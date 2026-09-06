@@ -34,13 +34,10 @@ contextBridge.exposeInMainWorld('mcctlDesktop', {
   /** Version and how this copy is running, for the About/Updates area. */
   appInfo: () => ipcRenderer.invoke('mcctl:appInfo'),
 
-  /** Ask GitHub whether a newer release exists. Never downloads by itself. */
+  /** Ask GitHub whether a newer release exists. The app also asks on its own, every six hours. */
   checkUpdate: () => ipcRenderer.invoke('mcctl:checkUpdate'),
 
-  /** Fetch the update the last check found. */
-  downloadUpdate: () => ipcRenderer.invoke('mcctl:downloadUpdate'),
-
-  /** Quit and run the installer. Warn about running servers before calling this. */
+  /** Close, install silently, reopen on the new version. Warn about running servers first. */
   installUpdate: () => ipcRenderer.invoke('mcctl:installUpdate'),
 
   /**
