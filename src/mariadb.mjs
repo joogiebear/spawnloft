@@ -60,47 +60,87 @@ function byVersionDesc(a, b) {
 }
 
 /**
- * Releases the API lists, newest first. Stable ones unless asked otherwise: a release candidate
- * is not what anyone means by "a database" unless they say so.
+ * Releases, newest first, from what the API actually answers.
+ *
+ * <p>The API is three levels deep and each level has its own shape. The root lists `major_releases`
+ * (11.4, 11.8, ...) as an array, and the status - Stable, RC, Preview - lives only there. A major
+ * (`/11.4/`) answers `releases`, an object keyed by point release, each with its date and its files,
+ * and no status of its own. A point release (`/11.4.5/`) answers `release_data`, keyed the same way.
+ * The first cut read `releases` off the root, found nothing, and the panel's version list said "No
+ * stable release listed" for every install.
+ *
+ * <p>So: the stable majors are picked from the root, each is asked for its point releases, and a
+ * point release inherits its major's status and support type. Release candidates are left out
+ * unless asked for: an RC is not what anyone means by "a database" unless they say so.
  */
-export function releasesFrom(payload, { includeUnstable = false } = {}) {
-  const releases = payload?.releases ?? {}
+export function releasesFrom(root, majors = {}, { includeUnstable = false } = {}) {
   const out = []
-  for (const [id, r] of Object.entries(releases)) {
-    const status = String(r?.release_status ?? '')
+  for (const m of root?.major_releases ?? []) {
+    const status = String(m?.release_status ?? '')
     if (!includeUnstable && !/stable/i.test(status)) continue
-    out.push({
-      version: r?.release_id ?? id,
-      status,
-      support: r?.release_support_type ?? null,
-      date: r?.date_of_release ?? null,
-    })
+    const id = String(m?.release_id ?? '')
+    const releases = majors[id]?.releases ?? {}
+    for (const [pid, r] of Object.entries(releases)) {
+      out.push({
+        version: String(r?.release_id ?? pid),
+        series: id,
+        status,
+        support: m?.release_support_type ?? null,
+        date: r?.date_of_release ?? null,
+      })
+    }
   }
   return out.sort((a, b) => byVersionDesc(a.version, b.version))
 }
 
-export async function versions(opts = {}) {
-  return releasesFrom(await api(API), opts)
+/** The stable majors the root lists, as the ids the per-major endpoint takes. */
+export function stableMajorsFrom(root, { includeUnstable = false } = {}) {
+  return (root?.major_releases ?? [])
+    .filter((m) => includeUnstable || /stable/i.test(String(m?.release_status ?? '')))
+    .map((m) => String(m.release_id))
 }
 
-/** The Windows x64 zip in a release's file list, or null when the release has none. */
-export function windowsZipFrom(payload) {
-  const files = payload?.files ?? []
-  const hit = files.find((f) =>
+export async function versions(opts = {}) {
+  const root = await api(API)
+  const ids = stableMajorsFrom(root, opts)
+  // One request per stable series, in parallel: five or six of them, each a few kilobytes.
+  const answers = await Promise.all(ids.map((id) => api(`${API}${encodeURIComponent(id)}/`)))
+  const majors = {}
+  ids.forEach((id, i) => { majors[id] = answers[i] })
+  return releasesFrom(root, majors, opts)
+}
+
+/**
+ * The Windows x64 zip in a release's file list, or null when the release has none.
+ *
+ * <p>Takes any of the shapes a file list arrives in: a bare `files` array, a major's `releases`,
+ * or a point release's `release_data`, the last two keyed by version. The debug-symbols zip is
+ * also a Windows x64 zip and is skipped by name; the API lists it alongside, sometimes first.
+ * Download URLs come back as http:// and are asked for over https.
+ */
+export function windowsZipFrom(payload, version = null) {
+  let files = payload?.files
+  if (!files) {
+    const keyed = payload?.release_data ?? payload?.releases ?? {}
+    const entry = version != null && keyed[version] ? keyed[version] : Object.values(keyed)[0]
+    files = entry?.files
+  }
+  const hit = (files ?? []).find((f) =>
     /windows/i.test(String(f?.os ?? '')) &&
     /zip/i.test(String(f?.package_type ?? '')) &&
-    /x86_64|amd64|x64/i.test(String(f?.cpu ?? '')))
+    /x86_64|amd64|x64/i.test(String(f?.cpu ?? '')) &&
+    !/debug/i.test(String(f?.file_name ?? '')))
   if (!hit) return null
   return {
     name: hit.file_name,
-    url: hit.file_download_url,
+    url: String(hit.file_download_url ?? '').replace(/^http:\/\//i, 'https://'),
     sha256: hit.checksum?.sha256sum ?? null,
     size: Number(hit.size) || 0,
   }
 }
 
 export async function fileFor(version) {
-  const zip = windowsZipFrom(await api(`${API}${encodeURIComponent(version)}/`))
+  const zip = windowsZipFrom(await api(`${API}${encodeURIComponent(version)}/`), version)
   if (!zip) fail(`MariaDB ${version} publishes no Windows zip, so it cannot be run from here.`)
   return zip
 }

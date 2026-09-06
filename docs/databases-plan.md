@@ -1,6 +1,9 @@
 # Plan: databases for servers
 
-Status: **all four phases built; awaiting their first run against real MariaDB and Garnet on Windows.** The
+Status: **all four phases built; the first Windows run (0.13.0-beta.1) found the MariaDB version list empty.** The
+download API is three shapes deep - `major_releases` at the root, `releases` under a major,
+`release_data` under a point release - and the code read one shape at the wrong level; fixed in
+beta.2, with the shapes pinned in `test/mariadb.test.mjs` from a probe of the live API. The
 engine module, the daemon generalisation, attach/detach, the CLI group and the panel are in,
 covered by a lifecycle test against a fake MariaDB (`test/fixtures/fake-mariadb`). What that
 fake cannot prove, and the first Windows run has to: the download API's file list, the init
@@ -58,6 +61,10 @@ Paper download pattern exactly, and Windows's own `tar` unpacks zips.
   fake MariaDB engine (four scripts in `test/fixtures/fake-mariadb/bin`) drives the same
   daemon through init, ready, attach and shutdown. Crash diagnosis is skipped for a
   database - the patterns are Minecraft's.
+- **One step from the server.** `mcctl db create <server>` / *Create a database* on the server's
+  Databases card: the newest stable MariaDB, named `<server>-db`, on the game port plus one (or
+  the next free port above it), started, attached, credentials shown. One rule a person can
+  remember - survival on 25565, its database on 25566 - and no version list to pick from.
 - **Attach.** `mcctl db attach <db> <server>` / the panel's Databases card on a server:
   creates ``<server>`` and `'<server>'@'localhost'` + `'<server>'@'127.0.0.1'` with a
   random password, grants that database only, records it on the database instance.

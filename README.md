@@ -611,6 +611,7 @@ mcctl db versions                    # MariaDB releases that can be run
 mcctl db add maria                   # downloads the newest stable MariaDB, once, and sets one up on a free port
 mcctl start maria
 mcctl db attach maria survival       # a database and a user for that server; prints the credentials
+mcctl db create survival             # or all of that in one step: survival-db on port 25566, started, attached
 mcctl db creds maria survival        # shows them again
 mcctl db detach maria survival       # takes the user away; --drop deletes the data too
 mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
@@ -629,7 +630,9 @@ database it came from, which has to be running. *Apply to a plugin* writes the c
 LuckPerms, CoreProtect, Plan or AuthMe's own config, in place, with the comments kept; the server
 restarts for the plugin to read it. A database you already run - XAMPP, a MariaDB install, a Redis on the LAN - is
 registered with its address and attaches the same way, only never started or stopped from here. In the panel, databases sit under the servers in the
-sidebar, a server's Settings tab has a Databases card with the credentials one click away, and
-*Add a server → A database* creates one. The plan, with what comes next (backups of attached
+sidebar, a server's Settings tab has a Databases card with the credentials one click away and a
+*Create a database* button that makes one for that server in one step - MariaDB's newest stable
+release on the port after the game port, started and attached - and *Add a server → A database*
+creates one with the choices in it (a version, an engine, one for several servers to share). The plan, with what comes next (backups of attached
 databases, config helpers for the common plugins, Redis by way of Garnet), is in
 `docs/databases-plan.md`.

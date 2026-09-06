@@ -1,0 +1,73 @@
+# A test build, from any branch, without the signing profile.
+#
+# Releases proper are built, signed and published from the maintainer's machine (see
+# CONTRIBUTING.md). This exists for the other case: a beta that needs trying on a machine before
+# it can be signed, when nobody is at the release machine. It runs the same two scripts a release
+# uses, on a Windows runner, with the signing step left out, and publishes the result as a GitHub
+# pre-release so it can be downloaded like any other build.
+#
+# The version in desktop/package.json must carry a prerelease part (0.13.0-beta.1), or
+# release:publish would mark the unsigned build "latest" and hand it to every install. The build
+# refuses a version that is already published, so each test build is its own beta number.
+#
+# Unsigned means Windows SmartScreen warns on install ("More info → Run anyway"). The release
+# notes get a line saying so, so nobody mistakes it for the signed build.
+name: dev-build
+
+on:
+  # Run by hand from the Actions tab - once this file is on main; GitHub only lists workflows it
+  # finds there. Until then, and as the everyday way: a push that changes desktop/package.json,
+  # on dev or a working branch, builds it - a version bump is the moment a build is wanted. A push
+  # to a version that is already published fails at the draft check and nothing is uploaded.
+  workflow_dispatch:
+  push:
+    branches: [dev, 'claude/**']
+    paths:
+      - desktop/package.json
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refuse a version without a prerelease part
+        shell: pwsh
+        run: |
+          $v = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          if ($v -notmatch '-') { Write-Host "FAIL $v has no prerelease part; an unsigned build must be a beta"; exit 1 }
+          Write-Host "ok   building $v"
+      - name: Test
+        run: npm test
+      - name: Install the desktop toolchain
+        working-directory: desktop
+        run: npm ci
+      - name: Build and upload as a draft
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release -- --unsigned
+      - name: Say it is unsigned
+        working-directory: desktop
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          # gh prints the body line by line and PowerShell hands that over as an array; joined
+          # with newlines, or the markdown's lists collapse into one paragraph (as on beta.1).
+          $body = (gh release view "v$v" --repo ${{ github.repository }} --json body --jq .body) -join "`n"
+          $note = "> **Unsigned test build** from GitHub Actions, run ${{ github.run_id }}. Windows SmartScreen will warn: *More info → Run anyway*. The signed build of this version, when there is one, comes from the release machine.`n`n"
+          if ($body -notmatch 'Unsigned test build') { gh release edit "v$v" --repo ${{ github.repository }} --notes ($note + $body) }
+      - name: Publish as a pre-release
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release:publish
