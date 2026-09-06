@@ -7564,30 +7564,51 @@ if (desktop) {
     $('#bUpdate').hidden = false;
   });
 
+  // What the button is offering right now: null when there is nothing to do, a version string
+  // while it is being fetched, 'ready' once the installer is on disk and only a restart is left.
   let pending = null;
+
+  const idle = () => {
+    const b = $('#bUpdate');
+    pending = null;
+    b.textContent = 'Check for updates';
+    b.title = '';
+    b.disabled = false;
+    b.classList.add('ghost');
+    b.classList.remove('primary');
+  };
+
   desktop.onUpdate((kind, data) => {
     const b = $('#bUpdate');
     if (kind === 'available') {
+      // Nothing to click: the download has already started. The button reports rather than asks.
       pending = data.version;
-      b.textContent = 'Download ' + data.version;
-      b.disabled = false;
-    } else if (kind === 'none') {
-      pending = null;
-      b.textContent = 'Up to date';
+      b.textContent = 'Downloading ' + data.version + '…';
       b.disabled = true;
-      setTimeout(() => { b.textContent = 'Check for updates'; b.disabled = false; }, 4000);
+    } else if (kind === 'none') {
+      // A background check finding nothing is not worth saying. One someone clicked is.
+      if (data.manual) {
+        pending = null;
+        b.textContent = 'Up to date';
+        b.disabled = true;
+        setTimeout(() => { if (!pending) idle(); }, 4000);
+      }
     } else if (kind === 'progress') {
       b.textContent = 'Downloading ' + data.percent + '%';
       b.disabled = true;
     } else if (kind === 'ready') {
       pending = 'ready';
-      b.textContent = 'Restart to install ' + data.version;
+      b.textContent = 'Restart to update';
+      b.title = 'SpawnLoft ' + data.version + ' is ready — restart to switch to it';
       b.disabled = false;
+      // The one moment this button is worth looking at, so it stops being a ghost.
+      b.classList.remove('ghost');
+      b.classList.add('primary');
     } else if (kind === 'error') {
-      pending = null;
-      b.textContent = 'Check for updates';
-      b.disabled = false;
-      toast('Update failed: ' + data.error, 'bad');
+      idle();
+      // A machine that is offline should not raise a toast every six hours about a check nobody
+      // asked for. A check someone clicked has to answer.
+      if (data.manual) toast('Update failed: ' + data.error, 'bad');
     }
   });
 
@@ -7597,32 +7618,26 @@ if (desktop) {
       // Servers survive the restart - they are detached daemons - but saying so beats letting
       // someone guess whether updating will drop their running world.
       const go = await ask({
-        title: 'Restart to install?',
-        text: 'Only this window restarts. Running servers keep running — SpawnLoft supervises them as separate processes.',
-        confirmLabel: 'Restart and install',
+        title: 'Restart to update?',
+        text: 'SpawnLoft closes, swaps itself for the new version and reopens. No installer window '
+          + 'appears. Running servers keep running — SpawnLoft supervises them as separate processes.',
+        confirmLabel: 'Restart and update',
       });
       if (go) await desktop.installUpdate();
-      return;
-    }
-    if (pending) {
-      b.textContent = 'Starting download…';
-      b.disabled = true;
-      await desktop.downloadUpdate();
       return;
     }
     b.textContent = 'Checking…';
     b.disabled = true;
     const res = await desktop.checkUpdate();
     if (!res.ok) {
-      b.textContent = 'Check for updates';
-      b.disabled = false;
+      idle();
       toast(res.message || 'Could not check for updates.', 'bad');
       return;
     }
     // A successful check resolves through onUpdate. If the feed answers nothing at all, do not
     // leave the button stuck on "Checking…" forever.
     setTimeout(() => {
-      if (b.textContent === 'Checking…') { b.textContent = 'Check for updates'; b.disabled = false; }
+      if (b.textContent === 'Checking…') idle();
     }, 20000);
   };
 }

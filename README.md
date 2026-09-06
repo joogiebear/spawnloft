@@ -577,10 +577,22 @@ installer is made and long before anything is published.
 
 ### How updates behave
 
-Checking, downloading and installing are three separate presses. Nothing downloads or installs on
-its own — this app sits beside long-lived servers, and an update that restarts the window
-unannounced is a surprise rather than a feature. Installing warns that running servers survive it,
-because the honest answer is that only the window restarts.
+SpawnLoft checks the release feed twenty seconds after it starts and every six hours it stays open,
+and fetches anything newer in the background — a few megabytes, sent as changed blocks only. The
+header button reports that rather than asking for it: it counts the download up, then reads
+**Restart to update**.
+
+Installing is the only press. It runs the installer with `/S`, so no wizard, no progress dialog and
+no Windows elevation prompt appear — the app installs per-user, so there is nothing to elevate. The
+window closes and reopens on the new version. Closing the app with a download waiting applies it on
+the way out instead, which is the same permission by another route.
+
+The split is deliberate: downloading costs nothing anyone notices, but replacing the running program
+interrupts, and this app sits beside long-lived servers. So the restart waits to be asked for, and
+says first that running servers survive it — the honest answer is that only the window restarts.
+
+A background check that fails says nothing; a machine that is offline should not raise a toast every
+six hours. A check someone pressed answers either way.
 
 Update checks are refused outside a packaged build: in development the version is whatever
 `package.json` says and there is no installer to replace.

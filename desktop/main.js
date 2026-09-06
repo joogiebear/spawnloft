@@ -272,26 +272,69 @@ ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate 
 
 // ---- updates -----------------------------------------------------------------
 
+/** How often a running copy asks GitHub whether there is anything newer. */
+const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+/** Long enough after start that the first check never competes with opening the panel. */
+const UPDATE_FIRST_DELAY_MS = 20 * 1000
+
 /**
- * Update checking against the published GitHub release feed.
+ * Whether the check in flight is one a person asked for.
+ *
+ * <p>A background check that fails is not news. A laptop that is offline, or GitHub being slow,
+ * would otherwise raise a toast every six hours about something nobody asked for. A check someone
+ * clicked has to answer either way, so the two are told apart here and the renderer is told which
+ * it is looking at.
+ */
+let updateCheckIsManual = false
+
+/**
+ * Updates: fetched in the background, applied on restart, with no installer ever on screen.
  *
  * <p>Only ever runs from a packaged build. In development the version is whatever package.json says
  * and there is no installer to replace, so a check would either do nothing or try to overwrite a
  * checkout — the guard is not politeness, it is what stops the updater touching source.
  *
- * <p>Downloads are not automatic. An update that installs itself while someone is mid-session on a
- * running server is a surprise, and this app exists to sit next to long-lived processes.
+ * <p>Downloading and installing are different promises and are kept differently. The download is
+ * automatic: it is a few megabytes over a connection nobody is watching, electron-updater sends
+ * only the changed blocks, and doing it ahead of time means the only thing left when an update
+ * matters is a restart. Replacing the running program is the part that interrupts, so it waits for
+ * the person to ask — or for them to close the window, which the updater treats as the same
+ * permission and uses to apply the update on the way out.
+ *
+ * <p>The install runs the NSIS package with `/S`: no wizard, no progress dialog, no UAC prompt —
+ * the app installs per-user, so there is nothing to elevate. The window closes and comes back on
+ * the new version. That is the whole visible update.
  */
 function setupUpdates() {
-  autoUpdater.autoDownload = false
+  autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.logger = null
 
   autoUpdater.on('update-available', (info) => send('update:available', { version: info.version }))
-  autoUpdater.on('update-not-available', () => send('update:none', {}))
-  autoUpdater.on('error', (err) => send('update:error', { error: String(err?.message ?? err) }))
+  autoUpdater.on('update-not-available', () => send('update:none', { manual: updateCheckIsManual }))
+  autoUpdater.on('error', (err) =>
+    send('update:error', { error: String(err?.message ?? err), manual: updateCheckIsManual }))
   autoUpdater.on('download-progress', (p) => send('update:progress', { percent: Math.round(p.percent) }))
   autoUpdater.on('update-downloaded', (info) => send('update:ready', { version: info.version }))
+
+  setTimeout(checkForUpdatesQuietly, UPDATE_FIRST_DELAY_MS).unref?.()
+  // Six-hourly rather than once at start, because this app is left open for days next to servers
+  // that are left running for weeks.
+  setInterval(checkForUpdatesQuietly, UPDATE_INTERVAL_MS).unref?.()
+}
+
+/**
+ * A check nobody asked for, and nobody has to hear about.
+ *
+ * <p>checkForUpdates rejects as well as emitting 'error'. Unhandled, that rejection would take the
+ * process down over a missing network, so it is swallowed here; the 'error' event is the one path
+ * that reports, and it stays quiet for background checks.
+ */
+function checkForUpdatesQuietly() {
+  if (!app.isPackaged) return
+  updateCheckIsManual = false
+  autoUpdater.checkForUpdates().catch(() => {})
 }
 
 function send(channel, payload) {
@@ -303,6 +346,7 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
     return { ok: false, reason: 'dev', message: 'Updates only apply to an installed build.' }
   }
   try {
+    updateCheckIsManual = true
     const res = await autoUpdater.checkForUpdates()
     return { ok: true, version: res?.updateInfo?.version ?? null, current: app.getVersion() }
   } catch (err) {
@@ -310,24 +354,19 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
   }
 })
 
-ipcMain.handle('mcctl:downloadUpdate', async () => {
-  try {
-    await autoUpdater.downloadUpdate()
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, message: String(err?.message ?? err) }
-  }
-})
-
 /**
- * Install now, by quitting and running the installer.
+ * Install now: close, replace, reopen.
+ *
+ * <p>Silent, and restarted afterwards. `/S` means the NSIS package never draws a window, and
+ * `--force-run` brings the app back on the new version rather than leaving someone looking at an
+ * empty desktop wondering whether it worked.
  *
  * <p>The caller is expected to have warned about running servers first. Servers survive this — they
  * are detached daemons — but the panel disappears mid-restart, and being told that beforehand is the
  * difference between an update and a glitch.
  */
 ipcMain.handle('mcctl:installUpdate', async () => {
-  autoUpdater.quitAndInstall()
+  autoUpdater.quitAndInstall(true, true)
   return { ok: true }
 })
 
