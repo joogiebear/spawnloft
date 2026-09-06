@@ -11,7 +11,12 @@
  * <p>So the token is fetched from `gh` when the variable is absent, and the whole thing fails in
  * the first second rather than the fourth minute when it cannot be found at all.
  */
+import fs from 'node:fs'
+import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const HERE = path.dirname(fileURLToPath(import.meta.url))
 
 function run(cmd, args, opts = {}) {
   return spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, shell: process.platform === 'win32', ...opts })
@@ -42,7 +47,25 @@ if (!token) {
 const draft = run('node', ['ensure-draft.mjs'], { stdio: 'inherit', encoding: undefined })
 if (draft.status !== 0) process.exit(draft.status ?? 1)
 
-const build = run('npx', ['electron-builder', '--publish', 'always'], {
+// --unsigned: build without the signing profile. Azure Trusted Signing is configured in
+// package.json and electron-builder has no switch to leave it out, so the same configuration minus
+// azureSignOptions is written to dist/ and passed as the config instead. This is how the CI
+// workflow (.github/workflows/dev-build.yml) makes a test build: the runner has no certificate,
+// and a build that can be tried today beats a signed one that cannot be made at all. Windows
+// SmartScreen warns about an unsigned installer, and the release notes say so.
+const args = ['electron-builder', '--publish', 'always']
+if (process.argv.includes('--unsigned')) {
+  const pkg = JSON.parse(fs.readFileSync(path.join(HERE, 'package.json'), 'utf8'))
+  const config = { ...pkg.build, win: { ...pkg.build.win } }
+  delete config.win.azureSignOptions
+  fs.mkdirSync(path.join(HERE, 'dist'), { recursive: true })
+  const file = path.join(HERE, 'dist', 'unsigned.config.json')
+  fs.writeFileSync(file, JSON.stringify(config, null, 2) + '\n')
+  args.push('--config', file)
+  process.stdout.write('  ok   building UNSIGNED: azureSignOptions left out of the configuration\n')
+}
+
+const build = run('npx', args, {
   stdio: 'inherit',
   encoding: undefined,
   env: { ...process.env, GH_TOKEN: token },

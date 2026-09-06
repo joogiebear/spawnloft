@@ -3,14 +3,15 @@ import path from 'node:path'
 
 import { SERVICES_DIR } from './paths.mjs'
 import {
-  getInstance, putInstance, updateInstance, removeInstance, hasInstance, listServices, isDatabase,
+  getInstance, putInstance, updateInstance, removeInstance, hasInstance, listServices, isDatabase, freeName,
   usedPorts, assertPortUsable,
 } from './registry.mjs'
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
 import { detectHelpers, applyHelper } from './dbconfig.mjs'
 import { readState, clearState } from './control.mjs'
-import { fail, findFreePort, randomPassword, validateName, cleanLabel } from './util.mjs'
+import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel } from './util.mjs'
+import * as supervisor from './supervisor.mjs'
 
 /**
  * Databases: registered like servers, run by the same daemon, attached to servers with their
@@ -123,6 +124,89 @@ export async function createDatabase(name, { engine = mariadb.ENGINE, version, p
   }
   putInstance(name, inst)
   return { name, ...inst }
+}
+
+/**
+ * The name a server's own database gets: the server's name with -db, made unique. Kept within the
+ * 32 characters a name may have, the suffix included, so a long server name still gets one.
+ */
+export function nameForServer(serverName) {
+  const suffix = '-db'
+  const base = serverName.slice(0, 32 - suffix.length).replace(/[-_]+$/g, '') + suffix
+  return freeName(base)
+}
+
+/**
+ * The port a server's own database gets: the game port plus one, unless something already has it.
+ *
+ * <p>One rule a person can remember - survival on 25565, its database on 25566 - beats the
+ * engine's usual port, which is 3306 for the first database and then whatever was free. When
+ * the port after the game port is taken, in the registry or on the machine, the search walks
+ * up from there, so the database still sits next to its server rather than somewhere else.
+ */
+export async function portForServer(server) {
+  const want = Number(server.port) + 1
+  if (!Number.isInteger(want) || want < 1 || want > 65535) return findFreePort(mariadb.DEFAULT_PORT, usedPorts())
+  return findFreePort(want, usedPorts())
+}
+
+/**
+ * A database of the server's own, in one step: made on the port after the server's, started,
+ * and attached, so the credentials come back from the same click that asked for it.
+ *
+ * <p>The version, when none is named, is the newest stable release the engine publishes; the
+ * server-side flow has no version list to pick from and should not need one. Attach needs the
+ * database up, so it is started here and waited for; a database that does not come up is
+ * removed again, engine and folder included, since a half-made database nobody asked for by
+ * name would only confuse the list. The engine download is kept, as ever.
+ */
+export async function createForServer(serverName, { engine = mariadb.ENGINE, version = null, onProgress = null } = {}) {
+  const server = assertServer(serverName)
+  if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)
+  if (!version) {
+    onProgress?.({ message: `Asking ${ENGINES[engine].label} for its newest stable release` })
+    const newest = (await versionsFor(engine))[0]
+    if (!newest) fail(`${ENGINES[engine].label} publishes no stable release to pick from - name one with --version`)
+    version = newest.version
+  }
+  const name = nameForServer(serverName)
+  const port = await portForServer(server)
+  const label = server.label ? `${server.label} database` : null
+  const db = await createDatabase(name, { engine, version, port, label, onProgress })
+
+  onProgress?.({ message: `Starting ${name} on port ${port}` })
+  let out
+  try {
+    out = await supervisor.start(name)
+  } catch (err) {
+    fs.rmSync(db.dir, { recursive: true, force: true })
+    removeInstance(name)
+    throw err
+  }
+  if (out.failed || out.timedOut) {
+    // Nothing to keep: the person asked for a working database, not a folder to debug.
+    try { await supervisor.kill(name) } catch { /* already down */ }
+    fs.rmSync(db.dir, { recursive: true, force: true })
+    removeInstance(name)
+    fail(out.failed
+      ? `the database started but stopped again: ${out.reason}`
+      : `the database did not report ready in time; nothing was kept`)
+  }
+  onProgress?.({ message: `Attaching ${serverName}` })
+  let credentials
+  try {
+    credentials = attach(name, serverName)
+  } catch (err) {
+    // The server may have been renamed or deleted while the engine downloaded, or the credentials
+    // may have failed to provision. A running database nobody is attached to, holding the port,
+    // is not what was asked for - so it goes the same way as one that failed to start.
+    try { await supervisor.kill(name) } catch { /* already down */ }
+    fs.rmSync(db.dir, { recursive: true, force: true })
+    removeInstance(name)
+    throw err
+  }
+  onProgress?.({ message: `Created ${name}`, done: true })
+  return { database: { name, ...getDatabase(name) }, credentials }
 }
 
 /** Remove a stopped database from the registry and, if asked, from disk. */

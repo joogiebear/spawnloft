@@ -89,7 +89,12 @@ if (matching.length === 1) {
   // request since the last release with its author's @name, and a "New Contributors" line for
   // anyone whose first change this is. The people who did the work are named on the release
   // without anyone remembering to type them. .github/release.yml shapes that list.
+  // --target: without it, gh tags the default branch's head when the draft is published, whatever
+  // was checked out. A beta is built from dev, so its tag would name a commit on main that does not
+  // contain it. The tag names the commit being built.
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })
   const args = ['release', 'create', TAG, '--repo', REPO, '--draft', '--title', title, '--generate-notes']
+  if (head.status === 0 && head.stdout.trim()) args.push('--target', head.stdout.trim())
   if (fs.existsSync(notes)) args.push('--notes-file', notes)
   else args.push('--notes', 'Release notes to follow.')
   gh(args)

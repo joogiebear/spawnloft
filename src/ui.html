@@ -6355,7 +6355,7 @@ async function renderServerDatabases(row, body) {
   const h = document.createElement('h3');
   h.textContent = 'Databases';
   const blurb = document.createElement('p');
-  blurb.textContent = 'A MySQL database of this server\'s own, for plugins that want one. Attaching creates the database and a user that can reach it and nothing else.';
+  blurb.textContent = 'A MySQL database of this server\'s own, for plugins that want one. Create one here and it is set up, started and attached in one go; attaching creates the database and a user that can reach it and nothing else.';
   head.append(mark, h, blurb);
   card.append(head);
   if (foot) body.insertBefore(card, foot); else body.append(card);
@@ -6442,15 +6442,56 @@ async function renderServerDatabases(row, body) {
 
   const attachedTo = new Set(mine.map((a) => a.service));
   const free = state.dbs.filter((d) => !attachedTo.has(d.name));
+
+  // A database of this server's own, one click: MariaDB's newest stable release on the port after
+  // the game port, started and attached, credentials shown. The Add sheet stays for the cases with
+  // choices in them - a version, an engine, a database several servers share.
+  const createRow = document.createElement('div');
+  createRow.className = 'row';
+  createRow.style.alignItems = 'center';
+  const create = document.createElement('button');
+  create.className = mine.length ? 'ghost' : 'primary';
+  create.textContent = 'Create a database';
+  const createHint = document.createElement('span');
+  createHint.className = 'hint';
+  createHint.textContent = 'MariaDB, newest stable, on port ' + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  create.onclick = async () => {
+    create.disabled = true;
+    const jobId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now();
+    const jobs = new EventSource('/api/jobs/' + jobId + '/stream');
+    jobs.onmessage = (ev) => {
+      let job;
+      try { job = JSON.parse(ev.data); } catch { return; }
+      if (job.message) createHint.textContent = job.message + (typeof job.percent === 'number' && job.stage === 'download' ? ' ' + job.percent + '%' : '') + '\u2026';
+    };
+    try {
+      const out = await post('/instances/' + encodeURIComponent(row.name) + '/databases/create', { jobId: jobId });
+      jobs.close();
+      toast('Created ' + out.database.name + ' on port ' + out.database.port + ' and attached ' + row.name + '.', 'good');
+      body.dataset.for = '';
+      await refresh();
+      renderServerSettings();
+      showCredentials(out.database.name, row.name);
+    } catch (e) {
+      jobs.close();
+      create.disabled = false;
+      createHint.textContent = e.message;
+      toast(e.message, 'bad');
+    }
+  };
+  createRow.append(create, createHint);
+  list.append(createRow);
+
   const attachRow = document.createElement('div');
   attachRow.className = 'row';
   attachRow.style.alignItems = 'center';
   if (!state.dbs.length) {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = mine.length ? '' : 'No database yet. ';
+    hint.textContent = 'Or add one with choices in it: ';
     const add = document.createElement('button');
-    add.textContent = 'Add a database';
+    add.className = 'ghost';
+    add.textContent = 'Add a database\u2026';
     add.onclick = () => openAdd('db');
     attachRow.append(hint, add);
   } else if (free.length) {

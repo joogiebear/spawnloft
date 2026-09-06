@@ -2,30 +2,51 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { releasesFrom, windowsZipFrom, iniFor, attachSql, detachSql, quoteIdent, quoteStr } from '../src/mariadb.mjs'
+import { releasesFrom, stableMajorsFrom, windowsZipFrom, iniFor, attachSql, detachSql, quoteIdent, quoteStr } from '../src/mariadb.mjs'
 
-test('releases come back newest first and stable only unless asked', () => {
-  const payload = { releases: {
-    '11.4.5': { release_id: '11.4.5', release_status: 'Stable', release_support_type: 'Long Term Support' },
-    '11.8.0': { release_id: '11.8.0', release_status: 'RC' },
-    '10.11.11': { release_id: '10.11.11', release_status: 'Stable' },
-    '11.4.10': { release_id: '11.4.10', release_status: 'Stable' },
-  } }
-  assert.deepEqual(releasesFrom(payload).map((r) => r.version), ['11.4.10', '11.4.5', '10.11.11'])
-  assert.deepEqual(releasesFrom(payload, { includeUnstable: true }).map((r) => r.version), ['11.8.0', '11.4.10', '11.4.5', '10.11.11'])
-  assert.equal(releasesFrom(payload)[0].support, null)
-  assert.equal(releasesFrom(payload)[1].support, 'Long Term Support')
+test('releases come from the stable majors, each asked for its point releases, newest first', () => {
+  // The shapes the API actually answers, level by level (probed 2026-09-06).
+  const root = { major_releases: [
+    { release_id: '13.0', release_name: '13.0', release_status: 'RC', release_support_type: 'Rolling' },
+    { release_id: '11.8', release_name: '11.8', release_status: 'Stable', release_support_type: 'Long Term Support' },
+    { release_id: '11.4', release_name: '11.4', release_status: 'Stable', release_support_type: 'Long Term Support' },
+  ] }
+  const majors = {
+    '13.0': { releases: { '13.0.1': { release_id: '13.0.1', date_of_release: '2026-08-01' } } },
+    '11.8': { releases: { '11.8.4': { release_id: '11.8.4', date_of_release: '2026-08-20' }, '11.8.3': { release_id: '11.8.3' } } },
+    '11.4': { releases: { '11.4.13': { release_id: '11.4.13', date_of_release: '2026-08-22' }, '11.4.9': { release_id: '11.4.9' } } },
+  }
+  assert.deepEqual(stableMajorsFrom(root), ['11.8', '11.4'])
+  assert.deepEqual(stableMajorsFrom(root, { includeUnstable: true }), ['13.0', '11.8', '11.4'])
+  const list = releasesFrom(root, majors)
+  assert.deepEqual(list.map((r) => r.version), ['11.8.4', '11.8.3', '11.4.13', '11.4.9'])
+  assert.equal(list[0].status, 'Stable')
+  assert.equal(list[0].support, 'Long Term Support')
+  assert.equal(list[0].series, '11.8')
+  assert.equal(list[0].date, '2026-08-20')
+  assert.deepEqual(releasesFrom(root, majors, { includeUnstable: true }).map((r) => r.version), ['13.0.1', '11.8.4', '11.8.3', '11.4.13', '11.4.9'])
+  // The old reading: `releases` on the root. The root has none, so this must be empty, not a crash.
+  assert.deepEqual(releasesFrom({ releases: { '11.4.5': { release_id: '11.4.5', release_status: 'Stable' } } }), [])
   assert.deepEqual(releasesFrom({}), [])
+  // A stable major the per-major request did not answer contributes nothing rather than failing.
+  assert.deepEqual(releasesFrom(root, { '11.4': majors['11.4'] }).map((r) => r.version), ['11.4.13', '11.4.9'])
 })
 
-test('the Windows x64 zip is picked out of a release, with its checksum', () => {
-  const payload = { files: [
+test('the Windows x64 zip is picked out of a release, with its checksum, not the debug symbols', () => {
+  const files = [
     { file_name: 'mariadb-11.4.5-linux-systemd-x86_64.tar.gz', os: 'Linux', package_type: 'gzipped tar file', cpu: 'x86_64' },
+    { file_name: 'mariadb-11.4.5-winx64-debugsymbols.zip', os: 'Windows', package_type: 'ZIP file', cpu: 'x86_64', checksum: { sha256sum: 'dbg' }, file_download_url: 'http://x/dbg.zip' },
     { file_name: 'mariadb-11.4.5-winx64.msi', os: 'Windows', package_type: 'MSI Package', cpu: 'x86_64' },
-    { file_name: 'mariadb-11.4.5-winx64.zip', os: 'Windows', package_type: 'ZIP file', cpu: 'x86_64', size: 5, checksum: { sha256sum: 'abc' }, file_download_url: 'https://x/z.zip' },
-  ] }
-  assert.deepEqual(windowsZipFrom(payload), { name: 'mariadb-11.4.5-winx64.zip', url: 'https://x/z.zip', sha256: 'abc', size: 5 })
-  assert.equal(windowsZipFrom({ files: [payload.files[0]] }), null)
+    { file_name: 'mariadb-11.4.5-winx64.zip', os: 'Windows', package_type: 'ZIP file', cpu: 'x86_64', size: 5, checksum: { sha256sum: 'abc' }, file_download_url: 'http://x/z.zip' },
+  ]
+  const want = { name: 'mariadb-11.4.5-winx64.zip', url: 'https://x/z.zip', sha256: 'abc', size: 5 }
+  assert.deepEqual(windowsZipFrom({ files }), want)
+  // A point release answers release_data keyed by version; a major answers releases the same way.
+  assert.deepEqual(windowsZipFrom({ release_data: { '11.4.5': { release_id: '11.4.5', files } } }, '11.4.5'), want)
+  assert.deepEqual(windowsZipFrom({ releases: { '11.4.5': { files } } }, '11.4.5'), want)
+  assert.deepEqual(windowsZipFrom({ release_data: { '11.4.5': { files } } }), want)
+  assert.equal(windowsZipFrom({ files: [files[0], files[1]] }), null)
+  assert.equal(windowsZipFrom({}), null)
 })
 
 test('the ini pins the port to loopback and the data folder with forward slashes', () => {

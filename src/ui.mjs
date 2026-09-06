@@ -1491,6 +1491,32 @@ async function route(req, res) {
   }
 
   if (seg[3] === 'start') return started()
+  // A database of this server's own, in one step: made on the port after the game port, started,
+  // attached. Progress goes out on the job stream the Add sheet uses, since the download is the
+  // long part and a button that sits there for a minute with nothing to say looks broken.
+  if (seg[3] === 'databases' && seg[4] === 'create') {
+    const body = await readBody(req)
+    const jobId = body.jobId ? String(body.jobId) : null
+    try {
+      const out = await services.createForServer(name, {
+        engine: body.engine ? String(body.engine) : 'mariadb',
+        version: body.version ? String(body.version) : null,
+        onProgress: (p) => {
+          if (p.cached) return jobUpdate(jobId, { stage: 'cached', percent: 100, message: p.message })
+          jobUpdate(jobId, {
+            stage: p.done ? 'done' : p.total ? 'download' : 'setup',
+            percent: p.total ? Math.min(100, Math.round((p.received / p.total) * 100)) : p.done ? 100 : null,
+            message: p.message ?? 'Working',
+            done: Boolean(p.done),
+          })
+        },
+      })
+      return json(res, 200, { database: safeDatabase(supervisor.statusOf(out.database.name)), credentials: out.credentials })
+    } catch (err) {
+      jobUpdate(jobId, { stage: 'error', message: err?.message ?? String(err), done: true })
+      throw err
+    }
+  }
   if (seg[3] === 'stop') {
     await supervisor.stop(name)
     return json(res, 200, safeInstance(supervisor.statusOf(name)))

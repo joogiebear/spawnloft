@@ -24,7 +24,7 @@ const mariadb = await import('../src/mariadb.mjs')
 const sup = await import('../src/supervisor.mjs')
 const { readState } = await import('../src/control.mjs')
 const { ENGINES_DIR, INSTANCES_DIR } = await import('../src/paths.mjs')
-const { UserError, findFreePort } = await import('../src/util.mjs')
+const { UserError, findFreePort, isPortFree } = await import('../src/util.mjs')
 const ui = await import('../src/ui.mjs')
 const backup = await import('../src/backup.mjs')
 
@@ -38,6 +38,7 @@ const SRV = `srv-${process.pid}`
 
 after(async () => {
   try { await sup.kill(DB) } catch { /* down */ }
+  try { await sup.kill(`${SRV}-db`) } catch { /* down */ }
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
@@ -159,6 +160,44 @@ test('the panel lists databases apart from servers and never sends a password', 
   } finally {
     server.close()
   }
+})
+
+test('a server can have a database of its own made in one step: game port plus one, started, attached', { timeout: 60000 }, async () => {
+  const srv = services.assertServer(SRV)
+  const wanted = Number(srv.port) + 1
+  const wantedFree = !usedPorts().has(wanted) && await isPortFree(wanted)
+
+  const { server, url } = await ui.serve({ port: 0, open: false })
+  let out
+  try {
+    const res = await fetch(`${url}api/instances/${SRV}/databases/create`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: VERSION }),
+    })
+    out = await res.json()
+    assert.equal(res.status, 200, JSON.stringify(out))
+  } finally {
+    server.close()
+  }
+  const name = `${SRV}-db`
+  assert.equal(out.database.name, name)
+  assert.equal(out.database.status, 'running')
+  assert.equal(out.database.root, undefined, 'the panel answer must not carry the root password')
+  if (wantedFree) assert.equal(out.database.port, wanted, 'the port after the game port, when free')
+  else assert.ok(out.database.port > wanted)
+  assert.equal(out.credentials.database, SRV)
+  assert.equal(out.credentials.port, out.database.port)
+  assert.ok(services.serverAttachments(SRV).some((a) => a.service === name), 'attached from the same call')
+  assert.equal(readState(name).status, 'running')
+
+  // The name stays within the 32 characters a name may have, suffix included, and is made unique.
+  assert.equal(services.nameForServer('a'.repeat(32)), 'a'.repeat(29) + '-db')
+  assert.equal(services.nameForServer(SRV), `${SRV}-db-2`, 'the first one exists, so the next is numbered')
+
+  // Put it away, so the snapshot tests below see the one database they expect.
+  await sup.stop(name, { timeout: 10000 })
+  services.detach(name, SRV)
+  services.removeDatabase(name, { purge: true })
+  assert.ok(!listServices().some((i) => i.name === name))
 })
 
 test('a snapshot of an attached server carries a dump of its database, and verify checks for it', { timeout: 30000 }, async () => {
