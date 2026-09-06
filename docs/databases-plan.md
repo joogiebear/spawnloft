@@ -1,9 +1,10 @@
 # Plan: databases for servers
 
-Status: **all four phases built; the first Windows run (0.13.0-beta.1) found the MariaDB version list empty.** The
+Status: **shipped in 0.13.0.** The first Windows run (0.13.0-beta.1) found the MariaDB version list empty. The
 download API is three shapes deep - `major_releases` at the root, `releases` under a major,
 `release_data` under a point release - and the code read one shape at the wrong level; fixed in
-beta.2, with the shapes pinned in `test/mariadb.test.mjs` from a probe of the live API. The
+beta.2, with the shapes pinned in `test/mariadb.test.mjs` from a probe of the live API; beta.2 ran
+a real MariaDB on Windows, created from the server on the game port plus one, and it answered. The
 engine module, the daemon generalisation, attach/detach, the CLI group and the panel are in,
 covered by a lifecycle test against a fake MariaDB (`test/fixtures/fake-mariadb`). What that
 fake cannot prove, and the first Windows run has to: the download API's file list, the init
