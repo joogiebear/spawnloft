@@ -193,7 +193,18 @@ export async function createForServer(serverName, { engine = mariadb.ENGINE, ver
       : `the database did not report ready in time; nothing was kept`)
   }
   onProgress?.({ message: `Attaching ${serverName}` })
-  const credentials = attach(name, serverName)
+  let credentials
+  try {
+    credentials = attach(name, serverName)
+  } catch (err) {
+    // The server may have been renamed or deleted while the engine downloaded, or the credentials
+    // may have failed to provision. A running database nobody is attached to, holding the port,
+    // is not what was asked for - so it goes the same way as one that failed to start.
+    try { await supervisor.kill(name) } catch { /* already down */ }
+    fs.rmSync(db.dir, { recursive: true, force: true })
+    removeInstance(name)
+    throw err
+  }
   onProgress?.({ message: `Created ${name}`, done: true })
   return { database: { name, ...getDatabase(name) }, credentials }
 }
