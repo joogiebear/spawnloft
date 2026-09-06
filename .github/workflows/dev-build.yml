@@ -16,15 +16,14 @@ name: dev-build
 
 on:
   # Run by hand from the Actions tab - once this file is on main; GitHub only lists workflows it
-  # finds there. Until then, and as the everyday way: a push that bumps the version, on dev or a
-  # working branch, builds it. That is the moment a build is wanted, and a push to the version
-  # that is already published fails at the draft check and nothing is uploaded.
+  # finds there. Until then, and as the everyday way: a push that changes desktop/package.json,
+  # on dev or a working branch, builds it - a version bump is the moment a build is wanted. A push
+  # to a version that is already published fails at the draft check and nothing is uploaded.
   workflow_dispatch:
   push:
     branches: [dev, 'claude/**']
     paths:
       - desktop/package.json
-      - .github/workflows/dev-build.yml
 
 permissions:
   contents: write
@@ -62,7 +61,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $v = (Get-Content package.json | ConvertFrom-Json).version
-          $body = gh release view "v$v" --repo ${{ github.repository }} --json body --jq .body
+          # gh prints the body line by line and PowerShell hands that over as an array; joined
+          # with newlines, or the markdown's lists collapse into one paragraph (as on beta.1).
+          $body = (gh release view "v$v" --repo ${{ github.repository }} --json body --jq .body) -join "`n"
           $note = "> **Unsigned test build** from GitHub Actions, run ${{ github.run_id }}. Windows SmartScreen will warn: *More info → Run anyway*. The signed build of this version, when there is one, comes from the release machine.`n`n"
           if ($body -notmatch 'Unsigned test build') { gh release edit "v$v" --repo ${{ github.repository }} --notes ($note + $body) }
       - name: Publish as a pre-release
