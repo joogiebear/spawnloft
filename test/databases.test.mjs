@@ -294,11 +294,27 @@ test('a database that dies during startup is reported as failed, with the engine
   }
 })
 
-test('remove refuses a running database, then deletes a stopped one with its folder', { timeout: 30000 }, async () => {
-  // The daemon from the failed start above lingers a few seconds to flush; wait it out.
-  const deadline = Date.now() + 10000
-  while (readState(DB).status !== 'stopped' && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100))
-  await sup.start(DB, { timeout: 15000 })
+test('remove refuses a running database, then deletes a stopped one with its folder', { timeout: 45000 }, async () => {
+  // The daemon from the failed start above is still tearing down, and there is no single moment to
+  // wait for. Its state reads 'stopping' for a few seconds; then it reads 'stopped' while the
+  // control socket it left behind is still there to be connected to and refuse. Waiting on the
+  // state caught the first and ran straight into the second - on CI this failed three ways across
+  // three runs: 'is still shutting down' after the full wait, 'is not running' 158ms in, and once
+  // not at all.
+  //
+  // So the start is retried rather than timed. Every way the teardown can refuse one - already
+  // running, still shutting down, not running - refuses in milliseconds, so a retry costs nothing
+  // and the loop ends the moment the daemon is really gone.
+  const deadline = Date.now() + 20000
+  for (;;) {
+    try {
+      await sup.start(DB, { timeout: 15000 })
+      break
+    } catch (err) {
+      if (Date.now() > deadline) throw err
+      await new Promise((r) => setTimeout(r, 250))
+    }
+  }
   assert.throws(() => services.removeDatabase(DB), /stop it/)
   await sup.stop(DB, { timeout: 10000 })
   const dir = services.getDatabase(DB).dir
