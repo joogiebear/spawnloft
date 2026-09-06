@@ -15,7 +15,16 @@
 name: dev-build
 
 on:
+  # Run by hand from the Actions tab - once this file is on main; GitHub only lists workflows it
+  # finds there. Until then, and as the everyday way: a push that bumps the version, on dev or a
+  # working branch, builds it. That is the moment a build is wanted, and a push to the version
+  # that is already published fails at the draft check and nothing is uploaded.
   workflow_dispatch:
+  push:
+    branches: [dev, 'claude/**']
+    paths:
+      - desktop/package.json
+      - .github/workflows/dev-build.yml
 
 permissions:
   contents: write
