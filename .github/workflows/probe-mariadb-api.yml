@@ -1,0 +1,15 @@
+# Temporary: prints the MariaDB download API's shape, which cannot be reached from the
+# development environment. Removed once read.
+name: probe-mariadb-api
+on:
+  push:
+    branches: ['claude/dev-version-database-deployment-vwgm9z']
+    paths: ['.github/workflows/probe-mariadb-api.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo '=== ROOT'; curl -sS -H 'Accept: application/json' https://downloads.mariadb.org/rest-api/mariadb/ | head -c 3000; echo
+          echo '=== MAJOR 11.4'; curl -sS -H 'Accept: application/json' https://downloads.mariadb.org/rest-api/mariadb/11.4/ | python3 -c 'import json,sys; d=json.load(sys.stdin); print(list(d.keys())); rel=d.get("releases",{}); print(list(rel.keys())[:5]); k=list(rel.keys())[0]; r=rel[k]; print({a:b for a,b in r.items() if a!="files"}); fs=r.get("files",[]); print(len(fs)); print([f for f in fs if "win" in str(f.get("os","")).lower()][:3])'
+          echo '=== POINT 11.4.5'; curl -sS -H 'Accept: application/json' https://downloads.mariadb.org/rest-api/mariadb/11.4.5/ | python3 -c 'import json,sys; d=json.load(sys.stdin); print(list(d.keys())); r=d.get("releases",d); k=list(r.keys())[0] if "releases" in d else None; r=r[k] if k else d; print({a:b for a,b in r.items() if a!="files"}); print([f for f in r.get("files",[]) if "win" in str(f.get("os","")).lower()][:3])'
