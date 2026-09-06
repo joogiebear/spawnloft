@@ -279,16 +279,6 @@ const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000
 const UPDATE_FIRST_DELAY_MS = 20 * 1000
 
 /**
- * Whether the check in flight is one a person asked for.
- *
- * <p>A background check that fails is not news. A laptop that is offline, or GitHub being slow,
- * would otherwise raise a toast every six hours about something nobody asked for. A check someone
- * clicked has to answer either way, so the two are told apart here and the renderer is told which
- * it is looking at.
- */
-let updateCheckIsManual = false
-
-/**
  * Updates: fetched in the background, applied on restart, with no installer ever on screen.
  *
  * <p>Only ever runs from a packaged build. In development the version is whatever package.json says
@@ -312,9 +302,8 @@ function setupUpdates() {
   autoUpdater.logger = null
 
   autoUpdater.on('update-available', (info) => send('update:available', { version: info.version }))
-  autoUpdater.on('update-not-available', () => send('update:none', { manual: updateCheckIsManual }))
-  autoUpdater.on('error', (err) =>
-    send('update:error', { error: String(err?.message ?? err), manual: updateCheckIsManual }))
+  autoUpdater.on('update-not-available', () => send('update:none', {}))
+  autoUpdater.on('error', (err) => send('update:error', { error: String(err?.message ?? err) }))
   autoUpdater.on('download-progress', (p) => send('update:progress', { percent: Math.round(p.percent) }))
   autoUpdater.on('update-downloaded', (info) => send('update:ready', { version: info.version }))
 
@@ -325,15 +314,19 @@ function setupUpdates() {
 }
 
 /**
- * A check nobody asked for, and nobody has to hear about.
+ * A check nobody asked for.
+ *
+ * <p>Whether anyone wants to hear about the result is the renderer's business, not this process's:
+ * the window knows whether a person pressed the button, because they pressed it there. Deciding it
+ * here would mean one shared flag standing for every check at once, and a background check landing
+ * on top of someone's would answer the wrong question - their "Up to date" swallowed as though
+ * nobody had asked, or a quiet failure raised at them as a toast.
  *
  * <p>checkForUpdates rejects as well as emitting 'error'. Unhandled, that rejection would take the
- * process down over a missing network, so it is swallowed here; the 'error' event is the one path
- * that reports, and it stays quiet for background checks.
+ * process down over a missing network, so it is swallowed here.
  */
 function checkForUpdatesQuietly() {
   if (!app.isPackaged) return
-  updateCheckIsManual = false
   autoUpdater.checkForUpdates().catch(() => {})
 }
 
@@ -346,7 +339,6 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
     return { ok: false, reason: 'dev', message: 'Updates only apply to an installed build.' }
   }
   try {
-    updateCheckIsManual = true
     const res = await autoUpdater.checkForUpdates()
     return { ok: true, version: res?.updateInfo?.version ?? null, current: app.getVersion() }
   } catch (err) {

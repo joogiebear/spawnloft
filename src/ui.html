@@ -7568,6 +7568,12 @@ if (desktop) {
   // while it is being fetched, 'ready' once the installer is on disk and only a restart is left.
   let pending = null;
 
+  // Whether someone is waiting on an answer, which is knowable here and nowhere else: they pressed
+  // the button on this page. The app also checks by itself every six hours, and those results are
+  // nobody's business - an offline laptop must not toast every six hours about a check nobody asked
+  // for, and a background "nothing new" must not overwrite the answer a person is still waiting for.
+  let awaitingAnswer = false;
+
   const idle = () => {
     const b = $('#bUpdate');
     pending = null;
@@ -7586,8 +7592,9 @@ if (desktop) {
       b.textContent = 'Downloading ' + data.version + '…';
       b.disabled = true;
     } else if (kind === 'none') {
-      // A background check finding nothing is not worth saying. One someone clicked is.
-      if (data.manual) {
+      // A background check finding nothing is not worth saying. One someone pressed for is.
+      if (awaitingAnswer) {
+        awaitingAnswer = false;
         pending = null;
         b.textContent = 'Up to date';
         b.disabled = true;
@@ -7597,6 +7604,7 @@ if (desktop) {
       b.textContent = 'Downloading ' + data.percent + '%';
       b.disabled = true;
     } else if (kind === 'ready') {
+      awaitingAnswer = false;
       pending = 'ready';
       b.textContent = 'Restart to update';
       b.title = 'SpawnLoft ' + data.version + ' is ready — restart to switch to it';
@@ -7607,8 +7615,10 @@ if (desktop) {
     } else if (kind === 'error') {
       idle();
       // A machine that is offline should not raise a toast every six hours about a check nobody
-      // asked for. A check someone clicked has to answer.
-      if (data.manual) toast('Update failed: ' + data.error, 'bad');
+      // asked for. Anything someone pressed for has to answer - including a download that started
+      // from their press and then failed, which is why this is not cleared when one begins.
+      if (awaitingAnswer) toast('Update failed: ' + data.error, 'bad');
+      awaitingAnswer = false;
     }
   });
 
@@ -7626,10 +7636,12 @@ if (desktop) {
       if (go) await desktop.installUpdate();
       return;
     }
+    awaitingAnswer = true;
     b.textContent = 'Checking…';
     b.disabled = true;
     const res = await desktop.checkUpdate();
     if (!res.ok) {
+      awaitingAnswer = false;
       idle();
       toast(res.message || 'Could not check for updates.', 'bad');
       return;
@@ -7637,7 +7649,7 @@ if (desktop) {
     // A successful check resolves through onUpdate. If the feed answers nothing at all, do not
     // leave the button stuck on "Checking…" forever.
     setTimeout(() => {
-      if (b.textContent === 'Checking…') idle();
+      if (b.textContent === 'Checking…') { awaitingAnswer = false; idle(); }
     }, 20000);
   };
 }
