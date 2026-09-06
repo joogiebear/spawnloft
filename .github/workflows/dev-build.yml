@@ -38,23 +38,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Refuse a version without a prerelease part
+      - name: Only a version with a prerelease part is built here
+        id: gate
         shell: pwsh
         run: |
           $v = (Get-Content desktop/package.json | ConvertFrom-Json).version
-          if ($v -notmatch '-') { Write-Host "FAIL $v has no prerelease part; an unsigned build must be a beta"; exit 1 }
-          Write-Host "ok   building $v"
+          if ($v -match '-') { Write-Host "ok   building $v"; "build=true" >> $env:GITHUB_OUTPUT; exit 0 }
+          # A release version. Run by hand, that is a mistake worth a red run; on a push it is the
+          # release bump landing on dev, which is not asking for an unsigned build: end quietly.
+          if ($env:GITHUB_EVENT_NAME -eq 'push') { Write-Host "::notice::$v has no prerelease part; the release is built and signed on the release machine, so nothing was built here."; "build=false" >> $env:GITHUB_OUTPUT; exit 0 }
+          Write-Host "FAIL $v has no prerelease part; an unsigned build must be a beta"; exit 1
       - name: Test
+        if: steps.gate.outputs.build == 'true'
         run: npm test
       - name: Install the desktop toolchain
+        if: steps.gate.outputs.build == 'true'
         working-directory: desktop
         run: npm ci
       - name: Build and upload as a draft
+        if: steps.gate.outputs.build == 'true'
         working-directory: desktop
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run release -- --unsigned
       - name: Say it is unsigned
+        if: steps.gate.outputs.build == 'true'
         working-directory: desktop
         shell: pwsh
         env:
@@ -67,6 +75,7 @@ jobs:
           $note = "> **Unsigned test build** from GitHub Actions, run ${{ github.run_id }}. Windows SmartScreen will warn: *More info → Run anyway*. The signed build of this version, when there is one, comes from the release machine.`n`n"
           if ($body -notmatch 'Unsigned test build') { gh release edit "v$v" --repo ${{ github.repository }} --notes ($note + $body) }
       - name: Publish as a pre-release
+        if: steps.gate.outputs.build == 'true'
         working-directory: desktop
         env:
           GH_TOKEN: ${{ github.token }}
