@@ -1459,6 +1459,31 @@ async function cmdDb(positional, flags) {
     return
   }
 
+  if (sub === 'create') {
+    const serverName = positional[1]
+    if (!serverName) fail('usage: mcctl db create <server> [--version <version>] [--engine mariadb]')
+    const engine = String(flags.engine ?? 'mariadb')
+    let lastPercent = -1
+    const { database: db, credentials } = await services.createForServer(serverName, {
+      engine,
+      version: flags.version ? String(flags.version) : null,
+      onProgress: (p) => {
+        if (p.total && p.received != null) {
+          const pct = Math.floor((p.received / p.total) * 10) * 10
+          if (pct !== lastPercent) {
+            lastPercent = pct
+            out(`  ${p.message} ${pct}%`)
+          }
+        } else if (p.message) out(`  ${p.message}`)
+      },
+    })
+    out('')
+    out(`Created database "${db.name}" (${services.ENGINES[db.engine]?.label ?? db.engine} ${db.version}) on 127.0.0.1:${db.port}, running, attached to "${serverName}".`)
+    out('')
+    printCredentials(credentials)
+    return
+  }
+
   if (sub === 'attach' || sub === 'detach') {
     const [, dbName, serverName] = positional
     if (!dbName || !serverName) fail(`usage: mcctl db ${sub} <database> <server>${sub === 'detach' ? ' [--drop]' : ''}`)
@@ -1541,7 +1566,7 @@ async function cmdDb(positional, flags) {
     return
   }
 
-  fail('usage: mcctl db [list|versions|add|connect|attach|detach|creds|plugins|apply|root|remove]')
+  fail('usage: mcctl db [list|versions|add|create|connect|attach|detach|creds|plugins|apply|root|remove]')
 }
 
 function printCredentials(c) {
@@ -1732,6 +1757,7 @@ DATABASES
   mcctl db versions [--engine e]     Releases that can be run: mariadb (default) or garnet (Redis)
   mcctl db add <name> [--version v]  Download MariaDB and set up a database on a free port [--engine garnet for Redis]
   mcctl db connect <name> --host h --port n --user u --password p   Register a database you already run
+  mcctl db create <server>           A database of the server's own on the port after its game port, started and attached
   mcctl db attach <db> <server>      Give a server its own database and user; prints the credentials
   mcctl db detach <db> <server>      Take the user away [--drop deletes the data too]
   mcctl db creds <db> <server>       Show a server's credentials again
