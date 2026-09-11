@@ -115,6 +115,8 @@ exports.default = async function afterPack(context) {
   const info = buildInfo()
   info.sourceVersion = info.version
   info.version = context.packager.appInfo.version
+  info.platform = context.electronPlatformName
+  info.arch = require('builder-util').Arch[context.arch]
   if (!info.commit) {
     console.warn('  warn could not read the source commit; this build will not say what produced it')
   } else if (info.dirty) {

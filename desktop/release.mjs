@@ -50,7 +50,7 @@ if (draft.status !== 0) process.exit(draft.status ?? 1)
 // --unsigned: build without the signing profile. Azure Trusted Signing is configured in
 // package.json and electron-builder has no switch to leave it out, so the same configuration minus
 // azureSignOptions is written to dist/ and passed as the config instead. This is how the CI
-// workflow (.github/workflows/dev-build.yml) makes a test build: the runner has no certificate,
+// workflow (.github/workflows/desktop-preview.yml) also makes test builds without a certificate,
 // and a build that can be tried today beats a signed one that cannot be made at all. Windows
 // SmartScreen warns about an unsigned installer, and the release notes say so.
 const args = ['electron-builder', '--publish', 'always']
