@@ -89,9 +89,9 @@ test('the memory graph ceiling accepts both units and refuses junk', () => {
  * "change both or neither". verify-build checks this too, but only during a packaged build;
  * this catches the half-edit the day it happens.
  */
-function tokensOf(file) {
+function tokensOf(file, website = false) {
   const src = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
-  const block = /:root\s*\{([\s\S]*?)\n {2}\}/.exec(src)
+  const block = (website ? /:root\[data-theme="spawnloft"\]\s*\{([\s\S]*?)\n {2}\}/ : /:root\s*\{([\s\S]*?)\n {2}\}/).exec(src)
   assert.ok(block, `no :root block in ${file}`)
   const map = {}
   for (const m of block[1].matchAll(/--([\w-]+):\s*([^;]+);/g)) map[m[1]] = m[2].trim()
@@ -101,4 +101,8 @@ function tokensOf(file) {
 
 test('the panel and the setup wizard share one token block, values included', () => {
   assert.deepEqual(tokensOf('../src/ui.html'), tokensOf('../desktop/setup.html'))
+})
+
+test('the website palette stays consistent between the panel and setup wizard', () => {
+  assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../desktop/setup.html', true))
 })
