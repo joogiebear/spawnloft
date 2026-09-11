@@ -42,6 +42,8 @@ jobs:
             app: desktop/dist/mac/SpawnLoft.app
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
+    env:
+      PREVIEW_BUILD: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +73,7 @@ jobs:
           CSC_FOR_PULL_REQUEST: 'true'
         run: npx electron-builder --config preview.config.cjs --${{ matrix.target }} --${{ matrix.arch }} --publish never
       - name: Verify the packaged app
-        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }}
+        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/preview.config.cjs
       - name: Verify the Mac ad-hoc signature
         if: matrix.platform == 'darwin'
         run: codesign --verify --deep --strict "${{ matrix.app }}"
