@@ -162,7 +162,7 @@ test('the panel lists databases apart from servers and never sends a password', 
   }
 })
 
-test('a server can have a database of its own made in one step: game port plus one, started, attached', { timeout: 60000 }, async () => {
+test('one-step database creation is available on Windows and explicitly unavailable in other previews', { timeout: 60000 }, async () => {
   const srv = services.assertServer(SRV)
   const wanted = Number(srv.port) + 1
   const wantedFree = !usedPorts().has(wanted) && await isPortFree(wanted)
@@ -174,6 +174,12 @@ test('a server can have a database of its own made in one step: game port plus o
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: VERSION }),
     })
     out = await res.json()
+    if (process.platform !== 'win32') {
+      assert.equal(res.status, 400)
+      assert.match(out.error, /Automatic database installation is not available/)
+      assert.ok(!listServices().some((i) => i.name === `${SRV}-db`), 'the refused request must not create a database')
+      return
+    }
     assert.equal(res.status, 200, JSON.stringify(out))
   } finally {
     server.close()

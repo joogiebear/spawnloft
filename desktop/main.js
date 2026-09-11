@@ -6,6 +6,10 @@ const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
+// Rolling Mac previews are installed by hand. Squirrel.Mac needs a signed,
+// versioned distribution; these ad-hoc test builds deliberately have neither.
+const manualUpdates = process.platform === 'darwin' && app.getVersion().includes('-')
+const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases/tag/v' + app.getVersion()
 
 /**
  * mcctl desktop.
@@ -297,6 +301,7 @@ const UPDATE_FIRST_DELAY_MS = 20 * 1000
  * the new version. That is the whole visible update.
  */
 function setupUpdates() {
+  if (manualUpdates) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.logger = null
@@ -326,7 +331,7 @@ function setupUpdates() {
  * process down over a missing network, so it is swallowed here.
  */
 function checkForUpdatesQuietly() {
-  if (!app.isPackaged) return
+  if (!app.isPackaged || manualUpdates) return
   autoUpdater.checkForUpdates().catch(() => {})
 }
 
@@ -335,6 +340,9 @@ function send(channel, payload) {
 }
 
 ipcMain.handle('mcctl:checkUpdate', async () => {
+  if (manualUpdates) {
+    return { ok: false, reason: 'manual', message: 'Mac previews update manually. Download the current build from the beta release page.' }
+  }
   if (!app.isPackaged) {
     return { ok: false, reason: 'dev', message: 'Updates only apply to an installed build.' }
   }
@@ -358,6 +366,7 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
  * difference between an update and a glitch.
  */
 ipcMain.handle('mcctl:installUpdate', async () => {
+  if (manualUpdates || !app.isPackaged) return { ok: false }
   autoUpdater.quitAndInstall(true, true)
   return { ok: true }
 })
@@ -390,6 +399,8 @@ ipcMain.handle('mcctl:appInfo', async () => {
     commit: build?.shortCommit ?? null,
     dirty: build?.dirty ?? null,
     builtAt: build?.builtAt ?? null,
+    manualUpdates,
+    downloadUrl: manualUpdates ? previewDownloadUrl : null,
   }
 })
 
@@ -411,7 +422,12 @@ if (process.platform === 'win32') app.setAppUserModelId('io.github.joogiebear.mc
  * Copy, paste and select-all keep working - Chromium handles those in the renderer on Windows
  * without a menu to hang them off.
  */
-Menu.setApplicationMenu(null)
+// macOS routes standard editing shortcuts and Quit through the application menu.
+Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
+  { role: 'appMenu' },
+  { role: 'editMenu' },
+  { role: 'windowMenu' },
+]) : null)
 
 /**
  * One instance.
@@ -435,20 +451,27 @@ if (!app.requestSingleInstanceLock()) {
     // Read through the core's normalizer before creating the native window. The wizard cannot
     // ask the panel for this setting yet; passing it in its file URL avoids a blue first frame.
     const appearance = await loadCore('src/appearance.mjs')
-    if (await needsSetup()) {
-      const theme = appearance.readTheme()
-      const setupUrl = pathToFileURL(path.join(__dirname, 'setup.html'))
-      setupUrl.searchParams.set('theme', theme)
-      createWindow(setupUrl.href, theme)
-    } else {
-      panelUrl = await startPanel()
-      createWindow(panelUrl, appearance.readTheme())
-      setupUpdates()
+    const openApp = async () => {
+      if (await needsSetup()) {
+        const theme = appearance.readTheme()
+        const setupUrl = pathToFileURL(path.join(__dirname, 'setup.html'))
+        setupUrl.searchParams.set('theme', theme)
+        createWindow(setupUrl.href, theme)
+      } else {
+        if (!panelUrl) {
+          panelUrl = await startPanel()
+          setupUpdates()
+        }
+        createWindow(panelUrl, appearance.readTheme())
+      }
     }
+    await openApp()
 
     app.on('activate', () => {
-      // panelUrl is still null on the setup branch; reopening into `null` would load about:blank.
-      if (BrowserWindow.getAllWindows().length === 0 && panelUrl) createWindow(panelUrl, appearance.readTheme())
+      // Closing the last window keeps a Mac app alive, including during first setup.
+      if (BrowserWindow.getAllWindows().length === 0) {
+        openApp().catch(err => dialog.showErrorBox('SpawnLoft could not reopen', String(err?.message ?? err)))
+      }
     })
   }).catch((err) => {
     // Without this, a failure in here rejects silently: no window, no message, and an mcctl.exe in

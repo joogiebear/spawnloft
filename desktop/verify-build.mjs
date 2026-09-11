@@ -33,7 +33,10 @@ const UNPACKED = args[0] ? path.resolve(args[0]) : path.join(HERE, 'dist', 'win-
 // The afterPack hook runs BEFORE electron-builder applies the icon, so it asks for the structural
 // checks only. Run on a finished build, everything is checked.
 const STRUCTURE_ONLY = process.argv.includes('--structure-only')
-const EXE = path.join(UNPACKED, 'SpawnLoft.exe')
+const MAC = process.argv.includes('--platform=darwin') || UNPACKED.endsWith('.app')
+const APP = UNPACKED.endsWith('.app') ? UNPACKED : path.join(UNPACKED, 'SpawnLoft.app')
+const RESOURCES = MAC ? path.join(APP, 'Contents', 'Resources') : path.join(UNPACKED, 'resources')
+const EXE = MAC ? path.join(APP, 'Contents', 'MacOS', 'SpawnLoft') : path.join(UNPACKED, 'SpawnLoft.exe')
 const ICO = path.join(HERE, 'build', 'icon.ico')
 
 const problems = []
@@ -60,6 +63,9 @@ if (STRUCTURE_ONLY) {
   notes.push('icon: checked separately once the build has finished')
 } else if (!fs.existsSync(EXE)) {
   problems.push(`no packaged executable at ${EXE} - did the build finish?`)
+} else if (MAC) {
+  if (!fs.readdirSync(RESOURCES).some(name => name.endsWith('.icns'))) problems.push('the Mac bundle has no application icon')
+  else notes.push('icon: present in the Mac application bundle')
 } else if (!fs.existsSync(ICO)) {
   problems.push(`build/icon.ico is missing, so nothing could have been applied to the executable`)
 } else {
@@ -78,13 +84,13 @@ if (STRUCTURE_ONLY) {
   }
 }
 
-const core = path.join(UNPACKED, 'resources', 'core')
-for (const rel of ['mcctl.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
+const core = path.join(RESOURCES, 'core')
+for (const rel of ['mcctl.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/platform.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
   if (!fs.existsSync(path.join(core, rel))) problems.push(`resources/core/${rel} is missing from the build`)
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')
 
-const asar = path.join(UNPACKED, 'resources', 'app.asar')
+const asar = path.join(RESOURCES, 'app.asar')
 if (!fs.existsSync(asar)) {
   problems.push('resources/app.asar is missing')
 } else {
@@ -168,7 +174,7 @@ function checkTokensMatch() {
   }
 }
 
-if (!STRUCTURE_ONLY && fs.existsSync(EXE)) {
+if (!STRUCTURE_ONLY && !MAC && fs.existsSync(EXE)) {
   const configured = Boolean(pkg?.build?.win?.azureSignOptions || pkg?.build?.win?.signtoolOptions)
   if (!configured) {
     notes.push('signing: not configured for this build, so not checked')
