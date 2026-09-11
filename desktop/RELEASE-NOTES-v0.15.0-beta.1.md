@@ -17,6 +17,9 @@ do not move your data or change any server settings.
 Buttons, inputs, dialogs, scrollbars, icons, and the processor chart follow the
 selected palette. Server status, warnings, and errors keep their distinct colors.
 
+Also fixes a quick-restart race: starting a server or database now waits for the
+new process's state instead of accepting a leftover record from its previous run.
+
 Install this beta manually to try it. This uses the same SpawnLoft installation
 and data locations; it is not a separate sandbox app. If you prefer to return to
 stable, install the latest stable installer from the release page.

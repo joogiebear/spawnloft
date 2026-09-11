@@ -134,6 +134,10 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
   while (Date.now() < deadline) {
     await sleep(150)
     const cur = readState(name)
+    // A stopped daemon leaves its state and console behind. On a quick restart,
+    // those can still describe the previous launch while this child is booting.
+    // Only this child's state can acknowledge this start (or report its failure).
+    if (cur.state?.daemonPid !== child.pid) continue
     // A daemon that failed during startup writes its reason and nothing else. Watching only for a
     // successful launch meant waiting the full fifteen seconds and then reporting that nothing came
     // up, when the answer had been sitting on disk since the first tick.
