@@ -18,6 +18,7 @@ import { storedPlayers } from './players.mjs'
 import * as players from './players.mjs'
 import * as metrics from './metrics.mjs'
 import * as settings from './settings.mjs'
+import { readTheme, saveTheme } from './appearance.mjs'
 import * as plugins from './plugins.mjs'
 import * as upgrade from './upgrade.mjs'
 import * as sources from './sources.mjs'
@@ -1027,13 +1028,26 @@ async function route(req, res) {
   const seg = url.pathname.split('/').filter(Boolean)
 
   if (url.pathname === '/') {
+    // The desktop uses a fresh localhost port at every launch. Persisting the
+    // palette in localStorage would lose it with the old origin. Render the saved
+    // choice before the first paint instead, from the app's existing settings.
     const html = readFileSync(path.join(HERE, 'ui.html'), 'utf8')
+      .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
     return
   }
 
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
+
+  // Appearance has its own narrow endpoint so a palette change cannot also
+  // relocate data or alter server configuration.
+  if (seg[1] === 'appearance' && seg.length === 2) {
+    if (req.method === 'GET') return json(res, 200, { theme: readTheme() })
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    return json(res, 200, { theme: saveTheme(body?.theme) })
+  }
 
   if (seg[1] === 'jars' && req.method === 'GET') {
     return json(res, 200, create.listJars().map((j) => ({ name: j.name, size: j.sizeHuman })))
@@ -1119,6 +1133,7 @@ async function route(req, res) {
 
   if (seg[1] === 'settings' && req.method === 'GET') {
     return json(res, 200, {
+      theme: readTheme(),
       dataRoot: LAYOUT.dataRoot,
       instancesDir: LAYOUT.instancesDir,
       separateInstances: LAYOUT.separateInstances,

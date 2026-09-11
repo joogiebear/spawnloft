@@ -109,7 +109,7 @@ function displayAreas() {
   return require('electron').screen.getAllDisplays().map((d) => d.workArea)
 }
 
-function createWindow(loadUrl) {
+function createWindow(loadUrl, theme = 'classic') {
   const state = windowState.load(windowStateFile(), displayAreas())
   win = new BrowserWindow({
     width: state.width,
@@ -118,7 +118,7 @@ function createWindow(loadUrl) {
     y: state.y,
     minWidth: windowState.MIN_WIDTH,
     minHeight: windowState.MIN_HEIGHT,
-    backgroundColor: '#0c0e14',
+    backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
     title: 'SpawnLoft',
     icon: fs.existsSync(ICON) ? ICON : undefined,
     // Painting a half-built page is worse than painting nothing. The window is created hidden and
@@ -432,17 +432,23 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     carryOverWindowState()
+    // Read through the core's normalizer before creating the native window. The wizard cannot
+    // ask the panel for this setting yet; passing it in its file URL avoids a blue first frame.
+    const appearance = await loadCore('src/appearance.mjs')
     if (await needsSetup()) {
-      createWindow(pathToFileURL(path.join(__dirname, 'setup.html')).href)
+      const theme = appearance.readTheme()
+      const setupUrl = pathToFileURL(path.join(__dirname, 'setup.html'))
+      setupUrl.searchParams.set('theme', theme)
+      createWindow(setupUrl.href, theme)
     } else {
       panelUrl = await startPanel()
-      createWindow(panelUrl)
+      createWindow(panelUrl, appearance.readTheme())
       setupUpdates()
     }
 
     app.on('activate', () => {
       // panelUrl is still null on the setup branch; reopening into `null` would load about:blank.
-      if (BrowserWindow.getAllWindows().length === 0 && panelUrl) createWindow(panelUrl)
+      if (BrowserWindow.getAllWindows().length === 0 && panelUrl) createWindow(panelUrl, appearance.readTheme())
     })
   }).catch((err) => {
     // Without this, a failure in here rejects silently: no window, no message, and an mcctl.exe in

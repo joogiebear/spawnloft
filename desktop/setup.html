@@ -3,6 +3,12 @@
 <meta name="color-scheme" content="dark">
 <title>SpawnLoft setup</title>
 
+<script>
+  // Electron supplies the saved preference before this file paints. Only the two known names
+  // reach the attribute; opening setup.html by itself keeps the original Classic appearance.
+  document.documentElement.dataset.theme = new URLSearchParams(location.search).get('theme') === 'spawnloft' ? 'spawnloft' : 'classic';
+</script>
+
 <style>
   /* ==========================================================================
      Design tokens.
@@ -105,6 +111,95 @@
     /* The lit top of a raised control, and the shade it goes to under the pointer. */
     --raised-hi: #212737;
     --hover:     #222839;
+    /* Theme-sensitive details previously embedded in component rules. Classic keeps its exact
+       palette; the second theme only replaces these values, never the meaning of a status. */
+    --accent-rgb: 91, 132, 255;
+    --ink-rgb: 233, 236, 244;
+    --scroll-thumb: #2a3145;
+    --scroll-hover: #3a4560;
+    --hover-hi: #262d40;
+    --primary-top: #4360d4;
+    --primary-bottom: #3247a4;
+    --primary-edge: #4c66d6;
+    --primary-ink: #eef2ff;
+    --primary-hover-top: #4d6ae6;
+    --primary-hover-bottom: #3a51b8;
+    --setup-primary-fill: #2c3f8f;
+    --setup-primary-edge: #3d55b8;
+    --setup-primary-ink: #eaf0ff;
+    --setup-primary-hover: #35499f;
+    --field-focus: #0d1119;
+    --segment-top: #242b3e;
+    --segment-bottom: #1d2333;
+    --door-hover: #212739;
+    --switch-top: #3a50bd;
+    --choice-top: #4a63d9;
+    --control-mark: #eaf0ff;
+    --console-ink: #cfd6e4;
+    --dialog-backdrop: rgba(6, 8, 12, .6);
+    --cube-top: #5f85ef;
+    --cube-left: #3a55b4;
+    --cube-right: #24357a;
+    --cube-cutout: #cfe0ff;
+    --chart-cpu: #7aa2ff;
+  }
+
+  /* Keep the default blue theme on :root so old settings and an unset attribute look exactly
+     as before. SpawnLoft borrows the website's materials; state colours keep their own jobs. */
+  :root[data-theme="spawnloft"] {
+    --void: #090d0d;
+    --surface: #141b15;
+    --raised: #1e271d;
+    --sunken: #080c09;
+    --recess: #101610;
+    --line: #30382e;
+    --edge: #485541;
+    --ink: #efeee6;
+    --ink-2: #b5bcac;
+    --ink-3: #909a86;
+    --idle: #909a86;
+    --lapis: #c4f566;
+    --lapis-dim: #546e2a;
+    --lapis-wash: rgba(196, 245, 102, .12);
+    --lapis-ink: #dbf4b2;
+    --lapis-edge: #516337;
+    --lapis-fill: #202b17;
+    --surface-hi: #19211a;
+    --raised-hi: #263021;
+    --hover: #2b3625;
+    --r: 6px;
+    --r-sm: 4px;
+    --r-xs: 3px;
+    --r-lg: 8px;
+    --accent-rgb: 196, 245, 102;
+    --ink-rgb: 239, 238, 230;
+    --scroll-thumb: #394431;
+    --scroll-hover: #536348;
+    --hover-hi: #303c29;
+    --primary-top: #c4f566;
+    --primary-bottom: #b5e35b;
+    --primary-edge: #c4f566;
+    --primary-ink: #14200b;
+    --primary-hover-top: #d3ff80;
+    --primary-hover-bottom: #c4f566;
+    --setup-primary-fill: #c4f566;
+    --setup-primary-edge: #c4f566;
+    --setup-primary-ink: #14200b;
+    --setup-primary-hover: #d3ff80;
+    --field-focus: #11180f;
+    --segment-top: #303c29;
+    --segment-bottom: #263020;
+    --door-hover: #293424;
+    --switch-top: #c4f566;
+    --choice-top: #c4f566;
+    --control-mark: #14200b;
+    --console-ink: #dedfd3;
+    --dialog-backdrop: rgba(4, 8, 5, .7);
+    --cube-top: #c4f566;
+    --cube-left: #8bb640;
+    --cube-right: #567c24;
+    --cube-cutout: #efffdc;
+    --chart-cpu: #c4f566;
   }
 
   * { box-sizing: border-box; }
@@ -127,12 +222,16 @@
     width: min(660px, 100%);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--r-lg);
     padding: 30px 32px 26px;
   }
 
   .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 26px; }
   .brand svg { display: block; }
+  .brand polygon:nth-child(1) { fill: var(--cube-top); }
+  .brand polygon:nth-child(2) { fill: var(--cube-left); }
+  .brand polygon:nth-child(3) { fill: var(--cube-right); }
+  .brand polygon:nth-child(4) { fill: var(--cube-cutout); }
   .brand b { font: 600 15px/1 var(--mono); letter-spacing: -.02em; }
   .brand .step { margin-left: auto; font: 11px/1 var(--mono); color: var(--ink-3); letter-spacing: .04em; }
 
@@ -182,11 +281,11 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  button:hover:not(:disabled) { border-color: var(--edge); background: #222839; }
+  button:hover:not(:disabled) { border-color: var(--edge); background: var(--hover); }
   button:active:not(:disabled) { transform: translateY(1px); }
   button:disabled { opacity: .38; cursor: default; }
-  button.primary { background: var(--lapis-dim); border-color: #3d55b8; color: #eaf0ff; font-weight: 600; padding: 10px 22px; }
-  button.primary:hover:not(:disabled) { background: #35499f; border-color: var(--lapis); }
+  button.primary { background: var(--setup-primary-fill); border-color: var(--setup-primary-edge); color: var(--setup-primary-ink); font-weight: 600; padding: 10px 22px; }
+  button.primary:hover:not(:disabled) { background: var(--setup-primary-hover); border-color: var(--lapis); }
   button.small { padding: 5px 11px; font-size: 12.5px; }
 
   .hint { font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
@@ -265,6 +364,13 @@
   }
 
   footer { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 4px; }
+
+  :root[data-theme="spawnloft"] ::selection { background: var(--lapis); color: var(--void); }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-track { background: transparent; }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border: 3px solid transparent; background-clip: padding-box; border-radius: var(--r-sm); }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-hover); }
+  :root[data-theme="spawnloft"] ::-webkit-scrollbar-corner { background: transparent; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }

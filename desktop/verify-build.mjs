@@ -79,7 +79,7 @@ if (STRUCTURE_ONLY) {
 }
 
 const core = path.join(UNPACKED, 'resources', 'core')
-for (const rel of ['mcctl.mjs', 'src/ui.html', 'src/ui.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
+for (const rel of ['mcctl.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
   if (!fs.existsSync(path.join(core, rel))) problems.push(`resources/core/${rel} is missing from the build`)
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')
