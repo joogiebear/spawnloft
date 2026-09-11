@@ -6,6 +6,13 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **Managed databases on Mac:** on macOS 15+, **Create a database** downloads verified
+  MySQL 8.4 LTS binaries for Apple Silicon or Intel, initializes a private data directory,
+  starts the database and creates scoped credentials for the selected server. No Homebrew,
+  system service or separate database installation is needed. Start/stop, restart and SQL
+  backup/restore use the managed tools. Windows continues to use MariaDB/Garnet.
+- Mac tool discovery also checks the managed engine store, Homebrew locations, `/usr/local/mysql`
+  and PATH when connecting to a database you already run.
 - **Plugin database configs stay manual:** database creation and attachment provide
   credentials for you to copy into your plugins. The former `db apply` command and
   panel config-writing controls are removed. Existing plugin files are left unchanged.
@@ -50,9 +57,9 @@ The Mac app is ad-hoc signed for testing and **not Apple-notarized**. If macOS b
 first launch, try opening it once, then use **System Settings → Privacy & Security →
 Open Anyway**. If it instead reports a damaged app, report the exact message.
 
-Scheduled tasks, automatic backups, and automatic installation
-of managed MariaDB/Garnet engines are still unavailable on Mac. Manual backups and
-connections to an existing external database are available. Windows retains its existing
+Scheduled tasks, automatic backups and managed Garnet remain unavailable on Mac. Managed
+SQL databases use MySQL 8.4 LTS and require macOS 15 or later; the app itself still runs
+on macOS 13+. Existing external MariaDB/MySQL/Redis connections remain available. Windows retains its existing
 capabilities; a shared fix lands in both packages, with platform differences explicit.
 
 ### Toward 1.0

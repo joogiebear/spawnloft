@@ -30,7 +30,7 @@ async function main() {
   // macOS Unix-domain sockets have a short path limit; the runner's default temp path is too long.
   const tempRoot = path.resolve(isMac ? '/tmp' : os.tmpdir())
   const scratch = fs.mkdtempSync(path.join(tempRoot, 'sl-'))
-  const data = path.join(scratch, 'd')
+  const data = path.join(scratch, 'App data')
   const config = path.join(scratch, 'c')
   const home = path.join(scratch, 'h')
   const userData = path.join(scratch, 'u')
@@ -441,6 +441,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(await page.evaluate(() => window.__backupSmoke), pageMarker)
     await page.screenshot({ path: path.join(output, '05-backup-refresh.png') })
     record('PASS: bundled CLI backups appear while Backups is open and after tab reentry without reload or lost form state')
+    if (isMac) await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
     assert.deepEqual(errors, [], `Renderer errors: ${errors.join('\n')}`)
     record('PASS: no uncaught renderer errors')
   } catch (error) {
@@ -450,6 +451,13 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
   } finally {
     // Shut the test daemon down before removing its control socket and settings, even after failure.
     let safeToRemove = true
+    if (isMac && fs.existsSync(path.join(data, 'instances.json'))) {
+      const instances = JSON.parse(fs.readFileSync(path.join(data, 'instances.json'), 'utf8')).instances
+      if (instances[`${name}-db`]) {
+        try { await cli(['kill', `${name}-db`], 45000) }
+        catch (error) { safeToRemove = false; record(`MySQL cleanup: ${error.message}`) }
+      }
+    }
     if (daemonCreated) {
       try { await cli(['kill', name]) }
       catch (error) {

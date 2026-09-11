@@ -1441,7 +1441,7 @@ async function cmdDb(positional, flags) {
   }
 
   if (sub === 'versions') {
-    const engine = String(flags.engine ?? 'mariadb')
+    const engine = String(flags.engine ?? services.defaultEngine())
     const list = await services.versionsFor(engine)
     if (!list.length) fail(`${engine} publishes no stable releases right now`)
     out(table([['VERSION', 'STATUS', 'SUPPORT', 'RELEASED'], ...list.slice(0, 20).map((v) => [v.version, v.status, v.support ?? '-', v.date ?? '-'])]))
@@ -1452,7 +1452,7 @@ async function cmdDb(positional, flags) {
   if (sub === 'add') {
     const name = positional[1]
     if (!name) fail('usage: mcctl db add <name> --version <version> [--port <n>] [--label "..."]')
-    const engine = String(flags.engine ?? 'mariadb')
+    const engine = String(flags.engine ?? services.defaultEngine())
     let version = flags.version ? String(flags.version) : null
     if (!version) {
       const newest = (await services.versionsFor(engine))[0]
@@ -1486,7 +1486,7 @@ async function cmdDb(positional, flags) {
   if (sub === 'create') {
     const serverName = positional[1]
     if (!serverName) fail('usage: mcctl db create <server> [--version <version>] [--engine mariadb]')
-    const engine = String(flags.engine ?? 'mariadb')
+    const engine = String(flags.engine ?? services.defaultEngine())
     let lastPercent = -1
     const { database: db, credentials } = await services.createForServer(serverName, {
       engine,
@@ -1532,8 +1532,8 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'connect') {
     const name = positional[1]
-    if (!name) fail('usage: mcctl db connect <name> --engine mariadb|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]')
-    const engine = String(flags.engine ?? 'mariadb')
+    if (!name) fail('usage: mcctl db connect <name> --engine mysql|mariadb|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]')
+    const engine = String(flags.engine ?? services.defaultEngine())
     const db = await services.registerExternal(name, {
       engine,
       host: flags.host ? String(flags.host) : '127.0.0.1',
@@ -1781,8 +1781,8 @@ OTHER
 
 DATABASES
   mcctl db                           List databases
-  mcctl db versions [--engine e]     Releases that can be run: mariadb (default) or garnet (Redis)
-  mcctl db add <name> [--version v]  Download MariaDB and set up a database on a free port [--engine garnet for Redis]
+  mcctl db versions [--engine e]     Releases that can be run: mysql (Mac), mariadb (Windows), or garnet (Windows Redis)
+  mcctl db add <name> [--version v]  Download the platform engine and set up a database on a free port [--engine garnet for Redis]
   mcctl db connect <name> --host h --port n --user u --password p   Register a database you already run
   mcctl db create <server>           A database of the server's own on the port after its game port, started and attached
   mcctl db attach <db> <server>      Give a server its own database and user; prints the credentials

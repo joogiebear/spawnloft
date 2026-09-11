@@ -24,7 +24,7 @@ after(async () => {
 
 test('Windows keeps its capabilities and Mac preview reports unfinished features', () => {
   assert.deepEqual(platformCapabilities('win32'), { scheduler: true, performance: true, managedDatabases: true })
-  assert.deepEqual(platformCapabilities('darwin'), { scheduler: false, performance: true, managedDatabases: false })
+  assert.deepEqual(platformCapabilities('darwin'), { scheduler: false, performance: true, managedDatabases: true })
   assert.deepEqual(platformCapabilities('linux'), { scheduler: false, performance: false, managedDatabases: false })
 })
 
@@ -69,8 +69,6 @@ test('Mac preview creates servers but refuses unsupported operations without cha
     for (const [route, message] of [
       [base + '/schedules', PREVIEW_LIMITS.scheduler],
       [base + '/backups/auto', PREVIEW_LIMITS.scheduler],
-      ['databases', PREVIEW_LIMITS.managedDatabases],
-      [base + '/databases/create', PREVIEW_LIMITS.managedDatabases],
     ]) {
       const response = await post(route)
       assert.equal(response.status, 400, route)

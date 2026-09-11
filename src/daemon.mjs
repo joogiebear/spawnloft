@@ -25,6 +25,7 @@ import { diagnose } from './diagnose.mjs'
 import { patternsFor } from './ready.mjs'
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
+import * as mysql from './mysql.mjs'
 import { respSend } from './resp.mjs'
 
 const name = process.argv[2]
@@ -131,7 +132,11 @@ function javaCommand(inst, args) {
 let program = null
 
 function programFor(inst) {
-  if (isDatabase(inst)) return inst.engine === 'garnet' ? garnet.launchSpec(inst) : mariadb.launchSpec(inst)
+  if (isDatabase(inst)) {
+    const engine = { mariadb, garnet, mysql }[inst.engine]
+    if (!engine) throw new Error(`Unknown database engine: ${inst.engine}`)
+    return engine.launchSpec(inst)
+  }
   const jar = serverJarPath(inst)
   const flags = inst.jvmFlags?.length ? inst.jvmFlags : jvmFlagsFor(inst.memory)
   const jvmArgs = [`-Xms${inst.memory}`, `-Xmx${inst.memory}`, ...flags, '-jar', path.basename(jar), '--nogui']
