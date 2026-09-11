@@ -13,7 +13,7 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
   assert.equal(await create.isEnabled(), true)
   const config = path.join(data, 'instances', name, 'plugins', 'LuckPerms', 'config.yml')
   const configBefore = fs.readFileSync(config, 'utf8')
-  assert.equal(fs.existsSync(path.join(data, 'engines')), false, 'GUI must exercise the first download')
+  assert.deepEqual(fs.readdirSync(path.join(data, 'engines')), [], 'GUI must exercise the first download')
   await create.click()
   // Even initialization must yield to the panel so progress, console, and other servers work.
   const deadline = Date.now() + 600000

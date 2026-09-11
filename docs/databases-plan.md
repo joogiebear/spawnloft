@@ -131,8 +131,9 @@ places (XAMPP, a MariaDB or MySQL install), or any MariaDB already in the engine
 - One shared engine, many databases: a server attaches to a database instance, and one
   database instance serves as many servers as you like. Lighter than one engine per
   server, and how people already use MySQL locally.
-- Managed engines are currently Windows-only; the Mac desktop is in preview. The CLI on other platforms
-  can still register and attach to a database someone runs themselves (phase 4).
+- Windows manages MariaDB/Garnet. macOS 15+ manages MySQL 8.4 LTS from pinned Oracle
+  archives for Apple Silicon and Intel; setup uses a private socket before enabling TCP.
+  Older Macs and other platforms can still attach to an external database (phase 4).
 - Engines are downloaded from their official mirrors at runtime, not bundled, exactly as
   Paper is; nothing is redistributed.
 - The database name and user are the server's name. Predictable beats clever, and the

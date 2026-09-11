@@ -110,7 +110,8 @@ stdout yourself when capturing an ongoing stream. JSON and CSV are mutually excl
 
 Safe local JAR deployment, required-plugin readiness checks, and automatic PATH installation
 are separate planned additions. Mac Scheduler and automatic backups remain separate work too.
-# Managed databases on Mac
+
+## Managed databases on Mac
 
 On macOS 15 or later, `spawnloft db create royalplugins` downloads the verified MySQL 8.4 LTS
 engine for your Mac, creates and starts a database, and prints the server's credentials.
