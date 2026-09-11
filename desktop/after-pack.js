@@ -92,7 +92,7 @@ function buildInfo() {
 
 exports.default = async function afterPack(context) {
   // ---- 1. the icon toolchain has to exist, or the icon is silently skipped -------------------
-  if (context.packager.platformSpecificBuildOptions.signAndEditExecutable !== false) {
+  if (context.electronPlatformName === 'win32' && context.packager.platformSpecificBuildOptions.signAndEditExecutable !== false) {
     const rcedit = await findRcedit(context)
     if (rcedit == null) {
       // Not knowing is not the same as knowing it is broken, and a guard that fails a good build
@@ -119,14 +119,17 @@ exports.default = async function afterPack(context) {
     console.warn(`  warn building from a dirty tree - ${info.shortCommit} plus uncommitted changes`)
   }
   const body = JSON.stringify(info, null, 2) + '\n'
-  fs.writeFileSync(path.join(context.appOutDir, 'resources', 'build-info.json'), body)
+  const resources = context.electronPlatformName === 'darwin'
+    ? path.join(context.appOutDir, 'SpawnLoft.app', 'Contents', 'Resources')
+    : path.join(context.appOutDir, 'resources')
+  fs.writeFileSync(path.join(resources, 'build-info.json'), body)
   fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true })
   fs.writeFileSync(path.join(__dirname, 'dist', 'build-info.json'), body)
 
   // ---- 3. everything the app needs is actually in the package --------------------------------
   const res = spawnSync(
     process.execPath,
-    [path.join(__dirname, 'verify-build.mjs'), context.appOutDir, '--structure-only'],
+    [path.join(__dirname, 'verify-build.mjs'), context.appOutDir, '--structure-only', `--platform=${context.electronPlatformName}`],
     { stdio: 'inherit' },
   )
   if (res.status !== 0) {

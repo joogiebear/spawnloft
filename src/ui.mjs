@@ -17,6 +17,7 @@ import { readProps, writeProps } from './props.mjs'
 import { storedPlayers } from './players.mjs'
 import * as players from './players.mjs'
 import * as metrics from './metrics.mjs'
+import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as settings from './settings.mjs'
 import { readTheme, saveTheme } from './appearance.mjs'
 import * as plugins from './plugins.mjs'
@@ -467,6 +468,8 @@ async function handleBackups(req, res, name, seg) {
         lastResult: auto.windows ? schedule.describeResult(auto.windows.lastResult) : null,
         nextRun: auto.windows?.nextRun ?? null,
       },
+      automaticAvailable: platformCapabilities().scheduler,
+      automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -510,6 +513,7 @@ async function handleBackups(req, res, name, seg) {
   }
 
   if (action === 'auto') {
+    if (!platformCapabilities().scheduler) return json(res, 400, { error: PREVIEW_LIMITS.scheduler })
     const existing = await autoBackupTask(name)
     if (body.enabled === false) {
       if (existing) schedule.remove(existing.id)
@@ -561,6 +565,9 @@ async function autoBackupTask(name) {
 function handleMetrics(req, res, name, url) {
   registry.getInstance(name)
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+  if (!platformCapabilities().performance) {
+    return json(res, 200, { available: false, reason: PREVIEW_LIMITS.performance, samples: [] })
+  }
 
   const asked = Number(url.searchParams.get('seconds'))
   // Capped at what is kept. Asking for a day gets everything there is rather than an error.
@@ -823,6 +830,11 @@ async function handlePlayers(req, res, name, seg) {
  */
 async function handleSchedules(req, res, name, seg) {
   registry.getInstance(name)
+  if (!platformCapabilities().scheduler) {
+    return req.method === 'GET'
+      ? json(res, 200, { available: false, reason: PREVIEW_LIMITS.scheduler, tasks: [], runs: [] })
+      : json(res, 400, { error: PREVIEW_LIMITS.scheduler })
+  }
   const id = seg[4] ?? null
   const verb = seg[5] ?? null
 
@@ -1033,6 +1045,7 @@ async function route(req, res) {
     // choice before the first paint instead, from the app's existing settings.
     const html = readFileSync(path.join(HERE, 'ui.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
+      .replace('name="spawnloft-platform" content="win32"', `name="spawnloft-platform" content="${process.platform}"`)
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
     return
@@ -1144,6 +1157,7 @@ async function route(req, res) {
       settingsFile: LAYOUT.settingsFile,
       usingLegacyLayout: LAYOUT.usingLegacyLayout,
       platform: process.platform,
+      capabilities: platformCapabilities(),
     })
   }
 
@@ -1228,6 +1242,7 @@ async function route(req, res) {
     return json(res, 200, await services.versionsFor(engine))
   }
   if (seg[1] === 'databases' && seg.length === 2 && req.method === 'POST') {
+    if (!platformCapabilities().managedDatabases) return json(res, 400, { error: PREVIEW_LIMITS.managedDatabases })
     const body = await readBody(req)
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
@@ -1510,6 +1525,7 @@ async function route(req, res) {
   // attached. Progress goes out on the job stream the Add sheet uses, since the download is the
   // long part and a button that sits there for a minute with nothing to say looks broken.
   if (seg[3] === 'databases' && seg[4] === 'create') {
+    if (!platformCapabilities().managedDatabases) return json(res, 400, { error: PREVIEW_LIMITS.managedDatabases })
     const body = await readBody(req)
     const jobId = body.jobId ? String(body.jobId) : null
     try {

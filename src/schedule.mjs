@@ -4,6 +4,7 @@ import { spawnSync, execFile } from 'node:child_process'
 
 import { DATA_ROOT, ROOT, RUN_DIR } from './paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
+import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 
 /**
  * Scheduled work, run by Windows.
@@ -317,6 +318,7 @@ function triggerArgs(schedule) {
 }
 
 function schtasks(args) {
+  if (!platformCapabilities().scheduler) fail(PREVIEW_LIMITS.scheduler)
   forgetWindows()
   const res = spawnSync('schtasks', args, { encoding: 'utf8', windowsHide: true, timeout: 30000 })
   if (res.error) fail(`could not run schtasks: ${res.error.message}`)
@@ -338,6 +340,8 @@ function schtasks(args) {
  * quoted is stored whole.
  */
 function writeWindowsTask(id, task) {
+  // Refuse before writing a Windows launcher into a Mac server's data folder.
+  if (!platformCapabilities().scheduler) fail(PREVIEW_LIMITS.scheduler)
   const shim = writeShim(id)
   schtasks(['/Create', '/TN', `${TASK_FOLDER}\\${id}`, '/TR', `"${shim}"`, ...triggerArgs(task.schedule), '/F'])
   // /Create always makes an enabled task, so a disabled one is disabled immediately afterwards

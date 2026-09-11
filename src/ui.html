@@ -2,6 +2,7 @@
 <html lang="en" data-theme="classic">
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
+<meta name="spawnloft-platform" content="win32">
 <title>SpawnLoft</title>
 
 <style>
@@ -2155,6 +2156,9 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
+const panelPlatform = $('meta[name="spawnloft-platform"]').content;
+const windowsFeatures = panelPlatform === 'win32';
+const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MariaDB, MySQL, or Redis database instead.';
 
 const state = {
   rows: [],
@@ -3613,6 +3617,7 @@ async function renderPerformance(opts) {
   if (!drawn) await paintPerformance(row.name);
 
   stopPerfPolling();
+  if (!windowsFeatures) return;
   // Matched to how often the daemon samples. Polling faster would redraw the same points.
   perfTimer = setInterval(() => {
     if (state.pane !== 'performance' || state.current !== row.name) return stopPerfPolling();
@@ -3638,7 +3643,15 @@ async function paintPerformance(name, opts) {
   if (body.dataset.for !== name || state.current !== name) return;
   body.textContent = '';
   paneHead(body, 'pulse', 'Performance',
-    'Processor and memory while the server runs, sampled every ten seconds.');
+    data.available === false ? 'Not available in this preview.'
+      : 'Processor and memory while the server runs, sampled every ten seconds.');
+  if (data.available === false) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = data.reason;
+    body.append(note);
+    return;
+  }
 
   // ---- how far back to look ------------------------------------------------
   const ranges = document.createElement('div');
@@ -4942,7 +4955,15 @@ async function renderScheduler(opts) {
   if (body.dataset.for !== row.name) return;
   body.textContent = '';
   paneHead(body, 'clock', 'Scheduled work',
-    'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+    data.available === false ? 'Not available in this preview.'
+      : 'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+  if (data.available === false) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = data.reason;
+    body.append(note);
+    return;
+  }
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/schedules';
   const again = () => renderScheduler({ force: true });
@@ -5420,6 +5441,11 @@ async function renderBackups(opts) {
     : 'Runs through Windows Task Scheduler, so it happens whether or not this window is open - while '
       + 'you are signed in, screen locked included, but not after you sign out.';
   auto.append(autoTitle, autoRow, autoState);
+  if (data.automaticAvailable === false) {
+    autoRow.hidden = true;
+    autoState.textContent = data.automaticUnavailableReason;
+    for (const control of [onOff, every, keep, apply]) control.disabled = true;
+  }
   body.append(auto);
 
   apply.onclick = async () => {
@@ -6594,6 +6620,10 @@ async function renderServerDatabases(row, body) {
   const createHint = document.createElement('span');
   createHint.className = 'hint';
   createHint.textContent = 'MariaDB, newest stable, on port ' + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  if (!windowsFeatures) {
+    create.disabled = true;
+    createHint.textContent = databasePreviewNote;
+  }
   create.onclick = async () => {
     create.disabled = true;
     const jobId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now();
@@ -6901,6 +6931,13 @@ function dbMode() {
 
 /** Show the fields the chosen mode and engine need, and say what the port default is. */
 function syncDbForm() {
+  if (!windowsFeatures) {
+    const run = $('input[name="dbMode"][value="run"]');
+    run.disabled = true;
+    run.checked = false;
+    run.closest('label').querySelector('span').textContent = databasePreviewNote;
+    $('input[name="dbMode"][value="connect"]').checked = true;
+  }
   const engine = $('#dEngine').value;
   const connect = dbMode() === 'connect';
   const redis = engine === 'garnet';
@@ -7445,7 +7482,13 @@ function renderSettings() {
   const about = $('#setAbout');
   about.textContent = '';
   const info = [['Panel', 'Local only — bound to 127.0.0.1']];
+  if (!windowsFeatures) {
+    info.push(['Preview limits', 'Scheduled tasks, automatic backups, CPU/memory charts, and automatic database installation are not available yet.']);
+  }
   if (state.appInfo) {
+    if (state.appInfo.manualUpdates) {
+      info.push(['Updates', 'Rolling Mac preview. Download and install each new build manually using Download Mac preview.']);
+    }
     // The commit, not just the version: a version is a label, and a bug report that names the
     // build is the difference between reproducing something and guessing at it.
     if (state.appInfo.commit) {
@@ -7740,6 +7783,10 @@ if (desktop) {
     state.appInfo = info;
     $('#appver').textContent = 'v' + info.version + (info.packaged ? '' : ' (' + info.coreMode + ')');
     $('#bUpdate').hidden = false;
+    if (info.manualUpdates) {
+      $('#bUpdate').textContent = 'Download Mac preview';
+      $('#bUpdate').title = 'Rolling development builds are installed manually; this opens the preview release.';
+    }
   });
 
   // What the button is offering right now: null when there is nothing to do, a version string
@@ -7763,6 +7810,7 @@ if (desktop) {
   };
 
   desktop.onUpdate((kind, data) => {
+    if (state.appInfo && state.appInfo.manualUpdates) return;
     const b = $('#bUpdate');
     if (kind === 'available') {
       // Nothing to click: the download has already started. The button reports rather than asks.
@@ -7802,6 +7850,10 @@ if (desktop) {
 
   $('#bUpdate').onclick = async () => {
     const b = $('#bUpdate');
+    if (state.appInfo && state.appInfo.manualUpdates) {
+      await desktop.openExternal(state.appInfo.downloadUrl);
+      return;
+    }
     if (pending === 'ready') {
       // Servers survive the restart - they are detached daemons - but saying so beats letting
       // someone guess whether updating will drop their running world.
