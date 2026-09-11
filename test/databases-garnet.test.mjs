@@ -133,6 +133,7 @@ test('a Garnet that dies on its port is reported with its reason', { timeout: 30
   process.env.FAKE_GARNET_FAIL = 'start'
   try {
     const res = await sup.start(RD, { timeout: 15000 })
+    assert.equal(res.ready, false, JSON.stringify(res))
     assert.equal(res.failed, true)
     assert.match(res.reason, /Unhandled exception|Address already in use|exited/)
   } finally {

@@ -79,7 +79,9 @@ process.on('uncaughtException', die)
 // One console file per daemon, truncated once at the first start so `logs` shows this session
 // only. A crash-restart APPENDS to the same file - the lines before the crash are the reason
 // it crashed, and they must survive the recovery.
-const out = fs.createWriteStream(consoleLog(name), { flags: 'w' })
+// Finish truncating before publishing this daemon's state. An asynchronous open can leave
+// the previous session's ready line visible to a caller waiting for this launch.
+const out = fs.createWriteStream(consoleLog(name), { fd: fs.openSync(consoleLog(name), 'w') })
 
 // ---- one run of the server --------------------------------------------------
 
