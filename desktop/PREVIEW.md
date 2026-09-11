@@ -6,6 +6,9 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **Performance now works on Apple Silicon and Intel Mac:** live server CPU and resident
+  memory, ten-second samples, selectable history ranges, and history retained after stopping.
+  CPU uses the same share-of-all-cores scale as Windows. Each server restart begins a fresh graph.
 - Console output strips ANSI escape sequences into clean, searchable plain text while
   keeping warning and error indicators.
 - Long lines scroll horizontally by default. Turn on **Wrap** whenever you prefer.
@@ -38,7 +41,7 @@ The Mac app is ad-hoc signed for testing and **not Apple-notarized**. If macOS b
 first launch, try opening it once, then use **System Settings → Privacy & Security →
 Open Anyway**. If it instead reports a damaged app, report the exact message.
 
-Scheduled tasks, automatic backups, performance sampling, and automatic installation
+Scheduled tasks, automatic backups, and automatic installation
 of managed MariaDB/Garnet engines are still unavailable on Mac. Manual backups and
 connections to an existing external database are available. Windows retains its existing
 capabilities; a shared fix lands in both packages, with platform differences explicit.

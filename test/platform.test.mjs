@@ -24,9 +24,8 @@ after(async () => {
 
 test('Windows keeps its capabilities and Mac preview reports unfinished features', () => {
   assert.deepEqual(platformCapabilities('win32'), { scheduler: true, performance: true, managedDatabases: true })
-  for (const platform of ['darwin', 'linux']) {
-    assert.deepEqual(platformCapabilities(platform), { scheduler: false, performance: false, managedDatabases: false })
-  }
+  assert.deepEqual(platformCapabilities('darwin'), { scheduler: false, performance: true, managedDatabases: false })
+  assert.deepEqual(platformCapabilities('linux'), { scheduler: false, performance: false, managedDatabases: false })
 })
 
 test('Mac preview creates servers but refuses unsupported operations without changing their data', async () => {
@@ -55,7 +54,11 @@ test('Mac preview creates servers but refuses unsupported operations without cha
     const base = 'instances/' + inst.name
     assert.deepEqual((await get('settings')).capabilities, platformCapabilities('darwin'))
     assert.equal((await get(base + '/schedules')).available, false)
-    assert.equal((await get(base + '/metrics')).reason, PREVIEW_LIMITS.performance)
+    const metrics = await get(base + '/metrics')
+    assert.deepEqual(metrics.samples, [])
+    assert.equal(metrics.everySeconds, 10)
+    assert.ok(metrics.cores >= 1)
+    assert.equal(metrics.running, false)
     const backups = await get(base + '/backups')
     assert.equal(backups.automaticAvailable, false)
     assert.deepEqual(backups.snapshots, [])

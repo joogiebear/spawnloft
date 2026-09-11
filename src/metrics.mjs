@@ -4,6 +4,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 import { runDir } from './paths.mjs'
+import { startDarwinSampler } from './metrics-darwin.mjs'
 
 /**
  * How hard a server is working, over time.
@@ -16,6 +17,8 @@ import { runDir } from './paths.mjs'
  * the server runs, which is a process launch per sample to read two numbers. Instead one PowerShell
  * is started with the server and left running, refreshing the same process object in a loop and
  * printing a line each time. One extra process for the life of the server, not one per reading.
+ * macOS supplies the same cumulative CPU time and resident memory through a short asynchronous
+ * /bin/ps query. Its moving-average %cpu field has a different time window, so it is not used.
  *
  * <p>Samples go to a plain text file in the run directory rather than being held in memory,
  * because the thing that reads them is the panel, in a different process, possibly started after
@@ -52,15 +55,22 @@ const CORES = Math.max(1, os.cpus()?.length || 1)
  * than taking the daemon down with it.
  */
 export function startSampler(name, pid, { onError = () => {} } = {}) {
-  if (process.platform !== 'win32') {
-    // Everywhere else would need a different tool and this project ships for Windows. Saying so
-    // beats a graph that is silently always empty.
-    onError(new Error('performance sampling is only implemented on Windows'))
+  if (!['win32', 'darwin'].includes(process.platform)) {
+    onError(new Error('performance sampling is only implemented on Windows and macOS'))
     return () => {}
   }
 
   const file = metricsFile(name)
   fs.mkdirSync(path.dirname(file), { recursive: true })
+
+  let written = 0
+  const record = sampleRecorder((sample) => {
+    fs.appendFileSync(file, `${sample.at} ${sample.cpu.toFixed(1)} ${sample.rss}\n`)
+    if (++written % 60 === 0) trim(file)
+  })
+  if (process.platform === 'darwin') {
+    return startDarwinSampler(pid, { onSample: record, onError, intervalMs: INTERVAL_SEC * 1000 })
+  }
 
   const script = [
     '$ErrorActionPreference = "Stop"',
@@ -93,11 +103,11 @@ export function startSampler(name, pid, { onError = () => {} } = {}) {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
-  let prev = null
-  let written = 0
   let buf = ''
+  let stopped = false
 
   ps.stdout.on('data', (chunk) => {
+    if (stopped) return
     buf += chunk
     const lines = buf.split(/\r?\n/)
     buf = lines.pop() ?? ''
@@ -106,23 +116,33 @@ export function startSampler(name, pid, { onError = () => {} } = {}) {
       const at = Number(ts)
       const seconds = Number(cpuSec)
       const bytes = Number(rss)
-      if (!Number.isFinite(at) || !Number.isFinite(seconds) || !Number.isFinite(bytes)) continue
-      // The first line establishes a baseline and produces no sample: CPU is a rate, and a rate
-      // needs two readings.
-      if (prev) {
-        const wall = at - prev.at
-        if (wall > 0) {
-          const pct = Math.max(0, Math.min(100, ((seconds - prev.seconds) / (wall * CORES)) * 100))
-          fs.appendFileSync(file, `${at} ${pct.toFixed(1)} ${Math.round(bytes / 1048576)}\n`)
-          if (++written % 60 === 0) trim(file)
-        }
-      }
-      prev = { at, seconds }
+      try { record({ at, seconds, bytes }) }
+      catch (error) { onError(error) }
     }
   })
 
-  ps.on('error', onError)
-  return () => { try { ps.kill() } catch { /* already gone with the server */ } }
+  ps.on('error', error => { if (!stopped) onError(error) })
+  return () => {
+    stopped = true
+    try { ps.kill() } catch { /* already gone with the server */ }
+  }
+}
+
+/** Both native collectors supply cumulative CPU seconds and resident bytes. Keep the
+ * conversion shared so the same workload has the same scale on Mac and Windows.
+ * A reset counter, clock adjustment, or long sleep starts a new baseline, not a spike. */
+export function sampleRecorder(write, cores = CORES) {
+  let previous = null
+  return ({ at, seconds, bytes }) => {
+    if (![at, seconds, bytes].every(Number.isFinite) || at <= 0 || seconds < 0 || bytes < 0) return
+    const prior = previous
+    previous = { at, seconds }
+    if (!prior) return
+    const wall = at - prior.at
+    if (wall <= 0 || wall > INTERVAL_SEC * 3 || seconds < prior.seconds) return
+    const cpu = Math.max(0, Math.min(100, ((seconds - prior.seconds) / (wall * Math.max(1, cores))) * 100))
+    write({ at: Math.floor(at), cpu, rss: Math.round(bytes / 1048576) })
+  }
 }
 
 function trim(file) {
@@ -155,8 +175,9 @@ export function readSamples(name) {
     if (!line) continue
     const [ts, cpu, rss] = line.split(' ')
     const at = Number(ts)
-    if (!Number.isFinite(at)) continue
-    rows.push({ at, cpu: Number(cpu), rss: Number(rss) })
+    const row = { at, cpu: Number(cpu), rss: Number(rss) }
+    if (!Object.values(row).every(Number.isFinite) || row.at <= 0 || row.cpu < 0 || row.cpu > 100 || row.rss < 0) continue
+    rows.push(row)
   }
   return rows
 }
