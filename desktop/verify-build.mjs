@@ -98,10 +98,15 @@ if (STRUCTURE_ONLY) {
 }
 
 const core = path.join(RESOURCES, 'core')
-for (const rel of ['mcctl.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/platform.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
+for (const rel of ['mcctl.mjs', 'spawnloft.mjs', 'src/cli-output.mjs', 'src/cli-metrics.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/platform.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
   if (!fs.existsSync(path.join(core, rel))) problems.push(`resources/core/${rel} is missing from the build`)
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')
+for (const name of ['spawnloft', 'mcctl']) {
+  const launcher = path.join(RESOURCES, 'bin', MAC ? name : `${name}.cmd`)
+  if (!fs.existsSync(launcher)) problems.push(`terminal launcher ${name} is missing`)
+  else if (MAC && (fs.statSync(launcher).mode & 0o111) === 0) problems.push(`terminal launcher ${name} is not executable`)
+}
 
 const asar = path.join(RESOURCES, 'app.asar')
 if (!fs.existsSync(asar)) {

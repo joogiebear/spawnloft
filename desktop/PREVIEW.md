@@ -6,6 +6,12 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **CLI automation:** versioned `--json` output for status, plugin inventory, backup history,
+  backup creation, diagnostics, and environment checks. `metrics --follow --json` streams
+  readings; `metrics --csv --output <file>` exports them without overwriting old runs.
+- **SpawnLoft terminal command:** both `spawnloft` and the compatible `mcctl` launcher live
+  in the package's `Resources/bin` on Mac or `resources/bin` on Windows and use the bundled
+  runtime. See [CLI setup and examples](https://github.com/joogiebear/spawnloft/blob/dev/CLI.md).
 - **Performance now works on Apple Silicon and Intel Mac:** live server CPU and resident
   memory, ten-second samples, selectable history ranges, and history retained after stopping.
   CPU uses the same share-of-all-cores scale as Windows. Each server restart begins a fresh graph.

@@ -13,7 +13,7 @@
  *   -x [value]     → { x: 'value' | true }
  *   --             → everything after it is positional, verbatim
  */
-export function parseArgs(argv) {
+export function parseArgs(argv, { booleanFlags = [] } = {}) {
   const flags = {}
   const positional = []
   for (let i = 0; i < argv.length; i++) {
@@ -29,6 +29,8 @@ export function parseArgs(argv) {
         flags[key] = inlineValue
       } else if (rawKey.startsWith('no-')) {
         flags[rawKey.slice(3).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = false
+      } else if (booleanFlags.includes(key)) {
+        flags[key] = true
       } else if (argv[i + 1] && !argv[i + 1].startsWith('-')) {
         flags[key] = argv[++i]
       } else {

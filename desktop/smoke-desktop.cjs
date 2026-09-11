@@ -156,6 +156,30 @@ async function main() {
     })
   }
 
+  async function terminal(command, args, expectedCode = 0) {
+    const launcher = path.join(path.dirname(core), 'bin', command + (isMac ? '' : '.cmd'))
+    const options = { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+    // Only fixed test arguments and generated fixture paths enter this cmd.exe command.
+    // The extra quote pair is cmd /s /c's required wrapper around a quoted batch path.
+    for (const arg of [launcher, ...args]) assert.ok(!/["%\r\n]/.test(arg))
+    const child = isMac ? spawn(launcher, args, options)
+      : spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c',
+        `""${launcher}" ${args.map(arg => `"${arg}"`).join(' ')}"`], { ...options, windowsVerbatimArguments: true })
+    return new Promise((resolve, reject) => {
+      let stdout = ''
+      let stderr = ''
+      const timer = setTimeout(() => child.kill('SIGKILL'), 20000)
+      child.stdout.on('data', chunk => { stdout += chunk })
+      child.stderr.on('data', chunk => { stderr += chunk })
+      child.once('error', error => { clearTimeout(timer); reject(error) })
+      child.once('close', code => {
+        clearTimeout(timer)
+        if (code !== expectedCode) reject(new Error(`${command} ${args.join(' ')}: exit ${code}; ${stdout} ${stderr}`))
+        else resolve({ stdout, stderr })
+      })
+    })
+  }
+
   async function api(route, body) {
     const response = await fetch(new URL(`/api/${route}`, page.url()), {
       method: body === undefined ? 'GET' : 'POST',
@@ -234,6 +258,20 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     }))
     assert.match(await cli(['list']), /desktop-smoke/, 'Packaged Node runtime must run the bundled CLI')
     record('PASS: bundled CLI runs through the packaged Electron Node runtime')
+    for (const command of ['spawnloft', 'mcctl']) {
+      const result = await terminal(command, ['status', name, '--json'])
+      assert.equal(result.stderr, '')
+      const status = JSON.parse(result.stdout)
+      assert.equal(status.schemaVersion, 1)
+      assert.equal(status.data.name, name)
+      assert.equal(status.data.status, 'stopped')
+      assert.ok(!result.stdout.includes('isolated-smoke'), 'Status JSON must not expose the RCON password')
+      const missing = JSON.parse((await terminal(command, ['status', 'no-such-instance', '--json'], 1)).stdout)
+      assert.equal(missing.ok, false)
+      const usage = JSON.parse((await terminal(command, ['remove', name, '--json'], 2)).stdout)
+      assert.equal(usage.error.code, 'INVALID_USAGE')
+    }
+    record('PASS: packaged spawnloft and mcctl terminal launchers return clean JSON and preserve success/failure exit codes')
 
     await launch()
     await page.locator('#bSettings').waitFor({ state: 'visible' })
@@ -306,6 +344,20 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(await page.locator('#performanceBody .ranges button[aria-pressed="true"]').textContent(), '1m')
     const beforeClose = await api(`instances/${name}/metrics`)
     fs.writeFileSync(path.join(output, 'performance-live.json'), JSON.stringify(beforeClose, null, 2))
+    const cliMetrics = JSON.parse((await terminal('spawnloft', ['metrics', name, '--json'])).stdout)
+    assert.equal(cliMetrics.data.cpuScale, 'whole-machine')
+    assert.ok(cliMetrics.data.samples.length >= beforeClose.samples.length)
+    assert.equal(cliMetrics.data.samples[0].cpuPercent, beforeClose.samples[0].cpu)
+    assert.equal(cliMetrics.data.samples[0].rssMiB, beforeClose.samples[0].rss)
+    const csvPath = path.join(scratch, 'test run export.csv')
+    await terminal('spawnloft', ['metrics', name, '--csv', '--output', csvPath])
+    const csvBytes = fs.readFileSync(csvPath)
+    assert.match(csvBytes.toString('utf8'), /^instance,run_id,timestamp,cpu_percent,rss_mib,cores\n/)
+    assert.ok(csvBytes.toString('utf8').includes(`,${beforeClose.samples[0].cpu},${beforeClose.samples[0].rss},`))
+    await terminal('mcctl', ['metrics', name, '--csv', '--output', csvPath], 1)
+    assert.ok(fs.readFileSync(csvPath).equals(csvBytes), 'An existing test export must survive an accidental repeat')
+    fs.copyFileSync(csvPath, path.join(output, 'performance-cli.csv'))
+    record('PASS: packaged CLI JSON and CSV use the same real measurements as the panel; export paths with spaces and overwrite protection work')
     record('PASS: native CPU/memory measurements reach the Performance charts and refresh automatically; history range survives tab reentry')
     await close()
 
