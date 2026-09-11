@@ -7,7 +7,7 @@ module.exports = {
   mac: {
     target: ['dmg', 'zip'],
     category: 'public.app-category.utilities',
-    icon: 'build/icon.png',
+    icon: 'build/icon-mac.png',
     minimumSystemVersion: '13.0',
     identity: '-',
     hardenedRuntime: false,

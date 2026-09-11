@@ -32,3 +32,9 @@ to 16px; the vent turns to mush.
 ## `icon.png`
 
 The 256px raster, kept alongside for documentation and release notes.
+
+## `icon-mac.png`
+
+The same SVG rasterized at 1024px for the Mac app bundle. macOS packaging requires
+at least 512px; regenerate this from `icon.svg` instead of enlarging the 256px image.
+The Mac preview configuration converts it to the bundle's ICNS icon during packaging.
