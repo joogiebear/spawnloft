@@ -451,14 +451,20 @@ async function handleBackups(req, res, name, seg) {
   const action = seg[4] ?? null
 
   if (req.method === 'GET') {
-    const auto = await autoBackupTask(name)
-    return json(res, 200, {
+    const history = {
       snapshots: backup.listSnapshots(name),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
-      scopes: backup.SCOPES,
       running: supervisor.isRunning(name),
+    }
+    // A visible history polls for CLI-created snapshots. That does not need to start
+    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits.
+    if (action === 'history') return json(res, 200, history)
+    const auto = await autoBackupTask(name)
+    return json(res, 200, {
+      ...history,
+      scopes: backup.SCOPES,
       auto: auto && {
         id: auto.id,
         enabled: auto.enabled,

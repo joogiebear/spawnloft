@@ -22,7 +22,7 @@ function fnSource(name) {
   let depth = 0
   for (let i = html.indexOf('{', at); i < html.length; i++) {
     if (html[i] === '{') depth++
-    else if (html[i] === '}' && --depth === 0) return html.slice(at, i + 1)
+    else if (html[i] === '}' && --depth === 0) return html.slice(html.slice(at - 6, at) === 'async ' ? at - 6 : at, i + 1)
   }
   assert.fail(`unbalanced braces after "function ${name}"`)
 }
@@ -35,6 +35,103 @@ const lifted = (names) => new Function(
 // ---- the console level classifier ------------------------------------------
 
 const { levelOf } = lifted(['MCCTL_RE', 'LEVEL_RE', 'BARE_LEVEL_RE', 'CONT_RE', 'EXC_RE', 'levelOf'])
+const { cleanConsoleText } = lifted(['ANSI_STRING_RE', 'ANSI_CSI_RE', 'ANSI_ESCAPE_RE', 'LOG_CONTROL_RE', 'cleanConsoleText'])
+
+test('console strips ANSI colors before classification, search and copy', () => {
+  const text = cleanConsoleText('\x1b[0m[12:34:56 \x1b[33mWARN\x1b[0m]: \x1b[38;2;255;90;0mwarning\x1b[m')
+  assert.equal(text, '[12:34:56 WARN]: warning')
+  assert.equal(levelOf(text), 'warn')
+  assert.equal(cleanConsoleText('\x1b[38;5;123mindexed\x1b[0m'), 'indexed')
+  assert.equal(cleanConsoleText('\x9b31mred\x9b0m'), 'red')
+})
+
+test('terminal hyperlinks retain their label without URL or OSC sequences', () => {
+  assert.equal(cleanConsoleText('\x1b]8;;https://example.com\x07docs\x1b]8;;\x07'), 'docs')
+  assert.equal(cleanConsoleText('\x1b]8;;https://example.com\x1b\\docs\x1b]8;;\x1b\\'), 'docs')
+  assert.equal(cleanConsoleText('\x9d8;;https://example.com\x9cdocs\x9d8;;\x9c'), 'docs')
+  assert.equal(cleanConsoleText('\x1b]0;terminal title\x07message'), 'message')
+})
+
+test('console removes cursor commands and control strings without losing ordinary text', () => {
+  assert.equal(cleanConsoleText('\x1b[2K\x1b[1Gmessage\x1b[?25h\r\x07'), 'message')
+  assert.equal(cleanConsoleText('\x1b7saved\x1b8'), 'saved')
+  assert.equal(cleanConsoleText('\x1bPignored terminal data\x1b\\message'), 'message')
+  assert.equal(cleanConsoleText('message\x1b[33'), 'message')
+  assert.equal(cleanConsoleText('\tat plugin.方法(File.java:42) — §aGreen [brackets]'), '\tat plugin.方法(File.java:42) — §aGreen [brackets]')
+  assert.equal(cleanConsoleText(''), '')
+})
+
+// Exercise the real refresh function with an already-rendered history. Any attempt to
+// rebuild the form reaches an unstubbed DOM method and fails instead of hiding lost edits.
+function backupRefreshFixture(api) {
+  const state = { current: 'test-server' }
+  const status = { textContent: '' }
+  const history = {
+    isConnected: true, dataset: { backupHistory: '' }, replacements: 0,
+    replaceWith(next) { this.dataset.backupHistory = next; this.replacements++ },
+  }
+  const body = {
+    dataset: { for: state.current },
+    querySelector(selector) { return selector === '[data-backup-history]' ? history : status },
+  }
+  const render = new Function('state', 'body', 'api', `
+    let backupRequest = 0;
+    let backupPending = null;
+    const $ = () => body;
+    const rowOf = name => ({ name });
+    const renderBackupHistory = (row, data, signature) => signature;
+    return ${fnSource('renderBackups')};
+  `)(state, body, api)
+  return { render, state, body, history, status }
+}
+
+test('backup history refreshes external changes without rebuilding unchanged history or forms', async () => {
+  const data = { snapshots: [], running: false, dir: '/backups/test-server', root: '/backups', mirror: null }
+  const fixture = backupRefreshFixture(async route => {
+    assert.equal(route, '/instances/test-server/backups/history')
+    return data
+  })
+  await fixture.render()
+  await fixture.render()
+  assert.equal(fixture.history.replacements, 1)
+  data.snapshots.push({ name: 'cli-backup.tar.gz' })
+  await fixture.render()
+  assert.equal(fixture.history.replacements, 2)
+  data.running = true
+  await fixture.render()
+  assert.equal(fixture.history.replacements, 3, 'Restore availability must follow server state')
+})
+
+test('backup polling does not overlap, and discards an answer after selecting another server', async () => {
+  let answer
+  let calls = 0
+  const fixture = backupRefreshFixture(() => {
+    calls++
+    return new Promise(resolve => { answer = resolve })
+  })
+  const pending = fixture.render()
+  await fixture.render()
+  assert.equal(calls, 1)
+  fixture.state.current = 'another-server'
+  answer({ snapshots: [] })
+  await pending
+  assert.equal(fixture.history.replacements, 0)
+})
+
+test('a failed backup refresh preserves history, reports stale data, and recovers', async () => {
+  let fail = true
+  const fixture = backupRefreshFixture(async () => {
+    if (fail) throw new Error('connection unavailable')
+    return { snapshots: [] }
+  })
+  await fixture.render()
+  assert.equal(fixture.history.replacements, 0)
+  assert.match(fixture.status.textContent, /could not refresh: connection unavailable/)
+  fail = false
+  await fixture.render()
+  assert.equal(fixture.status.textContent, '')
+  assert.equal(fixture.history.replacements, 1)
+})
 
 // Paper does not have one log format, it has four; all of them appear in a single session.
 test('every format Paper actually emits classifies by its level', () => {
