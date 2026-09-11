@@ -92,6 +92,29 @@ function backupDir(name) {
   return dir
 }
 
+function reserveSnapshot(dir, base) {
+  // The reservation is also tar's output. It never ends in .tar.gz, so history
+  // cannot offer a partially written archive to restore. Exclusive creation
+  // coordinates the CLI, panel, and scheduled tasks even in the same second.
+  for (let index = 0; ; index++) {
+    const file = path.join(dir, `${base}${index ? `_${index + 1}` : ''}.tar.gz`)
+    const pending = file + '.pending'
+    const manifestFile = file.replace(/\.tar\.gz$/, '.json')
+    let fd
+    try { fd = fs.openSync(pending, 'wx') }
+    catch (error) {
+      if (error.code === 'EEXIST') continue
+      throw error
+    }
+    fs.closeSync(fd)
+    if (fs.existsSync(file) || fs.existsSync(manifestFile)) {
+      fs.rmSync(pending, { force: true })
+      continue
+    }
+    return { file, pending, manifestFile }
+  }
+}
+
 function membersFor(inst, scope) {
   const props = readProps(path.join(inst.dir, 'server.properties'))
   const exists = (p) => fs.existsSync(path.join(inst.dir, p))
@@ -141,7 +164,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
 
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''
   const base = `${slug}${scope}_${stamp()}`
-  const file = path.join(backupDir(inst.name), `${base}.tar.gz`)
+  const dir = backupDir(inst.name)
 
   /*
     The databases this server is attached to go in too, as a `databases/` member holding one SQL
@@ -176,65 +199,82 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       flushWarning = `could not flush the world before the snapshot (${err.message}); the copy may be torn`
     }
   }
-  let stderr
+  let reservation = null
+  let published = false
   try {
-    ;({ stderr } = await runTar(['-czf', file, ...EXCLUDE_ARGS, ...members, ...dumpArgs], inst.dir))
-  } finally {
-    // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
-    // any failed backup.
-    if (flushed) {
-      try {
-        await rconExec(inst, ['save-on'])
-      } catch {
-        /* the server may have stopped mid-backup; nothing is left to turn back on */
+    let stderr
+    try {
+      reservation = reserveSnapshot(dir, base)
+      ;({ stderr } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...members, ...dumpArgs], inst.dir))
+    } finally {
+      // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
+      // any failed backup.
+      if (flushed) {
+        try {
+          await rconExec(inst, ['save-on'])
+        } catch {
+          /* the server may have stopped mid-backup; nothing is left to turn back on */
+        }
       }
+      if (dumpDir) fs.rmSync(dumpDir, { recursive: true, force: true })
     }
-    if (dumpDir) fs.rmSync(dumpDir, { recursive: true, force: true })
-  }
 
-  const size = fs.statSync(file).size
-  // An empty archive is not a snapshot, and this one is load-bearing: rebuild and delete both take
-  // one "first" and both are safe only if it exists. bsdtar reports a locked file as exit 1, which
-  // is deliberately tolerated above because a hot snapshot legitimately skips things - so without
-  // this check a failure that produced nothing at all would be recorded as a successful backup.
-  if (size === 0) {
-    fs.rmSync(file, { force: true })
-    const said = stderr.trim().split(/\r?\n/)[0]
-    fail(
-      `snapshot of "${inst.name}" came out empty and has been discarded.` +
-        (said ? `\n  tar said: ${said}` : ''),
-    )
+    const { file, pending, manifestFile } = reservation
+    const size = fs.statSync(pending).size
+    // An empty archive is not a snapshot, and this one is load-bearing: rebuild and delete both take
+    // one "first" and both are safe only if it exists. bsdtar reports a locked file as exit 1, which
+    // is deliberately tolerated above because a hot snapshot legitimately skips things - so without
+    // this check a failure that produced nothing at all would be recorded as a successful backup.
+    if (size === 0) {
+      const said = stderr.trim().split(/\r?\n/)[0]
+      fail(
+        `snapshot of "${inst.name}" came out empty and has been discarded.` +
+          (said ? `\n  tar said: ${said}` : ''),
+      )
+    }
+    const manifest = {
+      instance: inst.name,
+      scope,
+      label,
+      // Which scheduled task produced this, so its retention limit governs its own snapshots
+      // and nobody else's. Null for anything a person asked for directly.
+      taskId,
+      members: archived,
+      // The dumps, by file inside the archive, so a restore knows what to import and verify knows
+      // what to look for. Empty when the server is attached to nothing.
+      databases: dumps.dumped,
+      sourceDir: inst.dir,
+      createdAt: new Date().toISOString(),
+      size,
+      serverWasRunning: running,
+      flushed,
+      // bsdtar emits an undescribed "tar: (null)" alongside exit 1 when it
+      // skips a file the running server has locked. That carries no signal.
+      warnings: [
+        ...(flushWarning ? [flushWarning] : []),
+        ...dumps.skipped.map((d) => `database ${d.database} on ${d.service} not included: ${d.reason}`),
+        ...stderr
+          .trim()
+          .split(/\r?\n/)
+          .filter((l) => l.trim() && !/^tar:\s*\(null\)$/.test(l.trim())),
+      ].slice(0, 10),
+    }
+    writeJson(manifestFile, manifest)
+    // Both are on the same filesystem. History sees the final filename only after
+    // tar has closed it and its complete manifest is already available.
+    fs.renameSync(pending, file)
+    published = true
+    const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
+    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
+  } finally {
+    if (reservation && !published) {
+      // Keep the name reserved until its metadata is gone. Releasing it first
+      // lets a simultaneous CLI backup claim the name while this cleanup runs.
+      fs.rmSync(reservation.manifestFile, { force: true })
+      fs.rmSync(reservation.manifestFile + '.tmp', { force: true })
+      fs.rmSync(reservation.pending, { force: true })
+    }
   }
-  const manifest = {
-    instance: inst.name,
-    scope,
-    label,
-    // Which scheduled task produced this, so its retention limit governs its own snapshots
-    // and nobody else's. Null for anything a person asked for directly.
-    taskId,
-    members: archived,
-    // The dumps, by file inside the archive, so a restore knows what to import and verify knows
-    // what to look for. Empty when the server is attached to nothing.
-    databases: dumps.dumped,
-    sourceDir: inst.dir,
-    createdAt: new Date().toISOString(),
-    size,
-    serverWasRunning: running,
-    flushed,
-    // bsdtar emits an undescribed "tar: (null)" alongside exit 1 when it
-    // skips a file the running server has locked. That carries no signal.
-    warnings: [
-      ...(flushWarning ? [flushWarning] : []),
-      ...dumps.skipped.map((d) => `database ${d.database} on ${d.service} not included: ${d.reason}`),
-      ...stderr
-        .trim()
-        .split(/\r?\n/)
-        .filter((l) => l.trim() && !/^tar:\s*\(null\)$/.test(l.trim())),
-    ].slice(0, 10),
-  }
-  writeJson(path.join(backupDir(inst.name), `${base}.json`), manifest)
-  const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
-  return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
 }
 
 export function listSnapshots(name) {
