@@ -168,8 +168,8 @@ async function main() {
     return result
   }
 
-  async function until(check, message) {
-    const deadline = Date.now() + 10000
+  async function until(check, message, timeout = 10000) {
+    const deadline = Date.now() + timeout
     while (Date.now() < deadline) {
       if (check()) return
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -213,6 +213,12 @@ async function main() {
     const warningOutput = '[00:00:01 \u001b[33mWARN\u001b[0m]: desktop smoke \u001b[38;2;255;180;0mwarning\u001b[0m '
       + 'a long plugin diagnostic with useful details '.repeat(24)
     fs.appendFileSync(fakeJava, `\nprocess.stdout.write(${JSON.stringify(warningOutput + '\n')})\n`)
+    // Touch real memory and consume a bounded amount of CPU so the native sampler must
+    // measure the server process, not draw a plausible empty chart or measure the panel.
+    fs.appendFileSync(fakeJava, `
+globalThis.smokeMemory = Buffer.alloc(32 * 1024 * 1024, 1);
+setInterval(() => { const end = performance.now() + 50; while (performance.now() < end) {} }, 100);
+`)
     fs.writeFileSync(path.join(instanceDir, 'server.jar'), '')
     fs.writeFileSync(path.join(instanceDir, 'eula.txt'), 'eula=true\n')
     fs.writeFileSync(path.join(instanceDir, 'server.properties'), 'motd=Packaged desktop smoke test\n')
@@ -277,7 +283,35 @@ async function main() {
     await page.locator('#conSearch').fill('')
     await page.locator('[data-lvl="all"]').click()
     record('PASS: ANSI output becomes searchable plain text with warning levels; long lines scroll and Wrap remains available')
+
+    await page.locator('#tabPerformance').click()
+    await page.waitForFunction(() => {
+      const values = [...document.querySelectorAll('#performanceBody .gauge .now')].map(el => el.textContent)
+      return values.length === 2 && /\d.*%/.test(values[0]) && /\d.* MB/.test(values[1])
+    }, null, { timeout: 45000 })
+    const firstMetrics = await api(`instances/${name}/metrics?seconds=60`)
+    assert.notEqual(firstMetrics.available, false)
+    assert.ok(firstMetrics.samples.length > 0)
+    assert.ok(firstMetrics.samples.some(sample => sample.cpu > 0 && sample.cpu <= 100), 'Measured CPU must reflect the fixture workload')
+    assert.ok(firstMetrics.samples.every(sample => sample.rss >= 32), 'Measured resident memory must include the touched fixture buffer')
+    await page.waitForFunction(count => {
+      const match = /Samples\s+(\d+)/.exec(document.querySelector('#performanceBody .facts')?.textContent || '')
+      return match && Number(match[1]) > count
+    }, firstMetrics.samples.length, { timeout: 30000 })
+    await page.screenshot({ path: path.join(output, '06-performance-live.png') })
+    await page.locator('#performanceBody .ranges').getByRole('button', { name: '1m', exact: true }).click()
+    await page.waitForFunction(() => document.querySelector('#performanceBody .ranges button[aria-pressed="true"]')?.textContent === '1m')
+    await page.locator('#tabConsole').click()
+    await page.locator('#tabPerformance').click()
+    assert.equal(await page.locator('#performanceBody .ranges button[aria-pressed="true"]').textContent(), '1m')
+    const beforeClose = await api(`instances/${name}/metrics`)
+    fs.writeFileSync(path.join(output, 'performance-live.json'), JSON.stringify(beforeClose, null, 2))
+    record('PASS: native CPU/memory measurements reach the Performance charts and refresh automatically; history range survives tab reentry')
     await close()
+
+    const metricsPath = path.join(data, 'run', name, 'metrics.log')
+    await until(() => fs.readFileSync(metricsPath, 'utf8').trim().split('\n').length > beforeClose.history.count,
+      'The daemon must keep measuring while the desktop app is closed', 25000)
 
     await launch()
     await page.locator('#bSettings').waitFor({ state: 'visible' })
@@ -288,6 +322,26 @@ async function main() {
     assert.equal(stopped.status, 'stopped')
     assert.match(fs.readFileSync(consoleFile, 'utf8'), /server process exited \(code=0\)/)
     record('PASS: theme survives app restart; detached server survives and then stops cleanly')
+
+    await page.locator(`#list [data-name="${name}"]`).click()
+    await page.locator('#tabPerformance').click()
+    await page.waitForFunction(() => [...document.querySelectorAll('#performanceBody .gauge .now')]
+      .every(el => el.textContent === 'stopped') && document.querySelectorAll('#performanceBody .gauge .now').length === 2)
+    const stoppedMetrics = await api(`instances/${name}/metrics`)
+    assert.equal(stoppedMetrics.running, false)
+    assert.ok(stoppedMetrics.history.count > beforeClose.history.count)
+    await page.screenshot({ path: path.join(output, '07-performance-stopped.png') })
+    await api(`instances/${name}/start`, {})
+    const restartedMetrics = await api(`instances/${name}/metrics`)
+    assert.ok(restartedMetrics.startedAt > firstMetrics.startedAt)
+    assert.equal(restartedMetrics.history.count, 0, 'A restart must not join the previous process history')
+    await until(() => fs.existsSync(metricsPath) && fs.readFileSync(metricsPath, 'utf8').trim().length > 0,
+      'The replacement server process must produce new measurements', 30000)
+    const newMetrics = await api(`instances/${name}/metrics`)
+    assert.ok(newMetrics.samples.every(sample => sample.at >= Math.floor(restartedMetrics.startedAt / 1000)))
+    assert.ok(newMetrics.samples.some(sample => sample.cpu > 0))
+    await api(`instances/${name}/stop`, {})
+    record('PASS: measurements continue with the app closed, remain visible after stop, and restart with a fresh process baseline')
 
     await page.locator(`#list [data-name="${name}"]`).click()
     await page.locator('#tabBackups').click()
@@ -334,7 +388,7 @@ async function main() {
       process.exitCode = 1
       record(`App cleanup failed: ${error.message}`)
     })
-    for (const filename of ['console.log', 'daemon.log', 'state.json']) {
+    for (const filename of ['console.log', 'daemon.log', 'state.json', 'metrics.log']) {
       const source = path.join(data, 'run', name, filename)
       if (fs.existsSync(source)) fs.copyFileSync(source, path.join(output, filename))
     }
