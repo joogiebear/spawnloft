@@ -1,10 +1,13 @@
 ## Mac rolling preview
 
-The Mac downloads on this development release are refreshed from `dev` after both
-architectures pass tests. Their exact source is recorded below and in Settings →
-About; the original release tag and Windows installer still identify the earlier
-Windows build. Mac previews update manually: quit SpawnLoft and replace the app
-with the current download. Your data lives outside the application.
+Mac previews roll forward from the theme-changer development codebase on `dev`
+after both architectures pass tests. GitHub locks published releases, so each build
+gets a new `0.15.0-mac.N` prerelease rather than replacing an existing download.
+The build's exact source is recorded below and in Settings → About. The custom Mac
+channel is ignored by Windows beta updaters; the Windows beta and stable releases
+are unchanged. Mac previews update manually: quit SpawnLoft and replace the app
+with the newest Mac preview on the repository's Releases page. Your data lives
+outside the application.
 
 - **Apple Silicon (M1/M2/M3/M4 and later):** download the `mac-arm64.dmg` asset.
 - **Intel:** download the `mac-x64.dmg` asset.

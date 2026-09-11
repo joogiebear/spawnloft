@@ -6,21 +6,24 @@ import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dir = path.join(here, 'dist/mac-release')
-const version = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8')).version
-if (!version.includes('-')) throw new Error('Only a development version may refresh the Mac preview')
-const tag = `v${version}`
+const sourceVersion = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8')).version
+if (!sourceVersion.includes('-')) throw new Error('Only a development version may publish a Mac preview')
 const repo = 'joogiebear/spawnloft'
 const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-const release = JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'isDraft,isPrerelease,body']))
-if (release.isDraft || !release.isPrerelease) throw new Error('The rolling target must already be a published prerelease')
 const commit = gh(['api', `repos/${repo}/commits/dev`, '--jq', '.sha'])
-// Do not let a queued, older workflow replace the current development downloads.
+// Do not let a queued, older workflow publish after a newer development commit.
 if (commit !== process.env.GITHUB_SHA) throw new Error('dev moved while this build ran; publish the newer build instead')
+const version = JSON.parse(fs.readFileSync(path.join(dir, 'mac-build-arm64.json'), 'utf8')).version
+const base = sourceVersion.split('-')[0]
+if (!version.startsWith(base + '-mac.') || !/^\d+$/.test(version.slice((base + '-mac.').length))) {
+  throw new Error('Expected a numbered Mac preview version')
+}
+const tag = `v${version}`
 const assets = []
 for (const arch of ['arm64', 'x64']) {
   const manifestName = `mac-build-${arch}.json`
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, manifestName), 'utf8'))
-  if (manifest.arch !== arch || manifest.version !== version || manifest.commit !== commit || manifest.dirty) {
+  if (manifest.arch !== arch || manifest.version !== version || manifest.sourceVersion !== sourceVersion || manifest.commit !== commit || manifest.dirty) {
     throw new Error(`Unexpected build identity in ${manifestName}`)
   }
   for (const ext of ['dmg', 'zip']) {
@@ -34,13 +37,22 @@ for (const arch of ['arm64', 'x64']) {
   }
   assets.push(path.join(dir, manifestName))
 }
-// Only the explicit Mac allowlist is replaced; Windows binaries, update feeds,
-// the original tag, and stable/latest are never changed by this workflow.
-gh(['release', 'upload', tag, ...assets, '--repo', repo, '--clobber'])
 const guide = fs.readFileSync(path.join(here, 'MAC-PREVIEW.md'), 'utf8')
-const section = `<!-- mac-preview:start -->\n${guide}\n\nMac build source: [\`${commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${commit}). Refreshed ${new Date().toISOString()}.\n<!-- mac-preview:end -->`
-const previous = release.body.replace(/<!-- mac-preview:start -->[\s\S]*?<!-- mac-preview:end -->\s*/g, '').trim()
 const notes = path.join(dir, 'release-notes.md')
-fs.writeFileSync(notes, section + '\n\n---\n\n' + previous + '\n')
-gh(['release', 'edit', tag, '--repo', repo, '--notes-file', notes])
-console.log(`Refreshed Mac previews on ${tag}; stable and Windows assets are unchanged.`)
+fs.writeFileSync(notes, guide + `\n\nBuilt from [\`${commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${commit}), based on development version ${sourceVersion}.\n`)
+// Upload every verified asset while still a draft. Publishing locks the release,
+// so no client can ever see a half-uploaded Mac build. Existing releases are untouched.
+let release
+try { release = JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'isDraft,isPrerelease'])) }
+catch (error) {
+  if (!String(error.stderr).includes('release not found')) throw error
+}
+if (release && !release.isDraft) {
+  if (!release.isPrerelease) throw new Error('Refusing to change a stable release')
+  console.log(`${tag} is already published; immutable assets are unchanged.`)
+} else {
+  if (!release) gh(['release', 'create', tag, '--repo', repo, '--target', commit, '--draft', '--prerelease', '--title', `SpawnLoft ${version} — Mac preview`, '--notes-file', notes])
+  gh(['release', 'upload', tag, ...assets, '--repo', repo, '--clobber'])
+  gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease', '--latest=false'])
+  console.log(`Published ${tag}; stable and Windows assets are unchanged.`)
+}

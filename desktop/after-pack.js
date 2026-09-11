@@ -113,6 +113,8 @@ exports.default = async function afterPack(context) {
 
   // ---- 2. record what built this, for the app and for the release notes ----------------------
   const info = buildInfo()
+  info.sourceVersion = info.version
+  info.version = context.packager.appInfo.version
   if (!info.commit) {
     console.warn('  warn could not read the source commit; this build will not say what produced it')
   } else if (info.dirty) {
