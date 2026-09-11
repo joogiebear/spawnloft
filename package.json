@@ -9,6 +9,7 @@
     "test": "node --test \"test/*.test.mjs\""
   },
   "bin": {
+    "spawnloft": "./spawnloft.mjs",
     "mcctl": "./mcctl.mjs"
   },
   "engines": {

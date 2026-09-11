@@ -129,6 +129,7 @@ exports.default = async function afterPack(context) {
   fs.writeFileSync(path.join(resources, 'build-info.json'), body)
   fs.mkdirSync(path.join(__dirname, 'dist'), { recursive: true })
   fs.writeFileSync(path.join(__dirname, 'dist', 'build-info.json'), body)
+  require('./cli-launchers.cjs').writeCliLaunchers(resources, context.electronPlatformName)
 
   // ---- 3. everything the app needs is actually in the package --------------------------------
   const res = spawnSync(

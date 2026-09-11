@@ -4,8 +4,9 @@ Minecraft servers on your own PC, without the terminal. A local control plane fo
 multiple server instances with detached launch, captured console, RCON command/response, stdin
 injection, and snapshot/restore. The site is [spawnloft.com](https://spawnloft.com).
 
-SpawnLoft is the product: the desktop app, the panel, the installer. `mcctl` is the command-line
-tool inside it, and the name of this repository, so commands, file names and links keep that name.
+SpawnLoft is the product and the preferred command-line name. `mcctl` remains a compatible
+alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for packaged
+launchers, structured JSON output, live performance readings, and CSV export.
 
 Zero dependencies — plain Node 20+ and the `tar` that ships with Windows.
 

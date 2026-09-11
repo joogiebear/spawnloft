@@ -163,11 +163,12 @@ function trim(file) {
  * than the chosen window has plenty recorded, and telling someone "nothing recorded" because they
  * were looking at the last five minutes is a lie about their own data.
  */
-export function readSamples(name) {
+export function readSamples(name, { strict = false } = {}) {
   let text
   try {
     text = fs.readFileSync(metricsFile(name), 'utf8')
-  } catch {
+  } catch (error) {
+    if (strict && error.code !== 'ENOENT') throw error
     return []
   }
   const rows = []

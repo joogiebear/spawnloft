@@ -38,8 +38,12 @@ import * as paths from './src/paths.mjs'
 import { readProps, writeProps } from './src/props.mjs'
 import { UserError, fail, table, humanBytes, humanDuration, dirSize, isPortFree, sleep, cleanLabel } from './src/util.mjs'
 import { parseArgs } from './src/args.mjs'
+import { QUERY_ALIASES, query } from './src/cli-query.mjs'
+import { cmdMetrics } from './src/cli-metrics.mjs'
+import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
+const cliContext = { command: null, json: false }
 
 function requireName(positional, command) {
   const name = positional[0]
@@ -636,6 +640,16 @@ function cmdProps(positional) {
 // ------------------------------------------------------------------- backups
 
 async function cmdBackup(positional, flags) {
+  if (flags.json) {
+    checkFlags(flags, ['json', 'scope', 'label', 'keep', 'flush'])
+    instanceName(positional, 'backup')
+    if (flags.scope !== undefined && !backup.SCOPES.includes(flags.scope)) throw new UsageError('Invalid backup --scope')
+    if (flags.label !== undefined && typeof flags.label !== 'string') throw new UsageError('--label requires a value')
+    if (flags.keep !== undefined && (flags.keep === true || !Number.isInteger(Number(flags.keep)) || Number(flags.keep) < 1)) {
+      throw new UsageError('--keep must be a positive whole number')
+    }
+    if (flags.flush !== undefined && typeof flags.flush !== 'boolean') throw new UsageError('--flush does not take a value')
+  }
   const name = requireName(positional, 'backup')
   const inst = getInstance(name)
   const scope = flags.scope ?? 'standard'
@@ -643,9 +657,19 @@ async function cmdBackup(positional, flags) {
   const flush = flags.flush !== false
 
   // The flush itself lives in createSnapshot, so every caller gets it; this only narrates it.
-  if (running && flush) out('Flushing world to disk (save-all), then snapshotting...')
-  else out(`Snapshotting "${name}" (scope: ${scope})...`)
+  if (!flags.json) {
+    if (running && flush) out('Flushing world to disk (save-all), then snapshotting...')
+    else out(`Snapshotting "${name}" (scope: ${scope})...`)
+  }
   const res = await backup.createSnapshot(inst, { scope, label: flags.label ?? null, running, flush })
+  if (flags.json) {
+    const pruned = flags.keep === undefined ? [] : backup.pruneSnapshots(name, Number(flags.keep))
+    process.stdout.write(jsonLine('backup', { instance: name, path: res.file, sizeBytes: res.size,
+      scope, members: res.members, databases: res.databases, databasesSkipped: res.databasesSkipped,
+      warnings: res.manifest.warnings, mirrored: res.mirrored, mirrorError: res.mirrorError,
+      flushed: res.flushed, flushWarning: res.flushWarning, pruned }))
+    return
+  }
   out(`Wrote ${res.file} (${humanBytes(res.size)})`)
   out(`  included: ${res.members.join(', ')}`)
   for (const d of res.databases ?? []) out(`  database: ${d.database} on ${d.service} (${humanBytes(d.bytes)})`)
@@ -1604,7 +1628,11 @@ async function cmdUninstall(positional, flags) {
   if (res.failed.length) process.exitCode = 1
 }
 
-async function cmdDoctor() {
+async function cmdDoctor(positional, flags = {}) {
+  if (flags.json) {
+    checkFlags(flags, ['json'])
+    if (positional.length) throw new UsageError('Usage: spawnloft doctor --json')
+  }
   const problems = []
   const notes = []
 
@@ -1646,8 +1674,11 @@ async function cmdDoctor() {
     const { status } = readState(inst.name)
     if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
     if (status === 'stale') {
-      clearState(inst.name)
-      notes.push(`${inst.name}: cleared stale state file`)
+      if (flags.json) problems.push(`${inst.name}: stale state file; run doctor without --json to clear it`)
+      else {
+        clearState(inst.name)
+        notes.push(`${inst.name}: cleared stale state file`)
+      }
     }
     if (status === 'stopped') {
       const free = await isPortFree(inst.port)
@@ -1656,6 +1687,12 @@ async function cmdDoctor() {
     notes.push(`${inst.name}: ${humanBytes(dirSize(inst.dir))} on disk at ${inst.dir}`)
   }
 
+  if (flags.json) {
+    process.stdout.write(jsonLine('doctor', { healthy: problems.length === 0, notes, problems },
+      problems.length ? { error: { code: 'CHECK_FAILED', message: `${problems.length} environment problem(s) found` } } : undefined))
+    if (problems.length) process.exitCode = 1
+    return
+  }
   out('Environment')
   for (const n of notes) out(`  ${n}`)
   out('')
@@ -1671,7 +1708,21 @@ async function cmdDoctor() {
 // ---------------------------------------------------------------------- help
 
 function cmdHelp() {
-  out(`mcctl - the SpawnLoft command line. Local Minecraft servers, from a terminal.
+  out(`spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.
+
+AUTOMATION
+  spawnloft status <name> --json     Versioned status record (no configured credentials)
+  spawnloft plugins <name> --json    Full plugin inventory
+  spawnloft backups <name> --json    Backup history (snapshots is an alias)
+  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries
+  spawnloft doctor --json            Read-only environment checks
+  spawnloft backup <name> --json     Create a backup; return its result and warnings
+  spawnloft metrics <name> --json    Recorded CPU and memory measurements
+      --follow                       Stream new readings; --json uses JSON Lines
+      --seconds <n>                  Limit the initial history window
+      --csv [--output <file>]        CSV export; refuses to overwrite an existing file
+  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.
+  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.
 
 LIFECYCLE
   mcctl list                         Show every instance and its state
@@ -1799,6 +1850,7 @@ const COMMANDS = {
   backup: cmdBackup,
   snapshot: cmdBackup,
   snapshots: cmdSnapshots,
+  backups: cmdSnapshots,
   restore: cmdRestore,
   prune: cmdPrune,
   verify: cmdVerify,
@@ -1816,6 +1868,8 @@ const COMMANDS = {
   pack: cmdPack,
   worlds: cmdWorlds,
   why: cmdWhy,
+  diagnostics: cmdWhy,
+  metrics: cmdMetrics,
   launchers: cmdLaunchers,
   ui: cmdUi,
   panel: cmdUi,
@@ -1827,28 +1881,50 @@ const COMMANDS = {
 }
 
 async function main() {
-  ensureDirs()
   const [, , command, ...rest] = process.argv
+  const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow'] })
+  cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
+  cliContext.json = flags.json !== undefined && flags.json !== false
+  if (cliContext.json && flags.json !== true) throw new UsageError('--json does not take a value')
   if (!command || command === '--help' || command === '-h') {
+    if (cliContext.json) throw new UsageError('Use help without --json')
     cmdHelp()
     return
   }
-  const handler = COMMANDS[command]
+  const handler = Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : null
   if (!handler) {
-    process.stderr.write(`Unknown command "${command}". Run "mcctl help" for usage.\n`)
-    process.exitCode = 2
+    throw new UsageError(`Unknown command "${command}". Run "spawnloft help" for usage.`)
+  }
+  if (flags.csv !== undefined && command !== 'metrics') throw new UsageError('--csv is supported only for metrics')
+  if (cliContext.json && Object.hasOwn(QUERY_ALIASES, command)) {
+    process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  const { flags, positional } = parseArgs(rest)
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics'].includes(command)) {
+    throw new UsageError(`--json is not supported for ${command}; no action was performed`)
+  }
+  ensureDirs()
   await handler(positional, flags)
 }
 
+// A pipe consumer such as `head` can close stdout deliberately. Do not turn that into
+// a stack trace (or leave a follow process running after its consumer is gone).
+process.stdout.on('error', error => {
+  if (error.code === 'EPIPE') process.exit(0)
+  process.stderr.write(`Output failed: ${error.message}\n`)
+  process.exit(1)
+})
 main().catch((err) => {
+  process.exitCode = err instanceof UsageError ? 2 : 1
+  if (cliContext.json) {
+    process.stdout.write(jsonLine(cliContext.command, undefined, { type: 'error', error: {
+      code: err instanceof UsageError ? 'INVALID_USAGE' : (err.code || 'COMMAND_FAILED'), message: err.message || String(err),
+    } }))
+    return
+  }
   if (err instanceof UserError) {
     process.stderr.write(`error: ${err.message}\n`)
-    process.exitCode = 1
   } else {
     process.stderr.write(`${err.stack || err}\n`)
-    process.exitCode = 1
   }
 })
