@@ -629,8 +629,6 @@ mcctl db creds maria survival        # shows them again
 mcctl db detach maria survival       # takes the user away; --drop deletes the data too
 mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
 mcctl db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
-mcctl db plugins survival            # which plugins here can take the credentials
-mcctl db apply maria survival luckperms   # writes them into that plugin's config, comments kept
 ```
 
 MariaDB comes from its own mirror as the portable Windows zip, hash-checked and unpacked with the
@@ -639,13 +637,13 @@ Each database keeps its data under `services/<name>/`, listens on 127.0.0.1 only
 through `mariadb-admin` over TCP, since a database takes no console input. The user a server gets
 can reach its one database and nothing else. A snapshot of an attached server carries a dump of
 its database as a `databases/` member; verify checks for it, and restore imports it back into the
-database it came from, which has to be running. *Apply to a plugin* writes the credentials into
-LuckPerms, CoreProtect, Plan or AuthMe's own config, in place, with the comments kept; the server
-restarts for the plugin to read it. A database you already run - XAMPP, a MariaDB install, a Redis on the LAN - is
+database it came from, which has to be running. **Plugin configs stay manual.** Use
+`spawnloft db creds <database> <server>` or **Show credentials** in the panel, then copy
+the values into your plugin config yourself. Creating or attaching a database never
+writes plugin configs; existing configs are left unchanged. A database you already run - XAMPP, a MariaDB install, a Redis on the LAN - is
 registered with its address and attaches the same way, only never started or stopped from here. In the panel, databases sit under the servers in the
 sidebar, a server's Settings tab has a Databases card with the credentials one click away and a
 *Create a database* button that makes one for that server in one step - MariaDB's newest stable
 release on the port after the game port, started and attached - and *Add a server → A database*
-creates one with the choices in it (a version, an engine, one for several servers to share). The plan, with what comes next (backups of attached
-databases, config helpers for the common plugins, Redis by way of Garnet), is in
+creates one with the choices in it (a version, an engine, one for several servers to share). The database design and supported workflows are in
 `docs/databases-plan.md`.

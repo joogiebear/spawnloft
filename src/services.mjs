@@ -8,7 +8,6 @@ import {
 } from './registry.mjs'
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
-import { detectHelpers, applyHelper } from './dbconfig.mjs'
 import { readState, clearState } from './control.mjs'
 import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
@@ -69,7 +68,6 @@ export function serverAttachments(serverName) {
       database: a.database,
       user: a.user,
       createdAt: a.createdAt ?? null,
-      applied: a.applied ?? {},
     })
   }
   return out
@@ -231,7 +229,7 @@ export function removeDatabase(name, { purge = false } = {}) {
  * Give a server its own database and user on a running database, and remember it.
  *
  * <p>Idempotent: attaching again re-asserts the same credentials rather than minting new ones,
- * so a plugin config written from the first attach keeps working.
+ * so manually configured plugins keep working. Plugin configs are never changed here.
  */
 export function attach(dbName, serverName) {
   const db = getDatabase(dbName)
@@ -395,27 +393,4 @@ export async function importDumps(serverName, dumps, baseDir) {
     }
   }
   return { imported, skipped }
-}
-
-// ---- plugins that want the credentials ------------------------------------------------------
-
-/** The plugin config helpers this server can use, with whether each plugin and its config are there. */
-export function helpersFor(serverName, { engine = null } = {}) {
-  const kind = engine ? (ENGINES[engine]?.kind ?? engine) : null
-  return detectHelpers(assertServer(serverName)).filter((h) => !kind || h.engine === kind)
-}
-
-/**
- * Write a server's credentials on one database into one plugin's config, and remember that it
- * was done, so the panel can show which plugins point at which database.
- */
-export function applyToPlugin(dbName, serverName, helperId) {
-  const server = assertServer(serverName)
-  const creds = credentials(dbName, serverName)
-  const result = applyHelper(server, helperId, creds, { kind: creds.kind })
-  const db = getDatabase(dbName)
-  const record = db.attachments[serverName]
-  const applied = { ...(record.applied ?? {}), [result.plugin]: { file: result.file, at: new Date().toISOString() } }
-  updateInstance(dbName, { attachments: { ...db.attachments, [serverName]: { ...record, applied } } })
-  return { ...result, service: dbName, server: serverName, restartNeeded: true }
 }

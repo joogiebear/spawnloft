@@ -69,6 +69,31 @@ test('both CLI names return the same versioned status without registry credentia
   assert.ok(!JSON.stringify(next).includes(secret))
 })
 
+test('both CLI names reject removed database config commands without changing plugin files or credentials', () => {
+  const folder = path.join(instance, 'plugins', 'LuckPerms')
+  fs.mkdirSync(folder, { recursive: true })
+  const config = path.join(folder, 'config.yml')
+  const original = 'storage-method: h2\n# My manual settings\ndata:\n  password: keep-me\n'
+  fs.writeFileSync(config, original)
+  const registry = path.join(data, 'instances.json')
+  const before = fs.readFileSync(registry, 'utf8')
+  for (const name of ['mcctl', 'spawnloft']) {
+    for (const args of [['db', 'apply', 'externaldb', 'royalplugins', 'luckperms'], ['db', 'plugins', 'royalplugins']]) {
+      const result = cli(args, name)
+      assert.notEqual(result.code, 0)
+      assert.match(result.stderr, /usage:/)
+      assert.ok(!result.stdout.includes(secret))
+      assert.equal(fs.readFileSync(config, 'utf8'), original)
+      assert.equal(fs.readFileSync(registry, 'utf8'), before)
+    }
+    const credentials = cli(['db', 'creds', 'externaldb', 'royalplugins'], name)
+    assert.equal(credentials.code, 0, JSON.stringify(credentials))
+    assert.ok(credentials.stdout.includes(secret), 'explicit credential display remains available')
+    assert.match(credentials.stdout, /Configure your plugins manually/)
+    assert.equal(fs.readFileSync(config, 'utf8'), original)
+  }
+})
+
 test('JSON inventories and diagnostics retain useful fields and aliases agree', () => {
   const plugins = json(['plugins', 'royalplugins', '--json'])
   assert.equal(plugins.data.plugins[0].file, 'manual.jar')

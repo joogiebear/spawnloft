@@ -36,6 +36,12 @@ fs.cpSync(FIXTURE, path.join(ENGINES_DIR, `mariadb-${VERSION}`), { recursive: tr
 const DB = `dbt-${process.pid}`
 const FAILED_DB = `${DB}-failed`
 const SRV = `srv-${process.pid}`
+const pluginFile = path.join(INSTANCES_DIR, SRV, 'plugins', 'LuckPerms', 'config.yml')
+const manualConfig = "# Keep comments and credentials exactly as entered\r\nstorage-method: h2\r\ndata:\r\n  password: 'manual-only'\r\n"
+function assertManualConfigs() {
+  assert.equal(fs.readFileSync(pluginFile, 'utf8'), manualConfig)
+  assert.equal(fs.existsSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'CoreProtect', 'config.yml')), false)
+}
 
 after(async () => {
   try { await sup.kill(DB) } catch { /* down */ }
@@ -74,6 +80,9 @@ test('creating a database lays out its folder, picks a free port, and registers 
 test('a second create with the same name, or on the server side, is refused', async () => {
   await assert.rejects(services.createDatabase(DB, { version: VERSION }), UserError)
   fs.mkdirSync(path.join(INSTANCES_DIR, SRV), { recursive: true })
+  fs.mkdirSync(path.dirname(pluginFile), { recursive: true })
+  fs.mkdirSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'CoreProtect'), { recursive: true })
+  fs.writeFileSync(pluginFile, manualConfig)
   putInstance(SRV, { dir: path.join(INSTANCES_DIR, SRV), jar: 'paper.jar', memory: '4G', port: 25565 })
   assert.throws(() => services.getDatabase(SRV), UserError)
   assert.throws(() => services.assertServer(DB), UserError)
@@ -116,25 +125,21 @@ test('attach creates the database and user for the server, and the credentials c
   assert.equal(fromServer.length, 1)
   assert.equal(fromServer[0].service, DB)
   assert.equal(fromServer[0].password, undefined, 'the server-side list must not carry the password')
+  assertManualConfigs()
 })
 
-test('apply writes the credentials into a plugin config and records it on the attachment', () => {
-  const srvDir = path.join(INSTANCES_DIR, SRV)
-  fs.mkdirSync(path.join(srvDir, 'plugins', 'LuckPerms'), { recursive: true })
-  fs.writeFileSync(path.join(srvDir, 'plugins', 'LuckPerms', 'config.yml'), 'storage-method: h2\ndata:\n  address: localhost\n  database: minecraft\n  username: root\n  password: \'\'\n')
-  const helpers = services.helpersFor(SRV)
-  assert.equal(helpers.find((h) => h.id === 'luckperms').configPresent, true)
-
-  const res = services.applyToPlugin(DB, SRV, 'luckperms')
-  assert.equal(res.restartNeeded, true)
-  assert.deepEqual(res.written, ['storage-method', 'data.address', 'data.database', 'data.username', 'data.password'])
-  const creds = services.credentials(DB, SRV)
-  const text = fs.readFileSync(path.join(srvDir, 'plugins', 'LuckPerms', 'config.yml'), 'utf8')
-  assert.match(text, /^storage-method: 'mariadb'$/m)
-  assert.match(text, new RegExp(`^  address: '127\\.0\\.0\\.1:${creds.port}'$`, 'm'))
-  assert.match(text, new RegExp(`^  password: '${creds.password}'$`, 'm'))
-  assert.ok(services.serverAttachments(SRV)[0].applied.luckperms, 'the attachment must remember the plugin it was written to')
-  assert.throws(() => services.applyToPlugin(DB, SRV, 'coreprotect'), /has not written its config yet/)
+test('detach and reattach preserve manual plugin configs, including legacy attachment metadata', () => {
+  const db = services.getDatabase(DB)
+  const applied = { luckperms: { file: 'plugins/LuckPerms/config.yml', at: '2026-01-01T00:00:00Z' } }
+  updateInstance(DB, { attachments: { ...db.attachments, [SRV]: { ...db.attachments[SRV], applied } } })
+  const before = services.credentials(DB, SRV)
+  assert.deepEqual(services.attach(DB, SRV), before)
+  assert.equal(services.serverAttachments(SRV)[0].applied, undefined)
+  assertManualConfigs()
+  services.detach(DB, SRV)
+  assertManualConfigs()
+  assert.ok(services.attach(DB, SRV).password)
+  assertManualConfigs()
 })
 
 test('the panel lists databases apart from servers and never sends a password', async () => {
@@ -154,11 +159,28 @@ test('the panel lists databases apart from servers and never sends a password', 
     const mine = await (await fetch(`${url}api/instances/${SRV}/databases`)).json()
     assert.equal(mine[0].service, DB)
     assert.equal(mine[0].password, undefined)
-    const helpers = await (await fetch(`${url}api/instances/${SRV}/databases/helpers`)).json()
-    assert.equal(helpers.find((h) => h.id === 'luckperms').configPresent, true)
+    assert.equal((await fetch(`${url}api/instances/${SRV}/databases/helpers`)).status, 404)
+    const registryBefore = fs.readFileSync(path.join(scratch, 'instances.json'), 'utf8')
+    for (const plugin of ['luckperms', 'coreprotect', 'luckperms-redis']) {
+      const removed = await fetch(`${url}api/databases/${DB}/apply`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ server: SRV, plugin }),
+      })
+      assert.equal(removed.status, 404)
+      assert.equal((await removed.json()).error, 'not found')
+      assert.equal(fs.readFileSync(path.join(scratch, 'instances.json'), 'utf8'), registryBefore)
+      assertManualConfigs()
+    }
+    const attached = await fetch(`${url}api/databases/${DB}/attach`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ server: SRV }),
+    })
+    assert.equal(attached.status, 200)
+    assert.equal((await attached.json()).password, services.credentials(DB, SRV).password)
+    assertManualConfigs()
 
     const creds = await (await fetch(`${url}api/databases/${DB}/credentials?server=${SRV}`)).json()
     assert.equal(creds.password, services.credentials(DB, SRV).password)
+    assertManualConfigs()
   } finally {
     server.close()
   }
@@ -176,6 +198,7 @@ test('one-step database creation is available on Windows and explicitly unavaila
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: VERSION }),
     })
     out = await res.json()
+    assertManualConfigs()
     if (process.platform !== 'win32') {
       assert.equal(res.status, 400)
       assert.match(out.error, /Automatic database installation is not available/)
@@ -205,6 +228,7 @@ test('one-step database creation is available on Windows and explicitly unavaila
   await sup.stop(name, { timeout: 10000 })
   services.detach(name, SRV)
   services.removeDatabase(name, { purge: true })
+  assertManualConfigs()
   assert.ok(!listServices().some((i) => i.name === name))
 })
 

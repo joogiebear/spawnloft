@@ -67,18 +67,17 @@ test('attaching a server to Redis hands out the shared password, a URL and a key
   assert.equal(services.serverAttachments(SRV)[0].kind, 'redis')
 })
 
-test('only the Redis helpers are offered for a Redis database, and LuckPerms messaging is written', () => {
-  fs.writeFileSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'LuckPerms', 'config.yml'),
-    'storage-method: h2\nmessaging-service: auto\nredis:\n  enabled: false\n  address: localhost\n  password: \'\'\n')
-  const offered = services.helpersFor(SRV, { engine: 'garnet' })
-  assert.deepEqual(offered.map((h) => h.id), ['luckperms-redis'])
-  assert.throws(() => services.applyToPlugin(RD, SRV, 'luckperms'), /takes a mariadb connection/)
-  const res = services.applyToPlugin(RD, SRV, 'luckperms-redis')
-  const text = fs.readFileSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'LuckPerms', 'config.yml'), 'utf8')
-  assert.match(text, /^messaging-service: 'redis'$/m)
-  assert.match(text, /^  enabled: true$/m)
-  assert.match(text, /^storage-method: h2$/m, 'the storage line is not this helper\'s to touch')
-  assert.deepEqual(res.written, ['messaging-service', 'redis.enabled', 'redis.address', 'redis.password'])
+test('Redis attach, credential display and detach leave plugin storage and messaging manual', () => {
+  const file = path.join(INSTANCES_DIR, SRV, 'plugins', 'LuckPerms', 'config.yml')
+  const original = "# My messaging settings\nstorage-method: h2\nmessaging-service: auto\nredis:\n  enabled: false\n  address: localhost\n  password: ''\n"
+  fs.writeFileSync(file, original)
+  services.attach(RD, SRV)
+  assert.ok(services.credentials(RD, SRV).password)
+  assert.equal(fs.readFileSync(file, 'utf8'), original)
+  services.detach(RD, SRV)
+  assert.equal(fs.readFileSync(file, 'utf8'), original)
+  services.attach(RD, SRV)
+  assert.equal(fs.readFileSync(file, 'utf8'), original)
 })
 
 test('a snapshot skips a Redis database with the reason, rather than pretending to dump it', async () => {
