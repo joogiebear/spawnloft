@@ -1530,31 +1530,6 @@ async function cmdDb(positional, flags) {
     return
   }
 
-  if (sub === 'plugins') {
-    const serverName = positional[1]
-    if (!serverName) fail('usage: mcctl db plugins <server>')
-    const rows = [['PLUGIN', 'INSTALLED', 'CONFIG', 'FILE']]
-    for (const h of services.helpersFor(serverName)) {
-      rows.push([h.label, h.pluginPresent ? 'yes' : 'no', h.configPresent ? 'present' : 'not written yet', h.file])
-    }
-    out(table(rows))
-    out('')
-    out('Apply with: mcctl db apply <database> <server> <plugin>   (luckperms, coreprotect, plan, authme)')
-    return
-  }
-
-  if (sub === 'apply') {
-    const [, dbName, serverName, plugin] = positional
-    if (!dbName || !serverName || !plugin) fail('usage: mcctl db apply <database> <server> <plugin>')
-    const res = services.applyToPlugin(dbName, serverName, plugin.toLowerCase())
-    out(`Wrote ${res.file}`)
-    if (res.written.length) out(`  set:   ${res.written.join(', ')}`)
-    if (res.inserted.length) out(`  added: ${res.inserted.join(', ')}`)
-    out(`  ${res.note}`)
-    out(`Restart "${serverName}" for ${res.label} to pick it up.`)
-    return
-  }
-
   if (sub === 'connect') {
     const name = positional[1]
     if (!name) fail('usage: mcctl db connect <name> --engine mariadb|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]')
@@ -1586,11 +1561,11 @@ async function cmdDb(positional, flags) {
     if (!dbName) fail('usage: mcctl db remove <database> [--purge]')
     const res = services.removeDatabase(dbName, { purge: Boolean(flags.purge) })
     out(`Removed database "${res.name}"${res.purged ? ' and its files' : ' (files kept)'}.`)
-    if (res.detached.length) out(`Servers that were attached: ${res.detached.join(', ')} - their plugin configs still name it.`)
+    if (res.detached.length) out(`Servers that were attached: ${res.detached.join(', ')} - update any plugin configs you configured manually.`)
     return
   }
 
-  fail('usage: mcctl db [list|versions|add|create|connect|attach|detach|creds|plugins|apply|root|remove]')
+  fail('usage: mcctl db [list|versions|add|create|connect|attach|detach|creds|root|remove]')
 }
 
 function printCredentials(c) {
@@ -1603,6 +1578,7 @@ function printCredentials(c) {
   if (c.keyPrefix) rows.push(['key prefix:', c.keyPrefix])
   out(table(rows))
   if (c.note) out(`  ${c.note}`)
+  out('Configure your plugins manually with these values. SpawnLoft does not edit plugin configs.')
 }
 
 // ----------------------------------------------------------------- uninstall
@@ -1812,8 +1788,6 @@ DATABASES
   mcctl db attach <db> <server>      Give a server its own database and user; prints the credentials
   mcctl db detach <db> <server>      Take the user away [--drop deletes the data too]
   mcctl db creds <db> <server>       Show a server's credentials again
-  mcctl db plugins <server>          Which plugins here can take those credentials
-  mcctl db apply <db> <server> <plugin>  Write them into that plugin's config (luckperms, coreprotect, plan, authme)
   mcctl db remove <db> [--purge]     Forget a stopped database [and delete its files]
   start, stop, restart, logs and status take a database's name like a server's.
 

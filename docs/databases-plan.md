@@ -93,18 +93,12 @@ warning in the manifest, not a failed backup. Only the standard and full scopes 
 dumps: plugins, worlds and config each name one kind of file. The scheduler needed
 nothing new.
 
-## Phase 3 - config helpers (built)
+## Plugin configuration: manual only
 
-"Apply to a plugin": LuckPerms, CoreProtect, Plan and AuthMe, each a row in one table
-(`src/dbconfig.mjs`) naming the config file, the keys that carry the connection and the
-storage mode the plugin calls it. The keys are set in place by a comment-preserving YAML
-line editor (`src/yamlpath.mjs`): it walks the document by indentation, changes only the
-value on the line it wants, keeps a trailing comment, and adds a key that is missing under
-its parent at the parent's own child indent. Only ever on a click, only when the config
-exists - a plugin installed but never started is named with the reason, since a config
-written before its first start would be replaced by its defaults - and what was written
-is recorded on the attachment so the panel can say which plugins point at which database.
-The server has to restart for the plugin to read it, and every surface says so.
+SpawnLoft creates databases and users and displays connection details for manual use.
+It does not inject credentials or change plugin storage or messaging settings. The former
+`db apply`, helper discovery, and panel config-writing controls have been removed, along
+with their config writer. Existing plugin configs are left unchanged.
 
 ## Phase 4 - Redis, and connecting to what you already run (built)
 
@@ -115,8 +109,7 @@ Loopback, password auth, checkpoints and an append-only log in the data folder; 
 "ready to accept connections"; stopped with SAVE then SHUTDOWN over the protocol itself,
 by a forty-line Redis client of our own, since Garnet ships no admin tool. Redis has no
 per-server database or user, so an attachment is the shared password, a URL and a
-suggested key prefix, and the credentials say so. LuckPerms's messaging-over-Redis is the
-first helper for it. A snapshot skips a Redis database with the reason: it keeps its own
+suggested key prefix, and the credentials say so. A snapshot skips a Redis database with the reason: it keeps its own
 checkpoints.
 
 Each engine module fills one interface - versions, fetch, init, launch to run one here;
@@ -127,7 +120,7 @@ nothing engine-specific beyond that table.
 "Connect to one I already run": a database registered with its address and admin
 credentials, for either engine. It is asked to answer before it is saved, so a wrong
 address or password is refused with the engine's own reason. It attaches, hands out
-credentials, takes helpers and dumps like one run here, and is never started or stopped
+credentials and takes dumps like one run here, and is never started or stopped
 from here; the panel shows it as reachable or unreachable, asked each poll. MariaDB's
 client tools for an external one come from a folder the person names, the usual install
 places (XAMPP, a MariaDB or MySQL install), or any MariaDB already in the engine store.
@@ -138,7 +131,7 @@ places (XAMPP, a MariaDB or MySQL install), or any MariaDB already in the engine
 - One shared engine, many databases: a server attaches to a database instance, and one
   database instance serves as many servers as you like. Lighter than one engine per
   server, and how people already use MySQL locally.
-- Managed engines are Windows-only, like the desktop app. The CLI on other platforms
+- Managed engines are currently Windows-only; the Mac desktop is in preview. The CLI on other platforms
   can still register and attach to a database someone runs themselves (phase 4).
 - Engines are downloaded from their official mirrors at runtime, not bundled, exactly as
   Paper is; nothing is redistributed.

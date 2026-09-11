@@ -959,7 +959,7 @@ function safeDatabase(row) {
   const { root, attachments, tools, ...safe } = row
   const shown = {}
   for (const [server, a] of Object.entries(attachments ?? {})) {
-    shown[server] = { database: a.database, user: a.user, createdAt: a.createdAt ?? null, applied: a.applied ?? {} }
+    shown[server] = { database: a.database, user: a.user, createdAt: a.createdAt ?? null }
   }
   const engine = services.ENGINES[row.engine]
   return {
@@ -1299,10 +1299,6 @@ async function route(req, res) {
       if (!body.server) return json(res, 400, { error: 'server is required' })
       return json(res, 200, services.detach(db, String(body.server), { drop: body.drop === true }))
     }
-    if (seg[3] === 'apply') {
-      if (!body.server || !body.plugin) return json(res, 400, { error: 'server and plugin are required' })
-      return json(res, 200, services.applyToPlugin(db, String(body.server), String(body.plugin)))
-    }
     if (seg[3] === 'delete') {
       return json(res, 200, services.removeDatabase(db, { purge: body.purge === true }))
     }
@@ -1501,11 +1497,8 @@ async function route(req, res) {
   }
   if (seg[3] === 'metrics') return handleMetrics(req, res, name, url)
   // The databases this server is attached to, without passwords; those are one click further.
-  if (seg[3] === 'databases' && seg[4] === 'helpers' && req.method === 'GET') {
-    const engine = url.searchParams.get('engine')
-    return json(res, 200, services.helpersFor(name, { engine: engine || null }))
-  }
   if (seg[3] === 'databases' && req.method === 'GET') {
+    if (seg.length !== 4) return json(res, 404, { error: 'not found' })
     return json(res, 200, services.serverAttachments(name))
   }
 

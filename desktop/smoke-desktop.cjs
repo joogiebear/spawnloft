@@ -246,9 +246,20 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     fs.writeFileSync(path.join(instanceDir, 'server.jar'), '')
     fs.writeFileSync(path.join(instanceDir, 'eula.txt'), 'eula=true\n')
     fs.writeFileSync(path.join(instanceDir, 'server.properties'), 'motd=Packaged desktop smoke test\n')
+    const pluginConfig = path.join(instanceDir, 'plugins', 'LuckPerms', 'config.yml')
+    const manualConfig = '# Manual settings\nstorage-method: h2\ndata:\n  password: keep-my-settings\n'
+    fs.mkdirSync(path.dirname(pluginConfig), { recursive: true })
+    fs.writeFileSync(pluginConfig, manualConfig)
     fs.writeFileSync(path.join(data, 'instances.json'), JSON.stringify({
       version: 1,
       instances: {
+        'manual-db': {
+          kind: 'database', engine: 'mariadb', version: 'smoke-fixture',
+          dir: path.join(data, 'services', 'manual-db'), port: 45585,
+          root: { password: 'fixture-root' }, autoRestart: false,
+          attachments: { [name]: { database: name, user: name, password: 'fixture-manual-credential',
+            applied: { luckperms: { file: 'plugins/LuckPerms/config.yml', at: '2026-01-01T00:00:00Z' } } } },
+        },
         [name]: {
           dir: instanceDir, jar: 'server.jar', java: fakeJava, memory: '1G',
           port: 45565, rcon: { port: 45575, password: 'isolated-smoke' },
@@ -270,6 +281,9 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
       assert.equal(missing.ok, false)
       const usage = JSON.parse((await terminal(command, ['remove', name, '--json'], 2)).stdout)
       assert.equal(usage.error.code, 'INVALID_USAGE')
+      const removed = await terminal(command, ['db', 'apply', 'manual-db', name, 'luckperms'], 1)
+      assert.match(removed.stderr, /usage:/)
+      assert.equal(fs.readFileSync(pluginConfig, 'utf8'), manualConfig)
     }
     record('PASS: packaged spawnloft and mcctl terminal launchers return clean JSON and preserve success/failure exit codes')
 
@@ -300,6 +314,19 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     record(`PASS: packaged daemon starts, reaches ready, and receives console input over its ${isMac ? 'Unix socket' : 'named pipe'}`)
     await page.locator('#bSetClose').click()
     await page.locator(`#list [data-name="${name}"]`).click()
+    await page.locator('#tabSettings').click()
+    const showCredentials = page.locator('#settingsBody').getByRole('button', { name: 'Show credentials', exact: true })
+    await showCredentials.waitFor({ state: 'visible' })
+    assert.match(await page.locator('#settingsBody').textContent(), /configure your plugins manually/)
+    assert.equal(await page.locator('#settingsBody').getByRole('button', { name: /Apply to a plugin/ }).count(), 0)
+    assert.ok(!(await page.locator('#settingsBody').textContent()).includes('Written to'))
+    await page.screenshot({ path: path.join(output, '08-manual-database-settings.png') })
+    await showCredentials.click()
+    await page.locator('#dlg .creds').waitFor({ state: 'visible' })
+    assert.ok((await page.locator('#dlg .creds').textContent()).includes('fixture-manual-credential'))
+    await page.locator('#dlgCancel').click()
+    assert.equal(fs.readFileSync(pluginConfig, 'utf8'), manualConfig)
+    record('PASS: database settings offer manual credentials without plugin config writers; legacy CLI apply is rejected and existing config bytes stay unchanged')
     await page.locator('#tabConsole').click()
     const warningLine = page.locator('#log .ln').filter({ hasText: 'desktop smoke warning' })
     await warningLine.waitFor({ state: 'visible' })
