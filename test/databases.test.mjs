@@ -59,7 +59,7 @@ test('the fake engine is found through the same lookup the real one uses', () =>
 
 test('creating a database lays out its folder, picks a free port, and registers it apart from the servers', async () => {
   const port = await findFreePort(43000 + Math.floor(Math.random() * 10000))
-  const db = await services.createDatabase(DB, { version: VERSION, port, label: 'Test DB' })
+  const db = await services.createDatabase(DB, { engine: 'mariadb', version: VERSION, port, label: 'Test DB' })
   assert.equal(db.kind, 'database')
   assert.equal(db.engine, 'mariadb')
   assert.equal(db.port, port)
@@ -78,7 +78,7 @@ test('creating a database lays out its folder, picks a free port, and registers 
 })
 
 test('a second create with the same name, or on the server side, is refused', async () => {
-  await assert.rejects(services.createDatabase(DB, { version: VERSION }), UserError)
+  await assert.rejects(services.createDatabase(DB, { engine: 'mariadb', version: VERSION }), UserError)
   fs.mkdirSync(path.join(INSTANCES_DIR, SRV), { recursive: true })
   fs.mkdirSync(path.dirname(pluginFile), { recursive: true })
   fs.mkdirSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'CoreProtect'), { recursive: true })
@@ -186,7 +186,7 @@ test('the panel lists databases apart from servers and never sends a password', 
   }
 })
 
-test('one-step database creation is available on Windows and explicitly unavailable in other previews', { timeout: 60000 }, async () => {
+test('one-step MariaDB creation is available on Windows and explicitly refused on other platforms', { timeout: 60000 }, async () => {
   const srv = services.assertServer(SRV)
   const wanted = Number(srv.port) + 1
   const wantedFree = !usedPorts().has(wanted) && await isPortFree(wanted)
@@ -195,13 +195,13 @@ test('one-step database creation is available on Windows and explicitly unavaila
   let out
   try {
     const res = await fetch(`${url}api/instances/${SRV}/databases/create`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: VERSION }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ engine: 'mariadb', version: VERSION }),
     })
     out = await res.json()
     assertManualConfigs()
     if (process.platform !== 'win32') {
       assert.equal(res.status, 400)
-      assert.match(out.error, /Automatic database installation is not available/)
+      assert.match(out.error, /[Ii]nstallation.*not available/)
       assert.ok(!listServices().some((i) => i.name === `${SRV}-db`), 'the refused request must not create a database')
       return
     }
@@ -314,7 +314,7 @@ test('a database that dies during startup is reported as failed, with the engine
   // This daemon inherits the scripted failure environment. Keep it separate from the healthy
   // database, and leave auto-restart off: seeing its error line can precede the child exit, when
   // the daemon rereads the setting. Turning it back on then races into repeated scripted failures.
-  await services.createDatabase(FAILED_DB, { version: VERSION })
+  await services.createDatabase(FAILED_DB, { engine: 'mariadb', version: VERSION })
   updateInstance(FAILED_DB, { autoRestart: false })
   process.env.FAKE_MARIADB_FAIL = 'start'
   try {

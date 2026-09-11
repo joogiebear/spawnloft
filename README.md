@@ -615,6 +615,13 @@ SpawnLoft's own folders. The same command is available from a terminal as
 
 ## Databases
 
+On **Mac (macOS 15+)**, managed SQL databases use MySQL 8.4 LTS. Choose **Create a database**
+in a server's Settings, or run `spawnloft db create <server>`. SpawnLoft downloads an
+architecture-specific, SHA-256-verified archive from Oracle, keeps it in its own engine
+store, and initializes and starts a database with scoped credentials. It does not install
+Homebrew, add a system service, or edit plugin configs. On older Macs, connect to a database
+you already run. **Windows** retains the MariaDB/Garnet workflow below.
+
 Plugins that want MySQL — LuckPerms, CoreProtect, Plan, AuthMe, Jobs, mcMMO — can have one
 here, with nothing to install; so can plugins that want Redis, by way of Microsoft's Garnet. A database is another entry in the registry, run by the same
 daemon as a server: a card with a lamp, a console, start, stop and restart, crash recovery.

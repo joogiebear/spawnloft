@@ -2039,7 +2039,7 @@
         </div>
         <div class="row">
           <button type="submit" class="primary" id="bDbCreate">Add database</button>
-          <span class="hint" id="dbHint">Around 100 MB the first time for a version; every database on that version shares it.</span>
+          <span class="hint" id="dbHint">The engine downloads once for each version; every database on that version shares it.</span>
         </div>
       </form>
     </div>
@@ -2160,6 +2160,7 @@ const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
 const panelPlatform = $('meta[name="spawnloft-platform"]').content;
 const windowsFeatures = panelPlatform === 'win32';
+const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MariaDB, MySQL, or Redis database instead.';
 
 const state = {
@@ -6661,8 +6662,8 @@ async function renderServerDatabases(row, body) {
   create.textContent = 'Create a database';
   const createHint = document.createElement('span');
   createHint.className = 'hint';
-  createHint.textContent = 'MariaDB, newest stable, on port ' + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
-  if (!windowsFeatures) {
+  createHint.textContent = (panelPlatform === 'darwin' ? 'MySQL 8.4 LTS (macOS 15+), on port ' : 'MariaDB, newest stable, on port ') + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  if (!managedDatabaseFeatures) {
     create.disabled = true;
     createHint.textContent = databasePreviewNote;
   }
@@ -6921,14 +6922,18 @@ function openAdd(tab) {
 }
 
 let dbEnginesLoaded = false;
-const ENGINE_HINT = { mariadb: 'MySQL-compatible', garnet: 'Redis-compatible, by Microsoft' };
+const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; managed installation requires macOS 15+', mariadb: 'MySQL-compatible', garnet: 'Redis-compatible, by Microsoft' };
 async function loadDbEngines() {
   if (dbEnginesLoaded) return;
   try {
     const list = await api('/databases/engines');
     const sel = $('#dEngine');
     sel.textContent = '';
-    for (const e of list) sel.append(new Option(e.label, e.id));
+    for (const e of list) {
+      const option = new Option(e.label, e.id, e.default, e.default);
+      option.dataset.managed = String(e.managed);
+      sel.append(option);
+    }
     dbEnginesLoaded = true;
   } catch { /* the one engine already in the select stands */ }
 }
@@ -6939,15 +6944,21 @@ function dbMode() {
 
 /** Show the fields the chosen mode and engine need, and say what the port default is. */
 function syncDbForm() {
-  if (!windowsFeatures) {
+  if (!managedDatabaseFeatures) {
     const run = $('input[name="dbMode"][value="run"]');
     run.disabled = true;
     run.checked = false;
     run.closest('label').querySelector('span').textContent = databasePreviewNote;
     $('input[name="dbMode"][value="connect"]').checked = true;
   }
-  const engine = $('#dEngine').value;
   const connect = dbMode() === 'connect';
+  const engineSelect = $('#dEngine');
+  for (const option of engineSelect.options) option.disabled = !connect && option.dataset.managed === 'false';
+  if (engineSelect.selectedOptions[0]?.disabled) {
+    engineSelect.value = [...engineSelect.options].find(option => !option.disabled)?.value || '';
+    dbVersionsFor = null;
+  }
+  const engine = engineSelect.value;
   const redis = engine === 'garnet';
   $('#dEngineHint').textContent = ENGINE_HINT[engine] || '';
   $('#dVersionWrap').hidden = connect;

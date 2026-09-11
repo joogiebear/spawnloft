@@ -98,7 +98,7 @@ if (STRUCTURE_ONLY) {
 }
 
 const core = path.join(RESOURCES, 'core')
-for (const rel of ['mcctl.mjs', 'spawnloft.mjs', 'src/cli-output.mjs', 'src/cli-metrics.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/platform.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
+for (const rel of ['mcctl.mjs', 'spawnloft.mjs', 'src/mysql.mjs', 'src/cli-output.mjs', 'src/cli-metrics.mjs', 'src/ui.html', 'src/ui.mjs', 'src/appearance.mjs', 'src/platform.mjs', 'src/daemon.mjs', 'src/java.mjs']) {
   if (!fs.existsSync(path.join(core, rel))) problems.push(`resources/core/${rel} is missing from the build`)
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')

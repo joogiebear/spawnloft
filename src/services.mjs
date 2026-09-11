@@ -8,6 +8,7 @@ import {
 } from './registry.mjs'
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
+import * as mysql from './mysql.mjs'
 import { readState, clearState } from './control.mjs'
 import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
@@ -25,6 +26,12 @@ import * as supervisor from './supervisor.mjs'
 export const ENGINES = {
   [mariadb.ENGINE]: { label: mariadb.LABEL, kind: mariadb.KIND, defaultPort: mariadb.DEFAULT_PORT, module: mariadb },
   [garnet.ENGINE]: { label: garnet.LABEL, kind: garnet.KIND, defaultPort: garnet.DEFAULT_PORT, module: garnet },
+  [mysql.ENGINE]: { label: mysql.LABEL, kind: mysql.KIND, defaultPort: mysql.DEFAULT_PORT, module: mysql },
+}
+
+export function defaultEngine() { return process.platform === 'darwin' ? 'mysql' : 'mariadb' }
+export function canManage(engine, platform = process.platform) {
+  return platform === 'win32' ? ['mariadb', 'garnet'].includes(engine) : platform === 'darwin' && engine === 'mysql'
 }
 
 /** Whether the database is there to be talked to: running here, or external (assumed; the call says otherwise). */
@@ -74,7 +81,7 @@ export function serverAttachments(serverName) {
 }
 
 /** The engine's version list, for a picker. */
-export async function versionsFor(engine = mariadb.ENGINE) {
+export async function versionsFor(engine = defaultEngine()) {
   if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)
   return ENGINES[engine].module.versions()
 }
@@ -85,7 +92,7 @@ export async function versionsFor(engine = mariadb.ENGINE) {
  * <p>Registered last, so a download that fails or an init that refuses leaves nothing behind but
  * the engine, which is worth keeping.
  */
-export async function createDatabase(name, { engine = mariadb.ENGINE, version, port = null, label = null, onProgress = null } = {}) {
+export async function createDatabase(name, { engine = defaultEngine(), version, port = null, label = null, onProgress = null } = {}) {
   validateName(name)
   if (hasInstance(name)) fail(`"${name}" already exists - servers and databases share one set of names`)
   if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)
@@ -97,8 +104,18 @@ export async function createDatabase(name, { engine = mariadb.ENGINE, version, p
     : await findFreePort(ENGINES[engine].defaultPort, usedPorts())
 
   await mod.fetchEngine(String(version), { onProgress })
+  if (hasInstance(name)) fail(`"${name}" was created while the database engine downloaded. Pick another name.`)
+  assertPortUsable(name, chosenPort)
 
   const dir = path.join(SERVICES_DIR, name)
+  // Own this newly-created directory before initialization can yield. Never initialize
+  // or delete an orphaned/existing database, or another request's in-progress setup.
+  fs.mkdirSync(SERVICES_DIR, { recursive: true })
+  try { fs.mkdirSync(dir, { mode: 0o700 }) }
+  catch (err) {
+    if (err.code === 'EEXIST') fail(`A database folder already exists at ${dir}. Move it aside or finish the existing setup before retrying.`)
+    throw err
+  }
   const inst = {
     kind: 'database',
     engine,
@@ -115,7 +132,8 @@ export async function createDatabase(name, { engine = mariadb.ENGINE, version, p
 
   onProgress?.({ message: `Setting up ${ENGINES[engine].label} ${version} on port ${chosenPort}` })
   try {
-    mod.initData({ name, ...inst })
+    await mod.initData({ name, ...inst })
+    if (hasInstance(name)) fail(`"${name}" was created while the database initialized. Pick another name.`)
   } catch (err) {
     fs.rmSync(dir, { recursive: true, force: true })
     throw err
@@ -158,7 +176,7 @@ export async function portForServer(server) {
  * removed again, engine and folder included, since a half-made database nobody asked for by
  * name would only confuse the list. The engine download is kept, as ever.
  */
-export async function createForServer(serverName, { engine = mariadb.ENGINE, version = null, onProgress = null } = {}) {
+export async function createForServer(serverName, { engine = defaultEngine(), version = null, onProgress = null } = {}) {
   const server = assertServer(serverName)
   if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)
   if (!version) {
