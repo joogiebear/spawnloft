@@ -52,6 +52,9 @@ jobs:
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Apply the explicit ad-hoc identity even on PRs. These ephemeral
+          # runners have no signing certificate or signing secrets.
+          CSC_FOR_PULL_REQUEST: 'true'
         run: npx electron-builder --config mac-preview.config.cjs --mac --${{ matrix.arch }} --publish never
       - name: Verify the bundle and its ad-hoc signature
         run: |
