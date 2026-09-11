@@ -1,5 +1,13 @@
 ## Mac rolling preview
 
+### Console and backup fixes
+
+- Console output strips ANSI escape sequences into clean, searchable plain text while
+  keeping warning and error indicators.
+- Long lines scroll horizontally by default. Turn on **Wrap** whenever you prefer.
+- Backup history refreshes every four seconds while visible and when reopened, including
+  backups made with the CLI. Refreshes preserve backup scope and unsaved schedule edits.
+
 Mac previews roll forward from the theme-changer development codebase on `dev`
 after both architectures pass tests. GitHub locks published releases, so each build
 gets a new `0.15.0-mac.N` prerelease rather than replacing an existing download.

@@ -59,6 +59,10 @@ test('Mac preview creates servers but refuses unsupported operations without cha
     const backups = await get(base + '/backups')
     assert.equal(backups.automaticAvailable, false)
     assert.deepEqual(backups.snapshots, [])
+    const history = await get(base + '/backups/history')
+    assert.deepEqual(history, Object.fromEntries(
+      ['snapshots', 'dir', 'root', 'mirror', 'running'].map(key => [key, backups[key]]),
+    ))
     for (const [route, message] of [
       [base + '/schedules', PREVIEW_LIMITS.scheduler],
       [base + '/backups/auto', PREVIEW_LIMITS.scheduler],

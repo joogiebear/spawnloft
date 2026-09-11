@@ -926,8 +926,8 @@
     .srv-nav button[aria-selected="true"] { box-shadow: inset 0 -2px 0 var(--lapis); }
   }
 
-  .panes { display: grid; min-height: 0; }
-  .pane { display: none; min-height: 0; grid-area: 1 / 1; }
+  .panes { display: grid; min-height: 0; min-width: 0; }
+  .pane { display: none; min-height: 0; min-width: 0; grid-area: 1 / 1; }
   .pane[data-active] { display: grid; }
   .pane-console { grid-template-rows: auto minmax(0, 1fr) auto; }
   /*
@@ -979,6 +979,8 @@
     background: var(--recess);
   }
   .pane-foot .hint { margin: 0; }
+
+  [data-backup-status]:empty { display: none; }
 
   @container pane (min-width: 860px) {
     /* Backups: "now" and "automatic" are peers and sit side by side; the history below them is a
@@ -1367,7 +1369,7 @@
      for the toolbar to wrap - which is the app's own 900x600 minimum. */
   /* Holds the log and the jump pill, nothing else - the toolbar and the command bar are siblings
      in the pane grid now, which is what stops the console growing through them. */
-  .log-wrap { position: relative; min-height: 0; display: grid; }
+  .log-wrap { position: relative; min-height: 0; min-width: 0; display: grid; }
   #log {
     margin: 0;
     padding: 8px 0 12px;
@@ -1388,7 +1390,7 @@
     contrast.
   */
   .ln { padding: 0 12px 0 14px; border-left: 3px solid transparent; white-space: pre-wrap; word-break: break-word; }
-  #log.nowrap .ln { white-space: pre; word-break: normal; }
+  #log.nowrap .ln { white-space: pre; word-break: normal; width: max-content; min-width: 100%; }
   #log .num { display: none; }
   #log.nums .ln { display: grid; grid-template-columns: max-content 1fr; }
   #log.nums .num {
@@ -1759,7 +1761,7 @@
             <button data-lvl="error">Errors</button>
           </span>
           <button id="bPause" aria-pressed="false">Pause</button>
-          <button id="bWrap" aria-pressed="true">Wrap</button>
+          <button id="bWrap" aria-pressed="false">Wrap</button>
           <button id="bNums" aria-pressed="false">Line Numbers</button>
           <button id="bCopy">Copy</button>
           <button id="bClear">Clear</button>
@@ -1780,7 +1782,7 @@
           <span class="con-count" id="conCount"></span>
         </div>
         <div class="log-wrap">
-          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
+          <pre id="log" class="nowrap" tabindex="0" role="log" aria-label="Server console"></pre>
           <button class="jump" id="bJump" hidden>Jump to newest</button>
         </div>
 
@@ -2173,7 +2175,7 @@ const state = {
   pausedAt: 0,
   filter: 'all',
   search: '',
-  wrap: true,
+  wrap: false,
   nums: false,
   seq: 0,
   atBottom: true,
@@ -3069,7 +3071,19 @@ function renderLog() {
   if (state.atBottom) log.scrollTop = log.scrollHeight;
 }
 
+// The panel is a log reader, not a terminal. Strip formatting before classifying, searching
+// or copying so an escape inside WARN cannot hide a warning. Keep indentation and Unicode.
+const ANSI_STRING_RE = /(?:\x1b\]|\x9d)[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c|$)|(?:\x1b[P^_]|\x90|\x9e|\x9f)[^\x1b\x9c]*(?:\x1b\\|\x9c|$)/g;
+const ANSI_CSI_RE = /(?:\x1b\[|\x9b)[0-?]*[ -/]*(?:[@-~]|$)/g;
+const ANSI_ESCAPE_RE = /\x1b[ -/]*[0-~]/g;
+const LOG_CONTROL_RE = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+function cleanConsoleText(text) {
+  return text.replace(ANSI_STRING_RE, '').replace(ANSI_CSI_RE, '')
+    .replace(ANSI_ESCAPE_RE, '').replace(LOG_CONTROL_RE, '');
+}
+
 function pushLine(text) {
+  text = cleanConsoleText(text);
   const prev = state.lines.length ? state.lines[state.lines.length - 1].level : null;
   const entry = { text: text, level: levelOf(text, prev), n: ++state.seq };
   state.lines.push(entry);
@@ -5313,18 +5327,40 @@ async function changeBackupsLocation(current) {
  * refused outright while the server is running, and gated behind typing the server's name
  * otherwise. The core refuses too - a page that only disables a button is not a guard.
  */
+let backupRequest = 0;
+let backupPending = null;
+
+function refreshVisibleBackups() {
+  if (!document.hidden && state.view === 'server' && state.pane === 'backups') renderBackups();
+}
+setInterval(refreshVisibleBackups, 4000);
+document.addEventListener('visibilitychange', refreshVisibleBackups);
+window.addEventListener('focus', refreshVisibleBackups);
+
 async function renderBackups(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
   const body = $('#backupsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
-  if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  const history = body.dataset.for === row.name && body.querySelector('[data-backup-history]');
+  // A slow request must not accumulate polls. A deliberate mutation can supersede one;
+  // its older answer then cannot replace the result of the action that just finished.
+  if (!force && backupPending && backupPending.name === row.name) return;
+  const request = ++backupRequest;
+  backupPending = { name: row.name, request: request };
   body.dataset.for = row.name;
 
   let data;
   try {
-    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups');
+    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups'
+      + (history && !force ? '/history' : ''));
   } catch (e) {
+    if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
+    if (history && history.isConnected) {
+      const status = body.querySelector('[data-backup-status]');
+      status.textContent = 'Backup history could not refresh: ' + e.message + '. Trying again shortly.';
+      return;
+    }
     body.textContent = '';
     const bad = document.createElement('div');
     bad.className = 'bad';
@@ -5334,13 +5370,30 @@ async function renderBackups(opts) {
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
     return;
+  } finally {
+    if (backupPending && backupPending.request === request) backupPending = null;
   }
   // The selection can move while the request is in flight; the answer to the old question is not
   // an answer to the new one.
-  if (body.dataset.for !== row.name) return;
+  if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
+  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror]);
+  if (!force && history && history.isConnected) {
+    body.querySelector('[data-backup-status]').textContent = '';
+    // Only history changes in the background. Scope, schedule edits, focus and the archive
+    // progress message belong to the person using the form and must survive a CLI backup.
+    if (history.dataset.backupHistory !== signature) {
+      history.replaceWith(renderBackupHistory(row, data, signature));
+    }
+    return;
+  }
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
     'Take a snapshot now, put one back, or leave it to a schedule.');
+  const refreshStatus = document.createElement('div');
+  refreshStatus.dataset.backupStatus = '';
+  refreshStatus.className = 'bad';
+  refreshStatus.setAttribute('role', 'status');
+  body.append(refreshStatus);
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
 
@@ -5463,8 +5516,14 @@ async function renderBackups(opts) {
     }
   };
 
+  body.append(renderBackupHistory(row, data, signature));
+}
+
+function renderBackupHistory(row, data, signature) {
+  const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
   // ---- what is already there ------------------------------------------------
   const hist = document.createElement('div');
+  hist.dataset.backupHistory = signature;
   const histTitle = document.createElement('h3');
   histTitle.className = 'hist-title';
   histTitle.textContent = 'History (' + data.snapshots.length + ')';
@@ -5626,7 +5685,7 @@ async function renderBackups(opts) {
     }
     hist.append(list);
   }
-  body.append(hist);
+  return hist;
 }
 
 /**
