@@ -6,6 +6,9 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **Plugin database configs stay manual:** database creation and attachment provide
+  credentials for you to copy into your plugins. The former `db apply` command and
+  panel config-writing controls are removed. Existing plugin files are left unchanged.
 - **CLI automation:** versioned `--json` output for status, plugin inventory, backup history,
   backup creation, diagnostics, and environment checks. `metrics --follow --json` streams
   readings; `metrics --csv --output <file>` exports them without overwriting old runs.
