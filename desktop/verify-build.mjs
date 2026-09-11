@@ -25,6 +25,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 // electron-builder passes the directory it just packed; run by hand, the usual one is assumed.
@@ -43,6 +44,18 @@ const problems = []
 const notes = []
 
 const pkg = JSON.parse(fs.readFileSync(path.join(HERE, 'package.json'), 'utf8'))
+// An override used by electron-builder must also be used here. Otherwise a deliberately
+// unsigned development package is judged against the production Azure signing profile.
+const configArg = process.argv.find(arg => arg.startsWith('--config='))
+const buildConfig = configArg
+  ? createRequire(import.meta.url)(path.resolve(configArg.slice('--config='.length)))
+  : pkg.build
+if (configArg) {
+  const info = JSON.parse(fs.readFileSync(path.join(RESOURCES, 'build-info.json'), 'utf8'))
+  if (info.version !== (buildConfig.extraMetadata?.version || pkg.version) || info.sourceVersion !== pkg.version) {
+    problems.push('the verification configuration does not match the packaged version')
+  }
+}
 
 /** Every image in an .ico, as raw bytes. The format is a 6-byte header then 16 bytes per entry. */
 function icoFrames(file) {
@@ -175,7 +188,7 @@ function checkTokensMatch() {
 }
 
 if (!STRUCTURE_ONLY && !MAC && fs.existsSync(EXE)) {
-  const configured = Boolean(pkg?.build?.win?.azureSignOptions || pkg?.build?.win?.signtoolOptions)
+  const configured = Boolean(buildConfig?.win?.azureSignOptions || buildConfig?.win?.signtoolOptions)
   if (!configured) {
     notes.push('signing: not configured for this build, so not checked')
   } else {

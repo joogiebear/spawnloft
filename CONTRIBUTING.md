@@ -97,18 +97,33 @@ section; unlabelled ones go under "Everything else".
 
 ## Releases
 
-Releases are built, signed and published by the maintainer from a machine holding the
-signing profile, from `main` after `dev` has been merged into it. CI runs tests; it
-does not build installers. To try a build before it is released, run
+Production releases are built, signed and published by the maintainer from a machine
+holding the signing profile, from `main` after `dev` has been merged into it. Development
+previews build Windows and Mac installers in CI as described below. To try a local build, run
 `npx electron-builder --publish never` in `desktop/` on `dev` and install the result
 by hand; it never touches GitHub.
 
 ### Betas
 
-A version with a prerelease part, such as `0.10.0-beta.1`, is built and published from
-`dev` with the same two scripts as a release, and `release:publish` marks it a GitHub
-pre-release rather than latest. The two kinds of install sort themselves out: a stable
+The `desktop-preview` workflow builds the same `dev` commit natively on Windows x64,
+Apple Silicon, and Intel Mac. Relevant pushes to `dev` publish a new numbered beta only
+after all three packages pass core tests, bundle verification, and the shared packaged
+smoke checks. Pull requests run the same checks without publishing. Windows updater
+compatibility is tested with the installed updater library too.
+
+Every package uses the source version's base plus `-beta.N`; N is the workflow run number
+plus one, avoiding the existing beta.1. Manifests record the source version, actual package
+version, commit, platform, architecture, and checksums. The publisher verifies all three
+manifests and Windows updater feeds, uploads everything to one draft, then publishes it
+as a prerelease. It refuses mixed commits, missing packages, and conflicting existing tags.
+Keep fixes in shared code when they apply to both platforms. Platform-specific behavior
+must stay explicit and covered on its native runner.
+
+Windows test installers are unsigned, as in the previous dev-build workflow. Windows
+auto-update keeps its existing behavior: a stable
 install asks GitHub for the latest release, which leaves pre-releases out, so nobody on
 0.9.1 is offered a beta. An install that is itself a beta accepts newer betas and newer
 stable releases alike, so it follows each beta and then moves to the stable release when
 that is published. Install the first beta by hand; the rest arrive through the app.
+Mac previews update manually until Developer ID signing and notarization are ready.
+See [the desktop preview guide](desktop/PREVIEW.md) for installation and Mac limitations.

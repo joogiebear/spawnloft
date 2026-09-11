@@ -1,36 +1,48 @@
 'use strict'
 
-// Run on a Mac against the actual packaged app, not an Electron development checkout.
+// Run against the actual packaged app on macOS or Windows, not an Electron development checkout.
 // CI supplies Playwright through NODE_PATH so it never becomes an application dependency.
-// Usage: node desktop/smoke-mac.cjs /absolute/SpawnLoft.app /absolute/artifacts
+// Usage: node desktop/smoke-desktop.cjs <SpawnLoft.app|win-unpacked|SpawnLoft.exe> <artifacts>
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { _electron: electron } = require('playwright')
 
 async function main() {
-  assert.equal(process.platform, 'darwin', 'Packaged macOS smoke tests require macOS')
-  assert.ok(process.argv[2] && process.argv[3], 'Supply an app bundle and an artifact directory')
+  assert.ok(['darwin', 'win32'].includes(process.platform), 'Packaged desktop smoke tests require macOS or Windows')
+  const isMac = process.platform === 'darwin'
+  assert.ok(process.argv[2] && process.argv[3], 'Supply an app bundle, unpacked directory, or executable and an artifact directory')
   const bundle = path.resolve(process.argv[2])
   const output = path.resolve(process.argv[3])
-  const executable = path.join(bundle, 'Contents', 'MacOS', 'SpawnLoft')
-  const core = path.join(bundle, 'Contents', 'Resources', 'core')
+  assert.ok(fs.existsSync(bundle), `Missing package: ${bundle}`)
+  const executable = isMac
+    ? path.join(bundle, 'Contents', 'MacOS', 'SpawnLoft')
+    : fs.statSync(bundle).isDirectory() ? path.join(bundle, 'SpawnLoft.exe') : bundle
+  const core = isMac
+    ? path.join(bundle, 'Contents', 'Resources', 'core')
+    : path.join(path.dirname(executable), 'resources', 'core')
   assert.ok(fs.existsSync(executable), `Missing packaged executable: ${executable}`)
   assert.ok(fs.existsSync(path.join(core, 'mcctl.mjs')), 'The package must contain its own CLI')
   fs.mkdirSync(output, { recursive: true })
 
   // macOS Unix-domain sockets have a short path limit; the runner's default temp path is too long.
-  const scratch = fs.mkdtempSync('/tmp/sl-')
+  const tempRoot = path.resolve(isMac ? '/tmp' : os.tmpdir())
+  const scratch = fs.mkdtempSync(path.join(tempRoot, 'sl-'))
   const data = path.join(scratch, 'd')
   const config = path.join(scratch, 'c')
   const home = path.join(scratch, 'h')
   const userData = path.join(scratch, 'u')
-  for (const dir of [data, config, home, userData]) fs.mkdirSync(dir, { recursive: true })
+  const localData = path.join(scratch, 'l')
+  for (const dir of [data, config, home, userData, localData]) fs.mkdirSync(dir, { recursive: true })
   const settingsFile = path.join(config, 'mcctl', 'settings.json')
   const env = {
     ...process.env,
     HOME: home,
+    USERPROFILE: home,
+    APPDATA: config,
+    LOCALAPPDATA: localData,
     XDG_CONFIG_HOME: config,
     XDG_DATA_HOME: path.join(scratch, 'share'),
     MCCTL_DATA_ROOT: data,
@@ -40,10 +52,12 @@ async function main() {
   delete env.FAKE_JAVA_FAIL
   const errors = []
   const log = []
+  const pendingCloses = []
   let app = null
+  let appPid = null
   let page = null
   let daemonCreated = false
-  const name = 'mac-smoke'
+  const name = 'desktop-smoke'
   const consoleFile = path.join(data, 'run', name, 'console.log')
 
   function record(message) {
@@ -58,6 +72,7 @@ async function main() {
       env,
       timeout: 45000,
     })
+    appPid = await app.evaluate(() => process.pid)
     app.process().stdout?.on('data', (chunk) => log.push(`[stdout] ${chunk}`))
     app.process().stderr?.on('data', (chunk) => log.push(`[stderr] ${chunk}`))
     page = await app.firstWindow({ timeout: 45000 })
@@ -68,15 +83,63 @@ async function main() {
   }
 
   async function close() {
-    if (app) await app.close()
+    if (app) {
+      const current = app
+      if (isMac) {
+        await current.close()
+      } else {
+        // Playwright launches Electron through cmd.exe on Windows and waits for the child
+        // process's `close` event. A detached server can keep inherited stdio handles open
+        // after the app has exited, so waiting for `close` here prevents the restart test.
+        // Still request the normal app quit (and inspector disconnect), but first await
+        // process exit independently. Settle every close promise after daemon cleanup below.
+        const child = current.process()
+        const exited = new Promise((resolve, reject) => {
+          if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
+          const timer = setTimeout(() => {
+            child.removeListener('exit', onExit)
+            reject(new Error(`Packaged app process ${child.pid} did not exit within 15 seconds`))
+          }, 15000)
+          function onExit() { clearTimeout(timer); resolve() }
+          child.once('exit', onExit)
+        })
+        pendingCloses.push(current.close().then(() => null, (error) => error))
+        await exited
+        await until(() => {
+          try { process.kill(appPid, 0); return false }
+          catch (error) {
+            if (error.code === 'ESRCH') return true
+            throw error
+          }
+        }, `Electron main process ${appPid} must exit before the app is relaunched`)
+      }
+    }
     app = null
+    appPid = null
     page = null
+  }
+
+  async function settleCloses() {
+    if (!pendingCloses.length) return
+    let timer
+    try {
+      const results = await Promise.race([
+        Promise.all(pendingCloses),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Playwright did not finish closing after test daemon cleanup')), 15000)
+        }),
+      ])
+      for (const error of results) if (error) throw error
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   async function cli(args, timeout = 20000) {
     return new Promise((resolve, reject) => {
       const child = spawn(executable, [path.join(core, 'mcctl.mjs'), ...args], {
         env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+        windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       let text = ''
@@ -122,16 +185,19 @@ async function main() {
     assert.ok((await page.locator('#root').inputValue()).startsWith(scratch), 'Wizard must use isolated data paths')
     await page.screenshot({ path: path.join(output, '01-first-run.png') })
     record('PASS: packaged first-run wizard and preload bridge')
-    const roles = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.map(item => String(item.role).toLowerCase()))
-    assert.ok(roles.includes('appmenu') && roles.includes('editmenu'), `Native Mac menu roles: ${roles}`)
-    const closed = page.waitForEvent('close')
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
-    await closed
-    const reopened = app.waitForEvent('window')
-    await app.evaluate(({ app }) => app.emit('activate'))
-    page = await reopened
-    await page.locator('#root').waitFor({ state: 'visible' })
-    record('PASS: native Mac menus and reopening the setup window')
+    if (isMac) {
+      const roles = await app.evaluate(({ Menu }) => Menu.getApplicationMenu().items.map(item => String(item.role).toLowerCase()))
+      assert.ok(roles.includes('appmenu') && roles.includes('editmenu'), `Native Mac menu roles: ${roles}`)
+      const closed = page.waitForEvent('close')
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close())
+      await closed
+      const reopened = app.waitForEvent('window')
+      await app.evaluate(({ app }) => app.emit('activate'))
+      page = await reopened
+      page.on('pageerror', (error) => errors.push(error.stack || error.message))
+      await page.locator('#root').waitFor({ state: 'visible' })
+      record('PASS: native Mac menus and reopening the setup window')
+    }
     await close()
 
     // Keep relaunches under Playwright control; test the real wizard above and normal saved setup below.
@@ -143,24 +209,24 @@ async function main() {
     fs.copyFileSync(path.join(__dirname, '..', 'test', 'fixtures', 'fake-java.mjs'), fakeJava)
     // Real process output passes through the daemon, SSE stream, and renderer. Splitting the
     // searchable phrase with SGR codes proves the panel cleans text before searching/classifying.
-    const warningText = 'mac smoke warning ' + 'a long plugin diagnostic with useful details '.repeat(24)
-    const warningOutput = '[00:00:01 \u001b[33mWARN\u001b[0m]: mac smoke \u001b[38;2;255;180;0mwarning\u001b[0m '
+    const warningText = 'desktop smoke warning ' + 'a long plugin diagnostic with useful details '.repeat(24)
+    const warningOutput = '[00:00:01 \u001b[33mWARN\u001b[0m]: desktop smoke \u001b[38;2;255;180;0mwarning\u001b[0m '
       + 'a long plugin diagnostic with useful details '.repeat(24)
     fs.appendFileSync(fakeJava, `\nprocess.stdout.write(${JSON.stringify(warningOutput + '\n')})\n`)
     fs.writeFileSync(path.join(instanceDir, 'server.jar'), '')
     fs.writeFileSync(path.join(instanceDir, 'eula.txt'), 'eula=true\n')
-    fs.writeFileSync(path.join(instanceDir, 'server.properties'), 'motd=Packaged Mac smoke test\n')
+    fs.writeFileSync(path.join(instanceDir, 'server.properties'), 'motd=Packaged desktop smoke test\n')
     fs.writeFileSync(path.join(data, 'instances.json'), JSON.stringify({
       version: 1,
       instances: {
         [name]: {
           dir: instanceDir, jar: 'server.jar', java: fakeJava, memory: '1G',
           port: 45565, rcon: { port: 45575, password: 'isolated-smoke' },
-          label: 'Mac development smoke test', autoRestart: false,
+          label: 'Desktop development smoke test', autoRestart: false,
         },
       },
     }))
-    assert.match(await cli(['list']), /mac-smoke/, 'Packaged Node runtime must run the bundled CLI')
+    assert.match(await cli(['list']), /desktop-smoke/, 'Packaged Node runtime must run the bundled CLI')
     record('PASS: bundled CLI runs through the packaged Electron Node runtime')
 
     await launch()
@@ -169,8 +235,10 @@ async function main() {
     const info = await page.evaluate(() => window.mcctlDesktop.appInfo())
     assert.equal(info.packaged, true)
     assert.equal(info.coreMode, 'bundled')
-    assert.equal(info.manualUpdates, true)
-    assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
+    assert.equal(info.manualUpdates, isMac, 'Mac previews update manually; Windows keeps its existing updater')
+    // Windows checks use the live release feed. Keep packaged smoke tests independent of
+    // network/update availability; the Mac manual path returns immediately without a request.
+    if (isMac) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
     await page.locator('#bSettings').click()
     await page.locator('input[name="appTheme"][value="spawnloft"]').check()
     await page.waitForFunction(() => document.querySelector('#themeStatus').textContent.includes('SpawnLoft theme saved.'))
@@ -182,14 +250,14 @@ async function main() {
     daemonCreated = true
     const started = await api(`instances/${name}/start`, {})
     assert.equal(started.status, 'running')
-    await api(`instances/${name}/command`, { line: 'packaged mac console' })
-    await until(() => fs.existsSync(consoleFile) && fs.readFileSync(consoleFile, 'utf8').includes('fake got: packaged mac console'), 'Console input must reach the fixture through the packaged daemon')
+    await api(`instances/${name}/command`, { line: 'packaged desktop console' })
+    await until(() => fs.existsSync(consoleFile) && fs.readFileSync(consoleFile, 'utf8').includes('fake got: packaged desktop console'), 'Console input must reach the fixture through the packaged daemon')
     assert.match(fs.readFileSync(consoleFile, 'utf8'), /Done \(/)
-    record('PASS: packaged daemon starts, reaches ready, and receives console input over its Unix socket')
+    record(`PASS: packaged daemon starts, reaches ready, and receives console input over its ${isMac ? 'Unix socket' : 'named pipe'}`)
     await page.locator('#bSetClose').click()
     await page.locator(`#list [data-name="${name}"]`).click()
     await page.locator('#tabConsole').click()
-    const warningLine = page.locator('#log .ln').filter({ hasText: 'mac smoke warning' })
+    const warningLine = page.locator('#log .ln').filter({ hasText: 'desktop smoke warning' })
     await warningLine.waitFor({ state: 'visible' })
     assert.equal(await warningLine.locator('.txt').textContent(), '[00:00:01 WARN]: ' + warningText)
     assert.match(await warningLine.getAttribute('class'), /\bwarn\b/, 'ANSI-colored WARN must still classify as a warning')
@@ -201,8 +269,8 @@ async function main() {
     assert.equal(await page.locator('#bWrap').getAttribute('aria-pressed'), 'true')
     assert.equal(await warningLine.evaluate((line) => getComputedStyle(line).whiteSpace), 'pre-wrap')
     await page.locator('#bWrap').click()
-    await page.locator('#conSearch').fill('mac smoke warning')
-    await page.waitForFunction(() => document.querySelector('#log mark')?.textContent === 'mac smoke warning')
+    await page.locator('#conSearch').fill('desktop smoke warning')
+    await page.waitForFunction(() => document.querySelector('#log mark')?.textContent === 'desktop smoke warning')
     await page.locator('[data-lvl="warn"]').click()
     assert.equal(await page.locator('#log .ln').count(), 1, 'Warning filter and search must work on clean text')
     await page.screenshot({ path: path.join(output, '03-console-regression.png') })
@@ -257,14 +325,26 @@ async function main() {
         record(`Cleanup could not confirm daemon exit: ${error.message}`)
       }
     }
-    await close().catch((error) => record(`App close: ${error.message}`))
+    await close().catch((error) => {
+      safeToRemove = false
+      process.exitCode = 1
+      record(`App close: ${error.message}`)
+    })
+    await settleCloses().catch((error) => {
+      process.exitCode = 1
+      record(`App cleanup failed: ${error.message}`)
+    })
     for (const filename of ['console.log', 'daemon.log', 'state.json']) {
       const source = path.join(data, 'run', name, filename)
       if (fs.existsSync(source)) fs.copyFileSync(source, path.join(output, filename))
     }
     fs.writeFileSync(path.join(output, 'smoke.log'), log.join('\n'))
     fs.writeFileSync(path.join(output, 'renderer-errors.json'), JSON.stringify(errors, null, 2))
-    if (safeToRemove) fs.rmSync(scratch, { recursive: true, force: true })
+    if (safeToRemove) {
+      assert.equal(path.dirname(path.resolve(scratch)), tempRoot, 'Cleanup must stay in the temporary root')
+      assert.ok(path.basename(scratch).startsWith('sl-'), 'Cleanup must target the generated smoke directory')
+      fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    }
   }
 }
 

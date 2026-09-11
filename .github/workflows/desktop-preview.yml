@@ -1,0 +1,128 @@
+name: desktop-preview
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['src/**', 'desktop/**', 'test/**', 'package.json', '.github/workflows/desktop-preview.yml']
+  push:
+    branches: [dev]
+    paths: ['src/**', 'desktop/**', 'test/**', 'package.json', '.github/workflows/desktop-preview.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: win32
+            target: win
+            arch: x64
+            app: desktop/dist/win-unpacked
+          - runner: macos-15
+            platform: darwin
+            target: mac
+            arch: arm64
+            app: desktop/dist/mac-arm64/SpawnLoft.app
+          - runner: macos-15-intel
+            platform: darwin
+            target: mac
+            arch: x64
+            app: desktop/dist/mac/SpawnLoft.app
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      PREVIEW_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require a development version
+        run: node -e "if (!require('./desktop/package.json').version.includes('-')) throw new Error('Desktop previews require a prerelease version')"
+      - name: Test the shared core and desktop
+        env:
+          TMPDIR: /tmp
+        run: |
+          npm test
+          npm --prefix desktop test
+      - name: Install the desktop toolchain
+        run: npm ci --prefix desktop
+      - name: Verify Windows beta updater compatibility
+        if: matrix.platform == 'win32'
+        run: node --test desktop/updater-preview.test.cjs
+      - name: Package the native preview
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          PREVIEW_BUILD: ${{ github.run_number }}
+          # Apply the Mac ad-hoc identity on PRs too. No certificate or signing secrets.
+          CSC_FOR_PULL_REQUEST: 'true'
+        run: npx electron-builder --config preview.config.cjs --${{ matrix.target }} --${{ matrix.arch }} --publish never
+      - name: Verify the packaged app
+        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/preview.config.cjs
+      - name: Verify the Mac ad-hoc signature
+        if: matrix.platform == 'darwin'
+        run: codesign --verify --deep --strict "${{ matrix.app }}"
+      - name: Supply both Windows updater feed names
+        if: matrix.platform == 'win32'
+        run: node -e "require('fs').copyFileSync('desktop/dist/latest.yml', 'desktop/dist/beta.yml')"
+      - name: Install the isolated UI test tool
+        run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
+      - name: Open the packaged app and exercise the shared regressions
+        env:
+          NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
+        run: node desktop/smoke-desktop.cjs "${{ matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
+      - name: Record platform, source, and checksums
+        run: node desktop/preview-artifacts.mjs ${{ matrix.platform }} ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-preview-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/dist/SpawnLoft-*.exe
+            desktop/dist/SpawnLoft-*.exe.blockmap
+            desktop/dist/latest.yml
+            desktop/dist/beta.yml
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
+            desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}/
+
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-preview-*
+          path: desktop/dist/preview-release
+          merge-multiple: true
+      - name: Publish all platforms as one complete development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node desktop/publish-preview.mjs
