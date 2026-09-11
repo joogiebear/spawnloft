@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 
-# Only one publication can replace the rolling Mac downloads at a time.
+# Keep development publications ordered as immutable numbered Mac previews.
 concurrency:
   group: mac-preview-${{ github.ref }}
   cancel-in-progress: false
@@ -52,6 +52,7 @@ jobs:
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MAC_PREVIEW_BUILD: ${{ github.run_number }}
           # Apply the explicit ad-hoc identity even on PRs. These ephemeral
           # runners have no signing certificate or signing secrets.
           CSC_FOR_PULL_REQUEST: 'true'
@@ -98,7 +99,7 @@ jobs:
           pattern: mac-preview-*
           path: desktop/dist/mac-release
           merge-multiple: true
-      - name: Refresh Mac downloads on the existing prerelease
+      - name: Publish the next immutable Mac prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: node desktop/publish-mac-preview.mjs

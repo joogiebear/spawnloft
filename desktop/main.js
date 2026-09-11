@@ -9,7 +9,7 @@ const windowState = require('./window-state')
 // Rolling Mac previews are installed by hand. Squirrel.Mac needs a signed,
 // versioned distribution; these ad-hoc test builds deliberately have neither.
 const manualUpdates = process.platform === 'darwin' && app.getVersion().includes('-')
-const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases/tag/v' + app.getVersion()
+const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases'
 
 /**
  * mcctl desktop.
