@@ -11,6 +11,8 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 - Long lines scroll horizontally by default. Turn on **Wrap** whenever you prefer.
 - Backup history refreshes every four seconds while visible and when reopened, including
   backups made with the CLI. Refreshes preserve backup scope and unsaved schedule edits.
+- Snapshots appear only after their archive and manifest are complete. Concurrent backups
+  get separate names, and failed archives never appear as completed backups.
 - **Settings → Appearance** offers both Classic and SpawnLoft themes.
 
 ### Windows

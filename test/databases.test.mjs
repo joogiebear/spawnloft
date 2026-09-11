@@ -34,10 +34,12 @@ fs.mkdirSync(path.join(ENGINES_DIR, `mariadb-${VERSION}`), { recursive: true })
 fs.cpSync(FIXTURE, path.join(ENGINES_DIR, `mariadb-${VERSION}`), { recursive: true })
 
 const DB = `dbt-${process.pid}`
+const FAILED_DB = `${DB}-failed`
 const SRV = `srv-${process.pid}`
 
 after(async () => {
   try { await sup.kill(DB) } catch { /* down */ }
+  try { await sup.kill(FAILED_DB) } catch { /* down */ }
   try { await sup.kill(`${SRV}-db`) } catch { /* down */ }
   fs.rmSync(scratch, { recursive: true, force: true })
 })
@@ -285,42 +287,25 @@ test('detach while stopped keeps the record consistent, and dropping needs the d
 })
 
 test('a database that dies during startup is reported as failed, with the engine\'s reason', { timeout: 30000 }, async () => {
-  // Auto-restart is on for a database by default; off here, or the daemon would spend the next
-  // half minute retrying a start that is scripted to fail.
-  updateInstance(DB, { autoRestart: false })
+  // This daemon inherits the scripted failure environment. Keep it separate from the healthy
+  // database, and leave auto-restart off: seeing its error line can precede the child exit, when
+  // the daemon rereads the setting. Turning it back on then races into repeated scripted failures.
+  await services.createDatabase(FAILED_DB, { version: VERSION })
+  updateInstance(FAILED_DB, { autoRestart: false })
   process.env.FAKE_MARIADB_FAIL = 'start'
   try {
-    const res = await sup.start(DB, { timeout: 15000 })
+    const res = await sup.start(FAILED_DB, { timeout: 15000 })
     assert.equal(res.ready, false)
     assert.equal(res.failed, true)
     assert.match(res.reason, /Can't start server|exited/)
   } finally {
     delete process.env.FAKE_MARIADB_FAIL
-    updateInstance(DB, { autoRestart: true })
   }
 })
 
 test('remove refuses a running database, then deletes a stopped one with its folder', { timeout: 45000 }, async () => {
-  // The daemon from the failed start above is still tearing down, and there is no single moment to
-  // wait for. Its state reads 'stopping' for a few seconds; then it reads 'stopped' while the
-  // control socket it left behind is still there to be connected to and refuse. Waiting on the
-  // state caught the first and ran straight into the second - on CI this failed three ways across
-  // three runs: 'is still shutting down' after the full wait, 'is not running' 158ms in, and once
-  // not at all.
-  //
-  // So the start is retried rather than timed. Every way the teardown can refuse one - already
-  // running, still shutting down, not running - refuses in milliseconds, so a retry costs nothing
-  // and the loop ends the moment the daemon is really gone.
-  const deadline = Date.now() + 20000
-  for (;;) {
-    try {
-      await sup.start(DB, { timeout: 15000 })
-      break
-    } catch (err) {
-      if (Date.now() > deadline) throw err
-      await new Promise((r) => setTimeout(r, 250))
-    }
-  }
+  const started = await sup.start(DB, { timeout: 15000 })
+  assert.equal(started.ready, true, JSON.stringify(started))
   assert.throws(() => services.removeDatabase(DB), /stop it/)
   await sup.stop(DB, { timeout: 10000 })
   const dir = services.getDatabase(DB).dir
