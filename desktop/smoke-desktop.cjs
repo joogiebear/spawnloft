@@ -52,7 +52,9 @@ async function main() {
   delete env.FAKE_JAVA_FAIL
   const errors = []
   const log = []
+  const pendingCloses = []
   let app = null
+  let appPid = null
   let page = null
   let daemonCreated = false
   const name = 'desktop-smoke'
@@ -70,6 +72,7 @@ async function main() {
       env,
       timeout: 45000,
     })
+    appPid = await app.evaluate(() => process.pid)
     app.process().stdout?.on('data', (chunk) => log.push(`[stdout] ${chunk}`))
     app.process().stderr?.on('data', (chunk) => log.push(`[stderr] ${chunk}`))
     page = await app.firstWindow({ timeout: 45000 })
@@ -80,9 +83,56 @@ async function main() {
   }
 
   async function close() {
-    if (app) await app.close()
+    if (app) {
+      const current = app
+      if (isMac) {
+        await current.close()
+      } else {
+        // Playwright launches Electron through cmd.exe on Windows and waits for the child
+        // process's `close` event. A detached server can keep inherited stdio handles open
+        // after the app has exited, so waiting for `close` here prevents the restart test.
+        // Still request the normal app quit (and inspector disconnect), but first await
+        // process exit independently. Settle every close promise after daemon cleanup below.
+        const child = current.process()
+        const exited = new Promise((resolve, reject) => {
+          if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
+          const timer = setTimeout(() => {
+            child.removeListener('exit', onExit)
+            reject(new Error(`Packaged app process ${child.pid} did not exit within 15 seconds`))
+          }, 15000)
+          function onExit() { clearTimeout(timer); resolve() }
+          child.once('exit', onExit)
+        })
+        pendingCloses.push(current.close().then(() => null, (error) => error))
+        await exited
+        await until(() => {
+          try { process.kill(appPid, 0); return false }
+          catch (error) {
+            if (error.code === 'ESRCH') return true
+            throw error
+          }
+        }, `Electron main process ${appPid} must exit before the app is relaunched`)
+      }
+    }
     app = null
+    appPid = null
     page = null
+  }
+
+  async function settleCloses() {
+    if (!pendingCloses.length) return
+    let timer
+    try {
+      const results = await Promise.race([
+        Promise.all(pendingCloses),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Playwright did not finish closing after test daemon cleanup')), 15000)
+        }),
+      ])
+      for (const error of results) if (error) throw error
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   async function cli(args, timeout = 20000) {
@@ -275,7 +325,15 @@ async function main() {
         record(`Cleanup could not confirm daemon exit: ${error.message}`)
       }
     }
-    await close().catch((error) => record(`App close: ${error.message}`))
+    await close().catch((error) => {
+      safeToRemove = false
+      process.exitCode = 1
+      record(`App close: ${error.message}`)
+    })
+    await settleCloses().catch((error) => {
+      process.exitCode = 1
+      record(`App cleanup failed: ${error.message}`)
+    })
     for (const filename of ['console.log', 'daemon.log', 'state.json']) {
       const source = path.join(data, 'run', name, filename)
       if (fs.existsSync(source)) fs.copyFileSync(source, path.join(output, filename))
