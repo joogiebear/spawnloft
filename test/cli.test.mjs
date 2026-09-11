@@ -170,7 +170,13 @@ test('follow emits parseable JSON Lines, only new samples, and reset events', { 
     fs.writeFileSync(path.join(run, 'state.json'), JSON.stringify({ startedAt: Date.now(), daemonPid: process.pid, javaPid: process.pid }))
     fs.writeFileSync(metrics, `${at + 1} 30 320\n`)
     await wait(() => frames.some(frame => frame.type === 'reset'))
-    assert.equal(frames.at(-1).data.cpuPercent, 30)
+    // Reset and sample are separate writes and may arrive in separate pipe chunks.
+    // Seeing the reset acknowledges the generation change, not delivery of its first sample.
+    await wait(() => frames.some(frame => frame.type === 'sample' && frame.data.at === at + 1))
+    const resetIndex = frames.findIndex(frame => frame.type === 'reset')
+    const sampleIndex = frames.findIndex(frame => frame.type === 'sample' && frame.data.at === at + 1)
+    assert.ok(sampleIndex > resetIndex)
+    assert.equal(frames[sampleIndex].data.cpuPercent, 30)
     assert.equal(errors, '')
   } finally {
     child.kill('SIGTERM')
