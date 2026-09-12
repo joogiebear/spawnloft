@@ -16,6 +16,12 @@ node_modules/
 *.log
 .DS_Store
 
+# Local signing identities and private keys belong in the keychain / CI secrets.
+*.p12
+*.pfx
+*.p8
+*.key
+
 # Jars pulled out of an instance's plugins folder (e.g. conflicting duplicates)
 _disabled/
 

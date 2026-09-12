@@ -53,9 +53,11 @@ production builds use the existing Azure signing profile on the release machine.
 Quit SpawnLoft, open the DMG, and drag SpawnLoft to Applications to replace the previous
 preview. Your application data lives outside the app. Mac updates are manual for now.
 
+<!-- MAC_DISTRIBUTION -->
 The Mac app is ad-hoc signed for testing and **not Apple-notarized**. If macOS blocks its
 first launch, try opening it once, then use **System Settings → Privacy & Security →
 Open Anyway**. If it instead reports a damaged app, report the exact message.
+<!-- /MAC_DISTRIBUTION -->
 
 Scheduled tasks, automatic backups and managed Garnet remain unavailable on Mac. Managed
 SQL databases use MySQL 8.4 LTS and require macOS 15 or later; the app itself still runs
@@ -67,7 +69,7 @@ capabilities; a shared fix lands in both packages, with platform differences exp
 Keep testing setup, both themes, server creation, start/stop/restart, console commands,
 backup/restore, and upgrading an existing installation on both platforms. Any remaining
 Mac limitations must be implemented or explicitly scoped before calling 1.0 ready.
-An Apple Developer membership and Developer ID signing/notarization are the next
-distribution milestone before public Mac release and native Mac automatic updates.
+Signing/notarization status for this build is recorded above. Native Mac automatic updates
+remain a separate distribution milestone.
 
 This is a development prerelease, not SpawnLoft 1.0.

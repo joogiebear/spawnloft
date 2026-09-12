@@ -78,6 +78,10 @@ export function createManifest(dir, info, target) {
   validateIdentity(identity)
   if (info.platform !== target.platform) throw new Error('Build provenance platform mismatch')
   if (info.arch !== target.arch) throw new Error('Build provenance architecture mismatch')
+  if (target.platform === 'darwin') {
+    if (!['ad-hoc', 'signed'].includes(info.macSigningMode)) throw new Error('Missing or invalid Mac signing mode')
+    identity.macSigningMode = info.macSigningMode
+  }
   const assets = artifactNames(identity).map(name => {
     const bytes = fs.readFileSync(path.join(dir, name))
     if (!bytes.length) throw new Error(`Empty artifact: ${name}`)
@@ -97,6 +101,11 @@ export function verifyRelease(dir, expected) {
     return { name, info }
   })
   const first = manifests[0].info
+  const macModes = manifests.filter(({ info }) => info.platform === 'darwin').map(({ info }) => info.macSigningMode)
+  if (macModes.some(mode => !['ad-hoc', 'signed'].includes(mode)) || new Set(macModes).size !== 1 ||
+      (expected.macSigningMode !== undefined && macModes[0] !== expected.macSigningMode)) {
+    throw new Error('Mac signing mode must match on both architectures and the release policy')
+  }
   const assets = []
   for (const { name, info } of manifests) {
     validateIdentity(info, { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit })
@@ -114,7 +123,7 @@ export function verifyRelease(dir, expected) {
   }
   const installerName = artifactNames(first)[0]
   verifyWindowsFeeds(dir, first.version, installerName)
-  return { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit, assets }
+  return { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit, macSigningMode: macModes[0], assets }
 }
 
 function verifyWindowsFeeds(dir, version, installerName) {

@@ -117,6 +117,7 @@ exports.default = async function afterPack(context) {
   info.version = context.packager.appInfo.version
   info.platform = context.electronPlatformName
   info.arch = require('builder-util').Arch[context.arch]
+  if (info.platform === 'darwin') info.macSigningMode = require('./mac-signing.cjs').signingMode()
   if (!info.commit) {
     console.warn('  warn could not read the source commit; this build will not say what produced it')
   } else if (info.dirty) {
