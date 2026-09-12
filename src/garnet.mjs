@@ -23,7 +23,6 @@ import { fail, humanBytes } from './util.mjs'
  * credentials for every server, recorded so the panel can say who uses it.
  */
 
-const RELEASES = 'https://api.github.com/repos/microsoft/garnet/releases?per_page=30'
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
 
 export const VERSION = '2.1.7'
@@ -34,15 +33,16 @@ export const DEFAULT_PORT = 6379
 export const READY_RE = GARNET_READY_RE
 export const FAILED_RE = GARNET_FAILED_RE
 
-async function api(url) {
-  let res
-  try {
-    res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) })
-  } catch (err) {
-    fail(`could not reach GitHub for Garnet releases: ${err.message}`)
-  }
-  if (!res.ok) fail(`GitHub answered ${res.status} for the Garnet release list`)
-  return res.json()
+// Native release assets verified against Microsoft's published SHA-256 digests.
+export const ARCHIVES = Object.freeze({
+  'win32-x64': { name: 'win-x64-based-readytorun.zip', sha256: '3409c9aba39565caa4c6166f2d7c66ac112c2a773d70679b1bb34458dea16473' },
+  'darwin-arm64': { name: 'osx-arm64-based.tar.xz', sha256: 'e4b41812a5c554735046022e6f4ab8a8651511444f284935339296bd83e431b9' },
+  'darwin-x64': { name: 'osx-x64-based.tar.xz', sha256: '19bf42260c35d5521794f4a422e3df5d8cb0a921ab3a10a896413d4b7d45abdd' },
+})
+export function archiveFor(version, platform = process.platform, arch = process.arch) {
+  const archive = ARCHIVES[`${platform}-${arch}`]
+  if (version !== VERSION || !archive) fail(`No verified Redis (Garnet) ${version} archive for ${platform}/${arch}.`)
+  return { ...archive, url: `https://github.com/microsoft/garnet/releases/download/v${VERSION}/${archive.name}` }
 }
 
 /** The Windows x64 ReadyToRun zip on a release, or null. */
@@ -84,8 +84,9 @@ export function releasesFrom(list, { includeUnstable = false, platform = 'win32'
   return out
 }
 
-export async function versions(opts = {}) {
-  return releasesFrom(await api(RELEASES), { platform: process.platform, arch: process.arch, ...opts }).filter(r => r.version === VERSION)
+export async function versions() {
+  archiveFor(VERSION)
+  return [{ version: VERSION, status: 'Stable', support: 'Verified native build' }]
 }
 
 export function engineDir(version) {
@@ -122,7 +123,7 @@ export function hasEngine(version) {
   if (server.script) return true
   try {
     const marker = JSON.parse(fs.readFileSync(path.join(dir, 'spawnloft-engine.json'), 'utf8'))
-    return marker.platform === process.platform && marker.arch === process.arch &&
+    return marker.platform === process.platform && marker.arch === process.arch && marker.sha256 === archiveFor(version).sha256 &&
       fs.existsSync(path.join(dir, '.runtime', 'shared', 'Microsoft.NETCore.App', RUNTIME_VERSION))
   } catch { return false }
 }
@@ -143,11 +144,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     fail('Managed Redis (Garnet) requires Windows x64 or an Apple Silicon or Intel Mac.')
   }
   if (version !== VERSION) fail(`No verified Garnet ${version} bundle. See: mcctl db versions --engine garnet`)
-  const list = await api(RELEASES)
-  const release = list.find(r => !r.draft && !r.prerelease && String(r.tag_name).replace(/^v/, '') === String(version))
-  if (!release) fail(`Garnet has no stable release ${version}. See: mcctl db versions --engine garnet`)
-  const archive = archiveFrom(release)
-  if (!archive || !/^[a-f0-9]{64}$/.test(archive.sha256 ?? '')) fail(`Garnet ${version} has no verified native archive for this machine.`)
+  const archive = archiveFor(version)
   fs.mkdirSync(ENGINES_DIR, { recursive: true })
   const lock = `${dir}.install-lock`
   let fd

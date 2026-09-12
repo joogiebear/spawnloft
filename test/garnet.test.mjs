@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { releasesFrom, archiveFrom, windowsZipFrom, credentialsFor, newRecord } from '../src/garnet.mjs'
+import { VERSION, archiveFor, releasesFrom, archiveFrom, windowsZipFrom, credentialsFor, newRecord } from '../src/garnet.mjs'
 
 const rel = (tag, assets, extra = {}) => ({ tag_name: tag, published_at: '2026-08-01T00:00:00Z', assets, ...extra })
 
@@ -43,4 +43,15 @@ test('Mac archives match the native architecture and never fall back to Windows 
   assert.equal(archiveFrom(release, 'darwin', 'ia32'), null)
   assert.equal(archiveFrom(release, 'linux', 'x64'), null)
   assert.equal(windowsZipFrom(rel('v1', [{ name: 'win-x64-framework-dependent.zip' }])), null)
+})
+
+
+test('the shipped Garnet version has pinned native downloads without a release-list API call', () => {
+  for (const [platform, arch] of [['win32', 'x64'], ['darwin', 'arm64'], ['darwin', 'x64']]) {
+    const archive = archiveFor(VERSION, platform, arch)
+    assert.match(archive.url, /^https:\/\/github\.com\/microsoft\/garnet\/releases\/download\//)
+    assert.match(archive.sha256, /^[a-f0-9]{64}$/)
+  }
+  assert.throws(() => archiveFor('9.9.9', 'win32', 'x64'), /No verified/)
+  assert.throws(() => archiveFor(VERSION, 'linux', 'x64'), /No verified/)
 })
