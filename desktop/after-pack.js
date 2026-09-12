@@ -118,6 +118,7 @@ exports.default = async function afterPack(context) {
   info.platform = context.electronPlatformName
   info.arch = require('builder-util').Arch[context.arch]
   if (info.platform === 'darwin') info.macSigningMode = require('./mac-signing.cjs').signingMode()
+  if (info.platform === 'win32') info.windowsSigningMode = context.packager.platformSpecificBuildOptions.azureSignOptions ? 'azure' : 'unsigned'
   if (!info.commit) {
     console.warn('  warn could not read the source commit; this build will not say what produced it')
   } else if (info.dirty) {

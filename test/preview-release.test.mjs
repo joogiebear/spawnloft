@@ -150,3 +150,26 @@ test('signed publication refuses ad-hoc, missing, or mixed Mac provenance', t =>
   modifyManifest(dir, TARGETS[2], info => { info.macSigningMode = 'signed' })
   assert.equal(verifyRelease(dir, { ...identity, macSigningMode: 'signed' }).macSigningMode, 'signed')
 })
+
+
+test('stable release requires matching clean versions and signed builds on every platform', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-stable-test-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const stable = { ...identity, sourceVersion: '1.0.0', version: '1.0.0' }
+  for (const target of TARGETS) {
+    for (const name of artifactNames({ ...stable, ...target })) {
+      fs.writeFileSync(path.join(dir, name), name.endsWith('.yml') ? feed.replaceAll(identity.version, stable.version) : name.endsWith('.exe') ? installer : Buffer.from(name))
+    }
+    const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
+    writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
+  }
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 11)
+  assert.throws(() => verifyRelease(dir, stable), /development/)
+  modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)
+  modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'azure'; info.sourceVersion = '1.0.0-beta.1' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /clean stable/)
+  modifyManifest(dir, TARGETS[0], info => { info.sourceVersion = '1.0.0' })
+  for (const target of TARGETS.slice(1)) modifyManifest(dir, target, info => { info.macSigningMode = 'ad-hoc' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Mac signing mode/)
+})

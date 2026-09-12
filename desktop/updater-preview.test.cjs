@@ -12,14 +12,14 @@ const feed = '<feed>' + versions.map(version => `<entry><title>SpawnLoft ${versi
   <link href="https://github.com/joogiebear/spawnloft/releases/tag/v${version}"/>
   <content>Development test</content></entry>`).join('') + '</feed>'
 
-function provider(currentVersion, allowPrerelease, platform = 'win32') {
+function provider(currentVersion, allowPrerelease, platform = 'win32', stable = false) {
   const requests = []
   const executor = { async request(options) {
     const route = options.path
     requests.push(route)
-    if (route.endsWith('/releases.atom')) return feed
-    if (route.endsWith('/releases/latest')) return JSON.stringify({ tag_name: 'v0.14.0' })
-    const match = /\/download\/v(0\.15\.0-beta\.3|0\.14\.0)\/(beta|latest)(-mac)?\.yml$/.exec(route)
+    if (route.endsWith('/releases.atom')) return stable ? feed.replace('<feed>', '<feed><entry><title>SpawnLoft 1.0.0</title><link href="https://github.com/joogiebear/spawnloft/releases/tag/v1.0.0"/><content>Stable</content></entry>') : feed
+    if (route.endsWith('/releases/latest')) return JSON.stringify({ tag_name: stable ? 'v1.0.0' : 'v0.14.0' })
+    const match = /\/download\/v(0\.15\.0-beta\.3|0\.14\.0|1\.0\.0)\/(beta|latest)(-mac)?\.yml$/.exec(route)
     assert.ok(match, `Unexpected updater request: ${route}`)
     const version = match[1]
     if (platform === 'darwin') {
@@ -67,3 +67,19 @@ test('stable Windows stays on the stable release when paired betas exist', async
   assert.ok(requests.some(route => route.endsWith('/releases/latest')))
   assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
 })
+
+for (const platform of ['win32', 'darwin']) {
+  for (const current of ['0.14.0', '0.15.0-beta.42', '1.0.0']) {
+    test(`${platform} ${current} resolves stable 1.0 with its native update feed`, async () => {
+      const { client } = provider(current, current.includes('-'), platform, true)
+      const info = await client.getLatestVersion()
+      assert.equal(info.version, '1.0.0')
+      const files = client.resolveFiles(info)
+      if (platform === 'win32') assert.ok(files[0].url.href.endsWith('SpawnLoft-Setup-1.0.0.exe'))
+      else {
+        const { MacUpdater } = require('electron-updater/out/MacUpdater')
+        for (const arm of [true, false]) assert.ok(MacUpdater.filterFilesForArch(files, arm)[0].url.href.endsWith(`mac-${arm ? 'arm64' : 'x64'}.zip`))
+      }
+    })
+  }
+}
