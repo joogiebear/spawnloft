@@ -293,10 +293,12 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     const info = await page.evaluate(() => window.mcctlDesktop.appInfo())
     assert.equal(info.packaged, true)
     assert.equal(info.coreMode, 'bundled')
-    assert.equal(info.manualUpdates, isMac, 'Mac previews update manually; Windows keeps its existing updater')
-    // Windows checks use the live release feed. Keep packaged smoke tests independent of
-    // network/update availability; the Mac manual path returns immediately without a request.
-    if (isMac) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
+    const provenance = JSON.parse(fs.readFileSync(path.join(path.dirname(core), 'build-info.json'), 'utf8'))
+    const manual = isMac && provenance.macSigningMode !== 'signed'
+    assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows keeps its updater')
+    // Exercise the no-network manual path only for ad-hoc packages. Signed
+    // installed upgrades have their own native Squirrel.Mac smoke test.
+    if (manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
     await page.locator('#bSettings').click()
     await page.locator('input[name="appTheme"][value="spawnloft"]').check()
     await page.waitForFunction(() => document.querySelector('#themeStatus').textContent.includes('SpawnLoft theme saved.'))
