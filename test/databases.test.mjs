@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-databases-'))
 process.env.MCCTL_DATA_ROOT = scratch
@@ -126,6 +127,33 @@ test('attach creates the database and user for the server, and the credentials c
   assert.equal(fromServer[0].service, DB)
   assert.equal(fromServer[0].password, undefined, 'the server-side list must not carry the password')
   assertManualConfigs()
+})
+
+test('both CLI launchers start, restart, and detach a database without treating it as Minecraft', { timeout: 90000 }, async () => {
+  const cli = (launcher, args) => execFileSync(process.execPath,
+    [fileURLToPath(new URL(`../${launcher}.mjs`, import.meta.url)), ...args],
+    { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] })
+  assert.equal(services.getDatabase(DB).rcon, undefined, 'a database has no RCON settings')
+  for (const launcher of ['mcctl', 'spawnloft']) {
+    await sup.stop(DB, { timeout: 10000 })
+    const started = cli(launcher, ['start', DB, '--timeout', '15'])
+    assert.match(started, /Ready -/)
+    assert.match(started, /database pid \d+\s+port \d+/)
+    assert.doesNotMatch(started, /java pid|rcon|TypeError/i)
+    assert.equal(readState(DB).status, 'running')
+    const firstPid = readState(DB).state.javaPid
+    const restarted = cli(launcher, ['restart', DB, '--timeout', '15'])
+    assert.match(restarted, /Ready -/)
+    assert.doesNotMatch(restarted, /java pid|rcon|TypeError/i)
+    assert.equal(readState(DB).status, 'running')
+    assert.notEqual(readState(DB).state.javaPid, firstPid)
+    cli(launcher, ['stop', DB])
+    const detached = cli(launcher, ['start', DB, '--detach'])
+    assert.match(detached, /Launched \(database pid \d+\)/)
+    assert.doesNotMatch(detached, /java pid|rcon|TypeError/i)
+    assert.equal((await sup.waitForReady(DB, 15000)).ready, true)
+    assertManualConfigs()
+  }
 })
 
 test('detach and reattach preserve manual plugin configs, including legacy attachment metadata', () => {

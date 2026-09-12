@@ -6,6 +6,11 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **Database CLI startup:** `spawnloft start <database>` and `restart <database>` now
+  finish successfully after the database becomes ready, instead of throwing a TypeError
+  while trying to display a Minecraft RCON port. Database output labels the database PID;
+  detached startup is labeled correctly too. This shared fix applies to Mac and Windows,
+  and to both the `spawnloft` and `mcctl` commands.
 - **Managed databases on Mac:** on macOS 15+, **Create a database** downloads verified
   MySQL 8.4 LTS binaries for Apple Silicon or Intel, initializes a private data directory,
   starts the database and creates scoped credentials for the selected server. No Homebrew,
