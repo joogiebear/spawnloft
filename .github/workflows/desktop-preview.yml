@@ -124,6 +124,7 @@ jobs:
       - name: Verify a signed installed Mac upgrade
         if: matrix.platform == 'darwin' && needs.release-policy.outputs.mac-signing-mode == 'signed'
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
         run: node desktop/smoke-mac-update.cjs "${{ matrix.app }}"
       - uses: actions/upload-artifact@v4

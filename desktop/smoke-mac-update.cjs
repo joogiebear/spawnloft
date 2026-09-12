@@ -16,7 +16,9 @@ async function main() {
   const dist = path.resolve('desktop/dist')
   const info = JSON.parse(fs.readFileSync(path.join(target, 'Contents/Resources/build-info.json')))
   assert.equal(info.macSigningMode, 'signed')
-  const releasesResponse = await fetch('https://api.github.com/repos/joogiebear/spawnloft/releases?per_page=15')
+  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'SpawnLoft update verification' }
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  const releasesResponse = await fetch('https://api.github.com/repos/joogiebear/spawnloft/releases?per_page=15', { headers, signal: AbortSignal.timeout(30000) })
   assert.ok(releasesResponse.ok, `Release discovery: ${releasesResponse.status}`)
   const releases = await releasesResponse.json()
   const previous = releases.find(r => r.prerelease && !r.draft && r.assets.some(a => a.name === 'beta-mac.yml'))
@@ -38,6 +40,9 @@ async function main() {
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.MCCTL_CORE
+  // Authentication belongs only to CI release discovery, never the installed app.
+  delete env.GITHUB_TOKEN
+  delete env.GH_TOKEN
   const preserved = new Map()
   for (const [name, content] of [
     [path.join(config, 'mcctl/settings.json'), JSON.stringify({ dataRoot: data, theme: 'spawnloft' })],
