@@ -81,7 +81,7 @@ async function main() {
     await page.waitForLoadState('domcontentloaded')
     assert.equal((await page.evaluate(() => window.mcctlDesktop.appInfo())).manualUpdates, false)
     await app.evaluate(({ app, autoUpdater: nativeUpdater }, url) => {
-      const updater = require(require('node:path').join(app.getAppPath(), 'node_modules/electron-updater')).autoUpdater
+      const updater = process.mainModule.require('electron-updater').autoUpdater
       updater.setFeedURL({ provider: 'generic', url })
       updater.autoRunAppAfterInstall = false // Relaunch under Playwright after native replacement.
       globalThis.__nativeUpdateReady = false

@@ -62,6 +62,7 @@ function checked(args) {
   return res.stdout
 }
 export function writeShim(id) {
+  label(id)
   const file = shimFile(id)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const env = { MCCTL_DATA_ROOT: DATA_ROOT, ELECTRON_RUN_AS_NODE: '1' }
