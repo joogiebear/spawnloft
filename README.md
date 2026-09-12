@@ -196,23 +196,26 @@ a scheduled `verify <name> --all` can be noticed by whatever runs it.
 | `task list` | Every scheduled task, with its next run and last result |
 | `task add <inst> --do <what> [when]` | Create one |
 | `task rm <id>` / `task enable\|disable <id>` | Remove or pause one |
-| `task run <id>` | Run it now — this is also what Windows calls |
+| `task run <id>` | Run it now — this is also what the system scheduler calls |
 
 `--do` is one of `backup`, `command` (with `--line "<what to send>"`), `restart`,
 `stop`, `start`. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
 `--weekly SUN --at 03:00`, or `--on-logon`.
 
-Windows Task Scheduler runs these, so they happen whether or not SpawnLoft is open.
+Windows Task Scheduler or per-user macOS launchd agents run these, even with SpawnLoft closed.
 They run **interactive only**: while you are signed in, screen locked included,
 but not after you sign out. Running regardless would mean storing a Windows
 password in the task definition, which is not a thing to do quietly for a nightly
 backup.
 
-SpawnLoft keeps the definitions in its own file and gives Windows only a trigger that
-calls back into `mcctl task run <id>`. Two reasons: what a task *does* stays inside
-SpawnLoft, where it is constrained to the handful of things a task is allowed to be
-rather than an arbitrary command line; and editing a task does not mean recreating
-a Windows task.
+On Mac, daily and weekly jobs missed during sleep run once when the Mac wakes.
+Interval jobs skip missed runs; no jobs run after sign-out. Login tasks also run
+when first registered or enabled. macOS may show SpawnLoft background activity in
+Login Items; disabling it there prevents scheduled work. Remove tasks in SpawnLoft
+before deleting the application. Interval next-run times are not supplied by launchd.
+
+SpawnLoft keeps task actions in its own data folder. The operating system holds a
+trigger that invokes the bundled CLI; plugin configuration files stay manual.
 
 Every run writes a line to the instance's run directory recording what it did —
 the filename a backup produced, the command it sent, or why it was skipped. Task

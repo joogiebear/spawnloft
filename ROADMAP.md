@@ -68,6 +68,8 @@ user accounts, a remote web panel - stay off it on purpose.
 
 - **Distribution.** Screenshots in the README, a winget manifest, a public landing.
   People cannot want a tool they cannot find.
-- **Linux / macOS.** Everything except `schedule.mjs` (schtasks) and a few paths is
-  nearly portable already.
+- **macOS.** Signed Apple Silicon and Intel betas now include native scheduling,
+  automatic backups, performance metrics, managed MySQL, and automatic update feeds.
+  Installed upgrade verification gates subsequent signed betas before 1.0.
+- **Linux.** Native packaging and platform integrations remain future work.
 - Localization.
