@@ -206,16 +206,18 @@ async function cmdStart(positional, flags) {
   out(`Starting "${name}"...`)
   // --force: start on a Java the version is known to be too old for, for whoever knows better.
   const res = await sup.start(name, { wait, timeout, sync: flags.sync !== false, force: Boolean(flags.force) })
+  const inst = getInstance(name)
+  const processKind = isDatabase(inst) ? 'database' : 'java'
 
   if (!wait) {
-    out(`Launched (java pid ${res.javaPid}). Not waiting for ready.`)
+    out(`Launched (${processKind} pid ${res.javaPid}). Not waiting for ready.`)
     out(`Follow with: mcctl logs ${name} -f`)
     return
   }
   if (res.ready) {
-    const inst = getInstance(name)
     out(`Ready - ${res.readyLine}`)
-    out(`  java pid ${res.javaPid}   port ${inst.port}   rcon ${inst.rcon.port}`)
+    const rcon = isDatabase(inst) ? '' : `   rcon ${inst.rcon.port}`
+    out(`  ${processKind} pid ${res.javaPid}   port ${inst.port}${rcon}`)
     return
   }
   if (res.failed) {
