@@ -1,4 +1,4 @@
-/** Managed MySQL for macOS: official, pinned archives; no Homebrew or system service. */
+/** Managed MySQL: official pinned native archives; no system service. */
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -24,23 +24,26 @@ export const ARCHIVES = Object.freeze({
   arm64: { file: 'mysql-8.4.11-macos15-arm64.tar.gz', sha256: 'b96e00493bc3499b9ffd7f08d65c5d64933af0383a8287d9873b64f94c2d6009' },
   x64: { file: 'mysql-8.4.11-macos15-x86_64.tar.gz', sha256: '90e8aea10698d01b978f0179e72e8d5e2cbe9f9bd5771e88b0b75d7c82244d3f' },
 })
+export const WINDOWS_ARCHIVE = Object.freeze({ file: 'mysql-8.4.11-winx64.zip', sha256: 'a492371d687d2bab088b0062581144a0044b8964baefdf4faa579292b423d25c' })
 
 export function assertSupported({ platform = process.platform, arch = process.arch, release = os.release() } = {}) {
-  if (platform !== 'darwin' || !Object.hasOwn(ARCHIVES, arch)) fail('Managed MySQL requires an Apple Silicon or Intel Mac.')
-  if (Number(release.split('.')[0]) < 24) fail('Managed MySQL requires macOS 15 or later. You can still connect to an existing database on this Mac.')
+  if (platform === 'win32' && arch === 'x64') return
+  if (platform !== 'darwin' || !Object.hasOwn(ARCHIVES, arch)) fail('Managed MySQL requires Windows x64 or an Apple Silicon or Intel Mac.')
+  if (Number(release.split('.')[0]) < 24) fail('Managed MySQL requires macOS 15 or later. You can still connect to an existing MySQL database.')
 }
 export async function versions() {
   assertSupported()
   return [{ version: VERSION, series: '8.4', status: 'Stable', support: 'Long Term Support' }]
 }
-export function archiveFor(version, arch = process.arch) {
-  if (version !== VERSION || !Object.hasOwn(ARCHIVES, arch)) fail(`No verified MySQL ${version} archive for ${arch}. See: spawnloft db versions --engine mysql`)
-  const entry = ARCHIVES[arch]
+export function archiveFor(version, arch = process.arch, platform = process.platform) {
+  const entry = platform === 'win32' && arch === 'x64' ? WINDOWS_ARCHIVE
+    : platform === 'darwin' && Object.hasOwn(ARCHIVES, arch) ? ARCHIVES[arch] : null
+  if (version !== VERSION || !entry) fail(`No verified MySQL ${version} archive for ${platform}/${arch}. See: spawnloft db versions`)
   return { ...entry, url: `https://cdn.mysql.com/Downloads/MySQL-8.4/${entry.file}` }
 }
-export function engineDir(version) {
-  archiveFor(version)
-  return path.join(ENGINES_DIR, `mysql-${version}-darwin-${process.arch}`)
+export function engineDir(version, platform = process.platform, arch = process.arch) {
+  archiveFor(version, arch, platform)
+  return path.join(ENGINES_DIR, `mysql-${version}-${platform}-${arch}`)
 }
 export const binary = maria.binary
 const roles = ['server', 'admin', 'client', 'dump']
@@ -74,7 +77,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     if (hasEngine(version)) return { version, dir, cached: true }
     if (fs.existsSync(dir)) fail(`An incomplete MySQL engine exists at ${dir}. Move it aside before retrying; no existing files were replaced.`)
     staging = fs.mkdtempSync(path.join(ENGINES_DIR, '.mysql-download-'))
-    const file = path.join(staging, 'archive.tar.gz')
+    const file = path.join(staging, archive.file)
     const unpacked = path.join(staging, 'engine')
     fs.mkdirSync(unpacked)
     const response = await fetch(archive.url, { signal: AbortSignal.timeout(600000) })
@@ -113,11 +116,11 @@ export function socketFor(inst) {
   fs.chmodSync(base, 0o700)
   return path.join(base, crypto.createHash('sha256').update(path.resolve(inst.dir)).digest('hex').slice(0, 20) + '.sock')
 }
-export function iniFor(inst, socket) {
+export function iniFor(inst, socket, platform = process.platform) {
   const value = text => '"' + String(text).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"'
   return ['# Managed by SpawnLoft; plugin configs remain manual.', '[mysqld]',
-    `basedir=${value(engineDir(inst.version))}`, `datadir=${value(dataDir(inst))}`,
-    `socket=${value(socket)}`, `pid-file=${value(path.join(inst.dir, 'mysql.pid'))}`,
+    `basedir=${value(engineDir(inst.version, platform))}`, `datadir=${value(dataDir(inst))}`,
+    ...(platform === 'darwin' ? [`socket=${value(socket)}`] : []), `pid-file=${value(path.join(inst.dir, 'mysql.pid'))}`,
     `port=${inst.port}`, 'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve',
     'character-set-server=utf8mb4', 'collation-server=utf8mb4_unicode_ci',
     'max_connections=100', 'log-error-verbosity=2', '',
@@ -135,7 +138,10 @@ function execute(cmd, args, { env = process.env, timeout = 180000 } = {}) {
     child.once('close', code => {
       clearTimeout(timer)
       if (code === 0 && !timedOut) resolve(stdout)
-      else reject(new UserError(timedOut ? 'MySQL setup timed out.' : `MySQL tool exited ${code}: ${stderr.trim()}`))
+      else reject(new UserError(timedOut ? 'MySQL setup timed out.'
+        : process.platform === 'win32' && [3221225781, -1073741515].includes(code)
+          ? 'MySQL needs the Microsoft Visual C++ x64 runtime. Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe, then retry.'
+          : `MySQL tool exited ${code}: ${stderr.trim()}`))
     })
   })
 }
@@ -147,9 +153,11 @@ export async function initData(inst) {
   if (!hasEngine(inst.version)) fail('The MySQL engine installation is incomplete. Download it again.')
   if (fs.existsSync(dataDir(inst))) fail('Refusing to initialize an existing MySQL data directory.')
   fs.mkdirSync(inst.dir, { recursive: true, mode: 0o700 })
-  const socket = socketFor(inst)
+  const win = process.platform === 'win32'
+  const socket = win ? null : socketFor(inst)
   fs.writeFileSync(iniFile(inst), iniFor(inst, socket), { mode: 0o600 })
   const server = binary(dir, 'server').path
+  await execute(server, ['--no-defaults', '--version'])
   // --initialize creates a temporary random root password; it is captured, never logged.
   await execute(server, ['--no-defaults', '--initialize', `--basedir=${dir}`, `--datadir=${dataDir(inst)}`])
   const initFile = path.join(inst.dir, 'bootstrap.sql')
@@ -160,8 +168,11 @@ export async function initData(inst) {
     "GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;",
   ].join('\n'), { flag: 'wx', mode: 0o600 })
   let child, exited, timer
+  const sharedMemory = `SpawnLoft-${crypto.randomUUID()}`
   try {
-    child = spawn(server, [`--defaults-file=${iniFile(inst)}`, '--skip-networking', `--init-file=${initFile}`], { stdio: ['ignore', 'ignore', 'pipe'] })
+    child = spawn(server, [`--defaults-file=${iniFile(inst)}`, '--skip-networking', `--init-file=${initFile}`,
+      ...(win ? ['--console', '--shared-memory', `--shared-memory-base-name=${sharedMemory}`] : [])],
+    { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
     exited = new Promise(resolve => { child.once('error', () => resolve()); child.once('close', resolve) })
     await new Promise((resolve, reject) => {
       let log = ''
@@ -174,7 +185,8 @@ export async function initData(inst) {
       })
     })
     clearTimeout(timer)
-    await execute(binary(dir, 'admin').path, ['--no-defaults', '--protocol=SOCKET', `--socket=${socket}`, '--user=root', 'shutdown'],
+    await execute(binary(dir, 'admin').path, ['--no-defaults',
+      ...(win ? ['--protocol=MEMORY', `--shared-memory-base-name=${sharedMemory}`] : ['--protocol=SOCKET', `--socket=${socket}`]), '--user=root', 'shutdown'],
       { env: { ...process.env, MYSQL_PWD: inst.root.password }, timeout: 30000 })
     await exited
     if (child.exitCode !== 0) fail('MySQL did not finish setup cleanly.')
@@ -190,9 +202,9 @@ export async function initData(inst) {
 export function launchSpec(inst) {
   const dir = engineDir(inst.version)
   if (!hasEngine(inst.version)) fail('The managed MySQL engine is missing or incomplete.')
-  socketFor(inst)
+  if (process.platform === 'darwin') socketFor(inst)
   return {
-    cmd: binary(dir, 'server').path, args: [`--defaults-file=${iniFile(inst)}`], env: process.env, cwd: inst.dir,
+    cmd: binary(dir, 'server').path, args: [`--defaults-file=${iniFile(inst)}`, ...(process.platform === 'win32' ? ['--console'] : [])], env: process.env, cwd: inst.dir,
     ready: MARIADB_READY_RE, failed: /\[ERROR\].*(?:Aborting|Can't start|Unable to lock|Fatal)/i,
     stop: { cmd: binary(dir, 'admin').path,
       args: ['--no-defaults', '--protocol=TCP', '--host=127.0.0.1', `--port=${inst.port}`, '--user=root', 'shutdown'],

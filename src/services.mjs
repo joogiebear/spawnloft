@@ -29,9 +29,15 @@ export const ENGINES = {
   [mysql.ENGINE]: { label: mysql.LABEL, kind: mysql.KIND, defaultPort: mysql.DEFAULT_PORT, module: mysql },
 }
 
-export function defaultEngine() { return process.platform === 'darwin' ? 'mysql' : 'mariadb' }
+// Other drivers remain internal SQL/fixture utilities. New product flows expose MySQL and Redis (Garnet).
+export const NEW_ENGINES = ['mysql', 'garnet']
+export function assertNewEngine(engine = defaultEngine()) {
+  if (!NEW_ENGINES.includes(engine)) fail('Choose MySQL or Redis (Garnet). MariaDB is not offered for new databases.')
+  return engine
+}
+export function defaultEngine() { return 'mysql' }
 export function canManage(engine, platform = process.platform) {
-  return platform === 'win32' ? ['mariadb', 'garnet'].includes(engine) : platform === 'darwin' && engine === 'mysql'
+  return ['win32', 'darwin'].includes(platform) && NEW_ENGINES.includes(engine)
 }
 
 /** Whether the database is there to be talked to: running here, or external (assumed; the call says otherwise). */
@@ -303,7 +309,7 @@ export function credentials(dbName, serverName) {
  * is recorded: an address that is wrong is refused now, with the engine's own reason, rather
  * than at the first attach.
  */
-export async function registerExternal(name, { engine = mariadb.ENGINE, host = '127.0.0.1', port = null, user = 'root', password = '', tools = null, label = null } = {}) {
+export async function registerExternal(name, { engine = defaultEngine(), host = '127.0.0.1', port = null, user = 'root', password = '', tools = null, label = null } = {}) {
   validateName(name)
   if (hasInstance(name)) fail(`"${name}" already exists - servers and databases share one set of names`)
   if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)

@@ -60,6 +60,7 @@ const server = net.createServer((socket) => {
       } else if (op === 'PING') socket.write('+PONG\r\n')
       else if (op === 'SET') { store.set(args[0], args[1]); socket.write('+OK\r\n') }
       else if (op === 'GET') { const v = store.get(args[0]); socket.write(v == null ? '$-1\r\n' : `$${Buffer.byteLength(v)}\r\n${v}\r\n`) }
+      else if (op === 'SAVE' && checkpoints && fs.existsSync(path.join(checkpoints, 'fail-save'))) socket.write('-ERR checkpoint failed\r\n')
       else if (op === 'SAVE') { if (checkpoints) { fs.mkdirSync(checkpoints, { recursive: true }); fs.writeFileSync(path.join(checkpoints, 'checkpoint.txt'), String(Date.now())) } socket.write('+OK\r\n') }
       else if (op === 'SHUTDOWN') { say('User requested shutdown...'); socket.end(); setTimeout(() => process.exit(0), 50) }
       else socket.write(`-ERR unknown command '${cmd}'\r\n`)

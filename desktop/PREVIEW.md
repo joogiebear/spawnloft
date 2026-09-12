@@ -80,10 +80,11 @@ first launch, try opening it once, then use **System Settings → Privacy & Secu
 Open Anyway**. If it instead reports a damaged app, report the exact message.
 <!-- /MAC_DISTRIBUTION -->
 
-Managed Garnet remains Windows-only. Managed
-SQL databases use MySQL 8.4 LTS and require macOS 15 or later; the app itself still runs
-on macOS 13+. Existing external MariaDB/MySQL/Redis connections remain available. Windows retains its existing
-capabilities; a shared fix lands in both packages, with platform differences explicit.
+New setups offer **MySQL** and **Redis (Garnet)** on Windows x64 and both Mac architectures.
+Managed MySQL 8.4 LTS requires macOS 15+; the desktop app itself runs on macOS 13+.
+Garnet installs a verified private .NET runtime automatically. Its stop action waits for a
+saved checkpoint before terminating the process because Garnet does not implement SHUTDOWN.
+Plugin configs remain manual. MariaDB is no longer offered for new setups.
 
 ### Toward 1.0
 

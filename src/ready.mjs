@@ -17,7 +17,7 @@ export const MARIADB_READY_RE = /ready for connections/i
 export const MARIADB_FAILED_RE = /\[ERROR\] (?:Aborting|Can't start server|mariadbd: Can't|mysqld: Can't|InnoDB: Unable to lock|Fatal error)/i
 
 /** Garnet, and Redis itself: the line every Redis-speaking server prints once it listens. */
-export const GARNET_READY_RE = /ready to accept connections|listening on|server started/i
+export const GARNET_READY_RE = /ready to accept connections/i
 export const GARNET_FAILED_RE = /address already in use|only one usage of each socket|unhandled exception|cannot bind/i
 
 /** The pair that fits an instance: a database's engine has its own lines. */

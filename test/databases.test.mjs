@@ -214,50 +214,17 @@ test('the panel lists databases apart from servers and never sends a password', 
   }
 })
 
-test('one-step MariaDB creation is available on Windows and explicitly refused on other platforms', { timeout: 60000 }, async () => {
-  const srv = services.assertServer(SRV)
-  const wanted = Number(srv.port) + 1
-  const wantedFree = !usedPorts().has(wanted) && await isPortFree(wanted)
-
+test('new MariaDB creation is refused on every platform without touching plugin configs', async () => {
   const { server, url } = await ui.serve({ port: 0, open: false })
-  let out
   try {
     const res = await fetch(`${url}api/instances/${SRV}/databases/create`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ engine: 'mariadb', version: VERSION }),
     })
-    out = await res.json()
+    assert.equal(res.status, 400)
+    assert.match((await res.json()).error, /[Ii]nstallation.*not available/)
+    assert.ok(!listServices().some(i => i.name === `${SRV}-db`))
     assertManualConfigs()
-    if (process.platform !== 'win32') {
-      assert.equal(res.status, 400)
-      assert.match(out.error, /[Ii]nstallation.*not available/)
-      assert.ok(!listServices().some((i) => i.name === `${SRV}-db`), 'the refused request must not create a database')
-      return
-    }
-    assert.equal(res.status, 200, JSON.stringify(out))
-  } finally {
-    server.close()
-  }
-  const name = `${SRV}-db`
-  assert.equal(out.database.name, name)
-  assert.equal(out.database.status, 'running')
-  assert.equal(out.database.root, undefined, 'the panel answer must not carry the root password')
-  if (wantedFree) assert.equal(out.database.port, wanted, 'the port after the game port, when free')
-  else assert.ok(out.database.port > wanted)
-  assert.equal(out.credentials.database, SRV)
-  assert.equal(out.credentials.port, out.database.port)
-  assert.ok(services.serverAttachments(SRV).some((a) => a.service === name), 'attached from the same call')
-  assert.equal(readState(name).status, 'running')
-
-  // The name stays within the 32 characters a name may have, suffix included, and is made unique.
-  assert.equal(services.nameForServer('a'.repeat(32)), 'a'.repeat(29) + '-db')
-  assert.equal(services.nameForServer(SRV), `${SRV}-db-2`, 'the first one exists, so the next is numbered')
-
-  // Put it away, so the snapshot tests below see the one database they expect.
-  await sup.stop(name, { timeout: 10000 })
-  services.detach(name, SRV)
-  services.removeDatabase(name, { purge: true })
-  assertManualConfigs()
-  assert.ok(!listServices().some((i) => i.name === name))
+  } finally { server.close() }
 })
 
 test('a snapshot of an attached server carries a dump of its database, and verify checks for it', { timeout: 30000 }, async () => {

@@ -180,12 +180,12 @@ async function main() {
     })
   }
 
-  async function api(route, body) {
+  async function api(route, body, timeout = 30000) {
     const response = await fetch(new URL(`/api/${route}`, page.url()), {
       method: body === undefined ? 'GET' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(timeout),
     })
     const result = await response.json()
     assert.ok(response.ok, `${route}: ${response.status} ${JSON.stringify(result)}`)
@@ -444,7 +444,8 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '05-backup-refresh.png') })
     record('PASS: bundled CLI backups appear while Backups is open and after tab reentry without reload or lost form state')
     if (isMac) await require('./smoke-scheduler.cjs')({ api, cli, close, launch, data, name, record })
-    if (isMac) await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
+    await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
+    await require('./smoke-redis.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
     assert.deepEqual(errors, [], `Renderer errors: ${errors.join('\n')}`)
     record('PASS: no uncaught renderer errors')
   } catch (error) {
@@ -454,11 +455,11 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
   } finally {
     // Shut the test daemon down before removing its control socket and settings, even after failure.
     let safeToRemove = true
-    if (isMac && fs.existsSync(path.join(data, 'instances.json'))) {
+    if (fs.existsSync(path.join(data, 'instances.json'))) {
       const instances = JSON.parse(fs.readFileSync(path.join(data, 'instances.json'), 'utf8')).instances
-      if (instances[`${name}-db`]) {
-        try { await cli(['kill', `${name}-db`], 45000) }
-        catch (error) { safeToRemove = false; record(`MySQL cleanup: ${error.message}`) }
+      for (const db of [`${name}-db`, `${name}-cache`]) if (instances[db]) {
+        try { await cli(['kill', db], 45000) }
+        catch (error) { safeToRemove = false; record(`Database cleanup: ${error.message}`) }
       }
     }
     if (daemonCreated) {
