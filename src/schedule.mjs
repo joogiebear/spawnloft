@@ -590,9 +590,11 @@ export function renameInstance(oldName, newName) {
 
   if (process.platform === 'darwin') {
     for (const m of moved) {
-      data.tasks[m.to] = m.task
+      // Stage the new agent disabled: a login trigger must not fire in the
+      // middle of a rename, or while the old task might still be running.
+      data.tasks[m.to] = { ...m.task, enabled: false }
       writeJson(TASKS_FILE(), data)
-      try { mac.write(m.to, m.task); mac.remove(m.from) }
+      try { mac.write(m.to, data.tasks[m.to]); mac.remove(m.from) }
       catch (error) {
         try { mac.remove(m.to) } catch {}
         delete data.tasks[m.to]
@@ -601,6 +603,7 @@ export function renameInstance(oldName, newName) {
       }
       delete data.tasks[m.from]
       writeJson(TASKS_FILE(), data)
+      if (m.task.enabled) { update(m.to, { enabled: true }); data.tasks[m.to] = m.task }
     }
     return { moved: moved.length, stranded: [] }
   }
