@@ -12,7 +12,7 @@ Existing Windows stable and current Windows/Mac beta installs receive 1.0 throug
 
 - Original and SpawnLoft themes, live performance metrics, schedules and automatic backups on Windows and Mac.
 - Managed **MySQL and Redis** on both platforms. Redis uses Microsoft Garnet with its private bundled .NET runtime. MariaDB is no longer offered for new services.
-- CLI JSON output, metrics streaming and CSV export, readiness checks, and safe local plugin JAR deployment with rollback copies.
+- CLI JSON output, metrics streaming and CSV export.
 - Clean console output, easier scanning of long lines, and backup history that refreshes after CLI-created backups.
 - `spawnloft` and `mcctl` terminal launchers.
 
