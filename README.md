@@ -4,8 +4,9 @@ Minecraft servers on your own PC, without the terminal. A local control plane fo
 multiple server instances with detached launch, captured console, RCON command/response, stdin
 injection, and snapshot/restore. The site is [spawnloft.com](https://spawnloft.com).
 
-SpawnLoft is the product: the desktop app, the panel, the installer. `mcctl` is the command-line
-tool inside it, and the name of this repository, so commands, file names and links keep that name.
+SpawnLoft is the product and the preferred command-line name. `mcctl` remains a compatible
+alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for packaged
+launchers, structured JSON output, live performance readings, and CSV export.
 
 Zero dependencies — plain Node 20+ and the `tar` that ships with Windows.
 
@@ -195,23 +196,26 @@ a scheduled `verify <name> --all` can be noticed by whatever runs it.
 | `task list` | Every scheduled task, with its next run and last result |
 | `task add <inst> --do <what> [when]` | Create one |
 | `task rm <id>` / `task enable\|disable <id>` | Remove or pause one |
-| `task run <id>` | Run it now — this is also what Windows calls |
+| `task run <id>` | Run it now — this is also what the system scheduler calls |
 
 `--do` is one of `backup`, `command` (with `--line "<what to send>"`), `restart`,
 `stop`, `start`. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
 `--weekly SUN --at 03:00`, or `--on-logon`.
 
-Windows Task Scheduler runs these, so they happen whether or not SpawnLoft is open.
+Windows Task Scheduler or per-user macOS launchd agents run these, even with SpawnLoft closed.
 They run **interactive only**: while you are signed in, screen locked included,
 but not after you sign out. Running regardless would mean storing a Windows
 password in the task definition, which is not a thing to do quietly for a nightly
 backup.
 
-SpawnLoft keeps the definitions in its own file and gives Windows only a trigger that
-calls back into `mcctl task run <id>`. Two reasons: what a task *does* stays inside
-SpawnLoft, where it is constrained to the handful of things a task is allowed to be
-rather than an arbitrary command line; and editing a task does not mean recreating
-a Windows task.
+On Mac, daily and weekly jobs missed during sleep run once when the Mac wakes.
+Interval jobs skip missed runs; no jobs run after sign-out. Login tasks also run
+when first registered or enabled. macOS may show SpawnLoft background activity in
+Login Items; disabling it there prevents scheduled work. Remove tasks in SpawnLoft
+before deleting the application. Interval next-run times are not supplied by launchd.
+
+SpawnLoft keeps task actions in its own data folder. The operating system holds a
+trigger that invokes the bundled CLI; plugin configuration files stay manual.
 
 Every run writes a line to the instance's run directory recording what it did —
 the filename a backup produced, the command it sent, or why it was skipped. Task
@@ -614,37 +618,41 @@ SpawnLoft's own folders. The same command is available from a terminal as
 
 ## Databases
 
+On **Mac (macOS 15+)**, managed SQL databases use MySQL 8.4 LTS. Choose **Create a database**
+in a server's Settings, or run `spawnloft db create <server>`. SpawnLoft downloads an
+architecture-specific, SHA-256-verified archive from Oracle, keeps it in its own engine
+store, and initializes and starts a database with scoped credentials. It does not install
+Homebrew, add a system service, or edit plugin configs. On older Macs, connect to a database
+you already run. Windows x64 offers the same MySQL 8.4 LTS engine. Redis (Garnet) is available on Windows and both Mac architectures. New setups offer MySQL and Redis; MariaDB is no longer a creation option.
+
 Plugins that want MySQL — LuckPerms, CoreProtect, Plan, AuthMe, Jobs, mcMMO — can have one
 here, with nothing to install; so can plugins that want Redis, by way of Microsoft's Garnet. A database is another entry in the registry, run by the same
 daemon as a server: a card with a lamp, a console, start, stop and restart, crash recovery.
 
 ```bash
-mcctl db versions                    # MariaDB releases that can be run
-mcctl db add maria                   # downloads the newest stable MariaDB, once, and sets one up on a free port
-mcctl start maria
-mcctl db attach maria survival       # a database and a user for that server; prints the credentials
+mcctl db versions                    # verified MySQL LTS releases
+mcctl db add sql                     # downloads verified MySQL, once, and sets one up on a free port
+mcctl start sql
+mcctl db attach sql survival       # a database and a user for that server; prints the credentials
 mcctl db create survival             # or all of that in one step: survival-db on port 25566, started, attached
-mcctl db creds maria survival        # shows them again
-mcctl db detach maria survival       # takes the user away; --drop deletes the data too
+mcctl db creds sql survival        # shows them again
+mcctl db detach sql survival       # takes the user away; --drop deletes the data too
 mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
 mcctl db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
-mcctl db plugins survival            # which plugins here can take the credentials
-mcctl db apply maria survival luckperms   # writes them into that plugin's config, comments kept
 ```
 
-MariaDB comes from its own mirror as the portable Windows zip, hash-checked and unpacked with the
-`tar` Windows ships, into `engines/` beside the jars; every database on that version shares it.
+MySQL comes from Oracle's CDN as a pinned native archive, hash-checked and unpacked with the
+`tar` the OS ships, into `engines/` beside the jars; every database on that version shares it.
 Each database keeps its data under `services/<name>/`, listens on 127.0.0.1 only, and is stopped
-through `mariadb-admin` over TCP, since a database takes no console input. The user a server gets
+through `mysqladmin` over TCP, since a database takes no console input. The user a server gets
 can reach its one database and nothing else. A snapshot of an attached server carries a dump of
 its database as a `databases/` member; verify checks for it, and restore imports it back into the
-database it came from, which has to be running. *Apply to a plugin* writes the credentials into
-LuckPerms, CoreProtect, Plan or AuthMe's own config, in place, with the comments kept; the server
-restarts for the plugin to read it. A database you already run - XAMPP, a MariaDB install, a Redis on the LAN - is
+database it came from, which has to be running. **Plugin configs stay manual.** Use
+`spawnloft db creds <database> <server>` or **Show credentials** in the panel, then copy
+the values into your plugin config yourself. Creating or attaching a database never
+writes plugin configs; existing configs are left unchanged. A database you already run - XAMPP, a MySQL install, a Redis on the LAN - is
 registered with its address and attaches the same way, only never started or stopped from here. In the panel, databases sit under the servers in the
 sidebar, a server's Settings tab has a Databases card with the credentials one click away and a
-*Create a database* button that makes one for that server in one step - MariaDB's newest stable
-release on the port after the game port, started and attached - and *Add a server → A database*
-creates one with the choices in it (a version, an engine, one for several servers to share). The plan, with what comes next (backups of attached
-databases, config helpers for the common plugins, Redis by way of Garnet), is in
+*Create a database* button that makes one for that server in one step - MySQL 8.4 LTS on the port after the game port, started and attached - and *Add a server → A database*
+creates one with the choices in it (a version, an engine, one for several servers to share). The database design and supported workflows are in
 `docs/databases-plan.md`.

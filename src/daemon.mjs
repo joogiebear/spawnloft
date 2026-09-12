@@ -25,6 +25,7 @@ import { diagnose } from './diagnose.mjs'
 import { patternsFor } from './ready.mjs'
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
+import * as mysql from './mysql.mjs'
 import { respSend } from './resp.mjs'
 
 const name = process.argv[2]
@@ -79,7 +80,9 @@ process.on('uncaughtException', die)
 // One console file per daemon, truncated once at the first start so `logs` shows this session
 // only. A crash-restart APPENDS to the same file - the lines before the crash are the reason
 // it crashed, and they must survive the recovery.
-const out = fs.createWriteStream(consoleLog(name), { flags: 'w' })
+// Finish truncating before publishing this daemon's state. An asynchronous open can leave
+// the previous session's ready line visible to a caller waiting for this launch.
+const out = fs.createWriteStream(consoleLog(name), { fd: fs.openSync(consoleLog(name), 'w') })
 
 // ---- one run of the server --------------------------------------------------
 
@@ -129,7 +132,11 @@ function javaCommand(inst, args) {
 let program = null
 
 function programFor(inst) {
-  if (isDatabase(inst)) return inst.engine === 'garnet' ? garnet.launchSpec(inst) : mariadb.launchSpec(inst)
+  if (isDatabase(inst)) {
+    const engine = { mariadb, garnet, mysql }[inst.engine]
+    if (!engine) throw new Error(`Unknown database engine: ${inst.engine}`)
+    return engine.launchSpec(inst)
+  }
   const jar = serverJarPath(inst)
   const flags = inst.jvmFlags?.length ? inst.jvmFlags : jvmFlagsFor(inst.memory)
   const jvmArgs = [`-Xms${inst.memory}`, `-Xmx${inst.memory}`, ...flags, '-jar', path.basename(jar), '--nogui']
@@ -350,7 +357,7 @@ function forceKill() {
 }
 
 function waitForExit(timeoutMs) {
-  if (!child || child.exitCode !== null) return Promise.resolve(child?.exitCode ?? null)
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(child?.exitCode ?? null)
   return new Promise((resolve) => {
     stopWaiters.push(resolve)
     if (timeoutMs > 0) setTimeout(() => resolve(null), timeoutMs)
@@ -393,13 +400,25 @@ async function handleStop(timeoutMs) {
       // A Redis-speaking engine is asked in its own protocol: checkpoint, then shut down.
       const r = program.stop.resp
       log(`asking for shutdown over the Redis protocol at ${r.host}:${r.port}`)
-      respSend(r.host, r.port, r.commands, { password: r.password || null }).catch((err) => log(`shutdown request: ${err.message}`))
+      if (r.terminateAfterSave) {
+        try {
+          await respSend(r.host, r.port, r.commands, { password: r.password || null, timeout: timeoutMs })
+          log('Redis checkpoint saved; terminating the managed process (Garnet has no SHUTDOWN command)')
+          child.kill('SIGTERM')
+        } catch (err) {
+          stopSent = false
+          stopping = false
+          return { ok: false, error: `Redis checkpoint failed; the process was left running: ${err.message}` }
+        }
+      } else {
+        respSend(r.host, r.port, r.commands, { password: r.password || null }).catch(err => log(`shutdown request: ${err.message}`))
+      }
     } else {
       log('no graceful stop for this program; waiting, then killing')
     }
   }
   const code = await waitForExit(timeoutMs)
-  if (code === null) {
+  if (code === null && child.exitCode === null && child.signalCode === null) {
     log('graceful stop timed out')
     forceKill()
     await waitForExit(10000)

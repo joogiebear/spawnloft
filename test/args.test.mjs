@@ -3,6 +3,11 @@ import assert from 'node:assert/strict'
 
 import { parseArgs } from '../src/args.mjs'
 
+test('declared boolean flags never swallow an instance name or another positional argument', () => {
+  assert.deepEqual(parseArgs(['--follow', 'royalplugins', '--json'], { booleanFlags: ['follow', 'json'] }),
+    { flags: { follow: true, json: true }, positional: ['royalplugins'] })
+})
+
 test('bare words are positional, in order', () => {
   assert.deepEqual(parseArgs(['stock', 'extra']), { flags: {}, positional: ['stock', 'extra'] })
 })

@@ -18,6 +18,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
@@ -112,6 +113,17 @@ test('a second start while running is refused; a stop of a stopped server is a n
   await sup.stop(name)
   const again = await sup.stop(name)
   assert.equal(again.alreadyStopped, true)
+})
+
+test('CLI Minecraft startup retains its Java pid and RCON port', { timeout: 30000 }, async () => {
+  const name = await makeInstance('cli-ready')
+  const output = execFileSync(process.execPath,
+    [fileURLToPath(new URL('../spawnloft.mjs', import.meta.url)), 'start', name, '--timeout', '15'],
+    { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] })
+  assert.match(output, /Ready -/)
+  assert.match(output, /java pid \d+\s+port \d+\s+rcon \d+/)
+  assert.equal(readState(name).status, 'running')
+  await sup.stop(name)
 })
 
 test('a crash with auto-restart on comes back, and the console says so', { timeout: 30000 }, async () => {

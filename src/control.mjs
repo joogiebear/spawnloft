@@ -61,8 +61,8 @@ export function readState(name) {
   const state = readJson(stateFile(name), null)
   if (!state) return { status: 'stopped', state: null }
 
-  const daemonUp = pidAlive(state.daemonPid) && sameProcess(state.daemonPid, state.daemonExe)
-  const javaUp = pidAlive(state.javaPid) && sameProcess(state.javaPid, state.javaExe)
+  const daemonUp = pidAlive(state.daemonPid) && sameProcess(state.daemonPid, state.daemonExe, state.startedAt)
+  const javaUp = pidAlive(state.javaPid) && sameProcess(state.javaPid, state.javaExe, state.startedAt)
 
   if (state.running && daemonUp && javaUp) return { status: 'running', state }
   if (state.running && !daemonUp && javaUp) return { status: 'orphaned', state }

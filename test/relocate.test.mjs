@@ -22,7 +22,7 @@ after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
 const marker = path.join(scratch, 'runtime.json')
 const tasksFile = path.join(DATA_ROOT, 'schedules.json')
-const shim = path.join(DATA_ROOT, 'tasks', 'nightly.cmd')
+const shim = path.join(DATA_ROOT, 'tasks', process.platform === 'darwin' ? 'nightly.sh' : 'nightly.cmd')
 
 function stale(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -45,7 +45,7 @@ test('with no record, shims and launchers are rewritten for this runtime and a r
   const shimBody = fs.readFileSync(shim, 'utf8')
   assert.ok(!shimBody.includes(oldExe), 'the shim still names the old executable')
   assert.ok(shimBody.includes(path.join(ROOT, 'mcctl.mjs')), 'the shim does not name this code folder')
-  assert.ok(shimBody.includes('task run nightly'))
+  assert.ok(shimBody.includes(process.platform === 'darwin' ? "task run 'nightly'" : 'task run nightly'))
 
   const startBody = fs.readFileSync(path.join(dir, 'start.bat'), 'utf8')
   assert.ok(!startBody.includes(oldExe), 'the launcher still names the old executable')
@@ -66,7 +66,7 @@ test('while the record matches, nothing is touched', () => {
 test('a record from another executable or code folder triggers the rewrite again', () => {
   fs.writeFileSync(marker, JSON.stringify({ exe: 'C:\\somewhere\\else\\SpawnLoft.exe', root: ROOT }))
   assert.equal(repairAfterMove({ marker }).moved, true)
-  assert.ok(fs.readFileSync(shim, 'utf8').includes('task run nightly'))
+  assert.ok(fs.readFileSync(shim, 'utf8').includes(process.platform === 'darwin' ? "task run 'nightly'" : 'task run nightly'))
 
   fs.writeFileSync(marker, JSON.stringify({ exe: process.execPath, root: 'C:\\somewhere\\else\\core' }))
   assert.equal(repairAfterMove({ marker }).moved, true)

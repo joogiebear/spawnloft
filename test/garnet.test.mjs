@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { releasesFrom, windowsZipFrom, credentialsFor, newRecord } from '../src/garnet.mjs'
+import { VERSION, archiveFor, releasesFrom, archiveFrom, windowsZipFrom, credentialsFor, newRecord } from '../src/garnet.mjs'
 
 const rel = (tag, assets, extra = {}) => ({ tag_name: tag, published_at: '2026-08-01T00:00:00Z', assets, ...extra })
 
@@ -28,4 +28,30 @@ test('an attachment shares the password and suggests a key prefix; the URL carri
   const c = credentialsFor(inst, rec)
   assert.equal(c.url, 'redis://:p%40ss@127.0.0.1:6380')
   assert.match(c.note, /shares this password/)
+})
+
+
+test('Mac archives match the native architecture and never fall back to Windows or Linux', () => {
+  const release = rel('v2.1.7', ['arm64', 'x64'].map(arch => ({
+    name: `osx-${arch}-based.tar.xz`, browser_download_url: `https://example.test/${arch}`, digest: 'sha256:' + 'a'.repeat(64), size: 42,
+  })))
+  for (const arch of ['arm64', 'x64']) {
+    assert.equal(archiveFrom(release, 'darwin', arch).url, `https://example.test/${arch}`)
+    assert.equal(releasesFrom([release], { platform: 'darwin', arch }).length, 1)
+  }
+  assert.equal(archiveFrom(release, 'win32', 'x64'), null)
+  assert.equal(archiveFrom(release, 'darwin', 'ia32'), null)
+  assert.equal(archiveFrom(release, 'linux', 'x64'), null)
+  assert.equal(windowsZipFrom(rel('v1', [{ name: 'win-x64-framework-dependent.zip' }])), null)
+})
+
+
+test('the shipped Garnet version has pinned native downloads without a release-list API call', () => {
+  for (const [platform, arch] of [['win32', 'x64'], ['darwin', 'arm64'], ['darwin', 'x64']]) {
+    const archive = archiveFor(VERSION, platform, arch)
+    assert.match(archive.url, /^https:\/\/github\.com\/microsoft\/garnet\/releases\/download\//)
+    assert.match(archive.sha256, /^[a-f0-9]{64}$/)
+  }
+  assert.throws(() => archiveFor('9.9.9', 'win32', 'x64'), /No verified/)
+  assert.throws(() => archiveFor(VERSION, 'linux', 'x64'), /No verified/)
 })

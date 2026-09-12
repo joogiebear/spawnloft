@@ -17,7 +17,9 @@ import { readProps, writeProps } from './props.mjs'
 import { storedPlayers } from './players.mjs'
 import * as players from './players.mjs'
 import * as metrics from './metrics.mjs'
+import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as settings from './settings.mjs'
+import { readTheme, saveTheme } from './appearance.mjs'
 import * as plugins from './plugins.mjs'
 import * as upgrade from './upgrade.mjs'
 import * as sources from './sources.mjs'
@@ -449,14 +451,20 @@ async function handleBackups(req, res, name, seg) {
   const action = seg[4] ?? null
 
   if (req.method === 'GET') {
-    const auto = await autoBackupTask(name)
-    return json(res, 200, {
+    const history = {
       snapshots: backup.listSnapshots(name),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
-      scopes: backup.SCOPES,
       running: supervisor.isRunning(name),
+    }
+    // A visible history polls for CLI-created snapshots. That does not need to start
+    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits.
+    if (action === 'history') return json(res, 200, history)
+    const auto = await autoBackupTask(name)
+    return json(res, 200, {
+      ...history,
+      scopes: backup.SCOPES,
       auto: auto && {
         id: auto.id,
         enabled: auto.enabled,
@@ -466,6 +474,8 @@ async function handleBackups(req, res, name, seg) {
         lastResult: auto.windows ? schedule.describeResult(auto.windows.lastResult) : null,
         nextRun: auto.windows?.nextRun ?? null,
       },
+      automaticAvailable: platformCapabilities().scheduler,
+      automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -509,6 +519,7 @@ async function handleBackups(req, res, name, seg) {
   }
 
   if (action === 'auto') {
+    if (!platformCapabilities().scheduler) return json(res, 400, { error: PREVIEW_LIMITS.scheduler })
     const existing = await autoBackupTask(name)
     if (body.enabled === false) {
       if (existing) schedule.remove(existing.id)
@@ -560,6 +571,9 @@ async function autoBackupTask(name) {
 function handleMetrics(req, res, name, url) {
   registry.getInstance(name)
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+  if (!platformCapabilities().performance) {
+    return json(res, 200, { available: false, reason: PREVIEW_LIMITS.performance, samples: [] })
+  }
 
   const asked = Number(url.searchParams.get('seconds'))
   // Capped at what is kept. Asking for a day gets everything there is rather than an error.
@@ -822,6 +836,11 @@ async function handlePlayers(req, res, name, seg) {
  */
 async function handleSchedules(req, res, name, seg) {
   registry.getInstance(name)
+  if (!platformCapabilities().scheduler) {
+    return req.method === 'GET'
+      ? json(res, 200, { available: false, reason: PREVIEW_LIMITS.scheduler, tasks: [], runs: [] })
+      : json(res, 400, { error: PREVIEW_LIMITS.scheduler })
+  }
   const id = seg[4] ?? null
   const verb = seg[5] ?? null
 
@@ -940,7 +959,7 @@ function safeDatabase(row) {
   const { root, attachments, tools, ...safe } = row
   const shown = {}
   for (const [server, a] of Object.entries(attachments ?? {})) {
-    shown[server] = { database: a.database, user: a.user, createdAt: a.createdAt ?? null, applied: a.applied ?? {} }
+    shown[server] = { database: a.database, user: a.user, createdAt: a.createdAt ?? null }
   }
   const engine = services.ENGINES[row.engine]
   return {
@@ -1027,13 +1046,27 @@ async function route(req, res) {
   const seg = url.pathname.split('/').filter(Boolean)
 
   if (url.pathname === '/') {
+    // The desktop uses a fresh localhost port at every launch. Persisting the
+    // palette in localStorage would lose it with the old origin. Render the saved
+    // choice before the first paint instead, from the app's existing settings.
     const html = readFileSync(path.join(HERE, 'ui.html'), 'utf8')
+      .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
+      .replace('name="spawnloft-platform" content="win32"', `name="spawnloft-platform" content="${process.platform}"`)
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
     return
   }
 
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
+
+  // Appearance has its own narrow endpoint so a palette change cannot also
+  // relocate data or alter server configuration.
+  if (seg[1] === 'appearance' && seg.length === 2) {
+    if (req.method === 'GET') return json(res, 200, { theme: readTheme() })
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    return json(res, 200, { theme: saveTheme(body?.theme) })
+  }
 
   if (seg[1] === 'jars' && req.method === 'GET') {
     return json(res, 200, create.listJars().map((j) => ({ name: j.name, size: j.sizeHuman })))
@@ -1119,6 +1152,7 @@ async function route(req, res) {
 
   if (seg[1] === 'settings' && req.method === 'GET') {
     return json(res, 200, {
+      theme: readTheme(),
       dataRoot: LAYOUT.dataRoot,
       instancesDir: LAYOUT.instancesDir,
       separateInstances: LAYOUT.separateInstances,
@@ -1129,6 +1163,7 @@ async function route(req, res) {
       settingsFile: LAYOUT.settingsFile,
       usingLegacyLayout: LAYOUT.usingLegacyLayout,
       platform: process.platform,
+      capabilities: platformCapabilities(),
     })
   }
 
@@ -1195,7 +1230,7 @@ async function route(req, res) {
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     const db = await services.registerExternal(String(body.name), {
-      engine: body.engine ? String(body.engine) : 'mariadb',
+      engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
       host: body.host ? String(body.host) : '127.0.0.1',
       port: body.port ? Number(body.port) : null,
       user: body.user ? String(body.user) : 'root',
@@ -1206,21 +1241,23 @@ async function route(req, res) {
     return json(res, 200, safeDatabase({ ...db, status: 'reachable' }))
   }
   if (seg[1] === 'databases' && seg[2] === 'engines' && req.method === 'GET') {
-    return json(res, 200, Object.entries(services.ENGINES).map(([id, e]) => ({ id, label: e.label, defaultPort: e.defaultPort })))
+    return json(res, 200, Object.entries(services.ENGINES).filter(([id]) => services.NEW_ENGINES.includes(id)).map(([id, e]) => ({ id, label: e.label, defaultPort: e.defaultPort, managed: services.canManage(id), default: id === services.defaultEngine() })))
   }
   if (seg[1] === 'databases' && seg[2] === 'versions' && req.method === 'GET') {
-    const engine = String(url.searchParams.get('engine') || 'mariadb')
+    const engine = services.assertNewEngine(String(url.searchParams.get('engine') || services.defaultEngine()))
     return json(res, 200, await services.versionsFor(engine))
   }
   if (seg[1] === 'databases' && seg.length === 2 && req.method === 'POST') {
+    if (!platformCapabilities().managedDatabases) return json(res, 400, { error: PREVIEW_LIMITS.managedDatabases })
     const body = await readBody(req)
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     if (!body.version) return json(res, 400, { error: 'a version is required' })
     const jobId = body.jobId ? String(body.jobId) : null
+    if (!services.canManage(body.engine || services.defaultEngine())) return json(res, 400, { error: 'Managed installation of this engine is not available on this platform.' })
     try {
       const db = await services.createDatabase(String(body.name), {
-        engine: body.engine ? String(body.engine) : 'mariadb',
+        engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
         version: String(body.version),
         port: body.port ? Number(body.port) : null,
         label: body.label ?? null,
@@ -1262,10 +1299,6 @@ async function route(req, res) {
     if (seg[3] === 'detach') {
       if (!body.server) return json(res, 400, { error: 'server is required' })
       return json(res, 200, services.detach(db, String(body.server), { drop: body.drop === true }))
-    }
-    if (seg[3] === 'apply') {
-      if (!body.server || !body.plugin) return json(res, 400, { error: 'server and plugin are required' })
-      return json(res, 200, services.applyToPlugin(db, String(body.server), String(body.plugin)))
     }
     if (seg[3] === 'delete') {
       return json(res, 200, services.removeDatabase(db, { purge: body.purge === true }))
@@ -1465,11 +1498,8 @@ async function route(req, res) {
   }
   if (seg[3] === 'metrics') return handleMetrics(req, res, name, url)
   // The databases this server is attached to, without passwords; those are one click further.
-  if (seg[3] === 'databases' && seg[4] === 'helpers' && req.method === 'GET') {
-    const engine = url.searchParams.get('engine')
-    return json(res, 200, services.helpersFor(name, { engine: engine || null }))
-  }
   if (seg[3] === 'databases' && req.method === 'GET') {
+    if (seg.length !== 4) return json(res, 404, { error: 'not found' })
     return json(res, 200, services.serverAttachments(name))
   }
 
@@ -1495,11 +1525,13 @@ async function route(req, res) {
   // attached. Progress goes out on the job stream the Add sheet uses, since the download is the
   // long part and a button that sits there for a minute with nothing to say looks broken.
   if (seg[3] === 'databases' && seg[4] === 'create') {
+    if (!platformCapabilities().managedDatabases) return json(res, 400, { error: PREVIEW_LIMITS.managedDatabases })
     const body = await readBody(req)
     const jobId = body.jobId ? String(body.jobId) : null
+    if (!services.canManage(body.engine || services.defaultEngine())) return json(res, 400, { error: 'Managed installation of this engine is not available on this platform.' })
     try {
       const out = await services.createForServer(name, {
-        engine: body.engine ? String(body.engine) : 'mariadb',
+        engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
         version: body.version ? String(body.version) : null,
         onProgress: (p) => {
           if (p.cached) return jobUpdate(jobId, { stage: 'cached', percent: 100, message: p.message })

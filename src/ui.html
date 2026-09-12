@@ -1,6 +1,8 @@
 <!doctype html>
+<html lang="en" data-theme="classic">
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
+<meta name="spawnloft-platform" content="win32">
 <title>SpawnLoft</title>
 
 <style>
@@ -12,10 +14,9 @@
      exists - so they cannot share a stylesheet without a build step, and there is no build step.
      Duplicated deliberately; change both or neither.
 
-     Colour: the accent is lapis, taken from the block rather than from a palette of generic
-     product blues, and it is the ONLY interactive colour. Green, amber and red are reserved for
-     server state, because the console already speaks that language - Paper writes INFO, WARN and
-     ERROR, and a panel that used red for a button would be arguing with its own log.
+     Colour: Classic keeps the original lapis accent; SpawnLoft uses the website's lime. The
+     interactive accent is separate from server state in both themes: the console already speaks
+     that language - Paper writes INFO, WARN and ERROR - so its status colours stay familiar.
      ========================================================================== */
   :root {
     --void:     #0c0e14;
@@ -111,7 +112,129 @@
     /* The lit top of a raised control, and the shade it goes to under the pointer. */
     --raised-hi: #212737;
     --hover:     #222839;
+    /* Theme-sensitive details previously embedded in component rules. Classic keeps its exact
+       palette; the second theme only replaces these values, never the meaning of a status. */
+    --accent-rgb: 91, 132, 255;
+    --ink-rgb: 233, 236, 244;
+    --scroll-thumb: #2a3145;
+    --scroll-hover: #3a4560;
+    --hover-hi: #262d40;
+    --primary-top: #4360d4;
+    --primary-bottom: #3247a4;
+    --primary-edge: #4c66d6;
+    --primary-ink: #eef2ff;
+    --primary-hover-top: #4d6ae6;
+    --primary-hover-bottom: #3a51b8;
+    --setup-primary-fill: #2c3f8f;
+    --setup-primary-edge: #3d55b8;
+    --setup-primary-ink: #eaf0ff;
+    --setup-primary-hover: #35499f;
+    --field-focus: #0d1119;
+    --segment-top: #242b3e;
+    --segment-bottom: #1d2333;
+    --door-hover: #212739;
+    --switch-top: #3a50bd;
+    --choice-top: #4a63d9;
+    --control-mark: #eaf0ff;
+    --console-ink: #cfd6e4;
+    --dialog-backdrop: rgba(6, 8, 12, .6);
+    --cube-top: #5f85ef;
+    --cube-left: #3a55b4;
+    --cube-right: #24357a;
+    --cube-cutout: #cfe0ff;
+    --chart-cpu: #7aa2ff;
   }
+
+  /* Keep the default blue theme on :root so old settings and an unset attribute look exactly
+     as before. SpawnLoft borrows the website's materials; state colours keep their own jobs. */
+  :root[data-theme="spawnloft"] {
+    --void: #090d0d;
+    --surface: #141b15;
+    --raised: #1e271d;
+    --sunken: #080c09;
+    --recess: #101610;
+    --line: #30382e;
+    --edge: #485541;
+    --ink: #efeee6;
+    --ink-2: #b5bcac;
+    --ink-3: #909a86;
+    --idle: #909a86;
+    --lapis: #c4f566;
+    --lapis-dim: #546e2a;
+    --lapis-wash: rgba(196, 245, 102, .12);
+    --lapis-ink: #dbf4b2;
+    --lapis-edge: #516337;
+    --lapis-fill: #202b17;
+    --surface-hi: #19211a;
+    --raised-hi: #263021;
+    --hover: #2b3625;
+    --r: 6px;
+    --r-sm: 4px;
+    --r-xs: 3px;
+    --r-lg: 8px;
+    --accent-rgb: 196, 245, 102;
+    --ink-rgb: 239, 238, 230;
+    --scroll-thumb: #394431;
+    --scroll-hover: #536348;
+    --hover-hi: #303c29;
+    --primary-top: #c4f566;
+    --primary-bottom: #b5e35b;
+    --primary-edge: #c4f566;
+    --primary-ink: #14200b;
+    --primary-hover-top: #d3ff80;
+    --primary-hover-bottom: #c4f566;
+    --setup-primary-fill: #c4f566;
+    --setup-primary-edge: #c4f566;
+    --setup-primary-ink: #14200b;
+    --setup-primary-hover: #d3ff80;
+    --field-focus: #11180f;
+    --segment-top: #303c29;
+    --segment-bottom: #263020;
+    --door-hover: #293424;
+    --switch-top: #c4f566;
+    --choice-top: #c4f566;
+    --control-mark: #14200b;
+    --console-ink: #dedfd3;
+    --dialog-backdrop: rgba(4, 8, 5, .7);
+    --cube-top: #c4f566;
+    --cube-left: #8bb640;
+    --cube-right: #567c24;
+    --cube-cutout: #efffdc;
+    --chart-cpu: #c4f566;
+  }
+
+  :root[data-theme="spawnloft"] ::selection { background: var(--lapis); color: var(--void); }
+  :root[data-theme="spawnloft"] select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5l3.5 3.5 3.5-3.5' fill='none' stroke='%23b5bcac' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  :root[data-theme="spawnloft"] select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5l3.5 3.5 3.5-3.5' fill='none' stroke='%23c4f566' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+
+  /* Appearance is one local preference, so it stays a small labelled choice in Settings. The
+     fixed previews show both palettes even when the surrounding interface changes theme. */
+  .theme-picker { min-width: 0; margin: 0; padding: 0 0 var(--s-5); border: 0; border-bottom: 1px solid var(--line); }
+  .theme-picker legend { padding: 0; font-size: var(--t-5); font-weight: 600; }
+  .theme-picker > .hint { margin: var(--s-2) 0 var(--s-3); }
+  .theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
+  .theme-option { display: grid; grid-template-columns: 16px 64px minmax(0, 1fr); align-items: center; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; }
+  .theme-option:hover { border-color: var(--edge); }
+  .theme-option:has(input:checked) { border-color: var(--lapis); background: var(--lapis-wash); }
+  .theme-option input { appearance: auto; width: 16px; height: 16px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; accent-color: var(--lapis); cursor: pointer; }
+  .theme-option input:focus-visible { outline: 2px solid var(--lapis); outline-offset: 3px; box-shadow: none; }
+  .theme-option input:disabled { cursor: wait; }
+  .theme-option strong, .theme-option small { display: block; }
+  .theme-option strong { font-size: var(--t-3); font-weight: 600; }
+  .theme-option small { margin-top: 3px; color: var(--ink-2); font-size: var(--t-2); line-height: 1.4; }
+  .theme-preview { position: relative; display: block; width: 64px; height: 42px; overflow: hidden; border: 1px solid var(--preview-edge); border-radius: 3px; background: var(--preview-bg); }
+  .theme-preview-classic { --preview-bg: #0c0e14; --preview-edge: #354056; --preview-surface: #1c2130; --preview-accent: #5b84ff; }
+  .theme-preview-spawnloft { --preview-bg: #090d0d; --preview-edge: #485541; --preview-surface: #1e271d; --preview-accent: #c4f566; }
+  .theme-preview i { position: absolute; display: block; background: var(--preview-surface); }
+  .theme-preview i:nth-child(1) { inset: 0 0 auto; height: 8px; border-bottom: 1px solid var(--preview-edge); }
+  .theme-preview i:nth-child(2) { left: 4px; top: 12px; width: 14px; bottom: 4px; }
+  .theme-preview i:nth-child(3) { left: 22px; right: 5px; top: 13px; height: 5px; background: var(--preview-accent); box-shadow: 0 10px 0 var(--preview-surface), 0 18px 0 var(--preview-surface); }
+  .theme-picker #themeStatus { margin-bottom: 0; min-height: 1.5em; }
+  @media (max-width: 920px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
 
   /* ---- icons ---------------------------------------------------------------- */
 
@@ -156,12 +279,12 @@
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: #2a3145;
+    background: var(--scroll-thumb);
     border: 3px solid transparent;
     background-clip: padding-box;
     border-radius: var(--r-sm);
   }
-  ::-webkit-scrollbar-thumb:hover { background-color: #3a4560; }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-hover); }
   ::-webkit-scrollbar-corner { background: transparent; }
 
   html, body { height: 100%; }
@@ -170,8 +293,8 @@
     /* Not a flat void: two faint lapis glows, one high and one low, give the black some depth.
        They sit behind every panel and are quiet enough to disappear under content. */
     background:
-      radial-gradient(1100px 640px at 88% -12%, rgba(91, 132, 255, .07), transparent 62%),
-      radial-gradient(900px 620px at -8% 112%, rgba(91, 132, 255, .05), transparent 60%),
+      radial-gradient(1100px 640px at 88% -12%, rgba(var(--accent-rgb), .07), transparent 62%),
+      radial-gradient(900px 620px at -8% 112%, rgba(var(--accent-rgb), .05), transparent 60%),
       var(--void);
     color: var(--ink);
     font: var(--t-4)/1.5 var(--ui);
@@ -303,7 +426,7 @@
   }
   .card:hover { background: var(--hover); border-color: var(--edge); }
   .card[aria-current="true"] {
-    background: linear-gradient(180deg, rgba(91, 132, 255, .17), rgba(91, 132, 255, .08));
+    background: linear-gradient(180deg, rgba(var(--accent-rgb), .17), rgba(var(--accent-rgb), .08));
     border-color: var(--lapis-dim);
     box-shadow: var(--lift-strong);
   }
@@ -435,18 +558,18 @@
     box-shadow: var(--lift);
     transition: background .12s, border-color .12s;
   }
-  button:hover:not(:disabled) { border-color: var(--edge); background: linear-gradient(180deg, #262d40, var(--hover)); }
+  button:hover:not(:disabled) { border-color: var(--edge); background: linear-gradient(180deg, var(--hover-hi), var(--hover)); }
   button:active:not(:disabled) { transform: translateY(1px); }
   button:disabled { opacity: .38; cursor: default; }
 
   button.primary {
-    background: linear-gradient(180deg, #4360d4, #3247a4);
-    border-color: #4c66d6;
-    color: #eef2ff;
+    background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
+    border-color: var(--primary-edge);
+    color: var(--primary-ink);
     font-weight: 600;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14);
   }
-  button.primary:hover:not(:disabled) { background: linear-gradient(180deg, #4d6ae6, #3a51b8); border-color: var(--lapis); }
+  button.primary:hover:not(:disabled) { background: linear-gradient(180deg, var(--primary-hover-top), var(--primary-hover-bottom)); border-color: var(--lapis); }
   button.danger { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
   button.danger:hover:not(:disabled) { border-color: var(--fault); background: #3a1c1f; }
   button.ghost { background: transparent; box-shadow: none; }
@@ -475,7 +598,7 @@
   input:focus, select:focus {
     outline: none;
     border-color: var(--lapis);
-    background-color: #0d1119;
+    background-color: var(--field-focus);
     box-shadow: inset 0 1.5px 3px rgba(0, 0, 0, .28), 0 0 0 3px var(--lapis-wash);
   }
   input:disabled, select:disabled { opacity: .5; }
@@ -561,7 +684,7 @@
   }
   .seg button, .filters button, .ranges button { background: transparent; border: 0; box-shadow: none; padding: 4px 10px; font-size: var(--t-3); color: var(--ink-2); border-radius: var(--r-xs); }
   .seg button[aria-pressed="true"], .filters button[aria-pressed="true"], .ranges button[aria-pressed="true"] {
-    background: linear-gradient(180deg, #242b3e, #1d2333);
+    background: linear-gradient(180deg, var(--segment-top), var(--segment-bottom));
     color: var(--ink);
     box-shadow: inset 0 0 0 1px var(--line), var(--lift-strong);
   }
@@ -577,16 +700,16 @@
     /* The one screen with room to spare wears the brand's own geometry: a faint isometric grid
        at the mark's 2:1 pitch, lit from above. Working screens stay plain. */
     background:
-      linear-gradient(180deg, rgba(91, 132, 255, .055), transparent 46%),
-      repeating-linear-gradient(63.43deg, rgba(233, 236, 244, .02) 0 1px, transparent 1px 56px),
-      repeating-linear-gradient(-63.43deg, rgba(233, 236, 244, .02) 0 1px, transparent 1px 56px),
+      linear-gradient(180deg, rgba(var(--accent-rgb), .055), transparent 46%),
+      repeating-linear-gradient(63.43deg, rgba(var(--ink-rgb), .02) 0 1px, transparent 1px 56px),
+      repeating-linear-gradient(-63.43deg, rgba(var(--ink-rgb), .02) 0 1px, transparent 1px 56px),
       linear-gradient(180deg, var(--surface-hi), var(--surface) 340px);
     border: 1px solid var(--line);
     border-radius: var(--r);
     box-shadow: var(--lift);
     overflow: auto;
   }
-  .empty .mark { opacity: .95; margin-bottom: 24px; filter: drop-shadow(0 0 28px rgba(91, 132, 255, .4)); }
+  .empty .mark { opacity: .95; margin-bottom: 24px; filter: drop-shadow(0 0 28px rgba(var(--accent-rgb), .4)); }
   .empty h1 { font: 600 var(--t-7)/1.2 var(--ui); margin: 0 0 10px; letter-spacing: -.02em; }
   .empty p.lede { color: var(--ink-2); margin: 0 0 30px; max-width: 48ch; font-size: var(--t-4); }
 
@@ -612,7 +735,7 @@
   }
   .door:hover {
     border-color: var(--lapis-dim);
-    background: #212739;
+    background: var(--door-hover);
     transform: translateY(-2px);
     box-shadow: 0 12px 28px -16px rgba(0, 0, 0, .9), var(--lift-strong);
   }
@@ -765,7 +888,7 @@
   .srv-nav button:hover { background: var(--surface); color: var(--ink); }
   .srv-nav button:hover .ico { color: var(--ink-2); }
   .srv-nav button[aria-selected="true"] {
-    background: linear-gradient(90deg, rgba(91, 132, 255, .17), rgba(91, 132, 255, .07));
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), .17), rgba(var(--accent-rgb), .07));
     color: var(--ink);
     font-weight: 600;
     box-shadow: inset 2px 0 0 var(--lapis);
@@ -803,8 +926,8 @@
     .srv-nav button[aria-selected="true"] { box-shadow: inset 0 -2px 0 var(--lapis); }
   }
 
-  .panes { display: grid; min-height: 0; }
-  .pane { display: none; min-height: 0; grid-area: 1 / 1; }
+  .panes { display: grid; min-height: 0; min-width: 0; }
+  .pane { display: none; min-height: 0; min-width: 0; grid-area: 1 / 1; }
   .pane[data-active] { display: grid; }
   .pane-console { grid-template-rows: auto minmax(0, 1fr) auto; }
   /*
@@ -856,6 +979,8 @@
     background: var(--recess);
   }
   .pane-foot .hint { margin: 0; }
+
+  [data-backup-status]:empty { display: none; }
 
   @container pane (min-width: 860px) {
     /* Backups: "now" and "automatic" are peers and sit side by side; the history below them is a
@@ -1046,8 +1171,8 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .15);
     transition: transform .14s, background .14s;
   }
-  input.switch:checked { background: linear-gradient(180deg, #3a50bd, var(--lapis-dim)); border-color: var(--lapis); }
-  input.switch:checked::after { transform: translateX(14px); background: #eaf0ff; }
+  input.switch:checked { background: linear-gradient(180deg, var(--switch-top), var(--lapis-dim)); border-color: var(--lapis); }
+  input.switch:checked::after { transform: translateX(14px); background: var(--control-mark); }
   input.switch:disabled { opacity: .45; cursor: default; }
   /*
     Stated explicitly because this control loses the ring twice over: `input:focus { outline: none }`
@@ -1086,7 +1211,7 @@
     place-items: center;
     width: 38px; height: 38px;
     border-radius: var(--r-sm);
-    background: linear-gradient(180deg, rgba(91, 132, 255, .2), rgba(91, 132, 255, .08));
+    background: linear-gradient(180deg, rgba(var(--accent-rgb), .2), rgba(var(--accent-rgb), .08));
     border: 1px solid var(--lapis-dim);
     color: var(--lapis);
     box-shadow: var(--lift-strong);
@@ -1244,7 +1369,7 @@
      for the toolbar to wrap - which is the app's own 900x600 minimum. */
   /* Holds the log and the jump pill, nothing else - the toolbar and the command bar are siblings
      in the pane grid now, which is what stops the console growing through them. */
-  .log-wrap { position: relative; min-height: 0; display: grid; }
+  .log-wrap { position: relative; min-height: 0; min-width: 0; display: grid; }
   #log {
     margin: 0;
     padding: 8px 0 12px;
@@ -1254,7 +1379,7 @@
     font-family: var(--mono);
     font-size: var(--t-3);
     line-height: 1.55;
-    color: #cfd6e4;
+    color: var(--console-ink);
   }
   /*
     Level as a rail in the gutter, not as the colour of the whole line.
@@ -1265,7 +1390,7 @@
     contrast.
   */
   .ln { padding: 0 12px 0 14px; border-left: 3px solid transparent; white-space: pre-wrap; word-break: break-word; }
-  #log.nowrap .ln { white-space: pre; word-break: normal; }
+  #log.nowrap .ln { white-space: pre; word-break: normal; width: max-content; min-width: 100%; }
   #log .num { display: none; }
   #log.nums .ln { display: grid; grid-template-columns: max-content 1fr; }
   #log.nums .num {
@@ -1330,7 +1455,7 @@
      `display` here would override the browser's own rule that keeps a closed dialog hidden. */
   dialog[open] { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
   dialog .dlg-body { overflow-y: auto; }
-  dialog::backdrop { background: rgba(6, 8, 12, .6); backdrop-filter: blur(4px); }
+  dialog::backdrop { background: var(--dialog-backdrop); backdrop-filter: blur(4px); }
   dialog h2 { margin: 0; padding: var(--s-4) var(--s-5) 0; font: 600 var(--t-5)/1.3 var(--ui); }
   dialog .dlg-body { padding: var(--s-2) var(--s-5) var(--s-1); display: grid; gap: var(--s-4); }
   dialog p { margin: 0; color: var(--ink-2); font-size: var(--t-3); line-height: 1.55; }
@@ -1381,7 +1506,7 @@
     content: '';
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: #eaf0ff;
+    background: var(--control-mark);
     transform: scale(0);
     transition: transform .12s ease-out;
   }
@@ -1389,8 +1514,8 @@
      lapis disc with a light dot, not a ring with something small in it. */
   .choice input:checked {
     border-color: var(--lapis);
-    background: linear-gradient(180deg, #4a63d9, var(--lapis-dim));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15), 0 0 7px rgba(91, 132, 255, .45);
+    background: linear-gradient(180deg, var(--choice-top), var(--lapis-dim));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15), 0 0 7px rgba(var(--accent-rgb), .45);
   }
   .choice input:checked::after { transform: scale(1); }
   .choice b { font-size: var(--t-3); font-weight: 600; }
@@ -1532,10 +1657,10 @@
 <header>
   <span class="brand">
     <svg viewBox="0 0 64 64" width="21" height="21" aria-hidden="true">
-      <polygon points="8,20 32,8 56,20 32,32" fill="#5f85ef"/>
-      <polygon points="8,20 32,32 32,54 8,42" fill="#3a55b4"/>
-      <polygon points="56,20 32,32 32,54 56,42" fill="#24357a"/>
-      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="#cfe0ff"/>
+      <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
+      <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
+      <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
+      <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
     </svg>
     <b>SpawnLoft</b>
   </span>
@@ -1567,10 +1692,10 @@
     <!-- ============ nothing selected ===================================== -->
     <div class="view empty" id="vEmpty">
       <svg class="mark" viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
-        <polygon points="8,20 32,8 56,20 32,32" fill="#5f85ef"/>
-        <polygon points="8,20 32,32 32,54 8,42" fill="#3a55b4"/>
-        <polygon points="56,20 32,32 32,54 56,42" fill="#24357a"/>
-        <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="#cfe0ff"/>
+        <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
+        <polygon points="8,20 32,32 32,54 8,42" fill="var(--cube-left)"/>
+        <polygon points="56,20 32,32 32,54 56,42" fill="var(--cube-right)"/>
+        <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="var(--cube-cutout)"/>
       </svg>
       <h1 id="emptyTitle">No servers yet</h1>
       <p class="lede" id="emptyLede">
@@ -1636,7 +1761,7 @@
             <button data-lvl="error">Errors</button>
           </span>
           <button id="bPause" aria-pressed="false">Pause</button>
-          <button id="bWrap" aria-pressed="true">Wrap</button>
+          <button id="bWrap" aria-pressed="false">Wrap</button>
           <button id="bNums" aria-pressed="false">Line Numbers</button>
           <button id="bCopy">Copy</button>
           <button id="bClear">Clear</button>
@@ -1657,7 +1782,7 @@
           <span class="con-count" id="conCount"></span>
         </div>
         <div class="log-wrap">
-          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
+          <pre id="log" class="nowrap" tabindex="0" role="log" aria-label="Server console"></pre>
           <button class="jump" id="bJump" hidden>Jump to newest</button>
         </div>
 
@@ -1854,12 +1979,12 @@
             <label>
               <input type="radio" name="dbMode" value="run" checked>
               <b>Run one here</b>
-              <span>Nothing to install. MariaDB from its own mirror, Redis by way of Microsoft's Garnet.</span>
+              <span>MySQL from Oracle, or Redis by way of Microsoft's Garnet. SpawnLoft installs what each engine needs.</span>
             </label>
             <label>
               <input type="radio" name="dbMode" value="connect">
               <b>Connect to one I already run</b>
-              <span>XAMPP, a MariaDB or MySQL install, a Redis somewhere. Registered with its address so servers can be attached; never started or stopped from here.</span>
+              <span>A MySQL or Redis database you already run. Registered with its address so servers can be attached; never started or stopped from here.</span>
             </label>
           </div>
         </div>
@@ -1872,7 +1997,7 @@
           </div>
           <div class="field" style="flex:1;min-width:170px">
             <label for="dEngine">Engine</label>
-            <select id="dEngine" name="engine"><option value="mariadb" selected>MariaDB</option></select>
+            <select id="dEngine" name="engine"><option value="mysql" selected>MySQL</option></select>
             <div class="hint" id="dEngineHint">MySQL-compatible</div>
           </div>
           <div class="field" style="flex:2" id="dVersionWrap">
@@ -1905,7 +2030,7 @@
           <div class="field" style="flex:3" id="dToolsWrap">
             <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
             <input id="dTools" class="mono" placeholder="C:\xampp\mysql\bin" autocomplete="off">
-            <div class="hint">Where mysql.exe lives. Found on its own in the usual places.</div>
+            <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
           </div>
         </div>
         <div class="prog" id="dbProg" hidden>
@@ -1914,7 +2039,7 @@
         </div>
         <div class="row">
           <button type="submit" class="primary" id="bDbCreate">Add database</button>
-          <span class="hint" id="dbHint">Around 100 MB the first time for a version; every database on that version shares it.</span>
+          <span class="hint" id="dbHint">The engine downloads once for each version; every database on that version shares it.</span>
         </div>
       </form>
     </div>
@@ -1962,6 +2087,23 @@
         <button class="ghost" id="bSetClose">Close</button>
       </div>
       <div class="sheet-body wide">
+        <fieldset class="theme-picker">
+          <legend>Appearance</legend>
+          <p class="hint">Choose your colors. Your selection is saved on this PC and applies immediately.</p>
+          <div class="theme-options">
+            <label class="theme-option">
+              <input type="radio" name="appTheme" value="classic">
+              <span class="theme-preview theme-preview-classic" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span><strong>Classic</strong><small>The original blue palette</small></span>
+            </label>
+            <label class="theme-option">
+              <input type="radio" name="appTheme" value="spawnloft">
+              <span class="theme-preview theme-preview-spawnloft" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span><strong>SpawnLoft</strong><small>Charcoal, warm white, and lime</small></span>
+            </label>
+          </div>
+          <p id="themeStatus" class="hint" aria-live="polite"></p>
+        </fieldset>
         <div>
           <h2>Where SpawnLoft keeps things</h2>
           <p class="hint" style="margin:0 0 12px">
@@ -2016,6 +2158,14 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
+const panelPlatform = $('meta[name="spawnloft-platform"]').content;
+const windowsFeatures = panelPlatform === 'win32';
+const schedulerName = panelPlatform === 'darwin' ? 'macOS launchd' : 'Windows Task Scheduler';
+const schedulerHint = panelPlatform === 'darwin'
+  ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
+  : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
+const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
+const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
   rows: [],
@@ -2030,7 +2180,7 @@ const state = {
   pausedAt: 0,
   filter: 'all',
   search: '',
-  wrap: true,
+  wrap: false,
   nums: false,
   seq: 0,
   atBottom: true,
@@ -2926,7 +3076,19 @@ function renderLog() {
   if (state.atBottom) log.scrollTop = log.scrollHeight;
 }
 
+// The panel is a log reader, not a terminal. Strip formatting before classifying, searching
+// or copying so an escape inside WARN cannot hide a warning. Keep indentation and Unicode.
+const ANSI_STRING_RE = /(?:\x1b\]|\x9d)[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c|$)|(?:\x1b[P^_]|\x90|\x9e|\x9f)[^\x1b\x9c]*(?:\x1b\\|\x9c|$)/g;
+const ANSI_CSI_RE = /(?:\x1b\[|\x9b)[0-?]*[ -/]*(?:[@-~]|$)/g;
+const ANSI_ESCAPE_RE = /\x1b[ -/]*[0-~]/g;
+const LOG_CONTROL_RE = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+function cleanConsoleText(text) {
+  return text.replace(ANSI_STRING_RE, '').replace(ANSI_CSI_RE, '')
+    .replace(ANSI_ESCAPE_RE, '').replace(LOG_CONTROL_RE, '');
+}
+
 function pushLine(text) {
+  text = cleanConsoleText(text);
   const prev = state.lines.length ? state.lines[state.lines.length - 1].level : null;
   const entry = { text: text, level: levelOf(text, prev), n: ++state.seq };
   state.lines.push(entry);
@@ -3474,6 +3636,7 @@ async function renderPerformance(opts) {
   if (!drawn) await paintPerformance(row.name);
 
   stopPerfPolling();
+  if (!['win32', 'darwin'].includes(panelPlatform)) return;
   // Matched to how often the daemon samples. Polling faster would redraw the same points.
   perfTimer = setInterval(() => {
     if (state.pane !== 'performance' || state.current !== row.name) return stopPerfPolling();
@@ -3499,7 +3662,15 @@ async function paintPerformance(name, opts) {
   if (body.dataset.for !== name || state.current !== name) return;
   body.textContent = '';
   paneHead(body, 'pulse', 'Performance',
-    'Processor and memory while the server runs, sampled every ten seconds.');
+    data.available === false ? 'Not available in this preview.'
+      : 'Processor and memory while the server runs, sampled every ten seconds.');
+  if (data.available === false) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = data.reason;
+    body.append(note);
+    return;
+  }
 
   // ---- how far back to look ------------------------------------------------
   const ranges = document.createElement('div');
@@ -3538,7 +3709,7 @@ async function paintPerformance(name, opts) {
     body.append(gauge({
       title: 'Processor', now: data.running ? '…' : '—',
       aside: data.cores ? 'share of all ' + data.cores + ' cores' : '',
-      samples: [], pick: (s) => s.cpu, max: 10, colour: '#7aa2ff', empty: none,
+      samples: [], pick: (s) => s.cpu, max: 10, colour: 'var(--chart-cpu)', empty: none,
     }));
     body.append(gauge({
       title: 'Memory', now: data.running ? '…' : '—', aside: ceilingNote,
@@ -3565,7 +3736,7 @@ async function paintPerformance(name, opts) {
     // A fixed 100% scale would draw every ordinary server as a flat line on the floor. The scale
     // follows the peak instead, with a floor of 10% so a quiet server is not magnified into drama.
     max: Math.max(10, peakCpu * 1.15),
-    colour: '#7aa2ff',
+    colour: 'var(--chart-cpu)',
   }));
 
   body.append(gauge({
@@ -4803,7 +4974,15 @@ async function renderScheduler(opts) {
   if (body.dataset.for !== row.name) return;
   body.textContent = '';
   paneHead(body, 'clock', 'Scheduled work',
-    'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+    data.available === false ? 'Not available in this preview.'
+      : 'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+  if (data.available === false) {
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = data.reason;
+    body.append(note);
+    return;
+  }
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/schedules';
   const again = () => renderScheduler({ force: true });
@@ -4823,8 +5002,7 @@ async function renderScheduler(opts) {
   // ---- what a schedule is, before the list of them ---------------------------
   const intro = document.createElement('div');
   intro.className = 'hint';
-  intro.textContent = 'Windows Task Scheduler runs these, so they happen whether or not this window '
-    + 'is open - while you are signed in, screen locked included, but not after you sign out.';
+  intro.textContent = schedulerName + '. ' + schedulerHint;
   body.append(intro);
 
   // ---- add ------------------------------------------------------------------
@@ -4940,7 +5118,7 @@ function taskCard(task, data, base, again, editor) {
     // the query failed - either way it is not going to run, and saying "Ready" would be a lie.
     state.textContent = 'Not in Windows';
     state.dataset.tone = 'bad';
-    state.title = 'SpawnLoft has this task but Windows Task Scheduler does not. Edit it to put it back.';
+    state.title = 'SpawnLoft has this task but the system scheduler does not. Edit it to put it back.';
   } else {
     state.textContent = task.state || 'Ready';
     state.dataset.tone = task.state === 'Running' ? 'good' : '';
@@ -5023,7 +5201,7 @@ function taskCard(task, data, base, again, editor) {
   drop.onclick = async () => {
     const ok = await ask({
       title: 'Delete "' + task.name + '"?',
-      text: 'It stops running and is removed from Windows Task Scheduler. Backups it already took '
+      text: 'It stops running and is removed from the system scheduler. Backups it already took '
         + 'are not touched.',
       confirmLabel: 'Delete task',
       danger: true,
@@ -5153,18 +5331,40 @@ async function changeBackupsLocation(current) {
  * refused outright while the server is running, and gated behind typing the server's name
  * otherwise. The core refuses too - a page that only disables a button is not a guard.
  */
+let backupRequest = 0;
+let backupPending = null;
+
+function refreshVisibleBackups() {
+  if (!document.hidden && state.view === 'server' && state.pane === 'backups') renderBackups();
+}
+setInterval(refreshVisibleBackups, 4000);
+document.addEventListener('visibilitychange', refreshVisibleBackups);
+window.addEventListener('focus', refreshVisibleBackups);
+
 async function renderBackups(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
   const body = $('#backupsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
-  if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  const history = body.dataset.for === row.name && body.querySelector('[data-backup-history]');
+  // A slow request must not accumulate polls. A deliberate mutation can supersede one;
+  // its older answer then cannot replace the result of the action that just finished.
+  if (!force && backupPending && backupPending.name === row.name) return;
+  const request = ++backupRequest;
+  backupPending = { name: row.name, request: request };
   body.dataset.for = row.name;
 
   let data;
   try {
-    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups');
+    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups'
+      + (history && !force ? '/history' : ''));
   } catch (e) {
+    if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
+    if (history && history.isConnected) {
+      const status = body.querySelector('[data-backup-status]');
+      status.textContent = 'Backup history could not refresh: ' + e.message + '. Trying again shortly.';
+      return;
+    }
     body.textContent = '';
     const bad = document.createElement('div');
     bad.className = 'bad';
@@ -5174,13 +5374,30 @@ async function renderBackups(opts) {
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
     return;
+  } finally {
+    if (backupPending && backupPending.request === request) backupPending = null;
   }
   // The selection can move while the request is in flight; the answer to the old question is not
   // an answer to the new one.
-  if (body.dataset.for !== row.name) return;
+  if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
+  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror]);
+  if (!force && history && history.isConnected) {
+    body.querySelector('[data-backup-status]').textContent = '';
+    // Only history changes in the background. Scope, schedule edits, focus and the archive
+    // progress message belong to the person using the form and must survive a CLI backup.
+    if (history.dataset.backupHistory !== signature) {
+      history.replaceWith(renderBackupHistory(row, data, signature));
+    }
+    return;
+  }
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
     'Take a snapshot now, put one back, or leave it to a schedule.');
+  const refreshStatus = document.createElement('div');
+  refreshStatus.dataset.backupStatus = '';
+  refreshStatus.className = 'bad';
+  refreshStatus.setAttribute('role', 'status');
+  body.append(refreshStatus);
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
 
@@ -5276,11 +5493,15 @@ async function renderBackups(opts) {
   const autoState = document.createElement('div');
   autoState.className = 'hint';
   autoState.textContent = data.auto
-    ? 'Held by Windows Task Scheduler. Last run: ' + (data.auto.lastResult || 'unknown')
+    ? 'Held by ' + schedulerName + '. Last run: ' + (data.auto.lastResult || 'unknown')
       + '. Next: ' + (whenNext(data.auto.nextRun) || 'unknown') + '.'
-    : 'Runs through Windows Task Scheduler, so it happens whether or not this window is open - while '
-      + 'you are signed in, screen locked included, but not after you sign out.';
+    : schedulerHint;
   auto.append(autoTitle, autoRow, autoState);
+  if (data.automaticAvailable === false) {
+    autoRow.hidden = true;
+    autoState.textContent = data.automaticUnavailableReason;
+    for (const control of [onOff, every, keep, apply]) control.disabled = true;
+  }
   body.append(auto);
 
   apply.onclick = async () => {
@@ -5298,8 +5519,14 @@ async function renderBackups(opts) {
     }
   };
 
+  body.append(renderBackupHistory(row, data, signature));
+}
+
+function renderBackupHistory(row, data, signature) {
+  const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
   // ---- what is already there ------------------------------------------------
   const hist = document.createElement('div');
+  hist.dataset.backupHistory = signature;
   const histTitle = document.createElement('h3');
   histTitle.className = 'hist-title';
   histTitle.textContent = 'History (' + data.snapshots.length + ')';
@@ -5461,7 +5688,7 @@ async function renderBackups(opts) {
     }
     hist.append(list);
   }
-  body.append(hist);
+  return hist;
 }
 
 /**
@@ -6355,7 +6582,7 @@ async function renderServerDatabases(row, body) {
   const h = document.createElement('h3');
   h.textContent = 'Databases';
   const blurb = document.createElement('p');
-  blurb.textContent = 'A MySQL database of this server\'s own, for plugins that want one. Create one here and it is set up, started and attached in one go; attaching creates the database and a user that can reach it and nothing else.';
+  blurb.textContent = 'Attach a database, then use Show credentials to configure your plugins manually. SpawnLoft does not edit plugin configs.';
   head.append(mark, h, blurb);
   card.append(head);
   if (foot) body.insertBefore(card, foot); else body.append(card);
@@ -6366,12 +6593,8 @@ async function renderServerDatabases(row, body) {
   card.append(list);
 
   let mine = [];
-  let helpers = [];
   try {
-    [mine, helpers] = await Promise.all([
-      api('/instances/' + encodeURIComponent(row.name) + '/databases'),
-      api('/instances/' + encodeURIComponent(row.name) + '/databases/helpers'),
-    ]);
+    mine = await api('/instances/' + encodeURIComponent(row.name) + '/databases');
   } catch (e) {
     const bad = document.createElement('div');
     bad.className = 'bad';
@@ -6399,19 +6622,6 @@ async function renderServerDatabases(row, body) {
     const show = document.createElement('button');
     show.textContent = 'Show credentials';
     show.onclick = () => showCredentials(a.service, row.name);
-    // Which plugins have been pointed at this database, and a way to point another.
-    const appliedTo = Object.keys(a.applied || {});
-    if (appliedTo.length) {
-      const done = document.createElement('div');
-      done.className = 'hint';
-      done.style.margin = '0';
-      done.textContent = 'Written to ' + appliedTo.map((id) => (helpers.find((h) => h.id === id) || { label: id }).label).join(', ') + '.';
-      text.append(done);
-    }
-    const apply = document.createElement('button');
-    apply.className = 'ghost';
-    apply.textContent = 'Apply to a plugin\u2026';
-    apply.onclick = () => applyToPlugin(row, a, helpers.filter((h) => h.engine === (a.kind || 'mariadb')));
     const detach = document.createElement('button');
     detach.className = 'ghost';
     detach.textContent = 'Detach';
@@ -6436,14 +6646,14 @@ async function renderServerDatabases(row, body) {
         toast(e.message, 'bad');
       }
     };
-    line.append(text, show, apply, detach);
+    line.append(text, show, detach);
     list.append(line);
   }
 
   const attachedTo = new Set(mine.map((a) => a.service));
   const free = state.dbs.filter((d) => !attachedTo.has(d.name));
 
-  // A database of this server's own, one click: MariaDB's newest stable release on the port after
+  // A database of this server's own, one click: MySQL 8.4 LTS on the port after
   // the game port, started and attached, credentials shown. The Add sheet stays for the cases with
   // choices in them - a version, an engine, a database several servers share.
   const createRow = document.createElement('div');
@@ -6454,7 +6664,11 @@ async function renderServerDatabases(row, body) {
   create.textContent = 'Create a database';
   const createHint = document.createElement('span');
   createHint.className = 'hint';
-  createHint.textContent = 'MariaDB, newest stable, on port ' + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  createHint.textContent = (panelPlatform === 'darwin' ? 'MySQL 8.4 LTS (macOS 15+), on port ' : 'MySQL 8.4 LTS, on port ') + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  if (!managedDatabaseFeatures) {
+    create.disabled = true;
+    createHint.textContent = databasePreviewNote;
+  }
   create.onclick = async () => {
     create.disabled = true;
     const jobId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now();
@@ -6533,40 +6747,6 @@ async function renderServerDatabases(row, body) {
     attachRow.append(hint);
   }
   list.append(attachRow);
-}
-
-/**
- * Write the credentials into one plugin's config. Only plugins whose config exists are offered;
- * one that is installed but has never run is named with the reason, since a config written now
- * would be replaced by the plugin's defaults on its first start.
- */
-async function applyToPlugin(row, a, helpers) {
-  const ready = helpers.filter((h) => h.configPresent);
-  const waiting = helpers.filter((h) => h.pluginPresent && !h.configPresent);
-  if (!ready.length) {
-    toast(waiting.length
-      ? waiting.map((h) => h.label).join(', ') + ' installed but not started yet: start the server once so it writes its config, then apply.'
-      : (a.kind === 'redis'
-        ? 'No plugin here takes a Redis connection from this yet (LuckPerms messaging is the one).'
-        : 'None of the plugins this can configure (LuckPerms, CoreProtect, Plan, AuthMe) has a config here.'), 'bad');
-    return;
-  }
-  const res = await ask({
-    title: 'Write the connection into a plugin config',
-    text: 'Sets that plugin\'s storage to this database, in place, with its comments kept. Takes effect when the server restarts.'
-      + (waiting.length ? ' Not yet startable: ' + waiting.map((h) => h.label).join(', ') + ' (no config written yet).' : ''),
-    confirmLabel: 'Write it',
-    choices: ready.map((h) => ({ value: h.id, label: h.label, hint: h.file + (a.applied && a.applied[h.id] ? ' \u00b7 written before' : '') })),
-  });
-  if (!res) return;
-  try {
-    const out = await post('/databases/' + encodeURIComponent(a.service) + '/apply', { server: row.name, plugin: res.choice });
-    toast('Wrote ' + out.file + '. ' + out.note + ' Restart ' + row.name + ' for it to take effect.', 'good');
-    $('#settingsBody').dataset.for = '';
-    renderServerSettings();
-  } catch (e) {
-    toast(e.message, 'bad');
-  }
 }
 
 /** A database's Settings tab: how to reach it as root, and who is attached. */
@@ -6744,14 +6924,18 @@ function openAdd(tab) {
 }
 
 let dbEnginesLoaded = false;
-const ENGINE_HINT = { mariadb: 'MySQL-compatible', garnet: 'Redis-compatible, by Microsoft' };
+const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64 or macOS 15+', garnet: 'Redis-compatible, by Microsoft' };
 async function loadDbEngines() {
   if (dbEnginesLoaded) return;
   try {
     const list = await api('/databases/engines');
     const sel = $('#dEngine');
     sel.textContent = '';
-    for (const e of list) sel.append(new Option(e.label, e.id));
+    for (const e of list) {
+      const option = new Option(e.label, e.id, e.default, e.default);
+      option.dataset.managed = String(e.managed);
+      sel.append(option);
+    }
     dbEnginesLoaded = true;
   } catch { /* the one engine already in the select stands */ }
 }
@@ -6762,22 +6946,35 @@ function dbMode() {
 
 /** Show the fields the chosen mode and engine need, and say what the port default is. */
 function syncDbForm() {
-  const engine = $('#dEngine').value;
+  if (!managedDatabaseFeatures) {
+    const run = $('input[name="dbMode"][value="run"]');
+    run.disabled = true;
+    run.checked = false;
+    run.closest('label').querySelector('span').textContent = databasePreviewNote;
+    $('input[name="dbMode"][value="connect"]').checked = true;
+  }
   const connect = dbMode() === 'connect';
+  const engineSelect = $('#dEngine');
+  for (const option of engineSelect.options) option.disabled = !connect && option.dataset.managed === 'false';
+  if (engineSelect.selectedOptions[0]?.disabled) {
+    engineSelect.value = [...engineSelect.options].find(option => !option.disabled)?.value || '';
+    dbVersionsFor = null;
+  }
+  const engine = engineSelect.value;
   const redis = engine === 'garnet';
   $('#dEngineHint').textContent = ENGINE_HINT[engine] || '';
   $('#dVersionWrap').hidden = connect;
   $('#dConnect').hidden = !connect;
   $('#dUserWrap').hidden = redis;
   $('#dToolsWrap').hidden = redis;
-  $('#dPasswordHint').textContent = redis ? 'Its requirepass, if it has one' : "XAMPP's root has none";
+  $('#dPasswordHint').textContent = redis ? 'Its requirepass, if it has one' : 'Password for the database account';
   $('#dPortHint').textContent = connect
     ? 'Blank means ' + (redis ? '6379' : '3306')
     : 'Blank picks ' + (redis ? '6379' : '3306') + ' or the next free one';
   $('#bDbCreate').textContent = connect ? 'Connect' : 'Add database';
   $('#dbHint').textContent = connect
     ? 'It is asked to answer before it is saved, so a wrong address or password is refused now.'
-    : 'Around 100 MB the first time for a version; every database on that version shares it.';
+    : 'The verified engine downloads once; databases using that version share the installation.';
   if (!connect) loadDbVersions();
 }
 for (const r of $$('input[name="dbMode"]')) r.onchange = syncDbForm;
@@ -7203,6 +7400,44 @@ if (desktop) {
 
 // ----------------------------------------------------------------- paths ---
 
+let themeSaving = false;
+function showTheme(theme) {
+  const selected = theme === 'spawnloft' ? 'spawnloft' : 'classic';
+  document.documentElement.dataset.theme = selected;
+  $$('input[name="appTheme"]').forEach(input => { input.checked = input.value === selected; });
+}
+
+async function changeTheme(event) {
+  if (themeSaving || !event.target.checked) return;
+  const previous = document.documentElement.dataset.theme;
+  const requested = event.target.value;
+  const hadFocus = document.activeElement === event.target;
+  themeSaving = true;
+  $$('input[name="appTheme"]').forEach(input => { input.disabled = true; });
+  showTheme(requested);
+  $('#themeStatus').textContent = 'Saving appearance…';
+  try {
+    const out = await post('/appearance', { theme: requested });
+    showTheme(out.theme);
+    if (state.layout) state.layout.theme = out.theme;
+    $('#themeStatus').textContent = (out.theme === 'spawnloft' ? 'SpawnLoft' : 'Classic') + ' theme saved.';
+  } catch (error) {
+    showTheme(previous);
+    $('#themeStatus').textContent = 'Could not save your theme: ' + error.message;
+    toast('Appearance was not saved. Your previous theme has been restored.', 'bad');
+  } finally {
+    themeSaving = false;
+    $$('input[name="appTheme"]').forEach(input => { input.disabled = false; });
+    // Disabling the in-flight radio releases keyboard focus. Restore it only
+    // if the user has not moved elsewhere or closed Settings while saving.
+    if (hadFocus && state.view === 'settings' && document.activeElement === document.body) {
+      event.target.focus({ preventScroll: true });
+    }
+  }
+}
+showTheme(document.documentElement.dataset.theme);
+$$('input[name="appTheme"]').forEach(input => { input.onchange = changeTheme; });
+
 function shorten(p, max) {
   if (!p || p.length <= max) return p;
   return p.slice(0, 12) + '…' + p.slice(-(max - 13));
@@ -7221,6 +7456,7 @@ async function loadSettings() {
 }
 
 function renderSettings() {
+  showTheme(document.documentElement.dataset.theme);
   const l = state.layout;
   const paths = $('#setPaths');
   paths.textContent = '';
@@ -7267,7 +7503,13 @@ function renderSettings() {
   const about = $('#setAbout');
   about.textContent = '';
   const info = [['Panel', 'Local only — bound to 127.0.0.1']];
+  if (panelPlatform === 'darwin') {
+    info.push(['Mac support', 'Scheduled tasks run while signed in. Managed MySQL requires macOS 15+. Redis (Garnet) is available on Windows and Mac.']);
+  }
   if (state.appInfo) {
+    if (state.appInfo.manualUpdates) {
+      info.push(['Updates', 'Rolling Mac preview. Download and install each new build manually using Download Mac preview.']);
+    }
     // The commit, not just the version: a version is a label, and a bug report that names the
     // build is the difference between reproducing something and guessing at it.
     if (state.appInfo.commit) {
@@ -7562,6 +7804,10 @@ if (desktop) {
     state.appInfo = info;
     $('#appver').textContent = 'v' + info.version + (info.packaged ? '' : ' (' + info.coreMode + ')');
     $('#bUpdate').hidden = false;
+    if (info.manualUpdates) {
+      $('#bUpdate').textContent = 'Download Mac preview';
+      $('#bUpdate').title = 'Rolling development builds are installed manually; this opens the preview release.';
+    }
   });
 
   // What the button is offering right now: null when there is nothing to do, a version string
@@ -7585,6 +7831,7 @@ if (desktop) {
   };
 
   desktop.onUpdate((kind, data) => {
+    if (state.appInfo && state.appInfo.manualUpdates) return;
     const b = $('#bUpdate');
     if (kind === 'available') {
       // Nothing to click: the download has already started. The button reports rather than asks.
@@ -7624,6 +7871,10 @@ if (desktop) {
 
   $('#bUpdate').onclick = async () => {
     const b = $('#bUpdate');
+    if (state.appInfo && state.appInfo.manualUpdates) {
+      await desktop.openExternal(state.appInfo.downloadUrl);
+      return;
+    }
     if (pending === 'ready') {
       // Servers survive the restart - they are detached daemons - but saying so beats letting
       // someone guess whether updating will drop their running world.

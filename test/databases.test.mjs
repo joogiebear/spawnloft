@@ -14,6 +14,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-databases-'))
 process.env.MCCTL_DATA_ROOT = scratch
@@ -34,10 +35,18 @@ fs.mkdirSync(path.join(ENGINES_DIR, `mariadb-${VERSION}`), { recursive: true })
 fs.cpSync(FIXTURE, path.join(ENGINES_DIR, `mariadb-${VERSION}`), { recursive: true })
 
 const DB = `dbt-${process.pid}`
+const FAILED_DB = `${DB}-failed`
 const SRV = `srv-${process.pid}`
+const pluginFile = path.join(INSTANCES_DIR, SRV, 'plugins', 'LuckPerms', 'config.yml')
+const manualConfig = "# Keep comments and credentials exactly as entered\r\nstorage-method: h2\r\ndata:\r\n  password: 'manual-only'\r\n"
+function assertManualConfigs() {
+  assert.equal(fs.readFileSync(pluginFile, 'utf8'), manualConfig)
+  assert.equal(fs.existsSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'CoreProtect', 'config.yml')), false)
+}
 
 after(async () => {
   try { await sup.kill(DB) } catch { /* down */ }
+  try { await sup.kill(FAILED_DB) } catch { /* down */ }
   try { await sup.kill(`${SRV}-db`) } catch { /* down */ }
   fs.rmSync(scratch, { recursive: true, force: true })
 })
@@ -51,7 +60,7 @@ test('the fake engine is found through the same lookup the real one uses', () =>
 
 test('creating a database lays out its folder, picks a free port, and registers it apart from the servers', async () => {
   const port = await findFreePort(43000 + Math.floor(Math.random() * 10000))
-  const db = await services.createDatabase(DB, { version: VERSION, port, label: 'Test DB' })
+  const db = await services.createDatabase(DB, { engine: 'mariadb', version: VERSION, port, label: 'Test DB' })
   assert.equal(db.kind, 'database')
   assert.equal(db.engine, 'mariadb')
   assert.equal(db.port, port)
@@ -70,8 +79,11 @@ test('creating a database lays out its folder, picks a free port, and registers 
 })
 
 test('a second create with the same name, or on the server side, is refused', async () => {
-  await assert.rejects(services.createDatabase(DB, { version: VERSION }), UserError)
+  await assert.rejects(services.createDatabase(DB, { engine: 'mariadb', version: VERSION }), UserError)
   fs.mkdirSync(path.join(INSTANCES_DIR, SRV), { recursive: true })
+  fs.mkdirSync(path.dirname(pluginFile), { recursive: true })
+  fs.mkdirSync(path.join(INSTANCES_DIR, SRV, 'plugins', 'CoreProtect'), { recursive: true })
+  fs.writeFileSync(pluginFile, manualConfig)
   putInstance(SRV, { dir: path.join(INSTANCES_DIR, SRV), jar: 'paper.jar', memory: '4G', port: 25565 })
   assert.throws(() => services.getDatabase(SRV), UserError)
   assert.throws(() => services.assertServer(DB), UserError)
@@ -114,25 +126,48 @@ test('attach creates the database and user for the server, and the credentials c
   assert.equal(fromServer.length, 1)
   assert.equal(fromServer[0].service, DB)
   assert.equal(fromServer[0].password, undefined, 'the server-side list must not carry the password')
+  assertManualConfigs()
 })
 
-test('apply writes the credentials into a plugin config and records it on the attachment', () => {
-  const srvDir = path.join(INSTANCES_DIR, SRV)
-  fs.mkdirSync(path.join(srvDir, 'plugins', 'LuckPerms'), { recursive: true })
-  fs.writeFileSync(path.join(srvDir, 'plugins', 'LuckPerms', 'config.yml'), 'storage-method: h2\ndata:\n  address: localhost\n  database: minecraft\n  username: root\n  password: \'\'\n')
-  const helpers = services.helpersFor(SRV)
-  assert.equal(helpers.find((h) => h.id === 'luckperms').configPresent, true)
+test('both CLI launchers start, restart, and detach a database without treating it as Minecraft', { timeout: 90000 }, async () => {
+  const cli = (launcher, args) => execFileSync(process.execPath,
+    [fileURLToPath(new URL(`../${launcher}.mjs`, import.meta.url)), ...args],
+    { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] })
+  assert.equal(services.getDatabase(DB).rcon, undefined, 'a database has no RCON settings')
+  for (const launcher of ['mcctl', 'spawnloft']) {
+    await sup.stop(DB, { timeout: 10000 })
+    const started = cli(launcher, ['start', DB, '--timeout', '15'])
+    assert.match(started, /Ready -/)
+    assert.match(started, /database pid \d+\s+port \d+/)
+    assert.doesNotMatch(started, /java pid|rcon|TypeError/i)
+    assert.equal(readState(DB).status, 'running')
+    const firstPid = readState(DB).state.javaPid
+    const restarted = cli(launcher, ['restart', DB, '--timeout', '15'])
+    assert.match(restarted, /Ready -/)
+    assert.doesNotMatch(restarted, /java pid|rcon|TypeError/i)
+    assert.equal(readState(DB).status, 'running')
+    assert.notEqual(readState(DB).state.javaPid, firstPid)
+    cli(launcher, ['stop', DB])
+    const detached = cli(launcher, ['start', DB, '--detach'])
+    assert.match(detached, /Launched \(database pid \d+\)/)
+    assert.doesNotMatch(detached, /java pid|rcon|TypeError/i)
+    assert.equal((await sup.waitForReady(DB, 15000)).ready, true)
+    assertManualConfigs()
+  }
+})
 
-  const res = services.applyToPlugin(DB, SRV, 'luckperms')
-  assert.equal(res.restartNeeded, true)
-  assert.deepEqual(res.written, ['storage-method', 'data.address', 'data.database', 'data.username', 'data.password'])
-  const creds = services.credentials(DB, SRV)
-  const text = fs.readFileSync(path.join(srvDir, 'plugins', 'LuckPerms', 'config.yml'), 'utf8')
-  assert.match(text, /^storage-method: 'mariadb'$/m)
-  assert.match(text, new RegExp(`^  address: '127\\.0\\.0\\.1:${creds.port}'$`, 'm'))
-  assert.match(text, new RegExp(`^  password: '${creds.password}'$`, 'm'))
-  assert.ok(services.serverAttachments(SRV)[0].applied.luckperms, 'the attachment must remember the plugin it was written to')
-  assert.throws(() => services.applyToPlugin(DB, SRV, 'coreprotect'), /has not written its config yet/)
+test('detach and reattach preserve manual plugin configs, including legacy attachment metadata', () => {
+  const db = services.getDatabase(DB)
+  const applied = { luckperms: { file: 'plugins/LuckPerms/config.yml', at: '2026-01-01T00:00:00Z' } }
+  updateInstance(DB, { attachments: { ...db.attachments, [SRV]: { ...db.attachments[SRV], applied } } })
+  const before = services.credentials(DB, SRV)
+  assert.deepEqual(services.attach(DB, SRV), before)
+  assert.equal(services.serverAttachments(SRV)[0].applied, undefined)
+  assertManualConfigs()
+  services.detach(DB, SRV)
+  assertManualConfigs()
+  assert.ok(services.attach(DB, SRV).password)
+  assertManualConfigs()
 })
 
 test('the panel lists databases apart from servers and never sends a password', async () => {
@@ -152,52 +187,44 @@ test('the panel lists databases apart from servers and never sends a password', 
     const mine = await (await fetch(`${url}api/instances/${SRV}/databases`)).json()
     assert.equal(mine[0].service, DB)
     assert.equal(mine[0].password, undefined)
-    const helpers = await (await fetch(`${url}api/instances/${SRV}/databases/helpers`)).json()
-    assert.equal(helpers.find((h) => h.id === 'luckperms').configPresent, true)
+    assert.equal((await fetch(`${url}api/instances/${SRV}/databases/helpers`)).status, 404)
+    const registryBefore = fs.readFileSync(path.join(scratch, 'instances.json'), 'utf8')
+    for (const plugin of ['luckperms', 'coreprotect', 'luckperms-redis']) {
+      const removed = await fetch(`${url}api/databases/${DB}/apply`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ server: SRV, plugin }),
+      })
+      assert.equal(removed.status, 404)
+      assert.equal((await removed.json()).error, 'not found')
+      assert.equal(fs.readFileSync(path.join(scratch, 'instances.json'), 'utf8'), registryBefore)
+      assertManualConfigs()
+    }
+    const attached = await fetch(`${url}api/databases/${DB}/attach`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ server: SRV }),
+    })
+    assert.equal(attached.status, 200)
+    assert.equal((await attached.json()).password, services.credentials(DB, SRV).password)
+    assertManualConfigs()
 
     const creds = await (await fetch(`${url}api/databases/${DB}/credentials?server=${SRV}`)).json()
     assert.equal(creds.password, services.credentials(DB, SRV).password)
+    assertManualConfigs()
   } finally {
     server.close()
   }
 })
 
-test('a server can have a database of its own made in one step: game port plus one, started, attached', { timeout: 60000 }, async () => {
-  const srv = services.assertServer(SRV)
-  const wanted = Number(srv.port) + 1
-  const wantedFree = !usedPorts().has(wanted) && await isPortFree(wanted)
-
+test('new MariaDB creation is refused on every platform without touching plugin configs', async () => {
   const { server, url } = await ui.serve({ port: 0, open: false })
-  let out
   try {
     const res = await fetch(`${url}api/instances/${SRV}/databases/create`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: VERSION }),
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ engine: 'mariadb', version: VERSION }),
     })
-    out = await res.json()
-    assert.equal(res.status, 200, JSON.stringify(out))
-  } finally {
-    server.close()
-  }
-  const name = `${SRV}-db`
-  assert.equal(out.database.name, name)
-  assert.equal(out.database.status, 'running')
-  assert.equal(out.database.root, undefined, 'the panel answer must not carry the root password')
-  if (wantedFree) assert.equal(out.database.port, wanted, 'the port after the game port, when free')
-  else assert.ok(out.database.port > wanted)
-  assert.equal(out.credentials.database, SRV)
-  assert.equal(out.credentials.port, out.database.port)
-  assert.ok(services.serverAttachments(SRV).some((a) => a.service === name), 'attached from the same call')
-  assert.equal(readState(name).status, 'running')
-
-  // The name stays within the 32 characters a name may have, suffix included, and is made unique.
-  assert.equal(services.nameForServer('a'.repeat(32)), 'a'.repeat(29) + '-db')
-  assert.equal(services.nameForServer(SRV), `${SRV}-db-2`, 'the first one exists, so the next is numbered')
-
-  // Put it away, so the snapshot tests below see the one database they expect.
-  await sup.stop(name, { timeout: 10000 })
-  services.detach(name, SRV)
-  services.removeDatabase(name, { purge: true })
-  assert.ok(!listServices().some((i) => i.name === name))
+    assert.equal(res.status, 400)
+    assert.match((await res.json()).error, /[Ii]nstallation.*not available/)
+    assert.ok(!listServices().some(i => i.name === `${SRV}-db`))
+    assertManualConfigs()
+  } finally { server.close() }
 })
 
 test('a snapshot of an attached server carries a dump of its database, and verify checks for it', { timeout: 30000 }, async () => {
@@ -279,42 +306,25 @@ test('detach while stopped keeps the record consistent, and dropping needs the d
 })
 
 test('a database that dies during startup is reported as failed, with the engine\'s reason', { timeout: 30000 }, async () => {
-  // Auto-restart is on for a database by default; off here, or the daemon would spend the next
-  // half minute retrying a start that is scripted to fail.
-  updateInstance(DB, { autoRestart: false })
+  // This daemon inherits the scripted failure environment. Keep it separate from the healthy
+  // database, and leave auto-restart off: seeing its error line can precede the child exit, when
+  // the daemon rereads the setting. Turning it back on then races into repeated scripted failures.
+  await services.createDatabase(FAILED_DB, { engine: 'mariadb', version: VERSION })
+  updateInstance(FAILED_DB, { autoRestart: false })
   process.env.FAKE_MARIADB_FAIL = 'start'
   try {
-    const res = await sup.start(DB, { timeout: 15000 })
+    const res = await sup.start(FAILED_DB, { timeout: 15000 })
     assert.equal(res.ready, false)
     assert.equal(res.failed, true)
     assert.match(res.reason, /Can't start server|exited/)
   } finally {
     delete process.env.FAKE_MARIADB_FAIL
-    updateInstance(DB, { autoRestart: true })
   }
 })
 
 test('remove refuses a running database, then deletes a stopped one with its folder', { timeout: 45000 }, async () => {
-  // The daemon from the failed start above is still tearing down, and there is no single moment to
-  // wait for. Its state reads 'stopping' for a few seconds; then it reads 'stopped' while the
-  // control socket it left behind is still there to be connected to and refuse. Waiting on the
-  // state caught the first and ran straight into the second - on CI this failed three ways across
-  // three runs: 'is still shutting down' after the full wait, 'is not running' 158ms in, and once
-  // not at all.
-  //
-  // So the start is retried rather than timed. Every way the teardown can refuse one - already
-  // running, still shutting down, not running - refuses in milliseconds, so a retry costs nothing
-  // and the loop ends the moment the daemon is really gone.
-  const deadline = Date.now() + 20000
-  for (;;) {
-    try {
-      await sup.start(DB, { timeout: 15000 })
-      break
-    } catch (err) {
-      if (Date.now() > deadline) throw err
-      await new Promise((r) => setTimeout(r, 250))
-    }
-  }
+  const started = await sup.start(DB, { timeout: 15000 })
+  assert.equal(started.ready, true, JSON.stringify(started))
   assert.throws(() => services.removeDatabase(DB), /stop it/)
   await sup.stop(DB, { timeout: 10000 })
   const dir = services.getDatabase(DB).dir

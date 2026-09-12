@@ -188,7 +188,7 @@ export function toolsDir(inst) {
 export function findTools() {
   const candidates = []
   try {
-    for (const e of fs.readdirSync(ENGINES_DIR)) if (e.startsWith('mariadb-')) candidates.push(path.join(ENGINES_DIR, e))
+    for (const e of fs.readdirSync(ENGINES_DIR)) if (/^(mariadb-|mysql-)/.test(e)) candidates.push(path.join(ENGINES_DIR, e))
   } catch {
     /* no store yet */
   }
@@ -208,6 +208,13 @@ export function findTools() {
       }
     }
   }
+  if (process.platform === 'darwin') {
+    for (const base of ['/opt/homebrew/opt', '/usr/local/opt']) {
+      for (const formula of ['mysql', 'mysql@8.4', 'mariadb', 'mariadb@11.4']) candidates.push(path.join(base, formula, 'bin'))
+    }
+    candidates.push('/usr/local/mysql/bin')
+    for (const entry of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) candidates.push(entry)
+  }
   return candidates.find((c) => binary(c, 'client')) ?? null
 }
 
@@ -216,7 +223,7 @@ export function hostOf(inst) {
 }
 
 function rootArgs(inst) {
-  return ['--protocol=TCP', `--host=${hostOf(inst)}`, `--port=${inst.port}`, `--user=${inst.root?.user ?? 'root'}`]
+  return ['--no-defaults', '--protocol=TCP', `--host=${hostOf(inst)}`, `--port=${inst.port}`, `--user=${inst.root?.user ?? 'root'}`]
 }
 
 export function hasEngine(version) {
@@ -395,7 +402,7 @@ export function sql(inst, statements) {
   const client = binary(dir, 'client')
   if (!client) {
     fail(inst.external
-      ? `no MariaDB client tools found for "${inst.name}". Point at a folder holding mariadb.exe or mysql.exe (XAMPP's mysql\\bin, a MariaDB install's bin), or add a MariaDB here once so its tools are in the store.`
+      ? `no MariaDB/MySQL client tools found for "${inst.name}". Select a folder containing mariadb or mysql, or create a managed database here once to download its tools.`
       : `MariaDB ${inst.version} has no client tool under ${dir}`)
   }
   const { cmd, args, env } = runnable(client,

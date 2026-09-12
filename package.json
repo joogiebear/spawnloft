@@ -1,6 +1,6 @@
 {
   "name": "mcctl",
-  "version": "0.14.0",
+  "version": "1.0.0",
   "private": true,
   "repository": "github:joogiebear/spawnloft",
   "description": "SpawnLoft core: the mcctl command line and panel - a multi-instance Minecraft server supervisor with console capture, RCON, and snapshots",
@@ -9,6 +9,7 @@
     "test": "node --test \"test/*.test.mjs\""
   },
   "bin": {
+    "spawnloft": "./spawnloft.mjs",
     "mcctl": "./mcctl.mjs"
   },
   "engines": {

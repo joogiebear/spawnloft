@@ -1,6 +1,6 @@
 {
   "name": "mcctl-desktop",
-  "version": "0.14.0",
+  "version": "1.0.0",
   "private": true,
   "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
   "productName": "SpawnLoft",
@@ -35,6 +35,7 @@
         "to": "core",
         "filter": [
           "mcctl.mjs",
+          "spawnloft.mjs",
           "src/**",
           "package.json",
           "!**/node_modules",

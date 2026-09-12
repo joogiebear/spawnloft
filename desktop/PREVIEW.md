@@ -1,0 +1,106 @@
+## SpawnLoft desktop development preview
+
+Separate Windows and Mac installers, built from the same development commit with the
+same version. The release is published only after Windows x64, Apple Silicon, and Intel
+Mac packages all pass their native checks. Each release is immutable and numbered.
+
+### Fixes to try
+
+- **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
+  and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
+  from new setup choices. Garnet automatically downloads its verified private runtime;
+  no separate .NET installation is needed. Its stop action saves a checkpoint before
+  terminating the process, and a failed save leaves it running with an error.
+- **Reliable rapid restarts:** a process-list entry from before a new launch is rechecked
+  before labeling a live daemon as orphaned, avoiding stale Windows PID ownership.
+
+- **Mac scheduling and automatic backups:** native per-user launchd agents run tasks
+  with the desktop closed while you are signed in. Create, edit, enable, disable,
+  run now, and remove tasks through the Scheduler tab; the Backups tab uses the
+  same scheduler and retains only its own scheduled snapshots. No administrator
+  password or background copy of the desktop app is needed.
+- Daily/weekly jobs missed during sleep run once on wake. Interval jobs skip missed
+  runs. Jobs do not run after sign-out. Login tasks run at login and when first
+  registered/enabled. macOS may show SpawnLoft in Login Items / background activity;
+  disabling it there prevents scheduled work. Remove tasks in SpawnLoft before
+  deleting the app.
+- **Signed Mac automatic updates:** background download, then install on quit or
+  use Restart to update. Beta and stable channels stay separate. Both native
+  architectures share a verified feed; Windows update behavior is preserved.
+  Ad-hoc test packages still require manual installation.
+
+- **Database CLI startup:** `spawnloft start <database>` and `restart <database>` now
+  finish successfully after the database becomes ready, instead of throwing a TypeError
+  while trying to display a Minecraft RCON port. Database output labels the database PID;
+  detached startup is labeled correctly too. This shared fix applies to Mac and Windows,
+  and to both the `spawnloft` and `mcctl` commands.
+- **Managed MySQL:** **Create a database** downloads verified MySQL 8.4 LTS binaries
+  for Windows x64 or macOS 15+ (Apple Silicon and Intel), initializes a private data directory,
+  starts the database and creates scoped credentials for the selected server. No Homebrew,
+  system service or separate database installation is needed. Start/stop, restart and SQL
+  backup/restore use the managed tools. A Windows computer missing the Microsoft Visual C++
+  x64 runtime gets a link to install that prerequisite.
+- Mac tool discovery also checks the managed engine store, Homebrew locations, `/usr/local/mysql`
+  and PATH when connecting to a database you already run.
+- **Plugin database configs stay manual:** database creation and attachment provide
+  credentials for you to copy into your plugins. The former `db apply` command and
+  panel config-writing controls are removed. Existing plugin files are left unchanged.
+- **CLI automation:** versioned `--json` output for status, plugin inventory, backup history,
+  backup creation, diagnostics, and environment checks. `metrics --follow --json` streams
+  readings; `metrics --csv --output <file>` exports them without overwriting old runs.
+- **SpawnLoft terminal command:** both `spawnloft` and the compatible `mcctl` launcher live
+  in the package's `Resources/bin` on Mac or `resources/bin` on Windows and use the bundled
+  runtime. See [CLI setup and examples](https://github.com/joogiebear/spawnloft/blob/dev/CLI.md).
+- **Performance now works on Apple Silicon and Intel Mac:** live server CPU and resident
+  memory, ten-second samples, selectable history ranges, and history retained after stopping.
+  CPU uses the same share-of-all-cores scale as Windows. Each server restart begins a fresh graph.
+- Console output strips ANSI escape sequences into clean, searchable plain text while
+  keeping warning and error indicators.
+- Long lines scroll horizontally by default. Turn on **Wrap** whenever you prefer.
+- Backup history refreshes every four seconds while visible and when reopened, including
+  backups made with the CLI. Refreshes preserve backup scope and unsaved schedule edits.
+- Snapshots appear only after their archive and manifest are complete. Concurrent backups
+  get separate names, and failed archives never appear as completed backups.
+- **Settings → Appearance** offers both Classic and SpawnLoft themes.
+
+### Windows
+
+Download **SpawnLoft-Setup-VERSION.exe**. Windows beta installations continue to receive
+beta updates automatically; stable installations stay on the stable release. Both
+`beta.yml` and `latest.yml` describe the Windows installer on this prerelease.
+
+Like the previous Windows development beta, this GitHub Actions test build is unsigned.
+SmartScreen may warn during manual installation: **More info → Run anyway**. Signed
+production builds use the existing Azure signing profile on the release machine.
+
+### Mac
+
+- **Apple Silicon (M-series):** download the `mac-arm64.dmg` asset.
+- **Intel:** download the `mac-x64.dmg` asset.
+- Requires **macOS 13 Ventura or later** and a Java version suitable for your server.
+
+Quit SpawnLoft, open the DMG, and drag SpawnLoft to Applications to replace the previous
+preview. Your application data lives outside the app. Beta.25 and older require this
+one-time manual replacement to enable automatic updates in signed builds.
+
+<!-- MAC_DISTRIBUTION -->
+The Mac app is ad-hoc signed for testing and **not Apple-notarized**. If macOS blocks its
+first launch, try opening it once, then use **System Settings → Privacy & Security →
+Open Anyway**. If it instead reports a damaged app, report the exact message.
+<!-- /MAC_DISTRIBUTION -->
+
+New setups offer **MySQL** and **Redis (Garnet)** on Windows x64 and both Mac architectures.
+Managed MySQL 8.4 LTS requires macOS 15+; the desktop app itself runs on macOS 13+.
+Garnet installs a verified private .NET runtime automatically. Its stop action waits for a
+saved checkpoint before terminating the process because Garnet does not implement SHUTDOWN.
+Plugin configs remain manual. MariaDB is no longer offered for new setups.
+
+### Toward 1.0
+
+Keep testing setup, both themes, server creation, start/stop/restart, console commands,
+backup/restore, and upgrading an existing installation on both platforms. Any remaining
+Mac limitations must be implemented or explicitly scoped before calling 1.0 ready.
+Signing/notarization status for this build is recorded above. Verify a complete installed
+Mac automatic upgrade before promoting the release candidate to 1.0.
+
+This is a development prerelease, not SpawnLoft 1.0.
