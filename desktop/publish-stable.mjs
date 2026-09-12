@@ -48,7 +48,11 @@ if (release && !release.draft) {
   fs.writeFileSync(notes, fs.readFileSync(path.join(here, 'STABLE.md'), 'utf8') + `\n\nBuilt together from [\`${commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${commit}). Native Mac signing, notarization and installed upgrades verified in [build ${runId}](https://github.com/${repo}/actions/runs/${runId}).\n`)
   if (!release) gh(['release', 'create', tag, '--repo', repo, '--target', commit, '--draft', '--title', `SpawnLoft ${version}`, '--notes-file', notes])
   gh(['release', 'upload', tag, ...verified.assets.map(a => a.path), '--repo', repo, '--clobber'])
-  checkUploaded(JSON.parse(gh(['api', `repos/${repo}/releases/tags/${tag}`])))
+  // Drafts are not consistently indexed by the public tag endpoint. Use the
+  // authenticated release listing, which also detects duplicate draft names.
+  const uploaded = JSON.parse(gh(['api', `repos/${repo}/releases`, '--paginate', '--slurp'])).flat().filter(r => r.tag_name === tag || r.name === tag)
+  if (uploaded.length !== 1 || !uploaded[0].draft || uploaded[0].prerelease || uploaded[0].target_commitish !== commit) throw new Error('Uploaded draft has a different identity')
+  checkUploaded(uploaded[0])
   if (gh(['api', `repos/${repo}/commits/main`, '--jq', '.sha']) !== commit) throw new Error('main moved; leaving release as a draft')
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease=false', '--latest'])
   console.log(`Published ${tag}: signed Windows, Apple Silicon and Intel Mac packages, with stable and beta updater feeds.`)
