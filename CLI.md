@@ -109,7 +109,19 @@ CSV uses `instance,run_id,timestamp,cpu_percent,rss_mib,cores` with UTC ISO time
 stdout yourself when capturing an ongoing stream. JSON and CSV are mutually exclusive.
 
 Safe local JAR deployment, required-plugin readiness checks, and automatic PATH installation
-are separate planned additions. Mac Scheduler and automatic backups remain separate work too.
+are separate planned additions.
+
+## Scheduled work on Mac
+
+`spawnloft task add royalplugins --do backup --daily 03:00` creates a per-user
+launchd agent. Use `task list`, `task disable <id>`, `task enable <id>`, and
+`task rm <id>` to inspect, pause, resume, and remove it. The desktop Scheduler and
+Backups tabs use the same backend, including backup retention scoped to each task.
+Tasks run with the app closed while you are signed in. Daily/weekly jobs missed
+during sleep run once on wake; interval jobs skip missed runs. Jobs do not run
+after sign-out. Login jobs also run when first registered/enabled. Remove tasks
+before deleting the app, and keep SpawnLoft background activity enabled in macOS.
+
 
 ## Managed databases on Mac
 

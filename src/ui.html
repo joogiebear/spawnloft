@@ -2160,6 +2160,10 @@ const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
 const panelPlatform = $('meta[name="spawnloft-platform"]').content;
 const windowsFeatures = panelPlatform === 'win32';
+const schedulerName = panelPlatform === 'darwin' ? 'macOS launchd' : 'Windows Task Scheduler';
+const schedulerHint = panelPlatform === 'darwin'
+  ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
+  : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
 const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MariaDB, MySQL, or Redis database instead.';
 
@@ -4998,8 +5002,7 @@ async function renderScheduler(opts) {
   // ---- what a schedule is, before the list of them ---------------------------
   const intro = document.createElement('div');
   intro.className = 'hint';
-  intro.textContent = 'Windows Task Scheduler runs these, so they happen whether or not this window '
-    + 'is open - while you are signed in, screen locked included, but not after you sign out.';
+  intro.textContent = schedulerName + '. ' + schedulerHint;
   body.append(intro);
 
   // ---- add ------------------------------------------------------------------
@@ -5115,7 +5118,7 @@ function taskCard(task, data, base, again, editor) {
     // the query failed - either way it is not going to run, and saying "Ready" would be a lie.
     state.textContent = 'Not in Windows';
     state.dataset.tone = 'bad';
-    state.title = 'SpawnLoft has this task but Windows Task Scheduler does not. Edit it to put it back.';
+    state.title = 'SpawnLoft has this task but the system scheduler does not. Edit it to put it back.';
   } else {
     state.textContent = task.state || 'Ready';
     state.dataset.tone = task.state === 'Running' ? 'good' : '';
@@ -5198,7 +5201,7 @@ function taskCard(task, data, base, again, editor) {
   drop.onclick = async () => {
     const ok = await ask({
       title: 'Delete "' + task.name + '"?',
-      text: 'It stops running and is removed from Windows Task Scheduler. Backups it already took '
+      text: 'It stops running and is removed from the system scheduler. Backups it already took '
         + 'are not touched.',
       confirmLabel: 'Delete task',
       danger: true,
@@ -5490,10 +5493,9 @@ async function renderBackups(opts) {
   const autoState = document.createElement('div');
   autoState.className = 'hint';
   autoState.textContent = data.auto
-    ? 'Held by Windows Task Scheduler. Last run: ' + (data.auto.lastResult || 'unknown')
+    ? 'Held by ' + schedulerName + '. Last run: ' + (data.auto.lastResult || 'unknown')
       + '. Next: ' + (whenNext(data.auto.nextRun) || 'unknown') + '.'
-    : 'Runs through Windows Task Scheduler, so it happens whether or not this window is open - while '
-      + 'you are signed in, screen locked included, but not after you sign out.';
+    : schedulerHint;
   auto.append(autoTitle, autoRow, autoState);
   if (data.automaticAvailable === false) {
     autoRow.hidden = true;
@@ -7501,8 +7503,8 @@ function renderSettings() {
   const about = $('#setAbout');
   about.textContent = '';
   const info = [['Panel', 'Local only — bound to 127.0.0.1']];
-  if (!windowsFeatures) {
-    info.push(['Preview limits', 'Scheduled tasks, automatic backups, CPU/memory charts, and automatic database installation are not available yet.']);
+  if (panelPlatform === 'darwin') {
+    info.push(['Mac support', 'Scheduled tasks run while signed in. Managed MySQL requires macOS 15+. Managed Garnet is Windows-only.']);
   }
   if (state.appInfo) {
     if (state.appInfo.manualUpdates) {

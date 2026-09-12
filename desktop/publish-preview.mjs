@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { verifyRelease, verifyPublishedRelease } from './preview-artifacts.mjs'
 import signing from './mac-signing.cjs'
 import notesRenderer from './preview-notes.cjs'
+import { prepareMacFeeds } from './mac-update-feeds.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dir = path.join(here, 'dist/preview-release')
@@ -15,6 +16,7 @@ if (process.env.GITHUB_REF !== 'refs/heads/dev' || !/^[0-9a-f]{40}$/.test(proces
     !/^[1-9]\d*$/.test(process.env.GITHUB_RUN_NUMBER || '')) throw new Error('Only a numbered development workflow may publish')
 const version = `${sourceVersion.split('-')[0]}-beta.${Number(process.env.GITHUB_RUN_NUMBER) + 1}`
 const verified = verifyRelease(dir, { sourceVersion, version, commit: process.env.GITHUB_SHA, macSigningMode: signing.signingMode() })
+verified.assets.push(...prepareMacFeeds(dir, verified))
 const repo = 'joogiebear/spawnloft'
 const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const currentDev = () => gh(['api', `repos/${repo}/commits/dev`, '--jq', '.sha'])

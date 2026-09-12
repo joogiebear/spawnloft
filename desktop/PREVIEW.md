@@ -6,6 +6,21 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **Mac scheduling and automatic backups:** native per-user launchd agents run tasks
+  with the desktop closed while you are signed in. Create, edit, enable, disable,
+  run now, and remove tasks through the Scheduler tab; the Backups tab uses the
+  same scheduler and retains only its own scheduled snapshots. No administrator
+  password or background copy of the desktop app is needed.
+- Daily/weekly jobs missed during sleep run once on wake. Interval jobs skip missed
+  runs. Jobs do not run after sign-out. Login tasks run at login and when first
+  registered/enabled. macOS may show SpawnLoft in Login Items / background activity;
+  disabling it there prevents scheduled work. Remove tasks in SpawnLoft before
+  deleting the app.
+- **Signed Mac automatic updates:** background download, then install on quit or
+  use Restart to update. Beta and stable channels stay separate. Both native
+  architectures share a verified feed; Windows update behavior is preserved.
+  Ad-hoc test packages still require manual installation.
+
 - **Database CLI startup:** `spawnloft start <database>` and `restart <database>` now
   finish successfully after the database becomes ready, instead of throwing a TypeError
   while trying to display a Minecraft RCON port. Database output labels the database PID;
@@ -56,7 +71,8 @@ production builds use the existing Azure signing profile on the release machine.
 - Requires **macOS 13 Ventura or later** and a Java version suitable for your server.
 
 Quit SpawnLoft, open the DMG, and drag SpawnLoft to Applications to replace the previous
-preview. Your application data lives outside the app. Mac updates are manual for now.
+preview. Your application data lives outside the app. Beta.25 and older require this
+one-time manual replacement to enable automatic updates in signed builds.
 
 <!-- MAC_DISTRIBUTION -->
 The Mac app is ad-hoc signed for testing and **not Apple-notarized**. If macOS blocks its
@@ -64,7 +80,7 @@ first launch, try opening it once, then use **System Settings → Privacy & Secu
 Open Anyway**. If it instead reports a damaged app, report the exact message.
 <!-- /MAC_DISTRIBUTION -->
 
-Scheduled tasks, automatic backups and managed Garnet remain unavailable on Mac. Managed
+Managed Garnet remains Windows-only. Managed
 SQL databases use MySQL 8.4 LTS and require macOS 15 or later; the app itself still runs
 on macOS 13+. Existing external MariaDB/MySQL/Redis connections remain available. Windows retains its existing
 capabilities; a shared fix lands in both packages, with platform differences explicit.
@@ -74,7 +90,7 @@ capabilities; a shared fix lands in both packages, with platform differences exp
 Keep testing setup, both themes, server creation, start/stop/restart, console commands,
 backup/restore, and upgrading an existing installation on both platforms. Any remaining
 Mac limitations must be implemented or explicitly scoped before calling 1.0 ready.
-Signing/notarization status for this build is recorded above. Native Mac automatic updates
-remain a separate distribution milestone.
+Signing/notarization status for this build is recorded above. Verify a complete installed
+Mac automatic upgrade before promoting the release candidate to 1.0.
 
 This is a development prerelease, not SpawnLoft 1.0.

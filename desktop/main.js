@@ -6,9 +6,9 @@ const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
-// Rolling Mac previews are installed by hand. Squirrel.Mac needs a signed,
-// versioned distribution; these ad-hoc test builds deliberately have neither.
-const manualUpdates = process.platform === 'darwin' && app.getVersion().includes('-')
+// Ad-hoc packages cannot participate in Squirrel.Mac updates. Signed betas use
+// the same updater as stable builds; missing provenance fails closed on Mac.
+const manualUpdates = process.platform === 'darwin' && (!app.isPackaged || buildInfo()?.macSigningMode !== 'signed')
 const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases'
 
 /**
@@ -304,6 +304,8 @@ function setupUpdates() {
   if (manualUpdates) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
+  // Initial Mac support uses complete signed ZIPs. Windows keeps differential updates.
+  if (process.platform === 'darwin') autoUpdater.disableDifferentialDownload = true
   autoUpdater.logger = null
 
   autoUpdater.on('update-available', (info) => send('update:available', { version: info.version }))
