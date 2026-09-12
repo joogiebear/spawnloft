@@ -1230,7 +1230,7 @@ async function route(req, res) {
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     const db = await services.registerExternal(String(body.name), {
-      engine: body.engine ? String(body.engine) : services.defaultEngine(),
+      engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
       host: body.host ? String(body.host) : '127.0.0.1',
       port: body.port ? Number(body.port) : null,
       user: body.user ? String(body.user) : 'root',
@@ -1241,10 +1241,10 @@ async function route(req, res) {
     return json(res, 200, safeDatabase({ ...db, status: 'reachable' }))
   }
   if (seg[1] === 'databases' && seg[2] === 'engines' && req.method === 'GET') {
-    return json(res, 200, Object.entries(services.ENGINES).map(([id, e]) => ({ id, label: e.label, defaultPort: e.defaultPort, managed: services.canManage(id), default: id === services.defaultEngine() })))
+    return json(res, 200, Object.entries(services.ENGINES).filter(([id]) => services.NEW_ENGINES.includes(id)).map(([id, e]) => ({ id, label: e.label, defaultPort: e.defaultPort, managed: services.canManage(id), default: id === services.defaultEngine() })))
   }
   if (seg[1] === 'databases' && seg[2] === 'versions' && req.method === 'GET') {
-    const engine = String(url.searchParams.get('engine') || services.defaultEngine())
+    const engine = services.assertNewEngine(String(url.searchParams.get('engine') || services.defaultEngine()))
     return json(res, 200, await services.versionsFor(engine))
   }
   if (seg[1] === 'databases' && seg.length === 2 && req.method === 'POST') {
@@ -1257,7 +1257,7 @@ async function route(req, res) {
     if (!services.canManage(body.engine || services.defaultEngine())) return json(res, 400, { error: 'Managed installation of this engine is not available on this platform.' })
     try {
       const db = await services.createDatabase(String(body.name), {
-        engine: body.engine ? String(body.engine) : services.defaultEngine(),
+        engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
         version: String(body.version),
         port: body.port ? Number(body.port) : null,
         label: body.label ?? null,
@@ -1531,7 +1531,7 @@ async function route(req, res) {
     if (!services.canManage(body.engine || services.defaultEngine())) return json(res, 400, { error: 'Managed installation of this engine is not available on this platform.' })
     try {
       const out = await services.createForServer(name, {
-        engine: body.engine ? String(body.engine) : services.defaultEngine(),
+        engine: services.assertNewEngine(body.engine ? String(body.engine) : services.defaultEngine()),
         version: body.version ? String(body.version) : null,
         onProgress: (p) => {
           if (p.cached) return jobUpdate(jobId, { stage: 'cached', percent: 100, message: p.message })

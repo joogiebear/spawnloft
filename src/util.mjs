@@ -70,13 +70,13 @@ function readProcessTable() {
 export function refreshProcessTable() {
   if (refreshing) return refreshing
   const [cmd, args] = TABLE_COMMAND
+  const queriedAt = Date.now()
   refreshing = new Promise((resolve) => {
     execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 10000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => {
       refreshing = null
       // A failed read keeps the previous table rather than replacing it with nothing: an old
       // answer about a pid beats no answer, and the next read will try again.
-      if (!err) processTable = { at: Date.now(), names: parseProcessTable(stdout) }
-      else processTable = { ...processTable, at: Date.now() }
+      if (!err && queriedAt >= processTable.at) processTable = { at: queriedAt, names: parseProcessTable(stdout) }
       resolve(processTable.names)
     })
   })
@@ -102,9 +102,18 @@ export function processImage(pid) {
  * not caught up with yet all answer true, because the pid IS alive and that was the whole test
  * until now. Only "alive, and wearing a different name" answers false.
  */
-export function sameProcess(pid, expectedImage) {
+export function sameProcess(pid, expectedImage, startedAt = 0) {
   if (!expectedImage) return true
-  const actual = processImage(pid)
+  let actual = processImage(pid)
+  // A cached PID may belong to an older process when Windows reuses its number.
+  // Recheck a contradiction if that snapshot predates this launch; never reject a
+  // newly started daemon using the previous owner's executable name.
+  if (actual && startedAt > processTable.at &&
+      String(actual).toLowerCase().replace(/\.exe$/, '') !== String(expectedImage).toLowerCase().replace(/\.exe$/, '')) {
+    const at = Date.now()
+    const names = readProcessTable()
+    if (names) { processTable = { at, names }; actual = names.get(pid) ?? null }
+  }
   if (!actual) return true
   const strip = (s) => String(s).toLowerCase().replace(/\.exe$/, '')
   return strip(actual) === strip(expectedImage)

@@ -1,5 +1,11 @@
 # Plan: databases for servers
 
+Current development scope: new setups offer MySQL 8.4 LTS and Redis (Garnet) on Windows
+x64 and both Mac architectures. MariaDB creation has been removed. Garnet downloads a
+private, verified .NET runtime and stops by saving a checkpoint before process termination;
+it does not implement SHUTDOWN. Plugin configs remain manual. The notes below document
+the original 0.13 implementation; see README.md and desktop/PREVIEW.md for current behavior.
+
 Status: **shipped in 0.13.0.** The first Windows run (0.13.0-beta.1) found the MariaDB version list empty. The
 download API is three shapes deep - `major_releases` at the root, `releases` under a major,
 `release_data` under a point release - and the code read one shape at the wrong level; fixed in

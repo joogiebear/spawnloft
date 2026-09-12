@@ -6,6 +6,14 @@ Mac packages all pass their native checks. Each release is immutable and numbere
 
 ### Fixes to try
 
+- **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
+  and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
+  from new setup choices. Garnet automatically downloads its verified private runtime;
+  no separate .NET installation is needed. Its stop action saves a checkpoint before
+  terminating the process, and a failed save leaves it running with an error.
+- **Reliable rapid restarts:** a process-list entry from before a new launch is rechecked
+  before labeling a live daemon as orphaned, avoiding stale Windows PID ownership.
+
 - **Mac scheduling and automatic backups:** native per-user launchd agents run tasks
   with the desktop closed while you are signed in. Create, edit, enable, disable,
   run now, and remove tasks through the Scheduler tab; the Backups tab uses the
@@ -26,11 +34,12 @@ Mac packages all pass their native checks. Each release is immutable and numbere
   while trying to display a Minecraft RCON port. Database output labels the database PID;
   detached startup is labeled correctly too. This shared fix applies to Mac and Windows,
   and to both the `spawnloft` and `mcctl` commands.
-- **Managed databases on Mac:** on macOS 15+, **Create a database** downloads verified
-  MySQL 8.4 LTS binaries for Apple Silicon or Intel, initializes a private data directory,
+- **Managed MySQL:** **Create a database** downloads verified MySQL 8.4 LTS binaries
+  for Windows x64 or macOS 15+ (Apple Silicon and Intel), initializes a private data directory,
   starts the database and creates scoped credentials for the selected server. No Homebrew,
   system service or separate database installation is needed. Start/stop, restart and SQL
-  backup/restore use the managed tools. Windows continues to use MariaDB/Garnet.
+  backup/restore use the managed tools. A Windows computer missing the Microsoft Visual C++
+  x64 runtime gets a link to install that prerequisite.
 - Mac tool discovery also checks the managed engine store, Homebrew locations, `/usr/local/mysql`
   and PATH when connecting to a database you already run.
 - **Plugin database configs stay manual:** database creation and attachment provide
@@ -80,10 +89,11 @@ first launch, try opening it once, then use **System Settings → Privacy & Secu
 Open Anyway**. If it instead reports a damaged app, report the exact message.
 <!-- /MAC_DISTRIBUTION -->
 
-Managed Garnet remains Windows-only. Managed
-SQL databases use MySQL 8.4 LTS and require macOS 15 or later; the app itself still runs
-on macOS 13+. Existing external MariaDB/MySQL/Redis connections remain available. Windows retains its existing
-capabilities; a shared fix lands in both packages, with platform differences explicit.
+New setups offer **MySQL** and **Redis (Garnet)** on Windows x64 and both Mac architectures.
+Managed MySQL 8.4 LTS requires macOS 15+; the desktop app itself runs on macOS 13+.
+Garnet installs a verified private .NET runtime automatically. Its stop action waits for a
+saved checkpoint before terminating the process because Garnet does not implement SHUTDOWN.
+Plugin configs remain manual. MariaDB is no longer offered for new setups.
 
 ### Toward 1.0
 

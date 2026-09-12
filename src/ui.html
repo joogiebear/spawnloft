@@ -1979,12 +1979,12 @@
             <label>
               <input type="radio" name="dbMode" value="run" checked>
               <b>Run one here</b>
-              <span>Nothing to install. MariaDB from its own mirror, Redis by way of Microsoft's Garnet.</span>
+              <span>MySQL from Oracle, or Redis by way of Microsoft's Garnet. SpawnLoft installs what each engine needs.</span>
             </label>
             <label>
               <input type="radio" name="dbMode" value="connect">
               <b>Connect to one I already run</b>
-              <span>XAMPP, a MariaDB or MySQL install, a Redis somewhere. Registered with its address so servers can be attached; never started or stopped from here.</span>
+              <span>A MySQL or Redis database you already run. Registered with its address so servers can be attached; never started or stopped from here.</span>
             </label>
           </div>
         </div>
@@ -1997,7 +1997,7 @@
           </div>
           <div class="field" style="flex:1;min-width:170px">
             <label for="dEngine">Engine</label>
-            <select id="dEngine" name="engine"><option value="mariadb" selected>MariaDB</option></select>
+            <select id="dEngine" name="engine"><option value="mysql" selected>MySQL</option></select>
             <div class="hint" id="dEngineHint">MySQL-compatible</div>
           </div>
           <div class="field" style="flex:2" id="dVersionWrap">
@@ -2030,7 +2030,7 @@
           <div class="field" style="flex:3" id="dToolsWrap">
             <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
             <input id="dTools" class="mono" placeholder="C:\xampp\mysql\bin" autocomplete="off">
-            <div class="hint">Where mysql.exe lives. Found on its own in the usual places.</div>
+            <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
           </div>
         </div>
         <div class="prog" id="dbProg" hidden>
@@ -2165,7 +2165,7 @@ const schedulerHint = panelPlatform === 'darwin'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
 const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
-const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MariaDB, MySQL, or Redis database instead.';
+const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
   rows: [],
@@ -6653,7 +6653,7 @@ async function renderServerDatabases(row, body) {
   const attachedTo = new Set(mine.map((a) => a.service));
   const free = state.dbs.filter((d) => !attachedTo.has(d.name));
 
-  // A database of this server's own, one click: MariaDB's newest stable release on the port after
+  // A database of this server's own, one click: MySQL 8.4 LTS on the port after
   // the game port, started and attached, credentials shown. The Add sheet stays for the cases with
   // choices in them - a version, an engine, a database several servers share.
   const createRow = document.createElement('div');
@@ -6664,7 +6664,7 @@ async function renderServerDatabases(row, body) {
   create.textContent = 'Create a database';
   const createHint = document.createElement('span');
   createHint.className = 'hint';
-  createHint.textContent = (panelPlatform === 'darwin' ? 'MySQL 8.4 LTS (macOS 15+), on port ' : 'MariaDB, newest stable, on port ') + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
+  createHint.textContent = (panelPlatform === 'darwin' ? 'MySQL 8.4 LTS (macOS 15+), on port ' : 'MySQL 8.4 LTS, on port ') + (Number(row.port) + 1) + ' if it is free. Started and attached for you.';
   if (!managedDatabaseFeatures) {
     create.disabled = true;
     createHint.textContent = databasePreviewNote;
@@ -6924,7 +6924,7 @@ function openAdd(tab) {
 }
 
 let dbEnginesLoaded = false;
-const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; managed installation requires macOS 15+', mariadb: 'MySQL-compatible', garnet: 'Redis-compatible, by Microsoft' };
+const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64 or macOS 15+', garnet: 'Redis-compatible, by Microsoft' };
 async function loadDbEngines() {
   if (dbEnginesLoaded) return;
   try {
@@ -6967,14 +6967,14 @@ function syncDbForm() {
   $('#dConnect').hidden = !connect;
   $('#dUserWrap').hidden = redis;
   $('#dToolsWrap').hidden = redis;
-  $('#dPasswordHint').textContent = redis ? 'Its requirepass, if it has one' : "XAMPP's root has none";
+  $('#dPasswordHint').textContent = redis ? 'Its requirepass, if it has one' : 'Password for the database account';
   $('#dPortHint').textContent = connect
     ? 'Blank means ' + (redis ? '6379' : '3306')
     : 'Blank picks ' + (redis ? '6379' : '3306') + ' or the next free one';
   $('#bDbCreate').textContent = connect ? 'Connect' : 'Add database';
   $('#dbHint').textContent = connect
     ? 'It is asked to answer before it is saved, so a wrong address or password is refused now.'
-    : 'Around 100 MB the first time for a version; every database on that version shares it.';
+    : 'The verified engine downloads once; databases using that version share the installation.';
   if (!connect) loadDbVersions();
 }
 for (const r of $$('input[name="dbMode"]')) r.onchange = syncDbForm;
@@ -7504,7 +7504,7 @@ function renderSettings() {
   about.textContent = '';
   const info = [['Panel', 'Local only — bound to 127.0.0.1']];
   if (panelPlatform === 'darwin') {
-    info.push(['Mac support', 'Scheduled tasks run while signed in. Managed MySQL requires macOS 15+. Managed Garnet is Windows-only.']);
+    info.push(['Mac support', 'Scheduled tasks run while signed in. Managed MySQL requires macOS 15+. Redis (Garnet) is available on Windows and Mac.']);
   }
   if (state.appInfo) {
     if (state.appInfo.manualUpdates) {

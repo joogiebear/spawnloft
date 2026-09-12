@@ -357,7 +357,7 @@ function forceKill() {
 }
 
 function waitForExit(timeoutMs) {
-  if (!child || child.exitCode !== null) return Promise.resolve(child?.exitCode ?? null)
+  if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(child?.exitCode ?? null)
   return new Promise((resolve) => {
     stopWaiters.push(resolve)
     if (timeoutMs > 0) setTimeout(() => resolve(null), timeoutMs)
@@ -400,13 +400,25 @@ async function handleStop(timeoutMs) {
       // A Redis-speaking engine is asked in its own protocol: checkpoint, then shut down.
       const r = program.stop.resp
       log(`asking for shutdown over the Redis protocol at ${r.host}:${r.port}`)
-      respSend(r.host, r.port, r.commands, { password: r.password || null }).catch((err) => log(`shutdown request: ${err.message}`))
+      if (r.terminateAfterSave) {
+        try {
+          await respSend(r.host, r.port, r.commands, { password: r.password || null, timeout: timeoutMs })
+          log('Redis checkpoint saved; terminating the managed process (Garnet has no SHUTDOWN command)')
+          child.kill('SIGTERM')
+        } catch (err) {
+          stopSent = false
+          stopping = false
+          return { ok: false, error: `Redis checkpoint failed; the process was left running: ${err.message}` }
+        }
+      } else {
+        respSend(r.host, r.port, r.commands, { password: r.password || null }).catch(err => log(`shutdown request: ${err.message}`))
+      }
     } else {
       log('no graceful stop for this program; waiting, then killing')
     }
   }
   const code = await waitForExit(timeoutMs)
-  if (code === null) {
+  if (code === null && child.exitCode === null && child.signalCode === null) {
     log('graceful stop timed out')
     forceKill()
     await waitForExit(10000)

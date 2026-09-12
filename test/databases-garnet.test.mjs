@@ -117,10 +117,18 @@ test('an external database is registered only if it answers, and attaches like o
   assert.ok(!listServices().some((d) => d.name === EXT))
 })
 
-test('stop goes SAVE then SHUTDOWN over the protocol and is clean; the checkpoint lands', { timeout: 30000 }, async () => {
+test('a failed Redis checkpoint leaves the database running and allows a later retry', async () => {
+  const failFile = path.join(garnet.dataDir(services.getDatabase(RD)), 'fail-save')
+  fs.writeFileSync(failFile, 'fail')
+  try {
+    await assert.rejects(sup.stop(RD, { timeout: 10000 }), /checkpoint failed.*left running/i)
+    assert.equal(await garnet.probe(services.getDatabase(RD)), true)
+  } finally { fs.rmSync(failFile, { force: true }) }
+})
+
+test('stop acknowledges SAVE before terminating Garnet; the checkpoint lands', { timeout: 30000 }, async () => {
   const res = await sup.stop(RD, { timeout: 10000 })
   assert.equal(res.forced, undefined, JSON.stringify(res))
-  assert.equal(res.code, 0)
   assert.ok(fs.existsSync(path.join(garnet.dataDir(services.getDatabase(RD)), 'checkpoint.txt')))
   await settle(RD)
   assert.equal(await services.externalStatus({ ...services.getDatabase(RD), external: true }), 'unreachable')

@@ -69,7 +69,7 @@ console.log('PASS: MySQL ' + phase + ' and scoped credentials');
 `)
   const statements = phase => new Promise((resolve, reject) => {
     const child = spawn(executable, [script, core, dbName, name, phase, output], {
-      env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     })
     let text = ''
     child.stdout.on('data', c => { text += c })
