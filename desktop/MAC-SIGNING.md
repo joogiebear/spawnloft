@@ -69,8 +69,10 @@ the signature, expected Team ID, secure timestamp, hardened runtime, stapled not
 ticket, and Gatekeeper acceptance before the packaged app smoke tests. Both Mac architectures
 must report the same signing mode before publishing. Release notes use the verified mode.
 
-This configuration has no new Mac automatic updater feed; Mac updates remain manual. The
-existing Windows beta updater feeds and stable release channel are preserved.
+Signed releases publish combined `beta-mac.yml` and `latest-mac.yml` feeds only after
+both native ZIPs pass verification. Ad-hoc builds do not publish Mac feeds. The
+existing Windows updater and stable release channel are preserved. Beta.25 and older
+need one manual replacement to enable automatic updates.
 
 ## 4. Test the downloaded release
 

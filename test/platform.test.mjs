@@ -22,13 +22,13 @@ after(async () => {
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
-test('Windows keeps its capabilities and Mac preview reports unfinished features', () => {
+test('Windows keeps its capabilities and Mac supports scheduling, metrics, and managed databases', () => {
   assert.deepEqual(platformCapabilities('win32'), { scheduler: true, performance: true, managedDatabases: true })
-  assert.deepEqual(platformCapabilities('darwin'), { scheduler: false, performance: true, managedDatabases: true })
+  assert.deepEqual(platformCapabilities('darwin'), { scheduler: true, performance: true, managedDatabases: true })
   assert.deepEqual(platformCapabilities('linux'), { scheduler: false, performance: false, managedDatabases: false })
 })
 
-test('Mac preview creates servers but refuses unsupported operations without changing their data', async () => {
+test('Mac panel exposes scheduling and automatic backups without changing server data', async () => {
   // Exercise the platform branches on every runner, while Node's actual filesystem and
   // networking remain native. This does not claim to test a packaged Mac application.
   const platform = Object.getOwnPropertyDescriptor(process, 'platform')
@@ -39,11 +39,6 @@ test('Mac preview creates servers but refuses unsupported operations without cha
     const inst = await newInstance('preview-test', { jar, java: 'java', port: 25671, rconPort: 25672 })
     assert.equal(inst.name, 'preview-test')
     const registryBefore = fs.readFileSync(REGISTRY_FILE, 'utf8')
-    assert.throws(() => schedule.create({
-      instance: inst.name, action: { type: 'backup' }, schedule: { kind: 'daily', at: '03:00' },
-    }), { message: PREVIEW_LIMITS.scheduler })
-    assert.equal(fs.existsSync(path.join(DATA_ROOT, 'tasks')), false)
-
     const panel = await serve({ port: 0, open: false })
     servers.push(panel.server)
     assert.match(await (await fetch(panel.url)).text(), /name="spawnloft-platform" content="darwin"/)
@@ -53,27 +48,19 @@ test('Mac preview creates servers but refuses unsupported operations without cha
     })
     const base = 'instances/' + inst.name
     assert.deepEqual((await get('settings')).capabilities, platformCapabilities('darwin'))
-    assert.equal((await get(base + '/schedules')).available, false)
+    assert.equal(Array.isArray((await get(base + '/schedules')).tasks), true)
     const metrics = await get(base + '/metrics')
     assert.deepEqual(metrics.samples, [])
     assert.equal(metrics.everySeconds, 10)
     assert.ok(metrics.cores >= 1)
     assert.equal(metrics.running, false)
     const backups = await get(base + '/backups')
-    assert.equal(backups.automaticAvailable, false)
+    assert.equal(backups.automaticAvailable, true)
     assert.deepEqual(backups.snapshots, [])
     const history = await get(base + '/backups/history')
     assert.deepEqual(history, Object.fromEntries(
       ['snapshots', 'dir', 'root', 'mirror', 'running'].map(key => [key, backups[key]]),
     ))
-    for (const [route, message] of [
-      [base + '/schedules', PREVIEW_LIMITS.scheduler],
-      [base + '/backups/auto', PREVIEW_LIMITS.scheduler],
-    ]) {
-      const response = await post(route)
-      assert.equal(response.status, 400, route)
-      assert.equal((await response.json()).error, message)
-    }
     assert.equal(fs.readFileSync(REGISTRY_FILE, 'utf8'), registryBefore)
     assert.equal(fs.existsSync(path.join(DATA_ROOT, 'tasks')), false)
   } finally {

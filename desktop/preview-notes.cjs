@@ -6,6 +6,6 @@ exports.renderPreviewNotes = function (text, mode) {
   if (mode === 'ad-hoc') return text
   return text.replace(block, `The Mac app is **Developer ID signed and Apple-notarized**, with the notarization ticket
 stapled to the app. Both architectures passed signature, hardened-runtime, ticket, and
-Gatekeeper checks before publication. Mac updates remain manual for this beta.
+Gatekeeper checks before publication. Signed Mac builds support automatic beta updates.
 If macOS blocks a downloaded build, report the exact message, app version, and macOS version.`)
 }

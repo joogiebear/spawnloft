@@ -80,8 +80,7 @@ jobs:
           npm --prefix desktop test
       - name: Install the desktop toolchain
         run: npm ci --prefix desktop
-      - name: Verify Windows beta updater compatibility
-        if: matrix.platform == 'win32'
+      - name: Verify Mac and Windows beta updater compatibility
         run: node --test desktop/updater-preview.test.cjs
       - name: Package the native preview
         if: matrix.platform != 'darwin' || needs.release-policy.outputs.mac-signing-mode != 'signed'

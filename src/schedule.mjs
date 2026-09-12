@@ -5,6 +5,7 @@ import { spawnSync, execFile } from 'node:child_process'
 import { DATA_ROOT, ROOT, RUN_DIR } from './paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
+import * as mac from './schedule-mac.mjs'
 
 /**
  * Scheduled work, run by Windows.
@@ -162,7 +163,7 @@ export function load() {
 
 export async function list() {
   const data = load()
-  const live = await queryWindows()
+  const live = process.platform === 'darwin' ? await mac.query(data.tasks, recentRuns) : await queryWindows()
   return Object.entries(data.tasks)
     .map(([id, task]) => ({ id, ...task, windows: live.get(id) ?? null }))
     .sort((a, b) => a.instance.localeCompare(b.instance) || a.name.localeCompare(b.name))
@@ -266,6 +267,7 @@ function queryWindows() {
  * definition, where quoting it correctly is its own small nightmare.
  */
 function writeShim(id) {
+  if (process.platform === 'darwin') return mac.writeShim(id)
   const dir = path.join(DATA_ROOT, 'tasks')
   fs.mkdirSync(dir, { recursive: true })
   const shim = path.join(dir, `${id}.cmd`)
@@ -340,6 +342,7 @@ function schtasks(args) {
  * quoted is stored whole.
  */
 function writeWindowsTask(id, task) {
+  if (process.platform === 'darwin') return mac.write(id, task)
   // Refuse before writing a Windows launcher into a Mac server's data folder.
   if (!platformCapabilities().scheduler) fail(PREVIEW_LIMITS.scheduler)
   const shim = writeShim(id)
@@ -385,7 +388,14 @@ export function create({ instance, name, action, schedule, enabled = true, owner
     createdAt: new Date().toISOString(),
   }
 
-  writeWindowsTask(id, task)
+  // RunAtLoad may fire as soon as launchd accepts the agent. Publish its action
+  // first on Mac, rolling it back if registration fails.
+  if (process.platform === 'darwin') {
+    data.tasks[id] = task
+    writeJson(TASKS_FILE(), data)
+    try { writeWindowsTask(id, task) }
+    catch (error) { delete data.tasks[id]; writeJson(TASKS_FILE(), data); throw error }
+  } else writeWindowsTask(id, task)
   // Written to disk only once Windows has accepted it. A definition mcctl believes in that has no
   // trigger behind it is a schedule that silently never runs; the reverse - a trigger with no
   // definition - fails loudly on its next fire, which is the better half of the trade.
@@ -422,13 +432,19 @@ export function update(id, patch) {
   // the thing that tab is a toggle for, so it stops being that tab's - and the toggle reads Off
   // rather than pointing at a task that no longer backs anything up.
   if (task.owner === OWNER_BACKUPS && task.action.type !== 'backup') task.owner = null
-  writeWindowsTask(id, task)
+  if (process.platform === 'darwin') {
+    data.tasks[id] = task
+    writeJson(TASKS_FILE(), data)
+    try { writeWindowsTask(id, task) }
+    catch (error) { data.tasks[id] = current; writeJson(TASKS_FILE(), data); throw error }
+  } else writeWindowsTask(id, task)
   data.tasks[id] = task
   writeJson(TASKS_FILE(), data)
   return { id, ...task }
 }
 
 export function setEnabled(id, enabled) {
+  if (process.platform === 'darwin') return update(id, { enabled })
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
   schtasks(['/Change', '/TN', `${TASK_FOLDER}\\${id}`, enabled ? '/ENABLE' : '/DISABLE'])
@@ -458,6 +474,13 @@ export function remove(id) {
   // Checked, like every other id-addressed call here. Without it a mistyped id reported success
   // while the real task kept firing, and the id went on to build a path that rmSync would follow.
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
+
+  if (process.platform === 'darwin') {
+    mac.remove(id)
+    delete data.tasks[id]
+    writeJson(TASKS_FILE(), data)
+    return { id, removed: true }
+  }
 
   // Windows first: a definition without a trigger is inert, a trigger without a definition fires
   // into nothing and fails at 3am.
@@ -490,7 +513,8 @@ export function remove(id) {
 export function runNow(id) {
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
-  schtasks(['/Run', '/TN', `${TASK_FOLDER}\\${id}`])
+  if (process.platform === 'darwin') mac.runNow(id, data.tasks[id])
+  else schtasks(['/Run', '/TN', `${TASK_FOLDER}\\${id}`])
   return { id, started: true }
 }
 
@@ -564,6 +588,23 @@ export function renameInstance(oldName, newName) {
   }
   if (!moved.length) return { moved: 0 }
 
+  if (process.platform === 'darwin') {
+    for (const m of moved) {
+      data.tasks[m.to] = m.task
+      writeJson(TASKS_FILE(), data)
+      try { mac.write(m.to, m.task); mac.remove(m.from) }
+      catch (error) {
+        try { mac.remove(m.to) } catch {}
+        delete data.tasks[m.to]
+        writeJson(TASKS_FILE(), data)
+        throw error
+      }
+      delete data.tasks[m.from]
+      writeJson(TASKS_FILE(), data)
+    }
+    return { moved: moved.length, stranded: [] }
+  }
+
   // The new trigger goes in before the old one comes out. The other order leaves a window where a
   // rename that fails half way has removed the schedule and put nothing back.
   const stranded = []
@@ -634,6 +675,8 @@ export function removeAll() {
       `$s = New-Object -ComObject Schedule.Service; $s.Connect(); $s.GetFolder('\\').DeleteFolder('${TASK_FOLDER}', 0)`],
       { encoding: 'utf8', windowsHide: true, timeout: 30000 })
   }
-  fs.rmSync(path.join(DATA_ROOT, 'tasks'), { recursive: true, force: true })
-  return { removed: true }
+  // Failed removals must retain their shims and definitions for recovery.
+  const remaining = Object.keys(load().tasks)
+  if (!remaining.length) fs.rmSync(path.join(DATA_ROOT, 'tasks'), { recursive: true, force: true })
+  return { removed: remaining.length === 0, remaining }
 }
