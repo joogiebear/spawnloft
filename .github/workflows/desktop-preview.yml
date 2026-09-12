@@ -20,7 +20,24 @@ defaults:
     shell: bash
 
 jobs:
+  release-policy:
+    runs-on: ubuntu-latest
+    outputs:
+      mac-signing-mode: ${{ steps.mode.outputs.value }}
+    steps:
+      - id: mode
+        env:
+          ENABLED: ${{ vars.MAC_SIGNING_ENABLED }}
+          TRUSTED: ${{ github.ref == 'refs/heads/dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        run: |
+          if [[ "$TRUSTED" == "true" && "$ENABLED" == "true" ]]; then
+            echo 'value=signed' >> "$GITHUB_OUTPUT"
+          else
+            echo 'value=ad-hoc' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: release-policy
     strategy:
       fail-fast: false
       matrix:
@@ -41,9 +58,10 @@ jobs:
             arch: x64
             app: desktop/dist/mac/SpawnLoft.app
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 25
+    timeout-minutes: 60
     env:
       PREVIEW_BUILD: ${{ github.run_number }}
+      MAC_SIGNING_MODE: ${{ needs.release-policy.outputs.mac-signing-mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +74,7 @@ jobs:
       - name: Test the shared core and desktop
         env:
           TMPDIR: /tmp
+          MAC_SIGNING_MODE: ad-hoc
         run: |
           npm test
           npm --prefix desktop test
@@ -65,6 +84,7 @@ jobs:
         if: matrix.platform == 'win32'
         run: node --test desktop/updater-preview.test.cjs
       - name: Package the native preview
+        if: matrix.platform != 'darwin' || needs.release-policy.outputs.mac-signing-mode != 'signed'
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -72,11 +92,24 @@ jobs:
           # Apply the Mac ad-hoc identity on PRs too. No certificate or signing secrets.
           CSC_FOR_PULL_REQUEST: 'true'
         run: npx electron-builder --config preview.config.cjs --${{ matrix.target }} --${{ matrix.arch }} --publish never
+      - name: Sign and notarize the Mac preview
+        if: matrix.platform == 'darwin' && needs.release-policy.outputs.mac-signing-mode == 'signed'
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --config preview.config.cjs --mac --${{ matrix.arch }} --publish never
       - name: Verify the packaged app
-        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/preview.config.cjs
-      - name: Verify the Mac ad-hoc signature
+        # Structure verification does not need signing credentials or signed config evaluation.
+        run: MAC_SIGNING_MODE=ad-hoc node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/preview.config.cjs
+      - name: Verify Mac signing and notarization
         if: matrix.platform == 'darwin'
-        run: codesign --verify --deep --strict "${{ matrix.app }}"
+        env:
+          APPLE_TEAM_ID: ${{ needs.release-policy.outputs.mac-signing-mode == 'signed' && secrets.APPLE_TEAM_ID || '' }}
+        run: node desktop/verify-mac-signing.cjs "${{ matrix.app }}"
       - name: Supply both Windows updater feed names
         if: matrix.platform == 'win32'
         run: node -e "require('fs').copyFileSync('desktop/dist/latest.yml', 'desktop/dist/beta.yml')"
@@ -107,7 +140,7 @@ jobs:
           path: desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}/
 
   publish:
-    needs: build
+    needs: [release-policy, build]
     if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -125,4 +158,5 @@ jobs:
       - name: Publish all platforms as one complete development release
         env:
           GH_TOKEN: ${{ github.token }}
+          MAC_SIGNING_MODE: ${{ needs.release-policy.outputs.mac-signing-mode }}
         run: node desktop/publish-preview.mjs

@@ -19,7 +19,7 @@ function fixture(t) {
     for (const name of artifactNames({ ...identity, ...target })) {
       fs.writeFileSync(path.join(dir, name), name.endsWith('.yml') ? feed : name.endsWith('.exe') ? installer : Buffer.from(name))
     }
-    writeManifest(dir, target, createManifest(dir, { ...identity, ...target }, target))
+    writeManifest(dir, target, createManifest(dir, { ...identity, ...target, macSigningMode: 'ad-hoc' }, target))
   }
   return dir
 }
@@ -138,4 +138,15 @@ test('already published prereleases are a no-op only for the same commit and eve
     changed.assets[0].digest = digest
     assert.throws(() => verifyPublishedRelease(changed, identity.commit, verified), /differs or cannot be verified/)
   }
+})
+
+test('signed publication refuses ad-hoc, missing, or mixed Mac provenance', t => {
+  const dir = fixture(t)
+  assert.throws(() => verifyRelease(dir, { ...identity, macSigningMode: 'signed' }), /Mac signing mode/)
+  modifyManifest(dir, TARGETS[1], info => { info.macSigningMode = 'signed' })
+  assert.throws(() => verifyRelease(dir, identity), /Mac signing mode/)
+  modifyManifest(dir, TARGETS[2], info => { delete info.macSigningMode })
+  assert.throws(() => verifyRelease(dir, identity), /Mac signing mode/)
+  modifyManifest(dir, TARGETS[2], info => { info.macSigningMode = 'signed' })
+  assert.equal(verifyRelease(dir, { ...identity, macSigningMode: 'signed' }).macSigningMode, 'signed')
 })

@@ -3,6 +3,9 @@
 // One version for three native builds. The workflow starts at run 1; adding one
 // avoids the already-published beta.1 without rewriting either source package.
 const source = require('./package.json')
+const { signingMode, requireCredentials } = require('./mac-signing.cjs')
+const signedMac = signingMode() === 'signed'
+if (signedMac && process.platform === 'darwin') requireCredentials()
 const build = process.env.PREVIEW_BUILD
 if (!source.version.includes('-')) throw new Error('Desktop previews require a development source version')
 if (!/^[1-9]\d*$/.test(build || '') || !Number.isSafeInteger(Number(build) + 1)) {
@@ -22,9 +25,14 @@ module.exports = {
     category: 'public.app-category.utilities',
     icon: 'build/icon-mac.png',
     minimumSystemVersion: '13.0',
-    identity: '-',
-    hardenedRuntime: false,
-    notarize: false,
+    ...(signedMac ? {
+      type: 'distribution',
+      forceCodeSigning: true,
+      hardenedRuntime: true,
+      notarize: true,
+      entitlements: 'build/entitlements.spawnloft.plist',
+      entitlementsInherit: 'build/entitlements.spawnloft.plist',
+    } : { identity: '-', hardenedRuntime: false, notarize: false }),
     artifactName: 'SpawnLoft-${version}-mac-${arch}.${ext}',
   },
 }

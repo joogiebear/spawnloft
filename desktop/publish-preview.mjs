@@ -3,6 +3,8 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { verifyRelease, verifyPublishedRelease } from './preview-artifacts.mjs'
+import signing from './mac-signing.cjs'
+import notesRenderer from './preview-notes.cjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dir = path.join(here, 'dist/preview-release')
@@ -12,7 +14,7 @@ if (sourceVersion !== rootVersion) throw new Error('Desktop and core source vers
 if (process.env.GITHUB_REF !== 'refs/heads/dev' || !/^[0-9a-f]{40}$/.test(process.env.GITHUB_SHA || '') ||
     !/^[1-9]\d*$/.test(process.env.GITHUB_RUN_NUMBER || '')) throw new Error('Only a numbered development workflow may publish')
 const version = `${sourceVersion.split('-')[0]}-beta.${Number(process.env.GITHUB_RUN_NUMBER) + 1}`
-const verified = verifyRelease(dir, { sourceVersion, version, commit: process.env.GITHUB_SHA })
+const verified = verifyRelease(dir, { sourceVersion, version, commit: process.env.GITHUB_SHA, macSigningMode: signing.signingMode() })
 const repo = 'joogiebear/spawnloft'
 const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const currentDev = () => gh(['api', `repos/${repo}/commits/dev`, '--jq', '.sha'])
@@ -42,7 +44,7 @@ if (release && !release.draft) {
     }
   }
   const notes = path.join(dir, 'release-notes.md')
-  fs.writeFileSync(notes, fs.readFileSync(path.join(here, 'PREVIEW.md'), 'utf8') +
+  fs.writeFileSync(notes, notesRenderer.renderPreviewNotes(fs.readFileSync(path.join(here, 'PREVIEW.md'), 'utf8'), verified.macSigningMode) +
     `\n\nBuilt together from [\`${verified.commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${verified.commit}), based on development version ${sourceVersion}.\n`)
   // Nothing becomes public until every platform and the Windows updater feed are
   // uploaded. Published releases are immutable and are never overwritten here.
