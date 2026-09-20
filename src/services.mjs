@@ -36,8 +36,11 @@ export function assertNewEngine(engine = defaultEngine()) {
   return engine
 }
 export function defaultEngine() { return 'mysql' }
-export function canManage(engine, platform = process.platform) {
-  return ['win32', 'darwin'].includes(platform) && NEW_ENGINES.includes(engine)
+export function canManage(engine, platform = process.platform, arch = process.arch) {
+  if (!NEW_ENGINES.includes(engine)) return false
+  if (['win32', 'darwin'].includes(platform)) return true
+  // Elsewhere an engine is offered where it says it has a verified build, and not before.
+  return ENGINES[engine].module.supports?.(platform, arch) ?? false
 }
 
 /** Whether the database is there to be talked to: running here, or external (assumed; the call says otherwise). */

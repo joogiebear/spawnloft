@@ -38,7 +38,13 @@ export const ARCHIVES = Object.freeze({
   'win32-x64': { name: 'win-x64-based-readytorun.zip', sha256: '3409c9aba39565caa4c6166f2d7c66ac112c2a773d70679b1bb34458dea16473' },
   'darwin-arm64': { name: 'osx-arm64-based.tar.xz', sha256: 'e4b41812a5c554735046022e6f4ab8a8651511444f284935339296bd83e431b9' },
   'darwin-x64': { name: 'osx-x64-based.tar.xz', sha256: '19bf42260c35d5521794f4a422e3df5d8cb0a921ab3a10a896413d4b7d45abdd' },
+  'linux-x64': { name: 'linux-x64-based.tar.xz', sha256: 'cd36cd82b5a8b1da91acb0d7e3fba6aa01341f32556b89552058393b3fa9cf2d' },
+  'linux-arm64': { name: 'linux-arm64-based.tar.xz', sha256: '9365dc73df63d36cd2d29938e16494cb8ac9942444b22f37eaf4ff778615bd81' },
 })
+/** Is there a verified native build for this machine? What decides whether the panel offers it. */
+export function supports(platform = process.platform, arch = process.arch) {
+  return Object.hasOwn(ARCHIVES, `${platform}-${arch}`)
+}
 export function archiveFor(version, platform = process.platform, arch = process.arch) {
   const archive = ARCHIVES[`${platform}-${arch}`]
   if (version !== VERSION || !archive) fail(`No verified Redis (Garnet) ${version} archive for ${platform}/${arch}.`)
@@ -59,8 +65,8 @@ export function windowsZipFrom(release) {
 /** Select only a native release for this machine. */
 export function archiveFrom(release, platform = process.platform, arch = process.arch) {
   if (platform === 'win32' && arch === 'x64') return windowsZipFrom(release)
-  if (platform !== 'darwin' || !['arm64', 'x64'].includes(arch)) return null
-  const hit = (release?.assets ?? []).find(a => a.name === `osx-${arch}-based.tar.xz`)
+  if (!['darwin', 'linux'].includes(platform) || !['arm64', 'x64'].includes(arch)) return null
+  const hit = (release?.assets ?? []).find(a => a.name === `${platform === 'darwin' ? 'osx' : 'linux'}-${arch}-based.tar.xz`)
   if (!hit) return null
   return { name: hit.name, url: hit.browser_download_url,
     sha256: typeof hit.digest === 'string' && hit.digest.startsWith('sha256:') ? hit.digest.slice(7) : null,
@@ -139,9 +145,8 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     onProgress?.({ cached: true, message: `Garnet ${version} is already here` })
     return { version, dir, cached: true }
   }
-  if (!((process.platform === 'win32' && process.arch === 'x64') ||
-        (process.platform === 'darwin' && ['arm64', 'x64'].includes(process.arch)))) {
-    fail('Managed Redis (Garnet) requires Windows x64 or an Apple Silicon or Intel Mac.')
+  if (!supports()) {
+    fail('Managed Redis (Garnet) requires Windows x64, an Apple Silicon or Intel Mac, or Linux on x64 or arm64.')
   }
   if (version !== VERSION) fail(`No verified Garnet ${version} bundle. See: mcctl db versions --engine garnet`)
   const archive = archiveFor(version)
@@ -177,7 +182,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     const result = await runTar(['-xf', file, '-C', unpacked], staging)
     const server = binary(unpacked)
     if (result.code !== 0 || !server) fail('The Garnet archive did not unpack completely.')
-    if (process.platform === 'darwin') fs.chmodSync(server.path, 0o755)
+    if (process.platform !== 'win32') fs.chmodSync(server.path, 0o755)
     await installRuntime(unpacked, staging, onProgress)
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, platform: process.platform, arch: process.arch, sha256: archive.sha256 }))
     fs.renameSync(unpacked, dir)
@@ -205,13 +210,30 @@ export function initData(inst) {
  * machine; Garnet takes it no other way, and this is one person's PC. Stop waits for SAVE to acknowledge a durable checkpoint, then terminates the process;
  * Garnet does not implement the Redis SHUTDOWN command.
  */
+/**
+ * Which storage layer Garnet writes through.
+ *
+ * <p>On Linux its default is a native device, a shared library that needs libaio and liburing at
+ * load time. A stock server install has neither, and Garnet does not find out until the first
+ * write: it starts, says it is ready, answers PING and GET - and drops the connection on SET, while
+ * SAVE fails in the log and nowhere else. RandomAccess is .NET's own file I/O and needs nothing
+ * installed. The files it writes are the same ones, so this can change later without a migration.
+ * Windows and macOS keep the default they have always run on.
+ */
+export function storageArgs(platform = process.platform) {
+  return platform === 'linux' ? ['--device-type', 'RandomAccess'] : []
+}
+
 export function launchSpec(inst) {
   const dir = engineDir(inst.version)
   const server = binary(dir)
   if (!server) fail(`Garnet ${inst.version} is not in the engine store (${dir}). Add the database again to fetch it.`)
   const runtime = path.join(dir, '.runtime')
   const env = server.script ? process.env : { ...process.env, DOTNET_ROOT: runtime,
-    [`DOTNET_ROOT_${process.arch.toUpperCase()}`]: runtime, DOTNET_MULTILEVEL_LOOKUP: '0' }
+    [`DOTNET_ROOT_${process.arch.toUpperCase()}`]: runtime, DOTNET_MULTILEVEL_LOOKUP: '0',
+    // .NET on Linux loads the system's ICU for culture data and refuses to start without it. A
+    // minimal server install has none, and a key-value store has no use for it.
+    ...(process.platform === 'linux' ? { DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: '1' } : {}) }
   const run = runnable(server, [
     '--port', String(inst.port),
     '--bind', '127.0.0.1',
@@ -220,6 +242,7 @@ export function launchSpec(inst) {
     '--checkpointdir', dataDir(inst),
     '--recover',
     '--aof',
+    ...storageArgs(),
   ], env)
   return {
     cmd: run.cmd,
@@ -274,9 +297,16 @@ export const RUNTIME_HASHES = Object.freeze({
   'win-x64': '844fa99e16fd6f44e0a7c29def7a82d7846902334d6a955248a9519a4dddb3f5acceb9c9223bef69f8c83b8ae2417537e5b76dddf79fb7117dc85b5039bc1297',
   'osx-arm64': 'd1b422c2afecb5e741430584c3e1887d5e0f2df321a80d492fdd13d8c7f99579f0dbbf34e348bc512cb276f0f86b4645423a032ded52808b74ab8eb0d7bf2a6d',
   'osx-x64': 'c5019357c9d8fbe30b49ec8f81ae85be56a784d8b4b75f470e931583c39e082773c089b39785b322770a298ab08636c6b30e695a2397fc311060f73c98743b48',
+  'linux-x64': '58388fdde4f13bd703c7a6f7defb3300b17e42ba5fe8bca50066f80f64ac7406620dcdfb4acc1eff7992750c8cc5cff8369dd12d09730c8a9e8760d6032f7f6e',
+  'linux-arm64': 'ac1e0090391085ba70c7457adaaa8f6cc20dc216b9b368b4227a427de271708d783380c7b955b7be4897ff24849fbe5c3b7ec1cb1c38345a725de9a3812280eb',
 })
+/** Microsoft's name for this machine: the runtime identifier its downloads are filed under. */
+export function runtimeId(platform = process.platform, arch = process.arch) {
+  return `${{ win32: 'win', darwin: 'osx', linux: 'linux' }[platform]}-${arch}`
+}
 async function installRuntime(dir, staging, onProgress) {
-  const rid = `${process.platform === 'win32' ? 'win' : 'osx'}-${process.arch}`
+  const rid = runtimeId()
+  if (!RUNTIME_HASHES[rid]) fail(`No verified Redis runtime for ${rid}.`)
   const suffix = process.platform === 'win32' ? 'zip' : 'tar.gz'
   const url = `https://builds.dotnet.microsoft.com/dotnet/Runtime/${RUNTIME_VERSION}/dotnet-runtime-${RUNTIME_VERSION}-${rid}.${suffix}`
   const res = await fetch(url, { signal: AbortSignal.timeout(600000) })

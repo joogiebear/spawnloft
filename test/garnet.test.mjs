@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { VERSION, archiveFor, releasesFrom, archiveFrom, windowsZipFrom, credentialsFor, newRecord } from '../src/garnet.mjs'
+import { storageArgs, VERSION, archiveFor, releasesFrom, archiveFrom, windowsZipFrom, credentialsFor, newRecord, supports, runtimeId, RUNTIME_HASHES } from '../src/garnet.mjs'
 
 const rel = (tag, assets, extra = {}) => ({ tag_name: tag, published_at: '2026-08-01T00:00:00Z', assets, ...extra })
 
@@ -41,17 +41,32 @@ test('Mac archives match the native architecture and never fall back to Windows 
   }
   assert.equal(archiveFrom(release, 'win32', 'x64'), null)
   assert.equal(archiveFrom(release, 'darwin', 'ia32'), null)
+  // The fixture release carries no Linux tarball; a release that does is matched by its exact name.
   assert.equal(archiveFrom(release, 'linux', 'x64'), null)
+  const linux = rel('v2.1.7', [{ name: 'linux-arm64-based.tar.xz', browser_download_url: 'https://example.test/linux-arm64', digest: 'sha256:' + 'b'.repeat(64), size: 7 }])
+  assert.equal(archiveFrom(linux, 'linux', 'arm64').url, 'https://example.test/linux-arm64')
+  assert.equal(archiveFrom(linux, 'linux', 'x64'), null)
   assert.equal(windowsZipFrom(rel('v1', [{ name: 'win-x64-framework-dependent.zip' }])), null)
 })
 
 
+test('Linux runs Garnet on managed file I/O, because its native device needs libraries nobody has', () => {
+  assert.deepEqual(storageArgs('linux'), ['--device-type', 'RandomAccess'])
+  assert.deepEqual(storageArgs('win32'), [])
+  assert.deepEqual(storageArgs('darwin'), [])
+})
+
 test('the shipped Garnet version has pinned native downloads without a release-list API call', () => {
-  for (const [platform, arch] of [['win32', 'x64'], ['darwin', 'arm64'], ['darwin', 'x64']]) {
+  for (const [platform, arch] of [['win32', 'x64'], ['darwin', 'arm64'], ['darwin', 'x64'], ['linux', 'x64'], ['linux', 'arm64']]) {
+    assert.equal(supports(platform, arch), true)
+    // A build with no runtime to run it on is not a build that can be offered.
+    assert.match(RUNTIME_HASHES[runtimeId(platform, arch)], /^[a-f0-9]{128}$/)
     const archive = archiveFor(VERSION, platform, arch)
     assert.match(archive.url, /^https:\/\/github\.com\/microsoft\/garnet\/releases\/download\//)
     assert.match(archive.sha256, /^[a-f0-9]{64}$/)
   }
   assert.throws(() => archiveFor('9.9.9', 'win32', 'x64'), /No verified/)
-  assert.throws(() => archiveFor(VERSION, 'linux', 'x64'), /No verified/)
+  assert.throws(() => archiveFor(VERSION, 'linux', 'riscv64'), /No verified/)
+  assert.equal(supports('linux', 'riscv64'), false)
+  assert.equal(supports('freebsd', 'x64'), false)
 })
