@@ -1202,7 +1202,7 @@ async function cmdTask(positional, flags) {
         describeSchedule(t.schedule),
         t.enabled ? (w ? w.state : 'NOT IN SCHEDULER') : 'disabled',
         w ? schedule.describeResult(w.lastResult) : '-',
-        w?.nextRun ? String(w.nextRun).replace('T', ' ').slice(0, 16) : '-',
+        w?.nextRun ? localMinute(w.nextRun) : '-',
       ])
     }
     out(table(rows))
@@ -1254,6 +1254,19 @@ async function cmdTask(positional, flags) {
   }
 
   fail('usage: mcctl task [list|add|run|rm|enable|disable]')
+}
+
+/**
+ * A scheduler's time, to the minute, on this machine's clock.
+ *
+ * <p>Windows answers in local time with an offset, launchd and systemd in UTC. Cutting the string
+ * at sixteen characters printed whichever it was, so a 04:30 backup read as 09:30 off Windows.
+ */
+function localMinute(iso) {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return String(iso).replace('T', ' ').slice(0, 16)
+  const two = n => String(n).padStart(2, '0')
+  return `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())} ${two(at.getHours())}:${two(at.getMinutes())}`
 }
 
 function describeSchedule(s) {
