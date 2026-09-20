@@ -28,6 +28,18 @@ test('managed engines are explicit per platform and Mac archives are pinned by a
   assert.throws(() => mysql.assertSupported({ platform: 'darwin', arch: 'arm64', release: '23.0.0' }), /macOS 15/)
   assert.doesNotThrow(() => mysql.assertSupported({ platform: 'win32', arch: 'x64' }))
   assert.match(mysql.archiveFor(mysql.VERSION, 'x64', 'win32').url, /winx64\.zip$/)
+  // Linux: an engine is offered where it has a verified build. Oracle publishes no small arm64 one.
+  assert.equal(services.canManage('mysql', 'linux', 'x64'), true)
+  assert.equal(services.canManage('mysql', 'linux', 'arm64'), false)
+  assert.equal(services.canManage('garnet', 'linux', 'arm64'), true)
+  assert.equal(services.canManage('mariadb', 'linux', 'x64'), false)
+  assert.equal(services.canManage('mysql', 'freebsd', 'x64'), false)
+  assert.doesNotThrow(() => mysql.assertSupported({ platform: 'linux', arch: 'x64' }))
+  assert.throws(() => mysql.assertSupported({ platform: 'linux', arch: 'arm64' }), /managed Redis runs on arm64/)
+  const linux = mysql.archiveFor(mysql.VERSION, 'x64', 'linux')
+  assert.match(linux.url, /linux-glibc2\.28-x86_64-minimal\.tar\.xz$/)
+  assert.match(linux.sha256, /^[a-f0-9]{64}$/)
+  assert.throws(() => mysql.archiveFor(mysql.VERSION, 'arm64', 'linux'), /No verified/)
   assert.equal(services.defaultEngine(), 'mysql')
   assert.deepEqual(services.NEW_ENGINES, ['mysql', 'garnet'])
   assert.throws(() => services.assertNewEngine('mariadb'), /not offered/)
@@ -43,6 +55,10 @@ test('configuration isolates TCP and sockets, disables X Protocol, and quotes pa
   assert.match(text, /^mysqlx=0$/m)
   assert.match(text, /^port=3345$/m)
   assert.ok(!text.includes('password'))
+  // Every unix gets the short private socket; setup talks to the server over it before TCP is on.
+  // iniFor names the engine folder for this machine's architecture, so ask only where one exists.
+  if (mysql.supports('linux')) assert.match(mysql.iniFor(inst, '/tmp/private/mysql.sock', 'linux'), /^socket="\/tmp\/private\/mysql.sock"$/m)
+  if (mysql.supports('win32')) assert.doesNotMatch(mysql.iniFor(inst, null, 'win32'), /^socket=/m)
 })
 
 test('interrupted or corrupt installs leave no usable engine, staging folder, or lock', async t => {

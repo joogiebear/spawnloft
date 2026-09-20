@@ -25,7 +25,7 @@ after(async () => {
 test('Windows keeps its capabilities and Mac supports scheduling, metrics, and managed databases', () => {
   assert.deepEqual(platformCapabilities('win32'), { scheduler: true, performance: true, managedDatabases: true })
   assert.deepEqual(platformCapabilities('darwin'), { scheduler: true, performance: true, managedDatabases: true })
-  assert.deepEqual(platformCapabilities('linux'), { scheduler: true, performance: true, managedDatabases: false })
+  assert.deepEqual(platformCapabilities('linux'), { scheduler: true, performance: true, managedDatabases: true })
   assert.deepEqual(platformCapabilities('freebsd'), { scheduler: false, performance: false, managedDatabases: false })
 })
 

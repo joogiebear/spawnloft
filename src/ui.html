@@ -2166,7 +2166,7 @@ const schedulerHint = panelPlatform === 'linux'
   : panelPlatform === 'darwin'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
-const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
+const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin' || panelPlatform === 'linux';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
@@ -6926,7 +6926,7 @@ function openAdd(tab) {
 }
 
 let dbEnginesLoaded = false;
-const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64 or macOS 15+', garnet: 'Redis-compatible, by Microsoft' };
+const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64, macOS 15+ or Linux x64', garnet: 'Redis-compatible, by Microsoft' };
 async function loadDbEngines() {
   if (dbEnginesLoaded) return;
   try {

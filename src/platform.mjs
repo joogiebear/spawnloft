@@ -3,7 +3,7 @@ export function platformCapabilities(platform = process.platform) {
   return {
     scheduler: platform === 'win32' || platform === 'darwin' || platform === 'linux',
     performance: platform === 'win32' || platform === 'darwin' || platform === 'linux',
-    managedDatabases: platform === 'win32' || platform === 'darwin',
+    managedDatabases: platform === 'win32' || platform === 'darwin' || platform === 'linux',
   }
 }
 
