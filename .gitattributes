@@ -1,0 +1,3 @@
+# Shell scripts must keep LF: "#!/bin/sh\r" is not a program. Everything else follows the checkout.
+/spawnloft text eol=lf
+*.sh text eol=lf

@@ -108,7 +108,37 @@ function launcherRuntime() {
   }
 }
 
+/**
+ * The same three launchers as shell scripts, for Linux.
+ *
+ * <p>For someone in a terminal inside the server's folder, which is where a person running a Linux
+ * server usually is: ./start.sh rather than remembering what the instance was registered as.
+ * Quoted with single quotes throughout, since a home folder may hold a space and a shell would
+ * split the path on it.
+ */
+function writeShellLaunchers(inst) {
+  const quote = (value) => "'" + String(value).replaceAll("'", "'\\''") + "'"
+  const run = `${quote(process.execPath)} ${quote(path.join(ROOT, 'mcctl.mjs'))}`
+  // Electron's binary runs scripts as Node only when told to; plain node ignores the variable.
+  const head = ['#!/bin/sh', ...(process.versions.electron ? ['export ELECTRON_RUN_AS_NODE=1'] : [])]
+  const name = quote(inst.name)
+  const script = (...lines) => [...head, ...lines, ''].join('\n')
+  const files = {
+    // Starts, then attaches - the same meaning "start the server" has on Windows.
+    'start.sh': script(`${run} start ${name} || { echo; echo 'Failed to start.'; exit 1; }`, `exec ${run} console ${name}`),
+    'console.sh': script(`exec ${run} console ${name}`),
+    'stop.sh': script(`exec ${run} stop ${name}`),
+  }
+  for (const [file, body] of Object.entries(files)) {
+    fs.writeFileSync(path.join(inst.dir, file), body, { mode: 0o755 })
+    // The mode above only applies to a file being created; a rewrite has to be told again.
+    fs.chmodSync(path.join(inst.dir, file), 0o755)
+  }
+  return Object.keys(files)
+}
+
 export function writeLaunchers(inst) {
+  if (process.platform === 'linux') return writeShellLaunchers(inst)
   const cli = path.join(ROOT, 'mcctl.mjs')
   const rt = launcherRuntime()
   const run = `${rt.exe} "${cli}"`

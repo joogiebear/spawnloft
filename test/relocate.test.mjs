@@ -24,6 +24,8 @@ const marker = path.join(scratch, 'runtime.json')
 const tasksFile = path.join(DATA_ROOT, 'schedules.json')
 const posix = process.platform !== 'win32'
 const shim = path.join(DATA_ROOT, 'tasks', posix ? 'nightly.sh' : 'nightly.cmd')
+// Linux gets shell launchers; macOS still gets the batch files it always has.
+const launcher = (name) => name + (process.platform === 'linux' ? '.sh' : '.bat')
 
 function stale(file, body) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -38,7 +40,7 @@ test('with no record, shims and launchers are rewritten for this runtime and a r
 
   const oldExe = 'C:\\Users\\me\\AppData\\Local\\Programs\\mcctl\\mcctl.exe'
   stale(shim, `@echo off\r\n"${oldExe}" "C:\\old\\mcctl.mjs" task run nightly\r\n`)
-  stale(path.join(dir, 'start.bat'), `@echo off\r\n"${oldExe}" "C:\\old\\mcctl.mjs" start smp\r\n`)
+  stale(path.join(dir, launcher('start')), `@echo off\r\n"${oldExe}" "C:\\old\\mcctl.mjs" start smp\r\n`)
 
   const result = repairAfterMove({ marker })
   assert.deepEqual(result, { moved: true, shims: 1, launchers: 1 })
@@ -48,10 +50,12 @@ test('with no record, shims and launchers are rewritten for this runtime and a r
   assert.ok(shimBody.includes(path.join(ROOT, 'mcctl.mjs')), 'the shim does not name this code folder')
   assert.ok(shimBody.includes(posix ? "task run 'nightly'" : 'task run nightly'))
 
-  const startBody = fs.readFileSync(path.join(dir, 'start.bat'), 'utf8')
+  const startBody = fs.readFileSync(path.join(dir, launcher('start')), 'utf8')
   assert.ok(!startBody.includes(oldExe), 'the launcher still names the old executable')
   assert.ok(startBody.includes(path.join(ROOT, 'mcctl.mjs')))
-  for (const f of ['console.bat', 'stop.bat']) assert.ok(fs.existsSync(path.join(dir, f)), `${f} was not written`)
+  for (const f of [launcher('console'), launcher('stop')]) assert.ok(fs.existsSync(path.join(dir, f)), `${f} was not written`)
+  // A shell launcher that is not executable is a text file.
+  if (process.platform === 'linux') assert.equal(fs.statSync(path.join(dir, launcher('start'))).mode & 0o111, 0o111)
 
   assert.deepEqual(JSON.parse(fs.readFileSync(marker, 'utf8')), runtimeSignature())
 })
