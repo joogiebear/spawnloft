@@ -17,7 +17,7 @@ import net from 'node:net'
 import path from 'node:path'
 import { getInstance, serverJarPath, jvmFlagsFor, isDatabase, kindOf } from './registry.mjs'
 import { runDir, stateFile, consoleLog, daemonLog, controlPath } from './paths.mjs'
-import { writeJson } from './util.mjs'
+import { writeJson, killProcessGroup } from './util.mjs'
 import { startSampler, metricsFile } from './metrics.mjs'
 import { crashVerdict, CRASH_LIMIT, CRASH_WINDOW_MS } from './crashguard.mjs'
 import { notifyInstance } from './notify.mjs'
@@ -157,6 +157,10 @@ function launch({ first }) {
     cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
+    // Off Windows, the leader of its own process group, so that a force kill can take whatever
+    // the JVM forked along with it. Windows reaches the tree through taskkill /T instead, and
+    // `detached` there would mean a console window of the server's own.
+    detached: process.platform !== 'win32',
     env,
   })
 
@@ -348,11 +352,7 @@ function forceKill() {
     // Kill the whole tree - the JVM may have spawned helpers.
     spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true })
   } else {
-    try {
-      process.kill(child.pid, 'SIGKILL')
-    } catch {
-      /* already gone */
-    }
+    killProcessGroup(child.pid)
   }
 }
 

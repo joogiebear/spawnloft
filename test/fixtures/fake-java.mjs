@@ -10,12 +10,15 @@
  *   <li>`crash` - exits 3 with a ticking exception in the console, so crash recovery can be
  *       exercised.</li>
  *   <li>`hang`  - stops reading the console, so a graceful stop has to time out and be forced.</li>
+ *   <li>`fork`  - starts a helper process of its own and prints its pid, the way a JVM running a
+ *       plugin that shells out does, so that a force kill can be checked to reach it too.</li>
  *   <li>anything else is echoed, which is how a test proves a line reached the server.</li>
  * </ul>
  *
  * <p>FAKE_JAVA_FAIL=start makes it die during startup the way a server with a taken port does.
  */
 import readline from 'node:readline'
+import { spawn } from 'node:child_process'
 
 const say = (line) => process.stdout.write(`[00:00:00 INFO]: ${line}\n`)
 
@@ -37,6 +40,11 @@ rl.on('line', (raw) => {
   if (line === 'crash') {
     say('Exception ticking world')
     process.exit(3)
+  }
+  if (line === 'fork') {
+    const helper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1 << 30)'], { stdio: 'ignore' })
+    say(`forked helper pid ${helper.pid}`)
+    return
   }
   if (line === 'hang') {
     rl.close()

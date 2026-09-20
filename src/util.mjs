@@ -146,6 +146,30 @@ export function pidAlive(pid) {
   }
 }
 
+/**
+ * Kill a process and everything it started, on POSIX.
+ *
+ * <p>The daemon starts each server as the leader of its own process group, so the negative pid
+ * reaches the whole group at once: the JVM and any helper it forked, which a signal to the JVM
+ * alone leaves running and holding the port. A server started by an older daemon leads no group,
+ * and the group signal fails with ESRCH; the plain pid is the fallback for that and nothing else.
+ * Windows has taskkill /T for the same job and does not come through here.
+ */
+export function killProcessGroup(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 1) return
+  try {
+    process.kill(-pid, 'SIGKILL')
+    return
+  } catch {
+    /* no such group - not a leader, or already gone */
+  }
+  try {
+    process.kill(pid, 'SIGKILL')
+  } catch {
+    /* already gone */
+  }
+}
+
 export function isPortFree(port, host = '127.0.0.1') {
   return new Promise((resolve) => {
     const srv = net.createServer()
