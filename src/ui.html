@@ -3638,7 +3638,7 @@ async function renderPerformance(opts) {
   if (!drawn) await paintPerformance(row.name);
 
   stopPerfPolling();
-  if (!['win32', 'darwin'].includes(panelPlatform)) return;
+  if (!['win32', 'darwin', 'linux'].includes(panelPlatform)) return;
   // Matched to how often the daemon samples. Polling faster would redraw the same points.
   perfTimer = setInterval(() => {
     if (state.pane !== 'performance' || state.current !== row.name) return stopPerfPolling();
