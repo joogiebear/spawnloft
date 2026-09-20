@@ -2160,8 +2160,10 @@ const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
 const panelPlatform = $('meta[name="spawnloft-platform"]').content;
 const windowsFeatures = panelPlatform === 'win32';
-const schedulerName = panelPlatform === 'darwin' ? 'macOS launchd' : 'Windows Task Scheduler';
-const schedulerHint = panelPlatform === 'darwin'
+const schedulerName = { darwin: 'macOS launchd', linux: 'systemd' }[panelPlatform] || 'Windows Task Scheduler';
+const schedulerHint = panelPlatform === 'linux'
+  ? 'Runs with SpawnLoft closed while you are logged in. Daily and weekly jobs missed while the machine was off run once when it is back; interval jobs skip missed runs. Tasks stop at logout unless lingering is on for your account (loginctl enable-linger).'
+  : panelPlatform === 'darwin'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
 const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
