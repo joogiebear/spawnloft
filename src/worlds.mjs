@@ -20,6 +20,8 @@ import { BACKUPS_DIR } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { readState } from './control.mjs'
 import { runTar, EXCLUDE_ARGS } from './backup.mjs'
+import { tarHandlesZip } from './tar.mjs'
+import { createZip, extractZip, isZip } from './zip.mjs'
 import { fail, dirSizeAsync, humanBytes, stamp, validateName } from './util.mjs'
 
 /** The dimension companions a Bukkit-family server keeps beside a world. */
@@ -167,8 +169,10 @@ export async function importWorld(inst, source, { name } = {}) {
       tmp = path.join(inst.dir, `.mcctl-import-${Date.now()}`)
       fs.mkdirSync(tmp, { recursive: true })
       // bsdtar reads zip and tar.gz alike, and refuses absolute paths and ".." members on
-      // extraction - the zip-slip guard comes with the tool.
-      await runTar(['-xf', src], tmp)
+      // extraction - the zip-slip guard comes with the tool. GNU tar reads no zip at all, so
+      // there the zip is read here, with the same guard written out by hand.
+      if (!tarHandlesZip() && isZip(src)) await extractZip(src, tmp)
+      else await runTar(['-xf', src], tmp)
       root = findWorldRoot(tmp)
       if (!root) fail(`no level.dat found inside ${path.basename(src)} - that archive does not hold a world`)
     }
@@ -225,8 +229,10 @@ export async function exportWorld(inst, name) {
   const file = path.join(outDir, `${name}_${stamp()}.zip`)
   const members = [name, ...DIM_SUFFIXES.map((s) => `${name}${s}`)
     .filter((d) => isWorldDir(path.join(inst.dir, d)))]
-  // -a lets bsdtar pick the format from the extension: .zip in, zip out.
-  await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members], inst.dir)
+  // -a lets bsdtar pick the format from the extension: .zip in, zip out. GNU tar takes the same
+  // flags, exits 0, and writes a tar archive called .zip - so it is never asked.
+  if (tarHandlesZip()) await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members], inst.dir)
+  else await createZip(file, inst.dir, members, { exclude: EXCLUDE_ARGS.filter((arg) => arg !== '--exclude') })
   const size = fs.statSync(file).size
   if (size === 0) {
     fs.rmSync(file, { force: true })
