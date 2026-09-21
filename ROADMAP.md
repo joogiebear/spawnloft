@@ -1,6 +1,6 @@
 # Roadmap
 
-What SpawnLoft is for shapes what goes on this list: one person's Windows machine, running
+What SpawnLoft is for shapes what goes on this list: one person's own machine - Windows, macOS or Linux - running
 servers for friends, family or plugin testing, with no accounts, no cloud, no Docker, and
 nothing exposed to a network without a deliberate decision. Features that serve that
 person go on the list; features that turn this into a smaller Pterodactyl - multi-node,
@@ -28,7 +28,7 @@ user accounts, a remote web panel - stay off it on purpose.
   elsewhere-hosted) are linked to rather than pretended at; a sparse version claim is
   offered with the mismatch said out loud.
 
-- **Modded servers, complete** *(0.6.x; docs/modpacks-plan.md)* — Fabric and NeoForge
+- **Modded servers, complete** *(0.6.x)* — Fabric and NeoForge
   as first-class loaders with a Mods tab, "From a modpack" in Add-a-server for both,
   pack updates that may only touch what the old pack owned, and the server's version
   treated as a preference rather than a wall: search shows the loader's whole

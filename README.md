@@ -494,39 +494,34 @@ the app.
 
 ### Releasing
 
-Installers and the update feed live on **this repository's releases** (the repo went public on
-2026-09-01, and its full release history was migrated here). `joogiebear/mcctl-releases` is the
-legacy feed: apps installed as v0.6.6 or earlier check it for updates, so it keeps a copy of each
-new release until that population has moved across — publish there stops once it has.
+Installers and the update feeds live on **this repository's releases**. Windows, macOS and
+Linux are always one release, built from one commit.
 
-```bash
-cd desktop
-npm version patch                 # bump; the app reports this version
-GH_TOKEN=<token> npm run release  # build, sign, upload as a DRAFT
-npm run release:publish           # check it is whole, then make it live
-```
+**Betas are published by CI.** `dev` carries a prerelease version. Every push to it builds
+Windows x64, Apple Silicon, Intel Mac and Linux x64, opens each packaged app and runs the same
+smoke test against it - on Linux the `.deb` is installed with apt on Ubuntu 24.04 first - and
+publishes one release, numbered from the workflow run, only if all four pass. A pull request
+into `dev` runs the same builds and tests without publishing. See
+[`desktop/PREVIEW.md`](desktop/PREVIEW.md), which is also the text of each beta.
 
-**Two steps, deliberately.** Both one-step options fail, and this project has now seen each:
+**Stable releases are verified together, then published.** A release branch sets a stable
+version and is merged to `main`. The `desktop-stable` workflow signs and notarizes both Mac
+apps, checks an installed beta-to-stable upgrade, and builds, installs and exercises the Linux
+package. The Windows installer is built and signed on the Azure signing machine. Then
+`publish-stable.mjs` checks every package's bytes against its manifest, the Windows signature,
+that all four were built from the same clean commit, and the uploaded digests, and only then
+makes the release public; anything it cannot vouch for is left as a draft. The procedure is in
+[`desktop/STABLE.md`](desktop/STABLE.md), which is also the text of the stable release.
 
-- Publishing **live** means a failed upload leaves a release tagged, live and marked latest with
-  nothing to download and no update feed. That happened on v0.2.6 — the blockmap uploaded, the
-  111 MB installer did not, and a client checking for updates in that window got a 404.
-- Publishing as a **draft and leaving it** means the release looks published on GitHub while
-  `electron-updater` cannot see it at all, so nobody is offered the update and nothing says so.
-
-So the build uploads a draft, and `release:publish` makes it live only after confirming the things
-whose absence caused the first failure: all three assets present, uploaded and non-empty, and
-`latest.yml` naming this version with a size matching the installer actually up there. It refuses
-and exits non-zero otherwise.
-
-The draft is created **before** the build, by `ensure-draft.mjs`, and that ordering is load-bearing.
-electron-builder uploads artifacts concurrently and each upload creates the release if it cannot
-find it — and a draft has no git tag to find it by, so the first v0.2.7 build produced *two* drafts
-a second apart with the assets split between them. Creating it up front leaves nothing to race over.
+Nothing is ever published half-uploaded. That rule has a history: an early release went live
+with its blockmap uploaded and its 111 MB installer not, and a client checking for updates in
+that window got a 404. A draft left unpublished is the opposite failure - it looks released on
+GitHub while `electron-updater` cannot see it at all. Both are why publication is a separate
+step that verifies first.
 
 Every published release names the commit it was built from, captured at build time rather than
-publish time, and says so if the tree was dirty. Same information under **Settings → About** in the
-app, so a bug report can name the exact build rather than a version several builds could share.
+publish time. Same information under **Settings → About** in the app, so a bug report can name
+the exact build rather than a version several builds could share.
 
 Builds are signed through **Azure Artifact Signing** (formerly Trusted Signing), configured under
 `win.azureSignOptions`. That publishes under a validated individual identity, which is what turns
@@ -659,5 +654,4 @@ writes plugin configs; existing configs are left unchanged. A database you alrea
 registered with its address and attaches the same way, only never started or stopped from here. In the panel, databases sit under the servers in the
 sidebar, a server's Settings tab has a Databases card with the credentials one click away and a
 *Create a database* button that makes one for that server in one step - MySQL 8.4 LTS on the port after the game port, started and attached - and *Add a server → A database*
-creates one with the choices in it (a version, an engine, one for several servers to share). The database design and supported workflows are in
-`docs/databases-plan.md`.
+creates one with the choices in it (a version, an engine, one for several servers to share).

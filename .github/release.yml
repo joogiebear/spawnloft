@@ -1,6 +1,6 @@
 # Shapes the list GitHub appends to every release under the hand-written notes: each merged
 # pull request with its author, grouped by label, and a "New Contributors" line for first-timers.
-# ensure-draft.mjs asks for it with --generate-notes.
+# It is what "Generate release notes" on GitHub uses; the published releases carry hand-written notes.
 changelog:
   exclude:
     labels:
