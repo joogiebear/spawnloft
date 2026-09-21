@@ -184,6 +184,23 @@ export function linger() {
   return res.stdout.trim() === 'yes'
 }
 
+/**
+ * Turn lingering on for this user, so their tasks run whether or not they are logged in.
+ *
+ * <p>One's own account is usually allowed this without a password. Where policy says otherwise
+ * loginctl asks for one, which a panel cannot answer, so the refusal hands over the command to run
+ * in a terminal instead of a polkit error.
+ */
+export function enableLinger() {
+  const user = os.userInfo().username
+  const res = spawnSync('loginctl', ['enable-linger', user], { encoding: 'utf8', timeout: 15000 })
+  if (res.error?.code === 'ENOENT') fail('This machine has no loginctl, so lingering cannot be turned on from here.')
+  if (res.error || res.status !== 0 || linger() !== true) {
+    fail(`This account is not allowed to turn lingering on by itself. Run this in a terminal, then reload: sudo loginctl enable-linger ${user}`)
+  }
+  return { linger: true }
+}
+
 /** `systemctl show` for several units: blocks of Key=Value, separated by blank lines. */
 export function parseShow(text) {
   const units = new Map()

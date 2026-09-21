@@ -59,3 +59,14 @@ test('systemd answers are read per unit, and absent units are not reported as wo
   assert.equal(describe(id, daily, deleted, null), null)
   assert.equal(describe('other-backup', daily, units, null), null)
 })
+
+test('whether tasks run while logged out is a question only Linux has an answer to', async () => {
+  const schedule = await import('../src/schedule.mjs')
+  const { linger } = schedule.background()
+  if (process.platform === 'linux') assert.ok(linger === true || linger === false || linger === null)
+  else {
+    // Windows and macOS say "not after sign-out" in the hint; there is no setting to report or change.
+    assert.equal(linger, null)
+    assert.throws(() => schedule.keepRunningLoggedOut(), /Linux setting/)
+  }
+})

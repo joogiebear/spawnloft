@@ -159,6 +159,25 @@ export function describeResult(code) {
   return TASK_RESULT[code] ?? `failed (exit ${code})`
 }
 
+/**
+ * Will scheduled work run while nobody is logged in?
+ *
+ * <p>On Windows and macOS the answer is a fixed "no" and the panel says so in its hint. On Linux it
+ * is a setting: a user's systemd, and every timer in it, stops at their last logout unless
+ * lingering is on for the account. On a desktop that is the same promise Windows makes. On a server
+ * someone connects to over SSH and disconnects from, it means the nightly backup NEVER runs - and
+ * nothing fails, because nothing was started. `linger` is true, false, or null where the question
+ * does not apply or could not be asked.
+ */
+export function background() {
+  return { linger: process.platform === 'linux' ? linux.linger() : null }
+}
+
+export function keepRunningLoggedOut() {
+  if (process.platform !== 'linux') fail('Lingering is a Linux setting; there is nothing to turn on here.')
+  return linux.enableLinger()
+}
+
 export function load() {
   const data = readJson(TASKS_FILE(), EMPTY)
   if (!data.tasks) data.tasks = {}

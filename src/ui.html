@@ -4951,6 +4951,46 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
  * and nothing else, so "0" is all it can say about a backup; mcctl writes its own line naming the
  * file it produced, and both are shown - the state from Windows, the detail from us.
  */
+/**
+ * On Linux, scheduled work stops at logout unless lingering is on for the account.
+ *
+ * <p>On a desktop that is what Windows promises too. On a server someone reaches over SSH and
+ * disconnects from, it means the nightly backup never runs, and nothing reports a failure because
+ * nothing was started - so it is said where the schedule is made, with the way out beside it, rather
+ * than left in a hint. Returns null when there is nothing to say: lingering is on, the answer is
+ * unknown, or this is not Linux.
+ */
+function lingerNotice(background, refresh) {
+  if (panelPlatform !== 'linux' || !background || background.linger !== false) return null;
+  const box = document.createElement('div');
+  box.className = 'notice warn';
+  const text = document.createElement('div');
+  text.className = 'text';
+  const lead = document.createElement('b');
+  lead.textContent = 'These only run while you are logged in.';
+  text.append(lead, ' Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.');
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const fix = document.createElement('button');
+  fix.textContent = 'Keep running after logout';
+  fix.title = 'Turns on lingering for your account (loginctl enable-linger)';
+  fix.onclick = async () => {
+    fix.disabled = true;
+    try {
+      await api('/scheduler/linger', { method: 'POST' });
+      toast('Scheduled tasks will now run while you are logged out.', 'good');
+      await refresh();
+    } catch (e) {
+      // Policy may require a password, which a page cannot supply; the message carries the command.
+      toast(e.message, 'bad');
+      fix.disabled = false;
+    }
+  };
+  acts.append(fix);
+  box.append(text, acts);
+  return box;
+}
+
 async function renderScheduler(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -4977,7 +5017,7 @@ async function renderScheduler(opts) {
   body.textContent = '';
   paneHead(body, 'clock', 'Scheduled work',
     data.available === false ? 'Not available in this preview.'
-      : 'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+      : 'Backups, restarts and console commands on a clock, run by ' + (panelPlatform === 'win32' ? 'Windows' : panelPlatform === 'darwin' ? 'macOS' : 'your system') + ' whether or not this is open.');
   if (data.available === false) {
     const note = document.createElement('p');
     note.className = 'hint';
@@ -5006,6 +5046,8 @@ async function renderScheduler(opts) {
   intro.className = 'hint';
   intro.textContent = schedulerName + '. ' + schedulerHint;
   body.append(intro);
+  const lingering = lingerNotice(data.background, again);
+  if (lingering) body.append(lingering);
 
   // ---- add ------------------------------------------------------------------
   const addWrap = document.createElement('div');
@@ -5499,6 +5541,8 @@ async function renderBackups(opts) {
       + '. Next: ' + (whenNext(data.auto.nextRun) || 'unknown') + '.'
     : schedulerHint;
   auto.append(autoTitle, autoRow, autoState);
+  const lingering = lingerNotice(data.background, () => renderBackups({ force: true }));
+  if (lingering) auto.append(lingering);
   if (data.automaticAvailable === false) {
     autoRow.hidden = true;
     autoState.textContent = data.automaticUnavailableReason;

@@ -476,6 +476,7 @@ async function handleBackups(req, res, name, seg) {
       },
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
+      background: schedule.background(),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -873,6 +874,7 @@ async function handleSchedules(req, res, name, seg) {
       kinds: schedule.SCHEDULE_KINDS,
       days: schedule.DAYS,
       running: supervisor.isRunning(name),
+      background: schedule.background(),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -1165,6 +1167,11 @@ async function route(req, res) {
       platform: process.platform,
       capabilities: platformCapabilities(),
     })
+  }
+
+  // ---- let scheduled work run while logged out (Linux) ---------------------
+  if (seg[1] === 'scheduler' && seg[2] === 'linger' && req.method === 'POST') {
+    return json(res, 200, schedule.keepRunningLoggedOut())
   }
 
   // ---- progress for a create in flight -------------------------------------
