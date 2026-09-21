@@ -177,3 +177,23 @@ test('other tools open what is written here, and what they write is read here',
     for (const map of [got, expected]) for (const key of Object.keys(map)) if (map[key] === 'dir') delete map[key]
     assert.deepEqual(got, expected)
   })
+
+test('an end-record signature inside the zip comment is not mistaken for the end record', async () => {
+  const src = fs.mkdtempSync(path.join(scratch, 'srccomment-'))
+  fs.mkdirSync(path.join(src, 'world'))
+  fs.writeFileSync(path.join(src, 'world', 'level.dat'), 'level data')
+  const file = path.join(scratch, 'commented.zip')
+  await createZip(file, src, ['world'])
+
+  // Give the archive a comment that ends with a complete, well-formed, EMPTY end record: the
+  // signature and eighteen zero bytes. Read backwards and believed, it says "no entries".
+  const decoy = Buffer.concat([Buffer.from('made by a tool that likes '), Buffer.from([0x50, 0x4b, 0x05, 0x06]), Buffer.alloc(18)])
+  const bytes = fs.readFileSync(file)
+  bytes.writeUInt16LE(decoy.length, bytes.length - 2)
+  fs.writeFileSync(file, Buffer.concat([bytes, decoy]))
+
+  assert.deepEqual(names(file), ['world/', 'world/level.dat'])
+  const out = fs.mkdtempSync(path.join(scratch, 'outcomment-'))
+  await extractZip(file, out)
+  assert.equal(fs.readFileSync(path.join(out, 'world', 'level.dat'), 'utf8'), 'level data')
+})

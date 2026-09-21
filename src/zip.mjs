@@ -244,18 +244,31 @@ function findDirectory(fd, size) {
   // The end record sits at the very end, behind a comment of at most 64 KiB.
   const tailSize = Math.min(size, 22 + MAX16)
   const tail = readAt(fd, tailSize, size - tailSize)
+  // The four signature bytes can turn up INSIDE a zip's comment, and scanning backwards meets those
+  // first. Taken at their word they usually describe an archive with nothing in it - a world zip
+  // that imports as "contains no world". Two things tell the real record from a lookalike. Its
+  // comment runs exactly to the end of the file. And it sits directly after the directory it
+  // describes (or after the zip64 locator that does): a decoy can be given a comment length that
+  // fits, even a whole well-formed empty record can, but not a directory that ends where it begins.
+  // A record that passes only the first test is kept as a fallback, for the rare archive with
+  // something prepended to it, whose offsets are all out by that much.
+  let fallback = null
   for (let i = tailSize - 22; i >= 0; i--) {
     if (tail.readUInt32LE(i) !== EOCD_SIG) continue
+    if (i + 22 + tail.readUInt16LE(i + 20) !== tailSize) continue
+    const at = size - tailSize + i
     const found = { entries: tail.readUInt16LE(i + 10), size: tail.readUInt32LE(i + 12), offset: tail.readUInt32LE(i + 16) }
-    if (found.entries !== MAX16 && found.size !== MAX32 && found.offset !== MAX32) return found
-    const locatorAt = size - tailSize + i - 20
-    if (locatorAt < 0) fail('the zip says it is a large (zip64) archive but has no zip64 index')
-    const locator = readAt(fd, 20, locatorAt)
-    if (locator.readUInt32LE(0) !== LOCATOR64_SIG) fail('the zip says it is a large (zip64) archive but has no zip64 index')
-    const end64 = readAt(fd, 56, Number(locator.readBigUInt64LE(8)))
-    if (end64.readUInt32LE(0) !== EOCD64_SIG) fail('the zip64 index of that archive is damaged')
-    return { entries: Number(end64.readBigUInt64LE(32)), size: Number(end64.readBigUInt64LE(40)), offset: Number(end64.readBigUInt64LE(48)) }
+    const wide = found.entries === MAX16 || found.size === MAX32 || found.offset === MAX32
+    if (wide) {
+      if (at < 20 || readAt(fd, 20, at - 20).readUInt32LE(0) !== LOCATOR64_SIG) continue
+      const end64 = readAt(fd, 56, Number(readAt(fd, 20, at - 20).readBigUInt64LE(8)))
+      if (end64.readUInt32LE(0) !== EOCD64_SIG) fail('the zip64 index of that archive is damaged')
+      return { entries: Number(end64.readBigUInt64LE(32)), size: Number(end64.readBigUInt64LE(40)), offset: Number(end64.readBigUInt64LE(48)) }
+    }
+    if (found.offset + found.size === at) return found
+    fallback ??= found
   }
+  if (fallback) return fallback
   fail('that file is not a zip archive')
 }
 
