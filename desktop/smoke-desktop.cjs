@@ -315,6 +315,20 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '02-theme-picker.png') })
     record('PASS: theme picker changes and persists the real application setting')
 
+    // Read, never clicked: changing it asks GitHub for an update, and this test owes it nothing.
+    if (manual) {
+      assert.equal(await page.locator('#setUpdates').isVisible(), false, 'A build that updates by hand offers no beta setting')
+    } else {
+      await page.locator('#setUpdates').waitFor({ state: 'visible' })
+      const following = await page.evaluate(() => window.mcctlDesktop.updateChannel())
+      const onBeta = info.version.includes('-')
+      assert.deepEqual(following, { beta: onBeta, chosen: false, onBetaBuild: onBeta, waitingFor: null })
+      assert.equal(await page.locator('#setBeta').isChecked(), onBeta, 'With no choice made, a copy follows what its own version followed')
+      await page.locator('#setUpdates').scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(output, '02b-beta-setting.png') })
+      record('PASS: the packaged app offers the beta setting, and with no choice made follows what it already followed')
+    }
+
     daemonCreated = true
     const started = await api(`instances/${name}/start`, {})
     assert.equal(started.status, 'running')

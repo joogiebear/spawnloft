@@ -127,3 +127,38 @@ test('one Linux feed serves both packages: a deb install takes the .deb, an rpm 
   assert.ok(findFile(files, 'deb', ['AppImage', 'rpm', 'pacman']).url.href.endsWith('-linux-amd64.deb'))
   assert.ok(findFile(files, 'rpm', ['AppImage', 'deb', 'pacman']).url.href.endsWith('-linux-x86_64.rpm'))
 })
+
+// ---- the "Get beta builds" setting -----------------------------------------------------------
+// The setting is one property, allowPrerelease, chosen independently of the running version
+// (update-channel.js). These are the transitions that choice makes possible and the installer
+// someone downloaded used to decide.
+
+for (const platform of ['win32', 'darwin', 'linux']) {
+  test(`${platform}: a stable copy that opts in is offered the newest beta from that beta's own feed`, async () => {
+    const { client, requests } = provider('0.14.0', true, platform)
+    const info = await client.getLatestVersion()
+    assert.equal(info.version, '0.15.0-beta.3')
+    const suffix = { win32: '', darwin: '-mac', linux: LINUX_FEED }[platform]
+    assert.ok(requests.some(route => route.endsWith(`/v0.15.0-beta.3/beta${suffix}.yml`)))
+    assert.ok(requests.every(route => !route.includes('mac.6')))
+  })
+
+  test(`${platform}: a beta copy that opts out hears of no more betas, and is never pointed at one`, async () => {
+    const { client, requests } = provider('0.15.0-beta.1', false, platform)
+    const info = await client.getLatestVersion()
+    // Older than what is installed, so the updater does nothing with it: downgrades are off.
+    assert.equal(info.version, '0.14.0')
+    assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
+  })
+
+  test(`${platform}: a beta copy that opted out moves to the stable release when it ships`, async () => {
+    const { client } = provider('0.15.0-beta.1', false, platform, true)
+    assert.equal((await client.getLatestVersion()).version, '1.0.0')
+  })
+
+  test(`${platform}: a stable copy that opted in still gets the stable release when that is newest`, async () => {
+    const { client, requests } = provider('0.14.0', true, platform, true)
+    assert.equal((await client.getLatestVersion()).version, '1.0.0')
+    assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
+  })
+}

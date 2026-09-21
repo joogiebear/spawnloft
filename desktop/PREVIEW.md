@@ -25,7 +25,7 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   disabling it there prevents scheduled work. Remove tasks in SpawnLoft before
   deleting the app.
 - **Signed Mac automatic updates:** background download, then install on quit or
-  use Restart to update. Beta and stable channels stay separate. Both native
+  use Restart to update. Which releases a copy follows is a setting (below). Both native
   architectures share a verified feed; Windows update behavior is preserved.
   Ad-hoc test packages still require manual installation.
 
@@ -66,7 +66,10 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
 ### Windows
 
 Download **SpawnLoft-Setup-VERSION.exe**. Windows beta installations continue to receive
-beta updates automatically; stable installations stay on the stable release. Both
+beta updates automatically; stable installations stay on the stable release unless
+*Settings > Updates > Get beta builds* is turned on, which works the same on Mac and Linux.
+Turning it off never downgrades: the copy keeps the beta it has and moves to the next
+stable release when that ships. Both
 `beta.yml` and `latest.yml` describe the Windows installer on this prerelease.
 
 Like the previous Windows development beta, this GitHub Actions test build is unsigned.

@@ -37,6 +37,12 @@ contextBridge.exposeInMainWorld('mcctlDesktop', {
   /** Ask GitHub whether a newer release exists. The app also asks on its own, every six hours. */
   checkUpdate: () => ipcRenderer.invoke('mcctl:checkUpdate'),
 
+  /** Which releases this copy follows: { beta, chosen, onBetaBuild, waitingFor }. */
+  updateChannel: () => ipcRenderer.invoke('mcctl:updateChannel'),
+
+  /** Follow the betas (true) or only stable releases (false). Never downgrades. */
+  setUpdateChannel: (beta) => ipcRenderer.invoke('mcctl:setUpdateChannel', beta === true),
+
   /** Close, install silently, reopen on the new version. Warn about running servers first. */
   installUpdate: () => ipcRenderer.invoke('mcctl:installUpdate'),
 

@@ -6,6 +6,7 @@ const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
+const updateChannel = require('./update-channel')
 // Ad-hoc packages cannot participate in Squirrel.Mac updates. Signed betas use
 // the same updater as stable builds; missing provenance fails closed on Mac.
 const manualUpdates = process.platform === 'darwin' && (!app.isPackaged || buildInfo()?.macSigningMode !== 'signed')
@@ -306,6 +307,11 @@ const UPDATE_FIRST_DELAY_MS = 20 * 1000
  * the app installs per-user, so there is nothing to elevate. The window closes and comes back on
  * the new version. That is the whole visible update.
  */
+/** Which releases this copy follows. Kept with the window's state: it is about this install, not the servers. */
+function updateChannelFile() {
+  return path.join(app.getPath('userData'), 'update-channel.json')
+}
+
 function setupUpdates() {
   if (manualUpdates) return
   autoUpdater.autoDownload = true
@@ -313,6 +319,7 @@ function setupUpdates() {
   // Initial Mac support uses complete signed ZIPs. Windows keeps differential updates.
   if (process.platform === 'darwin') autoUpdater.disableDifferentialDownload = true
   autoUpdater.logger = null
+  updateChannel.apply(autoUpdater, updateChannel.describe(updateChannelFile(), app.getVersion()).beta)
 
   autoUpdater.on('update-available', (info) => send('update:available', { version: info.version }))
   autoUpdater.on('update-not-available', () => send('update:none', {}))
@@ -346,6 +353,26 @@ function checkForUpdatesQuietly() {
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
 }
+
+ipcMain.handle('mcctl:updateChannel', async () => updateChannel.describe(updateChannelFile(), app.getVersion()))
+
+/**
+ * Follow the betas, or stop following them.
+ *
+ * <p>Takes effect on the next check, which is asked for straight away so that opting in shows
+ * something happening. Opting out is never a downgrade; see update-channel.js.
+ */
+ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
+  if (typeof beta !== 'boolean') return { ok: false }
+  try {
+    updateChannel.save(updateChannelFile(), beta)
+  } catch (err) {
+    return { ok: false, message: String(err?.message ?? err) }
+  }
+  updateChannel.apply(autoUpdater, beta)
+  checkForUpdatesQuietly()
+  return { ok: true, ...updateChannel.describe(updateChannelFile(), app.getVersion()) }
+})
 
 ipcMain.handle('mcctl:checkUpdate', async () => {
   if (manualUpdates) {
