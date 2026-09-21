@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { TARGETS, manifestName, artifactNames, createManifest, verifyRelease, verifyPublishedRelease, verifyWindowsFeed } from '../desktop/preview-artifacts.mjs'
+import { TARGETS, manifestName, artifactNames, createManifest, verifyRelease, verifyPublishedRelease, verifyWindowsFeed, verifyLinuxFeed, linuxPackages, linuxFeedNames } from '../desktop/preview-artifacts.mjs'
 
 const identity = { sourceVersion: '0.15.0-beta.1', version: '0.15.0-beta.3', commit: 'a'.repeat(40), dirty: false }
 const installer = Buffer.from('fixture NSIS installer bytes')
@@ -12,18 +12,19 @@ const sha512 = crypto.createHash('sha512').update(installer).digest('base64')
 const installerName = `SpawnLoft-Setup-${identity.version}.exe`
 const feed = `version: ${identity.version}\nfiles:\n  - url: ${installerName}\n    sha512: ${sha512}\n    size: ${installer.length}\npath: ${installerName}\nsha512: ${sha512}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
 
-// The Linux feed is the same shape about a different file: the .deb, under the platform's feed names.
-const debPackage = Buffer.from('fixture Debian package bytes')
-const debSha512 = crypto.createHash('sha512').update(debPackage).digest('base64')
-const debName = `SpawnLoft-${identity.version}-linux-amd64.deb`
-const linuxFeed = `version: ${identity.version}\nfiles:\n  - url: ${debName}\n    sha512: ${debSha512}\n    size: ${debPackage.length}\npath: ${debName}\nsha512: ${debSha512}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
+// A Linux feed lists both packages for its architecture, and is named for that architecture.
+const linuxBytes = name => Buffer.from(`fixture Linux package bytes: ${name}`)
+function linuxFeed(arch, version = identity.version) {
+  const packages = linuxPackages({ arch, version })
+  const entry = name => `  - url: ${name}\n    sha512: ${crypto.createHash('sha512').update(linuxBytes(name)).digest('base64')}\n    size: ${linuxBytes(name).length}\n`
+  return `version: ${version}\nfiles:\n${packages.map(entry).join('')}path: ${packages[0]}\nsha512: ${crypto.createHash('sha512').update(linuxBytes(packages[0])).digest('base64')}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
+}
 
 function fixtureBytes(name, version = identity.version) {
   // Each feed names its installer, and the installer's name carries the version.
-  if (name.endsWith('-linux.yml')) return linuxFeed.replaceAll(identity.version, version)
+  if (name.includes('-linux')) return name.endsWith('.yml') ? linuxFeed(name.includes('arm64') ? 'arm64' : 'x64', version) : linuxBytes(name)
   if (name.endsWith('.yml')) return feed.replaceAll(identity.version, version)
   if (name.endsWith('.exe')) return installer
-  if (name.endsWith('.deb')) return debPackage
   return Buffer.from(name)
 }
 
@@ -49,32 +50,50 @@ function modifyManifest(dir, target, change) {
   writeManifest(dir, target, info)
 }
 
-test('paired release verifies Windows, both native Mac builds and Linux, including every updater feed', t => {
+test('paired release verifies Windows, both native Mac builds and both Linux architectures, including every updater feed', t => {
   const verified = verifyRelease(fixture(t), identity)
-  assert.equal(verified.assets.length, 15)
+  // 4 Windows + 2 x 2 Mac + 2 x (deb, rpm, two feeds) Linux, and one manifest per target.
+  assert.equal(verified.assets.length, 4 + 4 + 8 + TARGETS.length)
   assert.equal(verified.version, identity.version)
   assert.deepEqual(verified.assets.filter(asset => asset.name.endsWith('.yml')).map(asset => asset.name),
-    ['latest.yml', 'beta.yml', 'latest-linux.yml', 'beta-linux.yml'])
-  assert.ok(verified.assets.some(asset => asset.name === debName))
+    ['latest.yml', 'beta.yml', 'latest-linux.yml', 'beta-linux.yml', 'latest-linux-arm64.yml', 'beta-linux-arm64.yml'])
+  for (const name of [`SpawnLoft-${identity.version}-linux-amd64.deb`, `SpawnLoft-${identity.version}-linux-x86_64.rpm`,
+    `SpawnLoft-${identity.version}-linux-arm64.deb`, `SpawnLoft-${identity.version}-linux-aarch64.rpm`]) {
+    assert.ok(verified.assets.some(asset => asset.name === name), name)
+  }
 })
 
-test('a Linux feed that does not describe the package it ships with stops the release', t => {
-  const dir = fixture(t)
-  fs.writeFileSync(path.join(dir, 'latest-linux.yml'), linuxFeed.replace(`path: ${debName}`, 'path: other.deb'))
-  fs.copyFileSync(path.join(dir, 'latest-linux.yml'), path.join(dir, 'beta-linux.yml'))
-  const linux = TARGETS.find(target => target.platform === 'linux')
-  modifyManifest(dir, linux, info => {
-    for (const asset of info.assets.filter(a => a.name.endsWith('-linux.yml'))) {
-      const bytes = fs.readFileSync(path.join(dir, asset.name))
-      asset.size = bytes.length
-      asset.sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
-    }
-  })
-  assert.throws(() => verifyRelease(dir, identity), /does not match the verified installer/)
-  // The two names are one feed; a beta installation must not be told something different.
-  const other = fixture(t)
-  fs.appendFileSync(path.join(other, 'beta-linux.yml'), '\n')
-  assert.throws(() => createManifest(other, { ...identity, ...linux }, linux), /must be identical/)
+test('a Linux feed must describe every package it ships with, not just the first', t => {
+  const x64 = linuxPackages({ arch: 'x64', version: identity.version }).map(name => ({ name, bytes: linuxBytes(name) }))
+  assert.doesNotThrow(() => verifyLinuxFeed(linuxFeed('x64'), identity.version, x64))
+  // Right about the .deb and wrong about the .rpm: every Fedora install would be stranded.
+  const wrongRpm = x64.map(p => p.name.endsWith('.rpm') ? { ...p, bytes: Buffer.from('different bytes') } : p)
+  assert.throws(() => verifyLinuxFeed(linuxFeed('x64'), identity.version, wrongRpm), /does not match the verified package: .*rpm/)
+  assert.throws(() => verifyLinuxFeed(linuxFeed('x64'), identity.version, x64.slice(0, 1)), /does not match the verified packages/)
+  assert.throws(() => verifyLinuxFeed(linuxFeed('x64').replace(`path: ${x64[0].name}`, 'path: other.deb'), identity.version, x64), /names a package it does not list/)
+  assert.throws(() => verifyLinuxFeed(linuxFeed('x64'), '9.9.9', x64), /does not match the verified packages/)
+  assert.throws(() => verifyLinuxFeed(linuxFeed('x64') + 'blockMapSize: 1\n', identity.version, x64), /Unexpected Linux updater feed field/)
+
+  // Through a whole release: a feed changed after its manifest was made stops it, on either architecture.
+  for (const target of TARGETS.filter(target => target.platform === 'linux')) {
+    const dir = fixture(t)
+    const [latest, beta] = linuxFeedNames(target.arch)
+    const rpm = linuxPackages({ ...identity, ...target })[1]
+    fs.writeFileSync(path.join(dir, latest), linuxFeed(target.arch).replace(`- url: ${rpm}`, '- url: other.rpm'))
+    fs.copyFileSync(path.join(dir, latest), path.join(dir, beta))
+    modifyManifest(dir, target, info => {
+      for (const asset of info.assets.filter(a => a.name.endsWith('.yml'))) {
+        const bytes = fs.readFileSync(path.join(dir, asset.name))
+        asset.size = bytes.length
+        asset.sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+      }
+    })
+    assert.throws(() => verifyRelease(dir, identity), /does not match the verified package/, target.arch)
+    // The two names are one feed; a beta installation must not be told something different.
+    const other = fixture(t)
+    fs.appendFileSync(path.join(other, beta), '\n')
+    assert.throws(() => createManifest(other, { ...identity, ...target }, target), /must be identical/, target.arch)
+  }
 })
 
 test('paired release refuses missing platform manifests and missing installer bytes', async t => {
@@ -199,7 +218,7 @@ test('stable release requires matching clean versions and signed builds on every
     const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
     writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
   }
-  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 15)
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 4 + 4 + 8 + TARGETS.length)
   assert.throws(() => verifyRelease(dir, stable), /development/)
   modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)

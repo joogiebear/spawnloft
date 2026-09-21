@@ -37,6 +37,17 @@ jobs:
             app: desktop/dist/linux-unpacked
             smoke: /opt/SpawnLoft
             wrap: xvfb-run -a
+            deb: amd64
+          # GitHub's arm64 Linux runner. Managed MySQL has no arm64 build, so the smoke test checks
+          # that it is not offered there and runs everything else, Redis included.
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            target: linux
+            arch: arm64
+            app: desktop/dist/linux-arm64-unpacked
+            smoke: /opt/SpawnLoft
+            wrap: xvfb-run -a
+            deb: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
@@ -71,6 +82,10 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --config stable.config.cjs --mac --${{ matrix.arch }} --publish never
+      - name: Install the rpm build tool
+        if: matrix.platform == 'linux'
+        # electron-builder makes the .rpm with rpmbuild, which an Ubuntu runner does not carry.
+        run: sudo apt-get update && sudo apt-get install -y rpm
       - name: Package the Linux release
         if: matrix.platform == 'linux'
         working-directory: desktop
@@ -89,9 +104,26 @@ jobs:
         # needs on Ubuntu 24.04. The smoke test below opens what that leaves in /opt.
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-amd64.deb
+          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-${{ matrix.deb }}.deb
           test -x /usr/bin/spawnloft && test -x /opt/SpawnLoft/spawnloft-desktop
+          # Both packages are made from one folder, one after the other; each must say what it is,
+          # because that marker is how the updater decides between the .deb and the .rpm.
+          test "$(cat /opt/SpawnLoft/resources/package-type)" = deb
           /usr/bin/spawnloft config
+      - name: Install the rpm on Fedora the way a user would
+        if: matrix.platform == 'linux'
+        # The .deb and the .rpm carry the same app, so the window is exercised once, from the .deb
+        # above. What differs is the packaging: the dependencies the rpm declares, its install
+        # script, and the marker that tells the updater which kind of install this is. dnf on a
+        # real Fedora answers all three, and the bundled CLI proves the runtime loads there.
+        run: |
+          docker run --rm -v "$PWD/desktop/dist:/pkg:ro" fedora:42 bash -ec '
+            dnf install -y /pkg/SpawnLoft-*-linux-*.rpm
+            rpm -q spawnloft
+            test -x /opt/SpawnLoft/spawnloft-desktop && test -x /usr/bin/spawnloft
+            test "$(cat /opt/SpawnLoft/resources/package-type)" = rpm
+            spawnloft config
+          '
       - name: Install the isolated UI test tool
         run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
       - name: Open the packaged app and exercise the shared regressions
@@ -118,8 +150,9 @@ jobs:
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
             desktop/dist/SpawnLoft-*-linux-*.deb
-            desktop/dist/latest-linux.yml
-            desktop/dist/beta-linux.yml
+            desktop/dist/SpawnLoft-*-linux-*.rpm
+            desktop/dist/latest-linux*.yml
+            desktop/dist/beta-linux*.yml
             desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4

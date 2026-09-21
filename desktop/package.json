@@ -77,7 +77,8 @@
     },
     "linux": {
       "target": [
-        "deb"
+        "deb",
+        "rpm"
       ],
       "icon": "build/icon.png",
       "category": "Utility",
@@ -101,6 +102,12 @@
     "deb": {
       "packageName": "spawnloft",
       "packageCategory": "utils",
+      "fpm": [
+        "./build/linux/spawnloft=/usr/bin/spawnloft"
+      ]
+    },
+    "rpm": {
+      "packageName": "spawnloft",
       "fpm": [
         "./build/linux/spawnloft=/usr/bin/spawnloft"
       ]
