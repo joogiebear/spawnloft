@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { cliPackageNames } from './build-cli-package.mjs'
 
 export const TARGETS = [
   { platform: 'win32', arch: 'x64' },
@@ -55,7 +56,9 @@ export function artifactNames({ platform, arch, version }) {
     return ['dmg', 'zip'].map(ext => `SpawnLoft-${version}-mac-${arch}.${ext}`)
   }
   if (platform === 'linux' && Object.hasOwn(DEB_ARCH, arch)) {
-    return [...linuxPackages({ arch, version }), ...linuxFeedNames(arch)]
+    // The command-line packages are released and verified with the rest, and are in no feed: nothing
+    // updates them but the package manager that installed them.
+    return [...linuxPackages({ arch, version }), ...linuxFeedNames(arch), ...cliPackageNames({ arch, version })]
   }
   throw new Error('Unexpected build platform or architecture')
 }

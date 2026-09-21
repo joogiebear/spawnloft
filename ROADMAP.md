@@ -75,7 +75,8 @@ user accounts, a remote web panel - stay off it on purpose.
   backups through systemd user timers, performance metrics from `/proc`, managed MySQL (x64) and
   Redis (x64 and arm64), and automatic updates. Every preview installs the package on Ubuntu 24.04
   and opens it with the sandbox on. Managed MySQL is x64 only; Oracle
-  publishes no small arm64 build. Still to come: a command-line-only package for servers with
-  no desktop, and an AppImage - which needs libfuse2, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on
+  publishes no small arm64 build. For a server with no desktop there is `spawnloft-cli`: the command
+  line alone on its own Node, as a `.deb` and an `.rpm`, installed and run in clean Ubuntu 22.04, Debian 12,
+  Rocky 9 and Fedora containers by every build. Still to come: an AppImage - which needs libfuse2, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on
   every launch, so its scheduler shims have to go through `$APPIMAGE` before it can ship.
 - Localization.

@@ -124,6 +124,23 @@ jobs:
             test "$(cat /opt/SpawnLoft/resources/package-type)" = rpm
             spawnloft config
           '
+      - name: Build the command-line packages
+        if: matrix.platform == 'linux'
+        # The core on a Node of its own, for a machine with no screen: no Electron, and none of the
+        # graphical libraries the desktop package pulls in. Same version and commit as the app above.
+        run: node desktop/build-cli-package.mjs
+      - name: Install the command-line packages where there is no Node, and run a server
+        if: matrix.platform == 'linux'
+        # The oldest Debian-family and RHEL-family releases the package claims to support, and a
+        # current one of each. None of these images has Node, which is what the package promises
+        # not to need; what each run proves is written at the top of the script.
+        run: |
+          for image in ubuntu:22.04 debian:12; do
+            docker run --rm -v "$PWD:/repo:ro" "$image" sh /repo/desktop/smoke-cli-package.sh deb
+          done
+          for image in rockylinux:9 fedora:42; do
+            docker run --rm -v "$PWD:/repo:ro" "$image" sh /repo/desktop/smoke-cli-package.sh rpm
+          done
       - name: Install the isolated UI test tool
         run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
       - name: Open the packaged app and exercise the shared regressions
@@ -151,6 +168,8 @@ jobs:
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
             desktop/dist/SpawnLoft-*-linux-*.deb
             desktop/dist/SpawnLoft-*-linux-*.rpm
+            desktop/dist/spawnloft-cli-*.deb
+            desktop/dist/spawnloft-cli-*.rpm
             desktop/dist/latest-linux*.yml
             desktop/dist/beta-linux*.yml
             desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
