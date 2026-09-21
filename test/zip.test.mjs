@@ -32,7 +32,9 @@ function listing(root) {
   const visit = (dir) => {
     for (const name of fs.readdirSync(dir).sort()) {
       const full = path.join(dir, name)
-      const rel = path.relative(root, full).split(path.sep).join('/')
+      // Compared in one normal form. macOS hands file names back decomposed - "u" and a combining
+      // diaeresis where "ü" was written - so the same file would otherwise read as a different name.
+      const rel = path.relative(root, full).split(path.sep).join('/').normalize('NFC')
       if (fs.statSync(full).isDirectory()) { out[rel + '/'] = 'dir'; visit(full) }
       else out[rel] = crypto.createHash('sha1').update(fs.readFileSync(full)).digest('hex')
     }
