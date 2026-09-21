@@ -9,6 +9,7 @@ import { runTar } from './tar.mjs'
 import { respPing } from './resp.mjs'
 import { GARNET_READY_RE, GARNET_FAILED_RE } from './ready.mjs'
 import { fail, humanBytes } from './util.mjs'
+import { fetchRetry } from './download.mjs'
 
 /**
  * Garnet, for the Redis role.
@@ -166,7 +167,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     const file = path.join(staging, 'download')
     const unpacked = path.join(staging, 'engine')
     fs.mkdirSync(unpacked)
-    const res = await fetch(archive.url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(600000) })
+    const res = await fetchRetry(archive.url, { headers: { 'User-Agent': UA } }, { timeoutMs: 600000 })
     if (!res.ok || !res.body) fail(`Garnet download failed (${res.status}). Please retry.`)
     const hash = crypto.createHash('sha256')
     const source = Readable.fromWeb(res.body)
@@ -309,7 +310,7 @@ async function installRuntime(dir, staging, onProgress) {
   if (!RUNTIME_HASHES[rid]) fail(`No verified Redis runtime for ${rid}.`)
   const suffix = process.platform === 'win32' ? 'zip' : 'tar.gz'
   const url = `https://builds.dotnet.microsoft.com/dotnet/Runtime/${RUNTIME_VERSION}/dotnet-runtime-${RUNTIME_VERSION}-${rid}.${suffix}`
-  const res = await fetch(url, { signal: AbortSignal.timeout(600000) })
+  const res = await fetchRetry(url, {}, { timeoutMs: 600000 })
   if (!res.ok || !res.body) fail(`Redis runtime download failed (${res.status}). Please retry.`)
   const file = path.join(staging, 'runtime-archive')
   const hash = crypto.createHash('sha512')
