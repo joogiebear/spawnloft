@@ -97,9 +97,12 @@ Plugin configs remain manual. MariaDB is no longer offered for new setups.
 
 ### Linux
 
-- **x64:** download the `linux-amd64.deb` asset. For Ubuntu 22.04+ and Debian 12+.
-- Install it with `sudo apt install ./SpawnLoft-<version>-linux-amd64.deb`, which also pulls in
-  what it depends on. Java is separate, as everywhere: `sudo apt install openjdk-25-jre-headless`.
+- **Debian and Ubuntu (22.04+, Debian 12+):** the `linux-amd64.deb` asset, or `linux-arm64.deb` on
+  arm64. Install it with `sudo apt install ./<file>`, which also pulls in what it depends on.
+- **Fedora, the RHEL family and openSUSE:** the `linux-x86_64.rpm` asset, or `linux-aarch64.rpm`
+  on arm64. Install it with `sudo dnf install ./<file>`.
+- Java is separate, as everywhere, and which one depends on your Minecraft version:
+  `sudo apt install openjdk-25-jre-headless`, or on Fedora `sudo dnf install java-latest-openjdk-headless`.
 - `spawnloft-desktop` opens the window; `spawnloft` is the command line, and needs no Node.
 - On a server with no desktop, run `spawnloft ui --no-open` and reach the panel through an SSH
   tunnel. It listens on loopback only.
@@ -115,7 +118,8 @@ libnuma and ncurses, which a stock server does not have: SpawnLoft fetches the d
 packages with `apt-get download` and unpacks them beside the engine, without sudo and without
 installing anything on the system. Off Debian and Ubuntu it tells you the command to run instead.
 
-There is no AppImage or `.rpm` yet. Under WSL, a window that shows only a taskbar icon titled
+Managed MySQL is not offered on arm64, where Oracle publishes no small build; Redis is. There is
+no AppImage yet. Under WSL, a window that shows only a taskbar icon titled
 "WARN: Copy Mode" is WSLg, not SpawnLoft: run `wsl --shutdown` from a non-Administrator terminal.
 
 On a machine with a public address and no firewall, `spawnloft doctor` and the panel warn that

@@ -28,8 +28,8 @@ writer of SpawnLoft's own.
   version nothing installed can run is refused before the download, with the download link.
   `--force` on `new` and `start` goes ahead anyway.
 - **Node 20+**, for the CLI. The desktop app carries its own runtime and does not need it.
-- **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb`, for Ubuntu 22.04+ and Debian 12+) for the
-  desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
+- **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb` for Ubuntu 22.04+ and Debian 12+, an `.rpm` for Fedora,
+  the RHEL family and openSUSE; x64 and arm64) for the desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
   session, and tasks only run while you are logged in unless lingering is on for your account -
   the panel says so and offers to turn it on.
 
