@@ -8,7 +8,7 @@ import { mcVersionOf } from './plugins.mjs'
 import { readState, clearState, controlRequest } from './control.mjs'
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
-import { fail, sleep, pidAlive, UserError } from './util.mjs'
+import { fail, sleep, pidAlive, killProcessGroup, UserError } from './util.mjs'
 import { patternsFor } from './ready.mjs'
 
 const DAEMON = path.join(path.dirname(fileURLToPath(import.meta.url)), 'daemon.mjs')
@@ -215,11 +215,7 @@ function killTree(pid) {
   if (process.platform === 'win32') {
     spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true })
   } else {
-    try {
-      process.kill(pid, 'SIGKILL')
-    } catch {
-      /* already gone */
-    }
+    killProcessGroup(pid)
   }
 }
 

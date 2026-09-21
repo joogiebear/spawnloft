@@ -61,7 +61,8 @@ test('rebuild wipes the worlds level-name names, not "world"', async () => {
 
 test('rename rewrites the launchers under the new name and moves the mirror folder', async () => {
   const inst = makeInstance('before', { port: 40010, rconPort: 40011 })
-  fs.writeFileSync(path.join(inst.dir, 'start.bat'), 'stale start before\r\n')
+  const starter = process.platform === 'linux' ? 'start.sh' : 'start.bat'
+  fs.writeFileSync(path.join(inst.dir, starter), 'stale start before\r\n')
   const mirror = path.join(scratch, 'mirror')
   const settings = await import('../src/settings.mjs')
   settings.save({ backupsMirrorDir: mirror })
@@ -73,8 +74,8 @@ test('rename rewrites the launchers under the new name and moves the mirror fold
 
   assert.equal(res.movedDir, true)
   assert.ok(hasInstance('after') && !hasInstance('before'))
-  const bat = fs.readFileSync(path.join(res.dir, 'start.bat'), 'utf8')
-  assert.match(bat, /start after/, 'start.bat still starts the old name')
+  const bat = fs.readFileSync(path.join(res.dir, starter), 'utf8')
+  assert.match(bat, /start '?after/, 'the start launcher still starts the old name')
   assert.doesNotMatch(bat, /before/)
   assert.ok(fs.existsSync(path.join(mirror, 'after', 'x.tar.gz')), 'the mirror folder did not follow the rename')
   assert.ok(!fs.existsSync(path.join(mirror, 'before')))

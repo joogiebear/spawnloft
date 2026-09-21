@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 
 import { runDir } from './paths.mjs'
 import { startDarwinSampler } from './metrics-darwin.mjs'
+import { startLinuxSampler } from './metrics-linux.mjs'
 
 /**
  * How hard a server is working, over time.
@@ -19,6 +20,7 @@ import { startDarwinSampler } from './metrics-darwin.mjs'
  * printing a line each time. One extra process for the life of the server, not one per reading.
  * macOS supplies the same cumulative CPU time and resident memory through a short asynchronous
  * /bin/ps query. Its moving-average %cpu field has a different time window, so it is not used.
+ * Linux needs no tool at all: the kernel publishes both numbers per process under /proc.
  *
  * <p>Samples go to a plain text file in the run directory rather than being held in memory,
  * because the thing that reads them is the panel, in a different process, possibly started after
@@ -55,8 +57,8 @@ const CORES = Math.max(1, os.cpus()?.length || 1)
  * than taking the daemon down with it.
  */
 export function startSampler(name, pid, { onError = () => {} } = {}) {
-  if (!['win32', 'darwin'].includes(process.platform)) {
-    onError(new Error('performance sampling is only implemented on Windows and macOS'))
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
+    onError(new Error('performance sampling is only implemented on Windows, macOS and Linux'))
     return () => {}
   }
 
@@ -70,6 +72,9 @@ export function startSampler(name, pid, { onError = () => {} } = {}) {
   })
   if (process.platform === 'darwin') {
     return startDarwinSampler(pid, { onSample: record, onError, intervalMs: INTERVAL_SEC * 1000 })
+  }
+  if (process.platform === 'linux') {
+    return startLinuxSampler(pid, { onSample: record, onError, intervalMs: INTERVAL_SEC * 1000 })
   }
 
   const script = [

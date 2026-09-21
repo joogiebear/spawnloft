@@ -71,5 +71,10 @@ user accounts, a remote web panel - stay off it on purpose.
 - **macOS.** Signed Apple Silicon and Intel betas now include native scheduling,
   automatic backups, performance metrics, managed MySQL, and automatic update feeds.
   Installed upgrade verification gates subsequent signed betas before 1.0.
-- **Linux.** Native packaging and platform integrations remain future work.
+- **Linux.** x64 betas ship as a `.deb` with the same panel and CLI: scheduling and automatic
+  backups through systemd user timers, performance metrics from `/proc`, managed MySQL (x64) and
+  Redis (x64 and arm64), and automatic updates. Every preview installs the package on Ubuntu 24.04
+  and opens it with the sandbox on. Still to come: an `.rpm`, an arm64 package, and an AppImage -
+  which needs libfuse2, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on
+  every launch, so its scheduler shims have to go through `$APPIMAGE` before it can ship.
 - Localization.

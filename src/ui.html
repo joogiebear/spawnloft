@@ -2160,11 +2160,13 @@ const MAX_LINES = 5000;
 const desktop = window.mcctlDesktop;
 const panelPlatform = $('meta[name="spawnloft-platform"]').content;
 const windowsFeatures = panelPlatform === 'win32';
-const schedulerName = panelPlatform === 'darwin' ? 'macOS launchd' : 'Windows Task Scheduler';
-const schedulerHint = panelPlatform === 'darwin'
+const schedulerName = { darwin: 'macOS launchd', linux: 'systemd' }[panelPlatform] || 'Windows Task Scheduler';
+const schedulerHint = panelPlatform === 'linux'
+  ? 'Runs with SpawnLoft closed while you are logged in. Daily and weekly jobs missed while the machine was off run once when it is back; interval jobs skip missed runs. Tasks stop at logout unless lingering is on for your account (loginctl enable-linger).'
+  : panelPlatform === 'darwin'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
-const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin';
+const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin' || panelPlatform === 'linux';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
@@ -3636,7 +3638,7 @@ async function renderPerformance(opts) {
   if (!drawn) await paintPerformance(row.name);
 
   stopPerfPolling();
-  if (!['win32', 'darwin'].includes(panelPlatform)) return;
+  if (!['win32', 'darwin', 'linux'].includes(panelPlatform)) return;
   // Matched to how often the daemon samples. Polling faster would redraw the same points.
   perfTimer = setInterval(() => {
     if (state.pane !== 'performance' || state.current !== row.name) return stopPerfPolling();
@@ -4754,13 +4756,18 @@ const KIND_LABELS = {
   hourly: 'Every few hours',
   daily: 'Once a day',
   weekly: 'Once a week',
-  onlogon: 'When you sign in',
+  // On Linux this is when the account's systemd starts. That is sign-in - unless lingering is on,
+  // in which case it started with the machine and sign-in is not an event it sees at all.
+  onlogon: panelPlatform === 'linux' ? 'When your session starts (at startup, if tasks keep running after logout)' : 'When you sign in',
 };
 
 /** The schedule as a sentence, because "hourly /MO 6" is not one. */
 function describeSchedule(s) {
   if (!s) return '';
-  if (s.kind === 'onlogon') return 'when you sign in to Windows';
+  if (s.kind === 'onlogon') {
+    if (panelPlatform === 'linux') return 'when your session starts - at startup, if tasks keep running after logout';
+    return panelPlatform === 'darwin' ? 'when you sign in to this Mac' : 'when you sign in to Windows';
+  }
   if (s.kind === 'minutes') return s.every === 1 ? 'every minute' : 'every ' + s.every + ' minutes';
   if (s.kind === 'hourly') return s.every === 1 ? 'every hour' : 'every ' + s.every + ' hours';
   if (s.kind === 'weekly') return 'every ' + (DAY_NAMES[s.day] || s.day) + ' at ' + s.at;
@@ -4949,6 +4956,50 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
  * and nothing else, so "0" is all it can say about a backup; mcctl writes its own line naming the
  * file it produced, and both are shown - the state from Windows, the detail from us.
  */
+/**
+ * On Linux, scheduled work stops at logout unless lingering is on for the account.
+ *
+ * <p>On a desktop that is what Windows promises too. On a server someone reaches over SSH and
+ * disconnects from, it means the nightly backup never runs, and nothing reports a failure because
+ * nothing was started - so it is said where the schedule is made, with the way out beside it, rather
+ * than left in a hint. At a desktop the same fact is the ordinary arrangement, not a fault, so
+ * there it is a plain note with the same button. Returns null when there is nothing to say:
+ * lingering is on, the answer is unknown, or this is not Linux.
+ */
+function lingerNotice(background, refresh) {
+  if (panelPlatform !== 'linux' || !background || background.linger !== false) return null;
+  const box = document.createElement('div');
+  const headless = background.session !== 'desktop';
+  box.className = headless ? 'notice warn' : 'notice';
+  const text = document.createElement('div');
+  text.className = 'text';
+  const lead = document.createElement('b');
+  lead.textContent = headless ? 'These only run while you are logged in.' : 'These pause when you log out.';
+  text.append(lead, headless
+    ? ' Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.'
+    : ' They run while you are logged in, with the screen locked too. Turn this on if backups and servers should keep going after you log out of this computer.');
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const fix = document.createElement('button');
+  fix.textContent = 'Keep running after logout';
+  fix.title = 'Turns on lingering for your account (loginctl enable-linger)';
+  fix.onclick = async () => {
+    fix.disabled = true;
+    try {
+      await api('/scheduler/linger', { method: 'POST' });
+      toast('Scheduled tasks will now run while you are logged out.', 'good');
+      await refresh();
+    } catch (e) {
+      // Policy may require a password, which a page cannot supply; the message carries the command.
+      toast(e.message, 'bad');
+      fix.disabled = false;
+    }
+  };
+  acts.append(fix);
+  box.append(text, acts);
+  return box;
+}
+
 async function renderScheduler(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -4975,7 +5026,7 @@ async function renderScheduler(opts) {
   body.textContent = '';
   paneHead(body, 'clock', 'Scheduled work',
     data.available === false ? 'Not available in this preview.'
-      : 'Backups, restarts and console commands on a clock, run by Windows whether or not this is open.');
+      : 'Backups, restarts and console commands on a clock, run by ' + (panelPlatform === 'win32' ? 'Windows' : panelPlatform === 'darwin' ? 'macOS' : 'your system') + ' whether or not this is open.');
   if (data.available === false) {
     const note = document.createElement('p');
     note.className = 'hint';
@@ -5004,6 +5055,8 @@ async function renderScheduler(opts) {
   intro.className = 'hint';
   intro.textContent = schedulerName + '. ' + schedulerHint;
   body.append(intro);
+  const lingering = lingerNotice(data.background, again);
+  if (lingering) body.append(lingering);
 
   // ---- add ------------------------------------------------------------------
   const addWrap = document.createElement('div');
@@ -5497,6 +5550,8 @@ async function renderBackups(opts) {
       + '. Next: ' + (whenNext(data.auto.nextRun) || 'unknown') + '.'
     : schedulerHint;
   auto.append(autoTitle, autoRow, autoState);
+  const lingering = lingerNotice(data.background, () => renderBackups({ force: true }));
+  if (lingering) auto.append(lingering);
   if (data.automaticAvailable === false) {
     autoRow.hidden = true;
     autoState.textContent = data.automaticUnavailableReason;
@@ -6924,7 +6979,7 @@ function openAdd(tab) {
 }
 
 let dbEnginesLoaded = false;
-const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64 or macOS 15+', garnet: 'Redis-compatible, by Microsoft' };
+const ENGINE_HINT = { mysql: 'MySQL 8.4 LTS; Windows x64, macOS 15+ or Linux x64', garnet: 'Redis-compatible, by Microsoft' };
 async function loadDbEngines() {
   if (dbEnginesLoaded) return;
   try {

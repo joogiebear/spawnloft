@@ -1,9 +1,9 @@
-/** Features that still depend on Windows tools in the first Mac preview. */
+/** Features that depend on tools of the operating system, and where those are wired up so far. */
 export function platformCapabilities(platform = process.platform) {
   return {
-    scheduler: platform === 'win32' || platform === 'darwin',
-    performance: platform === 'win32' || platform === 'darwin',
-    managedDatabases: platform === 'win32' || platform === 'darwin',
+    scheduler: platform === 'win32' || platform === 'darwin' || platform === 'linux',
+    performance: platform === 'win32' || platform === 'darwin' || platform === 'linux',
+    managedDatabases: platform === 'win32' || platform === 'darwin' || platform === 'linux',
   }
 }
 

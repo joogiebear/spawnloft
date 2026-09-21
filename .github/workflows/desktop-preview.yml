@@ -24,7 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       mac-signing-mode: ${{ steps.mode.outputs.value }}
+      enabled: ${{ steps.version.outputs.enabled }}
     steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'enabled=' + require('./desktop/package.json').version.includes('-') + '\n')"
       - id: mode
         env:
           ENABLED: ${{ vars.MAC_SIGNING_ENABLED }}
@@ -38,6 +42,7 @@ jobs:
 
   build:
     needs: release-policy
+    if: needs.release-policy.outputs.enabled == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -47,16 +52,29 @@ jobs:
             target: win
             arch: x64
             app: desktop/dist/win-unpacked
+            smoke: desktop/dist/win-unpacked
           - runner: macos-15
             platform: darwin
             target: mac
             arch: arm64
             app: desktop/dist/mac-arm64/SpawnLoft.app
+            smoke: desktop/dist/mac-arm64/SpawnLoft.app
           - runner: macos-15-intel
             platform: darwin
             target: mac
             arch: x64
             app: desktop/dist/mac/SpawnLoft.app
+            smoke: desktop/dist/mac/SpawnLoft.app
+          # Pinned to 24.04 rather than -latest: it is the release whose AppArmor policy blocks
+          # Chromium's sandbox for programs without a profile, which is the thing worth testing.
+          - runner: ubuntu-24.04
+            platform: linux
+            target: linux
+            arch: x64
+            app: desktop/dist/linux-unpacked
+            # The smoke test opens the INSTALLED app, not the unpacked folder: see the install step.
+            smoke: /opt/SpawnLoft
+            wrap: xvfb-run -a
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
@@ -80,7 +98,7 @@ jobs:
           npm --prefix desktop test
       - name: Install the desktop toolchain
         run: npm ci --prefix desktop
-      - name: Verify Mac and Windows beta updater compatibility
+      - name: Verify beta updater compatibility on every platform
         run: node --test desktop/updater-preview.test.cjs
       - name: Package the native preview
         if: matrix.platform != 'darwin' || needs.release-policy.outputs.mac-signing-mode != 'signed'
@@ -112,12 +130,25 @@ jobs:
       - name: Supply both Windows updater feed names
         if: matrix.platform == 'win32'
         run: node -e "require('fs').copyFileSync('desktop/dist/latest.yml', 'desktop/dist/beta.yml')"
+      - name: Supply both Linux updater feed names
+        if: matrix.platform == 'linux'
+        run: node -e "require('fs').copyFileSync('desktop/dist/latest-linux.yml', 'desktop/dist/beta-linux.yml')"
+      - name: Install the package the way a user would
+        if: matrix.platform == 'linux'
+        # apt resolves the declared dependencies and runs the package's own postinst, which is what
+        # installs the AppArmor profile. Opening /opt/SpawnLoft afterwards is therefore the test a
+        # real Ubuntu 24.04 desktop would give it, sandbox included - not a folder run in place.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-amd64.deb
+          test -x /usr/bin/spawnloft && test -x /opt/SpawnLoft/spawnloft-desktop
+          /usr/bin/spawnloft config
       - name: Install the isolated UI test tool
         run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
       - name: Open the packaged app and exercise the shared regressions
         env:
           NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
-        run: node desktop/smoke-desktop.cjs "${{ matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
+        run: ${{ matrix.wrap }} node desktop/smoke-desktop.cjs "${{ matrix.smoke }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
       - name: Record platform, source, and checksums
         if: success()
         run: node desktop/preview-artifacts.mjs ${{ matrix.platform }} ${{ matrix.arch }}
@@ -137,6 +168,9 @@ jobs:
             desktop/dist/beta.yml
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
+            desktop/dist/SpawnLoft-*-linux-*.deb
+            desktop/dist/latest-linux.yml
+            desktop/dist/beta-linux.yml
             desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4

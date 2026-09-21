@@ -27,7 +27,7 @@ process.env.MCCTL_RESTART_DELAY_MS = '300'
 const { putInstance, removeInstance } = await import('../src/registry.mjs')
 const sup = await import('../src/supervisor.mjs')
 const { readState } = await import('../src/control.mjs')
-const { findFreePort, sleep, UserError } = await import('../src/util.mjs')
+const { findFreePort, sleep, pidAlive, UserError } = await import('../src/util.mjs')
 const { consoleLog } = await import('../src/paths.mjs')
 
 const FAKE_JAVA = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-java.mjs')
@@ -161,6 +161,25 @@ test('a server that ignores stop is force-killed once the grace period passes', 
   assert.equal(res.forced, true)
   assert.ok(await until(() => readState(name).status === 'stopped'), 'never reported stopped after the kill')
 })
+
+test('a force kill takes what the server forked along with it',
+  { skip: process.platform === 'win32' ? 'Windows reaches the tree through taskkill /T' : false, timeout: 30000 }, async () => {
+    const name = await makeInstance('forked')
+    await sup.start(name, { timeout: 15000 })
+    await sup.sendConsole(name, 'fork')
+    let helper = null
+    assert.ok(await until(() => {
+      helper = Number(/forked helper pid (\d+)/.exec(consoleText(name))?.[1])
+      return helper > 0
+    }), 'the helper never reported its pid')
+    assert.ok(pidAlive(helper))
+    await sup.sendConsole(name, 'hang')
+    await sleep(200)
+    const res = await sup.stop(name, { timeout: 1500 })
+    assert.equal(res.forced, true)
+    // Signalling the JVM alone left this running, holding whatever it held.
+    assert.ok(await until(() => !pidAlive(helper), 5000), 'the forked helper outlived the force kill')
+  })
 
 test('kill takes a running server down through the daemon', { timeout: 30000 }, async () => {
   const name = await makeInstance('kill')

@@ -212,7 +212,7 @@ test('follow emits parseable JSON Lines, only new samples, and reset events', { 
 })
 
 test('packaged launchers quote paths and forward arguments using the bundled runtime', () => {
-  for (const platform of ['darwin', 'win32']) {
+  for (const platform of ['darwin', 'linux', 'win32']) {
     const resources = path.join(scratch, platform, 'App With Spaces', 'Resources')
     writeCliLaunchers(resources, platform)
     for (const name of ['spawnloft', 'mcctl']) {
@@ -220,8 +220,10 @@ test('packaged launchers quote paths and forward arguments using the bundled run
       const script = fs.readFileSync(file, 'utf8')
       assert.ok(script.includes('ELECTRON_RUN_AS_NODE=1'))
       assert.ok(script.includes(`${name}.mjs"`))
-      assert.ok(script.includes(platform === 'darwin' ? '"$@"' : '%*'))
-      if (platform === 'darwin' && process.platform !== 'win32') assert.ok(fs.statSync(file).mode & 0o111)
+      assert.ok(script.includes(platform === 'win32' ? '%*' : '"$@"'))
+      // Linux names its executable for what it is; `spawnloft` there is the command line.
+      if (platform === 'linux') assert.ok(script.includes('/../../spawnloft-desktop"'))
+      if (platform !== 'win32' && process.platform !== 'win32') assert.ok(fs.statSync(file).mode & 0o111)
     }
   }
 })
