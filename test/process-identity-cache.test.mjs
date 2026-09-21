@@ -16,7 +16,9 @@ test('a snapshot from before launch cannot misidentify a reused PID as an orphan
     await new Promise(resolve => setTimeout(resolve, 5))
     const startedAt = Date.now()
     assert.equal(util.sameProcess(process.pid, image, startedAt), true)
-    assert.equal(queries, 2)
+    // Linux answers from /proc/<pid>/exe before the table is consulted, so the stale snapshot is
+    // never in a position to contradict anything and is not read again.
+    assert.equal(queries, process.platform === 'linux' ? 1 : 2)
     assert.equal(util.sameProcess(process.pid, 'wrong-executable', 0), false)
   } finally { mock.mock.restore(); syncBuiltinESMExports() }
 })
@@ -34,4 +36,27 @@ test('a process name Linux has cut to fifteen bytes is still the process it was 
   // Only Linux truncates; elsewhere a prefix is a different program.
   assert.equal(sameImage('spawnloft-deskt', 'spawnloft-desktop', 'darwin'), false)
   assert.equal(sameImage('spawnloft-deskt', 'spawnloft-desktop', 'win32'), false)
+})
+
+test('on Linux the executable is read from /proc, which a program cannot rename', async () => {
+  const { executableName } = await import('../src/util.mjs')
+  const asked = []
+  const link = target => (file) => { asked.push(file); return target }
+  assert.equal(executableName(4321, link('/opt/spawnloft-cli/bin/node')), 'node')
+  assert.deepEqual(asked, ['/proc/4321/exe'])
+  // After an upgrade replaces the file, a daemon that is still running is still the same program.
+  assert.equal(executableName(1, link('/opt/SpawnLoft/spawnloft-desktop (deleted)')), 'spawnloft-desktop')
+  // Not truncated to fifteen bytes, unlike the name in the process table.
+  assert.equal(executableName(1, link('/opt/SpawnLoft/spawnloft-desktop')), 'spawnloft-desktop')
+  // Another user's process, or one that has gone: no answer, and the table is asked instead.
+  assert.equal(executableName(1, () => { throw Object.assign(new Error('denied'), { code: 'EACCES' }) }), null)
+})
+
+test('this process is recognised whatever its runtime has named its main thread', { skip: process.platform !== 'linux' }, async () => {
+  const { sameProcess, executableName } = await import('../src/util.mjs')
+  const path = await import('node:path')
+  // Node 23 and later call the main thread "MainThread", and that is what `ps` reports as the name.
+  assert.equal(executableName(process.pid), path.basename(process.execPath))
+  assert.equal(sameProcess(process.pid, path.basename(process.execPath)), true)
+  assert.equal(sameProcess(process.pid, 'java'), false, 'and a different program is still a contradiction')
 })

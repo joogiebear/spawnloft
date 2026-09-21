@@ -22,6 +22,7 @@ Existing installs receive 1.2 through the built-in updater. ZIP files are used b
 
 ## Fixed
 
+- **Linux: every server showed as ORPHANED when SpawnLoft ran on Node 23 or newer** - running and healthy, but refused by every command. Node now names its main thread, and that name is what `ps` reports for the process. Processes are now recognised by the file they are running.
 - On Linux arm64 the one-click *Create a database* button was offered and then refused by the server.
 - Downloading a server jar or a database engine asks again when the download server answers with a gateway timeout or is briefly unavailable, instead of failing the install on one bad response.
 
