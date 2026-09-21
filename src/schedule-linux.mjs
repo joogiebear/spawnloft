@@ -57,7 +57,11 @@ export function trigger(schedule) {
       // Persistent: a run missed while the machine was off happens once when it comes back.
       return [`OnCalendar=${day}*-*-* ${schedule.at}:00`, 'Persistent=true', 'AccuracySec=1s']
     }
-    // "At logon" is the service itself, wanted by the user's default target.
+    // "At logon" is the service itself, wanted by the user's default target - which is reached when
+    // the account's systemd starts. Without lingering that is sign-in. With lingering it is boot, and
+    // later sign-ins are not seen at all; systemd's user side has no event for "someone logged in"
+    // that covers SSH as well as a desktop. The panel says which of the two this will be rather than
+    // calling it sign-in and being wrong on exactly the servers lingering is turned on for.
     case 'onlogon': return null
     default: throw new Error('Unknown systemd schedule')
   }

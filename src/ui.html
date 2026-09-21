@@ -4756,13 +4756,18 @@ const KIND_LABELS = {
   hourly: 'Every few hours',
   daily: 'Once a day',
   weekly: 'Once a week',
-  onlogon: 'When you sign in',
+  // On Linux this is when the account's systemd starts. That is sign-in - unless lingering is on,
+  // in which case it started with the machine and sign-in is not an event it sees at all.
+  onlogon: panelPlatform === 'linux' ? 'When your session starts (at startup, if tasks keep running after logout)' : 'When you sign in',
 };
 
 /** The schedule as a sentence, because "hourly /MO 6" is not one. */
 function describeSchedule(s) {
   if (!s) return '';
-  if (s.kind === 'onlogon') return 'when you sign in to Windows';
+  if (s.kind === 'onlogon') {
+    if (panelPlatform === 'linux') return 'when your session starts - at startup, if tasks keep running after logout';
+    return panelPlatform === 'darwin' ? 'when you sign in to this Mac' : 'when you sign in to Windows';
+  }
   if (s.kind === 'minutes') return s.every === 1 ? 'every minute' : 'every ' + s.every + ' minutes';
   if (s.kind === 'hourly') return s.every === 1 ? 'every hour' : 'every ' + s.every + ' hours';
   if (s.kind === 'weekly') return 'every ' + (DAY_NAMES[s.day] || s.day) + ' at ' + s.at;
