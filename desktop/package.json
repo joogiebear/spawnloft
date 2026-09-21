@@ -14,7 +14,8 @@
     "release": "node release.mjs",
     "verify": "node verify-build.mjs",
     "test": "node window-state.test.js",
-    "release:publish": "node finish-release.mjs"
+    "release:publish": "node finish-release.mjs",
+    "release:stable": "node release-stable.mjs"
   },
   "devDependencies": {
     "electron": "^44.0.0",

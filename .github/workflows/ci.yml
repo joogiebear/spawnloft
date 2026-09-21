@@ -9,6 +9,37 @@ on:
   pull_request:
 
 jobs:
+  # dev is next month's release and main is this month's, and the version says which is which.
+  # A prerelease version on dev is what switches the beta pipeline ON: after a stable release dev
+  # sits at a stable version, the previews skip themselves, and nothing says so - that is how dev
+  # was still calling itself 0.15.0-beta.1 after 1.0.0 had shipped. So the first pull request of a
+  # month cannot go in without the bump, and a release cannot go to main with a beta number on it.
+  version-policy:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The version fits the branch this is headed for
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          version=$(node -p "require('./desktop/package.json').version")
+          core=$(node -p "require('./package.json').version")
+          if [ "$version" != "$core" ]; then
+            echo "::error::package.json says $core and desktop/package.json says $version. Set both: node desktop/set-version.mjs <version>"
+            exit 1
+          fi
+          case "$BASE:$version" in
+            dev:*-beta.*) echo "dev <- $version: a prerelease, so merging this publishes a beta." ;;
+            dev:*)
+              echo "::error::dev has to carry a prerelease version, or the beta pipeline stays switched off. Start the month: node desktop/set-version.mjs <next minor>.0-beta.1"
+              exit 1 ;;
+            main:*-*)
+              echo "::error::main only takes stable versions. On the release branch: node desktop/set-version.mjs X.Y.Z"
+              exit 1 ;;
+            *) echo "$BASE <- $version" ;;
+          esac
+
   test:
     # Windows has its own scheduler (schtasks), control channel (a named pipe), paths (drive
     # letters) and process table, none of which the Linux job below exercises.
