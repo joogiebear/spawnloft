@@ -52,15 +52,19 @@ function modifyManifest(dir, target, change) {
 
 test('paired release verifies Windows, both native Mac builds and both Linux architectures, including every updater feed', t => {
   const verified = verifyRelease(fixture(t), identity)
-  // 4 Windows + 2 x 2 Mac + 2 x (deb, rpm, two feeds) Linux, and one manifest per target.
-  assert.equal(verified.assets.length, 4 + 4 + 8 + TARGETS.length)
+  // 4 Windows + 2 x 2 Mac + 2 x (deb, rpm, two feeds, command-line deb and rpm) Linux, and one manifest per target.
+  assert.equal(verified.assets.length, 4 + 4 + 12 + TARGETS.length)
   assert.equal(verified.version, identity.version)
   assert.deepEqual(verified.assets.filter(asset => asset.name.endsWith('.yml')).map(asset => asset.name),
     ['latest.yml', 'beta.yml', 'latest-linux.yml', 'beta-linux.yml', 'latest-linux-arm64.yml', 'beta-linux-arm64.yml'])
   for (const name of [`SpawnLoft-${identity.version}-linux-amd64.deb`, `SpawnLoft-${identity.version}-linux-x86_64.rpm`,
-    `SpawnLoft-${identity.version}-linux-arm64.deb`, `SpawnLoft-${identity.version}-linux-aarch64.rpm`]) {
+    `SpawnLoft-${identity.version}-linux-arm64.deb`, `SpawnLoft-${identity.version}-linux-aarch64.rpm`,
+    `spawnloft-cli-${identity.version}-linux-amd64.deb`, `spawnloft-cli-${identity.version}-linux-x86_64.rpm`,
+    `spawnloft-cli-${identity.version}-linux-arm64.deb`, `spawnloft-cli-${identity.version}-linux-aarch64.rpm`]) {
     assert.ok(verified.assets.some(asset => asset.name === name), name)
   }
+  // The command-line packages are verified and released, and offered to no updater.
+  for (const name of linuxFeedNames('x64')) assert.doesNotMatch(fs.readFileSync(path.join(path.dirname(verified.assets[0].path), name), 'utf8'), /spawnloft-cli/)
 })
 
 test('a Linux feed must describe every package it ships with, not just the first', t => {
@@ -218,7 +222,7 @@ test('stable release requires matching clean versions and signed builds on every
     const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
     writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
   }
-  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 4 + 4 + 8 + TARGETS.length)
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 4 + 4 + 12 + TARGETS.length)
   assert.throws(() => verifyRelease(dir, stable), /development/)
   modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)

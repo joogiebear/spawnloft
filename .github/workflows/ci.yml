@@ -76,3 +76,11 @@ jobs:
           node mcctl.mjs list
           # The checkout's shell entry point: present, executable, and with LF line endings.
           ./spawnloft config
+      # The packages run the core on Node 24, and Node 24 is not Node 22: it names its main thread,
+      # which is what `ps` reports as the process name, and that alone made every server ORPHANED.
+      # Nothing in this job noticed, because this job only ran 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test on the runtime the packages carry
+        run: npm test

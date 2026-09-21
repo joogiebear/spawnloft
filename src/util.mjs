@@ -95,6 +95,31 @@ export function processImage(pid) {
 }
 
 /**
+ * On Linux, the file a pid is actually running, from /proc/<pid>/exe.
+ *
+ * <p>What `ps` calls a process's name there is not the name of its executable. It is a label on the
+ * main thread that starts out as the executable's name and that the program is free to change, and
+ * Node does: from version 23 it names its threads, so `ps` reports every Node 24 process as
+ * "MainThread". The daemon recorded itself as `node`, was found wearing a different name, and every
+ * server came up ORPHANED: running, healthy and refused by every command. The same verdict, for the
+ * same kind of reason, as the fifteen-byte limit below - and again invisible from a checkout on the
+ * Node that CI happened to use.
+ *
+ * <p>The link cannot be changed by the process, and is not truncated. It is tried first and only
+ * ever says yes: when it cannot be read (another user's process), or names something else (Java
+ * started through a link called java21 runs a file called java), the name in the table still gets
+ * its say. Once the file has been replaced by an upgrade the kernel appends " (deleted)", which is
+ * still the same program.
+ */
+export function executableName(pid, readlink = fs.readlinkSync) {
+  try {
+    return path.basename(String(readlink(`/proc/${pid}/exe`)).replace(/ \(deleted\)$/, ''))
+  } catch {
+    return null
+  }
+}
+
+/**
  * Whether a live pid is still the process it was recorded as.
  *
  * <p>Lenient in every direction that is not an outright contradiction: no expected name recorded
@@ -104,6 +129,10 @@ export function processImage(pid) {
  */
 export function sameProcess(pid, expectedImage, startedAt = 0) {
   if (!expectedImage) return true
+  if (process.platform === 'linux') {
+    const exe = executableName(pid)
+    if (exe && sameImage(exe, expectedImage)) return true
+  }
   let actual = processImage(pid)
   // A cached PID may belong to an older process when Windows reuses its number.
   // Recheck a contradiction if that snapshot predates this launch; never reject a

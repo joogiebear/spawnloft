@@ -63,6 +63,14 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   get separate names, and failed archives never appear as completed backups.
 - **Settings → Appearance** offers both Classic and SpawnLoft themes.
 
+### Linux servers with no screen
+
+`spawnloft-cli-VERSION-linux-amd64.deb` / `-x86_64.rpm` (and `arm64` / `aarch64`) are the command
+line alone, on its own Node runtime, with none of the desktop app's graphical dependencies.
+Install with `sudo apt install ./<file>` or `sudo dnf install ./<file>`; it conflicts with the
+desktop package, which already contains it. There is no updater: install a newer package the same
+way. `spawnloft task linger on` keeps scheduled tasks running after you log out.
+
 ### Windows
 
 Download **SpawnLoft-Setup-VERSION.exe**. Windows beta installations continue to receive
