@@ -15,8 +15,8 @@ exports.requireCredentials = function (env = process.env) {
   if (missing.length) throw new Error(`Missing Mac signing credentials: ${missing.join(', ')}`)
   if (!/^[A-Z0-9]{10}$/.test(env.APPLE_TEAM_ID)) throw new Error('APPLE_TEAM_ID must be a 10-character Team ID')
   if (env.GITHUB_ACTIONS === 'true' &&
-      (env.GITHUB_REF !== 'refs/heads/dev' || !['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME))) {
-    throw new Error('Apple signing credentials may only be used on trusted dev builds')
+      (!['refs/heads/dev', 'refs/heads/main'].includes(env.GITHUB_REF) || !['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME))) {
+    throw new Error('Apple signing credentials may only be used on trusted dev or main builds')
   }
 }
 

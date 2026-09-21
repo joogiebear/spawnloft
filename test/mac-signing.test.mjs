@@ -10,10 +10,11 @@ const credentials = { CSC_LINK: 'fixture', CSC_KEY_PASSWORD: 'fixture', APPLE_ID
 
 test('signing fails closed on incomplete credentials or untrusted refs/events', () => {
   assert.doesNotThrow(() => signing.requireCredentials(credentials))
+  assert.doesNotThrow(() => signing.requireCredentials({ ...credentials, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch' }))
   for (const key of ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) {
     assert.throws(() => signing.requireCredentials({ ...credentials, [key]: '' }), /Missing Mac signing credentials/)
   }
-  for (const change of [{ GITHUB_REF: 'refs/heads/main' }, { GITHUB_EVENT_NAME: 'pull_request' },
+  for (const change of [{ GITHUB_REF: 'refs/heads/untrusted' }, { GITHUB_EVENT_NAME: 'pull_request' },
     { GITHUB_EVENT_NAME: 'pull_request_target' }, { APPLE_TEAM_ID: 'bad' }]) {
     assert.throws(() => signing.requireCredentials({ ...credentials, ...change }))
   }

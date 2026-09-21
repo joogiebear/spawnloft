@@ -1,0 +1,100 @@
+name: desktop-stable
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-stable
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: darwin
+            target: mac
+            arch: arm64
+            app: desktop/dist/mac-arm64/SpawnLoft.app
+          - runner: macos-15-intel
+            platform: darwin
+            target: mac
+            arch: x64
+            app: desktop/dist/mac/SpawnLoft.app
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      MAC_SIGNING_MODE: signed
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require the stable release version
+        run: node -e "if (!/^\d+\.\d+\.\d+$/.test(require('./desktop/package.json').version)) throw new Error('Stable source version required')"
+      - name: Test the shared core and desktop
+        env:
+          TMPDIR: /tmp
+          MAC_SIGNING_MODE: ad-hoc
+        run: |
+          npm test
+          npm --prefix desktop test
+      - name: Install the desktop toolchain
+        run: npm ci --prefix desktop
+      - name: Verify Mac and Windows beta updater compatibility
+        run: node --test desktop/updater-preview.test.cjs
+      - name: Sign and notarize the Mac release
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder --config stable.config.cjs --mac --${{ matrix.arch }} --publish never
+      - name: Verify the packaged app
+        # Structure verification does not need signing credentials or signed config evaluation.
+        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }}
+      - name: Verify Mac signing and notarization
+        if: matrix.platform == 'darwin'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: node desktop/verify-mac-signing.cjs "${{ matrix.app }}"
+      - name: Install the isolated UI test tool
+        run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
+      - name: Open the packaged app and exercise the shared regressions
+        env:
+          NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
+        run: node desktop/smoke-desktop.cjs "${{ matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
+      - name: Record platform, source, and checksums
+        if: success()
+        run: node desktop/stable-artifacts.mjs ${{ matrix.platform }} ${{ matrix.arch }}
+      - name: Verify a signed installed Mac upgrade
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
+        run: node desktop/smoke-mac-update.cjs "${{ matrix.app }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-stable-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/dist/SpawnLoft-*.exe
+            desktop/dist/SpawnLoft-*.exe.blockmap
+            desktop/dist/latest.yml
+            desktop/dist/beta.yml
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
+            desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-smoke-${{ matrix.platform }}-${{ matrix.arch }}
+          path: desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}/

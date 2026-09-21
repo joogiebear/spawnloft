@@ -18,9 +18,10 @@ const debSha512 = crypto.createHash('sha512').update(debPackage).digest('base64'
 const debName = `SpawnLoft-${identity.version}-linux-amd64.deb`
 const linuxFeed = `version: ${identity.version}\nfiles:\n  - url: ${debName}\n    sha512: ${debSha512}\n    size: ${debPackage.length}\npath: ${debName}\nsha512: ${debSha512}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
 
-function fixtureBytes(name) {
-  if (name.endsWith('-linux.yml')) return linuxFeed
-  if (name.endsWith('.yml')) return feed
+function fixtureBytes(name, version = identity.version) {
+  // Each feed names its installer, and the installer's name carries the version.
+  if (name.endsWith('-linux.yml')) return linuxFeed.replaceAll(identity.version, version)
+  if (name.endsWith('.yml')) return feed.replaceAll(identity.version, version)
   if (name.endsWith('.exe')) return installer
   if (name.endsWith('.deb')) return debPackage
   return Buffer.from(name)
@@ -184,4 +185,27 @@ test('signed publication refuses ad-hoc, missing, or mixed Mac provenance', t =>
   assert.throws(() => verifyRelease(dir, identity), /Mac signing mode/)
   modifyManifest(dir, TARGETS[2], info => { info.macSigningMode = 'signed' })
   assert.equal(verifyRelease(dir, { ...identity, macSigningMode: 'signed' }).macSigningMode, 'signed')
+})
+
+
+test('stable release requires matching clean versions and signed builds on every platform', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-stable-test-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const stable = { ...identity, sourceVersion: '1.0.0', version: '1.0.0' }
+  for (const target of TARGETS) {
+    for (const name of artifactNames({ ...stable, ...target })) {
+      fs.writeFileSync(path.join(dir, name), fixtureBytes(name, stable.version))
+    }
+    const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
+    writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
+  }
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 15)
+  assert.throws(() => verifyRelease(dir, stable), /development/)
+  modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)
+  modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'azure'; info.sourceVersion = '1.0.0-beta.1' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /clean stable/)
+  modifyManifest(dir, TARGETS[0], info => { info.sourceVersion = '1.0.0' })
+  for (const target of TARGETS.filter(target => target.platform === 'darwin')) modifyManifest(dir, target, info => { info.macSigningMode = 'ad-hoc' })
+  assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Mac signing mode/)
 })

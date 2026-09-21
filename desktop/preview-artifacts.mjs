@@ -15,6 +15,12 @@ export const manifestName = ({ platform, arch }) => `preview-build-${platform}-$
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => crypto.createHash(algorithm).update(bytes).digest(encoding)
 
 export function validateIdentity(info, expected = {}) {
+  if (expected.stable) {
+    if (!/^\d+\.\d+\.\d+$/.test(info.version || '') || info.sourceVersion !== info.version ||
+        !/^[0-9a-f]{40}$/.test(info.commit || '') || info.dirty !== false) {
+      throw new Error('A clean stable source version and full commit are required')
+    }
+  } else {
   const source = /^(\d+\.\d+\.\d+)-[0-9A-Za-z.-]+$/.exec(info.sourceVersion || '')
   if (!source || !/^[0-9a-f]{40}$/.test(info.commit || '') || info.dirty !== false) {
     throw new Error('A clean development source version and full commit are required')
@@ -26,6 +32,7 @@ export function validateIdentity(info, expected = {}) {
   }
   const sourceBeta = /-beta\.(\d+)$/.exec(info.sourceVersion)
   if (sourceBeta && Number(sequence) <= Number(sourceBeta[1])) throw new Error('Beta must be newer than the source version')
+  }
   if (!TARGETS.some(target => target.platform === info.platform && target.arch === info.arch)) {
     throw new Error('Unexpected build platform or architecture')
   }
@@ -77,16 +84,20 @@ export function verifyWindowsFeed(text, version, installerName, installerBytes) 
       fields.filter(field => field.key === 'releaseDate').length > 1) throw new Error('Invalid Windows updater feed structure')
 }
 
-export function createManifest(dir, info, target) {
+export function createManifest(dir, info, target, policy = {}) {
   const identity = { sourceVersion: info.sourceVersion, version: info.version, commit: info.commit, dirty: info.dirty, ...target }
   // New builds record the native identity in after-pack. A supplied target must
   // agree with that provenance, rather than merely relabelling an artifact.
-  validateIdentity(identity)
+  validateIdentity(identity, policy)
   if (info.platform !== target.platform) throw new Error('Build provenance platform mismatch')
   if (info.arch !== target.arch) throw new Error('Build provenance architecture mismatch')
   if (target.platform === 'darwin') {
     if (!['ad-hoc', 'signed'].includes(info.macSigningMode)) throw new Error('Missing or invalid Mac signing mode')
     identity.macSigningMode = info.macSigningMode
+  }
+  if (policy.stable && target.platform === 'win32') {
+    if (info.windowsSigningMode !== 'azure') throw new Error('Stable Windows builds require Azure signing')
+    identity.windowsSigningMode = info.windowsSigningMode
   }
   const assets = artifactNames(identity).map(name => {
     const bytes = fs.readFileSync(path.join(dir, name))
@@ -110,14 +121,16 @@ export function verifyRelease(dir, expected) {
     return { name, info }
   })
   const first = manifests[0].info
+  if (expected.stable && first.windowsSigningMode !== 'azure') throw new Error('Stable Windows builds require Azure signing')
   const macModes = manifests.filter(({ info }) => info.platform === 'darwin').map(({ info }) => info.macSigningMode)
   if (macModes.some(mode => !['ad-hoc', 'signed'].includes(mode)) || new Set(macModes).size !== 1 ||
+      (expected.stable && macModes[0] !== 'signed') ||
       (expected.macSigningMode !== undefined && macModes[0] !== expected.macSigningMode)) {
     throw new Error('Mac signing mode must match on both architectures and the release policy')
   }
   const assets = []
   for (const { name, info } of manifests) {
-    validateIdentity(info, { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit })
+    validateIdentity(info, { stable: expected.stable, version: first.version, sourceVersion: first.sourceVersion, commit: first.commit })
     const required = artifactNames(info)
     if (!Array.isArray(info.assets) || info.assets.length !== required.length ||
         new Set(info.assets.map(asset => asset.name)).size !== required.length ||

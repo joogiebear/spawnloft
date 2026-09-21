@@ -24,7 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       mac-signing-mode: ${{ steps.mode.outputs.value }}
+      enabled: ${{ steps.version.outputs.enabled }}
     steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: node -e "require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'enabled=' + require('./desktop/package.json').version.includes('-') + '\n')"
       - id: mode
         env:
           ENABLED: ${{ vars.MAC_SIGNING_ENABLED }}
@@ -38,6 +42,7 @@ jobs:
 
   build:
     needs: release-policy
+    if: needs.release-policy.outputs.enabled == 'true'
     strategy:
       fail-fast: false
       matrix:
