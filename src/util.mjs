@@ -108,15 +108,30 @@ export function sameProcess(pid, expectedImage, startedAt = 0) {
   // A cached PID may belong to an older process when Windows reuses its number.
   // Recheck a contradiction if that snapshot predates this launch; never reject a
   // newly started daemon using the previous owner's executable name.
-  if (actual && startedAt > processTable.at &&
-      String(actual).toLowerCase().replace(/\.exe$/, '') !== String(expectedImage).toLowerCase().replace(/\.exe$/, '')) {
+  if (actual && startedAt > processTable.at && !sameImage(actual, expectedImage)) {
     const at = Date.now()
     const names = readProcessTable()
     if (names) { processTable = { at, names }; actual = names.get(pid) ?? null }
   }
   if (!actual) return true
+  return sameImage(actual, expectedImage)
+}
+
+/**
+ * Is this the name the process table would give that executable?
+ *
+ * <p>Linux keeps fifteen bytes of a process's name and no more, so `ps` reports the installed app,
+ * spawnloft-desktop, as "spawnloft-deskt". Compared whole, that is a live process wearing a
+ * different name - the one verdict sameProcess treats as a contradiction - and every server
+ * started from the packaged app was declared orphaned the moment it came up: running, healthy, and
+ * refused by every command. `node` and `java` are short, which is why nothing but a real install
+ * showed it. A table name of exactly fifteen bytes therefore matches whatever it is the start of.
+ */
+export function sameImage(actual, expected, platform = process.platform) {
   const strip = (s) => String(s).toLowerCase().replace(/\.exe$/, '')
-  return strip(actual) === strip(expectedImage)
+  const [a, e] = [strip(actual), strip(expected)]
+  if (a === e) return true
+  return platform === 'linux' && Buffer.byteLength(a) === 15 && e.startsWith(a)
 }
 
 export function readJson(file, fallback = null) {
