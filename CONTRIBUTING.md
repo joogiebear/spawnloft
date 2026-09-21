@@ -5,7 +5,7 @@ they will save you time.
 
 ## What SpawnLoft is, and is not
 
-SpawnLoft runs Minecraft servers on one person's Windows machine: no accounts, no cloud,
+SpawnLoft runs Minecraft servers on one person's own machine - Windows, macOS or Linux: no accounts, no cloud,
 no Docker, and nothing exposed to a network without a deliberate decision. Features
 that push it toward being a hosting panel — multi-node, user accounts, a remote web
 UI — are out of scope on purpose. [ROADMAP.md](ROADMAP.md) says what is planned and
