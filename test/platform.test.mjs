@@ -42,7 +42,12 @@ test('Mac panel exposes scheduling and automatic backups without changing server
     const registryBefore = fs.readFileSync(REGISTRY_FILE, 'utf8')
     const panel = await serve({ port: 0, open: false })
     servers.push(panel.server)
-    assert.match(await (await fetch(panel.url)).text(), /name="spawnloft-platform" content="darwin"/)
+    const page = await (await fetch(panel.url)).text()
+    assert.match(page, /name="spawnloft-platform" content="darwin"/)
+    // The one-click database button is MySQL; the page is told whether this machine can have one.
+    assert.match(page, /name="spawnloft-managed-mysql" content="true"/)
+    const services = await import('../src/services.mjs')
+    assert.equal(services.canManage('mysql', 'linux', 'arm64'), false, 'no small MySQL build for Linux on arm64')
     const get = async route => (await fetch(panel.url + 'api/' + route)).json()
     const post = route => fetch(panel.url + 'api/' + route, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
