@@ -35,9 +35,13 @@ const UNPACKED = args[0] ? path.resolve(args[0]) : path.join(HERE, 'dist', 'win-
 // checks only. Run on a finished build, everything is checked.
 const STRUCTURE_ONLY = process.argv.includes('--structure-only')
 const MAC = process.argv.includes('--platform=darwin') || UNPACKED.endsWith('.app')
+const LINUX = process.argv.includes('--platform=linux')
+// Both are unix: launchers are shell scripts that must be executable, not .cmd files.
+const POSIX = MAC || LINUX
 const APP = UNPACKED.endsWith('.app') ? UNPACKED : path.join(UNPACKED, 'SpawnLoft.app')
 const RESOURCES = MAC ? path.join(APP, 'Contents', 'Resources') : path.join(UNPACKED, 'resources')
-const EXE = MAC ? path.join(APP, 'Contents', 'MacOS', 'SpawnLoft') : path.join(UNPACKED, 'SpawnLoft.exe')
+const EXE = MAC ? path.join(APP, 'Contents', 'MacOS', 'SpawnLoft')
+  : LINUX ? path.join(UNPACKED, 'spawnloft-desktop') : path.join(UNPACKED, 'SpawnLoft.exe')
 const ICO = path.join(HERE, 'build', 'icon.ico')
 
 const problems = []
@@ -79,6 +83,11 @@ if (STRUCTURE_ONLY) {
 } else if (MAC) {
   if (!fs.readdirSync(RESOURCES).some(name => name.endsWith('.icns'))) problems.push('the Mac bundle has no application icon')
   else notes.push('icon: present in the Mac application bundle')
+} else if (LINUX) {
+  // A Linux executable carries no icon. The window's comes from a file beside the app, and the
+  // launcher's from the package; without the first, every window wears Electron's default.
+  if (!fs.existsSync(path.join(RESOURCES, 'icon.png'))) problems.push('resources/icon.png is missing, so the window would have no icon')
+  else notes.push('icon: resources/icon.png is packaged for the window')
 } else if (!fs.existsSync(ICO)) {
   problems.push(`build/icon.ico is missing, so nothing could have been applied to the executable`)
 } else {
@@ -103,9 +112,9 @@ for (const rel of ['mcctl.mjs', 'spawnloft.mjs', 'src/mysql.mjs', 'src/cli-outpu
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')
 for (const name of ['spawnloft', 'mcctl']) {
-  const launcher = path.join(RESOURCES, 'bin', MAC ? name : `${name}.cmd`)
+  const launcher = path.join(RESOURCES, 'bin', POSIX ? name : `${name}.cmd`)
   if (!fs.existsSync(launcher)) problems.push(`terminal launcher ${name} is missing`)
-  else if (MAC && (fs.statSync(launcher).mode & 0o111) === 0) problems.push(`terminal launcher ${name} is not executable`)
+  else if (POSIX && (fs.statSync(launcher).mode & 0o111) === 0) problems.push(`terminal launcher ${name} is not executable`)
 }
 
 const asar = path.join(RESOURCES, 'app.asar')
@@ -192,7 +201,10 @@ function checkTokensMatch() {
   }
 }
 
-if (!STRUCTURE_ONLY && !MAC && fs.existsSync(EXE)) {
+if (LINUX) {
+  // Linux has no equivalent of Authenticode or notarization; there is no signature to check.
+  notes.push('signing: not applicable on Linux')
+} else if (!STRUCTURE_ONLY && !MAC && fs.existsSync(EXE)) {
   const configured = Boolean(buildConfig?.win?.azureSignOptions || buildConfig?.win?.signtoolOptions)
   if (!configured) {
     notes.push('signing: not configured for this build, so not checked')

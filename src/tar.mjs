@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { UserError } from './util.mjs'
@@ -23,6 +23,23 @@ export function tarBinary() {
   return fs.existsSync(system32) ? system32 : 'tar'
 }
 
+/**
+ * Can this tar read and write zip?
+ *
+ * <p>bsdtar can, and is what Windows and macOS have. GNU tar cannot, and is what nearly every Linux
+ * has - and it does not refuse: `-a -cf world.zip` exits 0 having written a tar archive under that
+ * name. So the tar is asked what it is, once, rather than the platform being assumed from; an Arch
+ * or FreeBSD machine whose tar is bsdtar keeps using it. zip.mjs is what the others use.
+ */
+let zipCapable = null
+export function tarHandlesZip() {
+  if (zipCapable === null) {
+    const res = spawnSync(tarBinary(), ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 5000 })
+    zipCapable = /bsdtar|libarchive/i.test(String(res.stdout ?? ''))
+  }
+  return zipCapable
+}
+
 export function runTar(args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(tarBinary(), args, { cwd, windowsHide: true })
@@ -34,7 +51,9 @@ export function runTar(args, cwd) {
       reject(
         new UserError(
           err.code === 'ENOENT'
-            ? 'tar was not found on PATH (Windows 10/11 ships tar.exe in System32)'
+            ? process.platform === 'win32'
+              ? 'tar was not found on PATH (Windows 10/11 ships tar.exe in System32)'
+              : 'tar was not found on PATH - install it with your package manager'
             : `tar failed: ${err.message}`,
         ),
       ),

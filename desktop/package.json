@@ -1,9 +1,10 @@
 {
   "name": "mcctl-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
   "productName": "SpawnLoft",
+  "desktopName": "spawnloft-desktop.desktop",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -74,6 +75,36 @@
       "allowElevation": false,
       "include": "build/installer.nsh"
     },
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "executableName": "spawnloft-desktop",
+      "synopsis": "Minecraft servers on your own PC, without the terminal",
+      "maintainer": "joogiebear <joogiebear@protonmail.com>",
+      "artifactName": "SpawnLoft-${version}-linux-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "build/icon.png",
+          "to": "icon.png"
+        }
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "SpawnLoft",
+          "Keywords": "minecraft;server;paper;spigot;"
+        }
+      }
+    },
+    "deb": {
+      "packageName": "spawnloft",
+      "packageCategory": "utils",
+      "fpm": [
+        "./build/linux/spawnloft=/usr/bin/spawnloft"
+      ]
+    },
     "publish": [
       {
         "provider": "github",
@@ -86,5 +117,10 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9"
+  },
+  "homepage": "https://github.com/joogiebear/spawnloft",
+  "author": {
+    "name": "joogiebear",
+    "email": "joogiebear@protonmail.com"
   }
 }

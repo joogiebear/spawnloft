@@ -21,6 +21,7 @@ import * as mrpack from './src/mrpack.mjs'
 import * as neoforge from './src/neoforge.mjs'
 import * as worlds from './src/worlds.mjs'
 import { diagnose, crashReports } from './src/diagnose.mjs'
+import { rconExposure } from './src/exposure.mjs'
 import { readState, clearState } from './src/control.mjs'
 import * as services from './src/services.mjs'
 import { listServices, isDatabase } from './src/registry.mjs'
@@ -1202,7 +1203,7 @@ async function cmdTask(positional, flags) {
         describeSchedule(t.schedule),
         t.enabled ? (w ? w.state : 'NOT IN SCHEDULER') : 'disabled',
         w ? schedule.describeResult(w.lastResult) : '-',
-        w?.nextRun ? String(w.nextRun).replace('T', ' ').slice(0, 16) : '-',
+        w?.nextRun ? localMinute(w.nextRun) : '-',
       ])
     }
     out(table(rows))
@@ -1254,6 +1255,19 @@ async function cmdTask(positional, flags) {
   }
 
   fail('usage: mcctl task [list|add|run|rm|enable|disable]')
+}
+
+/**
+ * A scheduler's time, to the minute, on this machine's clock.
+ *
+ * <p>Windows answers in local time with an offset, launchd and systemd in UTC. Cutting the string
+ * at sixteen characters printed whichever it was, so a 04:30 backup read as 09:30 off Windows.
+ */
+function localMinute(iso) {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return String(iso).replace('T', ' ').slice(0, 16)
+  const two = n => String(n).padStart(2, '0')
+  return `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())} ${two(at.getHours())}:${two(at.getMinutes())}`
 }
 
 function describeSchedule(s) {
@@ -1651,6 +1665,10 @@ async function cmdDoctor(positional, flags = {}) {
     }
     const { status } = readState(inst.name)
     if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
+    // Asked whether or not it is running: the port opens the moment it starts, and doctor is what
+    // someone runs before they start it.
+    const exposed = rconExposure(inst)
+    if (exposed) problems.push(`${inst.name}: ${exposed.title.toLowerCase()}. ${exposed.advice}`)
     if (status === 'stale') {
       if (flags.json) problems.push(`${inst.name}: stale state file; run doctor without --json to clear it`)
       else {

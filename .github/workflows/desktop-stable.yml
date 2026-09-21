@@ -21,11 +21,22 @@ jobs:
             target: mac
             arch: arm64
             app: desktop/dist/mac-arm64/SpawnLoft.app
+            smoke: desktop/dist/mac-arm64/SpawnLoft.app
           - runner: macos-15-intel
             platform: darwin
             target: mac
             arch: x64
             app: desktop/dist/mac/SpawnLoft.app
+            smoke: desktop/dist/mac/SpawnLoft.app
+          # Windows is built and signed on the Azure signing host, not here. Linux has no signing
+          # step, so it is built where the Macs are. Pinned to 24.04: see desktop-preview.yml.
+          - runner: ubuntu-24.04
+            platform: linux
+            target: linux
+            arch: x64
+            app: desktop/dist/linux-unpacked
+            smoke: /opt/SpawnLoft
+            wrap: xvfb-run -a
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
@@ -48,9 +59,10 @@ jobs:
           npm --prefix desktop test
       - name: Install the desktop toolchain
         run: npm ci --prefix desktop
-      - name: Verify Mac and Windows beta updater compatibility
+      - name: Verify updater compatibility on every platform
         run: node --test desktop/updater-preview.test.cjs
       - name: Sign and notarize the Mac release
+        if: matrix.platform == 'darwin'
         working-directory: desktop
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
@@ -59,6 +71,10 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --config stable.config.cjs --mac --${{ matrix.arch }} --publish never
+      - name: Package the Linux release
+        if: matrix.platform == 'linux'
+        working-directory: desktop
+        run: npx electron-builder --config stable.config.cjs --linux --${{ matrix.arch }} --publish never
       - name: Verify the packaged app
         # Structure verification does not need signing credentials or signed config evaluation.
         run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }}
@@ -67,16 +83,26 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: node desktop/verify-mac-signing.cjs "${{ matrix.app }}"
+      - name: Install the package the way a user would
+        if: matrix.platform == 'linux'
+        # apt runs the package's postinst, which installs the AppArmor profile Chromium's sandbox
+        # needs on Ubuntu 24.04. The smoke test below opens what that leaves in /opt.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-amd64.deb
+          test -x /usr/bin/spawnloft && test -x /opt/SpawnLoft/spawnloft-desktop
+          /usr/bin/spawnloft config
       - name: Install the isolated UI test tool
         run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
       - name: Open the packaged app and exercise the shared regressions
         env:
           NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
-        run: node desktop/smoke-desktop.cjs "${{ matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
+        run: ${{ matrix.wrap }} node desktop/smoke-desktop.cjs "${{ matrix.smoke }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
       - name: Record platform, source, and checksums
         if: success()
         run: node desktop/stable-artifacts.mjs ${{ matrix.platform }} ${{ matrix.arch }}
       - name: Verify a signed installed Mac upgrade
+        if: matrix.platform == 'darwin'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
@@ -91,6 +117,9 @@ jobs:
             desktop/dist/beta.yml
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
             desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
+            desktop/dist/SpawnLoft-*-linux-*.deb
+            desktop/dist/latest-linux.yml
+            desktop/dist/beta-linux.yml
             desktop/dist/preview-build-${{ matrix.platform }}-${{ matrix.arch }}.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4

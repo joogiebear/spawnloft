@@ -11,6 +11,7 @@ import { runTar } from './tar.mjs'
 import { fail, UserError } from './util.mjs'
 import * as maria from './mariadb.mjs'
 import { MARIADB_READY_RE } from './ready.mjs'
+import { ensureLibraries, libraryEnv } from './linux-libs.mjs'
 
 export const ENGINE = 'mysql'
 export const LABEL = 'MySQL'
@@ -25,11 +26,26 @@ export const ARCHIVES = Object.freeze({
   x64: { file: 'mysql-8.4.11-macos15-x86_64.tar.gz', sha256: '90e8aea10698d01b978f0179e72e8d5e2cbe9f9bd5771e88b0b75d7c82244d3f' },
 })
 export const WINDOWS_ARCHIVE = Object.freeze({ file: 'mysql-8.4.11-winx64.zip', sha256: 'a492371d687d2bab088b0062581144a0044b8964baefdf4faa579292b423d25c' })
+// Oracle's "minimal" generic build: the same server without debug binaries and the test suite, 80 MB
+// where the full tarball is 830. Built against glibc 2.28, so Ubuntu 20.04, Debian 10 and RHEL 8
+// onward. The pin was taken from a download whose MD5 matched the one Oracle publishes for it.
+// There is no arm64 entry because Oracle publishes no minimal arm64 build, and 820 MB is not a
+// download to start behind a button marked "Add database".
+export const LINUX_ARCHIVES = Object.freeze({
+  x64: { file: 'mysql-8.4.11-linux-glibc2.28-x86_64-minimal.tar.xz', sha256: '383f54e124d5f325d67f0c6912a8f96814eedc761a17ea30112e52fa4cc6b143' },
+})
+
+/** Is there a verified native build for this machine? What decides whether the panel offers it. */
+export function supports(platform = process.platform, arch = process.arch) {
+  if (platform === 'win32') return arch === 'x64'
+  if (platform === 'darwin') return Object.hasOwn(ARCHIVES, arch)
+  return platform === 'linux' && Object.hasOwn(LINUX_ARCHIVES, arch)
+}
 
 export function assertSupported({ platform = process.platform, arch = process.arch, release = os.release() } = {}) {
-  if (platform === 'win32' && arch === 'x64') return
-  if (platform !== 'darwin' || !Object.hasOwn(ARCHIVES, arch)) fail('Managed MySQL requires Windows x64 or an Apple Silicon or Intel Mac.')
-  if (Number(release.split('.')[0]) < 24) fail('Managed MySQL requires macOS 15 or later. You can still connect to an existing MySQL database.')
+  if (platform === 'linux' && arch !== 'x64') fail('Managed MySQL on Linux requires an x64 machine; Oracle publishes no small arm64 build. You can still connect to an existing MySQL database, and managed Redis runs on arm64.')
+  if (!supports(platform, arch)) fail('Managed MySQL requires Windows x64, an Apple Silicon or Intel Mac, or Linux on x64.')
+  if (platform === 'darwin' && Number(release.split('.')[0]) < 24) fail('Managed MySQL requires macOS 15 or later. You can still connect to an existing MySQL database.')
 }
 export async function versions() {
   assertSupported()
@@ -37,7 +53,8 @@ export async function versions() {
 }
 export function archiveFor(version, arch = process.arch, platform = process.platform) {
   const entry = platform === 'win32' && arch === 'x64' ? WINDOWS_ARCHIVE
-    : platform === 'darwin' && Object.hasOwn(ARCHIVES, arch) ? ARCHIVES[arch] : null
+    : platform === 'darwin' && Object.hasOwn(ARCHIVES, arch) ? ARCHIVES[arch]
+    : platform === 'linux' && Object.hasOwn(LINUX_ARCHIVES, arch) ? LINUX_ARCHIVES[arch] : null
   if (version !== VERSION || !entry) fail(`No verified MySQL ${version} archive for ${platform}/${arch}. See: spawnloft db versions`)
   return { ...entry, url: `https://cdn.mysql.com/Downloads/MySQL-8.4/${entry.file}` }
 }
@@ -95,6 +112,8 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     onProgress?.({ message: `Unpacking MySQL ${version}` })
     const extracted = await runTar(['-xf', file, '--strip-components=1', '-C', unpacked], staging)
     if (extracted.code !== 0 || !roles.every(role => binary(unpacked, role))) fail('The MySQL archive did not unpack completely. Please retry.')
+    // Before the engine is moved into place: one that cannot load its libraries must not look installed.
+    ensureLibraries(unpacked, ['server', 'client'].map(role => binary(unpacked, role).path), { onProgress, engineLabel: LABEL })
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, arch: process.arch, sha256: archive.sha256 }))
     fs.renameSync(unpacked, dir)
     return { version, dir, cached: false }
@@ -120,7 +139,7 @@ export function iniFor(inst, socket, platform = process.platform) {
   const value = text => '"' + String(text).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') + '"'
   return ['# Managed by SpawnLoft; plugin configs remain manual.', '[mysqld]',
     `basedir=${value(engineDir(inst.version, platform))}`, `datadir=${value(dataDir(inst))}`,
-    ...(platform === 'darwin' ? [`socket=${value(socket)}`] : []), `pid-file=${value(path.join(inst.dir, 'mysql.pid'))}`,
+    ...(platform !== 'win32' ? [`socket=${value(socket)}`] : []), `pid-file=${value(path.join(inst.dir, 'mysql.pid'))}`,
     `port=${inst.port}`, 'bind-address=127.0.0.1', 'mysqlx=0', 'skip-name-resolve',
     'character-set-server=utf8mb4', 'collation-server=utf8mb4_unicode_ci',
     'max_connections=100', 'log-error-verbosity=2', '',
@@ -157,9 +176,10 @@ export async function initData(inst) {
   const socket = win ? null : socketFor(inst)
   fs.writeFileSync(iniFile(inst), iniFor(inst, socket), { mode: 0o600 })
   const server = binary(dir, 'server').path
-  await execute(server, ['--no-defaults', '--version'])
+  const env = libraryEnv(server)
+  await execute(server, ['--no-defaults', '--version'], { env })
   // --initialize creates a temporary random root password; it is captured, never logged.
-  await execute(server, ['--no-defaults', '--initialize', `--basedir=${dir}`, `--datadir=${dataDir(inst)}`])
+  await execute(server, ['--no-defaults', '--initialize', `--basedir=${dir}`, `--datadir=${dataDir(inst)}`], { env })
   const initFile = path.join(inst.dir, 'bootstrap.sql')
   const password = maria.quoteStr(inst.root.password)
   fs.writeFileSync(initFile, [
@@ -172,7 +192,7 @@ export async function initData(inst) {
   try {
     child = spawn(server, [`--defaults-file=${iniFile(inst)}`, '--skip-networking', `--init-file=${initFile}`,
       ...(win ? ['--console', '--shared-memory', `--shared-memory-base-name=${sharedMemory}`] : [])],
-    { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+    { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true, env })
     exited = new Promise(resolve => { child.once('error', () => resolve()); child.once('close', resolve) })
     await new Promise((resolve, reject) => {
       let log = ''
@@ -187,7 +207,7 @@ export async function initData(inst) {
     clearTimeout(timer)
     await execute(binary(dir, 'admin').path, ['--no-defaults',
       ...(win ? ['--protocol=MEMORY', `--shared-memory-base-name=${sharedMemory}`] : ['--protocol=SOCKET', `--socket=${socket}`]), '--user=root', 'shutdown'],
-      { env: { ...process.env, MYSQL_PWD: inst.root.password }, timeout: 30000 })
+      { env: { ...env, MYSQL_PWD: inst.root.password }, timeout: 30000 })
     await exited
     if (child.exitCode !== 0) fail('MySQL did not finish setup cleanly.')
     return { initialised: true }
@@ -202,13 +222,14 @@ export async function initData(inst) {
 export function launchSpec(inst) {
   const dir = engineDir(inst.version)
   if (!hasEngine(inst.version)) fail('The managed MySQL engine is missing or incomplete.')
-  if (process.platform === 'darwin') socketFor(inst)
+  if (process.platform !== 'win32') socketFor(inst)
+  const env = libraryEnv(binary(dir, 'server').path)
   return {
-    cmd: binary(dir, 'server').path, args: [`--defaults-file=${iniFile(inst)}`, ...(process.platform === 'win32' ? ['--console'] : [])], env: process.env, cwd: inst.dir,
+    cmd: binary(dir, 'server').path, args: [`--defaults-file=${iniFile(inst)}`, ...(process.platform === 'win32' ? ['--console'] : [])], env, cwd: inst.dir,
     ready: MARIADB_READY_RE, failed: /\[ERROR\].*(?:Aborting|Can't start|Unable to lock|Fatal)/i,
     stop: { cmd: binary(dir, 'admin').path,
       args: ['--no-defaults', '--protocol=TCP', '--host=127.0.0.1', `--port=${inst.port}`, '--user=root', 'shutdown'],
-      env: { ...process.env, MYSQL_PWD: inst.root.password } },
+      env: { ...env, MYSQL_PWD: inst.root.password } },
   }
 }
 

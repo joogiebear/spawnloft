@@ -10,8 +10,8 @@ on:
 
 jobs:
   test:
-    # windows-latest, not ubuntu: the scheduler speaks schtasks, the control channel is a
-    # named pipe, and the paths are drive letters. Passing on Linux would prove little.
+    # Windows has its own scheduler (schtasks), control channel (a named pipe), paths (drive
+    # letters) and process table, none of which the Linux job below exercises.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,9 +25,11 @@ jobs:
           node mcctl.mjs help
           node mcctl.mjs list
 
-  # The same suite on Linux, in well under a minute. Nearly every module is portable, the
-  # Windows-only paths guard themselves, and a contributor on Linux gets an answer before the
-  # Windows runner has finished booting. Windows above remains the run that counts.
+  # Linux is a platform SpawnLoft ships for, with code of its own that only runs here: the
+  # systemd scheduler's unit files, /proc sampling against a live process, the zip reader and
+  # writer checked against Python's, process-group kills, and unix socket path limits. Both
+  # jobs count; neither stands in for the other. The job keeps its name because branch
+  # protection on main requires a check called test-linux.
   test-linux:
     runs-on: ubuntu-latest
     steps:
@@ -37,3 +39,9 @@ jobs:
           node-version: 22
       - name: Test
         run: npm test
+      - name: Smoke-check the CLI
+        run: |
+          node mcctl.mjs help
+          node mcctl.mjs list
+          # The checkout's shell entry point: present, executable, and with LF line endings.
+          ./spawnloft config

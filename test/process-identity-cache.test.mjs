@@ -20,3 +20,18 @@ test('a snapshot from before launch cannot misidentify a reused PID as an orphan
     assert.equal(util.sameProcess(process.pid, 'wrong-executable', 0), false)
   } finally { mock.mock.restore(); syncBuiltinESMExports() }
 })
+
+test('a process name Linux has cut to fifteen bytes is still the process it was started as', async () => {
+  const { sameImage } = await import('../src/util.mjs')
+  // What ps says about the installed app, against what was recorded when the daemon started.
+  assert.equal(sameImage('spawnloft-deskt', 'spawnloft-desktop', 'linux'), true)
+  assert.equal(sameImage('java', 'java', 'linux'), true)
+  assert.equal(sameImage('SpawnLoft.exe', 'spawnloft', 'win32'), true)
+  // Fifteen bytes of something else is still something else.
+  assert.equal(sameImage('chrome_crashpad', 'spawnloft-desktop', 'linux'), false)
+  // A short name is a whole name: "spawn" is not spawnloft-desktop cut short.
+  assert.equal(sameImage('spawn', 'spawnloft-desktop', 'linux'), false)
+  // Only Linux truncates; elsewhere a prefix is a different program.
+  assert.equal(sameImage('spawnloft-deskt', 'spawnloft-desktop', 'darwin'), false)
+  assert.equal(sameImage('spawnloft-deskt', 'spawnloft-desktop', 'win32'), false)
+})

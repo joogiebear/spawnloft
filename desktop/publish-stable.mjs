@@ -17,7 +17,7 @@ const commit = gh(['api', `repos/${repo}/commits/main`, '--jq', '.sha'])
 const run = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${runId}`]))
 if (run.path !== '.github/workflows/desktop-stable.yml' || run.head_branch !== 'main' || run.head_sha !== commit ||
     run.event !== 'workflow_dispatch' || run.status !== 'completed' || run.conclusion !== 'success') {
-  throw new Error('Both native Mac builds and installed upgrade checks must pass on the current main commit')
+  throw new Error('Both native Mac builds, the Linux build and the installed upgrade checks must pass on the current main commit')
 }
 const verified = verifyRelease(dir, { stable: true, version, sourceVersion: version, commit, macSigningMode: 'signed' })
 const installer = path.join(dir, `SpawnLoft-Setup-${version}.exe`).replaceAll("'", "''")
@@ -55,5 +55,5 @@ if (release && !release.draft) {
   checkUploaded(uploaded[0])
   if (gh(['api', `repos/${repo}/commits/main`, '--jq', '.sha']) !== commit) throw new Error('main moved; leaving release as a draft')
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease=false', '--latest'])
-  console.log(`Published ${tag}: signed Windows, Apple Silicon and Intel Mac packages, with stable and beta updater feeds.`)
+  console.log(`Published ${tag}: signed Windows, Apple Silicon and Intel Mac packages and the Linux package, with stable and beta updater feeds.`)
 }

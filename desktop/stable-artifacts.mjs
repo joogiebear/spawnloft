@@ -17,6 +17,9 @@ if (target.platform === 'win32') {
   }
   fs.copyFileSync(path.join(dir, 'latest.yml'), path.join(dir, 'beta.yml'))
 }
+// Linux has no signature to check: no Authenticode, no notarization. The package is verified by the
+// hash in its feed, and both feed names ship so a beta installation can move to the stable.
+if (target.platform === 'linux') fs.copyFileSync(path.join(dir, 'latest-linux.yml'), path.join(dir, 'beta-linux.yml'))
 const manifest = createManifest(dir, info, target, { stable: true })
 fs.writeFileSync(path.join(dir, manifestName(target)), JSON.stringify(manifest, null, 2) + '\n')
-console.log(`Verified signed stable artifacts for ${target.platform}/${target.arch}: ${info.version}`)
+console.log(`Verified ${target.platform === 'linux' ? '' : 'signed '}stable artifacts for ${target.platform}/${target.arch}: ${info.version}`)

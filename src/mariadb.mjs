@@ -9,6 +9,7 @@ import { ENGINES_DIR } from './paths.mjs'
 import { runTar } from './tar.mjs'
 import { fail, humanBytes, UserError, randomPassword } from './util.mjs'
 import { MARIADB_READY_RE, MARIADB_FAILED_RE } from './ready.mjs'
+import { libraryEnv } from './linux-libs.mjs'
 
 /**
  * MariaDB as an engine SpawnLoft runs: where to get it, how to lay a database out on it, how to
@@ -233,7 +234,8 @@ export function hasEngine(version) {
 /** How to run a binary: itself, or - a script standing in for it - this Node told to be Node. */
 function runnable(bin, args, env = process.env) {
   if (bin.script) return { cmd: process.execPath, args: [bin.path, ...args], env: { ...env, ELECTRON_RUN_AS_NODE: '1' } }
-  return { cmd: bin.path, args, env }
+  // A managed Linux engine may carry libraries of its own beside bin/; see linux-libs.mjs.
+  return { cmd: bin.path, args, env: libraryEnv(bin.path, env) }
 }
 
 /**

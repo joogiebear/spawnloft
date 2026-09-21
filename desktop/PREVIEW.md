@@ -1,8 +1,8 @@
 ## SpawnLoft desktop development preview
 
-Separate Windows and Mac installers, built from the same development commit with the
-same version. The release is published only after Windows x64, Apple Silicon, and Intel
-Mac packages all pass their native checks. Each release is immutable and numbered.
+Separate Windows, Mac and Linux installers, built from the same development commit with the
+same version. The release is published only after Windows x64, Apple Silicon, Intel Mac and
+Linux x64 packages all pass their native checks. Each release is immutable and numbered.
 
 ### Fixes to try
 
@@ -94,6 +94,32 @@ Managed MySQL 8.4 LTS requires macOS 15+; the desktop app itself runs on macOS 1
 Garnet installs a verified private .NET runtime automatically. Its stop action waits for a
 saved checkpoint before terminating the process because Garnet does not implement SHUTDOWN.
 Plugin configs remain manual. MariaDB is no longer offered for new setups.
+
+### Linux
+
+- **x64:** download the `linux-amd64.deb` asset. For Ubuntu 22.04+ and Debian 12+.
+- Install it with `sudo apt install ./SpawnLoft-<version>-linux-amd64.deb`, which also pulls in
+  what it depends on. Java is separate, as everywhere: `sudo apt install openjdk-25-jre-headless`.
+- `spawnloft-desktop` opens the window; `spawnloft` is the command line, and needs no Node.
+- On a server with no desktop, run `spawnloft ui --no-open` and reach the panel through an SSH
+  tunnel. It listens on loopback only.
+
+Linux has no code signing to check. The package is verified by the hash in the update feed.
+
+**Scheduled tasks and automatic backups run while you are logged in.** Turn on *Keep running
+after logout* in the Backups or Scheduler tab if they should outlive your session - on a server
+you disconnect from, that is the difference between a nightly backup and none.
+
+Managed **MySQL** is offered on x64 and **Redis (Garnet)** on x64 and arm64. MySQL needs libaio,
+libnuma and ncurses, which a stock server does not have: SpawnLoft fetches the distribution's own
+packages with `apt-get download` and unpacks them beside the engine, without sudo and without
+installing anything on the system. Off Debian and Ubuntu it tells you the command to run instead.
+
+There is no AppImage or `.rpm` yet. Under WSL, a window that shows only a taskbar icon titled
+"WARN: Copy Mode" is WSLg, not SpawnLoft: run `wsl --shutdown` from a non-Administrator terminal.
+
+On a machine with a public address and no firewall, `spawnloft doctor` and the panel warn that
+RCON is reachable from the internet. Minecraft cannot bind it separately from the game port.
 
 ### Toward 1.0
 

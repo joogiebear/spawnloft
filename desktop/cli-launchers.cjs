@@ -14,6 +14,13 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)" || exit 1
 exec env ELECTRON_RUN_AS_NODE=1 "$SCRIPT_DIR/../../MacOS/SpawnLoft" "$SCRIPT_DIR/../core/${name}.mjs" "$@"
 `
       fs.writeFileSync(path.join(bin, name), script, { mode: 0o755 })
+    } else if (platform === 'linux') {
+      // resources/bin -> resources -> the application folder, where the executable sits.
+      const script = `#!/bin/sh
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)" || exit 1
+exec env ELECTRON_RUN_AS_NODE=1 "$SCRIPT_DIR/../../spawnloft-desktop" "$SCRIPT_DIR/../core/${name}.mjs" "$@"
+`
+      fs.writeFileSync(path.join(bin, name), script, { mode: 0o755 })
     } else if (platform === 'win32') {
       fs.writeFileSync(path.join(bin, `${name}.cmd`), [
         '@echo off', 'setlocal', 'set ELECTRON_RUN_AS_NODE=1',

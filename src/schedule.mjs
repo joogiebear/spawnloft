@@ -6,6 +6,10 @@ import { DATA_ROOT, ROOT, RUN_DIR } from './paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as mac from './schedule-mac.mjs'
+import * as linux from './schedule-linux.mjs'
+
+// launchd and systemd are driven through the same five calls; Windows is the code in this file.
+const native = process.platform === 'darwin' ? mac : process.platform === 'linux' ? linux : null
 
 /**
  * Scheduled work, run by Windows.
@@ -155,6 +159,26 @@ export function describeResult(code) {
   return TASK_RESULT[code] ?? `failed (exit ${code})`
 }
 
+/**
+ * Will scheduled work run while nobody is logged in?
+ *
+ * <p>On Windows and macOS the answer is a fixed "no" and the panel says so in its hint. On Linux it
+ * is a setting: a user's systemd, and every timer in it, stops at their last logout unless
+ * lingering is on for the account. On a desktop that is the same promise Windows makes. On a server
+ * someone connects to over SSH and disconnects from, it means the nightly backup NEVER runs - and
+ * nothing fails, because nothing was started. `linger` is true, false, or null where the question
+ * does not apply or could not be asked; `session` says how loudly to say so.
+ */
+export function background() {
+  if (process.platform !== 'linux') return { linger: null, session: null }
+  return { linger: linux.linger(), session: linux.sessionKind() }
+}
+
+export function keepRunningLoggedOut() {
+  if (process.platform !== 'linux') fail('Lingering is a Linux setting; there is nothing to turn on here.')
+  return linux.enableLinger()
+}
+
 export function load() {
   const data = readJson(TASKS_FILE(), EMPTY)
   if (!data.tasks) data.tasks = {}
@@ -163,7 +187,7 @@ export function load() {
 
 export async function list() {
   const data = load()
-  const live = process.platform === 'darwin' ? await mac.query(data.tasks, recentRuns) : await queryWindows()
+  const live = native ? await native.query(data.tasks, recentRuns) : await queryWindows()
   return Object.entries(data.tasks)
     .map(([id, task]) => ({ id, ...task, windows: live.get(id) ?? null }))
     .sort((a, b) => a.instance.localeCompare(b.instance) || a.name.localeCompare(b.name))
@@ -267,7 +291,7 @@ function queryWindows() {
  * definition, where quoting it correctly is its own small nightmare.
  */
 function writeShim(id) {
-  if (process.platform === 'darwin') return mac.writeShim(id)
+  if (native) return native.writeShim(id)
   const dir = path.join(DATA_ROOT, 'tasks')
   fs.mkdirSync(dir, { recursive: true })
   const shim = path.join(dir, `${id}.cmd`)
@@ -342,7 +366,7 @@ function schtasks(args) {
  * quoted is stored whole.
  */
 function writeWindowsTask(id, task) {
-  if (process.platform === 'darwin') return mac.write(id, task)
+  if (native) return native.write(id, task)
   // Refuse before writing a Windows launcher into a Mac server's data folder.
   if (!platformCapabilities().scheduler) fail(PREVIEW_LIMITS.scheduler)
   const shim = writeShim(id)
@@ -390,7 +414,7 @@ export function create({ instance, name, action, schedule, enabled = true, owner
 
   // RunAtLoad may fire as soon as launchd accepts the agent. Publish its action
   // first on Mac, rolling it back if registration fails.
-  if (process.platform === 'darwin') {
+  if (native) {
     data.tasks[id] = task
     writeJson(TASKS_FILE(), data)
     try { writeWindowsTask(id, task) }
@@ -432,7 +456,7 @@ export function update(id, patch) {
   // the thing that tab is a toggle for, so it stops being that tab's - and the toggle reads Off
   // rather than pointing at a task that no longer backs anything up.
   if (task.owner === OWNER_BACKUPS && task.action.type !== 'backup') task.owner = null
-  if (process.platform === 'darwin') {
+  if (native) {
     data.tasks[id] = task
     writeJson(TASKS_FILE(), data)
     try { writeWindowsTask(id, task) }
@@ -444,7 +468,7 @@ export function update(id, patch) {
 }
 
 export function setEnabled(id, enabled) {
-  if (process.platform === 'darwin') return update(id, { enabled })
+  if (native) return update(id, { enabled })
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
   schtasks(['/Change', '/TN', `${TASK_FOLDER}\\${id}`, enabled ? '/ENABLE' : '/DISABLE'])
@@ -475,8 +499,8 @@ export function remove(id) {
   // while the real task kept firing, and the id went on to build a path that rmSync would follow.
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
 
-  if (process.platform === 'darwin') {
-    mac.remove(id)
+  if (native) {
+    native.remove(id)
     delete data.tasks[id]
     writeJson(TASKS_FILE(), data)
     return { id, removed: true }
@@ -513,7 +537,7 @@ export function remove(id) {
 export function runNow(id) {
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
-  if (process.platform === 'darwin') mac.runNow(id, data.tasks[id])
+  if (native) native.runNow(id, data.tasks[id])
   else schtasks(['/Run', '/TN', `${TASK_FOLDER}\\${id}`])
   return { id, started: true }
 }
@@ -588,15 +612,15 @@ export function renameInstance(oldName, newName) {
   }
   if (!moved.length) return { moved: 0 }
 
-  if (process.platform === 'darwin') {
+  if (native) {
     for (const m of moved) {
       // Stage the new agent disabled: a login trigger must not fire in the
       // middle of a rename, or while the old task might still be running.
       data.tasks[m.to] = { ...m.task, enabled: false }
       writeJson(TASKS_FILE(), data)
-      try { mac.write(m.to, data.tasks[m.to]); mac.remove(m.from) }
+      try { native.write(m.to, data.tasks[m.to]); native.remove(m.from) }
       catch (error) {
-        try { mac.remove(m.to) } catch {}
+        try { native.remove(m.to) } catch {}
         delete data.tasks[m.to]
         writeJson(TASKS_FILE(), data)
         throw error

@@ -31,6 +31,7 @@ import * as neoforge from './neoforge.mjs'
 import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
+import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
 
@@ -476,6 +477,7 @@ async function handleBackups(req, res, name, seg) {
       },
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
+      background: schedule.background(),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -873,6 +875,7 @@ async function handleSchedules(req, res, name, seg) {
       kinds: schedule.SCHEDULE_KINDS,
       days: schedule.DAYS,
       running: supervisor.isRunning(name),
+      background: schedule.background(),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -1165,6 +1168,11 @@ async function route(req, res) {
       platform: process.platform,
       capabilities: platformCapabilities(),
     })
+  }
+
+  // ---- let scheduled work run while logged out (Linux) ---------------------
+  if (seg[1] === 'scheduler' && seg[2] === 'linger' && req.method === 'POST') {
+    return json(res, 200, schedule.keepRunningLoggedOut())
   }
 
   // ---- progress for a create in flight -------------------------------------
@@ -1489,6 +1497,11 @@ async function route(req, res) {
       crashDir: path.join(inst.dir, 'crash-reports'),
     })
     const crashes = crashReports(inst, { limit: 5 })
+    // Not read from the console, but it belongs with what is: something wrong with this server
+    // that its owner can act on. Only while it runs - a stopped server has no port open - and
+    // first, because the panel shows two findings and this is the one that cannot wait.
+    const exposed = supervisor.isRunning(name) ? rconExposure(inst) : null
+    if (exposed) findings.unshift({ ...exposed, line: null })
     return json(res, 200, {
       // The line each finding was read from rides along, so the panel can put it in front of
       // the person in the console rather than telling them to go and look for it.

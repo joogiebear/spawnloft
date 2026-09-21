@@ -12,12 +12,27 @@ const sha512 = crypto.createHash('sha512').update(installer).digest('base64')
 const installerName = `SpawnLoft-Setup-${identity.version}.exe`
 const feed = `version: ${identity.version}\nfiles:\n  - url: ${installerName}\n    sha512: ${sha512}\n    size: ${installer.length}\npath: ${installerName}\nsha512: ${sha512}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
 
+// The Linux feed is the same shape about a different file: the .deb, under the platform's feed names.
+const debPackage = Buffer.from('fixture Debian package bytes')
+const debSha512 = crypto.createHash('sha512').update(debPackage).digest('base64')
+const debName = `SpawnLoft-${identity.version}-linux-amd64.deb`
+const linuxFeed = `version: ${identity.version}\nfiles:\n  - url: ${debName}\n    sha512: ${debSha512}\n    size: ${debPackage.length}\npath: ${debName}\nsha512: ${debSha512}\nreleaseDate: '2026-09-11T12:00:00.000Z'\n`
+
+function fixtureBytes(name, version = identity.version) {
+  // Each feed names its installer, and the installer's name carries the version.
+  if (name.endsWith('-linux.yml')) return linuxFeed.replaceAll(identity.version, version)
+  if (name.endsWith('.yml')) return feed.replaceAll(identity.version, version)
+  if (name.endsWith('.exe')) return installer
+  if (name.endsWith('.deb')) return debPackage
+  return Buffer.from(name)
+}
+
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-preview-test-'))
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   for (const target of TARGETS) {
     for (const name of artifactNames({ ...identity, ...target })) {
-      fs.writeFileSync(path.join(dir, name), name.endsWith('.yml') ? feed : name.endsWith('.exe') ? installer : Buffer.from(name))
+      fs.writeFileSync(path.join(dir, name), fixtureBytes(name))
     }
     writeManifest(dir, target, createManifest(dir, { ...identity, ...target, macSigningMode: 'ad-hoc' }, target))
   }
@@ -34,11 +49,32 @@ function modifyManifest(dir, target, change) {
   writeManifest(dir, target, info)
 }
 
-test('paired release verifies Windows and both native Mac builds, including both updater feeds', t => {
+test('paired release verifies Windows, both native Mac builds and Linux, including every updater feed', t => {
   const verified = verifyRelease(fixture(t), identity)
-  assert.equal(verified.assets.length, 11)
+  assert.equal(verified.assets.length, 15)
   assert.equal(verified.version, identity.version)
-  assert.deepEqual(verified.assets.filter(asset => asset.name.endsWith('.yml')).map(asset => asset.name), ['latest.yml', 'beta.yml'])
+  assert.deepEqual(verified.assets.filter(asset => asset.name.endsWith('.yml')).map(asset => asset.name),
+    ['latest.yml', 'beta.yml', 'latest-linux.yml', 'beta-linux.yml'])
+  assert.ok(verified.assets.some(asset => asset.name === debName))
+})
+
+test('a Linux feed that does not describe the package it ships with stops the release', t => {
+  const dir = fixture(t)
+  fs.writeFileSync(path.join(dir, 'latest-linux.yml'), linuxFeed.replace(`path: ${debName}`, 'path: other.deb'))
+  fs.copyFileSync(path.join(dir, 'latest-linux.yml'), path.join(dir, 'beta-linux.yml'))
+  const linux = TARGETS.find(target => target.platform === 'linux')
+  modifyManifest(dir, linux, info => {
+    for (const asset of info.assets.filter(a => a.name.endsWith('-linux.yml'))) {
+      const bytes = fs.readFileSync(path.join(dir, asset.name))
+      asset.size = bytes.length
+      asset.sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+    }
+  })
+  assert.throws(() => verifyRelease(dir, identity), /does not match the verified installer/)
+  // The two names are one feed; a beta installation must not be told something different.
+  const other = fixture(t)
+  fs.appendFileSync(path.join(other, 'beta-linux.yml'), '\n')
+  assert.throws(() => createManifest(other, { ...identity, ...linux }, linux), /must be identical/)
 })
 
 test('paired release refuses missing platform manifests and missing installer bytes', async t => {
@@ -158,18 +194,18 @@ test('stable release requires matching clean versions and signed builds on every
   const stable = { ...identity, sourceVersion: '1.0.0', version: '1.0.0' }
   for (const target of TARGETS) {
     for (const name of artifactNames({ ...stable, ...target })) {
-      fs.writeFileSync(path.join(dir, name), name.endsWith('.yml') ? feed.replaceAll(identity.version, stable.version) : name.endsWith('.exe') ? installer : Buffer.from(name))
+      fs.writeFileSync(path.join(dir, name), fixtureBytes(name, stable.version))
     }
     const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
     writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
   }
-  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 11)
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 15)
   assert.throws(() => verifyRelease(dir, stable), /development/)
   modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)
   modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'azure'; info.sourceVersion = '1.0.0-beta.1' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /clean stable/)
   modifyManifest(dir, TARGETS[0], info => { info.sourceVersion = '1.0.0' })
-  for (const target of TARGETS.slice(1)) modifyManifest(dir, target, info => { info.macSigningMode = 'ad-hoc' })
+  for (const target of TARGETS.filter(target => target.platform === 'darwin')) modifyManifest(dir, target, info => { info.macSigningMode = 'ad-hoc' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Mac signing mode/)
 })

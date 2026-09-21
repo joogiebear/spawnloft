@@ -33,9 +33,9 @@ npm test                 # node:test, no dependencies, ~a second
 node mcctl.mjs ui --no-open --port 8771    # the panel, from source
 ```
 
-Tests live in `test/` and run on every push and pull request, on Windows (the run
-that counts — the scheduler speaks schtasks and the paths are drive letters) and on
-Linux (fast feedback). New behaviour that has a pure core should come with tests for
+Tests live in `test/` and run on every push and pull request, on Windows and on
+Linux. Both count: each platform has a scheduler, a control channel and a process table of
+its own, and code that only runs there. New behaviour that has a pure core should come with tests for
 it; the existing files show the shape.
 
 One rule that is easy to break without noticing: **nothing synchronous and slow on the
