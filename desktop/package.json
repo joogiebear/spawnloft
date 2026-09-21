@@ -1,6 +1,6 @@
 {
   "name": "mcctl-desktop",
-  "version": "1.1.0",
+  "version": "1.2.0-beta.1",
   "private": true,
   "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
   "productName": "SpawnLoft",
@@ -77,7 +77,8 @@
     },
     "linux": {
       "target": [
-        "deb"
+        "deb",
+        "rpm"
       ],
       "icon": "build/icon.png",
       "category": "Utility",
@@ -101,6 +102,12 @@
     "deb": {
       "packageName": "spawnloft",
       "packageCategory": "utils",
+      "fpm": [
+        "./build/linux/spawnloft=/usr/bin/spawnloft"
+      ]
+    },
+    "rpm": {
+      "packageName": "spawnloft",
       "fpm": [
         "./build/linux/spawnloft=/usr/bin/spawnloft"
       ]

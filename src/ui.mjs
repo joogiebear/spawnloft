@@ -1055,6 +1055,7 @@ async function route(req, res) {
     const html = readFileSync(path.join(HERE, 'ui.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
       .replace('name="spawnloft-platform" content="win32"', `name="spawnloft-platform" content="${process.platform}"`)
+      .replace('name="spawnloft-managed-mysql" content="true"', `name="spawnloft-managed-mysql" content="${services.canManage('mysql')}"`)
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
     res.end(html)
     return

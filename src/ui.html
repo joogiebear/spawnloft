@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
 <meta name="spawnloft-platform" content="win32">
+<meta name="spawnloft-managed-mysql" content="true">
 <title>SpawnLoft</title>
 
 <style>
@@ -2167,6 +2168,10 @@ const schedulerHint = panelPlatform === 'linux'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
 const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin' || panelPlatform === 'linux';
+// A platform can manage databases without being able to manage every engine: Oracle publishes no
+// small MySQL build for Linux on arm64, where Redis (Garnet) still runs. The one-click button on a
+// server's Settings tab is MySQL, so it has to know.
+const managedMysql = $('meta[name="spawnloft-managed-mysql"]').content !== 'false';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
@@ -6723,6 +6728,9 @@ async function renderServerDatabases(row, body) {
   if (!managedDatabaseFeatures) {
     create.disabled = true;
     createHint.textContent = databasePreviewNote;
+  } else if (!managedMysql) {
+    create.disabled = true;
+    createHint.textContent = 'Managed MySQL is not available for this machine (there is no small MySQL build for Linux on arm64). Add a server, then A database, offers Redis here, or connect to a MySQL you already run.';
   }
   create.onclick = async () => {
     create.disabled = true;
