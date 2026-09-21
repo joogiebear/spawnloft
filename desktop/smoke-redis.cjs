@@ -8,7 +8,10 @@ module.exports = async function smokeRedis({ page, api, cli, core, executable, e
   const dbName = `${name}-cache`
   const engines = await api('databases/engines')
   assert.deepEqual(engines.map(e => e.id).sort(), ['garnet', 'mysql'])
-  assert.ok(engines.every(e => e.managed))
+  // Redis is managed everywhere SpawnLoft ships. MySQL is too, except Linux on arm64, where Oracle
+  // publishes no small build; there it must say so rather than claim an install it cannot do.
+  const mysqlExpected = !(process.platform === 'linux' && process.arch !== 'x64')
+  assert.deepEqual(Object.fromEntries(engines.map(e => [e.id, e.managed])), { garnet: true, mysql: mysqlExpected })
   await page.locator('#bNew').click()
   await page.locator('#vAdd [data-tab="db"]').click()
   await page.waitForFunction(() => document.querySelectorAll('#dEngine option').length === 2)
