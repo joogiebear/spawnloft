@@ -22,6 +22,7 @@ Existing installs receive 1.2 through the built-in updater. ZIP files are used b
 ## Fixed
 
 - On Linux arm64 the one-click *Create a database* button was offered and then refused by the server.
+- Downloading a server jar or a database engine asks again when the download server answers with a gateway timeout or is briefly unavailable, instead of failing the install on one bad response.
 
 Plugin configuration remains manual. SpawnLoft does not insert database credentials into plugin configuration files.
 

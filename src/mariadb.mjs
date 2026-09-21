@@ -8,6 +8,7 @@ import { pipeline } from 'node:stream/promises'
 import { ENGINES_DIR } from './paths.mjs'
 import { runTar } from './tar.mjs'
 import { fail, humanBytes, UserError, randomPassword } from './util.mjs'
+import { fetchRetry } from './download.mjs'
 import { MARIADB_READY_RE, MARIADB_FAILED_RE } from './ready.mjs'
 import { libraryEnv } from './linux-libs.mjs'
 
@@ -263,7 +264,7 @@ export async function fetchEngine(version, { onProgress = null, force = false } 
   onProgress?.({ message: `Downloading MariaDB ${version}`, received: 0, total: zip.size })
   let res
   try {
-    res = await fetch(zip.url, { headers: { 'User-Agent': UA } })
+    res = await fetchRetry(zip.url, { headers: { 'User-Agent': UA } })
   } catch (err) {
     fail(`download failed for MariaDB ${version}: ${err.message}`)
   }

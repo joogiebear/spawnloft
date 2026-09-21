@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises'
 import { ENGINES_DIR } from './paths.mjs'
 import { runTar } from './tar.mjs'
 import { fail, UserError } from './util.mjs'
+import { fetchRetry } from './download.mjs'
 import * as maria from './mariadb.mjs'
 import { MARIADB_READY_RE } from './ready.mjs'
 import { ensureLibraries, libraryEnv } from './linux-libs.mjs'
@@ -97,7 +98,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     const file = path.join(staging, archive.file)
     const unpacked = path.join(staging, 'engine')
     fs.mkdirSync(unpacked)
-    const response = await fetch(archive.url, { signal: AbortSignal.timeout(600000) })
+    const response = await fetchRetry(archive.url, {}, { timeoutMs: 600000 })
     if (!response.ok || !response.body) fail(`MySQL download failed (${response.status}). Please retry.`)
     const total = Number(response.headers.get('content-length')) || 0
     let received = 0
