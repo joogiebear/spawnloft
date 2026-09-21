@@ -192,11 +192,12 @@ jobs:
         # current one of each. None of these images has Node, which is what the package promises
         # not to need; what each run proves is written at the top of the script.
         run: |
-          for image in ubuntu:22.04 debian:12; do
-            docker run --rm -v "$PWD:/repo:ro" "$image" sh /repo/desktop/smoke-cli-package.sh deb
-          done
+          docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04 sh /repo/desktop/smoke-cli-package.sh deb
+          # "db": on x64, also install managed MySQL as an ordinary user on a system with none of the
+          # libraries it needs. apt-get download on Debian, dnf 4 on Rocky, dnf 5 on Fedora.
+          docker run --rm -v "$PWD:/repo:ro" debian:12 sh /repo/desktop/smoke-cli-package.sh deb db
           for image in rockylinux:9 fedora:42; do
-            docker run --rm -v "$PWD:/repo:ro" "$image" sh /repo/desktop/smoke-cli-package.sh rpm
+            docker run --rm -v "$PWD:/repo:ro" "$image" sh /repo/desktop/smoke-cli-package.sh rpm db
           done
       - name: Install the isolated UI test tool
         run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0

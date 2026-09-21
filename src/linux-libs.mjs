@@ -19,10 +19,10 @@ import { fail } from './util.mjs'
  *       24.04 ships libaio as libaio.so.1t64, so mysqld cannot find it EVEN AFTER the package it
  *       asked for is installed. A link under the old name, in a folder of the engine's own, is the
  *       whole fix.</li>
- *   <li>The packages are fetched with `apt-get download` - which needs no root, and verifies what
- *       it fetches against the distribution's signed index like any apt install - and unpacked
- *       beside the engine. Nothing is installed on the system and nothing outside the engine's
- *       folder is written.</li>
+ *   <li>The packages are fetched with `apt-get download` or `dnf download` - which need no root,
+ *       and verify what they fetch against the distribution's signed metadata like any install -
+ *       and unpacked beside the engine. Nothing is installed on the system and nothing outside the
+ *       engine's folder is written.</li>
  * </ol>
  * Failing all three, the refusal names the command that fixes it for this distribution.
  */
@@ -147,6 +147,55 @@ function fetchWithApt(missing, libs, onProgress) {
   }
 }
 
+/** dnf's name for this machine. Without it a 64-bit Fedora is handed the i686 package as well. */
+export const RPM_ARCH = Object.freeze({ x64: 'x86_64', arm64: 'aarch64' })
+
+/** One package can supply several libraries: ncurses-libs is both libncurses and libtinfo. */
+export function dnfPackagesFor(missing) {
+  return [...new Set(missing.map(name => PACKAGES[name]?.dnf).filter(Boolean))]
+}
+
+/**
+ * The same as fetchWithApt, for the Fedora and RHEL families.
+ *
+ * <p>`dnf download` is part of dnf 5, and of dnf-plugins-core before it, which a RHEL-family
+ * install normally has; where it is missing the command fails and the refusal names the packages,
+ * as it did before this existed. An rpm is unpacked with rpm2cpio, which comes with rpm itself,
+ * into cpio, which comes with anything that builds an initramfs; bsdtar reads an rpm directly and
+ * is tried where there is no cpio. A machine with neither gets the same refusal.
+ *
+ * <p>`run` is passed in so the order of those decisions can be checked without a Fedora.
+ */
+export function fetchWithDnf(missing, libs, onProgress = null, { run = spawnSync, arch = process.arch } = {}) {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-libs-'))
+  try {
+    for (const pkg of dnfPackagesFor(missing)) {
+      onProgress?.({ message: `Fetching ${pkg} from your distribution` })
+      const dest = path.join(work, pkg)
+      fs.mkdirSync(dest)
+      const got = run('dnf', ['download', '--destdir', dest, ...(RPM_ARCH[arch] ? ['--arch', RPM_ARCH[arch]] : []), pkg],
+        { cwd: dest, encoding: 'utf8', timeout: 180000, env: { ...process.env, LC_ALL: 'C' } })
+      if (got.error || got.status !== 0) continue
+      const rpm = fs.readdirSync(dest).find(file => file.startsWith(`${pkg}-`) && file.endsWith('.rpm'))
+      if (!rpm) continue
+      const out = path.join(work, `x-${pkg}`)
+      fs.mkdirSync(out)
+      const file = path.join(dest, rpm)
+      const unpackers = [
+        ['sh', ['-c', 'rpm2cpio "$1" | cpio -idm --quiet', 'sh', file]],
+        ['bsdtar', ['-xf', file]],
+      ]
+      for (const [cmd, args] of unpackers) {
+        const res = run(cmd, args, { cwd: out, encoding: 'utf8', timeout: 60000 })
+        if (!res.error && res.status === 0) break
+      }
+      copyLibraries(out, libs)
+    }
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true })
+  }
+}
+
 /** Every shared object under a package's tree, links kept as links so the sonames still resolve. */
 function copyLibraries(from, to) {
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
@@ -180,8 +229,9 @@ export function ensureLibraries(engineRoot, binaries, { onProgress = null, engin
   linkRenamed(missing, libs)
   missing = check() ?? []
   const family = packageFamily(readOsRelease())
-  if (missing.length && allowFetch && family === 'apt') {
-    fetchWithApt(missing, libs, onProgress)
+  const fetch = { apt: fetchWithApt, dnf: fetchWithDnf }[family]
+  if (missing.length && allowFetch && fetch) {
+    fetch(missing, libs, onProgress)
     missing = check() ?? []
   }
   if (missing.length) {
