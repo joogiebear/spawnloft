@@ -167,10 +167,11 @@ export function describeResult(code) {
  * lingering is on for the account. On a desktop that is the same promise Windows makes. On a server
  * someone connects to over SSH and disconnects from, it means the nightly backup NEVER runs - and
  * nothing fails, because nothing was started. `linger` is true, false, or null where the question
- * does not apply or could not be asked.
+ * does not apply or could not be asked; `session` says how loudly to say so.
  */
 export function background() {
-  return { linger: process.platform === 'linux' ? linux.linger() : null }
+  if (process.platform !== 'linux') return { linger: null, session: null }
+  return { linger: linux.linger(), session: linux.sessionKind() }
 }
 
 export function keepRunningLoggedOut() {

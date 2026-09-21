@@ -70,3 +70,14 @@ test('whether tasks run while logged out is a question only Linux has an answer 
     assert.throws(() => schedule.keepRunningLoggedOut(), /Linux setting/)
   }
 })
+
+test('a machine someone connects to is told apart from one they sit at', async () => {
+  const { sessionKind } = await import('../src/schedule-linux.mjs')
+  assert.equal(sessionKind({ DISPLAY: ':0' }), 'desktop')
+  assert.equal(sessionKind({ WAYLAND_DISPLAY: 'wayland-0' }), 'desktop')
+  // No display at all: a server, a container, a systemd service.
+  assert.equal(sessionKind({}), 'headless')
+  assert.equal(sessionKind({ SSH_CONNECTION: '203.0.113.9 51234 10.0.0.2 22' }), 'headless')
+  // X forwarding gives an SSH session a DISPLAY; it is still someone who will disconnect.
+  assert.equal(sessionKind({ SSH_TTY: '/dev/pts/0', DISPLAY: 'localhost:10.0' }), 'headless')
+})

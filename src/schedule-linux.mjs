@@ -185,6 +185,20 @@ export function linger() {
 }
 
 /**
+ * Is this a machine someone sits at, or one they connect to?
+ *
+ * <p>Lingering being off means something different in each. At a desktop it is the ordinary
+ * arrangement - tasks run while you are logged in - and worth a quiet note. Over SSH, or with no
+ * display at all, it means the schedule stops the moment the person who made it disconnects, which
+ * is the normal way to leave a server; that deserves a warning. An SSH session with X forwarding
+ * has a DISPLAY and is still a remote one, so the connection is asked about first.
+ */
+export function sessionKind(env = process.env) {
+  if (env.SSH_CONNECTION || env.SSH_TTY) return 'headless'
+  return env.DISPLAY || env.WAYLAND_DISPLAY ? 'desktop' : 'headless'
+}
+
+/**
  * Turn lingering on for this user, so their tasks run whether or not they are logged in.
  *
  * <p>One's own account is usually allowed this without a password. Where policy says otherwise

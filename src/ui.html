@@ -4957,18 +4957,22 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
  * <p>On a desktop that is what Windows promises too. On a server someone reaches over SSH and
  * disconnects from, it means the nightly backup never runs, and nothing reports a failure because
  * nothing was started - so it is said where the schedule is made, with the way out beside it, rather
- * than left in a hint. Returns null when there is nothing to say: lingering is on, the answer is
- * unknown, or this is not Linux.
+ * than left in a hint. At a desktop the same fact is the ordinary arrangement, not a fault, so
+ * there it is a plain note with the same button. Returns null when there is nothing to say:
+ * lingering is on, the answer is unknown, or this is not Linux.
  */
 function lingerNotice(background, refresh) {
   if (panelPlatform !== 'linux' || !background || background.linger !== false) return null;
   const box = document.createElement('div');
-  box.className = 'notice warn';
+  const headless = background.session !== 'desktop';
+  box.className = headless ? 'notice warn' : 'notice';
   const text = document.createElement('div');
   text.className = 'text';
   const lead = document.createElement('b');
-  lead.textContent = 'These only run while you are logged in.';
-  text.append(lead, ' Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.');
+  lead.textContent = headless ? 'These only run while you are logged in.' : 'These pause when you log out.';
+  text.append(lead, headless
+    ? ' Your account stops its background tasks when you log out. On a server you connect to and disconnect from, a nightly backup would never run.'
+    : ' They run while you are logged in, with the screen locked too. Turn this on if backups and servers should keep going after you log out of this computer.');
   const acts = document.createElement('div');
   acts.className = 'acts';
   const fix = document.createElement('button');
