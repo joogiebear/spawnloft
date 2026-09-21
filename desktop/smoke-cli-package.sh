@@ -66,7 +66,9 @@ if ldconfig -p | grep -q 'libaio.so.1'; then echo "this image already has libaio
 if [ "$kind" = rpm ]; then
   # What a real install has and a container image leaves out: the download command on dnf 4
   # (part of dnf itself from 5), and cpio, which anything that builds an initramfs pulls in.
-  dnf install -y -q dnf-plugins-core cpio >/dev/null 2>&1 || dnf install -y -q cpio
+  # util-linux is the test's own need, not SpawnLoft's: it is how this script becomes another user,
+  # and the Fedora image has neither su nor runuser.
+  dnf install -y -q dnf-plugins-core cpio util-linux >/dev/null 2>&1 || dnf install -y -q cpio util-linux
 fi
 useradd -m sl 2>/dev/null || adduser --disabled-password --gecos "" sl >/dev/null
 cat > /tmp/db-smoke.sh <<'SH'
