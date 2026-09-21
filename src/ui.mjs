@@ -31,6 +31,7 @@ import * as neoforge from './neoforge.mjs'
 import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
+import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
 
@@ -1496,6 +1497,11 @@ async function route(req, res) {
       crashDir: path.join(inst.dir, 'crash-reports'),
     })
     const crashes = crashReports(inst, { limit: 5 })
+    // Not read from the console, but it belongs with what is: something wrong with this server
+    // that its owner can act on. Only while it runs - a stopped server has no port open - and
+    // first, because the panel shows two findings and this is the one that cannot wait.
+    const exposed = supervisor.isRunning(name) ? rconExposure(inst) : null
+    if (exposed) findings.unshift({ ...exposed, line: null })
     return json(res, 200, {
       // The line each finding was read from rides along, so the panel can put it in front of
       // the person in the console rather than telling them to go and look for it.

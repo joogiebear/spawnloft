@@ -21,6 +21,7 @@ import * as mrpack from './src/mrpack.mjs'
 import * as neoforge from './src/neoforge.mjs'
 import * as worlds from './src/worlds.mjs'
 import { diagnose, crashReports } from './src/diagnose.mjs'
+import { rconExposure } from './src/exposure.mjs'
 import { readState, clearState } from './src/control.mjs'
 import * as services from './src/services.mjs'
 import { listServices, isDatabase } from './src/registry.mjs'
@@ -1664,6 +1665,10 @@ async function cmdDoctor(positional, flags = {}) {
     }
     const { status } = readState(inst.name)
     if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
+    // Asked whether or not it is running: the port opens the moment it starts, and doctor is what
+    // someone runs before they start it.
+    const exposed = rconExposure(inst)
+    if (exposed) problems.push(`${inst.name}: ${exposed.title.toLowerCase()}. ${exposed.advice}`)
     if (status === 'stale') {
       if (flags.json) problems.push(`${inst.name}: stale state file; run doctor without --json to clear it`)
       else {
