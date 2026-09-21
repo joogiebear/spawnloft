@@ -1,8 +1,9 @@
 'use strict'
 
-// Run against the actual packaged app on macOS or Windows, not an Electron development checkout.
+// Run against the actual packaged app on macOS, Windows or Linux, not an Electron development checkout.
 // CI supplies Playwright through NODE_PATH so it never becomes an application dependency.
-// Usage: node desktop/smoke-desktop.cjs <SpawnLoft.app|win-unpacked|SpawnLoft.exe> <artifacts>
+// Usage: node desktop/smoke-desktop.cjs <SpawnLoft.app|win-unpacked|SpawnLoft.exe|linux-unpacked|/opt/SpawnLoft> <artifacts>
+// On Linux it needs a display; CI supplies one with xvfb-run.
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -11,15 +12,19 @@ const { spawn } = require('node:child_process')
 const { _electron: electron } = require('playwright')
 
 async function main() {
-  assert.ok(['darwin', 'win32'].includes(process.platform), 'Packaged desktop smoke tests require macOS or Windows')
+  assert.ok(['darwin', 'win32', 'linux'].includes(process.platform), 'Packaged desktop smoke tests require macOS, Windows or Linux')
   const isMac = process.platform === 'darwin'
+  const isLinux = process.platform === 'linux'
+  // The two unixes share launchers that are shell scripts, a control channel that is a socket with
+  // a short path limit, and a Playwright that waits on the app itself rather than on cmd.exe.
+  const isUnix = isMac || isLinux
   assert.ok(process.argv[2] && process.argv[3], 'Supply an app bundle, unpacked directory, or executable and an artifact directory')
   const bundle = path.resolve(process.argv[2])
   const output = path.resolve(process.argv[3])
   assert.ok(fs.existsSync(bundle), `Missing package: ${bundle}`)
   const executable = isMac
     ? path.join(bundle, 'Contents', 'MacOS', 'SpawnLoft')
-    : fs.statSync(bundle).isDirectory() ? path.join(bundle, 'SpawnLoft.exe') : bundle
+    : fs.statSync(bundle).isDirectory() ? path.join(bundle, isLinux ? 'spawnloft-desktop' : 'SpawnLoft.exe') : bundle
   const core = isMac
     ? path.join(bundle, 'Contents', 'Resources', 'core')
     : path.join(path.dirname(executable), 'resources', 'core')
@@ -28,7 +33,7 @@ async function main() {
   fs.mkdirSync(output, { recursive: true })
 
   // macOS Unix-domain sockets have a short path limit; the runner's default temp path is too long.
-  const tempRoot = path.resolve(isMac ? '/tmp' : os.tmpdir())
+  const tempRoot = path.resolve(isUnix ? '/tmp' : os.tmpdir())
   const scratch = fs.mkdtempSync(path.join(tempRoot, 'sl-'))
   const data = path.join(scratch, 'App data')
   const config = path.join(scratch, 'c')
@@ -85,7 +90,7 @@ async function main() {
   async function close() {
     if (app) {
       const current = app
-      if (isMac) {
+      if (isUnix) {
         await current.close()
       } else {
         // Playwright launches Electron through cmd.exe on Windows and waits for the child
@@ -157,12 +162,12 @@ async function main() {
   }
 
   async function terminal(command, args, expectedCode = 0) {
-    const launcher = path.join(path.dirname(core), 'bin', command + (isMac ? '' : '.cmd'))
+    const launcher = path.join(path.dirname(core), 'bin', command + (isUnix ? '' : '.cmd'))
     const options = { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
     // Only fixed test arguments and generated fixture paths enter this cmd.exe command.
     // The extra quote pair is cmd /s /c's required wrapper around a quoted batch path.
     for (const arg of [launcher, ...args]) assert.ok(!/["%\r\n]/.test(arg))
-    const child = isMac ? spawn(launcher, args, options)
+    const child = isUnix ? spawn(launcher, args, options)
       : spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c',
         `""${launcher}" ${args.map(arg => `"${arg}"`).join(' ')}"`], { ...options, windowsVerbatimArguments: true })
     return new Promise((resolve, reject) => {
@@ -295,7 +300,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(info.coreMode, 'bundled')
     const provenance = JSON.parse(fs.readFileSync(path.join(path.dirname(core), 'build-info.json'), 'utf8'))
     const manual = isMac && provenance.macSigningMode !== 'signed'
-    assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows keeps its updater')
+    assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows and Linux keep their updater')
     // Exercise the no-network manual path only for ad-hoc packages. Signed
     // installed upgrades have their own native Squirrel.Mac smoke test.
     if (manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
@@ -313,7 +318,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await api(`instances/${name}/command`, { line: 'packaged desktop console' })
     await until(() => fs.existsSync(consoleFile) && fs.readFileSync(consoleFile, 'utf8').includes('fake got: packaged desktop console'), 'Console input must reach the fixture through the packaged daemon')
     assert.match(fs.readFileSync(consoleFile, 'utf8'), /Done \(/)
-    record(`PASS: packaged daemon starts, reaches ready, and receives console input over its ${isMac ? 'Unix socket' : 'named pipe'}`)
+    record(`PASS: packaged daemon starts, reaches ready, and receives console input over its ${isUnix ? 'Unix socket' : 'named pipe'}`)
     await page.locator('#bSetClose').click()
     await page.locator(`#list [data-name="${name}"]`).click()
     await page.locator('#tabSettings').click()

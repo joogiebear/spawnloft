@@ -50,7 +50,7 @@ if (release && !release.draft) {
     `\n\nBuilt together from [\`${verified.commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${verified.commit}), based on development version ${sourceVersion}.\n`)
   // Nothing becomes public until every platform and the Windows updater feed are
   // uploaded. Published releases are immutable and are never overwritten here.
-  if (!release) gh(['release', 'create', tag, '--repo', repo, '--target', verified.commit, '--draft', '--prerelease', '--title', `SpawnLoft ${verified.version} — Windows and Mac beta`, '--notes-file', notes])
+  if (!release) gh(['release', 'create', tag, '--repo', repo, '--target', verified.commit, '--draft', '--prerelease', '--title', `SpawnLoft ${verified.version} — Windows, Mac and Linux beta`, '--notes-file', notes])
   gh(['release', 'upload', tag, ...verified.assets.map(asset => asset.path), '--repo', repo, '--clobber'])
   if (currentDev() !== verified.commit) throw new Error('dev moved during upload; leaving the older build as a draft')
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease', '--latest=false'])

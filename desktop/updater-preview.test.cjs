@@ -19,14 +19,16 @@ function provider(currentVersion, allowPrerelease, platform = 'win32') {
     requests.push(route)
     if (route.endsWith('/releases.atom')) return feed
     if (route.endsWith('/releases/latest')) return JSON.stringify({ tag_name: 'v0.14.0' })
-    const match = /\/download\/v(0\.15\.0-beta\.3|0\.14\.0)\/(beta|latest)(-mac)?\.yml$/.exec(route)
+    const match = /\/download\/v(0\.15\.0-beta\.3|0\.14\.0)\/(beta|latest)(-mac|-linux)?\.yml$/.exec(route)
     assert.ok(match, `Unexpected updater request: ${route}`)
     const version = match[1]
     if (platform === 'darwin') {
       assert.equal(match[3], '-mac')
       return JSON.stringify({ version, files: ['arm64', 'x64'].map(arch => ({ url: `SpawnLoft-${version}-mac-${arch}.zip`, sha512: 'Zml4dHVyZQ==', size: 42 })) })
     }
-    const name = `SpawnLoft-Setup-${version}.exe`
+    if (platform === 'linux') assert.equal(match[3], '-linux')
+    else assert.equal(match[3], undefined)
+    const name = platform === 'linux' ? `SpawnLoft-${version}-linux-amd64.deb` : `SpawnLoft-Setup-${version}.exe`
     return `version: ${version}\nfiles:\n  - url: ${name}\n    sha512: Zml4dHVyZQ==\n    size: 42\npath: ${name}\nsha512: Zml4dHVyZQ==\n`
   } }
   return {
@@ -65,5 +67,25 @@ test('stable Windows stays on the stable release when paired betas exist', async
   const info = await client.getLatestVersion()
   assert.equal(info.version, '0.14.0')
   assert.ok(requests.some(route => route.endsWith('/releases/latest')))
+  assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
+})
+
+test('a Linux beta asks for the Linux feed and is handed the Debian package', async () => {
+  const { client, requests } = provider('0.15.0-beta.1', true, 'linux')
+  const info = await client.getLatestVersion()
+  assert.equal(info.version, '0.15.0-beta.3')
+  assert.equal(client.resolveFiles(info)[0].url.href,
+    'https://github.com/joogiebear/spawnloft/releases/download/v0.15.0-beta.3/SpawnLoft-0.15.0-beta.3-linux-amd64.deb')
+  // The name the preview workflow copies latest-linux.yml to. If the updater ever asked for
+  // anything else, Linux betas would install and then never hear of another release.
+  assert.ok(requests.some(route => route.endsWith('/beta-linux.yml')))
+  assert.ok(requests.every(route => !route.endsWith('/beta.yml') && !route.endsWith('-mac.yml')))
+})
+
+test('stable Linux stays on the stable release when betas exist', async () => {
+  const { client, requests } = provider('0.14.0', false, 'linux')
+  const info = await client.getLatestVersion()
+  assert.equal(info.version, '0.14.0')
+  assert.ok(requests.some(route => route.endsWith('/latest-linux.yml')))
   assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
 })

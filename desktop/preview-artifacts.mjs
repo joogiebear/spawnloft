@@ -7,7 +7,10 @@ export const TARGETS = [
   { platform: 'win32', arch: 'x64' },
   { platform: 'darwin', arch: 'arm64' },
   { platform: 'darwin', arch: 'x64' },
+  { platform: 'linux', arch: 'x64' },
 ]
+// Debian's names for the architectures, which is what electron-builder puts in a .deb's filename.
+const DEB_ARCH = { x64: 'amd64', arm64: 'arm64' }
 export const manifestName = ({ platform, arch }) => `preview-build-${platform}-${arch}.json`
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => crypto.createHash(algorithm).update(bytes).digest(encoding)
 
@@ -38,6 +41,9 @@ export function artifactNames({ platform, arch, version }) {
   }
   if (platform === 'darwin' && ['arm64', 'x64'].includes(arch)) {
     return ['dmg', 'zip'].map(ext => `SpawnLoft-${version}-mac-${arch}.${ext}`)
+  }
+  if (platform === 'linux' && arch === 'x64') {
+    return [`SpawnLoft-${version}-linux-${DEB_ARCH[arch]}.deb`, 'latest-linux.yml', 'beta-linux.yml']
   }
   throw new Error('Unexpected build platform or architecture')
 }
@@ -90,6 +96,9 @@ export function createManifest(dir, info, target) {
   if (identity.platform === 'win32') {
     verifyWindowsFeeds(dir, identity.version, assets[0].name)
   }
+  if (identity.platform === 'linux') {
+    verifyLinuxFeeds(dir, identity.version, assets[0].name)
+  }
   return { ...identity, assets }
 }
 
@@ -123,6 +132,8 @@ export function verifyRelease(dir, expected) {
   }
   const installerName = artifactNames(first)[0]
   verifyWindowsFeeds(dir, first.version, installerName)
+  const linux = manifests.find(({ info }) => info.platform === 'linux').info
+  verifyLinuxFeeds(dir, linux.version, artifactNames(linux)[0])
   return { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit, macSigningMode: macModes[0], assets }
 }
 
@@ -131,6 +142,16 @@ function verifyWindowsFeeds(dir, version, installerName) {
   const beta = fs.readFileSync(path.join(dir, 'beta.yml'))
   if (!latest.equals(beta)) throw new Error('Windows beta.yml and latest.yml must be identical')
   verifyWindowsFeed(latest.toString('utf8'), version, installerName, fs.readFileSync(path.join(dir, installerName)))
+}
+
+// electron-updater names the Linux feed for the platform: latest-linux.yml, and beta-linux.yml for
+// an installation on the beta channel. With one package in it the feed has exactly the shape of the
+// Windows one - an installer, its hash, its size - so it is held to exactly the same check.
+function verifyLinuxFeeds(dir, version, packageName) {
+  const latest = fs.readFileSync(path.join(dir, 'latest-linux.yml'))
+  const beta = fs.readFileSync(path.join(dir, 'beta-linux.yml'))
+  if (!latest.equals(beta)) throw new Error('Linux beta-linux.yml and latest-linux.yml must be identical')
+  verifyWindowsFeed(latest.toString('utf8'), version, packageName, fs.readFileSync(path.join(dir, packageName)))
 }
 
 export function verifyPublishedRelease(release, resolvedCommit, verified) {
