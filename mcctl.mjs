@@ -1208,7 +1208,20 @@ async function cmdTask(positional, flags) {
     }
     out(table(rows))
     out('')
-    out('Tasks run while you are logged in, including with the screen locked - not after signing out.')
+    for (const line of schedule.loggedOutNote()) out(line)
+    return
+  }
+
+  if (sub === 'linger') {
+    // Linux only: whether this account's tasks outlive its login session. The panel has a button
+    // for this; a server with no screen needs the same thing in words.
+    if (positional[1] === 'on') {
+      schedule.keepRunningLoggedOut()
+      out('Lingering is on. Tasks now run whether or not you are logged in, from boot.')
+      return
+    }
+    if (positional[1] !== undefined) fail('usage: mcctl task linger [on]')
+    for (const line of schedule.loggedOutNote()) out(line)
     return
   }
 
@@ -1235,6 +1248,9 @@ async function cmdTask(positional, flags) {
       : { kind: 'daily', at: String(flags.daily === true ? '03:00' : flags.daily ?? flags.at ?? '03:00') }
     const made = schedule.create({ instance, name: flags.name ?? null, action, schedule: sched })
     out(`Created "${made.id}" - ${made.name}, ${describeSchedule(made.schedule)}.`)
+    // Said when the task is made, not only when the list is read: this is the moment it matters.
+    const note = schedule.loggedOutNote()
+    if (note[0].startsWith('WARNING')) { out(''); for (const line of note) out(line) }
     return
   }
 
@@ -1254,7 +1270,7 @@ async function cmdTask(positional, flags) {
     return
   }
 
-  fail('usage: mcctl task [list|add|run|rm|enable|disable]')
+  fail('usage: mcctl task [list|add|run|rm|enable|disable|linger]')
 }
 
 /**
@@ -1810,6 +1826,12 @@ DATABASES
   mcctl db creds <db> <server>       Show a server's credentials again
   mcctl db remove <db> [--purge]     Forget a stopped database [and delete its files]
   start, stop, restart, logs and status take a database's name like a server's.
+
+  mcctl task list                    Scheduled tasks, when each last ran and runs next
+  mcctl task add <server> --do <backup|restart|stop|start|command> [--line "<cmd>"]
+      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon
+  mcctl task run|rm|enable|disable <id>
+  mcctl task linger [on]             Linux: whether tasks run while you are logged out, and turn that on
 
   mcctl doctor                       Check environment, ports, EULA, disk, stale state
   mcctl uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what mcctl made
