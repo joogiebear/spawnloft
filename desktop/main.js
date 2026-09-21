@@ -80,8 +80,14 @@ async function needsSetup() {
  * unpackaged `npm start` gets Electron's own atom - and so does the BrowserWindow unless it is
  * told. Pointing at the same file keeps development, the taskbar and the installer showing one
  * icon rather than three.
+ *
+ * <p>Linux cannot read an .ico, and its executable carries no icon of its own: the window's icon is
+ * whatever the window is given, and that is what the dock and the task switcher show. Packaged, it
+ * is copied beside the app as resources/icon.png, because build/ is not inside app.asar.
  */
-const ICON = path.join(__dirname, 'build', 'icon.ico')
+const ICON = process.platform === 'linux'
+  ? (app.isPackaged ? path.join(process.resourcesPath, 'icon.png') : path.join(__dirname, 'build', 'icon.png'))
+  : path.join(__dirname, 'build', 'icon.ico')
 
 // ---- window size and position ------------------------------------------------
 

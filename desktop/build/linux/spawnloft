@@ -1,0 +1,3 @@
+#!/bin/sh
+# /usr/bin/spawnloft: the command line, run on the runtime the desktop app carries. No Node needed.
+exec /opt/SpawnLoft/resources/bin/spawnloft "$@"
