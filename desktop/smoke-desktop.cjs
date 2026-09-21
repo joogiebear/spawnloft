@@ -90,9 +90,12 @@ async function main() {
   async function close() {
     if (app) {
       const current = app
-      if (isUnix) {
+      if (isMac) {
         await current.close()
       } else {
+        // On Linux the server daemon inherits the pipes Playwright drives the app through (they
+        // arrive as descriptors 3 and 4, and spawn only replaces 0 to 2), so Playwright's close
+        // never resolves while a server started by the app is still running. Same remedy as below.
         // Playwright launches Electron through cmd.exe on Windows and waits for the child
         // process's `close` event. A detached server can keep inherited stdio handles open
         // after the app has exited, so waiting for `close` here prevents the restart test.
