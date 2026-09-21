@@ -124,10 +124,10 @@ if (!fs.existsSync(asar)) {
   // setup.html is listed in the build's `files` allowlist. Anything added to desktop/ and not
   // listed there is silently left out, and the first-run wizard is the screen that would go.
   const bytes = fs.readFileSync(asar)
-  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js']) {
+  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'update-channel.js']) {
     if (!bytes.includes(Buffer.from(name))) problems.push(`${name} is not in app.asar - check the "files" list in package.json`)
   }
-  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js and setup.html are packaged')
+  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, update-channel.js and setup.html are packaged')
 }
 
 /**

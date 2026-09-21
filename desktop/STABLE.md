@@ -17,6 +17,7 @@ Existing installs receive 1.2 through the built-in updater. ZIP files are used b
 ## New in 1.2
 
 - **An `.rpm`**, with the same arrangement as the `.deb`: `spawnloft-desktop` opens the window, `spawnloft` is the command line and needs no Node, and everything installs to `/opt/SpawnLoft`.
+- **Get beta builds**, in Settings under Updates. Turn it on and SpawnLoft follows the betas between monthly releases - new features as they are finished - and then the release itself. Turn it off whenever you like: nothing is downgraded, the betas stop, and the next release installs when it ships. Until now this was decided by which installer you had downloaded.
 - **arm64 Linux packages**, for both. Managed Redis runs there. Managed MySQL does not - Oracle publishes no small arm64 build - so *Create a database* is off on those machines and says so, rather than being offered and refused; connecting to a MySQL you already run works as it does everywhere.
 
 ## Fixed

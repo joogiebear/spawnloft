@@ -13,7 +13,7 @@
     "dist": "electron-builder",
     "release": "node release.mjs",
     "verify": "node verify-build.mjs",
-    "test": "node window-state.test.js",
+    "test": "node window-state.test.js && node --test update-channel.test.js",
     "release:publish": "node finish-release.mjs",
     "release:stable": "node release-stable.mjs"
   },
@@ -29,6 +29,7 @@
       "preload.js",
       "setup.html",
       "window-state.js",
+      "update-channel.js",
       "package.json"
     ],
     "extraResources": [
