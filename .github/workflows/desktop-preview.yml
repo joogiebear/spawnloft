@@ -148,7 +148,12 @@ jobs:
       - name: Supply both Linux updater feed names
         if: matrix.platform == 'linux'
         # The feed is named for the architecture: latest-linux.yml on x64, latest-linux-arm64.yml on arm64.
-        run: node -e "const s = process.argv[1] === 'x64' ? '' : '-' + process.argv[1]; require('fs').copyFileSync('desktop/dist/latest-linux' + s + '.yml', 'desktop/dist/beta-linux' + s + '.yml')" ${{ matrix.arch }}
+        # A block, not a one-line value: the command has a colon followed by a space in it, which
+        # YAML reads as the start of a key.
+        run: |
+          suffix=""
+          if [ "${{ matrix.arch }}" != "x64" ]; then suffix="-${{ matrix.arch }}"; fi
+          cp "desktop/dist/latest-linux${suffix}.yml" "desktop/dist/beta-linux${suffix}.yml"
       - name: Install the package the way a user would
         if: matrix.platform == 'linux'
         # apt resolves the declared dependencies and runs the package's own postinst, which is what
