@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parseLdd, parseLdconfig, packageFamily, installHint, libraryEnv, libsDirFor, ensureLibraries, LIBS_FOLDER } from '../src/linux-libs.mjs'
+import { parseLdd, parseLdconfig, packageFamily, installHint, libraryEnv, libsDirFor, ensureLibraries, LIBS_FOLDER, fetchWithDnf, dnfPackagesFor, RPM_ARCH } from '../src/linux-libs.mjs'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-libs-test-'))
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
@@ -81,4 +81,80 @@ test('a binary with nothing missing needs no private folder', { skip: process.pl
   const result = ensureLibraries(engine, [process.execPath], { allowFetch: false })
   assert.deepEqual(result, { missing: [], supplied: [] })
   assert.ok(!fs.existsSync(path.join(engine, LIBS_FOLDER)))
+})
+
+// ---- dnf -----------------------------------------------------------------------------------------
+
+/** A stand-in for spawnSync that plays dnf and the unpackers, and records what it was asked. */
+function fakeDnf({ download = true, cpio = true, bsdtar = true } = {}) {
+  const calls = []
+  const unpack = (cwd, file) => {
+    const pkg = /([a-z-]+?)-\d/.exec(path.basename(file))[1]
+    const lib64 = path.join(cwd, 'usr', 'lib64')
+    fs.mkdirSync(lib64, { recursive: true })
+    const names = { libaio: ['libaio.so.1'], 'numactl-libs': ['libnuma.so.1'], 'ncurses-libs': ['libncurses.so.6', 'libtinfo.so.6'] }[pkg]
+    for (const name of names) {
+      fs.writeFileSync(path.join(lib64, `${name}.0.0`), `fixture ${name}`)
+      fs.symlinkSync(`${name}.0.0`, path.join(lib64, name))
+    }
+    fs.writeFileSync(path.join(cwd, 'usr', 'README'), 'not a library')
+  }
+  const run = (cmd, args, options) => {
+    calls.push([cmd, ...args])
+    if (cmd === 'dnf') {
+      if (!download) return { status: 1, stderr: 'No such command: download' }
+      const pkg = args.at(-1)
+      fs.writeFileSync(path.join(args[args.indexOf('--destdir') + 1], `${pkg}-1.0-1.fc42.x86_64.rpm`), 'rpm')
+      return { status: 0 }
+    }
+    if (cmd === 'sh') { if (!cpio) return { status: 127 }; unpack(options.cwd, args.at(-1)); return { status: 0 } }
+    if (cmd === 'bsdtar') { if (!bsdtar) return { error: Object.assign(new Error('no bsdtar'), { code: 'ENOENT' }) }; unpack(options.cwd, args.at(-1)); return { status: 0 } }
+    throw new Error(`unexpected command ${cmd}`)
+  }
+  return { run, calls }
+}
+
+const symlinks = process.platform !== 'win32'
+
+test('dnf is asked once per package, for this architecture only', { skip: !symlinks }, t => {
+  const libs = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dnf-'))
+  t.after(() => fs.rmSync(libs, { recursive: true, force: true }))
+  const { run, calls } = fakeDnf()
+  // ncurses-libs supplies both of the last two. Downloading it twice is a second trip to a mirror.
+  assert.deepEqual(dnfPackagesFor(['libaio.so.1', 'libncurses.so.6', 'libtinfo.so.6', 'libunknown.so.9']), ['libaio', 'ncurses-libs'])
+  fetchWithDnf(['libaio.so.1', 'libncurses.so.6', 'libtinfo.so.6'], libs, null, { run, arch: 'arm64' })
+  const downloads = calls.filter(call => call[0] === 'dnf')
+  assert.deepEqual(downloads.map(call => call.at(-1)), ['libaio', 'ncurses-libs'])
+  // Without --arch a 64-bit Fedora is handed the i686 package too.
+  for (const call of downloads) assert.deepEqual(call.slice(1, 2).concat(call.slice(4, 6)), ['download', '--arch', 'aarch64'])
+  // Links kept as links so the soname resolves; nothing that is not a shared object comes along.
+  assert.deepEqual(fs.readdirSync(libs).sort(), ['libaio.so.1', 'libaio.so.1.0.0', 'libncurses.so.6', 'libncurses.so.6.0.0', 'libtinfo.so.6', 'libtinfo.so.6.0.0'])
+  assert.equal(fs.readlinkSync(path.join(libs, 'libaio.so.1')), 'libaio.so.1.0.0')
+  assert.ok(calls.every(call => call[0] !== 'bsdtar'), 'cpio worked, so nothing else was tried')
+})
+
+test('an rpm is unpacked by bsdtar where there is no cpio, and a machine with neither supplies nothing', { skip: !symlinks }, t => {
+  const libs = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dnf-'))
+  t.after(() => fs.rmSync(libs, { recursive: true, force: true }))
+  const noCpio = fakeDnf({ cpio: false })
+  fetchWithDnf(['libnuma.so.1'], libs, null, { run: noCpio.run, arch: 'x64' })
+  assert.deepEqual(noCpio.calls.map(call => call[0]), ['dnf', 'sh', 'bsdtar'])
+  assert.ok(fs.existsSync(path.join(libs, 'libnuma.so.1')))
+
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dnf-'))
+  t.after(() => fs.rmSync(empty, { recursive: true, force: true }))
+  fetchWithDnf(['libnuma.so.1'], empty, null, { run: fakeDnf({ cpio: false, bsdtar: false }).run, arch: 'x64' })
+  assert.deepEqual(fs.readdirSync(empty), [], 'ensureLibraries then refuses with the install command, as before')
+})
+
+test('a dnf without the download command supplies nothing and unpacks nothing', t => {
+  const libs = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dnf-'))
+  t.after(() => fs.rmSync(libs, { recursive: true, force: true }))
+  const { run, calls } = fakeDnf({ download: false })
+  const progress = []
+  fetchWithDnf(['libaio.so.1'], libs, p => progress.push(p.message), { run, arch: 'x64' })
+  assert.deepEqual(calls.map(call => call[0]), ['dnf'])
+  assert.deepEqual(fs.readdirSync(libs), [])
+  assert.deepEqual(progress, ['Fetching libaio from your distribution'])
+  assert.equal(RPM_ARCH.x64, 'x86_64')
 })

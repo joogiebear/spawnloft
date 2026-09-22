@@ -126,8 +126,9 @@ you disconnect from, that is the difference between a nightly backup and none.
 
 Managed **MySQL** is offered on x64 and **Redis (Garnet)** on x64 and arm64. MySQL needs libaio,
 libnuma and ncurses, which a stock server does not have: SpawnLoft fetches the distribution's own
-packages with `apt-get download` and unpacks them beside the engine, without sudo and without
-installing anything on the system. Off Debian and Ubuntu it tells you the command to run instead.
+packages - `apt-get download` on Debian and Ubuntu, `dnf download` on Fedora and the RHEL family -
+and unpacks them beside the engine, without sudo and without installing anything on the system.
+Anywhere else, or where that cannot work, it tells you the command to run instead.
 
 Managed MySQL is not offered on arm64, where Oracle publishes no small build; Redis is. There is
 no AppImage yet. Under WSL, a window that shows only a taskbar icon titled
