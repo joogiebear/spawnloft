@@ -2,15 +2,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { cliPackageNames } from './build-cli-package.mjs'
 
 export const TARGETS = [
   { platform: 'win32', arch: 'x64' },
   { platform: 'darwin', arch: 'arm64' },
   { platform: 'darwin', arch: 'x64' },
   { platform: 'linux', arch: 'x64' },
+  { platform: 'linux', arch: 'arm64' },
 ]
-// Debian's names for the architectures, which is what electron-builder puts in a .deb's filename.
+// Each packaging system has its own names for the architectures, and electron-builder puts the
+// native one in the filename: amd64 and arm64 for a .deb, x86_64 and aarch64 for an .rpm.
 const DEB_ARCH = { x64: 'amd64', arm64: 'arm64' }
+const RPM_ARCH = { x64: 'x86_64', arm64: 'aarch64' }
+/** The installable Linux packages for one architecture, without their feeds. */
+export const linuxPackages = ({ arch, version }) => [`SpawnLoft-${version}-linux-${DEB_ARCH[arch]}.deb`, `SpawnLoft-${version}-linux-${RPM_ARCH[arch]}.rpm`]
 export const manifestName = ({ platform, arch }) => `preview-build-${platform}-${arch}.json`
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => crypto.createHash(algorithm).update(bytes).digest(encoding)
 
@@ -49,8 +55,10 @@ export function artifactNames({ platform, arch, version }) {
   if (platform === 'darwin' && ['arm64', 'x64'].includes(arch)) {
     return ['dmg', 'zip'].map(ext => `SpawnLoft-${version}-mac-${arch}.${ext}`)
   }
-  if (platform === 'linux' && arch === 'x64') {
-    return [`SpawnLoft-${version}-linux-${DEB_ARCH[arch]}.deb`, 'latest-linux.yml', 'beta-linux.yml']
+  if (platform === 'linux' && Object.hasOwn(DEB_ARCH, arch)) {
+    // The command-line packages are released and verified with the rest, and are in no feed: nothing
+    // updates them but the package manager that installed them.
+    return [...linuxPackages({ arch, version }), ...linuxFeedNames(arch), ...cliPackageNames({ arch, version })]
   }
   throw new Error('Unexpected build platform or architecture')
 }
@@ -108,7 +116,7 @@ export function createManifest(dir, info, target, policy = {}) {
     verifyWindowsFeeds(dir, identity.version, assets[0].name)
   }
   if (identity.platform === 'linux') {
-    verifyLinuxFeeds(dir, identity.version, assets[0].name)
+    verifyLinuxFeeds(dir, identity.version, identity.arch, linuxPackages(identity))
   }
   return { ...identity, assets }
 }
@@ -145,8 +153,9 @@ export function verifyRelease(dir, expected) {
   }
   const installerName = artifactNames(first)[0]
   verifyWindowsFeeds(dir, first.version, installerName)
-  const linux = manifests.find(({ info }) => info.platform === 'linux').info
-  verifyLinuxFeeds(dir, linux.version, artifactNames(linux)[0])
+  for (const { info } of manifests.filter(({ info }) => info.platform === 'linux')) {
+    verifyLinuxFeeds(dir, info.version, info.arch, linuxPackages(info))
+  }
   return { version: first.version, sourceVersion: first.sourceVersion, commit: first.commit, macSigningMode: macModes[0], assets }
 }
 
@@ -157,14 +166,59 @@ function verifyWindowsFeeds(dir, version, installerName) {
   verifyWindowsFeed(latest.toString('utf8'), version, installerName, fs.readFileSync(path.join(dir, installerName)))
 }
 
-// electron-updater names the Linux feed for the platform: latest-linux.yml, and beta-linux.yml for
-// an installation on the beta channel. With one package in it the feed has exactly the shape of the
-// Windows one - an installer, its hash, its size - so it is held to exactly the same check.
-function verifyLinuxFeeds(dir, version, packageName) {
-  const latest = fs.readFileSync(path.join(dir, 'latest-linux.yml'))
-  const beta = fs.readFileSync(path.join(dir, 'beta-linux.yml'))
-  if (!latest.equals(beta)) throw new Error('Linux beta-linux.yml and latest-linux.yml must be identical')
-  verifyWindowsFeed(latest.toString('utf8'), version, packageName, fs.readFileSync(path.join(dir, packageName)))
+/**
+ * A Linux feed lists every package built for one architecture - the .deb and the .rpm - and the
+ * installed app takes the one matching the marker its own package left behind. So unlike the
+ * Windows feed it has several `files`, and each has to describe the bytes that ship under that name:
+ * a feed that is right about the .deb and wrong about the .rpm strands every Fedora install on the
+ * version it has. `path` and the top-level hash must agree with one of them.
+ */
+export function verifyLinuxFeed(text, version, packages) {
+  const fields = []
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue
+    const match = /^(\s*)(- )?(version|files|url|sha512|size|path|releaseDate):\s*(.*?)\s*$/.exec(line)
+    if (!match) throw new Error('Unexpected Linux updater feed field')
+    let value = match[4]
+    if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) value = value.slice(1, -1)
+    fields.push({ indent: match[1].length, list: Boolean(match[2]), key: match[3], value })
+  }
+  const top = key => {
+    const found = fields.filter(field => field.key === key && field.indent === 0)
+    if (found.length !== 1) throw new Error(`Invalid Linux updater feed ${key}`)
+    return found[0].value
+  }
+  // Each list item is a url followed by its sha512 and size, in the order electron-builder writes them.
+  const listed = []
+  for (const field of fields.filter(field => field.indent > 0)) {
+    if (field.list) {
+      if (field.key !== 'url') throw new Error('Invalid Linux updater feed structure')
+      listed.push({ url: field.value })
+    } else if (!listed.length || field.key in listed.at(-1) || !['sha512', 'size'].includes(field.key)) {
+      throw new Error('Invalid Linux updater feed structure')
+    } else listed.at(-1)[field.key] = field.value
+  }
+  if (top('version') !== version || top('files') !== '' || listed.length !== packages.length ||
+      fields.filter(field => field.key === 'releaseDate').length > 1) throw new Error('Linux updater feed does not match the verified packages')
+  for (const { name, bytes } of packages) {
+    const entry = listed.filter(item => item.url === name)
+    if (entry.length !== 1 || entry[0].sha512 !== digest(bytes, 'sha512', 'base64') || entry[0].size !== String(bytes.length)) {
+      throw new Error(`Linux updater feed does not match the verified package: ${name}`)
+    }
+  }
+  const primary = listed.find(item => item.url === top('path'))
+  if (!primary || primary.sha512 !== top('sha512')) throw new Error('Linux updater feed names a package it does not list')
+}
+
+// electron-updater names the Linux feed for the machine: latest-linux.yml on x64 and
+// latest-linux-arm64.yml on arm64, with a beta- twin for an installation on the beta channel.
+export const linuxFeedNames = arch => ['latest', 'beta'].map(channel => `${channel}-linux${arch === 'x64' ? '' : `-${arch}`}.yml`)
+
+function verifyLinuxFeeds(dir, version, arch, packageNames) {
+  const [latestName, betaName] = linuxFeedNames(arch)
+  const latest = fs.readFileSync(path.join(dir, latestName))
+  if (!latest.equals(fs.readFileSync(path.join(dir, betaName)))) throw new Error(`Linux ${betaName} and ${latestName} must be identical`)
+  verifyLinuxFeed(latest.toString('utf8'), version, packageNames.map(name => ({ name, bytes: fs.readFileSync(path.join(dir, name)) })))
 }
 
 export function verifyPublishedRelease(release, resolvedCommit, verified) {

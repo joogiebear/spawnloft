@@ -27,9 +27,10 @@ writer of SpawnLoft's own.
   1.21, 25 for 26.x) and picks the newest installed Java that fits when a server is created; a
   version nothing installed can run is refused before the download, with the download link.
   `--force` on `new` and `start` goes ahead anyway.
-- **Node 20+**, for the CLI. The desktop app carries its own runtime and does not need it.
-- **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb`, for Ubuntu 22.04+ and Debian 12+) for the
-  desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
+- **Node 20+**, for the CLI from a checkout. The desktop app and the Linux command-line package
+  carry their own runtime and do not need it.
+- **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb` for Ubuntu 22.04+ and Debian 12+, an `.rpm` for Fedora,
+  the RHEL family and openSUSE; x64 and arm64) for the desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
   session, and tasks only run while you are logged in unless lingering is on for your account -
   the panel says so and offers to turn it on.
 
@@ -74,6 +75,28 @@ worlds, for reproducing a bug without touching the real server:
 ```bash
 node mcctl.mjs clone survival ecotest && node mcctl.mjs start ecotest
 ```
+
+### On a server with no screen
+
+Linux has a package that is the command line alone: `spawnloft-cli`, a `.deb` and an `.rpm` for
+x64 and arm64, about 30 MB, with its own Node and none of the desktop app's graphical
+dependencies. It installs `spawnloft` on PATH and conflicts with the desktop package, which
+already contains it.
+
+```bash
+sudo apt install ./spawnloft-cli-<version>-linux-amd64.deb     # Debian 12+, Ubuntu 22.04+
+sudo dnf install ./spawnloft-cli-<version>-linux-x86_64.rpm    # Fedora, RHEL 9 family
+sudo apt install openjdk-25-jre-headless                        # Java is separate
+spawnloft new survival --paper 1.21.4 --accept-eula && spawnloft start survival
+```
+
+Two things matter more there than at a desk. **Scheduled tasks stop when you log out** unless
+lingering is on for your account, so a nightly backup made over SSH never runs;
+`spawnloft task linger on` turns it on, and `task add` warns when it is off. And **the panel
+still works**: `spawnloft ui --no-open` serves it on `127.0.0.1:8770`, which
+`ssh -L 8770:127.0.0.1:8770 you@server` brings to your own browser without opening a port.
+Updates are a newer package installed the same way; there is no updater on a machine with
+nobody to prompt.
 
 From a checkout on Linux or macOS, `./spawnloft` does the same. On Windows `mcctl.cmd` wraps the above, so `mcctl list` works once this folder is
 on your PATH.

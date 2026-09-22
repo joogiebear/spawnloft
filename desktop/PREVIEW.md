@@ -25,7 +25,7 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   disabling it there prevents scheduled work. Remove tasks in SpawnLoft before
   deleting the app.
 - **Signed Mac automatic updates:** background download, then install on quit or
-  use Restart to update. Beta and stable channels stay separate. Both native
+  use Restart to update. Which releases a copy follows is a setting (below). Both native
   architectures share a verified feed; Windows update behavior is preserved.
   Ad-hoc test packages still require manual installation.
 
@@ -63,10 +63,21 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   get separate names, and failed archives never appear as completed backups.
 - **Settings → Appearance** offers both Classic and SpawnLoft themes.
 
+### Linux servers with no screen
+
+`spawnloft-cli-VERSION-linux-amd64.deb` / `-x86_64.rpm` (and `arm64` / `aarch64`) are the command
+line alone, on its own Node runtime, with none of the desktop app's graphical dependencies.
+Install with `sudo apt install ./<file>` or `sudo dnf install ./<file>`; it conflicts with the
+desktop package, which already contains it. There is no updater: install a newer package the same
+way. `spawnloft task linger on` keeps scheduled tasks running after you log out.
+
 ### Windows
 
 Download **SpawnLoft-Setup-VERSION.exe**. Windows beta installations continue to receive
-beta updates automatically; stable installations stay on the stable release. Both
+beta updates automatically; stable installations stay on the stable release unless
+*Settings > Updates > Get beta builds* is turned on, which works the same on Mac and Linux.
+Turning it off never downgrades: the copy keeps the beta it has and moves to the next
+stable release when that ships. Both
 `beta.yml` and `latest.yml` describe the Windows installer on this prerelease.
 
 Like the previous Windows development beta, this GitHub Actions test build is unsigned.
@@ -97,9 +108,12 @@ Plugin configs remain manual. MariaDB is no longer offered for new setups.
 
 ### Linux
 
-- **x64:** download the `linux-amd64.deb` asset. For Ubuntu 22.04+ and Debian 12+.
-- Install it with `sudo apt install ./SpawnLoft-<version>-linux-amd64.deb`, which also pulls in
-  what it depends on. Java is separate, as everywhere: `sudo apt install openjdk-25-jre-headless`.
+- **Debian and Ubuntu (22.04+, Debian 12+):** the `linux-amd64.deb` asset, or `linux-arm64.deb` on
+  arm64. Install it with `sudo apt install ./<file>`, which also pulls in what it depends on.
+- **Fedora, the RHEL family and openSUSE:** the `linux-x86_64.rpm` asset, or `linux-aarch64.rpm`
+  on arm64. Install it with `sudo dnf install ./<file>`.
+- Java is separate, as everywhere, and which one depends on your Minecraft version:
+  `sudo apt install openjdk-25-jre-headless`, or on Fedora `sudo dnf install java-latest-openjdk-headless`.
 - `spawnloft-desktop` opens the window; `spawnloft` is the command line, and needs no Node.
 - On a server with no desktop, run `spawnloft ui --no-open` and reach the panel through an SSH
   tunnel. It listens on loopback only.
@@ -112,10 +126,12 @@ you disconnect from, that is the difference between a nightly backup and none.
 
 Managed **MySQL** is offered on x64 and **Redis (Garnet)** on x64 and arm64. MySQL needs libaio,
 libnuma and ncurses, which a stock server does not have: SpawnLoft fetches the distribution's own
-packages with `apt-get download` and unpacks them beside the engine, without sudo and without
-installing anything on the system. Off Debian and Ubuntu it tells you the command to run instead.
+packages - `apt-get download` on Debian and Ubuntu, `dnf download` on Fedora and the RHEL family -
+and unpacks them beside the engine, without sudo and without installing anything on the system.
+Anywhere else, or where that cannot work, it tells you the command to run instead.
 
-There is no AppImage or `.rpm` yet. Under WSL, a window that shows only a taskbar icon titled
+Managed MySQL is not offered on arm64, where Oracle publishes no small build; Redis is. There is
+no AppImage yet. Under WSL, a window that shows only a taskbar icon titled
 "WARN: Copy Mode" is WSLg, not SpawnLoft: run `wsl --shutdown` from a non-Administrator terminal.
 
 On a machine with a public address and no firewall, `spawnloft doctor` and the panel warn that

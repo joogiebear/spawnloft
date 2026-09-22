@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
-import { createManifest, manifestName } from './preview-artifacts.mjs'
+import { createManifest, manifestName, linuxFeedNames } from './preview-artifacts.mjs'
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dist')
 const target = { platform: process.argv[2], arch: process.argv[3] }
@@ -19,7 +19,10 @@ if (target.platform === 'win32') {
 }
 // Linux has no signature to check: no Authenticode, no notarization. The package is verified by the
 // hash in its feed, and both feed names ship so a beta installation can move to the stable.
-if (target.platform === 'linux') fs.copyFileSync(path.join(dir, 'latest-linux.yml'), path.join(dir, 'beta-linux.yml'))
+if (target.platform === 'linux') {
+  const [latest, beta] = linuxFeedNames(target.arch)
+  fs.copyFileSync(path.join(dir, latest), path.join(dir, beta))
+}
 const manifest = createManifest(dir, info, target, { stable: true })
 fs.writeFileSync(path.join(dir, manifestName(target)), JSON.stringify(manifest, null, 2) + '\n')
 console.log(`Verified ${target.platform === 'linux' ? '' : 'signed '}stable artifacts for ${target.platform}/${target.arch}: ${info.version}`)

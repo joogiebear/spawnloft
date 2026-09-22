@@ -174,6 +174,26 @@ export function background() {
   return { linger: linux.linger(), session: linux.sessionKind() }
 }
 
+/**
+ * What the command line says about tasks and logging out.
+ *
+ * <p>On Windows and macOS the answer is fixed. On Linux it depends on lingering, and on a machine
+ * reached over SSH the difference is the whole schedule: with lingering off, the nightly backup
+ * stops existing the moment the person who made it disconnects, and nothing anywhere says so. The
+ * panel has warned about this since the Linux port; a server with no screen only has this.
+ */
+export function loggedOutNote({ linger, session } = background(), platform = process.platform) {
+  if (platform !== 'linux') return ['Tasks run while you are logged in, including with the screen locked - not after signing out.']
+  if (linger === true) return ['Lingering is on for your account: tasks run whether or not you are logged in, from boot.']
+  if (session === 'headless') return [
+    'WARNING: tasks stop when you log out, and this looks like a machine you connect to rather than sit at.',
+    'A backup scheduled for 03:00 will not run unless you are connected at 03:00. To keep them running:',
+    '  spawnloft task linger on',
+  ]
+  return ['Tasks run while you are logged in, including with the screen locked - not after signing out.',
+    'To run them from boot instead, logged in or not: spawnloft task linger on']
+}
+
 export function keepRunningLoggedOut() {
   if (process.platform !== 'linux') fail('Lingering is a Linux setting; there is nothing to turn on here.')
   return linux.enableLinger()

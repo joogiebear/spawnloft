@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
 <meta name="spawnloft-platform" content="win32">
+<meta name="spawnloft-managed-mysql" content="true">
 <title>SpawnLoft</title>
 
 <style>
@@ -2113,6 +2114,22 @@
           <dl class="kv" id="setPaths"></dl>
         </div>
         <div class="row" id="setActions"></div>
+        <div id="setUpdates" hidden>
+          <h2>Updates</h2>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" id="setBeta" class="switch" style="flex:none;margin-top:2px">
+            <span>
+              <strong>Get beta builds</strong>
+              <span class="hint" style="display:block;margin-top:2px">
+                New features as they are finished, usually several builds a month, instead of once
+                they reach the monthly release. Every beta passes the same automated tests as a
+                release on every platform, but has not had a month of use: back up a server you care
+                about first. You can turn this off at any time.
+              </span>
+            </span>
+          </label>
+          <p id="setBetaStatus" class="hint" aria-live="polite" style="margin:10px 0 0"></p>
+        </div>
         <div>
           <h2>About</h2>
           <dl class="kv" id="setAbout"></dl>
@@ -2167,6 +2184,10 @@ const schedulerHint = panelPlatform === 'linux'
   ? 'Runs with SpawnLoft closed while you are signed in, including with the screen locked. Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs. Tasks do not run after sign-out. Login tasks also run when first enabled.'
   : 'Runs with this window closed while you are signed in, including with the screen locked, but not after sign-out.';
 const managedDatabaseFeatures = windowsFeatures || panelPlatform === 'darwin' || panelPlatform === 'linux';
+// A platform can manage databases without being able to manage every engine: Oracle publishes no
+// small MySQL build for Linux on arm64, where Redis (Garnet) still runs. The one-click button on a
+// server's Settings tab is MySQL, so it has to know.
+const managedMysql = $('meta[name="spawnloft-managed-mysql"]').content !== 'false';
 const databasePreviewNote = 'Automatic database installation is not available in this preview. Connect to an existing MySQL or Redis database instead.';
 
 const state = {
@@ -6723,6 +6744,9 @@ async function renderServerDatabases(row, body) {
   if (!managedDatabaseFeatures) {
     create.disabled = true;
     createHint.textContent = databasePreviewNote;
+  } else if (!managedMysql) {
+    create.disabled = true;
+    createHint.textContent = 'Managed MySQL is not available for this machine (there is no small MySQL build for Linux on arm64). Add a server, then A database, offers Redis here, or connect to a MySQL you already run.';
   }
   create.onclick = async () => {
     create.disabled = true;
@@ -7555,6 +7579,8 @@ function renderSettings() {
     actions.append(hint);
   }
 
+  renderUpdateChannel();
+
   const about = $('#setAbout');
   about.textContent = '';
   const info = [['Panel', 'Local only — bound to 127.0.0.1']];
@@ -7579,6 +7605,48 @@ function renderSettings() {
     dd.textContent = r[1];
     about.append(dt, dd);
   }
+}
+
+/**
+ * Which releases this copy follows. Desktop only, and not where updates are installed by hand.
+ *
+ * The status line exists for the one case that would otherwise look broken: turning betas off
+ * while running one. Nothing is downgraded, so nothing visibly happens until the release that
+ * beta was leading to ships, and saying which release that is beats leaving someone to wonder.
+ */
+function updateChannelStatus(c) {
+  if (c.beta) return c.onBetaBuild
+    ? 'You are on a beta and will get each new one, then the release itself when it ships.'
+    : 'The next check will offer the newest beta.';
+  if (c.waitingFor) return 'You will stay on this beta build. Betas stop, and SpawnLoft ' + c.waitingFor
+    + ' installs when it is released. Nothing is downgraded.';
+  return 'You get the monthly releases.';
+}
+
+async function renderUpdateChannel() {
+  const box = $('#setUpdates');
+  if (!desktop || !desktop.updateChannel || !state.appInfo || state.appInfo.manualUpdates || !state.appInfo.packaged) {
+    box.hidden = true;
+    return;
+  }
+  const show = (c) => {
+    $('#setBeta').checked = c.beta;
+    $('#setBetaStatus').textContent = updateChannelStatus(c);
+  };
+  box.hidden = false;
+  show(await desktop.updateChannel());
+  $('#setBeta').onchange = async (e) => {
+    const want = e.target.checked;
+    e.target.disabled = true;
+    const out = await desktop.setUpdateChannel(want);
+    e.target.disabled = false;
+    if (!out || !out.ok) {
+      toast((out && out.message) || 'Could not save that choice.', 'bad');
+      show(await desktop.updateChannel());
+      return;
+    }
+    show(out);
+  };
 }
 
 $('#bSettings').onclick = () => openSheet('settings', renderSettings);

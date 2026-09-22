@@ -81,3 +81,22 @@ test('a machine someone connects to is told apart from one they sit at', async (
   // X forwarding gives an SSH session a DISPLAY; it is still someone who will disconnect.
   assert.equal(sessionKind({ SSH_TTY: '/dev/pts/0', DISPLAY: 'localhost:10.0' }), 'headless')
 })
+
+test('the command line says what logging out does to a schedule, loudest where it matters', async () => {
+  const { loggedOutNote } = await import('../src/schedule.mjs')
+  // A server reached over SSH with lingering off: the nightly backup never runs, and nothing else says so.
+  const headless = loggedOutNote({ linger: false, session: 'headless' }, 'linux')
+  assert.match(headless[0], /^WARNING: tasks stop when you log out/)
+  assert.ok(headless.some(line => line.includes('spawnloft task linger on')))
+  // At a desktop the same setting is the ordinary arrangement, and gets a note rather than an alarm.
+  const desktop = loggedOutNote({ linger: false, session: 'desktop' }, 'linux')
+  assert.doesNotMatch(desktop.join('\n'), /WARNING/)
+  assert.ok(desktop.some(line => line.includes('spawnloft task linger on')))
+  // Lingering that could not be read is not reported as on.
+  assert.doesNotMatch(loggedOutNote({ linger: null, session: 'headless' }, 'linux').join('\n'), /Lingering is on/)
+  assert.deepEqual(loggedOutNote({ linger: true, session: 'headless' }, 'linux'), ['Lingering is on for your account: tasks run whether or not you are logged in, from boot.'])
+  // Elsewhere there is no setting, and the sentence that was always there.
+  for (const platform of ['win32', 'darwin']) {
+    assert.deepEqual(loggedOutNote({ linger: null, session: null }, platform), ['Tasks run while you are logged in, including with the screen locked - not after signing out.'])
+  }
+})

@@ -15,6 +15,44 @@ import { fail, humanBytes } from './util.mjs'
 
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
 
+/** A gateway that timed out, a server that is busy or restarting, a rate limit: worth asking again. */
+const TRANSIENT = new Set([408, 425, 429, 500, 502, 503, 504])
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * `fetch`, asked again when the answer is one that a second request usually changes.
+ *
+ * <p>GitHub's download servers answered 504 to three separate engine downloads on one release
+ * day. Each was a single bad response, and each failed an install that the next request would
+ * have completed. A refusal that means something - 403, 404 - is returned at once, as is the last
+ * answer when every attempt was transient, so the caller's own message still names the status.
+ *
+ * <p>Only opening the response is retried. A download that breaks half way is the caller's to
+ * report: its bytes are already being hashed and written.
+ *
+ * <p>`timeoutMs` rather than a signal, because an AbortSignal that has fired stays fired and each
+ * attempt needs its own.
+ */
+export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500, timeoutMs = 0, fetcher = fetch, onRetry = null } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    const last = attempt >= attempts
+    let res
+    try {
+      res = await fetcher(url, timeoutMs ? { ...init, signal: AbortSignal.timeout(timeoutMs) } : init)
+    } catch (err) {
+      if (last) throw err
+      onRetry?.({ attempt, reason: err.cause?.message || err.message })
+      await wait(delayMs * attempt)
+      continue
+    }
+    if (last || !TRANSIENT.has(res.status)) return res
+    // An unread body holds its connection open.
+    await res.body?.cancel().catch(() => {})
+    onRetry?.({ attempt, reason: `HTTP ${res.status}` })
+    await wait(delayMs * attempt)
+  }
+}
+
 export async function fetchJson(url, { label = url } = {}) {
   let res
   try {
@@ -35,7 +73,7 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
   const what = label ?? dest
   let res
   try {
-    res = await fetch(url, { headers: { 'User-Agent': UA } })
+    res = await fetchRetry(url, { headers: { 'User-Agent': UA } })
   } catch (err) {
     fail(`download of ${what} failed: ${err.cause?.message || err.message}`)
   }

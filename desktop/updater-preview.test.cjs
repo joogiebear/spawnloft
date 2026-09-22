@@ -32,9 +32,14 @@ function provider(currentVersion, allowPrerelease, platform = 'win32', stable = 
       assert.equal(match[3], '-mac')
       return JSON.stringify({ version, files: ['arm64', 'x64'].map(arch => ({ url: `SpawnLoft-${version}-mac-${arch}.zip`, sha512: 'Zml4dHVyZQ==', size: 42 })) })
     }
-    if (platform === 'linux') assert.equal(match[3], LINUX_FEED)
-    else assert.equal(match[3], undefined)
-    const name = platform === 'linux' ? `SpawnLoft-${version}-linux-amd64.deb` : `SpawnLoft-Setup-${version}.exe`
+    if (platform === 'linux') {
+      assert.equal(match[3], LINUX_FEED)
+      // One feed per architecture, listing both packages; the installed app takes its own kind.
+      const names = [`SpawnLoft-${version}-linux-amd64.deb`, `SpawnLoft-${version}-linux-x86_64.rpm`]
+      return `version: ${version}\nfiles:\n${names.map(name => `  - url: ${name}\n    sha512: Zml4dHVyZQ==\n    size: 42\n`).join('')}path: ${names[0]}\nsha512: Zml4dHVyZQ==\n`
+    }
+    assert.equal(match[3], undefined)
+    const name = `SpawnLoft-Setup-${version}.exe`
     return `version: ${version}\nfiles:\n  - url: ${name}\n    sha512: Zml4dHVyZQ==\n    size: 42\npath: ${name}\nsha512: Zml4dHVyZQ==\n`
   } }
   return {
@@ -111,3 +116,49 @@ test('stable Linux stays on the stable release when betas exist', async () => {
   assert.ok(requests.some(route => route.endsWith(`/latest${LINUX_FEED}.yml`)))
   assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
 })
+
+test('one Linux feed serves both packages: a deb install takes the .deb, an rpm install the .rpm', async () => {
+  const { findFile } = require('electron-updater/out/providers/Provider')
+  const { client } = provider('0.15.0-beta.1', true, 'linux')
+  const files = client.resolveFiles(await client.getLatestVersion())
+  assert.equal(files.length, 2)
+  // The same calls DebUpdater and RpmUpdater make. Which one runs is decided by the package-type
+  // marker each package leaves in its own resources folder.
+  assert.ok(findFile(files, 'deb', ['AppImage', 'rpm', 'pacman']).url.href.endsWith('-linux-amd64.deb'))
+  assert.ok(findFile(files, 'rpm', ['AppImage', 'deb', 'pacman']).url.href.endsWith('-linux-x86_64.rpm'))
+})
+
+// ---- the "Get beta builds" setting -----------------------------------------------------------
+// The setting is one property, allowPrerelease, chosen independently of the running version
+// (update-channel.js). These are the transitions that choice makes possible and the installer
+// someone downloaded used to decide.
+
+for (const platform of ['win32', 'darwin', 'linux']) {
+  test(`${platform}: a stable copy that opts in is offered the newest beta from that beta's own feed`, async () => {
+    const { client, requests } = provider('0.14.0', true, platform)
+    const info = await client.getLatestVersion()
+    assert.equal(info.version, '0.15.0-beta.3')
+    const suffix = { win32: '', darwin: '-mac', linux: LINUX_FEED }[platform]
+    assert.ok(requests.some(route => route.endsWith(`/v0.15.0-beta.3/beta${suffix}.yml`)))
+    assert.ok(requests.every(route => !route.includes('mac.6')))
+  })
+
+  test(`${platform}: a beta copy that opts out hears of no more betas, and is never pointed at one`, async () => {
+    const { client, requests } = provider('0.15.0-beta.1', false, platform)
+    const info = await client.getLatestVersion()
+    // Older than what is installed, so the updater does nothing with it: downgrades are off.
+    assert.equal(info.version, '0.14.0')
+    assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
+  })
+
+  test(`${platform}: a beta copy that opted out moves to the stable release when it ships`, async () => {
+    const { client } = provider('0.15.0-beta.1', false, platform, true)
+    assert.equal((await client.getLatestVersion()).version, '1.0.0')
+  })
+
+  test(`${platform}: a stable copy that opted in still gets the stable release when that is newest`, async () => {
+    const { client, requests } = provider('0.14.0', true, platform, true)
+    assert.equal((await client.getLatestVersion()).version, '1.0.0')
+    assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
+  })
+}
