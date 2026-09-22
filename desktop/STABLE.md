@@ -2,7 +2,7 @@
      A pull request that changes something a person would notice adds its line here, under the
      version it will ship in, so that release day is a read-through. Rewrite the top for each
      release; the build procedure at the bottom stays. -->
-SpawnLoft 1.2 brings Linux to more machines: an `.rpm` beside the `.deb`, and both for arm64.
+SpawnLoft 1.2 brings Linux to more machines - an `.rpm` beside the `.deb`, both for arm64, and a command-line package for servers with no screen - and lets any install opt into beta builds.
 
 - **Windows 10/11 x64:** download `SpawnLoft-Setup-1.2.0.exe`, signed through Microsoft Azure Artifact Signing.
 - **Mac with Apple Silicon:** download `SpawnLoft-1.2.0-mac-arm64.dmg`.
