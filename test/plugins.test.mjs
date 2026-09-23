@@ -7,7 +7,7 @@ import zlib from 'node:zlib'
 
 import {
   readZipEntry, parsePluginYml, mcVersionOf, listPlugins, setPluginEnabled, removePlugin,
-  pickVersion, primaryFile, LOADERS, readManaged, recordManaged, pickHangarVersion,
+  pickVersion, primaryFile, LOADERS, readManaged, recordManaged, pickHangarVersion, searchHangar,
 } from '../src/plugins.mjs'
 import { UserError } from '../src/util.mjs'
 
@@ -264,4 +264,17 @@ test('the primary file wins; the first stands in when nothing is marked', () => 
   assert.equal(primaryFile({ files }).filename, 'b.jar')
   assert.equal(primaryFile({ files: [{ filename: 'a.jar' }] }).filename, 'a.jar')
   assert.equal(primaryFile({ files: [] }), null)
+})
+
+test('Hangar search reports how often each project was downloaded', async (t) => {
+  // The shape Hangar's /projects endpoint returns: the count lives at stats.downloads. Reading a
+  // field it does not have showed every Hangar result as never downloaded.
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ result: [{
+    name: 'Chunky', namespace: { owner: 'pop4959', slug: 'Chunky' }, description: 'Pre-generates chunks',
+    stats: { views: 252983, downloads: 76528, recentViews: 7015, recentDownloads: 2392, stars: 303, watchers: 157 },
+  }] }), { headers: { 'content-type': 'application/json' } }))
+  const [hit] = await searchHangar('chunky')
+  assert.equal(hit.downloads, 76528)
+  assert.equal(hit.id, 'Chunky')
+  assert.equal(hit.source, 'hangar')
 })
