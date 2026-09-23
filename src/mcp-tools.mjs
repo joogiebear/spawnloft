@@ -12,7 +12,7 @@ import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
 import { readState } from './control.mjs'
-import { fail } from './util.mjs'
+import { fail, humanBytes, humanDuration } from './util.mjs'
 
 /**
  * What an AI client may do to this machine's servers, and exactly that much.
@@ -86,7 +86,13 @@ const readTools = [
     description: 'Status of one server: running or not, ports, memory, uptime and process ids.',
     inputSchema: object({ name }, ['name']),
     run({ name: n }) {
-      return { data: statusRecord(n) }
+      const s = statusRecord(n)
+      const parts = [`${s.name}${s.label ? ` (${s.label})` : ''}: ${s.status}`]
+      if (s.port) parts.push(`port ${s.port}${s.rconPort ? `, RCON ${s.rconPort}` : ''}`)
+      if (s.memory) parts.push(`${s.memory} memory`)
+      if (s.status === 'running' && s.uptimeMs) parts.push(`up ${humanDuration(s.uptimeMs)}`)
+      if (s.status !== 'running' && s.exitCode !== null && s.exitCode !== undefined) parts.push(`last exit code ${s.exitCode}`)
+      return { data: s, text: parts.join('; ') }
     },
   },
   {
@@ -117,7 +123,20 @@ const readTools = [
     description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries.',
     inputSchema: object({ name }, ['name']),
     run({ name: n }) {
-      return { data: query('diagnostics', [n], {}) }
+      const d = query('diagnostics', [n], {})
+      const out = [`${n} is ${d.status.status}.`]
+      if (d.findings.length) {
+        out.push('Known problems in the recent console, oldest first:')
+        for (const f of d.findings) out.push(`- ${f.title}. ${f.advice}\n  From: ${f.line.trim()}`)
+      } else {
+        out.push('No known failure causes in the recent console. get_logs with level "warn" shows anything else.')
+      }
+      const reports = d.crashes.reports ?? []
+      if (reports.length) {
+        out.push(`Crash reports (${reports.length}, newest first):`)
+        for (const r of reports) out.push(`- ${r.file}: ${r.description ?? 'no description line'}`)
+      }
+      return { data: d, text: out.join('\n') }
     },
   },
   {
@@ -174,7 +193,11 @@ const readTools = [
     inputSchema: object({ name }, ['name']),
     run({ name: n }) {
       getInstance(n)
-      return { data: { name: n, snapshots: backup.listSnapshots(n).map(snapshotRow) } }
+      const snapshots = backup.listSnapshots(n).map(snapshotRow)
+      const text = snapshots.length
+        ? snapshots.map((s) => `${s.name}: ${s.scope}, ${humanBytes(s.sizeBytes)}, taken ${s.createdAt}`).join('\n')
+        : `No backups of ${n} yet. The backup tool takes one.`
+      return { data: { name: n, snapshots }, text }
     },
   },
   {
@@ -218,7 +241,18 @@ const readTools = [
     inputSchema: object({ name }, ['name']),
     async run({ name: n }) {
       const inst = server(n)
-      return { data: { name: n, updates: await plugins.checkUpdates(inst, { gameVersion: plugins.mcVersionOf(inst) }) } }
+      const updates = await plugins.checkUpdates(inst, { gameVersion: plugins.mcVersionOf(inst) })
+      const all = plugins.listPlugins(inst)
+      const managed = all.filter((p) => p.managed).length
+      const own = all.length - managed
+      const note = own ? ` ${own} other plugin(s) were added by hand and are not checked; SpawnLoft never touches those.` : ''
+      const text = !managed
+        ? `SpawnLoft has not installed any plugins on ${n}, so there is nothing it can update.${note}`
+        : updates.length
+          ? [`${updates.length} of ${managed} can be updated:`,
+            ...updates.map((u) => `- ${u.name}: ${u.installedVersion ?? '?'} -> ${u.latestVersion} (update_plugin with file "${u.file}")`)].join('\n') + note
+          : `All ${managed} plugin(s) SpawnLoft installed are up to date.${note}`
+      return { data: { name: n, updates }, text }
     },
   },
   {
@@ -350,7 +384,11 @@ const actionTools = [
     async run({ name: n, project_id: id, source = 'modrinth' }, { progress }) {
       progress('Snapshotting plugins, then downloading')
       const res = await pluginActions.installWithSnapshot(server(n), id, { source })
-      return { data: { name: n, ...res, snapshot: res.snapshot ? path.basename(res.snapshot) : null } }
+      const snapshot = res.snapshot ? path.basename(res.snapshot) : null
+      const text = [`Installed ${res.installed} (${res.version}) on ${n}. It loads at the next restart.`,
+        res.versionNote,
+        snapshot ? `Snapshot taken first: ${snapshot}.` : 'No snapshot: this is the first plugin on the server.'].filter(Boolean).join('\n')
+      return { data: { name: n, ...res, snapshot }, text }
     },
   },
   {
@@ -360,7 +398,12 @@ const actionTools = [
     async run({ name: n, file }, { progress }) {
       progress('Snapshotting plugins, then downloading')
       const res = await pluginActions.updateWithSnapshot(server(n), file)
-      return { data: { name: n, ...res, snapshot: res.snapshot ? path.basename(res.snapshot) : null } }
+      const snapshot = res.snapshot ? path.basename(res.snapshot) : null
+      const text = res.alreadyLatest
+        ? `${file} is already the newest build (${res.version}).`
+        : [`Updated ${res.from} to ${res.updated} (${res.version}) on ${n}. It loads at the next restart.`,
+          res.versionNote, snapshot ? `Snapshot taken first: ${snapshot}.` : null].filter(Boolean).join('\n')
+      return { data: { name: n, ...res, snapshot }, text }
     },
   },
   {
@@ -398,8 +441,13 @@ const destructiveTools = [
       }
       progress(`Restoring ${snap.name}`)
       const res = await backup.restoreSnapshot(inst, snap)
+      const imported = res.databases?.imported ?? []
+      const skipped = res.databases?.skipped ?? []
+      const text = [`Restored ${snap.name} into ${n}. Start it to use the restored files.`,
+        ...imported.map((d) => `Imported database ${d.database} into ${d.service}.`),
+        ...skipped.map((d) => `NOT imported: database ${d.database}: ${d.reason}. The dump is left in the server folder to import by hand.`)].join('\n')
       return { data: { name: n, confirmed: true, snapshot: snap.name, restored: res.restored,
-        databasesImported: res.databases?.imported ?? [], databasesSkipped: res.databases?.skipped ?? [] } }
+        databasesImported: imported, databasesSkipped: skipped }, text }
     },
     failed: (data) => data.databasesSkipped?.length > 0,
   },
@@ -414,7 +462,9 @@ const destructiveTools = [
         return { data: { name: n, confirmed: false, status },
           text: `${n} is ${status}. Killing it skips the world save. Nothing has changed yet; call again with confirm: true to do it, or try stop first.` }
       }
-      return { data: { name: n, confirmed: true, ...(await sup.kill(n)) } }
+      const res = await sup.kill(n)
+      return { data: { name: n, confirmed: true, ...res },
+        text: res.alreadyStopped ? `${n} was not running; nothing was killed.` : `${n} was force-killed. Anything since its last autosave is lost.` }
     },
   },
   {
@@ -433,8 +483,10 @@ const destructiveTools = [
       progress(`Downloading Paper ${version}`)
       const running = sup.isRunning(n)
       const res = await upgrade.applyUpgrade(n, { version, running })
-      return { data: { name: n, confirmed: true, from: res.from, to: res.to, snapshot: res.snapshot ? path.basename(res.snapshot) : null,
-        takesEffect: running ? 'next restart' : 'next start' } }
+      const snapshot = res.snapshot ? path.basename(res.snapshot) : null
+      return { data: { name: n, confirmed: true, from: res.from, to: res.to, snapshot, takesEffect: running ? 'next restart' : 'next start' },
+        text: `${n}: ${res.from} -> ${res.to}. The worlds migrate at the ${running ? 'next restart' : 'next start'}.` +
+          (snapshot ? ` The way back is the snapshot ${snapshot}, restored with restore.` : '') }
     },
   },
 ]
