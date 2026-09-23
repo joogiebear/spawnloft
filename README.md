@@ -6,7 +6,8 @@ injection, and snapshot/restore. The site is [spawnloft.com](https://spawnloft.c
 
 SpawnLoft is the product and the preferred command-line name. `mcctl` remains a compatible
 alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for packaged
-launchers, structured JSON output, live performance readings, and CSV export.
+launchers, structured JSON output, live performance readings, and CSV export, and
+[the MCP guide](MCP.md) to let an AI assistant you choose check on and run your servers.
 
 Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
 GNU tar, which cannot read or write a zip, world import and export use a zip reader and
@@ -260,6 +261,7 @@ tasks with it, and deleting one takes them away.
 | `templates` / `templates save <inst> <tpl>` | Reusable plugin+config sets |
 | `jars` / `jars import <path>` | Server jar store used by `new` |
 | `doctor` | Environment, port collisions, EULA, disk, stale state |
+| `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
 
 ## How it works
 
