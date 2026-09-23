@@ -13,6 +13,8 @@ import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
 import { readState } from './control.mjs'
 import { fail, humanBytes, humanDuration } from './util.mjs'
+import { DATA_ROOT } from './paths.mjs'
+import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 
 /**
  * What an AI client may do to this machine's servers, and exactly that much.
@@ -78,7 +80,12 @@ const readTools = [
       const data = query('list', [], {})
       const rows = [...data.instances, ...data.databases].map((r) =>
         `${r.name}: ${r.status}${r.kind === 'database' ? ` (database, ${r.engine})` : ''}${r.port ? `, port ${r.port}` : ''}`)
-      return { data, text: rows.length ? rows.join('\n') : 'No servers yet.' }
+      if (rows.length) return { data, text: rows.join('\n') }
+      // An empty list is also what a data root pointed at the wrong folder looks like, so say
+      // which folder was read, and where servers were found instead.
+      const elsewhere = describeServersElsewhere(DATA_ROOT)
+      return { data: { ...data, dataRoot: DATA_ROOT, serversElsewhere: serversElsewhere(DATA_ROOT) },
+        text: [`No servers in ${DATA_ROOT}.`, ...elsewhere.map((l) => `NOTE: ${l}`)].join('\n') }
     },
   },
   {

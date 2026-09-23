@@ -98,6 +98,40 @@ export function resolveRoots(overrides = {}) {
 }
 
 /**
+ * Other places on this machine that hold a registry with servers in it, when the data root in use
+ * holds none.
+ *
+ * <p>The desktop app resolves its data root once, at launch; the CLI and the MCP server resolve it
+ * on every run. So if settings.json changes under a running app - a second copy of SpawnLoft on the
+ * same account, a development checkout, a hand edit - the app keeps showing the servers it started
+ * with while every fresh process looks somewhere else and reports that nothing exists. That reads
+ * as "my servers are gone" when they are one folder away. Checked only where SpawnLoft itself would
+ * have put them: the per-user default and the legacy checkout layout.
+ */
+export function serversElsewhere(dataRoot) {
+  const here = path.resolve(dataRoot)
+  const found = []
+  for (const root of new Set([defaultDataRoot(), CODE_ROOT].map((r) => path.resolve(r)))) {
+    if (root === here) continue
+    let names = []
+    try {
+      names = Object.keys(JSON.parse(fs.readFileSync(path.join(root, 'instances.json'), 'utf8')).instances ?? {})
+    } catch {
+      continue
+    }
+    if (names.length) found.push({ root, names })
+  }
+  return found
+}
+
+/** One line per other location, for the places that report an empty data root. */
+export function describeServersElsewhere(dataRoot) {
+  return serversElsewhere(dataRoot).map(({ root, names }) =>
+    `${names.length} server(s) (${names.join(', ')}) are registered in ${root}, which is not the data root in use. ` +
+    `If they are yours: spawnloft config set-root "${root}"`)
+}
+
+/**
  * Whether a directory can be written to, checked by actually writing.
  *
  * <p>Permission bits and free-space numbers both lie — a network share, a read-only mount, or a

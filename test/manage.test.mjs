@@ -14,6 +14,10 @@ import path from 'node:path'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-manage-'))
 process.env.MCCTL_DATA_ROOT = scratch
+// The mirror test saves settings, and MCCTL_DATA_ROOT does not move the settings file: without
+// these it rewrote the developer's own settings.json on every run.
+process.env.APPDATA = path.join(scratch, 'config')
+process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 
 const { putInstance, getInstance, assertPortUsable, hasInstance } = await import('../src/registry.mjs')
 const manage = await import('../src/manage.mjs')
