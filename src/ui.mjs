@@ -459,14 +459,15 @@ async function handleBackups(req, res, name, seg) {
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
       running: supervisor.isRunning(name),
+      scopes: backup.SCOPES,
     }
     // A visible history polls for CLI-created snapshots. That does not need to start
-    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits.
+    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits. It is also
+    // what the tab draws first: the scheduler's answer can take seconds on a cold machine, and the
+    // snapshots and "Back up now" should not wait for it.
     if (action === 'history') return json(res, 200, history)
     const auto = await autoBackupTask(name)
-    return json(res, 200, {
-      ...history,
-      scopes: backup.SCOPES,
+    const automatic = {
       auto: auto && {
         id: auto.id,
         enabled: auto.enabled,
@@ -479,7 +480,10 @@ async function handleBackups(req, res, name, seg) {
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
       background: schedule.background(),
-    })
+    }
+    // The schedule on its own, which the tab fills in once the scheduler answers.
+    if (action === 'auto') return json(res, 200, automatic)
+    return json(res, 200, { ...history, ...automatic })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
 

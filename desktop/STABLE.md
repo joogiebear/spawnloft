@@ -21,6 +21,7 @@ Existing installs receive 1.3 through the built-in updater. ZIP files are used b
 
 ## Fixed
 
+- On Windows, the Backups tab could stay blank for several seconds while SpawnLoft asked Task Scheduler about automatic backups. Your backups and "Back up now" now appear at once, and the automatic-backup settings fill in when Windows answers.
 - On Windows, the app could stop responding for a few seconds while setting up a MySQL or Redis database, as the engine was moved into place. It now stays responsive throughout.
 - Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.
 
