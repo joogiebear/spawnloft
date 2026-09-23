@@ -6,6 +6,10 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
 
 ### Fixes to try
 
+- **AI assistants (new in 1.3):** `spawnloft mcp` lets an MCP app such as Claude Desktop or
+  Claude Code run your servers. Settings -> AI assistants shows the config for this install.
+  Tried: start, TPS, backup, plugin install, Paper update and restart on Windows. Please try it
+  from a Mac and Linux, and with a local model, and say what your assistant got wrong.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;
