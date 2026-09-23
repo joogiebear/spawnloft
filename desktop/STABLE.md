@@ -21,6 +21,7 @@ Existing installs receive 1.3 through the built-in updater. ZIP files are used b
 
 ## Fixed
 
+- On Windows, the app could stop responding for a few seconds while setting up a MySQL or Redis database, as the engine was moved into place. It now stays responsive throughout.
 - Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.
 
 Plugin configuration remains manual. SpawnLoft does not insert database credentials into plugin configuration files.
