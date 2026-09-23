@@ -33,6 +33,7 @@ fs.writeFileSync(path.join(run, 'console.log'), [
   '[12:00:02 WARN]: Plugin Example uses a deprecated API',
   `[12:00:03 ERROR]: Could not connect: jdbc:mariadb://127.0.0.1/db?password=${secret}`,
   '[12:00:04 INFO]: Alex[/[2001:db8::5]:40000] logged in with entity id 2',
+  '[12:00:05 INFO]: **** FAILED TO BIND TO PORT!',
   '',
 ].join('\n'))
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
@@ -220,6 +221,23 @@ test('backup works through MCP and reports progress to a client that asked for i
   assert.ok(s.notes.some((n) => n.method === 'notifications/progress' && n.params.progressToken === 'p1'))
   const listed = await session([call(1, 'list_snapshots', { name: 'royalplugins' })])
   assert.equal(listed.byId.get(1).result.structuredContent.snapshots.length, 1)
+})
+
+test('results read as sentences, with the structured data beside them', async () => {
+  const s = await session([
+    call(1, 'server_status', { name: 'royalplugins' }),
+    call(2, 'diagnostics', { name: 'royalplugins' }),
+    call(3, 'check_plugin_updates', { name: 'royalplugins' }),
+    call(4, 'list_snapshots', { name: 'royalplugins' }),
+  ])
+  for (let id = 1; id <= 4; id++) {
+    const r = s.byId.get(id).result
+    assert.ok(!r.content[0].text.trimStart().startsWith('{'), `tool ${id} answered with raw JSON: ${r.content[0].text}`)
+    assert.ok(r.structuredContent, `tool ${id} lost its structured data`)
+  }
+  assert.match(s.byId.get(1).result.content[0].text, /^royalplugins: stopped; port 45611, RCON 45612; 1G memory/)
+  assert.match(s.byId.get(2).result.content[0].text, /The port is already taken\. .*\n  From: .*FAILED TO BIND/)
+  assert.match(s.byId.get(3).result.content[0].text, /has not installed any plugins/)
 })
 
 test('hideIps masks socket addresses and leaves versions and times alone', () => {
