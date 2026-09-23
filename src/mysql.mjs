@@ -116,10 +116,13 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     // Before the engine is moved into place: one that cannot load its libraries must not look installed.
     ensureLibraries(unpacked, ['server', 'client'].map(role => binary(unpacked, role).path), { onProgress, engineLabel: LABEL })
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, arch: process.arch, sha256: archive.sha256 }))
-    fs.renameSync(unpacked, dir)
+    // Asynchronous on purpose, as is the cleanup below. The engine is thousands of files and the
+    // staging folder holds the whole archive; Defender scans them as they move, and a synchronous
+    // call held the panel's event loop for seconds - long enough for its own requests to time out.
+    await fs.promises.rename(unpacked, dir)
     return { version, dir, cached: false }
   } finally {
-    if (staging) fs.rmSync(staging, { recursive: true, force: true })
+    if (staging) await fs.promises.rm(staging, { recursive: true, force: true })
     fs.closeSync(fd)
     fs.unlinkSync(lock)
   }
