@@ -8,10 +8,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
-import { spawnSync } from 'node:child_process'
 
 import { ensureDirs, ROOT, runDir } from './src/paths.mjs'
-import { listInstances, getInstance, removeInstance, updateInstance, serverJarPath, assertPortUsable } from './src/registry.mjs'
+import { listInstances, getInstance, removeInstance, updateInstance, assertPortUsable } from './src/registry.mjs'
 import { acceptableWebhook, notifyInstance } from './src/notify.mjs'
 import * as plugins from './src/plugins.mjs'
 import * as upgrade from './src/upgrade.mjs'
@@ -21,8 +20,7 @@ import * as mrpack from './src/mrpack.mjs'
 import * as neoforge from './src/neoforge.mjs'
 import * as worlds from './src/worlds.mjs'
 import { diagnose, crashReports } from './src/diagnose.mjs'
-import { rconExposure } from './src/exposure.mjs'
-import { readState, clearState } from './src/control.mjs'
+import { readState } from './src/control.mjs'
 import * as services from './src/services.mjs'
 import { listServices, isDatabase } from './src/registry.mjs'
 import * as sup from './src/supervisor.mjs'
@@ -37,10 +35,11 @@ import * as java from './src/java.mjs'
 import * as schedule from './src/schedule.mjs'
 import * as paths from './src/paths.mjs'
 import { readProps, writeProps } from './src/props.mjs'
-import { UserError, fail, table, humanBytes, humanDuration, dirSize, isPortFree, sleep, cleanLabel } from './src/util.mjs'
+import { UserError, fail, table, humanBytes, humanDuration, sleep, cleanLabel } from './src/util.mjs'
 import { parseArgs } from './src/args.mjs'
 import { QUERY_ALIASES, query } from './src/cli-query.mjs'
 import { cmdMetrics } from './src/cli-metrics.mjs'
+import { runDoctor } from './src/doctor.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
@@ -1641,63 +1640,7 @@ async function cmdDoctor(positional, flags = {}) {
     checkFlags(flags, ['json'])
     if (positional.length) throw new UsageError('Usage: spawnloft doctor --json')
   }
-  const problems = []
-  const notes = []
-
-  // The same probe the panel and the first-run wizard use, so all three agree about what
-  // counts as a usable Java.
-  const javaCheck = await java.health()
-  if (!javaCheck.ok) problems.push(`java: ${javaCheck.message} ${java.DOWNLOAD_URL}`)
-  else notes.push(`java: ${javaCheck.version}${javaCheck.onPath ? '' : ` at ${javaCheck.path} (not on PATH)`}`)
-  for (const other of javaCheck.others ?? []) {
-    if (other.path !== javaCheck.path) notes.push(`java (also): ${other.version} at ${other.path}`)
-  }
-
-  const tarCheck = spawnSync('tar', ['--version'], { encoding: 'utf8', windowsHide: true })
-  if (tarCheck.error) problems.push('tar is not on PATH (needed for snapshots)')
-  else notes.push(`tar: ${(tarCheck.stdout || '').split('\n')[0].trim()}`)
-
-  notes.push(`node: ${process.version}`)
-  notes.push(`root: ${ROOT}`)
-
-  const seenPorts = new Map()
-  for (const inst of listInstances()) {
-    if (!fs.existsSync(inst.dir)) {
-      problems.push(`${inst.name}: directory missing (${inst.dir})`)
-      continue
-    }
-    if (!fs.existsSync(serverJarPath(inst))) {
-      problems.push(`${inst.name}: jar missing (${serverJarPath(inst)})`)
-    }
-    const eula = path.join(inst.dir, 'eula.txt')
-    const eulaText = fs.existsSync(eula) ? fs.readFileSync(eula, 'utf8') : ''
-    if (!/^\s*eula\s*=\s*true\s*$/im.test(eulaText)) {
-      problems.push(`${inst.name}: EULA not accepted (${eula})`)
-    }
-    for (const [label, port] of [['port', inst.port], ['rcon', inst.rcon?.port]]) {
-      if (!port) continue
-      if (seenPorts.has(port)) problems.push(`${inst.name}: ${label} ${port} collides with ${seenPorts.get(port)}`)
-      else seenPorts.set(port, `${inst.name} ${label}`)
-    }
-    const { status } = readState(inst.name)
-    if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
-    // Asked whether or not it is running: the port opens the moment it starts, and doctor is what
-    // someone runs before they start it.
-    const exposed = rconExposure(inst)
-    if (exposed) problems.push(`${inst.name}: ${exposed.title.toLowerCase()}. ${exposed.advice}`)
-    if (status === 'stale') {
-      if (flags.json) problems.push(`${inst.name}: stale state file; run doctor without --json to clear it`)
-      else {
-        clearState(inst.name)
-        notes.push(`${inst.name}: cleared stale state file`)
-      }
-    }
-    if (status === 'stopped') {
-      const free = await isPortFree(inst.port)
-      if (!free) problems.push(`${inst.name}: port ${inst.port} is in use by something else while the instance is stopped`)
-    }
-    notes.push(`${inst.name}: ${humanBytes(dirSize(inst.dir))} on disk at ${inst.dir}`)
-  }
+  const { notes, problems } = await runDoctor({ repair: !flags.json })
 
   if (flags.json) {
     process.stdout.write(jsonLine('doctor', { healthy: problems.length === 0, notes, problems },
