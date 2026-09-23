@@ -1051,6 +1051,18 @@ async function route(req, res) {
   // ---- prerequisites ---------------------------------------------------------
   // Java is the one thing mcctl needs and cannot provide. Asked here so the panel can say so up
   // front instead of letting it surface as "spawn java ENOENT" after a fifty-megabyte download.
+  // ---- how an AI client launches `spawnloft mcp` on this install ------------
+  // The panel runs on the same runtime the command line does, so it knows the real executable and
+  // script paths. Pointing a client straight at them avoids the .cmd launcher, which a client that
+  // spawns without a shell cannot start on Windows.
+  if (seg[1] === 'mcp' && seg.length === 2 && req.method === 'GET') {
+    return json(res, 200, {
+      command: process.execPath,
+      args: [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
+      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
+    })
+  }
+
   if (seg[1] === 'health' && req.method === 'GET') {
     return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })
   }

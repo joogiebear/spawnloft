@@ -2130,6 +2130,33 @@
           </label>
           <p id="setBetaStatus" class="hint" aria-live="polite" style="margin:10px 0 0"></p>
         </div>
+        <div id="setMcp">
+          <h2>AI assistants</h2>
+          <p class="hint" style="margin:0 0 12px">
+            Let an AI app that supports MCP, such as Claude Desktop or Claude Code, check on and run
+            your servers. You choose the app; SpawnLoft sends nothing on its own. What the tools return
+            &mdash; console lines, player names, plugin lists &mdash; goes to that app's provider.
+            Passwords and webhooks never do.
+          </p>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
+            <input type="checkbox" id="mcpDestructive" class="switch" style="flex:none;margin-top:2px">
+            <span><strong>Allow restoring backups, force-kill and Minecraft version upgrades</strong>
+              <span class="hint" style="display:block;margin-top:2px">Off, the assistant is never offered them. On, each still describes what it would do and waits to be confirmed.</span></span>
+          </label>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:12px">
+            <input type="checkbox" id="mcpIps" class="switch" style="flex:none;margin-top:2px">
+            <span><strong>Show players' IP addresses</strong>
+              <span class="hint" style="display:block;margin-top:2px">The console records one each time someone joins. Hidden unless this is on.</span></span>
+          </label>
+          <p class="hint" style="margin:0 0 6px">For Claude Desktop, add this to <code>claude_desktop_config.json</code> (Settings &rarr; Developer &rarr; Edit Config), then restart it:</p>
+          <textarea id="mcpJson" class="mono" readonly rows="9" style="width:100%;resize:vertical" aria-label="Claude Desktop configuration"></textarea>
+          <p class="hint" style="margin:10px 0 6px">For Claude Code, run this in a terminal:</p>
+          <textarea id="mcpCli" class="mono" readonly rows="3" style="width:100%;resize:vertical" aria-label="Claude Code command"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost" id="bMcpJson">Copy Claude Desktop config</button>
+            <button class="ghost" id="bMcpCli">Copy Claude Code command</button>
+          </div>
+        </div>
         <div>
           <h2>About</h2>
           <dl class="kv" id="setAbout"></dl>
@@ -7580,6 +7607,7 @@ function renderSettings() {
   }
 
   renderUpdateChannel();
+  renderMcp();
 
   const about = $('#setAbout');
   about.textContent = '';
@@ -7647,6 +7675,47 @@ async function renderUpdateChannel() {
     }
     show(out);
   };
+}
+
+/**
+ * The launch line for `spawnloft mcp`, as an AI client wants it. The paths come from the core,
+ * which knows where this install actually lives; the two switches only add flags, so nothing
+ * here is saved - the client's config is where the choice lives.
+ */
+function mcpQuote(s) {
+  return /[\s"]/.test(s) ? '"' + s.replace(/"/g, '\\"') + '"' : s;
+}
+
+function mcpSnippets(launch, { destructive, ips }) {
+  const args = [...launch.args, ...(destructive ? ['--allow-destructive'] : []), ...(ips ? ['--show-ips'] : [])];
+  const entry = { command: launch.command, args };
+  if (Object.keys(launch.env).length) entry.env = launch.env;
+  const json = JSON.stringify({ mcpServers: { spawnloft: entry } }, null, 2);
+  const env = Object.entries(launch.env).map(([k, v]) => '--env ' + k + '=' + v + ' ').join('');
+  const cli = 'claude mcp add --transport stdio --scope user ' + env + 'spawnloft -- '
+    + [launch.command, ...args].map(mcpQuote).join(' ');
+  return { json, cli };
+}
+
+async function renderMcp() {
+  let launch;
+  try {
+    launch = await api('/mcp');
+  } catch {
+    $('#setMcp').hidden = true;
+    return;
+  }
+  $('#setMcp').hidden = false;
+  const show = () => {
+    const s = mcpSnippets(launch, { destructive: $('#mcpDestructive').checked, ips: $('#mcpIps').checked });
+    $('#mcpJson').value = s.json;
+    $('#mcpCli').value = s.cli;
+  };
+  $('#mcpDestructive').onchange = show;
+  $('#mcpIps').onchange = show;
+  $('#bMcpJson').onclick = () => copyText($('#mcpJson').value, 'the Claude Desktop configuration');
+  $('#bMcpCli').onclick = () => copyText($('#mcpCli').value, 'the Claude Code command');
+  show();
 }
 
 $('#bSettings').onclick = () => openSheet('settings', renderSettings);

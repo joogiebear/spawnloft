@@ -295,8 +295,46 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     }
     record('PASS: packaged spawnloft and mcctl terminal launchers return clean JSON and preserve success/failure exit codes')
 
+    // The launch line Settings gives an AI app: the executable itself with ELECTRON_RUN_AS_NODE,
+    // not the .cmd launcher, spoken to over piped stdin the way an MCP client does.
+    const mcp = await new Promise((resolve, reject) => {
+      const child = spawn(executable, [path.join(core, 'spawnloft.mjs'), 'mcp'], {
+        env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      })
+      let stdout = ''
+      let stderr = ''
+      const timer = setTimeout(() => child.kill('SIGKILL'), 20000)
+      child.stdout.on('data', chunk => { stdout += chunk })
+      child.stderr.on('data', chunk => { stderr += chunk })
+      child.once('error', error => { clearTimeout(timer); reject(error) })
+      child.once('close', code => {
+        clearTimeout(timer)
+        log.push(`[MCP] exit ${code} ${stderr}`)
+        if (code !== 0) return reject(new Error(`spawnloft mcp: exit ${code}; ${stderr}`))
+        resolve({ stdout, replies: new Map(stdout.split('\n').filter(Boolean).map(line => JSON.parse(line)).map(m => [m.id, m])) })
+      })
+      for (const message of [
+        { id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } } },
+        { method: 'notifications/initialized' },
+        { id: 2, method: 'tools/list' },
+        { id: 3, method: 'tools/call', params: { name: 'server_status', arguments: { name } } },
+      ]) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
+      child.stdin.end()
+    })
+    assert.equal(mcp.replies.get(1).result.serverInfo.name, 'spawnloft')
+    const mcpTools = mcp.replies.get(2).result.tools.map(tool => tool.name)
+    assert.ok(mcpTools.includes('start') && !mcpTools.includes('restore'), 'Destructive tools need --allow-destructive')
+    assert.equal(mcp.replies.get(3).result.structuredContent.status, 'stopped')
+    assert.ok(!mcp.stdout.includes('isolated-smoke'), 'MCP results must not expose the RCON password')
+    record('PASS: packaged runtime serves MCP over stdio without exposing credentials')
+
     await launch()
     await page.locator('#bSettings').waitFor({ state: 'visible' })
+    const mcpLaunch = await api('mcp')
+    assert.equal(fs.realpathSync(mcpLaunch.command), fs.realpathSync(executable), 'Settings must point AI apps at this executable')
+    assert.equal(fs.realpathSync(mcpLaunch.args[0]), fs.realpathSync(path.join(core, 'spawnloft.mjs')))
+    assert.deepEqual(mcpLaunch.env, { ELECTRON_RUN_AS_NODE: '1' })
+    record('PASS: Settings gives AI apps the packaged executable and script')
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'classic')
     const info = await page.evaluate(() => window.mcctlDesktop.appInfo())
     assert.equal(info.packaged, true)
