@@ -67,6 +67,64 @@ export const SCOPES = ['plugins', 'worlds', 'config', 'standard', 'full']
  */
 export const EXCLUDE_ARGS = ['--exclude', 'session.lock']
 
+/**
+ * Files under `members` that cannot be read right now, as archive paths.
+ *
+ * <p>session.lock is not the only one. Any plugin with an embedded database holds its file the
+ * same way - LuckPerms' default H2 store is the common case - and bsdtar does not skip it either:
+ * it stops writing at that file and exits 1, the code it also uses for harmless hot-snapshot
+ * warnings. The result was an archive cut off partway through the plugins folder, with no world
+ * in it, recorded as a successful backup of the right size to look plausible.
+ *
+ * <p>A file that cannot be read cannot be backed up by anything, so these are excluded and named
+ * in the manifest's warnings: the rest of the server is still worth having, and the warning says
+ * exactly what is missing. Windows only: POSIX locks are advisory and tar reads straight through
+ * them. Asynchronous, because a world is thousands of files and the panel's event loop must not
+ * stall on them.
+ */
+async function lockedFiles(cwd, members) {
+  if (process.platform !== 'win32') return []
+  const locked = []
+  const probe = Buffer.alloc(1)
+  const visit = async (rel) => {
+    const full = path.join(cwd, rel)
+    let stat
+    try {
+      stat = await fs.promises.lstat(full)
+    } catch {
+      return
+    }
+    if (stat.isDirectory()) {
+      let entries = []
+      try {
+        entries = await fs.promises.readdir(full)
+      } catch {
+        return
+      }
+      for (let i = 0; i < entries.length; i += 16) {
+        await Promise.all(entries.slice(i, i + 16).map((e) => visit(path.join(rel, e))))
+      }
+      return
+    }
+    // Opening succeeds on a locked file; it is the read that fails, so one byte is read.
+    if (!stat.isFile() || stat.size === 0 || path.basename(rel) === 'session.lock') return
+    let handle
+    try {
+      handle = await fs.promises.open(full, 'r')
+      await handle.read(probe, 0, 1, 0)
+    } catch (err) {
+      if (['EBUSY', 'EPERM', 'EACCES'].includes(err.code)) locked.push(rel.split(path.sep).join('/'))
+    } finally {
+      await handle?.close()
+    }
+  }
+  for (const member of members) await visit(member)
+  return locked.sort()
+}
+
+// A literal path as a bsdtar pattern: the glob characters are bracketed so they match themselves.
+const literalPattern = (p) => p.replace(/[[*?]/g, (c) => `[${c}]`)
+
 const ROOT_CONFIG_FILES = [
   'server.properties',
   'bukkit.yml',
@@ -201,11 +259,16 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   }
   let reservation = null
   let published = false
+  let skipped = []
   try {
     let stderr
+    let code
     try {
       reservation = reserveSnapshot(dir, base)
-      ;({ stderr } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...members, ...dumpArgs], inst.dir))
+      // After the flush, so the files are checked in the state tar will find them.
+      skipped = await lockedFiles(inst.dir, members)
+      const skipArgs = skipped.flatMap((f) => ['--exclude', literalPattern(f)])
+      ;({ stderr, code } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...skipArgs, ...members, ...dumpArgs], inst.dir))
     } finally {
       // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
       // any failed backup.
@@ -232,6 +295,20 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
           (said ? `\n  tar said: ${said}` : ''),
       )
     }
+    // Exit 1 is tolerated above, but it is also how bsdtar reports giving up partway through - a
+    // file that became locked after the check, or anything else it could not read. So an archive
+    // written with warnings is read back before it is published. A clean exit means tar read
+    // everything, and a large world is not read twice for nothing.
+    if (code !== 0) {
+      const check = await verifyArchive(reservation.pending, archived, dumps.dumped.map((d) => d.file))
+      if (!check.ok) {
+        const said = stderr.trim().split(/\r?\n/)[0]
+        fail(
+          `snapshot of "${inst.name}" came out incomplete and has been discarded: ${check.problems[0]}` +
+            (said ? `\n  tar said: ${said}` : ''),
+        )
+      }
+    }
     const manifest = {
       instance: inst.name,
       scope,
@@ -248,15 +325,18 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       size,
       serverWasRunning: running,
       flushed,
-      // bsdtar emits an undescribed "tar: (null)" alongside exit 1 when it
-      // skips a file the running server has locked. That carries no signal.
+      // Files left out because another program held them locked, by archive path.
+      skipped,
+      // bsdtar emits an undescribed "tar: (null)" (or "tar.exe: (null)") alongside exit 1 when it
+      // meets a locked file. That carries no signal.
       warnings: [
         ...(flushWarning ? [flushWarning] : []),
         ...dumps.skipped.map((d) => `database ${d.database} on ${d.service} not included: ${d.reason}`),
+        ...skipped.map((f) => `${f} not included: another program has it locked, usually the running server`),
         ...stderr
           .trim()
           .split(/\r?\n/)
-          .filter((l) => l.trim() && !/^tar:\s*\(null\)$/.test(l.trim())),
+          .filter((l) => l.trim() && !/^tar(\.exe)?:\s*\(null\)$/i.test(l.trim())),
       ].slice(0, 10),
     }
     writeJson(manifestFile, manifest)
@@ -265,7 +345,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
     fs.renameSync(pending, file)
     published = true
     const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
-    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
+    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
   } finally {
     if (reservation && !published) {
       // Keep the name reserved until its metadata is gone. Releasing it first
