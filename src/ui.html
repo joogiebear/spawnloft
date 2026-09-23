@@ -5457,8 +5457,9 @@ async function renderBackups(opts) {
 
   let data;
   try {
-    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups'
-      + (history && !force ? '/history' : ''));
+    // The history answers at once; the schedule, which needs Windows Task Scheduler, is asked for
+    // separately below so the tab never waits on it.
+    data = await api('/instances/' + encodeURIComponent(row.name) + '/backups/history');
   } catch (e) {
     if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
     if (history && history.isConnected) {
@@ -5545,6 +5546,31 @@ async function renderBackups(opts) {
   };
 
   // ---- on a schedule --------------------------------------------------------
+  // Drawn in two steps. The schedule lives in Windows Task Scheduler, and asking means starting
+  // PowerShell - seconds on a cold machine. Nothing else here needs that answer, so the form and
+  // the history appear at once and this card fills in when the scheduler replies.
+  const auto = autoBackupSection(base, null);
+  body.append(auto);
+  body.append(renderBackupHistory(row, data, signature));
+  let automatic;
+  try {
+    automatic = await api(base + '/auto');
+  } catch (e) {
+    automatic = { error: e.message };
+  }
+  // Only this card's own place is checked, not backupRequest: the history poll bumps that every
+  // few seconds, and would otherwise stop a slow schedule answer from ever being shown.
+  if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
+  auto.replaceWith(autoBackupSection(base, automatic));
+}
+
+/**
+ * The automatic-backup card. `data` is null while Task Scheduler is being asked, and carries
+ * `error` if asking failed; either way the controls are drawn but cannot be used.
+ */
+function autoBackupSection(base, data) {
+  // Until the scheduler has answered there is nothing to show but the shape of the card.
+  const known = data && !data.error ? data : {};
   const auto = document.createElement('div');
   auto.className = 'section';
   const autoTitle = document.createElement('h3');
@@ -5555,7 +5581,7 @@ async function renderBackups(opts) {
   const onOff = document.createElement('input');
   onOff.type = 'checkbox';
   onOff.className = 'switch';
-  onOff.checked = Boolean(data.auto);
+  onOff.checked = Boolean(known.auto);
   const onOffLabel = document.createElement('label');
   onOffLabel.className = 'row';
   onOffLabel.style.cursor = 'pointer';
@@ -5566,7 +5592,7 @@ async function renderBackups(opts) {
     const o = document.createElement('option');
     o.value = opt.label;
     o.textContent = opt.label;
-    o.selected = data.auto ? sameSchedule(opt.schedule, data.auto.schedule) : opt.label === 'Daily at 03:00';
+    o.selected = known.auto ? sameSchedule(opt.schedule, known.auto.schedule) : opt.label === 'Daily at 03:00';
     every.append(o);
   }
   every.style.maxWidth = '190px';
@@ -5578,7 +5604,7 @@ async function renderBackups(opts) {
   keep.type = 'number';
   keep.min = '1';
   keep.max = '365';
-  keep.value = String((data.auto && data.auto.keep) || 7);
+  keep.value = String((known.auto && known.auto.keep) || 7);
   keep.style.maxWidth = '68px';
   const keepAfter = document.createElement('span');
   keepAfter.className = 'hint';
@@ -5593,19 +5619,18 @@ async function renderBackups(opts) {
 
   const autoState = document.createElement('div');
   autoState.className = 'hint';
-  autoState.textContent = data.auto
-    ? 'Held by ' + schedulerName + '. Last run: ' + (data.auto.lastResult || 'unknown')
-      + '. Next: ' + (whenNext(data.auto.nextRun) || 'unknown') + '.'
+  autoState.textContent = known.auto
+    ? 'Held by ' + schedulerName + '. Last run: ' + (known.auto.lastResult || 'unknown')
+      + '. Next: ' + (whenNext(known.auto.nextRun) || 'unknown') + '.'
     : schedulerHint;
   auto.append(autoTitle, autoRow, autoState);
-  const lingering = lingerNotice(data.background, () => renderBackups({ force: true }));
+  const lingering = lingerNotice(known.background, () => renderBackups({ force: true }));
   if (lingering) auto.append(lingering);
-  if (data.automaticAvailable === false) {
+  if (known.automaticAvailable === false) {
     autoRow.hidden = true;
-    autoState.textContent = data.automaticUnavailableReason;
+    autoState.textContent = known.automaticUnavailableReason;
     for (const control of [onOff, every, keep, apply]) control.disabled = true;
   }
-  body.append(auto);
 
   apply.onclick = async () => {
     apply.disabled = true;
@@ -5622,7 +5647,12 @@ async function renderBackups(opts) {
     }
   };
 
-  body.append(renderBackupHistory(row, data, signature));
+  const settled = data && !data.error;
+  if (!settled) {
+    autoState.textContent = data ? 'Could not read the schedule: ' + data.error : 'Checking the schedule…';
+    for (const control of [onOff, every, keep, apply]) control.disabled = true;
+  }
+  return auto;
 }
 
 function renderBackupHistory(row, data, signature) {
