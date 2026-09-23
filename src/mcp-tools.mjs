@@ -367,10 +367,11 @@ const actionTools = [
       progress(`Snapshotting ${n} (${scope})`)
       const res = await backup.createSnapshot(inst, { scope, label, running: sup.isRunning(n) })
       const data = { name: n, snapshot: path.basename(res.file), sizeBytes: res.size, scope, members: res.members,
-        databases: res.databases ?? [], databasesSkipped: res.databasesSkipped ?? [], warnings: res.manifest?.warnings ?? [],
-        mirrored: Boolean(res.mirrored), mirrorError: res.mirrorError ?? null }
+        databases: res.databases ?? [], databasesSkipped: res.databasesSkipped ?? [], skipped: res.skipped ?? [],
+        warnings: res.manifest?.warnings ?? [], mirrored: Boolean(res.mirrored), mirrorError: res.mirrorError ?? null }
       return { data, text: `Wrote ${data.snapshot} (${Math.round(res.size / 1048576 * 10) / 10} MiB): ${res.members.join(', ')}` +
-        (data.databasesSkipped.length ? `\nWARNING: ${data.databasesSkipped.map((d) => `${d.database} not included: ${d.reason}`).join('; ')}` : '') }
+        (data.databasesSkipped.length ? `\nWARNING: ${data.databasesSkipped.map((d) => `${d.database} not included: ${d.reason}`).join('; ')}` : '') +
+        (data.skipped.length ? `\nWARNING: locked by another program, so not included: ${data.skipped.join(', ')}` : '') }
     },
   },
   {

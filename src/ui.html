@@ -5537,6 +5537,7 @@ async function renderBackups(opts) {
       const out = await post(base, { scope: scope.value });
       toast('Saved ' + out.created + (out.mirrored ? ', and mirrored.' : '.'), 'good');
       if (out.mirrorError) toast(out.mirrorError, 'bad');
+      if (out.skipped?.length) toast('Left out, locked by the running server: ' + out.skipped.join(', '), 'bad');
       await renderBackups({ force: true });
     } catch (e) {
       toast(e.message, 'bad');

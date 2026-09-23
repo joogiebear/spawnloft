@@ -491,7 +491,7 @@ async function handleBackups(req, res, name, seg) {
 
   if (!action) {
     // A snapshot of a running server is legitimate - it is what "back up before I try this" means -
-    // and createSnapshot excludes the one file the server holds locked.
+    // and createSnapshot leaves out the files the server holds locked, and says which.
     const running = supervisor.isRunning(name)
     const out = await backup.createSnapshot(inst, {
       scope: backup.SCOPES.includes(body.scope) ? body.scope : 'standard',
@@ -502,6 +502,7 @@ async function handleBackups(req, res, name, seg) {
       created: path.basename(out.file),
       size: out.size,
       members: out.members,
+      skipped: out.skipped,
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
     })

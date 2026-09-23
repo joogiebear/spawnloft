@@ -671,7 +671,7 @@ async function cmdBackup(positional, flags) {
     const pruned = flags.keep === undefined ? [] : backup.pruneSnapshots(name, Number(flags.keep))
     process.stdout.write(jsonLine('backup', { instance: name, path: res.file, sizeBytes: res.size,
       scope, members: res.members, databases: res.databases, databasesSkipped: res.databasesSkipped,
-      warnings: res.manifest.warnings, mirrored: res.mirrored, mirrorError: res.mirrorError,
+      skipped: res.skipped, warnings: res.manifest.warnings, mirrored: res.mirrored, mirrorError: res.mirrorError,
       flushed: res.flushed, flushWarning: res.flushWarning, pruned }))
     return
   }
@@ -679,10 +679,13 @@ async function cmdBackup(positional, flags) {
   out(`  included: ${res.members.join(', ')}`)
   for (const d of res.databases ?? []) out(`  database: ${d.database} on ${d.service} (${humanBytes(d.bytes)})`)
   for (const d of res.databasesSkipped ?? []) out(`  WARNING: database ${d.database} on ${d.service} not included: ${d.reason}`)
+  for (const f of res.skipped ?? []) out(`  WARNING: ${f} not included: another program has it locked, usually the running server`)
   if (res.flushWarning) out(`  WARNING: ${res.flushWarning}`)
   if (res.mirrored) out(`  mirrored: ${res.mirrored}`)
   if (res.mirrorError) out(`  WARNING: ${res.mirrorError}`)
-  const tarWarnings = res.manifest.warnings.filter((w) => w !== res.flushWarning)
+  const tarWarnings = res.manifest.warnings.filter((w) => w !== res.flushWarning
+    && !(res.skipped ?? []).some((f) => w.startsWith(`${f} not included:`))
+    && !(res.databasesSkipped ?? []).some((d) => w.startsWith(`database ${d.database} on ${d.service} not included:`)))
   if (tarWarnings.length) {
     out('  tar warnings (normal for a live server):')
     for (const w of tarWarnings) out(`    ${w}`)
