@@ -24,6 +24,7 @@ Existing installs receive 1.3 through the built-in updater. ZIP files are used b
 - On Windows, the Backups tab could stay blank for several seconds while SpawnLoft asked Task Scheduler about automatic backups. Your backups and "Back up now" now appear at once, and the automatic-backup settings fill in when Windows answers.
 - On Windows, the app could stop responding for a few seconds while setting up a MySQL or Redis database, as the engine was moved into place. It now stays responsive throughout.
 - Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.
+- When the AI assistant tools, `spawnloft list` or `spawnloft doctor` find no servers, they now say which folder they looked in, and if your servers are registered in another folder SpawnLoft uses, they name it and the command that points SpawnLoft back at it. Before, this only showed as an empty list.
 
 Plugin configuration remains manual. SpawnLoft does not insert database credentials into plugin configuration files.
 

@@ -67,7 +67,8 @@ const STATUS_LABEL = {
 function cmdList() {
   const instances = listInstances()
   if (!instances.length) {
-    out('No instances registered.')
+    out(`No instances registered in ${paths.DATA_ROOT}.`)
+    for (const line of settings.describeServersElsewhere(paths.DATA_ROOT)) out(`  NOTE: ${line}`)
     out('')
     out('  Adopt an existing server:  mcctl adopt <name> <path-to-server-dir>')
     out('  Create a fresh one:        mcctl new <name> --jar <jar> --accept-eula')

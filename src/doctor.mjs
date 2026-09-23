@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { ROOT } from './paths.mjs'
+import { DATA_ROOT, ROOT } from './paths.mjs'
+import { describeServersElsewhere } from './settings.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
 import { rconExposure } from './exposure.mjs'
@@ -32,6 +33,10 @@ export async function runDoctor({ repair = false } = {}) {
 
   notes.push(`node: ${process.version}`)
   notes.push(`root: ${ROOT}`)
+  notes.push(`data root: ${DATA_ROOT}`)
+  if (!listInstances().length) {
+    for (const line of describeServersElsewhere(DATA_ROOT)) problems.push(line)
+  }
 
   const seenPorts = new Map()
   for (const inst of listInstances()) {
