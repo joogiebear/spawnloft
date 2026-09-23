@@ -19,6 +19,10 @@ Existing installs receive 1.3 through the built-in updater. ZIP files are used b
 - **AI assistants.** `spawnloft mcp` lets Claude Desktop, Claude Code, or any app that speaks the Model Context Protocol start and stop your servers, read their consoles, find out why one crashed, check TPS, take backups, install and update plugins and update Paper. You choose the app and add SpawnLoft to it; Settings, under AI assistants, shows the exact configuration for your install. No account, no open port, and nothing is sent unless that app asks. What the tools return - console lines, player names, plugin lists - goes to the app's provider; passwords and webhooks never do, and players' IP addresses are hidden unless you turn that on. Restoring a backup, force-kill and Minecraft version upgrades are offered only if you allow them, and each waits to be confirmed. Deleting a server is never offered. See [MCP.md](https://github.com/joogiebear/spawnloft/blob/main/MCP.md).
 - **Installing a plugin takes a snapshot first**, as updating one already did, so a plugin that turns out to be the wrong one can be rolled back from the Backups tab.
 
+## Fixed
+
+- Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.
+
 Plugin configuration remains manual. SpawnLoft does not insert database credentials into plugin configuration files.
 
 
