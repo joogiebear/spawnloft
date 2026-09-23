@@ -111,6 +111,13 @@ stdout yourself when capturing an ongoing stream. JSON and CSV are mutually excl
 Safe local JAR deployment, required-plugin readiness checks, and automatic PATH installation
 are separate planned additions.
 
+## AI assistants
+
+`spawnloft mcp` is a Model Context Protocol server on stdio, started by an AI app such as
+Claude Desktop or Claude Code rather than by you. It is not part of the JSON contract above and
+writes nothing but protocol messages to stdout. Setup, the tool list and what the AI provider
+sees are in [MCP.md](MCP.md).
+
 ## Scheduled work on Mac
 
 `spawnloft task add royalplugins --do backup --daily 03:00` creates a per-user

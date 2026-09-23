@@ -8,6 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
+import { fileURLToPath } from 'node:url'
 
 import { ensureDirs, ROOT, runDir } from './src/paths.mjs'
 import { listInstances, getInstance, removeInstance, updateInstance, assertPortUsable } from './src/registry.mjs'
@@ -40,6 +41,8 @@ import { parseArgs } from './src/args.mjs'
 import { QUERY_ALIASES, query } from './src/cli-query.mjs'
 import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
+import { serveStdio } from './src/mcp.mjs'
+import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
@@ -1660,6 +1663,27 @@ async function cmdDoctor(positional, flags = {}) {
   process.exitCode = 1
 }
 
+// ----------------------------------------------------------------------- mcp
+
+/**
+ * An MCP server on stdio, for an AI client the person configured to launch it. Never started by
+ * SpawnLoft itself and never listening on a port: the client owns this process and its lifetime.
+ */
+async function cmdMcp(positional, flags) {
+  checkFlags(flags, ['allowDestructive', 'showIps'])
+  if (positional.length) throw new UsageError('Usage: spawnloft mcp [--allow-destructive] [--show-ips]')
+  let version = null
+  try {
+    version = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')).version
+  } catch { /* a checkout without package.json still serves */ }
+  await serveStdio({
+    info: { name: 'spawnloft', title: 'SpawnLoft', version: version ?? '0.0.0' },
+    instructions: INSTRUCTIONS,
+    tools: toolsFor({ allowDestructive: flags.allowDestructive === true }),
+    scrub: scrubber({ showIps: flags.showIps === true }),
+  })
+}
+
 // ---------------------------------------------------------------------- help
 
 function cmdHelp() {
@@ -1678,6 +1702,9 @@ AUTOMATION
       --csv [--output <file>]        CSV export; refuses to overwrite an existing file
   Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.
   Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.
+  spawnloft mcp                      MCP server on stdio, for an AI client to launch
+      --allow-destructive            Also offer restore, kill and upgrade_minecraft
+      --show-ips                     Stop hiding player IP addresses in console lines
 
 LIFECYCLE
   mcctl list                         Show every instance and its state
@@ -1835,6 +1862,7 @@ const COMMANDS = {
   task: cmdTask,
   doctor: cmdDoctor,
   db: cmdDb,
+  mcp: cmdMcp,
   uninstall: cmdUninstall,
   help: cmdHelp,
 }

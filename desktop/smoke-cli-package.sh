@@ -50,6 +50,14 @@ spawnloft send pkgtest "say from the package"
 spawnloft stop pkgtest
 spawnloft status pkgtest --json | grep -q '"status": *"stopped"'
 spawnloft doctor || true
+# What an AI app sees: MCP over stdio from the package's own Node, with the RCON password left out.
+mcp_out=$(printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"server_status","arguments":{"name":"pkgtest"}}}' \
+  | spawnloft mcp)
+echo "$mcp_out" | grep -q '"serverInfo":{"name":"spawnloft"'
+echo "$mcp_out" | grep -q '"status":"stopped"'
+if echo "$mcp_out" | grep -q package-smoke; then echo "FAIL: spawnloft mcp exposed the RCON password"; exit 1; fi
 echo "PASS: spawnloft-cli $kind on $(. /etc/os-release && echo "$PRETTY_NAME")"
 
 # ---- managed MySQL, where the system has none of the libraries it needs ---------------------------
