@@ -118,20 +118,22 @@ test('same-second concurrent and subsequent snapshots never overwrite each other
   await spawned(children, 1)
   assert.notEqual(children[0].file, children[1].file)
   assert.deepEqual(backup.listSnapshots(inst.name), [])
-  fs.writeFileSync(children[0].file, 'first contents')
-  fs.writeFileSync(children[1].file, 'second contents')
+  // The names are reserved in call order, but tar starts only after each snapshot's locked-file
+  // check, and those can finish in either order. So each archive is written with its own
+  // reservation's name, and each snapshot is checked against what went into its own file.
+  for (const { file } of children) fs.writeFileSync(file, `contents of ${path.basename(file)}`)
   children[1].child.emit('exit', 0)
   children[0].child.emit('exit', 0)
   const [a, b] = await Promise.all([first, second])
   const third = backup.createSnapshot(inst, { scope: 'plugins' })
   await spawned(children, 2)
-  fs.writeFileSync(children[2].file, 'third contents')
+  fs.writeFileSync(children[2].file, `contents of ${path.basename(children[2].file)}`)
   children[2].child.emit('exit', 0)
   const c = await third
   assert.equal(new Set([a.file, b.file, c.file]).size, 3)
-  assert.equal(fs.readFileSync(a.file, 'utf8'), 'first contents')
-  assert.equal(fs.readFileSync(b.file, 'utf8'), 'second contents')
-  assert.equal(fs.readFileSync(c.file, 'utf8'), 'third contents')
+  for (const s of [a, b, c]) {
+    assert.equal(fs.readFileSync(s.file, 'utf8'), `contents of ${path.basename(s.file)}.pending`)
+  }
   assert.equal(backup.listSnapshots(inst.name).length, 3)
   assert.equal(fs.readdirSync(path.join(BACKUPS_DIR, inst.name)).filter(file => file.endsWith('.pending')).length, 0)
 })
