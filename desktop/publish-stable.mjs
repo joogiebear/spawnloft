@@ -9,7 +9,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const dir = path.resolve(process.argv[2] || path.join(here, 'dist/stable-release'))
 const runId = process.argv[3]
 if (process.platform !== 'win32' || !/^\d+$/.test(runId || '')) throw new Error('Publish from the Windows signing host with the successful desktop-stable run ID')
-const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim()
+// maxBuffer: the full releases listing passed Node's 1 MB default before 1.3.0 (see release-stable.mjs).
+const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, maxBuffer: 256 * 1024 * 1024 }).trim()
 const repo = 'joogiebear/spawnloft'
 const version = JSON.parse(fs.readFileSync(path.join(here, 'package.json'))).version
 if (JSON.parse(fs.readFileSync(path.join(here, '../package.json'))).version !== version) throw new Error('Core and desktop versions differ')
