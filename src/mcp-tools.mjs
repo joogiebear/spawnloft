@@ -443,9 +443,19 @@ const destructiveTools = [
       if (sup.isRunning(n)) fail(`"${n}" is running - stop it before restoring`)
       const snap = backup.resolveSnapshot(n, snapshot)
       if (!yes) {
-        return { data: { name: n, confirmed: false, snapshot: snap.name, scope: snap.scope, overwrites: snap.members,
-          imports: (snap.databases ?? []).map((d) => ({ database: d.database, service: d.service })) },
-        text: `Would restore ${snap.name} into ${n}, overwriting: ${snap.members.join(', ') || '(see manifest)'}. Nothing has changed yet; call again with confirm: true to do it.` }
+        // The preview reads the archive too, so a broken one is caught before anyone confirms it.
+        progress(`Checking ${snap.name}`)
+        const check = await backup.checkRestorable(snap)
+        const data = { name: n, confirmed: false, snapshot: snap.name, scope: snap.scope, overwrites: snap.members,
+          imports: (snap.databases ?? []).map((d) => ({ database: d.database, service: d.service })),
+          restorable: check.ok, problems: check.problems }
+        if (!check.ok) {
+          return { data, text: `${snap.name} does NOT read back cleanly, so restoring it would be refused: ` +
+            `${check.problems.join('; ')}. Nothing has changed. Pick an older snapshot from list_snapshots; verify_snapshot checks one.` }
+        }
+        return { data,
+          text: `Would restore ${snap.name} into ${n}, overwriting: ${snap.members.join(', ') || '(see manifest)'}. ` +
+            'The archive reads back cleanly. Nothing has changed yet; call again with confirm: true to do it.' }
       }
       progress(`Restoring ${snap.name}`)
       const res = await backup.restoreSnapshot(inst, snap)

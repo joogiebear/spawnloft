@@ -223,6 +223,30 @@ test('backup works through MCP and reports progress to a client that asked for i
   assert.equal(listed.byId.get(1).result.structuredContent.snapshots.length, 1)
 })
 
+test('the restore preview reads the archive, and a broken one is refused before and after confirming', async () => {
+  const snapshot = (await session([call(1, 'list_snapshots', { name: 'royalplugins' })]))
+    .byId.get(1).result.structuredContent.snapshots[0].name
+  const sound = (await session([call(1, 'restore', { name: 'royalplugins' })], ['--allow-destructive'])).byId.get(1).result
+  assert.equal(sound.structuredContent.restorable, true)
+  assert.match(sound.content[0].text, /reads back cleanly/)
+
+  const file = path.join(data, 'backups', 'royalplugins', snapshot)
+  const bytes = fs.readFileSync(file)
+  fs.writeFileSync(file, bytes.subarray(0, Math.floor(bytes.length / 2)))
+  const s = await session([
+    call(1, 'restore', { name: 'royalplugins' }),
+    call(2, 'restore', { name: 'royalplugins', confirm: true }),
+  ], ['--allow-destructive'])
+  const preview = s.byId.get(1).result
+  assert.equal(preview.structuredContent.restorable, false)
+  assert.match(preview.content[0].text, /does NOT read back cleanly/)
+  const confirmed = s.byId.get(2).result
+  assert.equal(confirmed.isError, true)
+  assert.match(confirmed.content[0].text, /would not restore cleanly, so nothing was changed/)
+  fs.rmSync(file)
+  fs.rmSync(file.replace(/\.tar\.gz$/, '.json'))
+})
+
 test('results read as sentences, with the structured data beside them', async () => {
   const s = await session([
     call(1, 'server_status', { name: 'royalplugins' }),
