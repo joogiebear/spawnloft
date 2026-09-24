@@ -138,7 +138,7 @@ nothing until it is called again with `confirm: true`.
 
 | Tool | What it does |
 | --- | --- |
-| `restore` | Overwrites a stopped server's files with a backup. |
+| `restore` | Overwrites a stopped server's files with a backup. The backup is read through first, in the preview too, and a damaged one is refused before anything is touched. |
 | `kill` | Ends the process without saving the world. |
 | `upgrade_minecraft` | Moves to a newer Minecraft version. Worlds migrate one way; a snapshot is taken first. |
 
