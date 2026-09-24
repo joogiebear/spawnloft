@@ -22,6 +22,7 @@ Existing installs receive 1.3 through the built-in updater. ZIP files are used b
 ## Fixed
 
 - On Windows, backing up a running server that uses a plugin with its own database file, such as LuckPerms, produced a backup that stopped partway through the plugins folder and had no world in it, yet was listed as a normal backup. Those files are now left out and named in a warning, and the rest of the server is backed up in full. A backup that does not read back is discarded with an error instead of being kept. Backups taken before this fix can be checked with `spawnloft verify <server> --all`.
+- Restoring a backup now reads it through first, and refuses one that is damaged or incomplete before any file is touched. Before, a damaged backup was restored as far as it went, replacing part of the server with its old copy and leaving the rest, and was reported as a successful restore. The restore confirmation in the command line and in AI assistants now says whether the backup reads back cleanly.
 - On Windows, the Backups tab could stay blank for several seconds while SpawnLoft asked Task Scheduler about automatic backups. Your backups and "Back up now" now appear at once, and the automatic-backup settings fill in when Windows answers.
 - On Windows, the app could stop responding for a few seconds while setting up a MySQL or Redis database, as the engine was moved into place. It now stays responsive throughout.
 - Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.

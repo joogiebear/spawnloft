@@ -396,9 +396,39 @@ export function resolveSnapshot(name, ref) {
   fail(`no snapshot matching "${ref}" for "${name}"`)
 }
 
+/**
+ * Whether a snapshot would restore: the whole archive read back and checked against its manifest.
+ *
+ * <p>Separate from restoreSnapshot so a preview can say it before anyone confirms.
+ */
+export function checkRestorable(snapshot) {
+  return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
+}
+
 export async function restoreSnapshot(inst, snapshot) {
   if (!fs.existsSync(inst.dir)) fail(`instance directory is missing: ${inst.dir}`)
-  await runTar(['-xzf', snapshot.path], inst.dir)
+
+  // Checked before a single file is touched. Extraction overwrites in place and cannot be undone,
+  // so an archive that stops partway - as every hot snapshot of a server with a locked plugin
+  // database did before that was fixed, and as a disk error can do to any archive - would replace
+  // the start of the server with its old copy and leave the rest as it was: a server that is
+  // neither the backup nor what it replaced. "latest" makes that the default choice whenever the
+  // newest snapshot is the broken one.
+  const check = await checkRestorable(snapshot)
+  if (!check.ok) {
+    fail(`${snapshot.name} would not restore cleanly, so nothing was changed.\n  ` +
+      check.problems.join('\n  ') +
+      `\n  Choose an older snapshot; "spawnloft verify ${inst.name} --all" checks every one.`)
+  }
+
+  // runTar accepts exit 1 because bsdtar uses it for warnings while creating an archive. Reading
+  // one, it means the archive did not read, so here it is a failure like any other.
+  const { code, stderr } = await runTar(['-xzf', snapshot.path], inst.dir)
+  if (code !== 0) {
+    fail(`restoring ${snapshot.name} stopped partway (tar exited ${code}` +
+      `${stderr.trim() ? `: ${stderr.trim().split(/\r?\n/)[0]}` : ''}). ` +
+      `Some files in ${inst.dir} may already have been replaced; restore another snapshot before starting it.`)
+  }
 
   // The dumps came out with everything else, under databases/ in the server folder. Imported
   // into the databases they came from, then removed from the folder; a dump that cannot be

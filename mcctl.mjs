@@ -721,6 +721,16 @@ async function cmdRestore(positional, flags) {
     out(`  snapshot: ${snap.name} (${snap.sizeHuman}, scope ${snap.scope})`)
     out(`  overwrites: ${snap.members.join(', ') || '(see manifest)'}`)
     for (const d of snap.databases ?? []) out(`  imports:    database ${d.database} on ${d.service} (needs "${d.service}" running)`)
+    const check = await backup.checkRestorable(snap)
+    if (!check.ok) {
+      out(`  archive:    DOES NOT READ BACK - a restore would be refused`)
+      for (const p of check.problems) out(`              ${p}`)
+      out('')
+      out(`Choose an older snapshot; "spawnloft verify ${name} --all" checks every one.`)
+      process.exitCode = 1
+      return
+    }
+    out('  archive:    reads back cleanly')
     out('')
     out('This overwrites existing files in place. Re-run with --yes to proceed.')
     process.exitCode = 1
