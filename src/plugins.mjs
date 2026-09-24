@@ -569,7 +569,7 @@ export async function searchHangar(query, { limit = 10 } = {}) {
     slug: p.namespace?.slug ?? p.name,
     title: p.name,
     description: p.description || '',
-    downloads: p.stats?.totalDownloads ?? 0,
+    downloads: p.stats?.downloads ?? 0,
     author: p.namespace?.owner ?? null,
   }))
 }

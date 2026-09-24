@@ -52,6 +52,13 @@ user accounts, a remote web panel - stay off it on purpose.
   likely cause. Minecraft's own crash reports are surfaced beside them, with their
   Description line, one click from the folder.
 
+- **AI assistants** *(1.3.0)* — `spawnloft mcp`, a Model Context Protocol server on stdio for
+  an assistant the owner chooses: status, logs, diagnostics, TPS, backups, plugins and Paper
+  updates. No account, no port, nothing sent unless that assistant asks. Credentials and player
+  IPs stay out of every result; restore, kill and cross-version upgrades are offered only when the
+  owner's own config allows them, and deleting a server is not offered at all. Settings shows the
+  exact config for the install. Plugin installs now take a snapshot first, in the panel too.
+
 ## Later
 
 ## After 1.0

@@ -2,32 +2,31 @@
      A pull request that changes something a person would notice adds its line here, under the
      version it will ship in, so that release day is a read-through. Rewrite the top for each
      release; the build procedure at the bottom stays. -->
-SpawnLoft 1.2 brings Linux to more machines - an `.rpm` beside the `.deb`, both for arm64, and a command-line package for servers with no screen - and lets any install opt into beta builds.
+SpawnLoft 1.3 lets an AI assistant you choose check on and run your servers.
 
-- **Windows 10/11 x64:** download `SpawnLoft-Setup-1.2.0.exe`, signed through Microsoft Azure Artifact Signing.
-- **Mac with Apple Silicon:** download `SpawnLoft-1.2.0-mac-arm64.dmg`.
-- **Mac with Intel:** download `SpawnLoft-1.2.0-mac-x64.dmg`.
+- **Windows 10/11 x64:** download `SpawnLoft-Setup-1.3.0.exe`, signed through Microsoft Azure Artifact Signing.
+- **Mac with Apple Silicon:** download `SpawnLoft-1.3.0-mac-arm64.dmg`.
+- **Mac with Intel:** download `SpawnLoft-1.3.0-mac-x64.dmg`.
 - Both Mac builds are Developer ID signed, hardened, Apple-notarized and stapled. The app requires macOS 13 or later; managed MySQL requires macOS 15 or later.
-- **Linux, Debian and Ubuntu (22.04+, Debian 12+):** `SpawnLoft-1.2.0-linux-amd64.deb`, or `-linux-arm64.deb` on arm64. Install with `sudo apt install ./<file>`.
-- **Linux, Fedora, RHEL-family and openSUSE:** `SpawnLoft-1.2.0-linux-x86_64.rpm`, or `-linux-aarch64.rpm` on arm64. Install with `sudo dnf install ./<file>`.
+- **Linux, Debian and Ubuntu (22.04+, Debian 12+):** `SpawnLoft-1.3.0-linux-amd64.deb`, or `-linux-arm64.deb` on arm64. Install with `sudo apt install ./<file>`.
+- **Linux, Fedora, RHEL-family and openSUSE:** `SpawnLoft-1.3.0-linux-x86_64.rpm`, or `-linux-aarch64.rpm` on arm64. Install with `sudo dnf install ./<file>`.
 - Java is separate on every platform, and which one depends on your Minecraft version. On Debian and Ubuntu: `sudo apt install openjdk-25-jre-headless`. On Fedora the newest is `sudo dnf install java-latest-openjdk-headless`.
 
-Existing installs receive 1.2 through the built-in updater. ZIP files are used by the Mac updater; choose the DMG for a manual installation. A Linux install updates through a system password prompt, and takes the package of its own kind.
+Existing installs receive 1.3 through the built-in updater. ZIP files are used by the Mac updater; choose the DMG for a manual installation. A Linux install updates through a system password prompt, and takes the package of its own kind.
 
-## New in 1.2
+## New in 1.3
 
-- **An `.rpm`**, with the same arrangement as the `.deb`: `spawnloft-desktop` opens the window, `spawnloft` is the command line and needs no Node, and everything installs to `/opt/SpawnLoft`.
-- **Get beta builds**, in Settings under Updates. Turn it on and SpawnLoft follows the betas between monthly releases - new features as they are finished - and then the release itself. Turn it off whenever you like: nothing is downgraded, the betas stop, and the next release installs when it ships. Until now this was decided by which installer you had downloaded.
-- **A command-line package for servers with no screen.** `spawnloft-cli` is the command line alone - a `.deb` and an `.rpm`, x64 and arm64, about 30 MB - on its own Node runtime, with none of the desktop app's graphical dependencies. `sudo apt install ./spawnloft-cli-1.2.0-linux-amd64.deb` or `sudo dnf install ./spawnloft-cli-1.2.0-linux-x86_64.rpm`. The panel still works there: `spawnloft ui --no-open`, reached through an SSH tunnel. It has no updater; install a newer package the same way. Install it or the desktop package, not both.
-- **`spawnloft task linger on`**, and a warning when it is needed. On Linux, scheduled tasks stop when you log out unless lingering is on for your account, so on a server reached over SSH a nightly backup never ran. The panel already offered to fix this; now the command line says so when you add a task, and can turn it on.
-- **Managed MySQL sets itself up on Fedora and the RHEL family.** It needs libaio, libnuma and ncurses, which a server does not have. On Debian and Ubuntu SpawnLoft already fetched them privately, without sudo and without installing anything; elsewhere it stopped and told you what to install. It now does the same with `dnf download`.
-- **arm64 Linux packages**, for both. Managed Redis runs there. Managed MySQL does not - Oracle publishes no small arm64 build - so *Create a database* is off on those machines and says so, rather than being offered and refused; connecting to a MySQL you already run works as it does everywhere.
+- **AI assistants.** `spawnloft mcp` lets Claude Desktop, Claude Code, or any app that speaks the Model Context Protocol start and stop your servers, read their consoles, find out why one crashed, check TPS, take backups, install and update plugins and update Paper. You choose the app and add SpawnLoft to it; Settings, under AI assistants, shows the exact configuration for your install. No account, no open port, and nothing is sent unless that app asks. What the tools return - console lines, player names, plugin lists - goes to the app's provider; passwords and webhooks never do, and players' IP addresses are hidden unless you turn that on. Restoring a backup, force-kill and Minecraft version upgrades are offered only if you allow them, and each waits to be confirmed. Deleting a server is never offered. See [MCP.md](https://github.com/joogiebear/spawnloft/blob/main/MCP.md).
+- **Installing a plugin takes a snapshot first**, as updating one already did, so a plugin that turns out to be the wrong one can be rolled back from the Backups tab.
 
 ## Fixed
 
-- **Linux: every server showed as ORPHANED when SpawnLoft ran on Node 23 or newer** - running and healthy, but refused by every command. Node now names its main thread, and that name is what `ps` reports for the process. Processes are now recognised by the file they are running.
-- On Linux arm64 the one-click *Create a database* button was offered and then refused by the server.
-- Downloading a server jar or a database engine asks again when the download server answers with a gateway timeout or is briefly unavailable, instead of failing the install on one bad response.
+- On Windows, backing up a running server that uses a plugin with its own database file, such as LuckPerms, produced a backup that stopped partway through the plugins folder and had no world in it, yet was listed as a normal backup. Those files are now left out and named in a warning, and the rest of the server is backed up in full. A backup that does not read back is discarded with an error instead of being kept. Backups taken before this fix can be checked with `spawnloft verify <server> --all`.
+- Restoring a backup now reads it through first, and refuses one that is damaged or incomplete before any file is touched. Before, a damaged backup was restored as far as it went, replacing part of the server with its old copy and leaving the rest, and was reported as a successful restore. The restore confirmation in the command line and in AI assistants now says whether the backup reads back cleanly.
+- On Windows, the Backups tab could stay blank for several seconds while SpawnLoft asked Task Scheduler about automatic backups. Your backups and "Back up now" now appear at once, and the automatic-backup settings fill in when Windows answers.
+- On Windows, the app could stop responding for a few seconds while setting up a MySQL or Redis database, as the engine was moved into place. It now stays responsive throughout.
+- Plugin search showed every Hangar result as never downloaded. It now shows the real count, so the popular project stands out from its imitators.
+- When the AI assistant tools, `spawnloft list` or `spawnloft doctor` find no servers, they now say which folder they looked in, and if your servers are registered in another folder SpawnLoft uses, they name it and the command that points SpawnLoft back at it. Before, this only showed as an empty list.
 
 Plugin configuration remains manual. SpawnLoft does not insert database credentials into plugin configuration files.
 

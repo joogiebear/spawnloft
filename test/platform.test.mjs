@@ -63,10 +63,17 @@ test('Mac panel exposes scheduling and automatic backups without changing server
     const backups = await get(base + '/backups')
     assert.equal(backups.automaticAvailable, true)
     assert.deepEqual(backups.snapshots, [])
+    // The tab draws from history alone, so it carries the scopes "Back up now" offers; the schedule
+    // comes separately, and the two together are the whole of the combined answer.
     const history = await get(base + '/backups/history')
     assert.deepEqual(history, Object.fromEntries(
-      ['snapshots', 'dir', 'root', 'mirror', 'running'].map(key => [key, backups[key]]),
+      ['snapshots', 'dir', 'root', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),
     ))
+    const automatic = await get(base + '/backups/auto')
+    assert.deepEqual(automatic, Object.fromEntries(
+      ['auto', 'automaticAvailable', 'automaticUnavailableReason', 'background'].map(key => [key, backups[key]]),
+    ))
+    assert.deepEqual({ ...history, ...automatic }, backups)
     assert.equal(fs.readFileSync(REGISTRY_FILE, 'utf8'), registryBefore)
     assert.equal(fs.existsSync(path.join(DATA_ROOT, 'tasks')), false)
   } finally {

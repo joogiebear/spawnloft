@@ -41,11 +41,17 @@ function controlledTar(t) {
   return children
 }
 
+// tar starts only after the locked-file check has walked the members, so not synchronously.
+async function spawned(children, index) {
+  while (children.length <= index) await new Promise((resolve) => setImmediate(resolve))
+  return children[index]
+}
+
 test('history and restore ignore an in-flight archive until its manifest is complete', async t => {
   const children = controlledTar(t)
   const inst = instance('pending')
   const creating = backup.createSnapshot(inst, { scope: 'plugins', label: 'manual' })
-  const { child, file } = children[0]
+  const { child, file } = await spawned(children, 0)
   assert.ok(file.endsWith('.pending'))
   fs.writeFileSync(file, 'partial archive')
   assert.deepEqual(backup.listSnapshots(inst.name), [])
@@ -72,7 +78,7 @@ test('failed and empty tar output is removed without publishing a snapshot', asy
   ]) {
     const inst = instance(name)
     const creating = backup.createSnapshot(inst, { scope: 'plugins' })
-    const { child, file } = children.at(-1)
+    const { child, file } = await spawned(children, children.length)
     fs.writeFileSync(file, contents)
     child.stderr.write('fixture tar failure')
     child.emit('exit', code)
@@ -95,6 +101,7 @@ test('a failed final rename cleans only its own pending archive and manifest', a
     return rename(from, to)
   })
   const creating = backup.createSnapshot(inst, { scope: 'plugins' })
+  await spawned(children, 0)
   fs.writeFileSync(children[0].file, 'completed archive')
   children[0].child.emit('exit', 0)
   await assert.rejects(creating, /fixture publication failure/)
@@ -108,21 +115,25 @@ test('same-second concurrent and subsequent snapshots never overwrite each other
   const inst = instance('concurrent')
   const first = backup.createSnapshot(inst, { scope: 'plugins' })
   const second = backup.createSnapshot(inst, { scope: 'plugins' })
+  await spawned(children, 1)
   assert.notEqual(children[0].file, children[1].file)
   assert.deepEqual(backup.listSnapshots(inst.name), [])
-  fs.writeFileSync(children[0].file, 'first contents')
-  fs.writeFileSync(children[1].file, 'second contents')
+  // The names are reserved in call order, but tar starts only after each snapshot's locked-file
+  // check, and those can finish in either order. So each archive is written with its own
+  // reservation's name, and each snapshot is checked against what went into its own file.
+  for (const { file } of children) fs.writeFileSync(file, `contents of ${path.basename(file)}`)
   children[1].child.emit('exit', 0)
   children[0].child.emit('exit', 0)
   const [a, b] = await Promise.all([first, second])
   const third = backup.createSnapshot(inst, { scope: 'plugins' })
-  fs.writeFileSync(children[2].file, 'third contents')
+  await spawned(children, 2)
+  fs.writeFileSync(children[2].file, `contents of ${path.basename(children[2].file)}`)
   children[2].child.emit('exit', 0)
   const c = await third
   assert.equal(new Set([a.file, b.file, c.file]).size, 3)
-  assert.equal(fs.readFileSync(a.file, 'utf8'), 'first contents')
-  assert.equal(fs.readFileSync(b.file, 'utf8'), 'second contents')
-  assert.equal(fs.readFileSync(c.file, 'utf8'), 'third contents')
+  for (const s of [a, b, c]) {
+    assert.equal(fs.readFileSync(s.file, 'utf8'), `contents of ${path.basename(s.file)}.pending`)
+  }
   assert.equal(backup.listSnapshots(inst.name).length, 3)
   assert.equal(fs.readdirSync(path.join(BACKUPS_DIR, inst.name)).filter(file => file.endsWith('.pending')).length, 0)
 })
@@ -137,4 +148,136 @@ test('completed real snapshots still verify and restore with their manifests', a
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'changed contents')
   await backup.restoreSnapshot(inst, checked.snapshot)
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'fixture plugin contents')
+})
+
+test('an archive tar gave up on partway through is discarded, not published', async t => {
+  // bsdtar's answer to a file it cannot read: exit 1, the same code as a harmless warning, and an
+  // archive that stops at that file. Only reading it back tells the two apart.
+  const reads = []
+  t.mock.method(childProcess, 'spawn', (binary, args) => {
+    const child = new EventEmitter()
+    child.stderr = new PassThrough()
+    child.stdout = new PassThrough()
+    if (args[0] === '-czf') {
+      fs.writeFileSync(args[1], 'an archive cut off after its first file')
+      setImmediate(() => {
+        child.stderr.write('tar.exe: (null)\n')
+        child.emit('exit', 1)
+      })
+    } else {
+      assert.equal(args[0], '-tzf')
+      reads.push(args[1])
+      setImmediate(() => {
+        child.stdout.write('plugins/example.jar\n')
+        child.stderr.write('tar.exe: Truncated input file (needed 1501696 bytes, only 0 available)\n')
+        child.emit('exit', 1)
+      })
+    }
+    return child
+  })
+  syncBuiltinESMExports()
+  t.after(() => {
+    t.mock.restoreAll()
+    syncBuiltinESMExports()
+  })
+  const inst = instance('truncated')
+  await assert.rejects(backup.createSnapshot(inst, { scope: 'plugins' }), /came out incomplete.*Truncated input file/s)
+  assert.equal(reads.length, 1)
+  assert.deepEqual(backup.listSnapshots(inst.name), [])
+  assert.deepEqual(fs.readdirSync(path.join(BACKUPS_DIR, inst.name)), [])
+})
+
+test('a file another program holds locked is left out and named, and the rest is kept', {
+  skip: process.platform !== 'win32' && 'POSIX locks are advisory; tar reads through them',
+}, async t => {
+  const inst = instance('locked')
+  const dbDir = path.join(inst.dir, 'plugins', 'LuckPerms')
+  fs.mkdirSync(dbDir, { recursive: true })
+  const db = path.join(dbDir, 'luckperms-h2-v2.mv.db')
+  fs.writeFileSync(db, 'x'.repeat(4096))
+  fs.writeFileSync(path.join(dbDir, 'config.yml'), 'storage-method: h2')
+  // A byte-range lock over the whole file, as Java's FileChannel.lock takes it: opening still
+  // works, and every read fails.
+  const script = path.join(scratch, 'lock.ps1')
+  fs.writeFileSync(script, [
+    `$f = [IO.File]::Open('${db.replace(/'/g, "''")}', 'Open', 'ReadWrite', 'ReadWrite')`,
+    '$f.Lock(0, 4096)',
+    "Write-Output 'locked'",
+    '[Console]::In.ReadLine() | Out-Null',
+  ].join('\n'))
+  const holder = childProcess.spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script], { windowsHide: true })
+  t.after(() => holder.kill())
+  await new Promise((resolve, reject) => {
+    holder.stdout.on('data', (d) => { if (String(d).includes('locked')) resolve() })
+    holder.on('exit', (code) => reject(new Error(`lock holder exited ${code}`)))
+  })
+
+  const created = await backup.createSnapshot(inst, { scope: 'plugins' })
+  assert.deepEqual(created.skipped, ['plugins/LuckPerms/luckperms-h2-v2.mv.db'])
+  assert.ok(created.manifest.warnings.some((w) => w.startsWith('plugins/LuckPerms/luckperms-h2-v2.mv.db not included')))
+  assert.ok(!created.manifest.warnings.some((w) => /\(null\)/.test(w)))
+  const checked = await backup.verifySnapshot(inst.name, path.basename(created.file))
+  assert.equal(checked.ok, true, checked.problems.join('; '))
+  holder.stdin.end()
+
+  fs.writeFileSync(path.join(dbDir, 'config.yml'), 'changed')
+  await new Promise((resolve) => holder.on('exit', resolve))
+  await backup.restoreSnapshot(inst, checked.snapshot)
+  assert.equal(fs.readFileSync(path.join(dbDir, 'config.yml'), 'utf8'), 'storage-method: h2')
+  assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'fixture plugin contents')
+})
+
+test('a restore reads the archive first and refuses a broken one without touching the server', async () => {
+  const inst = instance('restore-refusal')
+  const good = await backup.createSnapshot(inst, { scope: 'plugins', label: 'good' })
+  fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'second version')
+  const broken = await backup.createSnapshot(inst, { scope: 'plugins', label: 'broken' })
+  // Cut it off halfway, the way a hot snapshot with a locked plugin file used to come out.
+  const bytes = fs.readFileSync(broken.file)
+  fs.writeFileSync(broken.file, bytes.subarray(0, Math.floor(bytes.length / 2)))
+  fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'current version')
+
+  const check = await backup.checkRestorable(backup.resolveSnapshot(inst.name, path.basename(broken.file)))
+  assert.equal(check.ok, false)
+  await assert.rejects(backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, path.basename(broken.file))),
+    /would not restore cleanly, so nothing was changed[\s\S]*verify restore-refusal --all/)
+  assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'current version')
+
+  // The good one still restores.
+  await backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, path.basename(good.file)))
+  assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'fixture plugin contents')
+})
+
+test('a restore refuses an archive that reads back but lacks what its manifest lists', async () => {
+  const inst = instance('restore-missing-member')
+  const created = await backup.createSnapshot(inst, { scope: 'plugins' })
+  const manifestFile = created.file.replace(/\.tar\.gz$/, '.json')
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+  fs.writeFileSync(manifestFile, JSON.stringify({ ...manifest, members: ['plugins', 'world'] }))
+  await assert.rejects(backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, 'latest')),
+    /would not restore cleanly[\s\S]*"world"/)
+})
+
+test('tar exiting 1 while extracting is a failed restore, not a warning', async t => {
+  const inst = instance('restore-extract-failure')
+  const created = await backup.createSnapshot(inst, { scope: 'plugins' })
+  const snap = backup.resolveSnapshot(inst.name, path.basename(created.file))
+  const realSpawn = childProcess.spawn
+  t.mock.method(childProcess, 'spawn', (binary, args, opts) => {
+    if (args[0] !== '-xzf') return realSpawn(binary, args, opts)
+    const child = new EventEmitter()
+    child.stderr = new PassThrough()
+    child.stdout = new PassThrough()
+    setImmediate(() => {
+      child.stderr.write('tar.exe: Error exit delayed from previous errors\n')
+      child.emit('exit', 1)
+    })
+    return child
+  })
+  syncBuiltinESMExports()
+  t.after(() => {
+    t.mock.restoreAll()
+    syncBuiltinESMExports()
+  })
+  await assert.rejects(backup.restoreSnapshot(inst, snap), /stopped partway \(tar exited 1: tar\.exe: Error exit delayed/)
 })

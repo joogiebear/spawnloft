@@ -21,6 +21,7 @@ import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as settings from './settings.mjs'
 import { readTheme, saveTheme } from './appearance.mjs'
 import * as plugins from './plugins.mjs'
+import * as pluginActions from './plugin-actions.mjs'
 import * as upgrade from './upgrade.mjs'
 import * as sources from './sources.mjs'
 import { repairAfterMove } from './relocate.mjs'
@@ -458,14 +459,15 @@ async function handleBackups(req, res, name, seg) {
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
       running: supervisor.isRunning(name),
+      scopes: backup.SCOPES,
     }
     // A visible history polls for CLI-created snapshots. That does not need to start
-    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits.
+    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits. It is also
+    // what the tab draws first: the scheduler's answer can take seconds on a cold machine, and the
+    // snapshots and "Back up now" should not wait for it.
     if (action === 'history') return json(res, 200, history)
     const auto = await autoBackupTask(name)
-    return json(res, 200, {
-      ...history,
-      scopes: backup.SCOPES,
+    const automatic = {
       auto: auto && {
         id: auto.id,
         enabled: auto.enabled,
@@ -478,7 +480,10 @@ async function handleBackups(req, res, name, seg) {
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
       background: schedule.background(),
-    })
+    }
+    // The schedule on its own, which the tab fills in once the scheduler answers.
+    if (action === 'auto') return json(res, 200, automatic)
+    return json(res, 200, { ...history, ...automatic })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
 
@@ -486,7 +491,7 @@ async function handleBackups(req, res, name, seg) {
 
   if (!action) {
     // A snapshot of a running server is legitimate - it is what "back up before I try this" means -
-    // and createSnapshot excludes the one file the server holds locked.
+    // and createSnapshot leaves out the files the server holds locked, and says which.
     const running = supervisor.isRunning(name)
     const out = await backup.createSnapshot(inst, {
       scope: backup.SCOPES.includes(body.scope) ? body.scope : 'standard',
@@ -497,6 +502,7 @@ async function handleBackups(req, res, name, seg) {
       created: path.basename(out.file),
       size: out.size,
       members: out.members,
+      skipped: out.skipped,
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
     })
@@ -735,28 +741,7 @@ async function handlePlugins(req, res, name, seg, url) {
   if (req.method === 'GET' && verb === 'search') {
     const q = String(url.searchParams.get('q') || '').trim()
     if (!q) return json(res, 200, { results: [], errors: [] })
-    // Vanilla loads nothing; a search would send Modrinth an empty loader facet and get a 400.
-    if (kind.kind === 'none') return json(res, 200, { results: [], errors: [`${kind.label} runs no plugins or mods`] })
-    // Both sources at once. One being down must not blank the other's answers, so each
-    // failure becomes a note beside the results rather than an error instead of them.
-    const asks = [
-      plugins.searchPlugins(q, {
-        loaders: plugins.loadersFor(inst),
-        projectType: kind.projectType,
-      }),
-    ]
-    if (kind.hangar) asks.push(plugins.searchHangar(q))
-    const [modrinthHits, hangarHits] = await Promise.allSettled(asks)
-    const errors = []
-    if (modrinthHits.status === 'rejected') errors.push(modrinthHits.reason?.message ?? 'Modrinth search failed')
-    if (hangarHits && hangarHits.status === 'rejected') errors.push(hangarHits.reason?.message ?? 'Hangar search failed')
-    return json(res, 200, {
-      results: [
-        ...(modrinthHits.value ?? []),
-        ...(hangarHits?.value ?? []),
-      ],
-      errors,
-    })
+    return json(res, 200, await pluginActions.searchEverywhere(inst, q))
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
   const body = await readBody(req)
@@ -769,21 +754,13 @@ async function handlePlugins(req, res, name, seg, url) {
   }
   if (verb === 'install') {
     if (!body.projectId) return json(res, 400, { error: 'projectId is required' })
-    const result = body.source === 'hangar'
-      ? await plugins.installFromHangar(inst, String(body.projectId), { gameVersion })
-      : await plugins.installPlugin(inst, String(body.projectId), { gameVersion })
-    return json(res, 200, result)
+    return json(res, 200, await pluginActions.installWithSnapshot(inst, body.projectId, { source: body.source }))
   }
   if (verb === 'updates') {
     return json(res, 200, { updates: await plugins.checkUpdates(inst, { gameVersion }) })
   }
   if (verb === 'update') {
-    // A snapshot of the plugins alone before anything is replaced: small, fast, and the way
-    // back when the new build turns out to be the wrong one.
-    await backup.createSnapshot(inst, {
-      scope: 'plugins', label: 'pre-update', running: supervisor.isRunning(name),
-    })
-    return json(res, 200, await plugins.updatePlugin(inst, String(body.file), { gameVersion }))
+    return json(res, 200, await pluginActions.updateWithSnapshot(inst, body.file))
   }
   return json(res, 404, { error: 'not found' })
 }
@@ -1079,6 +1056,18 @@ async function route(req, res) {
   // ---- prerequisites ---------------------------------------------------------
   // Java is the one thing mcctl needs and cannot provide. Asked here so the panel can say so up
   // front instead of letting it surface as "spawn java ENOENT" after a fifty-megabyte download.
+  // ---- how an AI client launches `spawnloft mcp` on this install ------------
+  // The panel runs on the same runtime the command line does, so it knows the real executable and
+  // script paths. Pointing a client straight at them avoids the .cmd launcher, which a client that
+  // spawns without a shell cannot start on Windows.
+  if (seg[1] === 'mcp' && seg.length === 2 && req.method === 'GET') {
+    return json(res, 200, {
+      command: process.execPath,
+      args: [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
+      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
+    })
+  }
+
   if (seg[1] === 'health' && req.method === 'GET') {
     return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })
   }

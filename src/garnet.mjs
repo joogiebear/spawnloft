@@ -186,10 +186,12 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     if (process.platform !== 'win32') fs.chmodSync(server.path, 0o755)
     await installRuntime(unpacked, staging, onProgress)
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, platform: process.platform, arch: process.arch, sha256: archive.sha256 }))
-    fs.renameSync(unpacked, dir)
+    // Asynchronous, like MySQL's: the engine and its .NET runtime are thousands of files, and a
+    // synchronous move or cleanup under Defender's scan held the panel's event loop for seconds.
+    await fs.promises.rename(unpacked, dir)
     return { version, dir, cached: false, sizeHuman: humanBytes(total) }
   } finally {
-    if (staging) fs.rmSync(staging, { recursive: true, force: true })
+    if (staging) await fs.promises.rm(staging, { recursive: true, force: true })
     fs.closeSync(fd)
     fs.unlinkSync(lock)
   }

@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       mac-signing-mode: ${{ steps.mode.outputs.value }}
+      windows-signing-mode: ${{ steps.windows-mode.outputs.value }}
       enabled: ${{ steps.version.outputs.enabled }}
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +39,18 @@ jobs:
             echo 'value=signed' >> "$GITHUB_OUTPUT"
           else
             echo 'value=ad-hoc' >> "$GITHUB_OUTPUT"
+          fi
+      # Windows betas are signed only where the Azure federated credential trusts the run: a push or
+      # dispatch on dev. A pull request builds unsigned, as before, and cannot reach the signer.
+      - id: windows-mode
+        env:
+          ENABLED: ${{ vars.WINDOWS_SIGNING_ENABLED }}
+          TRUSTED: ${{ github.ref == 'refs/heads/dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        run: |
+          if [[ "$TRUSTED" == "true" && "$ENABLED" == "true" ]]; then
+            echo 'value=signed' >> "$GITHUB_OUTPUT"
+          else
+            echo 'value=unsigned' >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -88,9 +101,14 @@ jobs:
             deb: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    permissions:
+      contents: read
+      # The Azure login exchanges this job's GitHub token for a signing session. No stored secret.
+      id-token: write
     env:
       PREVIEW_BUILD: ${{ github.run_number }}
       MAC_SIGNING_MODE: ${{ needs.release-policy.outputs.mac-signing-mode }}
+      WINDOWS_SIGNING_MODE: ${{ matrix.platform == 'win32' && needs.release-policy.outputs.windows-signing-mode || 'unsigned' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -115,6 +133,13 @@ jobs:
         if: matrix.platform == 'linux'
         # electron-builder makes the .rpm with rpmbuild, which an Ubuntu runner does not carry.
         run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Sign in to Azure to sign the Windows beta
+        if: matrix.platform == 'win32' && needs.release-policy.outputs.windows-signing-mode == 'signed'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_SIGNING_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SIGNING_SUBSCRIPTION_ID }}
       - name: Package the native preview
         if: matrix.platform != 'darwin' || needs.release-policy.outputs.mac-signing-mode != 'signed'
         working-directory: desktop
@@ -137,6 +162,19 @@ jobs:
       - name: Verify the packaged app
         # Structure verification does not need signing credentials or signed config evaluation.
         run: MAC_SIGNING_MODE=ad-hoc node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/preview.config.cjs
+      - name: Verify the Windows installer carries the release publisher
+        # What an installed copy checks before it applies an update: the installer's signer must be
+        # the publisher it was itself signed by, with a timestamp so the signature outlives the
+        # short-lived certificate.
+        if: matrix.platform == 'win32' && needs.release-policy.outputs.windows-signing-mode == 'signed'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem desktop/dist/SpawnLoft-Setup-*.exe | Select-Object -First 1
+          $s = Get-AuthenticodeSignature -LiteralPath $installer.FullName
+          if ($s.Status -ne 'Valid' -or $null -eq $s.TimeStamperCertificate -or $s.SignerCertificate.Subject -notmatch 'CN=victor zemeckis(,|$)') {
+            throw "$($installer.Name): $($s.Status) $($s.SignerCertificate.Subject)"
+          }
+          Write-Output "$($installer.Name) signed by $($s.SignerCertificate.Subject)"
       - name: Verify Mac signing and notarization
         if: matrix.platform == 'darwin'
         env:
