@@ -43,8 +43,12 @@ function run(cmd, args, { cwd = ROOT, env = process.env, shell = false } = {}) {
   if (res.error) stop(`${cmd} could not be run: ${res.error.message}`)
   if (res.status !== 0) stop(`${cmd} ${args.join(' ')} exited ${res.status}`)
 }
+// The releases listing grows with every beta and passed Node's default 1 MB between 1.2.0 and
+// 1.3.0; past it spawnSync fails with ENOBUFS and the release stops at its first check.
+const MAX_OUTPUT = 256 * 1024 * 1024
+
 function read(cmd, args, { cwd = ROOT, shell = false, allowFail = false } = {}) {
-  const res = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, shell })
+  const res = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, shell, maxBuffer: MAX_OUTPUT })
   if (res.error || res.status !== 0) {
     if (allowFail) return null
     stop(`${cmd} ${args.join(' ')} failed: ${res.error?.message || res.stderr?.trim() || `exit ${res.status}`}`)
