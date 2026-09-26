@@ -216,8 +216,10 @@ export { runTar, tarBinary } from './tar.mjs'
  * reported in the result and the manifest rather than failing the snapshot: an unflushed copy is
  * still worth more than none.
  */
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true } = {}) {
-  const members = membersFor(inst, scope)
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null } = {}) {
+  // `members` narrows a snapshot to named paths inside the server folder - one config file before
+  // an assistant changes it - so restoring it puts back that file and touches nothing else.
+  const members = only ?? membersFor(inst, scope)
   if (!members.length) fail(`nothing to back up for scope "${scope}" in ${inst.dir}`)
 
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''

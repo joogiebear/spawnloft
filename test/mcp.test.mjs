@@ -283,3 +283,54 @@ test('validate enforces what the tool schemas declare', () => {
   assert.match(validate(schema, { a: 'ok', e: 'y' }), /one of/)
   assert.match(validate(schema, []), /object/)
 })
+
+test('config files: listed, read with secrets hidden, changed with a one-file snapshot that restores', async () => {
+  fs.writeFileSync(path.join(instance, 'server.properties'), `motd=Fixture\nserver-port=45611\nrcon.port=45612\nrcon.password=${secret}\n`)
+  const cfg = path.join(instance, 'plugins', 'Example', 'config.yml')
+  fs.mkdirSync(path.dirname(cfg), { recursive: true })
+  fs.writeFileSync(cfg, 'storage:\n  host: localhost\n  password: plugin-db-pass\nradius: 5\n')
+  fs.writeFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'untouched: true\n')
+
+  const s = await session([
+    { id: 1, method: 'tools/list', params: { _meta: meta() } },
+    call(2, 'list_config_files', { name: 'royalplugins' }),
+    call(3, 'read_config_file', { name: 'royalplugins', path: 'server.properties' }),
+    call(4, 'read_config_file', { name: 'royalplugins', path: 'plugins/Example/config.yml' }),
+    call(5, 'read_config_file', { name: 'royalplugins', path: 'eula.txt' }),
+    call(6, 'read_config_file', { name: 'royalplugins', path: '../../instances.json' }),
+  ])
+  const tools = s.byId.get(1).result.tools
+  const write = tools.find((t) => t.name === 'write_config_file')
+  assert.ok(tools.some((t) => t.name === 'list_config_files' && t.annotations.readOnlyHint))
+  assert.ok(tools.some((t) => t.name === 'read_config_file' && t.annotations.readOnlyHint))
+  assert.deepEqual([write.annotations.readOnlyHint, write.annotations.destructiveHint], [false, false])
+  const listed = s.byId.get(2).result.structuredContent.files.map((f) => f.path)
+  assert.ok(listed.includes('plugins/Example/config.yml') && listed.includes('server.properties'))
+  assert.ok(!listed.includes('eula.txt'))
+  assert.ok(!s.stdout.includes(secret) && !s.stdout.includes('plugin-db-pass'), 'no secret in any reply')
+  assert.match(s.byId.get(3).result.content[0].text, /rcon\.password=\[redacted\]/)
+  assert.match(s.byId.get(4).result.content[0].text, /password: \[redacted\]/)
+  assert.equal(s.byId.get(5).result.isError, true)
+  assert.match(s.byId.get(6).result.content[0].text, /inside the server folder/)
+
+  const w = await session([
+    call(1, 'write_config_file', { name: 'royalplugins', path: 'plugins/Example/config.yml', old_text: 'radius: 5', new_text: 'radius: 12' }),
+    call(2, 'write_config_file', { name: 'royalplugins', path: 'plugins/Example/config.yml', content: 'radius: 1\n' }),
+    call(3, 'write_config_file', { name: 'royalplugins', path: 'server.properties', old_text: 'server-port=45611', new_text: 'server-port=1' }),
+  ])
+  const done = w.byId.get(1).result
+  assert.equal(done.isError, undefined, done.content[0].text)
+  assert.match(done.content[0].text, /- radius: 5\n\+ radius: 12/)
+  assert.match(done.structuredContent.snapshot, /^before-edit_config_.*\.tar\.gz$/)
+  assert.match(w.byId.get(2).result.content[0].text, /hides/)
+  assert.match(w.byId.get(3).result.content[0].text, /set by SpawnLoft/)
+  assert.ok(!w.stdout.includes('plugin-db-pass'))
+  assert.match(fs.readFileSync(cfg, 'utf8'), /password: plugin-db-pass\nradius: 12\n/)
+
+  // The snapshot holds that one file, so restoring it puts the file back and nothing else.
+  fs.writeFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'untouched: changed later\n')
+  const r = await session([call(1, 'restore', { name: 'royalplugins', snapshot: done.structuredContent.snapshot, confirm: true })], ['--allow-destructive'])
+  assert.equal(r.byId.get(1).result.isError, undefined, r.byId.get(1).result.content[0].text)
+  assert.match(fs.readFileSync(cfg, 'utf8'), /radius: 5\n$/)
+  assert.equal(fs.readFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'utf8'), 'untouched: changed later\n')
+})
