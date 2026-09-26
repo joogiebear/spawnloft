@@ -310,6 +310,8 @@ test('config files: listed, read with secrets hidden, changed with a one-file sn
   assert.ok(!s.stdout.includes(secret) && !s.stdout.includes('plugin-db-pass'), 'no secret in any reply')
   assert.match(s.byId.get(3).result.content[0].text, /rcon\.password=\[redacted\]/)
   assert.match(s.byId.get(4).result.content[0].text, /password: \[redacted\]/)
+  // Claude Code shows the structured data instead of the text, so the file has to be there too.
+  assert.match(s.byId.get(4).result.structuredContent.text, /host: localhost\n {2}password: \[redacted\]\nradius: 5/)
   assert.equal(s.byId.get(5).result.isError, true)
   assert.match(s.byId.get(6).result.content[0].text, /inside the server folder/)
 
