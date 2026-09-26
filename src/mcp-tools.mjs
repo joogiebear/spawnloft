@@ -295,9 +295,10 @@ const readTools = [
     inputSchema: object({ name, path: { type: 'string', minLength: 1, description: 'Path inside the server folder, e.g. "plugins/EcoItems/config.yml"' } }, ['name', 'path']),
     run({ name: n, path: p }) {
       const file = configFiles.readConfigFile(server(n), p)
-      // The text goes once, as the reply; repeating it in the structured data would double a large file.
-      const { text, ...facts } = file
-      return { data: { name: n, ...facts }, text: text || '(the file is empty)' }
+      // The file goes in the structured data as well as the reply: a client that has structured data
+      // shows the model that instead of the text (Claude Code does), so leaving it out there
+      // returned a file with no contents.
+      return { data: { name: n, ...file }, text: file.text || '(the file is empty)' }
     },
   },
   {
