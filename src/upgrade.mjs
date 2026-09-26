@@ -182,7 +182,10 @@ export async function applyUpgrade(name, { version = null, build = null, running
   }
 
   placeJar(inst.dir, fetched.name)
-  updateInstance(name, { jar: fetched.name })
+  // The recorded Minecraft version moves with the jar: it picks the Java the server starts on and
+  // the plugin builds it is offered, and a server left recording the version it crossed from gets
+  // both wrong. An instance that never recorded one reads it from the new jar's name instead.
+  updateInstance(name, { jar: fetched.name, ...(inst.mcVersion ? { mcVersion: target } : {}) })
   return {
     from: inst.jar,
     to: fetched.name,
