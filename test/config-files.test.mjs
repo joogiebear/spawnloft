@@ -57,6 +57,14 @@ test('secret values are hidden, and ordinary keys that only look alike are not',
   for (const s of ['s3cret', 'abc123', 'xyz', 'MTAx', 'pa55', 'x-y-z', 'hunter22']) assert.ok(!redactConfig(text).includes(s), s)
 })
 
+test('a URL password with no user in front of it is hidden too, and URLs without one are left alone', () => {
+  // How TAB and most Redis clients write it; the first real config read through the tool had one.
+  assert.equal(redactConfig("    url: 'redis://:r3dis-pass@localhost:6379/0'"), "    url: 'redis://:[redacted]@localhost:6379/0'")
+  for (const kept of ["url: 'redis://localhost:6379/0'", 'site: https://example.com:8443/path', 'dl: https://user@host/x']) {
+    assert.equal(redactConfig(kept), kept)
+  }
+})
+
 test('paths stay inside the server folder and away from worlds, logs and player data', () => {
   const inst = server({ 'server.properties': PROPS, 'plugins/EcoItems/config.yml': 'a: 1\n', 'world/level.dat': 'x',
     'world/datapacks/x.json': '{}', 'logs/latest.txt': 'x', 'eula.txt': 'eula=true\n', 'banned-ips.json': '[]',
