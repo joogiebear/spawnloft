@@ -5363,6 +5363,19 @@ const AUTO_INTERVALS = [
  * a wall of filenames - which is the opposite of what a dialog asking "are you sure" is for. The
  * first few name the things that matter; the count carries the rest.
  */
+/**
+ * The file a snapshot holds when it holds exactly one - a path inside the server folder with an
+ * extension, such as plugins/EcoCrates/config.yml or server.properties - or null. The scoped
+ * snapshots name folders (plugins, world, config), so a lone file with an extension is a snapshot
+ * of just that file, and saying so is true whichever way it came about.
+ */
+function singleFileOf(snap) {
+  const members = snap.members || [];
+  if (members.length !== 1 || (snap.databases && snap.databases.length)) return null;
+  const only = String(members[0]).replace(/\\/g, '/');
+  return /(^|\/)[^/]+\.[a-z0-9]+$/i.test(only) ? only : null;
+}
+
 function describeMembers(members) {
   if (!members || !members.length) return 'everything the snapshot holds';
   if (members.length <= 4) return members.join(', ');
@@ -5751,12 +5764,27 @@ function renderBackupHistory(row, data, signature) {
       const what = document.createElement('div');
       what.className = 'what';
       what.textContent = snap.name;
+      // An AI assistant snapshots the one file it is about to change. Its scope says "config", but
+      // it holds that file and nothing else, and a restore puts back only that file - so it says
+      // which file rather than leaving it to read as a copy of the whole configuration.
+      const onlyFile = singleFileOf(snap);
+      if (onlyFile) {
+        const which = document.createElement('div');
+        which.className = 'hint';
+        which.textContent = 'Only ' + onlyFile;
+        // The row truncates, so the path is the line and the reason is the tooltip.
+        which.title = snap.label === 'before-edit'
+          ? onlyFile + ' as it was before an AI assistant changed it. Restoring puts back this file and nothing else.'
+          : 'Restoring puts back ' + onlyFile + ' and nothing else.';
+        what.append(which);
+      }
       const size = document.createElement('div');
       size.className = 'size';
       size.textContent = snap.sizeHuman;
       const tag = document.createElement('div');
       tag.className = 'tag';
-      tag.textContent = snap.scope + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
+      tag.textContent = (onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
+      if (onlyFile) tag.title = 'Holds only ' + onlyFile + '. Restoring it puts back that file and nothing else.';
       if (snap.databases && snap.databases.length) {
         tag.title = 'Includes a dump of ' + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ');
       }
