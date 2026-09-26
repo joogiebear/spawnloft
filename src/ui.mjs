@@ -613,9 +613,9 @@ function handleMetrics(req, res, name, url) {
 }
 
 /**
- * The server software itself: what Paper offers, and moving to it.
+ * The server software itself: what its project offers, and moving to it.
  *
- * <p>GET asks PaperMC what exists - on demand only, so the panel stays off the network until
+ * <p>GET asks PaperMC, Purpur or InfernalSuite what exists - on demand only, so the panel stays off the network until
  * the person clicks. POST with no version is a routine build update; POST naming a version
  * crosses Minecraft versions, which the page has already made someone confirm, and
  * applyUpgrade takes a standard snapshot before anything is swapped.

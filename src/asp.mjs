@@ -61,6 +61,27 @@ export async function versions() {
   return versionsOf(await allBuilds())
 }
 
+/**
+ * The newest build for a Minecraft version against the one a server runs, by the id prefix its
+ * jar name carries. Builds have no number to compare, so "newer" is by date; a prefix the API no
+ * longer lists is taken to be older than whatever it does.
+ */
+export function compareBuilds(builds, mc, currentPrefix) {
+  const latest = pickBuild(builds, mc)
+  if (!latest) return null
+  const prefix = String(latest.id).slice(0, 8)
+  const current = builds.find((b) => String(b.id).startsWith(String(currentPrefix)))
+  return {
+    build: prefix,
+    time: new Date(latest.date).toISOString(),
+    newer: prefix !== currentPrefix && (!current || latest.date > current.date),
+  }
+}
+
+export async function latestBuild(mc, currentPrefix) {
+  return compareBuilds(await allBuilds(), mc, currentPrefix)
+}
+
 export async function fetchBuild(mc, { force = false, onProgress = null } = {}) {
   const build = pickBuild(await allBuilds(), mc)
   if (!build) fail(`Advanced Slime Paper has no build for Minecraft ${mc}.`)

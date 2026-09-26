@@ -6036,9 +6036,9 @@ async function renderServerSettings() {
   // from a visit. Updated after each save so the next one is measured from there.
   const mine = { autoRestart: row.autoRestart === true, webhook: row.webhook || '', java: row.java || 'java' };
 
-  // The Server software card below speaks PaperMC; on a Fabric server it would offer builds
-  // the server cannot run, so it does not appear at all.
-  const isPaper = (row.loader ?? 'paper') === 'paper';
+  // The Server software card below knows the software SpawnLoft can update; on a Fabric or
+  // Spigot server it would have nothing true to say, so it does not appear at all.
+  const canUpdate = ['paper', 'purpur', 'folia', 'asp'].includes(row.loader ?? 'paper');
 
   // ---- which Java runs it ------------------------------------------------------
   // Per server, not per machine. Someone testing a plugin against 1.20.4 and 26.1 side by side
@@ -6135,7 +6135,7 @@ async function renderServerSettings() {
 
   // ---- the server software itself -------------------------------------------
   // Off the network until asked: the card shows what is installed from the registry alone, and
-  // only the button talks to PaperMC.
+  // only the button talks to the software's own download API.
   const soft = document.createElement('div');
   soft.className = 'section set-group';
   {
@@ -6147,7 +6147,7 @@ async function renderServerSettings() {
     const h = document.createElement('h3');
     h.textContent = 'Server software';
     const blurb = document.createElement('p');
-    blurb.textContent = 'The Paper build this server runs.';
+    blurb.textContent = 'The server build this server runs.';
     head.append(mark, h, blurb);
     soft.append(head);
   }
@@ -6162,7 +6162,7 @@ async function renderServerSettings() {
   softOut.style.display = 'grid';
   softOut.style.gap = '8px';
   soft.append(softNow, softRow, softOut);
-  soft.hidden = !isPaper;
+  soft.hidden = !canUpdate;
   body.append(soft);
 
   softCheck.onclick = async () => {
@@ -6170,7 +6170,7 @@ async function renderServerSettings() {
     softOut.textContent = '';
     const asking = document.createElement('div');
     asking.className = 'hint';
-    asking.textContent = 'Asking PaperMC…';
+    asking.textContent = 'Checking for updates…';
     softOut.append(asking);
     let info;
     try {
@@ -6196,12 +6196,14 @@ async function renderServerSettings() {
     };
 
     if (!info.current) {
-      line('This jar is not a Paper build SpawnLoft recognises, so it cannot offer updates for it.');
+      line('SpawnLoft did not download this jar, so it cannot tell which build it is or offer updates for it.');
       return;
     }
+    line('Runs ' + info.label + ' ' + info.current.version + ', build ' + info.current.build + '.');
     if (info.buildUpdate) {
+      const channel = info.latestBuild.channel;
       line('Build ' + info.latestBuild.build + ' is available for ' + info.current.version
-        + (info.latestBuild.channel !== 'STABLE' ? ' (' + info.latestBuild.channel.toLowerCase() + ')' : '')
+        + (channel && channel !== 'STABLE' ? ' (' + channel.toLowerCase() + ')' : '')
         + '. The jar it runs now stays in the folder as the way back.');
       const go = document.createElement('button');
       go.className = 'primary';
@@ -6246,7 +6248,7 @@ async function renderServerSettings() {
         if (!ok) return;
         cross.disabled = true;
         cross.textContent = 'Downloading…';
-        const note = toast('Snapshotting, then downloading Paper ' + next + '…');
+        const note = toast('Snapshotting, then downloading ' + info.label + ' ' + next + '…');
         try {
           const out = await post('/instances/' + encodeURIComponent(row.name) + '/upgrade', { version: next });
           note.remove();

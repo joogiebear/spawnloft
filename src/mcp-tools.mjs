@@ -40,6 +40,7 @@ const LEVEL_RE = {
 // Commands that would take the server down behind the supervisor's back - it would read the exit
 // as a crash - or run Bukkit's reload, which leaves plugins half-initialised. Each has a tool.
 const REFUSED_COMMANDS = new Set(['stop', 'restart', 'reload', 'rl'])
+const UNRECOGNISED_JAR = 'is not a jar SpawnLoft can update: it updates the Paper, Purpur, Folia and Advanced Slime Paper jars it downloaded itself'
 
 const name = { type: 'string', minLength: 1, description: 'Server name, as list_servers shows it' }
 const confirm = { type: 'boolean', description: 'Leave unset first to see what would happen; true to do it' }
@@ -264,14 +265,14 @@ const readTools = [
     },
   },
   {
-    name: 'check_server_update', title: 'Check for a Paper update', annotations: READ_NET,
-    description: 'Whether a newer Paper build exists for the server\'s Minecraft version (upgrade_build applies it), and which newer Minecraft versions exist.',
+    name: 'check_server_update', title: 'Check for a server update', annotations: READ_NET,
+    description: 'Whether a newer build of the server\'s own software (Paper, Purpur, Folia or Advanced Slime Paper) exists for its Minecraft version (upgrade_build applies it), and which newer Minecraft versions that software supports.',
     inputSchema: object({ name }, ['name']),
     async run({ name: n }) {
       const info = await upgrade.checkUpgrade(server(n))
       const text = !info.current
-        ? `${n} does not run a Paper jar SpawnLoft recognises. Newest Paper is for ${info.latestVersion}.`
-        : [`${n} runs Paper ${info.current.version} build ${info.current.build}.`,
+        ? `${n} runs ${server(n).jar}, which ${UNRECOGNISED_JAR}.`
+        : [`${n} runs ${info.label} ${info.current.version} build ${info.current.build}.`,
           info.buildUpdate ? `Build ${info.latestBuild.build} is available (upgrade_build applies it).` : 'That is the newest build for its version.',
           info.newerVersions.length ? `Newer Minecraft versions: ${info.newerVersions.join(', ')} (crossing one migrates the worlds for good).` : ''].filter(Boolean).join('\n')
       return { data: { name: n, ...info }, text }
@@ -473,12 +474,12 @@ const actionTools = [
     },
   },
   {
-    name: 'upgrade_build', title: 'Update Paper', annotations: WRITE_NET,
-    description: 'Move a server to the newest Paper build of the Minecraft version it already runs. The old jar is kept beside it. Takes effect at the next start. Crossing Minecraft versions is upgrade_minecraft.',
+    name: 'upgrade_build', title: 'Update the server software', annotations: WRITE_NET,
+    description: 'Move a server to the newest build of its own software (Paper, Purpur, Folia or Advanced Slime Paper) for the Minecraft version it already runs. The old jar is kept beside it. Takes effect at the next start. Crossing Minecraft versions is upgrade_minecraft.',
     inputSchema: object({ name }, ['name']),
     async run({ name: n }, { progress }) {
       const inst = server(n)
-      if (!upgrade.parsePaperJar(inst.jar)) fail(`${inst.jar} is not a Paper jar SpawnLoft recognises`)
+      if (!upgrade.parseServerJar(inst.jar)) fail(`${inst.jar} ${UNRECOGNISED_JAR}`)
       progress('Downloading the newest build')
       const running = sup.isRunning(n)
       const res = await upgrade.applyUpgrade(n, { running })
@@ -549,14 +550,14 @@ const destructiveTools = [
     inputSchema: object({ name, version: { type: 'string', minLength: 1, description: 'Target Minecraft version, from check_server_update' }, confirm }, ['name', 'version']),
     async run({ name: n, version, confirm: yes = false }, { progress }) {
       const inst = server(n)
-      const current = upgrade.parsePaperJar(inst.jar)
-      if (!current) fail(`${inst.jar} is not a Paper jar SpawnLoft recognises`)
+      const current = upgrade.parseServerJar(inst.jar)
+      if (!current) fail(`${inst.jar} ${UNRECOGNISED_JAR}`)
       if (version === current.version) fail(`${n} already runs ${version}; use upgrade_build for a newer build of it`)
       if (!yes) {
         return { data: { name: n, confirmed: false, from: current.version, to: version },
           text: `Would move ${n} from Minecraft ${current.version} to ${version}. Worlds migrate one way on the next start; a snapshot is taken first. Check that its plugins support ${version}. Nothing has changed yet; call again with confirm: true to do it.` }
       }
-      progress(`Downloading Paper ${version}`)
+      progress(`Downloading ${current.label} ${version}`)
       const running = sup.isRunning(n)
       const res = await upgrade.applyUpgrade(n, { version, running })
       const snapshot = res.snapshot ? path.basename(res.snapshot) : null
@@ -572,7 +573,7 @@ export function toolsFor({ allowDestructive = false } = {}) {
 }
 
 export const INSTRUCTIONS = `SpawnLoft runs Minecraft servers on this computer. Start with list_servers to learn the server names.
-Changes to plugins and Paper take effect when the server next restarts. install_plugin and update_plugin take a plugins snapshot first; take a backup yourself before anything else risky.
+Changes to plugins and the server software take effect when the server next restarts. install_plugin and update_plugin take a plugins snapshot first; take a backup yourself before anything else risky.
 To change a plugin's settings, find the file with list_config_files, read it with read_config_file, and change it with write_config_file using old_text and new_text; each change is snapshotted first. Then reload the plugin with run_command, or restart.
 When a server will not start, read diagnostics before get_logs. For get_logs, prefer level "warn" over reading everything.
 Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.`

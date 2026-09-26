@@ -3,7 +3,7 @@
 `spawnloft mcp` lets an AI app that speaks the [Model Context Protocol](https://modelcontextprotocol.io)
 check on and run the servers on this machine: start one and wait for it, read its console, find out
 why it crashed, look at TPS, back it up, install and update plugins, change their configuration files,
-update Paper.
+update the server software.
 
 You pick the AI app. SpawnLoft needs no account for this, opens no port and sends nothing on its own.
 The app starts `spawnloft mcp` itself and talks to it over stdin and stdout, and the process ends when
@@ -123,7 +123,7 @@ Add them after `mcp` in `args`.
 | `list_plugins` | Installed plugins or mods, and which ones SpawnLoft manages. |
 | `search_plugins` | Search Modrinth and Hangar for plugins or mods this server can load. |
 | `check_plugin_updates` | Newer builds of the plugins SpawnLoft installed. |
-| `check_server_update` | A newer Paper build, and newer Minecraft versions. |
+| `check_server_update` | A newer build of the server's software (Paper, Purpur, Folia or Advanced Slime Paper), and newer Minecraft versions it supports. |
 | `list_config_files` | A server's text configuration files, or those in one folder such as `plugins/EcoItems`. |
 | `read_config_file` | One configuration file, with secret values shown as `[redacted]`. |
 | `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports. |
@@ -138,7 +138,7 @@ Add them after `mcp` in `args`.
 | `backup` | Takes a snapshot. Safe while the server is running. |
 | `install_plugin` / `update_plugin` | Takes a plugins snapshot first, then installs. Takes effect at the next restart. |
 | `write_config_file` | Changes one configuration file: an exact `old_text` to `new_text` replacement, or `content` for a whole or new file. Snapshots the file first. |
-| `upgrade_build` | The newest Paper build of the same Minecraft version. The old jar is kept. |
+| `upgrade_build` | The newest build of the same software and Minecraft version. The old jar is kept. |
 
 **Destructive**, only with `--allow-destructive`. Each describes what it would do and changes
 nothing until it is called again with `confirm: true`.
