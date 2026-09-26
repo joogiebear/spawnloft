@@ -146,7 +146,7 @@ RCON refuses to carry.
 | `set <name> key=value` | `label`, `memory`, `java`, `jar`, `port`, `rcon.port`, `rcon.password`, `auto-restart=on\|off`, `webhook=<url>\|off` |
 | `props <name> [key=value]` | Read or edit `server.properties` |
 | `plugins <name> [enable\|disable <x>]` | List a server's plugins, flip one on or off |
-| `upgrade <name> [--check]` | Newest Paper build for its version; `--version <v> --yes` crosses Minecraft versions |
+| `upgrade <name> [--check]` | Newest build for its version, on Paper, Purpur, Folia or Advanced Slime Paper; `--version <v> --yes` crosses Minecraft versions |
 | `rm <name> [--purge --yes]` | Unregister, optionally deleting the files |
 
 #### Server software

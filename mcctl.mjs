@@ -916,7 +916,8 @@ function cmdReveal(positional) {
 }
 
 /**
- * Move a server to a newer Paper build, or - deliberately harder - a newer Minecraft version.
+ * Move a server to a newer build of its software (Paper, Purpur, Folia or Advanced Slime Paper),
+ * or - deliberately harder - a newer Minecraft version.
  *
  * <p>A build update is routine and just happens; the old jar stays in the instance folder as
  * the way back. Crossing Minecraft versions migrates the worlds one-way on the next start, so
@@ -930,13 +931,14 @@ async function cmdUpgrade(positional, flags) {
   if (flags.check) {
     const info = await upgrade.checkUpgrade(inst)
     if (!info.current) {
-      out(`${inst.jar} is not a Paper jar SpawnLoft recognises. Newest Paper is for ${info.latestVersion}.`)
+      out(`${inst.jar} is not a jar SpawnLoft can update: it updates the Paper, Purpur, Folia and Advanced Slime Paper jars it downloaded itself.`)
       return
     }
-    out(`${name} runs Paper ${info.current.version} build ${info.current.build}.`)
+    const channel = info.latestBuild.channel
+    out(`${name} runs ${info.label} ${info.current.version} build ${info.current.build}.`)
     out(info.buildUpdate
-      ? `Build ${info.latestBuild.build} is available (${info.latestBuild.channel.toLowerCase()}). Apply with: mcctl upgrade ${name}`
-      : `That is the newest ${info.latestBuild.channel === 'STABLE' ? 'stable ' : ''}build for ${info.current.version}.`)
+      ? `Build ${info.latestBuild.build} is available${channel ? ` (${channel.toLowerCase()})` : ''}. Apply with: mcctl upgrade ${name}`
+      : `That is the newest ${channel === 'STABLE' ? 'stable ' : ''}build for ${info.current.version}.`)
     if (info.newerVersions.length) {
       out(`Minecraft ${info.newerVersions[0]} is out. Cross with: mcctl upgrade ${name} --version ${info.newerVersions[0]} --yes`)
     }
@@ -944,7 +946,7 @@ async function cmdUpgrade(positional, flags) {
   }
 
   const version = flags.version ? String(flags.version) : null
-  const current = upgrade.parsePaperJar(inst.jar)
+  const current = upgrade.parseServerJar(inst.jar)
   if (version && current && version !== current.version && !flags.yes) {
     fail(`upgrading "${name}" from ${current.version} to ${version} migrates its worlds, and worlds do not migrate back.
   A snapshot is taken first, but read your plugins' release notes too. Re-run with --yes.`)
@@ -956,7 +958,7 @@ async function cmdUpgrade(positional, flags) {
     return
   }
   if (res.snapshot) out(`Snapshot: ${res.snapshot}`)
-  out(`${name}: ${res.from} -> ${res.to}${res.channel !== 'STABLE' ? ` (${res.channel})` : ''}`)
+  out(`${name}: ${res.from} -> ${res.to}${res.channel && res.channel !== 'STABLE' ? ` (${res.channel})` : ''}`)
   if (res.oldJars.length) out(`  Old jar kept in the instance folder - the way back if this build misbehaves.`)
   out(running
     ? '  The server is running; the new jar loads at its next restart.'
@@ -1782,7 +1784,8 @@ OTHER
   mcctl ui [--port n] [--no-open]    Serve the local control panel (and open it in a browser)
   mcctl paper versions               Paper versions available to download
   mcctl paper fetch <version>        Download a Paper build into the jar store
-  mcctl upgrade <name> [--check]     Move to the newest Paper build for its version;
+  mcctl upgrade <name> [--check]     Move to the newest build for its version (Paper,
+                                     Purpur, Folia or Advanced Slime Paper);
                                      --version <v> --yes crosses Minecraft versions
   mcctl pack <name> [update --yes]   A modpack server's pack: show, check, update
                                      (snapshot first; worlds and hand-added files untouched)

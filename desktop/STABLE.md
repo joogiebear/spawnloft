@@ -17,6 +17,11 @@ Existing installs receive 1.4 through the built-in updater. ZIP files are used b
 ## New in 1.4
 
 - **AI assistants can change configuration files.** Ask for a plugin setting to be changed and the assistant finds the file, reads it and changes the lines it means to, then reloads the plugin or restarts the server. Each change is snapshotted first, one file at a time, so it can be put back from the Backups tab without touching anything else. It stays inside the server's folder, works only on text configuration (YAML, JSON, properties, TOML and the like), and never sees worlds, logs, `eula.txt` or players' IP addresses. Passwords, tokens and webhook URLs in those files are shown to it as `[redacted]` and cannot be changed through it, and neither can the ports and RCON settings SpawnLoft manages. See [MCP.md](https://github.com/joogiebear/spawnloft/blob/main/MCP.md).
+- **Update checks for Purpur, Folia and Advanced Slime Paper**, as Paper already had. Settings, under Server software, says which build a server runs and offers the newest one, or a newer Minecraft version; so do `spawnloft upgrade` and the AI assistant tools. Advanced Slime Paper builds have no number, so they are compared by date.
+
+## Fixed
+
+- Upgrading a server to a newer Minecraft version left it recorded as the old one, so it kept being offered plugin builds for that version and was started on the Java that version needs rather than the new one's. It now records the version it moved to.
 
 SpawnLoft does not insert database credentials into plugin configuration files.
 
