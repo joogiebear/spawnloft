@@ -37,8 +37,9 @@ const SECRET_KEY = /password|passwd|secret|webhook|api[-_.]?key|(?:^|[-_.])(?:to
 // key: value / key = value / "key": "value", with the value up to the end of the line (or the
 // closing quote).
 const KEY_VALUE = /^(\s*-?\s*["']?)([\w.-]+)(["']?\s*[:=]\s*)(["']?)(.+?)\4(\s*,?\s*)$/
-// Credentials inside a URL: scheme://user:password@host
-const URL_CREDENTIAL = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]+)(@)/gi
+// Credentials inside a URL: scheme://user:password@host, or scheme://:password@host with no user,
+// which is how a Redis URL usually carries one.
+const URL_CREDENTIAL = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)([^\s@/]+)(@)/gi
 // Nothing to hide in an empty value or a switch.
 const NOT_A_SECRET = /^(null|~|none|true|false|""|''|\[\]|\{\})$/i
 
