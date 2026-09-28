@@ -32,6 +32,7 @@ import * as neoforge from './neoforge.mjs'
 import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
+import * as files from './files.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
@@ -474,6 +475,59 @@ async function handleRawProps(req, res, name) {
     appliesOnRestart: supervisor.isRunning(name),
     diff: configFiles.summarizeChange(plan.before, plan.after),
   })
+}
+
+/**
+ * The Files tool: the server's folder, browsed and changed. See files.mjs for what is refused and
+ * what is copied first.
+ *
+ * <p>An upload is the one request whose body is not JSON: the file's bytes, streamed straight to
+ * disk, with where it goes in the query string.
+ */
+async function handleFiles(req, res, name, seg, url) {
+  const inst = registry.getInstance(name)
+  const verb = seg[4] ?? null
+  const running = supervisor.isRunning(name)
+  const q = (k) => url.searchParams.get(k) ?? ''
+
+  if (req.method === 'GET') {
+    if (!verb) return json(res, 200, { ...files.listDir(inst, q('path'), { running }), running })
+    if (verb === 'read') return json(res, 200, await files.readFile(inst, q('path')))
+    if (verb === 'search') return json(res, 200, { ...await files.searchNames(inst, q('path'), q('q'), { running }), running })
+    if (verb === 'download') {
+      const out = await files.downloadable(inst, q('path'))
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'content-length': out.size,
+        // filename* carries a name that is not plain ASCII; the plain one is the fallback.
+        'content-disposition': `attachment; filename="${out.name.replace(/[^\x20-\x7e]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(out.name)}`,
+        'cache-control': 'no-store',
+      })
+      const stream = fs.createReadStream(out.file)
+      stream.on('close', out.done)
+      stream.pipe(res)
+      return
+    }
+    return json(res, 404, { error: 'not found' })
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+
+  if (verb === 'upload') {
+    return json(res, 200, await files.uploadFile(inst, q('dir'), q('name'), req, { overwrite: q('overwrite') === '1', running }))
+  }
+  const body = await readBody(req)
+  if (verb === 'write') {
+    return json(res, 200, {
+      ...await files.writeFile(inst, body.path, { text: body.text, version: body.version ?? null, create: body.create === true, force: body.force === true }),
+      appliesOnRestart: running,
+    })
+  }
+  if (verb === 'mkdir') return json(res, 200, files.makeFolder(inst, body.dir, body.name))
+  if (verb === 'move') return json(res, 200, files.movePath(inst, body.from, body.to, { running }))
+  if (verb === 'delete') return json(res, 200, await files.deletePaths(inst, body.paths, { withoutCopy: body.withoutCopy === true, running }))
+  if (verb === 'archive') return json(res, 200, await files.archivePaths(inst, body.paths, body.name))
+  if (verb === 'extract') return json(res, 200, await files.extractArchive(inst, body.path, { running }))
+  return json(res, 404, { error: 'not found' })
 }
 
 async function handleProps(req, res, name) {
@@ -1594,6 +1648,7 @@ async function route(req, res) {
   if (seg[3] === 'upgrade') return handleUpgrade(req, res, name)
   if (seg[3] === 'pack') return handlePack(req, res, name)
   if (seg[3] === 'worlds') return handleWorlds(req, res, name, seg)
+  if (seg[3] === 'files') return handleFiles(req, res, name, seg, url)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
 
   // What went wrong, in words: the known failure shapes found in this server's console,
