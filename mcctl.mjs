@@ -43,6 +43,7 @@ import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
 import { serveStdio } from './src/mcp.mjs'
 import * as activity from './src/activity.mjs'
+import { runSteps, describeStep } from './src/task-steps.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
@@ -1219,7 +1220,7 @@ async function cmdTask(positional, flags) {
       rows.push([
         t.id,
         t.instance,
-        t.action.type,
+        t.action.type === 'steps' ? t.action.steps.map(describeStep).join(', then ') : t.action.type,
         describeSchedule(t.schedule),
         t.enabled ? (w ? w.state : 'NOT IN SCHEDULER') : 'disabled',
         w ? schedule.describeResult(w.lastResult) : '-',
@@ -1458,6 +1459,33 @@ async function runTask(id) {
     } else if (action.type === 'start') {
       if (running) return record('skipped', 'it was already running')
       return await startAndReport('started')
+    } else if (action.type === 'steps') {
+      // The chain's rules live in task-steps.mjs; what each step does to the server is here, the
+      // same calls the single-action tasks above make.
+      const res = await runSteps(action, {
+        isRunning: () => sup.isRunning(instance),
+        send: (line) => sup.sendConsole(instance, line),
+        sleep,
+        backup: async ({ keep }) => {
+          const snap = await backup.createSnapshot(inst, { scope: 'standard', label: 'scheduled', running: sup.isRunning(instance), taskId: id })
+          const gone = keep ? backup.pruneSnapshots(instance, keep, { only: 'scheduled', taskId: id }) : []
+          return `backed up ${path.basename(snap.file)} (${humanBytes(snap.size)})${gone.length ? `, pruned ${gone.length}` : ''}`
+        },
+        verify: async () => {
+          const snaps = backup.listSnapshots(instance)
+          const bad = []
+          for (const s of snaps) if (!(await backup.verifySnapshot(instance, s.name)).ok) bad.push(s.name)
+          if (bad.length) throw new Error(`${bad.length} of ${snaps.length} backups do not read back: ${bad.join(', ')}`)
+          return `verified ${snaps.length} backups`
+        },
+        stop: () => sup.stop(instance),
+        start: () => sup.start(instance, { timeout: TASK_START_TIMEOUT }),
+      })
+      if (res.status === 'FAILED') {
+        process.exitCode = 1
+        await alert(res.failures.join('; '))
+      }
+      return record(res.status, res.detail)
     } else {
       fail(`unknown action "${action.type}"`)
     }

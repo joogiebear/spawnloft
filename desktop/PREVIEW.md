@@ -18,6 +18,9 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   who did it - you, a schedule, an AI assistant (by its app's name) or SpawnLoft's crash guard.
   Edits, replaced files, deletes and an assistant's config changes have Undo. Please have your
   assistant change something, then find it there and undo it, and say what was missing.
+- **Chained schedules (new in 1.5):** in Schedule, "Several steps in order" builds a task of
+  steps - countdown, backup, restart, commands, waits - run one after another. Please set up a
+  nightly restart from the ready-made chain, press Run now, and watch Recent runs and Activity.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;

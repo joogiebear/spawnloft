@@ -228,7 +228,14 @@ a scheduled `verify <name> --all` can be noticed by whatever runs it.
 | `task run <id>` | Run it now — this is also what the system scheduler calls |
 
 `--do` is one of `backup`, `command` (with `--line "<what to send>"`), `restart`,
-`stop`, `start`. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
+`stop`, `start`. The panel's Schedule tool also makes **chained tasks** - several steps in one run,
+in order: tell the players, run a command, wait, count down (announced at the full time, one minute
+and ten seconds), back up (with its own retention), verify, stop, start, restart. A step waits for
+the one before it, so a restart never overtakes its backup; a step with nothing to act on (telling
+a stopped server something) is skipped, and one that fails stops the rest unless the task says to
+keep going. "Only while the server is running" skips the whole chain on a stopped server. Waits are
+capped at two hours in total and a chain at twelve steps. Ready-made chains: a restart with a
+countdown and a backup first; a backup with the players told; stop, back up, start. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
 `--weekly SUN --at 03:00`, or `--on-logon`.
 
 Windows Task Scheduler or per-user macOS launchd agents run these, even with SpawnLoft closed.

@@ -8,6 +8,7 @@ import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as mac from './schedule-mac.mjs'
 import * as linux from './schedule-linux.mjs'
 import * as activity from './activity.mjs'
+import { normaliseSteps } from './task-steps.mjs'
 
 // launchd and systemd are driven through the same five calls; Windows is the code in this file.
 const native = process.platform === 'darwin' ? mac : process.platform === 'linux' ? linux : null
@@ -59,6 +60,8 @@ export const ACTIONS = {
   restart: { label: 'Restart the server', needsRunning: false },
   stop: { label: 'Stop the server', needsRunning: true },
   start: { label: 'Start the server', needsRunning: false },
+  // Several of the above and more, in order, in one run: see task-steps.mjs.
+  steps: { label: 'Several steps in order', needsRunning: false },
 }
 
 /**
@@ -152,6 +155,7 @@ export function normaliseAction(input) {
     const warn = Number(input.warnMinutes)
     return { type, warnMinutes: Number.isInteger(warn) && warn > 0 ? Math.min(warn, 60) : 0 }
   }
+  if (type === 'steps') return normaliseSteps(input)
   return { type }
 }
 
