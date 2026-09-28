@@ -22,6 +22,8 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 
 - **Scheduled tasks can be several steps.** A task can now warn the players with a countdown, take a backup, and restart - in that order, in one run, each step waiting for the one before it, so a restart never overtakes its backup. Steps can also run commands, wait, verify backups, stop and start. A failed step stops the rest unless you say otherwise, and a task can be set to run only while the server is up. Three ready-made chains cover the usual nightly routines.
 
+- **Backups you can keep, name and take with you.** Lock a backup and nothing deletes it - not the Delete button, not a schedule's retention - so the one taken before a big change stays. Give any backup a note ("before the 1.21 upgrade"), download it to keep somewhere else, and list paths each server's backups should leave out, such as a map plugin's rendered tiles. A restore can now clear what the backup holds first, so the server ends up exactly as it was; what was cleared is kept, so that can be undone too.
+
 SpawnLoft does not insert database credentials into plugin configuration files.
 
 

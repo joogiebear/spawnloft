@@ -207,6 +207,12 @@ that takes one gets it: this command, the panel's Backups tab, a scheduled
 backup task, and the snapshot taken before a cross-version upgrade. If the
 flush cannot be done the snapshot is still taken and the manifest says so.
 
+In the panel a snapshot can be **locked** (neither Delete nor a schedule's retention removes it),
+given a **note**, and **downloaded**; each server has a **leave-out list** - paths with `*`
+wildcards, one per line - that every backup of it skips, and the manifest records what was left out.
+The panel's restore can also **clear first**: what the snapshot holds is copied aside as a
+`pre-restore` snapshot, removed, then restored, so the server ends exactly as the snapshot was.
+
 `restore` refuses without `--yes` and prints what it would overwrite. It
 extracts over the instance in place and deletes nothing, so a file added after
 the snapshot was taken survives a restore. To get back to exactly what the

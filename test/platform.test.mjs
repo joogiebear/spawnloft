@@ -67,7 +67,7 @@ test('Mac panel exposes scheduling and automatic backups without changing server
     // comes separately, and the two together are the whole of the combined answer.
     const history = await get(base + '/backups/history')
     assert.deepEqual(history, Object.fromEntries(
-      ['snapshots', 'dir', 'root', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),
+      ['snapshots', 'exclude', 'dir', 'root', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),
     ))
     const automatic = await get(base + '/backups/auto')
     assert.deepEqual(automatic, Object.fromEntries(

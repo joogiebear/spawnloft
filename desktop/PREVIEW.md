@@ -21,6 +21,10 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
 - **Chained schedules (new in 1.5):** in Schedule, "Several steps in order" builds a task of
   steps - countdown, backup, restart, commands, waits - run one after another. Please set up a
   nightly restart from the ready-made chain, press Run now, and watch Recent runs and Activity.
+- **Backup controls (new in 1.5):** in Backups, lock a snapshot (retention and Delete leave it
+  alone), give it a note, download it, and list paths to leave out. Restore offers "Clear first",
+  which ends exactly as the backup was and keeps what it cleared. Please try a clean restore on a
+  test server and say whether the result was what you expected.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;

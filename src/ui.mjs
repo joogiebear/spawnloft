@@ -602,9 +602,24 @@ async function handleBackups(req, res, name, seg) {
   const inst = registry.getInstance(name)
   const action = seg[4] ?? null
 
+  // The archive itself, to keep somewhere this machine is not.
+  if (req.method === 'GET' && action === 'download') {
+    const url = new URL(req.url, 'http://localhost')
+    const snap = backup.resolveSnapshot(name, String(url.searchParams.get('snapshot') ?? ''))
+    res.writeHead(200, {
+      'content-type': 'application/gzip',
+      'content-length': snap.size,
+      'content-disposition': `attachment; filename="${snap.name}"`,
+      'cache-control': 'no-store',
+    })
+    fs.createReadStream(snap.path).pipe(res)
+    return
+  }
+
   if (req.method === 'GET') {
     const history = {
       snapshots: backup.listSnapshots(name),
+      exclude: backup.excludePatterns(inst),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
@@ -667,8 +682,23 @@ async function handleBackups(req, res, name, seg) {
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))
-    const out = await backup.restoreSnapshot(inst, snap)
+    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true })
     return json(res, 200, out)
+  }
+
+  if (action === 'lock') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotLocked(name, String(body.snapshot), body.locked !== false))
+  }
+  if (action === 'note') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotNote(name, String(body.snapshot), body.note))
+  }
+  if (action === 'exclude') {
+    const patterns = backup.cleanExcludePatterns(body.patterns)
+    registry.updateInstance(name, { backupExclude: patterns.length ? patterns : null })
+    activity.record(name, 'settings', { detail: patterns.length ? `backups leave out ${patterns.join(', ')}` : 'backups leave nothing out' })
+    return json(res, 200, { exclude: patterns })
   }
 
   if (action === 'delete') {
