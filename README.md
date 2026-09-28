@@ -1,360 +1,682 @@
 # SpawnLoft
 
-SpawnLoft runs Minecraft servers on the machine in front of you, without a terminal, a hosting account, or Docker. It is a local control plane: many server instances, each supervised by a detached daemon, with captured console output, RCON command and reply, stdin injection, snapshots, scheduled tasks, plugin management, and managed MySQL and Redis databases. Site and guides: [spawnloft.com](https://spawnloft.com).
+Minecraft servers on your own PC, without the terminal. A local control plane for this machine:
+multiple server instances with detached launch, captured console, RCON command/response, stdin
+injection, and snapshot/restore. The site is [spawnloft.com](https://spawnloft.com).
 
-`spawnloft` is the command-line name. `mcctl` is the original name and runs the same code; existing scripts, scheduled tasks and shortcuts keep working. Settings directories, application identity and the Windows updater were not renamed.
+SpawnLoft is the product and the preferred command-line name. `mcctl` remains a compatible
+alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for packaged
+launchers, structured JSON output, live performance readings, and CSV export, and
+[the MCP guide](MCP.md) to let an AI assistant you choose check on and run your servers.
 
-| Guide | Contents |
-| --- | --- |
-| [CLI.md](CLI.md) | Every command, flag, exit code, and the JSON output contract |
-| [MCP.md](MCP.md) | Model Context Protocol server for AI assistants: setup, tools, privacy |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Ground rules, branches, pull requests, release procedure |
-| [ROADMAP.md](ROADMAP.md) | Shipped work, planned work, declined scope |
-| [desktop/MAC-SIGNING.md](desktop/MAC-SIGNING.md) | Apple Developer ID signing and notarization setup |
+Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
+GNU tar, which cannot read or write a zip, world import and export use a zip reader and
+writer of SpawnLoft's own.
 
-## Requirements
+## What you need
 
-| Component | Requirement | Notes |
-| --- | --- | --- |
-| Java | Java 25+ for Minecraft 26.x; Java 21 for 1.20.5 to 1.21.x; Java 17 for 1.18 to 1.20.4 | Not bundled. SpawnLoft selects the newest installed Java that fits the server's Minecraft version at creation, and refuses a version no installed Java can run before downloading anything. `--force` on `new` and `start` overrides the refusal. |
-| JDK (not JRE) | Required only for Spigot and CraftBukkit | BuildTools needs `javac`. |
-| Desktop app | Windows 10/11 x64, macOS 13+ (Apple Silicon and Intel), Linux `.deb` (Ubuntu 22.04+, Debian 12+) or `.rpm` (Fedora, RHEL family, openSUSE), x64 and arm64 | Bundles its own runtime. No Node needed. |
-| CLI from a checkout | Node 20 or later, and the system `tar` | No npm packages. Where `tar` is GNU tar and cannot read or write a zip, world import and export use SpawnLoft's own zip reader and writer. |
-| Linux scheduling | A systemd user session | Tasks run only while you are logged in unless lingering is on (`spawnloft task linger on`). |
-| Managed MySQL | Windows x64, macOS 15+, Linux x64 | Linux x64 also needs `libaio`, `libnuma` and `ncurses`; SpawnLoft fetches the distribution packages and unpacks them beside the engine without `sudo`. |
-| Managed Redis (Garnet) | Windows x64, macOS (both architectures), Linux x64 and arm64 | Downloads a verified private runtime. |
+- **Java 25 or newer** for current Minecraft (26.x); 1.21.x runs on 21. This is the one thing
+  SpawnLoft cannot supply: Minecraft servers *are* Java processes.
+  [Temurin 25](https://adoptium.net/temurin/releases/?version=25) is a good default, and a JDK
+  rather than a JRE if you want Spigot or CraftBukkit built here.
+  The desktop app checks for it on first run and the panel says so in a banner if it is missing;
+  `mcctl doctor` reports it from the command line. SpawnLoft looks for Java on PATH **and** in the
+  usual install folders (Program Files, the per-user Programs folder, `JAVA_HOME`), so a Java that
+  the installer did not add to PATH, or one added after SpawnLoft was already running, is still found
+  and used. Each server can also be pointed at a specific Java with `mcctl set <name> java=<path>`.
+  SpawnLoft knows which Java each Minecraft version needs (17 for 1.18 to 1.20.4, 21 for 1.20.5 and
+  1.21, 25 for 26.x) and picks the newest installed Java that fits when a server is created; a
+  version nothing installed can run is refused before the download, with the download link.
+  `--force` on `new` and `start` goes ahead anyway.
+- **Node 20+**, for the CLI from a checkout. The desktop app and the Linux command-line package
+  carry their own runtime and do not need it.
+- **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb` for Ubuntu 22.04+ and Debian 12+, an `.rpm` for Fedora,
+  the RHEL family and openSUSE; x64 and arm64) for the desktop app. The CLI runs anywhere Node does. On Linux, scheduling needs a systemd user
+  session, and tasks only run while you are logged in unless lingering is on for your account -
+  the panel says so and offers to turn it on.
 
-Java lookup covers `PATH`, `JAVA_HOME`, and the standard install folders (Program Files, the per-user Programs folder), so a Java the installer did not add to `PATH`, or one installed after SpawnLoft started, is still found. Point one server at a specific Java with `spawnloft set <name> java=<path>`. `spawnloft doctor` reports the Java it found; the desktop app shows a header chip when Java is missing or too old.
+## Why this exists
+
+A Minecraft server is an interactive foreground process. Launched from a normal
+shell call it blocks forever, its stdin is unreachable, and its console output is
+lost. That makes the ordinary edit-restart-check loop painful to automate.
+
+`mcctl` puts a supervisor in front of each server so short-lived commands can
+start it, read what it printed, talk to it, and shut it down cleanly.
 
 ## Quickstart
 
-```sh
-spawnloft new survival --paper 1.21.4 --accept-eula
-spawnloft start survival          # blocks until the console prints "Done (…s)!"
-spawnloft cmd survival "tps"      # RCON command, reply printed
-spawnloft backup survival
-spawnloft ui                      # control panel at http://127.0.0.1:8770
+```bash
+node mcctl.mjs list
 ```
 
-From a source checkout, replace `spawnloft` with `node spawnloft.mjs` (or `./spawnloft` on Linux and macOS, `spawnloft.cmd` on Windows).
+Register a server directory you already have, in place — nothing is moved or
+rewritten, and its existing ports and RCON password are read from its own
+`server.properties`:
 
-Register a server directory that already exists, in place. Nothing is moved or rewritten, and its ports and RCON password are read from its own `server.properties`:
-
-```sh
-spawnloft adopt survival "/srv/minecraft/survival" --memory 6G
+```bash
+node mcctl.mjs adopt survival "S:\Claude\minecraft\Server" --memory 6G
 ```
 
-Create a disposable copy of a server's plugins and configuration on a free port with fresh worlds, to reproduce a bug without touching the real server:
+Start it and wait until Paper reports ready:
 
-```sh
-spawnloft clone survival ecotest && spawnloft start ecotest
+```bash
+node mcctl.mjs start survival
 ```
 
-### Headless Linux
+Talk to it:
 
-`spawnloft-cli` is the command line alone, without the desktop app's graphical dependencies: a `.deb` and an `.rpm` for x64 and arm64, about 30 MB, with its own Node. It installs `spawnloft` on `PATH` and conflicts with the desktop package, which already contains it.
+```bash
+node mcctl.mjs cmd survival "tps"
+```
 
-```sh
+Spin up a disposable copy of its plugins and config on its own port, with fresh
+worlds, for reproducing a bug without touching the real server:
+
+```bash
+node mcctl.mjs clone survival ecotest && node mcctl.mjs start ecotest
+```
+
+### On a server with no screen
+
+Linux has a package that is the command line alone: `spawnloft-cli`, a `.deb` and an `.rpm` for
+x64 and arm64, about 30 MB, with its own Node and none of the desktop app's graphical
+dependencies. It installs `spawnloft` on PATH and conflicts with the desktop package, which
+already contains it.
+
+```bash
 sudo apt install ./spawnloft-cli-<version>-linux-amd64.deb     # Debian 12+, Ubuntu 22.04+
 sudo dnf install ./spawnloft-cli-<version>-linux-x86_64.rpm    # Fedora, RHEL 9 family
 sudo apt install openjdk-25-jre-headless                        # Java is separate
 spawnloft new survival --paper 1.21.4 --accept-eula && spawnloft start survival
 ```
 
-| Concern | Behavior |
+Two things matter more there than at a desk. **Scheduled tasks stop when you log out** unless
+lingering is on for your account, so a nightly backup made over SSH never runs;
+`spawnloft task linger on` turns it on, and `task add` warns when it is off. And **the panel
+still works**: `spawnloft ui --no-open` serves it on `127.0.0.1:8770`, which
+`ssh -L 8770:127.0.0.1:8770 you@server` brings to your own browser without opening a port.
+Updates are a newer package installed the same way; there is no updater on a machine with
+nobody to prompt.
+
+From a checkout on Linux or macOS, `./spawnloft` does the same. On Windows `mcctl.cmd` wraps the above, so `mcctl list` works once this folder is
+on your PATH.
+
+## Commands
+
+### Lifecycle
+
+| Command | Does |
 | --- | --- |
-| Scheduled tasks | Stop when you log out unless lingering is enabled. `spawnloft task linger on` enables it; `task add` warns when it is off. |
-| Control panel | `spawnloft ui --no-open` serves on `127.0.0.1:8770`. Reach it with `ssh -L 8770:127.0.0.1:8770 you@server`; no port is opened. |
-| Updates | Install a newer package the same way. There is no updater. |
+| `list` | Every instance with status, ports, memory, uptime |
+| `status <name>` | Detail for one instance, including pids and level-name |
+| `start <name>` | Launch and block until the server reports ready |
+| `stop <name>` | Graceful shutdown by writing `stop` to the console |
+| `restart <name>` | Stop, then start |
+| `kill <name>` | Force-kill the process tree |
 
-## Server software
+`start` flags: `--detach` (return as soon as the process launches),
+`--timeout <sec>` (ready timeout, default 180), `--no-sync` (leave
+`server.properties` alone instead of pushing registry ports into it).
 
-`new` downloads or builds the server you name. Every option runs with a plain `-jar`, so the daemon is indifferent to which; the differences are the source, the verification, and what the server loads.
+If the server fails to reach ready, `start` prints the last 25 console lines and
+exits non-zero, so a failed launch is self-diagnosing.
 
-| Flag | Software | Loads | Source and verification |
+### Console
+
+| Command | Does |
+| --- | --- |
+| `logs <name> [-n 60] [-f] [--grep re]` | Read the captured console; `-f` follows |
+| `cmd <name> "<command>"` | Run over RCON and print the reply |
+| `send <name> "<line>"` | Write a raw line to the server's stdin |
+| `console <name>` | Interactive attach; `/detach` leaves the server running |
+| `players <name>` | Who is online |
+
+`cmd` goes over RCON and gets a reply back, which is what you want almost always.
+`send` writes to stdin and gets no reply, which is what you want for anything
+RCON refuses to carry.
+
+### Instances
+
+| Command | Does |
+| --- | --- |
+| `adopt <name> <dir>` | Register an existing server directory in place |
+| `new <name>` | Create a fresh instance (`--paper <v>`, `--purpur <v>`, `--folia <v>`, `--asp <v>`, `--vanilla <v>`, `--spigot <v>`, `--craftbukkit <v>`, `--fabric <v>`, `--neoforge <v>`, `--modpack <slug>`, `--jar`, `--template`, `--accept-eula`) |
+| `clone <src> <new>` | Copy plugins and config into a new instance on a free port |
+| `set <name> key=value` | `label`, `memory`, `java`, `jar`, `port`, `rcon.port`, `rcon.password`, `auto-restart=on\|off`, `webhook=<url>\|off` |
+| `props <name> [key=value]` | Read or edit `server.properties` |
+| `plugins <name> [enable\|disable <x>]` | List a server's plugins, flip one on or off |
+| `upgrade <name> [--check]` | Newest build for its version, on Paper, Purpur, Folia or Advanced Slime Paper; `--version <v> --yes` crosses Minecraft versions |
+| `rm <name> [--purge --yes]` | Unregister, optionally deleting the files |
+
+#### Server software
+
+`new` fetches whichever server you name. Every one runs with a plain `-jar`, so
+the daemon does not care which; what differs is where it comes from and what it
+loads.
+
+| Flag | What you get | Loads | From |
 | --- | --- | --- | --- |
-| `--paper <v>` | Paper, newest stable build | Plugins | PaperMC, sha256 |
-| `--purpur <v>` | Purpur, a Paper fork with additional configuration | Plugins | purpurmc.org, md5 |
+| `--paper <v>` | Paper, newest stable build | plugins | PaperMC, sha256-verified |
+| `--purpur <v>` | Purpur, a Paper fork with more configuration | plugins | purpurmc.org, md5-verified |
 | `--folia <v>` | Folia, Paper with regionised multithreading | Folia-built plugins only | PaperMC |
-| `--asp <v>` | Advanced Slime Paper, Paper with Slime World Manager | Plugins | InfernalSuite, sha256 |
-| `--spigot <v>` | Spigot | Plugins | Compiled locally by BuildTools |
-| `--craftbukkit <v>` | CraftBukkit | Plugins | Compiled locally by BuildTools |
-| `--vanilla <v>` | Mojang server | Nothing | Mojang, sha1 |
-| `--fabric <v>` | Fabric launcher | Mods | FabricMC |
-| `--neoforge <v>` | NeoForge, through its installer | Mods | NeoForged maven, sha256 |
-| `--modpack <slug>` | Full server from a Modrinth modpack | Mods | Modrinth |
-| `--jar <file>` | A jar from the `jars/` store | Depends on the jar | Local |
-| `--template <name>` | A saved plugin and config set | Depends on the template | Local |
+| `--asp <v>` | Advanced Slime Paper, Paper with Slime World Manager built in | plugins | InfernalSuite, sha256-verified |
+| `--spigot <v>` | Spigot | plugins | **compiled here** by BuildTools |
+| `--craftbukkit <v>` | CraftBukkit | plugins | **compiled here** by BuildTools |
+| `--vanilla <v>` | Mojang's own server | nothing | Mojang, sha1-verified |
+| `--fabric <v>` | Fabric launcher | mods | FabricMC |
+| `--neoforge <v>` | NeoForge, via its installer | mods | NeoForged maven, sha256-verified |
 
-`--build <n>` selects a specific build for sources that number builds (Paper, Folia, Purpur).
+`--build <n>` picks a specific build where the source numbers them (Paper,
+Folia, Purpur). The panel's **Add a server** offers the same list.
 
-SpigotMC publishes no jars. BuildTools compiles Spigot and CraftBukkit on this machine: it needs a JDK, fetches a portable git, takes five to ten minutes the first time for a version, and keeps about 1 GB of clones under `jars/buildtools/` so later builds are faster.
+SpigotMC publishes no jars, so Spigot and CraftBukkit are built on this machine
+by BuildTools: it needs a **JDK** (javac, not just a runtime), fetches a portable
+git for itself, takes five to ten minutes the first time for a version, and
+keeps about a gigabyte of clones under `jars/buildtools/` so later builds are
+faster. The panel narrates the build line by line.
 
-The Plugins tab follows the software:
+The Plugins tab follows the software: Purpur searches Modrinth for Purpur, Paper,
+Spigot and Bukkit builds; Folia only for Folia-built plugins; Spigot for Spigot
+and Bukkit; vanilla has nothing to manage and says so. `upgrade` still knows
+Paper only; other servers move versions by creating a new instance or importing
+a newer jar.
 
-| Software | Plugin search |
+`clone` gives fresh worlds by default; pass `--with-worlds` to copy world data
+too. Ports are allocated automatically from 25565/25575 upward, skipping anything
+already claimed in the registry or in use on the box.
+
+### Snapshots
+
+| Command | Does |
 | --- | --- |
-| Paper | Modrinth and Hangar |
-| Purpur | Modrinth for Purpur, Paper, Spigot and Bukkit builds |
-| Folia | Folia-built plugins only |
-| Spigot, CraftBukkit | Spigot and Bukkit builds |
-| Vanilla | Nothing to manage |
-| Fabric, NeoForge | **Mods** tab, Modrinth |
+| `backup <name>` | Snapshot to `backups/<name>/` |
+| `snapshots <name>` | List snapshots |
+| `restore <name> [ref] --yes` | Restore (default `latest`); server must be stopped |
+| `prune <name> --keep <n>` | Delete all but the newest n |
+| `verify <name> [ref\|--all]` | Read a snapshot back end to end and check its coverage |
 
-`spawnloft upgrade` moves Paper, Purpur, Folia and Advanced Slime Paper servers to their newest build. Other software changes version by creating a new instance or importing a newer jar.
+Scopes: `plugins`, `worlds`, `config`, `standard` (the default — plugins, the
+active world set, and config), `full` (everything except `cache/`, `libraries/`,
+`versions/`, `logs/`).
 
-## Architecture
+Backing up a running server issues `save-off` / `save-all flush` over RCON first
+and `save-on` afterward, so a hot snapshot is coherent rather than a torn copy
+of a world mid-write. That happens inside the snapshot itself, so every path
+that takes one gets it: this command, the panel's Backups tab, a scheduled
+backup task, and the snapshot taken before a cross-version upgrade. If the
+flush cannot be done the snapshot is still taken and the manifest says so.
 
-A Minecraft server is an interactive foreground process. Launched from a short-lived shell call it blocks, its stdin is unreachable, and its console output is lost. SpawnLoft puts a supervisor in front of each server.
+`restore` refuses without `--yes` and prints what it would overwrite. It
+extracts over the instance in place and deletes nothing, so a file added after
+the snapshot was taken survives a restore. To get back to exactly what the
+snapshot holds, remove the members it lists first.
+
+`verify` is a restore minus the writes: listing the archive decompresses every
+block, so the gzip checksums are genuinely checked, and the entries are compared
+against the manifest so a snapshot missing a locked world is caught the week it
+was taken rather than the day it is needed. It exits non-zero on any failure, so
+a scheduled `verify <name> --all` can be noticed by whatever runs it.
+
+### Scheduled work
+
+| Command | Does |
+| --- | --- |
+| `task list` | Every scheduled task, with its next run and last result |
+| `task add <inst> --do <what> [when]` | Create one |
+| `task rm <id>` / `task enable\|disable <id>` | Remove or pause one |
+| `task run <id>` | Run it now — this is also what the system scheduler calls |
+
+`--do` is one of `backup`, `command` (with `--line "<what to send>"`), `restart`,
+`stop`, `start`. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
+`--weekly SUN --at 03:00`, or `--on-logon`.
+
+Windows Task Scheduler or per-user macOS launchd agents run these, even with SpawnLoft closed.
+They run **interactive only**: while you are signed in, screen locked included,
+but not after you sign out. Running regardless would mean storing a Windows
+password in the task definition, which is not a thing to do quietly for a nightly
+backup.
+
+On Mac, daily and weekly jobs missed during sleep run once when the Mac wakes.
+Interval jobs skip missed runs; no jobs run after sign-out. Login tasks also run
+when first registered or enabled. macOS may show SpawnLoft background activity in
+Login Items; disabling it there prevents scheduled work. Remove tasks in SpawnLoft
+before deleting the application. Interval next-run times are not supplied by launchd.
+
+SpawnLoft keeps task actions in its own data folder. The operating system holds a
+trigger that invokes the bundled CLI; plugin configuration files stay manual.
+
+Every run writes a line to the instance's run directory recording what it did —
+the filename a backup produced, the command it sent, or why it was skipped. Task
+Scheduler only records an exit code, so `0` is all it can say about a backup.
+
+Runs have three outcomes. A `command` task whose server is down did not fail;
+there was nothing to send, and it reads as skipped. Renaming a server moves its
+tasks with it, and deleting one takes them away.
+
+### Other
+
+| Command | Does |
+| --- | --- |
+| `templates` / `templates save <inst> <tpl>` | Reusable plugin+config sets |
+| `jars` / `jars import <path>` | Server jar store used by `new` |
+| `doctor` | Environment, port collisions, EULA, disk, stale state |
+| `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
+
+## How it works
 
 ```
-spawnloft / mcctl (short-lived CLI)
+mcctl (short-lived CLI)
    │
    ├─ spawns detached ──▶ src/daemon.mjs (one per instance)
+   │                        │
    │                        ├─ owns the java child process
    │                        ├─ mirrors stdout/stderr ──▶ run/<name>/console.log
-   │                        ├─ samples CPU and RSS every 10 s ──▶ run/<name>/metrics.log
-   │                        └─ listens on a control channel: ping | send | stop | kill
+   │                        └─ listens on \\.\pipe\mcctl-<name>
+   │                              ops: ping | send | stop | kill
    │
-   ├─ reads run/<name>/state.json   (pids, ports, start time)
-   ├─ reads run/<name>/console.log  (logs, ready detection, follow)
+   ├─ reads run/<name>/state.json  (pids, ports, start time)
+   ├─ reads run/<name>/console.log (logs, ready detection, follow)
    └─ connects to RCON on 127.0.0.1 (cmd, players, save flush)
 ```
 
-| Platform | Control channel |
-| --- | --- |
-| Windows | Named pipe `\\.\pipe\mcctl-<name>` |
-| macOS, Linux | Unix socket `run/<name>/control.sock`. When that path exceeds the socket limit (103 bytes on macOS, 107 on Linux), a socket under `/tmp/spawnloft-<uid>/` named by a hash of the path is used; the directory must be private to the user. |
+The daemon exists because the CLI is short-lived and the JVM is not. It holds the
+pipe to the server's stdin for as long as the server runs.
 
-### Lifecycle and state
+It also owns crash recovery, because it is the only thing alive at the moment a
+server dies. With `auto-restart=on` for an instance, a crash is relaunched in
+place after ten seconds; three crashes in ten minutes and it stays down saying
+why, so a broken plugin cannot grind the machine all night. A stop that was
+asked for always sticks — including `stop` typed straight into the console,
+recognised by its clean exit. An optional per-instance Discord `webhook` gets a
+message for the events nobody is watching the panel for: crashed, recovered,
+gave up, or a scheduled task that failed. Routine lifecycle stays quiet.
 
-| Status | Meaning |
-| --- | --- |
-| `running` | Daemon and java process are alive. |
-| `stopping` | A graceful stop is in progress. |
-| `stopped` | No daemon, no state. |
-| `stale` | State file references dead pids. Cleared automatically or by `spawnloft doctor`. |
-| `orphaned` | A java process outlived its daemon. `spawnloft kill <name>` cleans it up. |
+Scheduled restarts can warn the players first (`warnMinutes` on the action, a
+field in the panel's task form): the countdown is said over the console at the
+full figure, one minute, and ten seconds.
 
-State is reconciled against live pids on every read. A server is ready when its console prints `Done (<seconds>s)!`. `start` also stops waiting early on known failure shapes (`Failed to start the minecraft server`, `A fatal error has occurred`, heap reservation failures, `Unable to access jarfile`), prints the last 25 console lines, and exits non-zero.
+State is reconciled against live pids on every read, so a daemon that dies takes
+its instance to `stale` (cleaned up automatically) rather than reporting
+`running` forever. A java process that outlives its daemon shows as `orphaned`
+and `kill` will clean it up.
 
-### Crash recovery
+`instances.json` is the source of truth for ports and RCON. `start` pushes those
+values into `server.properties` before every launch, so hand-editing the file
+cannot silently desync an instance from what SpawnLoft believes about it. Pass
+`--no-sync` if you want the file left alone.
 
-The daemon owns crash recovery because it is the only process alive when a server dies.
+### Layout
 
-| Setting | Behavior |
-| --- | --- |
-| `auto-restart=on` | A crash relaunches the server in place after 10 seconds. |
-| Crash-loop limit | Three crashes within ten minutes: the server stays down and records why. |
-| Requested stops | Always stick, including `stop` typed into the console (recognised by its clean exit). |
-| `webhook=<url>` | Per-instance Discord webhook for crashed, recovered, gave-up, and failed scheduled-task events. Routine lifecycle events are not sent. |
-| Restart warnings | A scheduled restart with `warnMinutes` announces the countdown over the console at the full figure, at one minute, and at ten seconds. |
-
-### Configuration authority
-
-`instances.json` is the source of truth for ports and RCON. `start` writes those values into `server.properties` before every launch, so a hand edit cannot desynchronise an instance from the registry. `--no-sync` leaves the file untouched. Default ports allocate from `25565` (game) and `25575` (RCON) upward, skipping ports claimed in the registry or in use on the machine.
-
-JVM flags default to Aikar's G1 tuning, switching to the large-heap variant at 12 GB and above. Override per instance with a `jvmFlags` array in `instances.json`. `start` truncates `run/<name>/console.log` each launch; the server's own `logs/` directory keeps the rolling history.
-
-### Data layout
-
-| Item | Location |
-| --- | --- |
-| Settings file | Windows `%APPDATA%\mcctl\settings.json`; elsewhere `$XDG_CONFIG_HOME/mcctl/settings.json`, default `~/.config/mcctl/settings.json` |
-| Default data root | Windows `%LOCALAPPDATA%\mcctl`; elsewhere `$XDG_DATA_HOME/mcctl`, default `~/.local/share/mcctl` |
-| Legacy data root | The checkout itself, when it already contains `instances.json` |
-| Override | `MCCTL_DATA_ROOT` environment variable, which wins over everything and is inherited by daemons |
-
-| Path under the data root | Contents |
-| --- | --- |
-| `instances.json` | Registry: ports, memory, RCON credentials, loader, options |
-| `instances/` | Servers SpawnLoft created. Adopted servers stay where they were. |
-| `templates/` | Saved plugin and config sets |
-| `jars/` | Server jar store, plus `jars/buildtools/` |
-| `backups/` | Snapshots and manifests (relocatable with `config`) |
-| `run/<name>/` | `state.json`, `console.log`, `daemon.log`, `metrics.log`, task run logs |
-| `run/panel.log` | Records every panel event-loop stall longer than 250 ms |
-| `run/mclogs.json` | mclo.gs delete tokens |
-| `engines/` | Database engine binaries, shared by version |
-| `services/<name>/` | Data for each managed database |
-
-`spawnloft config` shows the resolved layout and moves it: `set-root <path>` (new servers only), `set-instances <path>`, `same-drive`, and `set-backup-mirror <path>|off`. Moving a location never moves existing data.
-
-## Backups
-
-Snapshots are tar archives with a manifest in `backups/<name>/`.
-
-| Scope | Contents |
-| --- | --- |
-| `plugins` | `plugins/` and `mods/` |
-| `worlds` | The active world set (only the active world is ever included) |
-| `config` | Root configuration files and `config/` |
-| `standard` (default) | Plugins, active worlds and config |
-| `full` | Everything except `cache/`, `libraries/`, `versions/` and `logs/` |
-
-| Behavior | Detail |
-| --- | --- |
-| Hot snapshots | A running server receives `save-off` and `save-all flush` over RCON first and `save-on` afterwards. This is inside the snapshot routine, so the CLI, the panel, scheduled backups, pre-upgrade snapshots and MCP all get it. If the flush fails, the snapshot is still taken and the manifest records that. |
-| Databases | Snapshots of `standard` and `full` scope include a `databases/` dump of an attached database. Restore imports it back; the database must be running. |
-| Restore | Refuses without `--yes` and while the server runs. Extracts in place and deletes nothing: files added after the snapshot survive. |
-| Verify | Reads the archive end to end (every gzip block is decompressed) and compares entries to the manifest. Exits non-zero on any failure. |
-| Retention | `--keep <n>` prunes only snapshots produced by the same schedule, never manual ones or pre-reset ones. |
-| Mirror | `config set-backup-mirror <path>` copies every new snapshot to a second location; deletions follow. |
-| tar warnings | `tar` exits 1 when it skips a file the running server holds locked. That is expected on hot snapshots and is not treated as failure. |
-
-## Scheduled tasks
-
-| Action | Behavior | Skipped when |
-| --- | --- | --- |
-| `backup` | Snapshot, optional `keep` (1 to 365) | |
-| `verify` | Reads every snapshot back | |
-| `command` | Sends `--line "<command>"` | Server is down |
-| `restart` | Optional `warnMinutes` (1 to 60) | |
-| `stop` | Graceful stop | Server is down |
-| `start` | Launches the server | |
-
-| Trigger | Flag |
-| --- | --- |
-| Daily | `--daily 03:00` |
-| Weekly | `--weekly SUN --at 03:00` |
-| Every n hours | `--hourly <n>` |
-| Every n minutes | `--minutes <n>` |
-| At sign-in | `--on-logon` |
-
-| Platform | Scheduler | Notes |
-| --- | --- | --- |
-| Windows | Task Scheduler | Interactive only: runs while you are signed in, screen locked included, never after sign-out. Running regardless would need a stored Windows password. |
-| macOS | Per-user launchd agents | Daily and weekly jobs missed during sleep run once on wake; interval jobs skip missed runs; login tasks also run when registered or enabled. Interval next-run times are not supplied by launchd. Remove tasks before deleting the app. |
-| Linux | systemd user timers | Requires lingering to run after logout. |
-
-The operating system holds only a trigger that invokes the bundled CLI (`task run <id>`). Task definitions live in SpawnLoft's data folder, and an unrecognised action is refused rather than executed. Every run appends a line to the instance's run directory describing what it did; Task Scheduler alone records only an exit code. Outcomes are success, failure, or skipped. Renaming a server moves its tasks; deleting it removes them.
-
-## Databases
-
-MySQL 8.4 LTS and Redis-compatible Garnet run as registry entries beside servers, under the same daemon: a lamp, a console, start, stop, restart and crash recovery. Every database listens on `127.0.0.1` only, and is stopped through `mysqladmin` over TCP because databases take no console input.
-
-```sh
-spawnloft db versions                         # verified releases
-spawnloft db add sql                          # download MySQL once, set up a database on a free port
-spawnloft start sql
-spawnloft db attach sql survival              # database and scoped user for that server; prints credentials
-spawnloft db create survival                  # all of the above: survival-db on the next port, started, attached
-spawnloft db creds sql survival               # show credentials again
-spawnloft db detach sql survival --drop       # remove the user and the data
-spawnloft db add cache --engine garnet        # Redis-compatible server
-spawnloft db connect xampp --port 3306 --user root --password ''   # register an existing database
+```
+mcctl/
+├── mcctl.mjs           CLI
+├── mcctl.cmd           Windows shim
+├── instances.json      Registry: ports, memory, RCON credentials  (gitignored)
+├── src/
+│   ├── daemon.mjs      Per-instance supervisor
+│   ├── supervisor.mjs  start/stop/kill/ready-detection/log tailing
+│   ├── control.mjs     Named-pipe client, state reconciliation
+│   ├── rcon.mjs        Source RCON protocol client
+│   ├── registry.mjs    Instance registry, Aikar JVM flags
+│   ├── backup.mjs      tar-based snapshots
+│   ├── create.mjs      new/clone/adopt/templates/jars
+│   ├── props.mjs       server.properties reader/writer (preserves comments)
+│   └── util.mjs        Ports, pids, tables, formatting
+├── instances/          Instance data for servers mcctl created
+├── templates/          Saved plugin+config sets
+├── jars/               Server jar store
+├── backups/            Snapshots + manifests
+└── run/                Per-instance state.json, console.log, daemon.log
 ```
 
-| Fact | Detail |
-| --- | --- |
-| Source | Oracle CDN, pinned native archive, SHA-256 verified, unpacked with the system `tar` into `engines/` |
-| Isolation | The user given to a server reaches its one database and nothing else |
-| Snapshots | A server snapshot carries a dump of its attached database; a MySQL database also has its own **Backups** tool with plain SQL dumps that can be downloaded, restored (saving a dump of the current state first) or deleted |
-| Redis | Garnet keeps its own checkpoints and has no dump; stop saves a checkpoint and a failed save leaves it running with an error |
-| Existing databases | Registered with `db connect`; attached the same way; never started or stopped by SpawnLoft |
-| MariaDB | Removed from new setups |
-| Plugin configuration | Never written. Copy credentials from `db creds` or **Show credentials** into plugin configs yourself. |
-
-## Control panel
-
-```sh
-spawnloft ui [--port 8770] [--no-open]
-```
-
-One HTML file (`src/ui.html`) served by Node's `http` module. No framework, no build step, no npm packages, and no network fetches. The same page runs in a browser tab and inside the desktop app; `window.mcctlDesktop` exists only in Electron and gates additive features (a **Browse** button beside path fields, moving the data folder, update checks).
-
-Servers are tabs across the top. A server's tools open from a dock beside its console rather than replacing it; **Settings** and **Backups** open full width with the console's newest line and error count along the bottom. The first tab is an overview of every server.
-
-| Area | Function |
-| --- | --- |
-| **Overview** | State, players, TPS, memory and last backup per server, with **Start** and **Stop** on each card, and the machine's memory budget across servers. A **Needs attention** row flags crashes (including crash-guard restarts today), plugin updates found by the last check, servers never backed up or not backed up in a week, and a Java too old to start a server, each with one button that resolves it. |
-| **Console** | Search, filter to warnings or errors, pause, copy, wrap, line numbers, bounded scrollback. ANSI escapes are stripped. Log level appears as a coloured gutter rail; a stack trace inherits the level of the line above so the error filter shows whole failures. **Export** saves a `.log` beside the snapshots or uploads to mclo.gs. |
-| **Plugins** / **Mods** | Search Modrinth and Hangar together, each result naming its source, with checksum-verified downloads, an update check, and update-all behind one plugins snapshot and a restart. Lists everything in the folder, including hand-added jars, but manages only what SpawnLoft installed (provenance is recorded beside the jars); custom and premium plugins are never offered updates and never have their hash sent anywhere. Enable and disable rename the jar in place. Hangar projects hosting downloads elsewhere are linked, not installed. |
-| **Worlds** | List worlds with the active one named, import a map from a zip or folder (found however deeply nested, never overwriting), export as zip, switch the active world, delete. |
-| **Backups** | Take a snapshot at a chosen scope; list with size, age and coverage; restore, verify or delete; schedule automatic backups with retention. Refreshes every four seconds while visible. |
-| **Players** | Everyone the server knows, merged from operators, bans, whitelist, name cache and world data. Connected players are marked and sorted first. Op, ban, or delete world data; through the console while running, through files when stopped. |
-| **Stats** | CPU and memory over 1 minute, 5 minutes, 30 minutes, 1 hour or 4 hours, sampled every 10 seconds, with both axes following the data. |
-| **Schedule** | Create, edit, enable, disable, run now and remove tasks. |
-| **Settings** | One form of sections with a dot on any section holding unsaved changes. Each setting reads **Default** until the file has it and **Changed** until saved. A bottom bar saves, discards, or saves and restarts. Memory and Java are set here; `server.properties` can be edited as a whole file (RCON password hidden, managed ports uneditable, file snapshotted first). **Server software** shows the running build and offers the newest, or a newer Minecraft version. **Databases** shows credentials and **Create a database**. |
-| Preferences (gear) | Appearance (**Classic** and **SpawnLoft** themes), data locations, updates (**Get beta builds**), **AI assistants** configuration, **Copy diagnostics**, **Feedback**. |
-
-Quick-form `server.properties` fields:
-
-| Key | Label | Type | Range or values | Default shown |
-| --- | --- | --- | --- | --- |
-| `online-mode` | Who can join | Toggle | Mojang accounts (`true`) or any name (`false`) | `true` |
-| `motd` | Message of the day | Text | | `A Minecraft Server` |
-| `difficulty` | Difficulty | Choice | `peaceful`, `easy`, `normal`, `hard` | `easy` |
-| `gamemode` | Default game mode | Choice | `survival`, `creative`, `adventure`, `spectator` | `survival` |
-| `max-players` | Max players | Integer | 1 to 1000 | `20` |
-| `pvp` | PvP | Toggle | | `true` |
-| `white-list` | Whitelist | Toggle | | `false` |
-| `view-distance` | View distance | Integer | 2 to 32 | `10` |
-| `spawn-protection` | Spawn protection | Integer | 0 to 256 | `16` |
-
-New instances are generated with `online-mode=true`, `motd=<name> (SpawnLoft)`, `max-players=10`, and `spawn-protection=0`. Writes preserve comments and key order.
-
-Changing `online-mode` on a world with existing players shows a warning first. Minecraft derives an offline UUID from the player name and uses the Mojang UUID otherwise, so switching hands every player a different identity and orphans permissions, homes and inventories keyed by UUID. The panel reads player data, distinguishes the two UUID kinds by version, and reports how many players are affected.
-
-Renaming, resetting and deleting a server require typing its name.
-
-### Feedback and diagnostics
-
-| Feature | Behavior |
-| --- | --- |
-| **Something broke** | Opens a GitHub bug report with version, Java, server status and panel log pre-filled and copies the full diagnostics to the clipboard. |
-| **A question** | Opens a new post in [Q&A](https://github.com/joogiebear/spawnloft/discussions/categories/q-a). |
-| **An idea** | Opens a new post in [Ideas](https://github.com/joogiebear/spawnloft/discussions/categories/ideas). |
-| **Copy diagnostics** | Version, Java, locations, every server's status, `run/panel.log`, and the last console lines of the selected server. Never includes an RCON password or webhook URL. |
-| Crash notice **Report** link | Same as **Something broke**, named for the crash. |
-
-Nothing is sent by SpawnLoft; the browser hop is the consent.
+Instances that were `adopt`ed keep living wherever they already are; only their
+runtime state lands in `run/`.
 
 ## Security posture
 
-SpawnLoft is built for localhost and LAN use.
+This is built for **localhost and LAN only**.
 
-| Area | Behavior |
-| --- | --- |
-| RCON | Binds to `server-ip`; empty means all interfaces (LAN), `127.0.0.1` keeps it local. RCON has no rate limiting or encryption and must never face the internet. `spawnloft doctor` and the panel warn when a machine has a public address and no active firewall. Minecraft cannot bind RCON separately from the game port. |
-| Secrets at rest | `instances.json` stores RCON passwords in plaintext. It is gitignored, as are `backups/`, `jars/`, `instances/` and `run/`. The panel never receives an RCON password; every route that returns an instance strips it. |
-| Online mode | New instances default to `online-mode=true`. Offline mode gives name-derived UUIDs, so UUID-keyed plugin behavior differs from a real server, and Paper prints a four-line `OFFLINE/INSECURE` banner that plugin authors commonly refuse reports for. Offline remains available: `spawnloft new <name> --offline`, `spawnloft props <name> online-mode=false`, or the panel's **Settings**. The panel badges servers running that way. |
-| Network | Nothing opens firewall ports or touches the router. Exposing a server is a separate, deliberate decision. |
-| Panel binding | Fixed to `127.0.0.1`. There is no `--host` flag, on purpose: the panel has no login. To manage a server elsewhere, remote into the machine. |
-| Panel request checks | Every request needs a loopback `Host` header (defeats DNS rebinding). An `Origin`, when present, must equal the panel's own `Host` including port (dynmap, BlueMap and Plan serve pages on other loopback ports). Requests without `Origin` (the panel itself, curl, the CLI) are allowed. |
-| Scheduled tasks | An allowlist of actions (`backup`, `verify`, `command`, `restart`, `stop`, `start`), not command strings. Tasks run as the signed-in user with no stored password and no elevation. |
-| Outbound data | Only on a click: **Feedback** (browser opens GitHub) and **Console → Export → Upload to mclo.gs**. Before an upload SpawnLoft replaces your account name in file paths; mclo.gs removes IP addresses on its side (best effort) and deletes the log 90 days after last open; player names and plugin output are sent as is. The delete token is kept in `run/mclogs.json`. Everything else stays on the machine. |
-| AI assistants | See [MCP.md](MCP.md). |
+- RCON binds to whatever `server-ip` says; leave it empty for LAN or set it to
+  `127.0.0.1` to keep RCON strictly local. RCON has no rate limiting or
+  encryption and must never face the internet.
+- `instances.json` stores RCON passwords in plaintext and is gitignored. So are
+  `backups/`, `jars/`, `instances/`, and `run/`.
+- Generated instances default to **`online-mode=true`**. That was `false` until v0.2.3, on the
+  reasoning that a scratch server is for testing — but offline mode gives players name-derived
+  UUIDs rather than Mojang ones, so any plugin keying data by UUID behaves differently: some bugs
+  will not reproduce, and some appear that do not exist on a real server. Paper also prints a
+  four-line `OFFLINE/INSECURE` banner near the top of every log, and plugin authors routinely
+  refuse a bug report carrying it. A tool for reproducing plugin bugs should not produce reports
+  that get thrown out on sight.
+
+  Offline is still one toggle away, for multi-account testing or working without internet:
+  `mcctl new <name> --offline`, `mcctl props <name> online-mode=false`, or the panel's
+  **Settings…** on a server. The panel badges any server running that way.
+- Nothing here opens firewall ports or touches your router. Exposing a server to
+  the internet is a deliberate, separate decision.
+- **Two things leave the machine, and only on a click.** *Feedback* opens GitHub in your browser
+  with a report drafted; nothing is sent by SpawnLoft. *Console → Export → Upload to mclo.gs* posts the
+  console log to [mclo.gs](https://mclo.gs), the log-sharing service plugin developers ask for,
+  after a dialog that says what is in it: SpawnLoft replaces your account name in file paths first,
+  mclo.gs removes IP addresses on its side (best effort, by its own policy) and deletes the log 90
+  days after it was last opened, and everything else - player names, plugin output - goes as is.
+  The delete token comes back and is kept in `run/mclogs.json`. Everything else SpawnLoft does stays
+  on this machine.
+- **The panel cannot be bound to another address.** There is no `--host` flag, on purpose:
+  the panel has no login, and a panel reachable from another machine is a server console
+  reachable from another machine. If you want to manage a server from elsewhere, remote into
+  the machine that runs it. A remote panel is out of scope (see [ROADMAP.md](ROADMAP.md)).
+- The panel is an **unauthenticated local HTTP server that can start processes and type into a
+  server console**. Binding to `127.0.0.1` stops other machines reaching it; it does not stop the
+  browser already on this one. So every request must also carry a loopback `Host` — which is what
+  defeats DNS rebinding, since the attacker's own hostname is what arrives in that header — and an
+  `Origin`, when there is one, must match that `Host` exactly, **port included**. Comparing only the
+  hostname was not enough: this machine is full of pages served from loopback, and dynmap, BlueMap
+  and Plan all serve web UIs on their own ports while rendering names and chat that players chose.
+  Requests with no `Origin` (the panel's own fetches, curl, the CLI) are allowed, because that is
+  what a first-party request looks like.
+- **Scheduled tasks are code that runs on a timer**, so what a task may be is an allowlist rather
+  than a command string: back up, send a console command, restart, stop, start. Windows holds only
+  a trigger calling `mcctl task run <id>`; what that id means lives in SpawnLoft's own file, and a value
+  it does not recognise is refused rather than executed. Tasks run as the signed-in user, with no
+  stored password and no elevation.
+- The page never receives an RCON password. Every route that returns an instance strips it first,
+  so it cannot end up in a browser cache, a screenshot, or a pasted bug report.
+
+## Notes
+
+- JVM flags default to Aikar's G1 tuning, switching to the large-heap variant at
+  12G and above. Override per instance with a `jvmFlags` array in
+  `instances.json`.
+- `start` truncates `run/<name>/console.log` each launch so `logs` shows the
+  current run. The server's own `logs/` directory keeps the full rolling history.
+- `tar` exits 1 with a warning when it skips a file the running server holds
+  locked. That is expected on hot snapshots and is not treated as failure.
+
+---
+
+## The site
+
+The project page and the docs live in their own repository,
+[joogiebear/mcctl-site](https://github.com/joogiebear/mcctl-site), served at
+[spawnloft.com](https://spawnloft.com): a VitePress site deployed by Vercel on every push. The
+banner artwork partner sites embed lives there too, under `public/banner/`.
+
+## The panel
+
+```bash
+node mcctl.mjs ui        # opens http://127.0.0.1:8770 in your browser
+```
+
+One HTML file, served by Node's own http module. No framework, no build step, no npm packages —
+the panel that ships is the file in `src/ui.html`, and it works offline because nothing is fetched
+from anywhere.
+
+The same page runs in a browser tab and inside the desktop app. `window.mcctlDesktop` exists only in
+Electron, and everything that depends on it is additive: a Browse button beside a path field, a
+Settings screen that can move the data folder, update checking. In a browser those simply are not
+there, and nothing else changes.
+
+What it does:
+
+- **Servers** — a card each, with a status lamp, the port, the memory and a live uptime that ticks.
+- **Adding a server** — either create one, which downloads Paper and reports real progress, or point
+  SpawnLoft at a folder you already have. Nothing is moved; existing ports and the RCON password are
+  read from that folder's own `server.properties`.
+- **Renaming, resetting and deleting** ask you to type the server's name. That friction is
+  deliberate: a dialog that only says "are you sure" gets answered reflexively.
+
+A selected server has five tabs.
+
+**Console** — search, filter to warnings or errors, pause, copy, wrap, line numbers and a bounded
+scrollback. *Export* saves the console to a `.log` file beside the server's snapshots, or uploads
+it to mclo.gs for sharing with a plugin developer (see the security section for what is in it).
+Log level shows as a coloured rail in the gutter rather than by recolouring the text, so ERROR
+stands out without becoming harder to read. A stack trace inherits the level of the line above it,
+which is what makes "filter to errors" show the whole failure instead of its first line.
+
+**Plugins** — search and install from **Modrinth and Hangar** together, each result
+naming its source, filtered or checked against this server's version, with checksum-
+verified downloads, an update check, and one-click updates (a plugins-scope snapshot is
+taken first). Hangar projects that host their downloads elsewhere are linked to rather
+than pretended at. The page manages **only what SpawnLoft installed** — it records
+provenance in the plugins folder — so a custom or premium plugin dropped in by hand is
+never listed there, never offered a meaningless update, and never has its hash sent to
+anyone. `mcctl plugins <name>` lists the full inventory, manual jars included, with a
+SOURCE column saying which is which. Enable/disable renames the jar in place, so a
+disabled plugin keeps its spot and its config.
+
+**Backups** — take one at a chosen scope, see every snapshot with its size, age and coverage, and
+restore or delete any of them. Restoring is refused while the server runs, because extracting over
+files a live server holds open corrupts a world rather than replacing it. Automatic backups run on
+a schedule with a retention limit, and the limit only ever removes snapshots its own schedule
+produced — never one taken by hand or before a reset.
+
+**Players** — everyone the server knows about, gathered from operators, bans, the whitelist, the
+name cache and the world folder, since none of those is a complete list on its own. Search, filter
+to operators or the banned, and op, ban or delete a player's world data. Whoever is connected is
+marked and sorted first, which has to be asked of the server: a player's file is not written until
+they log out, so a screen reading only files says "has never joined" about somebody standing in
+front of you. Changes go through the console while the server runs and into its files when it does
+not — editing a file under a live server is reverted the next time it saves.
+
+**Feedback**, in the header, is three doors. *Something broke* opens a GitHub bug report with the
+version, Java, server status and panel log already in it, and puts the full diagnostics on the
+clipboard for pasting under it. *A question* opens a new post in the project's
+[Q&A](https://github.com/joogiebear/spawnloft/discussions/categories/q-a), and *An idea* one in
+[Ideas](https://github.com/joogiebear/spawnloft/discussions/categories/ideas). Nothing is
+sent from SpawnLoft on its own; the browser hop is the consent. A crash notice under a server's vitals
+has a **Report** link that does the same, named for the crash.
+
+**Settings → Copy diagnostics** puts a bug report's worth of facts on the clipboard: the version,
+the Java found, where things live, every server's status, the panel's own log (`run/panel.log`,
+which records every time the panel process was held up for more than a quarter of a second) and
+the last console lines of the selected server. It never includes an RCON password or a webhook URL.
+
+**Performance** — processor and memory over the last minute, five minutes, half hour, hour or four
+hours, sampled every ten seconds. Both scales follow the data, because a fixed 0–100% processor
+axis draws every ordinary server as a flat line on the floor.
+
+**Settings** — the part of `server.properties` people actually change: who can join, MOTD,
+difficulty, game mode, max players, PvP, whitelist, view distance, spawn protection. Everything
+else stays in the file for `mcctl props` or an editor, and nothing the panel writes disturbs
+another key or a comment.
+
+**Changing who can join** on a world that already has players warns first. Minecraft derives an
+offline UUID from the player's name and uses the real Mojang one otherwise, so flipping this hands
+everybody a different identity — permissions, homes, inventories and anything else a plugin keyed
+by UUID stay attached to the identity nobody has any more. The panel reads the world's player data,
+tells the two kinds of UUID apart by version, and says how many players are affected before you
+decide.
+
+There is also a **Scheduler** tab, covered under [Scheduled work](#scheduled-work).
+
+The panel is bound to `127.0.0.1` and refuses any request whose `Host` is not a loopback address, or
+whose `Origin` is not exactly its own — port included, because this machine is full of other things
+serving web pages on loopback. It can start processes and type into a server console, so "local"
+has to mean local rather than merely reachable — see [Security posture](#security-posture).
+
+---
 
 ## Desktop app
 
-The desktop app is a window around the same panel, plus a native folder picker and first-run setup. The core runs inside the Electron process, so there is no second Node and no orphaned child if the window dies. Closing the window does not stop servers; they are detached daemons.
+A window around the same panel, plus a native folder picker and first-run setup.
 
-```sh
+```bash
 cd desktop
 npm install
-npm start                    # bundled core
-npm start -- --core ..       # develop against this checkout (or set MCCTL_CORE)
-npm test                     # window-state and update-channel tests
-npm run pack                 # build; afterPack fails the build if the result is wrong
-npm run verify               # re-check an existing build
+npm start                  # runs the bundled core
+npm start -- --core ..     # develop against this checkout (or set MCCTL_CORE)
 ```
 
-| Topic | Behavior |
-| --- | --- |
-| Terminal launchers | `resources/bin/spawnloft` and `mcctl` (`.cmd` on Windows) use the bundled runtime. See [CLI.md](CLI.md). |
-| Update checks | 20 seconds after start and every 6 hours while open. Newer builds download in the background as changed blocks; the header button reads **Restart to update**. Windows installs with `/S` per user, with no wizard or elevation prompt. Closing with a download waiting applies it on exit. Failed background checks are silent; a check you press answers either way. Refused outside a packaged build. |
-| Channels | Stable installs follow stable releases. Turn on **Settings > Updates > Get beta builds** to follow betas. Turning it off never downgrades. |
-| Uninstall | Removes the program and asks once whether to delete servers, worlds, backups, jars and settings (default no). Always first stops every server and removes every scheduled task. Deleting data removes only what SpawnLoft created: adopted servers stay, and a data folder shared with other files loses only SpawnLoft's own folders. Terminal equivalent: `spawnloft uninstall --yes [--data]`. |
-| Signing | Windows: Azure Artifact Signing, timestamped. SmartScreen reputation accrues per publisher through installs, so **More info → Run anyway** may still be needed on new builds. Mac: Developer ID with notarization ([desktop/MAC-SIGNING.md](desktop/MAC-SIGNING.md)). Linux packages are verified by the hash in the update feed. |
-| Build provenance | Every release names its source commit; **Settings → About** shows it. |
+The core runs **inside** the Electron process. Electron is already a Node runtime, so importing
+SpawnLoft directly is what bundling means here: one process, no second Node to ship, and no orphaned
+child if the window dies.
 
-Release engineering is documented in [CONTRIBUTING.md](CONTRIBUTING.md#releases).
+Closing the window does **not** stop your servers. They are detached daemons that do not belong to
+the app.
 
-## Site
+### Releasing
 
-The project site and documentation live in [joogiebear/mcctl-site](https://github.com/joogiebear/mcctl-site), a VitePress site deployed by Vercel to [spawnloft.com](https://spawnloft.com). Partner banner artwork is under `public/banner/` in that repository.
+Installers and the update feeds live on **this repository's releases**. Windows, macOS and
+Linux are always one release, built from one commit.
 
-## License
+**Betas are published by CI.** `dev` carries a prerelease version. Every push to it builds
+Windows x64, Apple Silicon, Intel Mac and Linux x64, opens each packaged app and runs the same
+smoke test against it - on Linux the `.deb` is installed with apt on Ubuntu 24.04 first - and
+publishes one release, numbered from the workflow run, only if all four pass. A pull request
+into `dev` runs the same builds and tests without publishing. See
+[`desktop/PREVIEW.md`](desktop/PREVIEW.md), which is also the text of each beta.
 
-[MIT](LICENSE).
+**Stable releases are verified together, then published.** A release branch sets a stable
+version and is merged to `main`. The `desktop-stable` workflow signs and notarizes both Mac
+apps, checks an installed beta-to-stable upgrade, and builds, installs and exercises the Linux
+package. The Windows installer is built and signed on the Azure signing machine. Then
+`publish-stable.mjs` checks every package's bytes against its manifest, the Windows signature,
+that all four were built from the same clean commit, and the uploaded digests, and only then
+makes the release public; anything it cannot vouch for is left as a draft. The procedure is in
+[`desktop/STABLE.md`](desktop/STABLE.md), which is also the text of the stable release.
+
+Nothing is ever published half-uploaded. That rule has a history: an early release went live
+with its blockmap uploaded and its 111 MB installer not, and a client checking for updates in
+that window got a 404. A draft left unpublished is the opposite failure - it looks released on
+GitHub while `electron-updater` cannot see it at all. Both are why publication is a separate
+step that verifies first.
+
+Every published release names the commit it was built from, captured at build time rather than
+publish time. Same information under **Settings → About** in the app, so a bug report can name
+the exact build rather than a version several builds could share.
+
+Builds are signed through **Azure Artifact Signing** (formerly Trusted Signing), configured under
+`win.azureSignOptions`. That publishes under a validated individual identity, which is what turns
+"Unknown publisher" into a name.
+
+It does **not** make SmartScreen go away immediately. SmartScreen is a reputation system, not a
+signature check, and reputation accrues to the publisher identity through real installs — so a new
+publisher still gets warned about. EV certificates used to grant reputation automatically; Microsoft
+removed that in 2024. Keep telling people about **More info → Run anyway** until the reputation
+builds.
+
+Signing needs, on the build machine:
+
+- the **.NET SDK** — electron-builder installs a `dotnet` tool to do the signing, and fails with
+  "No .NET SDKs were found" if only the runtime is present
+- **`az login`**, against the tenant holding the signing account. Note that MFA is enforced for
+  Azure Resource Manager, and a bare `az login` fails against such a tenant because it tries to
+  acquire tokens silently — use `az login --tenant <id>`, which authenticates interactively.
+- the **Artifact Signing Certificate Profile Signer** role. Being subscription Owner does not
+  include it; identity validation does not include it either. It is assigned separately, and its
+  absence is the last thing that bites before a first successful signature.
+
+Certificates live about **three days** and rotate automatically, which is why every signature is
+timestamped — without one, everything already shipped would stop validating within the week rather
+than staying valid for the moment it was signed in. `npm run verify` treats a missing timestamp as
+a failure for exactly that reason.
+
+### Tests
+
+```bash
+cd desktop
+npm test
+```
+
+Covers window-state.js, which decides whether a remembered window position is still somewhere a
+person can reach. That decision depends on which monitors are attached — the thing you cannot
+arrange on the machine running the test — so the module takes the display list as an argument and
+the test passes it fictional ones, including the case that matters: a window last seen on a second
+monitor that is no longer plugged in.
+
+### Checking a build before shipping it
+
+CI runs the test suite and a CLI smoke check on every push, but it cannot build,
+sign or publish - the signing profile lives on the release machine - so the
+build checks itself:
+
+```bash
+cd desktop
+npm run pack      # builds; afterPack fails it if the result is wrong
+npm run verify    # re-checks a build that already exists, icon included
+```
+
+The check covers the things that have gone wrong silently before — the app icon not reaching the
+executable, the core not being copied into `resources`, a file added to `desktop/` and forgotten in
+the `files` allowlist, and a signature that is missing, invalid or untimestamped. `afterPack` runs during the build itself, so a bad build throws before an
+installer is made and long before anything is published.
+
+### How updates behave
+
+SpawnLoft checks the release feed twenty seconds after it starts and every six hours it stays open,
+and fetches anything newer in the background — a few megabytes, sent as changed blocks only. The
+header button reports that rather than asking for it: it counts the download up, then reads
+**Restart to update**.
+
+Installing is the only press. It runs the installer with `/S`, so no wizard, no progress dialog and
+no Windows elevation prompt appear — the app installs per-user, so there is nothing to elevate. The
+window closes and reopens on the new version. Closing the app with a download waiting applies it on
+the way out instead, which is the same permission by another route.
+
+The split is deliberate: downloading costs nothing anyone notices, but replacing the running program
+interrupts, and this app sits beside long-lived servers. So the restart waits to be asked for, and
+says first that running servers survive it — the honest answer is that only the window restarts.
+
+A background check that fails says nothing; a machine that is offline should not raise a toast every
+six hours. A check someone pressed answers either way.
+
+Update checks are refused outside a packaged build: in development the version is whatever
+`package.json` says and there is no installer to replace.
+
+### How uninstalling behaves
+
+The uninstaller removes the program and asks one question: whether to delete your servers, worlds,
+backups, downloaded jars and settings too. The default is no, so uninstalling to reinstall, or to
+move to a new version by hand, loses nothing.
+
+Either way it first stops every running server and removes every scheduled task, since a task left
+behind would keep firing at a program that is gone. An update never does any of this: the servers,
+the tasks and the data all carry across.
+
+Saying yes deletes only what this program created. A server you added from a folder you already
+had stays where it is, and a data folder you pointed at a drive with other things on it loses only
+SpawnLoft's own folders. The same command is available from a terminal as
+`mcctl uninstall --yes [--data]`.
+
+## Databases
+
+On **Mac (macOS 15+)**, managed SQL databases use MySQL 8.4 LTS. Choose **Create a database**
+in a server's Settings, or run `spawnloft db create <server>`. SpawnLoft downloads an
+architecture-specific, SHA-256-verified archive from Oracle, keeps it in its own engine
+store, and initializes and starts a database with scoped credentials. It does not install
+Homebrew, add a system service, or edit plugin configs. On older Macs, connect to a database
+you already run. Windows x64 offers the same MySQL 8.4 LTS engine. Redis (Garnet) is available on Windows and both Mac architectures. New setups offer MySQL and Redis; MariaDB is no longer a creation option.
+
+Plugins that want MySQL — LuckPerms, CoreProtect, Plan, AuthMe, Jobs, mcMMO — can have one
+here, with nothing to install; so can plugins that want Redis, by way of Microsoft's Garnet. A database is another entry in the registry, run by the same
+daemon as a server: a card with a lamp, a console, start, stop and restart, crash recovery.
+
+```bash
+mcctl db versions                    # verified MySQL LTS releases
+mcctl db add sql                     # downloads verified MySQL, once, and sets one up on a free port
+mcctl start sql
+mcctl db attach sql survival       # a database and a user for that server; prints the credentials
+mcctl db create survival             # or all of that in one step: survival-db on port 25566, started, attached
+mcctl db creds sql survival        # shows them again
+mcctl db detach sql survival       # takes the user away; --drop deletes the data too
+mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
+mcctl db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
+```
+
+MySQL comes from Oracle's CDN as a pinned native archive, hash-checked and unpacked with the
+`tar` the OS ships, into `engines/` beside the jars; every database on that version shares it.
+Each database keeps its data under `services/<name>/`, listens on 127.0.0.1 only, and is stopped
+through `mysqladmin` over TCP, since a database takes no console input. The user a server gets
+can reach its one database and nothing else. A snapshot of an attached server carries a dump of
+its database as a `databases/` member; verify checks for it, and restore imports it back into the
+database it came from, which has to be running. **Plugin configs stay manual.** Use
+`spawnloft db creds <database> <server>` or **Show credentials** in the panel, then copy
+the values into your plugin config yourself. Creating or attaching a database never
+writes plugin configs; existing configs are left unchanged. A database you already run - XAMPP, a MySQL install, a Redis on the LAN - is
+registered with its address and attaches the same way, only never started or stopped from here. In the panel, databases sit under the servers in the
+sidebar, a server's Settings tab has a Databases card with the credentials one click away and a
+*Create a database* button that makes one for that server in one step - MySQL 8.4 LTS on the port after the game port, started and attached - and *Add a server → A database*
+creates one with the choices in it (a version, an engine, one for several servers to share).
