@@ -1087,6 +1087,8 @@ async function handleSchedules(req, res, name, seg) {
 
   if (verb === 'run') {
     schedule.runNow(id)
+    // Asked for now by the person; what the task then does is recorded as the schedule's.
+    activity.record(name, 'schedule-run', { detail: owned.name })
     // Fired, not finished: schtasks /Run returns as soon as Windows has started the task. What it
     // did shows up in the run log a moment later, which is what the panel re-reads.
     return json(res, 200, { started: true })
