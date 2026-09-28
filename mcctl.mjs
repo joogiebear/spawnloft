@@ -42,6 +42,7 @@ import { QUERY_ALIASES, query } from './src/cli-query.mjs'
 import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
 import { serveStdio } from './src/mcp.mjs'
+import * as activity from './src/activity.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
@@ -295,6 +296,7 @@ async function cmdCmd(positional, flags) {
   if (!sup.isRunning(name)) fail(`instance "${name}" is not running`)
 
   const [response] = await rconExec(inst, [command])
+  activity.record(name, 'command', { detail: command })
   const text = flags.raw ? response : stripColors(response)
   if (text.trim()) out(text.trimEnd())
   else out('(no output)')
@@ -1246,7 +1248,8 @@ async function cmdTask(positional, flags) {
   if (sub === 'run') {
     const id = positional[1]
     if (!id) fail('usage: mcctl task run <id>')
-    return runTask(id)
+    // Whatever the task does is the schedule's doing, named as the person named it.
+    return activity.asActor({ kind: 'schedule', name: schedule.load().tasks[id]?.name ?? id }, () => runTask(id))
   }
 
   if (sub === 'add') {
@@ -1886,6 +1889,9 @@ const COMMANDS = {
 
 async function main() {
   const [, , command, ...rest] = process.argv
+  // A command typed in a terminal is the person's doing. The panel, a task and the MCP server all
+  // run through here too, and each says who it is for what it does.
+  activity.setDefaultActor({ kind: 'cli' })
   const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow'] })
   cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
   cliContext.json = flags.json !== undefined && flags.json !== false

@@ -1280,6 +1280,41 @@
   .fm-dirty[hidden] { display: none; }
   .fm-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); margin-top: var(--s-2); }
 
+  /* Activity: a day at a time, one line per thing done - when, who, what - with Undo at the end of
+     the lines that have one. Who is a chip in a colour per kind, since it is the column people scan. */
+  .act-filter { display: inline-flex; flex-wrap: wrap; gap: 2px; margin-bottom: var(--s-3); }
+  .act-list { display: grid; }
+  .act-day { margin: var(--s-4) 0 var(--s-2); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .act-day:first-child { margin-top: 0; }
+  .act-row {
+    display: grid; grid-template-columns: 64px auto minmax(0, 1fr) auto; column-gap: var(--s-3);
+    align-items: center; min-height: 36px; padding: 4px var(--s-2);
+    border-bottom: 1px solid var(--line-soft); transition: background var(--ease);
+  }
+  .act-row:hover { background: rgba(var(--ink-rgb), .035); }
+  .act-when { font: var(--t-2)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .act-who {
+    justify-self: start; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid var(--edge);
+    font: 600 var(--t-1)/1.2 var(--ui); color: var(--ink-2); background: rgba(var(--ink-rgb), .04);
+  }
+  .act-who[data-tone="you"] { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
+  .act-who[data-tone="ai"] { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
+  .act-who[data-tone="sched"] { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
+  .act-what { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+  .act-detail { overflow-wrap: anywhere; color: var(--ink-2); }
+  code.act-detail { font: var(--t-2)/1.4 var(--mono); }
+  .act-row[data-bad] .act-what > span:first-child { color: var(--fault-ink); }
+  .act-undo { padding: 3px 9px; font-size: var(--t-2); }
+  .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
+  .act-more { margin-top: var(--s-3); }
+  @container pane (max-width: 560px) {
+    .act-row { grid-template-columns: 56px minmax(0, 1fr) auto; row-gap: 4px; padding: 6px var(--s-2); }
+    .act-who { grid-column: 2; grid-row: 1; }
+    .act-what { grid-column: 1 / -1; grid-row: 2; }
+    .act-undo, .act-undone { grid-column: 3; grid-row: 1; }
+  }
+
   .section { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
   .section h3 { margin: 0; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
   .where { margin: 0 0 10px; gap: 10px; }
@@ -2054,6 +2089,7 @@
   <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.8 9.5A5.5 5.5 0 1 0 4 4.2"/><path d="M3.5 1.8v2.7h2.7"/><path d="M8 5v3.2l2.2 1.5"/></symbol>
   <symbol id="i-file" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z"/><path d="M9.5 2v3h3"/></symbol>
   <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 11v2.5h11V11"/></symbol>
   <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></symbol>
@@ -2279,6 +2315,9 @@
           <div class="pane pane-scroll" id="paneBackups" tabindex="-1">
             <div class="pane-body wide" id="backupsBody"></div>
           </div>
+          <div class="pane pane-scroll" id="paneActivity" tabindex="-1">
+            <div class="pane-body wide" id="activityBody"></div>
+          </div>
           <div class="pane pane-scroll" id="panePlayers" tabindex="-1">
             <div class="pane-body wide" id="playersBody"></div>
           </div>
@@ -2304,6 +2343,7 @@
         <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
         <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
         <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
+        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
         <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
         <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
         <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
@@ -2935,14 +2975,15 @@ function show(view) {
  * hidden, which costs nothing, and means coming back to it has the scrollback intact.
  */
 const TOOL_NAMES = {
-  plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', players: 'Players',
+  plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', activity: 'Activity', players: 'Players',
   performance: 'Stats', scheduler: 'Schedule', settings: 'Settings',
 };
 // A settings form, a dense backup grid and a file listing are cramped at 480px; the rest read fine beside the
 // console. Each opens where it fits, and a tool someone moved stays where they put it.
 const POPPED_BY_DEFAULT = new Set(['settings', 'backups', 'files']);
-// A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps.
-const DB_TOOLS = new Set(['performance', 'backups', 'settings']);
+// A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps, and
+// its Activity is its starts, stops and crashes.
+const DB_TOOLS = new Set(['performance', 'backups', 'activity', 'settings']);
 const NARROW = window.matchMedia('(max-width: 1279px)');
 
 const toolView = { tool: null, popped: false };
@@ -3008,6 +3049,8 @@ function setTool(tool, popped) {
   if (t === 'plugins') renderPlugins();
   if (t === 'worlds') renderWorlds();
   if (t === 'files') renderFiles();
+  // Always read afresh: history is the one tool whose whole point is what changed since last time.
+  if (t === 'activity') renderActivity();
   if (t === 'performance') renderPerformance();
   // Only a visible Stats tool polls. A graph nobody is looking at is a request every ten seconds
   // for as long as the app is open.
@@ -7495,6 +7538,219 @@ function renderFileEditor(row, view) {
     paint();
   };
   save.onclick = () => write(false);
+}
+
+// --------------------------------------------------------------- activity ---
+
+/**
+ * The Activity tool: what was done to this server, when, and by whom.
+ *
+ * <p>Whom is what it is for. A server that was fine last night and is not this morning was changed
+ * by somebody - you, a schedule, an AI assistant you gave it to, or SpawnLoft's own crash guard -
+ * and this says which, in sentences. A change that kept an exact copy of what it changed (an edit,
+ * a replaced file, a delete, an assistant's config change) has Undo beside it.
+ */
+const ACTIVITY_TEXT = {
+  start: 'Started', stop: 'Stopped', kill: 'Forced to stop', command: 'Ran', crash: 'Crashed',
+  backup: 'Backed up', restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-prune': 'Cleared old backups',
+  'file-edit': 'Edited', 'file-create': 'Created', 'folder-create': 'Made a folder', 'file-upload': 'Uploaded',
+  'file-replace': 'Replaced', 'file-move': 'Moved', 'file-delete': 'Deleted', 'file-zip': 'Zipped', 'file-unzip': 'Unzipped',
+  'config-edit': 'Changed', 'config-create': 'Created', undo: 'Put back', settings: 'Changed settings:',
+  'plugin-install': 'Installed', 'plugin-update': 'Updated', 'plugin-enable': 'Turned on', 'plugin-disable': 'Turned off', 'plugin-remove': 'Removed',
+  upgrade: 'Changed the server software:', 'world-activate': 'Switched to the world', 'world-import': 'Imported the world', 'world-delete': 'Deleted the world',
+  'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
+  'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
+  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset', delete: 'Deleted this server',
+};
+// Changes whose copy holds exactly what they changed. The server makes the same list; this one only
+// decides where a button is drawn.
+const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit']);
+const ACTIVITY_FILTERS = [['', 'Everything'], ['you', 'You'], ['assistant', 'AI assistants'], ['schedule', 'Schedules'], ['spawnloft', 'SpawnLoft']];
+const activityView = { by: '' };
+
+function activityActor(by) {
+  const k = by && by.kind;
+  if (k === 'panel') return { text: 'You', tone: 'you' };
+  if (k === 'cli') return { text: 'You, in a terminal', tone: 'you' };
+  if (k === 'assistant') return { text: by.name || 'AI assistant', tone: 'ai', title: 'An AI assistant, through SpawnLoft’s MCP tools' };
+  if (k === 'schedule') return { text: by.name ? 'Schedule: ' + by.name : 'A schedule', tone: 'sched' };
+  return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
+}
+
+function activityDay(iso) {
+  const d = new Date(iso);
+  const today = new Date();
+  const y = new Date(today);
+  y.setDate(today.getDate() - 1);
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  if (same(d, today)) return 'Today';
+  if (same(d, y)) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+async function renderActivity(opts) {
+  const row = rowOf(state.current);
+  const body = $('#activityBody');
+  if (!row) { body.textContent = ''; clearPaneHead(body); return; }
+  body.dataset.for = row.name;
+  const base = '/instances/' + encodeURIComponent(row.name) + '/activity';
+  const q = (before) => '?limit=60' + (activityView.by ? '&by=' + activityView.by : '') + (before ? '&before=' + encodeURIComponent(before) : '');
+
+  let data;
+  try {
+    data = await api(base + q());
+  } catch (e) {
+    body.textContent = '';
+    const bad = document.createElement('div');
+    bad.className = 'bad';
+    bad.textContent = e.message;
+    body.append(bad);
+    return;
+  }
+  if (body.dataset.for !== row.name) return;
+  body.textContent = '';
+  paneHead(body, 'history', 'Activity',
+    'What was done to this server and who did it: you, a schedule, an AI assistant, or SpawnLoft itself.');
+
+  const seg = document.createElement('div');
+  seg.className = 'seg act-filter';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Show');
+  for (const [value, label] of ACTIVITY_FILTERS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(activityView.by === value));
+    b.onclick = () => { activityView.by = value; renderActivity(); };
+    seg.append(b);
+  }
+  body.append(seg);
+
+  if (!data.entries.length) {
+    body.append(emptyState('history', activityView.by
+      ? 'Nothing from them yet.'
+      : 'Nothing yet. Starts and stops, backups, edits and anything an assistant or a schedule does will show here.'));
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'act-list';
+  body.append(list);
+  // An undo names the copy it put back; the change that copy undid says so rather than offering
+  // the same undo twice.
+  const undone = new Set();
+  let lastDay = null;
+
+  const draw = (entries) => {
+    for (const e of entries) if (e.action === 'undo' && e.snapshot) undone.add(e.snapshot);
+    for (const e of entries) {
+      const day = activityDay(e.at);
+      if (day !== lastDay) {
+        lastDay = day;
+        const h = document.createElement('h3');
+        h.className = 'act-day';
+        h.textContent = day;
+        list.append(h);
+      }
+      list.append(activityRow(e));
+    }
+  };
+
+  const activityRow = (e) => {
+    const line = document.createElement('div');
+    line.className = 'act-row';
+    if (e.ok === false) line.setAttribute('data-bad', '');
+    const when = document.createElement('time');
+    when.className = 'act-when';
+    when.dateTime = e.at;
+    when.textContent = new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    when.title = new Date(e.at).toLocaleString();
+    const who = activityActor(e.by);
+    const chip = document.createElement('span');
+    chip.className = 'act-who';
+    chip.dataset.tone = who.tone;
+    chip.textContent = who.text;
+    if (who.title) chip.title = who.title;
+    const what = document.createElement('div');
+    what.className = 'act-what';
+    const verb = document.createElement('span');
+    // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
+    // the webhook; it reads as its own line rather than after a verb that says it twice.
+    if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
+    else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
+    what.append(verb);
+    if (e.detail && e.action !== 'crash') {
+      const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
+      d.className = 'act-detail';
+      d.textContent = e.detail;
+      what.append(d);
+    }
+    if (e.ok === false) {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.dataset.tone = 'ban';
+      pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
+      what.append(pill);
+    }
+    line.append(when, chip, what);
+
+    if (ACTIVITY_UNDOABLE.has(e.action) && e.snapshot) {
+      if (undone.has(e.snapshot)) {
+        const note = document.createElement('span');
+        note.className = 'act-undone';
+        note.textContent = 'Undone';
+        line.append(note);
+      } else {
+        const undo = iconButton('restore', 'Undo', 'ghost');
+        undo.className = 'ghost act-undo';
+        undo.title = 'Put back what this changed, as it was just before';
+        line.append(undo);
+        undo.onclick = async () => {
+          const ok = await ask({
+            title: 'Undo this change?',
+            text: 'Puts back ' + (e.detail || 'what it changed') + ' as it was just before. '
+              + 'Anything changed there since is replaced. The undo is recorded here too.',
+            confirmLabel: 'Undo',
+          });
+          if (!ok) return;
+          undo.disabled = true;
+          try {
+            await post(base + '/undo', { snapshot: e.snapshot });
+            toast('Put back ' + (e.detail || 'the change') + '.', 'good');
+            // What the Files tool has on screen may be the file that just changed.
+            const fsView = filesByServer.get(row.name);
+            if (fsView && !fsView.editing) $('#filesBody').dataset.for = '';
+            renderActivity();
+          } catch (err) {
+            toast(err.message, 'bad');
+            undo.disabled = false;
+          }
+        };
+      }
+    }
+    return line;
+  };
+
+  draw(data.entries);
+
+  if (data.more) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'ghost act-more';
+    more.textContent = 'Show older';
+    body.append(more);
+    let oldest = data.entries[data.entries.length - 1].at;
+    more.onclick = async () => {
+      more.disabled = true;
+      try {
+        const next = await api(base + q(oldest));
+        draw(next.entries);
+        if (next.entries.length) oldest = next.entries[next.entries.length - 1].at;
+        more.hidden = !next.more;
+      } catch (err) { toast(err.message, 'bad'); }
+      more.disabled = false;
+    };
+  }
 }
 
 // ---------------------------------------------------------------- backups ---

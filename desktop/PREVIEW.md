@@ -14,6 +14,10 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   the active world, its jar, the plugins it loaded - cannot be moved, replaced or deleted.
   Please edit a real plugin config beside the console and reload it, and say what you reached
   for that was not there.
+- **Activity (new in 1.5):** the Activity tool in the dock lists what was done to a server and
+  who did it - you, a schedule, an AI assistant (by its app's name) or SpawnLoft's crash guard.
+  Edits, replaced files, deletes and an assistant's config changes have Undo. Please have your
+  assistant change something, then find it there and undo it, and say what was missing.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;

@@ -6,6 +6,7 @@ import { readProps, writeProps } from './props.mjs'
 import { fail, findFreePort, randomPassword, validateName, humanBytes } from './util.mjs'
 import { guessLoader } from './software.mjs'
 import { defaultJava } from './java.mjs'
+import * as activity from './activity.mjs'
 
 const DEFAULT_PORT = 25565
 const DEFAULT_RCON_PORT = 25575
@@ -339,6 +340,7 @@ export async function newInstance(
   }
   putInstance(name, cfg)
   writeLaunchers({ name, dir: cfg.dir })
+  activity.record(name, 'create', { detail: cfg.jar ?? null })
   return { name, ...cfg, eulaAccepted: acceptEula }
 }
 
@@ -391,6 +393,7 @@ export async function adoptInstance(name, dir, { jar = null, memory = '4G', java
   }
   putInstance(name, cfg)
   writeLaunchers({ name, dir: cfg.dir })
+  activity.record(name, 'adopt', { detail: cfg.dir })
   return { name, ...cfg }
 }
 

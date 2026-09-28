@@ -458,6 +458,15 @@ and a tab in YAML or broken JSON asks before saving. While the server runs, what
 or deleted. The ports and RCON settings SpawnLoft writes into `server.properties` are refused here
 as everywhere else.
 
+**Activity** — what was done to the server, when, and by whom: you in the app or in a terminal, a
+scheduled task by name, an AI assistant by the name its app gives, or SpawnLoft itself (crash guard).
+Starts, stops and crashes, console commands, backups and restores, file and config edits, plugin
+changes, settings, worlds, players and schedules are all there, filterable by who. A change that kept
+an exact copy of what it changed - an edit, a replaced file, a delete, an assistant's config change -
+has **Undo**, allowed while the server runs on the same terms as an edit. The history is one
+`activity.jsonl` in the data folder, written by whichever process did the thing, and rolls over at
+2 MB. `get_activity` gives an assistant the same view.
+
 **Backups** — take one at a chosen scope, see every snapshot with its size, age and coverage, and
 restore or delete any of them. Restoring is refused while the server runs, because extracting over
 files a live server holds open corrupts a world rather than replacing it. Automatic backups run on

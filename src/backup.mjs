@@ -9,6 +9,7 @@ import { readProps, worldDirs } from './props.mjs'
 import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
 import { fail, stamp, humanBytes, writeJson, readJson, UserError } from './util.mjs'
+import * as activity from './activity.mjs'
 
 /**
  * The mirror: a second location every snapshot is copied to as it is taken.
@@ -216,7 +217,7 @@ export { runTar, tarBinary } from './tar.mjs'
  * reported in the result and the manifest rather than failing the snapshot: an unflushed copy is
  * still worth more than none.
  */
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null } = {}) {
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false } = {}) {
   // `members` narrows a snapshot to named paths inside the server folder - one config file before
   // an assistant changes it - so restoring it puts back that file and touches nothing else.
   const members = only ?? membersFor(inst, scope)
@@ -347,6 +348,9 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
     fs.renameSync(pending, file)
     published = true
     const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
+    // A snapshot narrowed to named files - or a quiet one - is the copy taken before something
+    // changes them, and whatever changes them records itself, naming this snapshot as its undo.
+    if (!only && !quiet) activity.record(inst.name, 'backup', { detail: `${scope}${label ? ` (${label})` : ''}, ${humanBytes(size)}`, snapshot: path.basename(file) })
     return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
   } finally {
     if (reservation && !published) {
@@ -427,7 +431,7 @@ export function checkRestorable(snapshot) {
   return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
 }
 
-export async function restoreSnapshot(inst, snapshot) {
+export async function restoreSnapshot(inst, snapshot, { quiet = false } = {}) {
   if (!fs.existsSync(inst.dir)) fail(`instance directory is missing: ${inst.dir}`)
 
   // Checked before a single file is touched. Extraction overwrites in place and cannot be undone,
@@ -468,6 +472,7 @@ export async function restoreSnapshot(inst, snapshot) {
       /* a folder that will not go is not worth failing a restore that already happened */
     }
   }
+  if (!quiet) activity.record(inst.name, 'restore', { detail: snapshot.name })
   return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases }
 }
 
@@ -577,6 +582,7 @@ export function removeSnapshot(name, ref) {
   fs.rmSync(snap.path, { force: true })
   fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
   mirrorRemove(name, snap.name)
+  activity.record(name, 'backup-delete', { detail: snap.name })
   return { removed: snap.name, size: snap.size }
 }
 
@@ -606,5 +612,6 @@ export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) 
     fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
     mirrorRemove(name, snap.name)
   }
+  if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} old snapshot${remove.length === 1 ? '' : 's'} removed, keeping ${keep}` })
   return remove
 }

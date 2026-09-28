@@ -10,6 +10,7 @@ import * as schedule from './schedule.mjs'
 import { writeLaunchers } from './create.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import { UserError, validateName } from './util.mjs'
+import * as activity from './activity.mjs'
 
 /** Written once, because every editor and shell between here and the file mangles it. */
 const NL = String.fromCharCode(10)
@@ -145,6 +146,9 @@ export function rename(oldName, newName) {
   } catch {
     /* reported through the scheduler screen, where the task will show as not in Windows */
   }
+  // Its history goes with it, and says that it moved.
+  activity.renameServer(oldName, newName)
+  activity.record(newName, 'rename', { detail: `from ${oldName}` })
   return { name: newName, ...cfg, movedDir: wasDefaultDir, tasksMoved }
 }
 
@@ -166,7 +170,7 @@ export async function rebuild(name, { keepPlugins = true, snapshot = true } = {}
   if (snapshot) {
     // Before, not after. A rebuild is the moment someone most wants an undo and least expects to
     // need one.
-    const res = await backup.createSnapshot(inst, { label: 'pre-rebuild' })
+    const res = await backup.createSnapshot(inst, { label: 'pre-rebuild', quiet: true })
     snapshotFile = res?.file ?? res?.path ?? null
   }
 
@@ -193,6 +197,7 @@ export async function rebuild(name, { keepPlugins = true, snapshot = true } = {}
   const log = path.join(runDir(name), 'console.log')
   if (fs.existsSync(log)) fs.rmSync(log, { force: true })
 
+  activity.record(name, 'rebuild', { detail: keepPlugins ? 'fresh worlds, plugins kept' : 'fresh worlds and plugins', snapshot: snapshotFile ? path.basename(snapshotFile) : null })
   return { name, removed, keptPlugins: keepPlugins, snapshot: snapshotFile }
 }
 
@@ -208,7 +213,7 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
 
   let snapshotFile = null
   if (purge && snapshot) {
-    const res = await backup.createSnapshot(inst, { label: 'pre-delete' })
+    const res = await backup.createSnapshot(inst, { label: 'pre-delete', quiet: true })
     snapshotFile = res?.file ?? res?.path ?? null
   }
   // Files first, registry second. The other order loses the instance from mcctl and leaves the
@@ -233,6 +238,7 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
   } catch {
     /* the instance is gone either way; a stuck task is not a reason to refuse that */
   }
+  activity.record(name, 'delete', { detail: purge ? 'files deleted' : 'unregistered, files kept', snapshot: snapshotFile ? path.basename(snapshotFile) : null })
   return { name, purged: purge, snapshot: snapshotFile, tasksRemoved }
 }
 

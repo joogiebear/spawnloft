@@ -23,6 +23,7 @@ import zlib from 'node:zlib'
 import { fail, UserError, readJson, writeJson } from './util.mjs'
 import { loaderOf } from './registry.mjs'
 import { softwareOf, versionFromJar } from './software.mjs'
+import * as activity from './activity.mjs'
 
 // ---- reading one entry out of a zip -----------------------------------------
 
@@ -414,6 +415,7 @@ export function setPluginEnabled(inst, file, enabled) {
   const next = enabled ? file.slice(0, -DISABLED.length) : `${file}${DISABLED}`
   fs.renameSync(current, path.join(dir, next))
   moveManaged(inst, file, next)
+  activity.record(inst.name, enabled ? 'plugin-enable' : 'plugin-disable', { detail: file.replace(/\.disabled$/, '') })
   return { file: next, enabled: Boolean(enabled) }
 }
 
@@ -421,6 +423,7 @@ export function removePlugin(inst, file) {
   const dir = pluginsDir(inst)
   fs.rmSync(safePluginPath(dir, file), { force: true })
   forgetManaged(inst, file)
+  activity.record(inst.name, 'plugin-remove', { detail: file })
   return { removed: file }
 }
 

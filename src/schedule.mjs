@@ -7,6 +7,7 @@ import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as mac from './schedule-mac.mjs'
 import * as linux from './schedule-linux.mjs'
+import * as activity from './activity.mjs'
 
 // launchd and systemd are driven through the same five calls; Windows is the code in this file.
 const native = process.platform === 'darwin' ? mac : process.platform === 'linux' ? linux : null
@@ -445,6 +446,7 @@ export function create({ instance, name, action, schedule, enabled = true, owner
   // definition - fails loudly on its next fire, which is the better half of the trade.
   data.tasks[id] = task
   writeJson(TASKS_FILE(), data)
+  activity.record(instance, 'schedule-add', { detail: `${task.name}: ${task.action.type}` })
   return { id, ...task }
 }
 
@@ -484,6 +486,8 @@ export function update(id, patch) {
   } else writeWindowsTask(id, task)
   data.tasks[id] = task
   writeJson(TASKS_FILE(), data)
+  const onlyToggled = Object.keys(patch).every((k) => k === 'enabled' || k === 'owner')
+  activity.record(task.instance, onlyToggled ? (task.enabled ? 'schedule-enable' : 'schedule-disable') : 'schedule-change', { detail: task.name })
   return { id, ...task }
 }
 
@@ -494,6 +498,7 @@ export function setEnabled(id, enabled) {
   schtasks(['/Change', '/TN', `${TASK_FOLDER}\\${id}`, enabled ? '/ENABLE' : '/DISABLE'])
   data.tasks[id].enabled = Boolean(enabled)
   writeJson(TASKS_FILE(), data)
+  activity.record(data.tasks[id].instance, enabled ? 'schedule-enable' : 'schedule-disable', { detail: data.tasks[id].name })
   return { id, ...data.tasks[id] }
 }
 
@@ -519,10 +524,12 @@ export function remove(id) {
   // while the real task kept firing, and the id went on to build a path that rmSync would follow.
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
 
+  const gone = data.tasks[id]
   if (native) {
     native.remove(id)
     delete data.tasks[id]
     writeJson(TASKS_FILE(), data)
+    activity.record(gone.instance, 'schedule-remove', { detail: gone.name })
     return { id, removed: true }
   }
 
@@ -550,6 +557,7 @@ export function remove(id) {
   fs.rmSync(path.join(DATA_ROOT, 'tasks', `${id}.cmd`), { force: true })
   delete data.tasks[id]
   writeJson(TASKS_FILE(), data)
+  activity.record(gone.instance, 'schedule-remove', { detail: gone.name })
   return { id, removed: true }
 }
 

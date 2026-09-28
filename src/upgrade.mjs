@@ -8,6 +8,7 @@
  * not migrate back. Both end the same way mechanically - fetch, verify, place, point the
  * registry at it - but only one should ever happen without a person having read a warning.
  */
+import path from 'node:path'
 import * as paper from './paper.mjs'
 import * as purpur from './purpur.mjs'
 import * as asp from './asp.mjs'
@@ -15,6 +16,7 @@ import { placeJar, strayJars } from './create.mjs'
 import { getInstance, updateInstance } from './registry.mjs'
 import { createSnapshot } from './backup.mjs'
 import { fail } from './util.mjs'
+import * as activity from './activity.mjs'
 
 const MC = String.raw`(\d+\.\d+(?:\.\d+)?)`
 
@@ -177,7 +179,7 @@ export async function applyUpgrade(name, { version = null, build = null, running
   // worlds are untouched and the old jar stays beside the new one.
   let snapshot = null
   if (crossVersion) {
-    const snap = await createSnapshot(inst, { scope: 'standard', label: 'pre-upgrade', running })
+    const snap = await createSnapshot(inst, { scope: 'standard', label: 'pre-upgrade', running, quiet: true })
     snapshot = snap.file
   }
 
@@ -186,6 +188,7 @@ export async function applyUpgrade(name, { version = null, build = null, running
   // the plugin builds it is offered, and a server left recording the version it crossed from gets
   // both wrong. An instance that never recorded one reads it from the new jar's name instead.
   updateInstance(name, { jar: fetched.name, ...(inst.mcVersion ? { mcVersion: target } : {}) })
+  activity.record(name, 'upgrade', { detail: `${inst.jar} to ${fetched.name}`, snapshot: snapshot ? path.basename(snapshot) : null })
   return {
     from: inst.jar,
     to: fetched.name,

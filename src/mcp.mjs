@@ -1,5 +1,6 @@
 import readline from 'node:readline'
 import { UserError } from './util.mjs'
+import { asActor } from './activity.mjs'
 
 /**
  * SpawnLoft as an MCP server: `spawnloft mcp`, spoken over stdio by an AI client the person
@@ -50,6 +51,10 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
   const capabilities = { tools: { listChanged: false } }
   const listing = tools.map(({ name, title, description, inputSchema, annotations }) =>
     ({ name, title, description, inputSchema, annotations }))
+  // Which app is asking - "Claude Desktop", "claude-code" - as it names itself, so the activity
+  // log can say which assistant changed what. A modern request carries it every time; a
+  // handshake-era client says it once, in initialize.
+  let clientName = null
 
   function reply(id, result, modern) {
     if (cancelled.delete(id)) return null
@@ -58,6 +63,8 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
   }
 
   async function callTool(params, meta) {
+    const named = meta?.[`${META}clientInfo`]?.name
+    if (typeof named === 'string' && named) clientName = named
     const tool = byName.get(params?.name)
     if (!tool) throw new RpcError(INVALID_PARAMS, `Unknown tool: ${params?.name}`)
     const args = params.arguments ?? {}
@@ -70,7 +77,7 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
       notify({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken: token, progress: ++step, message: scrub(message) } })
     }
     try {
-      const { text, data } = await tool.run(args, { progress })
+      const { text, data } = await asActor({ kind: 'assistant', name: clientName ?? 'AI assistant' }, () => tool.run(args, { progress }))
       const safe = scrubDeep(data, scrub)
       const body = { content: [{ type: 'text', text: scrub(text ?? JSON.stringify(safe)) }] }
       if (safe !== undefined) body.structuredContent = safe
@@ -123,6 +130,7 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
   async function answer(id, method, params) {
     try {
       if (method === 'initialize') {
+        if (typeof params?.clientInfo?.name === 'string' && params.clientInfo.name) clientName = params.clientInfo.name
         const asked = params?.protocolVersion
         return reply(id, {
           protocolVersion: LEGACY_VERSIONS.includes(asked) ? asked : LEGACY_VERSIONS[0],

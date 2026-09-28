@@ -22,6 +22,7 @@ import { startSampler, metricsFile } from './metrics.mjs'
 import { startTickSampler } from './tick.mjs'
 import { crashVerdict, CRASH_LIMIT, CRASH_WINDOW_MS } from './crashguard.mjs'
 import { notifyInstance } from './notify.mjs'
+import * as activity from './activity.mjs'
 import { diagnose } from './diagnose.mjs'
 import { patternsFor } from './ready.mjs'
 import * as mariadb from './mariadb.mjs'
@@ -102,7 +103,10 @@ const crashes = []
 // The last webhook in flight, so shutdown can give it a moment to land instead of exiting
 // underneath it. Capped - a dead webhook must not hold a dead server's daemon open.
 let lastNotify = Promise.resolve()
+// Every message told is a crash and what crash guard did about it, which belongs in the server's
+// history as much as in a Discord channel: it is the one entry nobody asked for.
 function tell(message) {
+  activity.record(name, 'crash', { ok: false, detail: message })
   lastNotify = notifyInstance(inst, message, { log })
 }
 

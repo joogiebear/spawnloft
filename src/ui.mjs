@@ -33,6 +33,7 @@ import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
+import * as activity from './activity.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
@@ -74,7 +75,8 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       if (!isLocalRequest(req)) {
         return json(res, 403, { error: 'this panel only answers requests addressed to localhost' })
       }
-      await route(req, res)
+      // Everything done through the panel is the person at the keyboard's doing.
+      await activity.asActor({ kind: 'panel' }, () => route(req, res))
     } catch (err) {
       // A route that threw after starting a stream (the SSE routes write their headers first)
       // cannot be answered with JSON: writeHead would throw ERR_HTTP_HEADERS_SENT from inside
@@ -470,6 +472,7 @@ async function handleRawProps(req, res, name) {
   // The snapshot took a moment; the server writing its own properties meanwhile must not be lost.
   if (!configFiles.unchangedSince(plan)) fail('server.properties changed while it was being snapshotted; reload it and try again')
   configFiles.applyConfigWrite(plan)
+  activity.record(name, 'config-edit', { detail: 'server.properties', snapshot: path.basename(snap.file) })
   return json(res, 200, {
     snapshot: path.basename(snap.file),
     appliesOnRestart: supervisor.isRunning(name),
@@ -530,6 +533,26 @@ async function handleFiles(req, res, name, seg, url) {
   return json(res, 404, { error: 'not found' })
 }
 
+function activityQuery(url, server = null) {
+  const q = (k) => url.searchParams.get(k) || null
+  const limit = Math.min(500, Math.max(1, Number(q('limit')) || 100))
+  return { server: server ?? q('server'), before: q('before'), since: q('since'), by: q('by'), limit }
+}
+
+/**
+ * One server's history, and Undo for the changes that kept an exact copy of what they changed.
+ * An undo is itself history: it is recorded, naming the copy it put back.
+ */
+async function handleActivity(req, res, name, seg, url) {
+  if (req.method === 'GET' && !seg[4]) return json(res, 200, { ...activity.readActivity(activityQuery(url, name)), running: supervisor.isRunning(name) })
+  if (req.method === 'POST' && seg[4] === 'undo') {
+    const body = await readBody(req)
+    if (!body.snapshot) return json(res, 400, { error: 'which change?' })
+    return json(res, 200, await files.undoSnapshot(registry.getInstance(name), String(body.snapshot), { running: supervisor.isRunning(name) }))
+  }
+  return json(res, 404, { error: 'not found' })
+}
+
 async function handleProps(req, res, name) {
   const inst = registry.getInstance(name)
   const file = path.join(inst.dir, 'server.properties')
@@ -559,6 +582,7 @@ async function handleProps(req, res, name) {
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
 
   writeProps(file, updates)
+  activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => `${k} = ${v}`).join(', ') })
   return json(res, 200, {
     changed: Object.keys(updates),
     appliesOnRestart: supervisor.isRunning(name),
@@ -791,17 +815,23 @@ async function handleWorlds(req, res, name, seg) {
   const body = await readBody(req)
 
   if (verb === 'activate') {
-    return json(res, 200, worlds.activateWorld(inst, String(body.name)))
+    const out = worlds.activateWorld(inst, String(body.name))
+    activity.record(name, 'world-activate', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'import') {
     if (!body.source || !body.name) return json(res, 400, { error: 'a source path and a name are required' })
-    return json(res, 200, await worlds.importWorld(inst, String(body.source), { name: String(body.name) }))
+    const out = await worlds.importWorld(inst, String(body.source), { name: String(body.name) })
+    activity.record(name, 'world-import', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'export') {
     return json(res, 200, await worlds.exportWorld(inst, String(body.name)))
   }
   if (verb === 'delete') {
-    return json(res, 200, worlds.deleteWorld(inst, String(body.name)))
+    const out = worlds.deleteWorld(inst, String(body.name))
+    activity.record(name, 'world-delete', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   return json(res, 404, { error: 'not found' })
 }
@@ -941,9 +971,23 @@ async function handlePlayers(req, res, name, seg) {
   if (!body.uuid) return json(res, 400, { error: 'which player?' })
   const uuid = String(body.uuid)
 
-  if (verb === 'op') return json(res, 200, await players.setOp(inst, uuid, body.on !== false))
-  if (verb === 'ban') return json(res, 200, await players.setBan(inst, uuid, body.on !== false, body.reason))
-  if (verb === 'forget') return json(res, 200, players.forgetPlayer(inst, uuid))
+  // Named for the history by whatever the server knows them as; an id alone means nothing to read.
+  const who = () => players.listPlayers(inst).find((p) => p.uuid === uuid)?.name ?? uuid
+  if (verb === 'op') {
+    const out = await players.setOp(inst, uuid, body.on !== false)
+    activity.record(name, body.on !== false ? 'player-op' : 'player-deop', { detail: who() })
+    return json(res, 200, out)
+  }
+  if (verb === 'ban') {
+    const out = await players.setBan(inst, uuid, body.on !== false, body.reason)
+    activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
+    return json(res, 200, out)
+  }
+  if (verb === 'forget') {
+    const out = players.forgetPlayer(inst, uuid)
+    activity.record(name, 'player-forget', { detail: out.name ?? uuid })
+    return json(res, 200, out)
+  }
 
   return json(res, 404, { error: 'not found' })
 }
@@ -1476,6 +1520,11 @@ async function route(req, res) {
   // was last backed up and whether it backs itself up. The schedule is read from SpawnLoft's own
   // task file, not asked of the operating system's scheduler - that starts a process per ask, and
   // this is asked for every server at once. Plus the machine's memory, for "14 of 32 GB reserved".
+  // Every server's history at once, newest first.
+  if (seg[1] === 'activity' && seg.length === 2 && req.method === 'GET') {
+    return json(res, 200, activity.readActivity(activityQuery(url)))
+  }
+
   if (seg[1] === 'overview' && seg.length === 2 && req.method === 'GET') {
     const tasks = Object.values(schedule.load().tasks)
     const servers = {}
@@ -1649,6 +1698,7 @@ async function route(req, res) {
   if (seg[3] === 'pack') return handlePack(req, res, name)
   if (seg[3] === 'worlds') return handleWorlds(req, res, name, seg)
   if (seg[3] === 'files') return handleFiles(req, res, name, seg, url)
+  if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
 
   // What went wrong, in words: the known failure shapes found in this server's console,
@@ -1801,6 +1851,10 @@ async function route(req, res) {
       patch.webhook = url || null
     }
     registry.updateInstance(name, patch)
+    // The webhook is a credential of sorts - whoever has it can post to that channel - so the
+    // history says it changed, not what to.
+    const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed') : `${k} = ${v}`)
+    if (said.length) activity.record(name, 'settings', { detail: said.join(', ') })
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'command') {
