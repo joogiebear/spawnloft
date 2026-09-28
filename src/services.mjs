@@ -12,6 +12,7 @@ import * as mysql from './mysql.mjs'
 import { readState, clearState } from './control.mjs'
 import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel, stamp, humanBytes } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
+import * as activity from './activity.mjs'
 
 /**
  * Databases: registered like servers, run by the same daemon, attached to servers with their
@@ -465,7 +466,7 @@ export function databaseBackupStatus(name) {
  * joined in order: each part names its own database, so the whole file imports in one go. Written
  * beside its final name and renamed into place, so a listing never offers half a dump.
  */
-export async function backupDatabase(name, { label = 'manual' } = {}) {
+export async function backupDatabase(name, { label = 'manual', quiet = false } = {}) {
   const db = getDatabase(name)
   const engine = engineOf(db)
   if (!engine.canDump) fail(`${ENGINES[db.engine].label} keeps its own checkpoints on disk; there is nothing here to dump`)
@@ -498,6 +499,7 @@ export async function backupDatabase(name, { label = 'manual' } = {}) {
     await Promise.all([pending, ...parts].map((p) => fs.promises.rm(p, { force: true })))
   }
   const { size } = await fs.promises.stat(file)
+  if (!quiet) activity.record(name, 'backup', { detail: `${databases.join(', ')} as SQL, ${humanBytes(size)}`, snapshot: `${base}.sql` })
   return { name: `${base}.sql`, file, databases, size, sizeHuman: humanBytes(size) }
 }
 
@@ -510,8 +512,9 @@ export async function restoreDatabaseBackup(name, file) {
   const db = getDatabase(name)
   const full = dumpPath(name, file)
   if (!isUp(db)) fail(`"${name}" is not running. A backup is put back into the running database - start it first.`)
-  const safety = attachedDatabases(db).length ? await backupDatabase(name, { label: 'pre-restore' }) : null
+  const safety = attachedDatabases(db).length ? await backupDatabase(name, { label: 'pre-restore', quiet: true }) : null
   await engineOf(db).importSql(db, full)
+  activity.record(name, 'restore', { detail: path.basename(full) + (safety ? `; how it was is kept as ${safety.name}` : '') })
   return { restored: path.basename(full), safety: safety?.name ?? null }
 }
 
@@ -520,6 +523,7 @@ export async function deleteDatabaseBackup(name, file) {
   const full = dumpPath(name, file)
   await fs.promises.rm(full, { force: true })
   await fs.promises.rm(`${full.slice(0, -4)}.json`, { force: true })
+  activity.record(name, 'backup-delete', { detail: path.basename(full) })
   return { deleted: path.basename(full) }
 }
 

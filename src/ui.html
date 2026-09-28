@@ -1308,6 +1308,20 @@
   .act-undo { padding: 3px 9px; font-size: var(--t-2); }
   .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
   .act-more { margin-top: var(--s-3); }
+  .home-activity { margin-top: var(--s-6); }
+  .home-activity .act-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .act-row.act-home {
+    grid-template-columns: 84px minmax(90px, 160px) auto minmax(0, 1fr); width: 100%;
+    border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none;
+    background: transparent; padding: 6px var(--s-4); text-align: left; font: inherit; color: inherit;
+  }
+  .act-row.act-home:last-child { border-bottom: 0; }
+  button.act-row.act-home:hover:not(:disabled) { background: rgba(var(--ink-rgb), .035); transform: none; }
+  .act-server { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 900px) {
+    .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
+    .act-row.act-home .act-what { grid-column: 1 / -1; }
+  }
   @container pane (max-width: 560px) {
     .act-row { grid-template-columns: 56px minmax(0, 1fr) auto; row-gap: 4px; padding: 6px var(--s-2); }
     .act-who { grid-column: 2; grid-row: 1; }
@@ -2203,6 +2217,10 @@
         <button type="button" class="more-link" id="attMore" hidden></button>
       </section>
       <div class="home-cards" id="homeCards"></div>
+      <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
+        <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
+        <div class="act-list" id="homeActList"></div>
+      </section>
     </div>
 
     <!-- ============ a server is selected ================================= -->
@@ -3908,7 +3926,11 @@ async function loadOverview(force) {
   if (!force && Date.now() - overview.asked < 30000) return;
   overview.asked = Date.now();
   try {
-    overview.data = await api('/overview');
+    // The history rides along: the same "what changed" the servers' Activity tools answer, across
+    // all of them, newest first.
+    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=8').catch(() => null)]);
+    overview.data = data;
+    overview.activity = recent ? recent.entries : null;
   } catch {
     return;
   }
@@ -3936,6 +3958,39 @@ function renderOverview() {
 
   renderAttention();
   renderHomeCards();
+  renderHomeActivity();
+}
+
+/**
+ * The last few things done anywhere, and by whom. A line opens that server's Activity, where the
+ * rest of its history and any Undo are; a server since deleted has nowhere to open, and says so.
+ */
+function renderHomeActivity() {
+  const entries = overview.activity || [];
+  const box = $('#homeActList');
+  $('#homeActivity').hidden = !entries.length;
+  box.textContent = '';
+  for (const e of entries) {
+    const row = rowOf(e.server);
+    const line = document.createElement(row ? 'button' : 'div');
+    line.className = 'act-row act-home';
+    if (row) {
+      line.type = 'button';
+      line.title = 'Open ' + (row.label || row.name) + '\u2019s activity';
+      line.onclick = () => openServerTool(row.name, 'activity');
+    }
+    if (e.ok === false) line.setAttribute('data-bad', '');
+    const when = document.createElement('time');
+    when.className = 'act-when';
+    when.dateTime = e.at;
+    when.textContent = ago(e.at) || stamp(e.at);
+    when.title = new Date(e.at).toLocaleString();
+    const where = document.createElement('b');
+    where.className = 'act-server';
+    where.textContent = row ? (row.label || row.name) : e.server + ' (deleted)';
+    line.append(when, where, activityChip(e.by), activitySentence(e));
+    box.append(line);
+  }
 }
 
 // ---- needs attention ----------------------------------------------------------
@@ -7560,6 +7615,7 @@ const ACTIVITY_TEXT = {
   upgrade: 'Changed the server software:', 'world-activate': 'Switched to the world', 'world-import': 'Imported the world', 'world-delete': 'Deleted the world',
   'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
   'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
+  'schedule-run': 'Ran the schedule now:',
   create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset', delete: 'Deleted this server',
 };
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
@@ -7575,6 +7631,43 @@ function activityActor(by) {
   if (k === 'assistant') return { text: by.name || 'AI assistant', tone: 'ai', title: 'An AI assistant, through SpawnLoft’s MCP tools' };
   if (k === 'schedule') return { text: by.name ? 'Schedule: ' + by.name : 'A schedule', tone: 'sched' };
   return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
+}
+
+/** What happened, as a sentence: the verb, then what it was done to, then whether it failed. */
+function activitySentence(e) {
+  const what = document.createElement('div');
+  what.className = 'act-what';
+  const verb = document.createElement('span');
+  // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
+  // the webhook; it reads as its own line rather than after a verb that says it twice.
+  if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
+  else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
+  what.append(verb);
+  if (e.detail && e.action !== 'crash') {
+    const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
+    d.className = 'act-detail';
+    d.textContent = e.detail;
+    what.append(d);
+  }
+  if (e.ok === false) {
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.dataset.tone = 'ban';
+    pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
+    what.append(pill);
+  }
+  return what;
+}
+
+/** Who did it, as the chip both screens show. */
+function activityChip(by) {
+  const who = activityActor(by);
+  const chip = document.createElement('span');
+  chip.className = 'act-who';
+  chip.dataset.tone = who.tone;
+  chip.textContent = who.text;
+  if (who.title) chip.title = who.title;
+  return chip;
 }
 
 function activityDay(iso) {
@@ -7665,34 +7758,7 @@ async function renderActivity(opts) {
     when.dateTime = e.at;
     when.textContent = new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     when.title = new Date(e.at).toLocaleString();
-    const who = activityActor(e.by);
-    const chip = document.createElement('span');
-    chip.className = 'act-who';
-    chip.dataset.tone = who.tone;
-    chip.textContent = who.text;
-    if (who.title) chip.title = who.title;
-    const what = document.createElement('div');
-    what.className = 'act-what';
-    const verb = document.createElement('span');
-    // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
-    // the webhook; it reads as its own line rather than after a verb that says it twice.
-    if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
-    else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
-    what.append(verb);
-    if (e.detail && e.action !== 'crash') {
-      const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
-      d.className = 'act-detail';
-      d.textContent = e.detail;
-      what.append(d);
-    }
-    if (e.ok === false) {
-      const pill = document.createElement('span');
-      pill.className = 'pill';
-      pill.dataset.tone = 'ban';
-      pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
-      what.append(pill);
-    }
-    line.append(when, chip, what);
+    line.append(when, activityChip(e.by), activitySentence(e));
 
     if (ACTIVITY_UNDOABLE.has(e.action) && e.snapshot) {
       if (undone.has(e.snapshot)) {
