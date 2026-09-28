@@ -1,89 +1,55 @@
 # Roadmap
 
-What SpawnLoft is for shapes what goes on this list: one person's own machine - Windows, macOS or Linux - running
-servers for friends, family or plugin testing, with no accounts, no cloud, no Docker, and
-nothing exposed to a network without a deliberate decision. Features that serve that
-person go on the list; features that turn this into a smaller Pterodactyl - multi-node,
-user accounts, a remote web panel - stay off it on purpose.
+## Scope
 
-## Done
+SpawnLoft serves one person on their own machine (Windows, macOS or Linux) running servers for friends, family or plugin testing, with no accounts, no cloud, no Docker, and nothing exposed to a network without a deliberate decision. Features serving that person are listed. Features that turn SpawnLoft into a smaller Pterodactyl (multi-node, user accounts, a remote web panel) are declined on purpose.
 
-- **Reliability** *(v0.6 line)* — crash auto-restart with a crash-loop stop, scheduled
-  restarts that warn the players first, Discord webhook notifications for the events
-  nobody is watching for, and `mcctl verify` to prove snapshots actually restore.
-- **Plugin manager** — a Plugins tab and `mcctl plugins`: Modrinth search and install
-  filtered to compatible builds, hash-based update check, one-click update with a
-  plugins snapshot first, enable/disable by renaming in place. Manages only what it
-  installed (provenance recorded beside the jars); hand-dropped custom and premium
-  plugins are left alone and never hashed to anyone.
+| Declined | Reason |
+| --- | --- |
+| Remote web panel, `--host` binding | The panel has no login; a reachable panel is a reachable server console. Remote into the machine instead. |
+| User accounts, multi-node | Hosting-panel scope. |
+| Docker or cloud hosting | Contradicts the local-machine premise. |
+| Writing database credentials into plugin configs | Plugin configs stay manual; the former `db apply` command was removed. |
+| Deleting servers or credentials through MCP | Not offered to AI assistants. |
 
-- **Server updates** — `mcctl upgrade` and a "Server software" card in Settings: a
-  routine one-click move to the newest Paper build (old jar kept as the way back), and
-  a deliberately harder, confirmed, snapshot-first path for crossing Minecraft
-  versions, because worlds migrate one-way.
+## Shipped
 
-- **Hangar as a second plugin source** *(v0.6.2)* — searched alongside Modrinth with
-  the source named on every result, sha256-verified installs, and version-name update
-  checks against the provenance record. External-download projects (premium and
-  elsewhere-hosted) are linked to rather than pretended at; a sparse version claim is
-  offered with the mismatch said out loud.
+| Feature | Version | Summary |
+| --- | --- | --- |
+| Reliability | 0.6 line | Crash auto-restart with a crash-loop stop (three crashes in ten minutes), scheduled restarts that warn players first, Discord webhook notifications, and `verify` to prove snapshots restore. |
+| Plugin manager | 0.6 line | **Plugins** tool and `plugins` command: Modrinth search and install filtered to compatible builds, hash-based update check, one-click update after a plugins snapshot, enable and disable by renaming in place. Manages only what it installed; hand-added and premium plugins are never hashed to anyone. |
+| Server updates | 0.6 line | `upgrade` and **Server software** in **Settings**: one-click newest build with the old jar kept as the way back, and a confirmed, snapshot-first path for crossing Minecraft versions because worlds migrate one way. |
+| Hangar as a second plugin source | 0.6.2 | Searched beside Modrinth with the source named on every result, sha256-verified installs, version-name update checks against the provenance record. External-download projects are linked, and a sparse version claim is offered with the mismatch stated. |
+| Modded servers | 0.6.x | Fabric and NeoForge as first-class loaders with a **Mods** tool, **From a modpack** in **Add a server**, pack updates that touch only what the old pack owned, and the server's version treated as a preference: a mismatched build installs with the author's version claim stated. |
+| Form controls | 0.6.6 | Carved fields, owned select chevron, drawn radios, troughed switches; the wizard matches the panel. |
+| Worlds | 0.7.0 | **Worlds** tool and `worlds`: list with the active world named, import from zip or folder, export as zip, switch, delete. Also a backup mirror (every snapshot copied to a second location, deletions following) and a scheduled `verify` action whose failures reach the webhook. |
+| Log intelligence | 0.8.0 | `src/diagnose.mjs` recognises known failures (port taken, EULA, wrong Java, out of memory or disk, missing dependencies, duplicate plugins, corrupt worlds, ticking crashes, watchdog stalls, missing jars) and states the fix in the panel strip, on a failed `start`, in `why`, and in the crash webhook. Minecraft crash reports are surfaced with their description line. |
+| AI assistants | 1.3.0 | `spawnloft mcp`: status, logs, diagnostics, TPS, backups, plugins and server updates for an assistant the owner chooses. Credentials and player IPs stay out of every result. Restore, kill and cross-version upgrades are offered only with `--allow-destructive`. **Settings** shows the install's exact configuration. Plugin installs snapshot first, in the panel too. |
+| Panel redesign, config editing through MCP | 1.4.0 | Console stays on screen beside a tool dock, per-server overview with **Needs attention**, settings as one form, database backups of their own, update checks for Purpur, Folia and Advanced Slime Paper, and `list_config_files`, `read_config_file` and `write_config_file` for AI assistants. |
+| macOS | Pre-1.0 betas | Developer ID signed and notarized Apple Silicon and Intel builds with native scheduling, automatic backups, performance metrics, managed MySQL and automatic update feeds. |
+| Linux | Pre-1.0 betas | `.deb` and `.rpm` for x64 and arm64: systemd user-timer scheduling, `/proc` metrics, managed MySQL (x64) and Redis, automatic updates, and `spawnloft-cli` for machines with no desktop. |
 
-- **Modded servers, complete** *(0.6.x)* — Fabric and NeoForge
-  as first-class loaders with a Mods tab, "From a modpack" in Add-a-server for both,
-  pack updates that may only touch what the old pack owned, and the server's version
-  treated as a preference rather than a wall: search shows the loader's whole
-  ecosystem, and a mismatched build installs with the author's version claim stated.
-- **Form controls with depth** *(v0.6.6)* — carved fields, an owned select chevron,
-  drawn radios, troughed switches; the wizard matches the panel.
-- **Worlds** *(v0.7.0)* — a Worlds tab and `mcctl worlds`: every world listed with the
-  active one named (and shown in the vitals), import a downloaded map from a zip or
-  folder (found wherever it is nested, never overwriting), export one as a zip, switch
-  which world runs, delete with the truth stated (only the active world is ever in
-  snapshots). Plus the batch's two riders: a **backup mirror** — every snapshot copied
-  to a second location as it is taken, deletions following, because servers and backups
-  on one drive fail together — and a **scheduled verify** action, so backup integrity
-  runs on a clock and failures reach the webhook.
+## Planned
 
-- **Log intelligence** *(v0.8.0)* — src/diagnose.mjs recognises the known failure shapes
-  (port taken, EULA, wrong Java, out of memory or disk, missing plugin/mod dependencies,
-  duplicate plugins, corrupt worlds, ticking crashes, watchdog stalls, missing jars) and
-  says the fix wherever the failure surfaces: a strip under the panel's vitals, advice on
-  a failed `mcctl start`, `mcctl why <name>`, and the daemon's crash webhook naming the
-  likely cause. Minecraft's own crash reports are surfaced beside them, with their
-  Description line, one click from the folder.
+### Share screen (after 1.0)
 
-- **AI assistants** *(1.3.0)* — `spawnloft mcp`, a Model Context Protocol server on stdio for
-  an assistant the owner chooses: status, logs, diagnostics, TPS, backups, plugins and Paper
-  updates. No account, no port, nothing sent unless that assistant asks. Credentials and player
-  IPs stay out of every result; restore, kill and cross-version upgrades are offered only when the
-  owner's own config allows them, and deleting a server is not offered at all. Settings shows the
-  exact config for the install. Plugin installs now take a snapshot first, in the panel too.
+Tabled 2026-09-01 at the owner's call, likely post-1.0. It answers "how do my friends join?" in tiers of increasing exposure:
 
-## Later
+| Tier | Mechanism |
+| --- | --- |
+| LAN | The LAN address, stated plainly. |
+| Direct | A DNS record on the owner's own domain pointed at the home IP, with an SRV record for the port and UPnP as an explicit opt-in. |
+| Tunnel | playit.gg or a self-owned VPS relay: no ports opened, home IP hidden. |
 
-## After 1.0
+Exposure stays a deliberate decision; the screen's job is making it an informed one, with whitelist and `online-mode` nudged on at the moment anything goes public.
 
-- **A Share screen** *(tabled 2026-09-01, owner's call — likely post-1.0)*. The honest
-  answer to "how do my friends join?", in tiers of increasing exposure: the LAN address
-  plainly; "direct" keeping a DNS record on the owner's own domain pointed at the home
-  IP with SRV for the port and UPnP as an explicit opt-in; "tunnel" via playit.gg or a
-  self-owned VPS relay, no ports opened and the home IP hidden. Exposure stays a
-  deliberate user decision; this screen's whole job is making it an informed one, with
-  whitelist and online-mode nudged on at the moment anything goes public.
+### Reach
 
-## Reach
-
-- **Distribution.** Screenshots in the README, a winget manifest, a public landing.
-  People cannot want a tool they cannot find.
-- **macOS.** Signed Apple Silicon and Intel betas now include native scheduling,
-  automatic backups, performance metrics, managed MySQL, and automatic update feeds.
-  Installed upgrade verification gates subsequent signed betas before 1.0.
-- **Linux.** Ships as a `.deb` and an `.rpm`, for x64 and arm64, with the same panel and CLI: scheduling and automatic
-  backups through systemd user timers, performance metrics from `/proc`, managed MySQL (x64) and
-  Redis (x64 and arm64), and automatic updates. Every preview installs the package on Ubuntu 24.04
-  and opens it with the sandbox on. Managed MySQL is x64 only; Oracle
-  publishes no small arm64 build. For a server with no desktop there is `spawnloft-cli`: the command
-  line alone on its own Node, as a `.deb` and an `.rpm`, installed and run in clean Ubuntu 22.04, Debian 12,
-  Rocky 9 and Fedora containers by every build. Still to come: an AppImage - which needs libfuse2, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on
-  every launch, so its scheduler shims have to go through `$APPIMAGE` before it can ship.
-- Localization.
+| Item | Status |
+| --- | --- |
+| Distribution | Screenshots in the README, a winget manifest, a public landing page. |
+| macOS | Installed upgrade verification gates subsequent signed betas before 1.0. |
+| Linux AppImage | Blocked: needs `libfuse2`, meets Ubuntu's AppArmor sandbox restriction, and mounts at a new path on every launch, so its scheduler shims must go through `$APPIMAGE` first. |
+| Managed MySQL on Linux arm64 | Not offered; Oracle publishes no small arm64 build. Redis is available. |
+| Localization | Planned. |
+| Local JAR deployment, required-plugin readiness checks, automatic `PATH` setup | Planned CLI additions. |
