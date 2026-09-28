@@ -24,6 +24,10 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 
 - **Backups you can keep, name and take with you.** Lock a backup and nothing deletes it - not the Delete button, not a schedule's retention - so the one taken before a big change stays. Give any backup a note ("before the 1.21 upgrade"), download it to keep somewhere else, and list paths each server's backups should leave out, such as a map plugin's rendered tiles. A restore can now clear what the backup holds first, so the server ends up exactly as it was; what was cleared is kept, so that can be undone too.
 
+- **See how your server looks in the multiplayer list.** Settings shows the server's icon, name and message of the day the way players see them, with the colours; swatches insert Minecraft's colour and style codes, and any image becomes the server icon.
+- **Java arguments of your own.** Settings, under Java and memory, keeps SpawnLoft's recommended flags unless you write your own, and shows the whole launch line either way. Memory stays with the Memory setting.
+- **The console in its own window.** A button on the console's toolbar opens that server's console on its own - on a second screen, say - while the main window does something else.
+
 SpawnLoft does not insert database credentials into plugin configuration files.
 
 

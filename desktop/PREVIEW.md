@@ -25,6 +25,10 @@ Linux x64 packages all pass their native checks. Each release is immutable and n
   alone), give it a note, download it, and list paths to leave out. Restore offers "Clear first",
   which ends exactly as the backup was and keeps what it cleared. Please try a clean restore on a
   test server and say whether the result was what you expected.
+- **Small things (new in 1.5):** Settings shows the server as the multiplayer list does - icon,
+  name, coloured MOTD - with colour swatches and "Change icon"; Java and memory takes Java
+  arguments of your own and shows the launch line; the console toolbar opens the console in its
+  own window. Please try each once.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;

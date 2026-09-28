@@ -533,6 +533,39 @@ async function handleFiles(req, res, name, seg, url) {
   return json(res, 404, { error: 'not found' })
 }
 
+/**
+ * The server's icon: server-icon.png in its folder, which Minecraft shows beside the server in the
+ * multiplayer list. It must be a 64 by 64 PNG or Minecraft ignores it, so that is checked here; the
+ * panel scales whatever image it is given to that before sending it.
+ */
+async function handleIcon(req, res, name, seg) {
+  const inst = registry.getInstance(name)
+  const file = path.join(inst.dir, 'server-icon.png')
+  if (req.method === 'GET') {
+    let bytes
+    try { bytes = await fs.promises.readFile(file) } catch { return json(res, 404, { error: 'no icon' }) }
+    res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' })
+    return res.end(bytes)
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+  if (seg[4] === 'remove') {
+    await fs.promises.rm(file, { force: true })
+    activity.record(name, 'settings', { detail: 'server icon removed' })
+    return json(res, 200, { icon: false })
+  }
+  const body = await readBody(req)
+  const png = Buffer.from(String(body.png ?? '').replace(/^data:image\/png;base64,/, ''), 'base64')
+  const isPng = png.length > 24 && png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (!isPng) return json(res, 400, { error: 'the icon must be a PNG image' })
+  if (png.readUInt32BE(16) !== 64 || png.readUInt32BE(20) !== 64) return json(res, 400, { error: 'the icon must be 64 by 64 pixels' })
+  if (png.length > 256 * 1024) return json(res, 400, { error: 'that icon is too large' })
+  const tmp = `${file}.${process.pid}.tmp`
+  await fs.promises.writeFile(tmp, png)
+  await fs.promises.rename(tmp, file)
+  activity.record(name, 'settings', { detail: 'server icon changed' })
+  return json(res, 200, { icon: true, appliesOnRestart: supervisor.isRunning(name) })
+}
+
 function activityQuery(url, server = null) {
   const q = (k) => url.searchParams.get(k) || null
   const limit = Math.min(500, Math.max(1, Number(q('limit')) || 100))
@@ -1185,7 +1218,11 @@ function safeInstance(row) {
   } catch {
     /* a directory that has gone missing is already reported through status */
   }
-  return { ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)) }
+  return {
+    ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)),
+    // What it would launch with were no Java arguments of its own set, for Settings to show.
+    ...(registry.isDatabase(row) ? {} : { defaultJvmFlags: registry.jvmFlagsFor(row.memory ?? '4G') }),
+  }
 }
 
 /**
@@ -1731,6 +1768,7 @@ async function route(req, res) {
   if (seg[3] === 'worlds') return handleWorlds(req, res, name, seg)
   if (seg[3] === 'files') return handleFiles(req, res, name, seg, url)
   if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
+  if (seg[3] === 'icon') return handleIcon(req, res, name, seg)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
 
   // What went wrong, in words: the known failure shapes found in this server's console,
@@ -1873,6 +1911,7 @@ async function route(req, res) {
       patch.java = bin
     }
     if (Object.hasOwn(body, 'autoRestart')) patch.autoRestart = body.autoRestart === true
+    if (Object.hasOwn(body, 'jvmFlags')) patch.jvmFlags = registry.cleanJvmFlags(body.jvmFlags)
     // Empty clears it, and the panel falls back to the name.
     if (Object.hasOwn(body, 'label')) patch.label = cleanLabel(body.label)
     if (Object.hasOwn(body, 'webhook')) {
@@ -1885,7 +1924,9 @@ async function route(req, res) {
     registry.updateInstance(name, patch)
     // The webhook is a credential of sorts - whoever has it can post to that channel - so the
     // history says it changed, not what to.
-    const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed') : `${k} = ${v}`)
+    const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed')
+      : k === 'jvmFlags' ? (v ? `Java arguments: ${v.join(' ')}` : 'Java arguments back to the recommended ones')
+      : `${k} = ${v}`)
     if (said.length) activity.record(name, 'settings', { detail: said.join(', ') })
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }

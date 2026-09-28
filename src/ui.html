@@ -1315,6 +1315,33 @@
   .act-undo { padding: 3px 9px; font-size: var(--t-2); }
   .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
   .act-more { margin-top: var(--s-3); }
+  .launch-line {
+    display: block; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm);
+    background: var(--sunken); border: 1px solid var(--line-soft);
+    font: var(--t-1)/1.6 var(--mono); color: var(--ink-3); white-space: normal; overflow-wrap: anywhere;
+  }
+  .set-control label.check { display: flex; align-items: center; gap: 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
+  .set-control label.check input { width: auto; margin: 0; }
+  .mc-look { display: grid; gap: var(--s-2); margin-top: var(--s-2); }
+  .mc-palette { display: flex; flex-wrap: wrap; gap: 3px; }
+  .mc-swatch { width: 18px; height: 18px; padding: 0; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .25); box-shadow: none; }
+  .mc-swatch:hover:not(:disabled) { transform: none; outline: 2px solid var(--lapis-edge); }
+  .mc-style { width: 22px; height: 18px; padding: 0; font: 700 11px/1 var(--mono); justify-content: center; }
+  /* The multiplayer list's own look: a near-black strip, white name, grey MOTD, the icon at size. */
+  .mc-entry { display: flex; gap: 10px; align-items: flex-start; padding: 6px; background: #0b0b0b; border: 1px solid #2a2a2a; border-radius: 2px; max-width: 460px; }
+  .mc-icon { width: 64px; height: 64px; flex: none; image-rendering: pixelated; background: #222; }
+  .mc-text { min-width: 0; padding-top: 2px; font: 13px/1.35 var(--mono); }
+  .mc-name { color: #fff; }
+  .mc-motd { color: #aaa; overflow-wrap: anywhere; }
+
+  :root[data-console-only] header,
+  :root[data-console-only] .dock,
+  :root[data-console-only] #toolPanel,
+  :root[data-console-only] #conMini,
+  :root[data-console-only] #bPopConsole,
+  :root[data-console-only] #srvNotice,
+  :root[data-console-only] #bManage { display: none !important; }
+  :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
   .steps { display: grid; gap: var(--s-2); }
   .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
   .step {
@@ -2309,6 +2336,7 @@
           <span class="con-count" id="conCount"></span>
           <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
           <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
+          <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
           <span class="menu-wrap" id="shareWrap">
             <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
@@ -2831,6 +2859,18 @@ const state = {
   health: null,
 };
 
+/*
+  A server's console in a window of its own - on a second screen while the panel does something else
+  - is this same page at ?console=<name>, with everything but that server's strip and console
+  hidden. It never opens a tool and never records one as open, so it cannot change what the main
+  window shows for that server next time.
+*/
+const consoleOnly = new URLSearchParams(location.search).get('console');
+if (consoleOnly) {
+  document.documentElement.setAttribute('data-console-only', '');
+  document.title = consoleOnly + ' \u2014 console';
+}
+
 /** The selected thing, whichever list it is in. */
 function rowOf(name) {
   return state.rows.find((r) => r.name === name) || state.dbs.find((r) => r.name === name) || null;
@@ -3055,7 +3095,7 @@ function recallTool(name) {
 }
 
 function rememberTool() {
-  if (!state.current) return;
+  if (!state.current || consoleOnly) return;
   try { localStorage.setItem(toolKey(state.current), JSON.stringify(toolView)); } catch { /* see recallTool */ }
 }
 
@@ -3068,6 +3108,7 @@ function toolLabel(tool) {
 
 /** Open a tool beside the console, popped out in its place, or close it (tool null). */
 function setTool(tool, popped) {
+  if (consoleOnly) tool = null;
   if (tool && isDb(rowOf(state.current)) && !DB_TOOLS.has(tool)) tool = null;
   toolView.tool = tool || null;
   toolView.popped = Boolean(toolView.tool && popped);
@@ -6477,6 +6518,169 @@ function actionSummary(task, actions) {
   return label;
 }
 
+// ------------------------------------------------------------ server list look ---
+
+const MC_COLOURS = {
+  0: '#000000', 1: '#0000AA', 2: '#00AA00', 3: '#00AAAA', 4: '#AA0000', 5: '#AA00AA', 6: '#FFAA00', 7: '#AAAAAA',
+  8: '#555555', 9: '#5555FF', a: '#55FF55', b: '#55FFFF', c: '#FF5555', d: '#FF55FF', e: '#FFFF55', f: '#FFFFFF',
+};
+
+/**
+ * A MOTD as Minecraft draws it. server.properties spells the section sign as \u00A7 and a line break
+ * as \n; both are read that way here, and a literal \u00a7 too. Obfuscated text (k) is shown plainly.
+ */
+function mcText(raw) {
+  const text = String(raw || '').replace(/\\u00a7/gi, '\u00a7').replace(/\\n/g, '\n');
+  const frag = document.createDocumentFragment();
+  let style = { color: MC_COLOURS[7], b: false, i: false, u: false, s: false };
+  let buf = '';
+  const flush = () => {
+    if (!buf) return;
+    const span = document.createElement('span');
+    span.textContent = buf;
+    span.style.color = style.color;
+    if (style.b) span.style.fontWeight = '700';
+    if (style.i) span.style.fontStyle = 'italic';
+    const lines = [style.u && 'underline', style.s && 'line-through'].filter(Boolean);
+    if (lines.length) span.style.textDecoration = lines.join(' ');
+    frag.append(span);
+    buf = '';
+  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\u00a7' && i + 1 < text.length) {
+      flush();
+      const code = text[++i].toLowerCase();
+      if (Object.hasOwn(MC_COLOURS, code)) style = { color: MC_COLOURS[code], b: false, i: false, u: false, s: false };
+      else if (code === 'l') style.b = true;
+      else if (code === 'o') style.i = true;
+      else if (code === 'n') style.u = true;
+      else if (code === 'm') style.s = true;
+      else if (code === 'r') style = { color: MC_COLOURS[7], b: false, i: false, u: false, s: false };
+    } else if (ch === '\n') {
+      flush();
+      frag.append(document.createElement('br'));
+    } else {
+      buf += ch;
+    }
+  }
+  flush();
+  return frag;
+}
+
+function serverListPreview(row, input) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mc-look';
+  const palette = document.createElement('div');
+  palette.className = 'mc-palette';
+  palette.setAttribute('role', 'group');
+  palette.setAttribute('aria-label', 'Insert a colour or style');
+  const insert = (code) => {
+    const at = input.selectionStart ?? input.value.length;
+    const tag = '\\u00A7' + code;
+    input.setRangeText(tag, at, input.selectionEnd ?? at, 'end');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  };
+  for (const [code, hex] of Object.entries(MC_COLOURS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mc-swatch';
+    b.style.background = hex;
+    b.title = 'Colour \u00a7' + code;
+    b.setAttribute('aria-label', 'Colour ' + code);
+    b.onclick = () => insert(code);
+    palette.append(b);
+  }
+  for (const [code, label, glyph] of [['l', 'Bold', 'B'], ['o', 'Italic', 'I'], ['n', 'Underline', 'U'], ['m', 'Strikethrough', 'S'], ['r', 'Reset', '\u21ba']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mc-style';
+    b.textContent = glyph;
+    b.title = label + ' (\u00a7' + code + ')';
+    b.setAttribute('aria-label', label);
+    b.onclick = () => insert(code);
+    palette.append(b);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'mc-entry';
+  card.setAttribute('aria-label', 'How it looks in the multiplayer list');
+  const img = document.createElement('img');
+  img.className = 'mc-icon';
+  img.alt = '';
+  img.width = 64;
+  img.height = 64;
+  const blank = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="#3b3b3b"/><rect x="1" y="1" width="6" height="6" fill="#555"/></svg>');
+  const iconUrl = '/api/instances/' + encodeURIComponent(row.name) + '/icon';
+  const loadIcon = () => { img.src = iconUrl + '?t=' + Date.now(); };
+  img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
+  loadIcon();
+  const text = document.createElement('div');
+  text.className = 'mc-text';
+  const title = document.createElement('div');
+  title.className = 'mc-name';
+  title.textContent = row.label || row.name;
+  const lines = document.createElement('div');
+  lines.className = 'mc-motd';
+  text.append(title, lines);
+  card.append(img, text);
+  const draw = () => { lines.textContent = ''; lines.append(mcText(input.value)); };
+  input.addEventListener('input', draw);
+  draw();
+
+  const iconRow = document.createElement('div');
+  iconRow.className = 'row';
+  const pick = document.createElement('input');
+  pick.type = 'file';
+  pick.accept = 'image/*';
+  pick.hidden = true;
+  const change = iconButton('upload', 'Change icon', 'ghost');
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'ghost';
+  remove.textContent = 'Remove icon';
+  const iconNote = document.createElement('span');
+  iconNote.className = 'hint';
+  iconNote.textContent = 'Any image; it is cut to a square and scaled to 64 by 64. Saved at once.';
+  iconRow.append(change, remove, iconNote, pick);
+  change.onclick = () => pick.click();
+  pick.onchange = async () => {
+    const file = pick.files && pick.files[0];
+    pick.value = '';
+    if (!file) return;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const side = Math.min(bitmap.width, bitmap.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const g = canvas.getContext('2d');
+      // Pixel art stays sharp; a photo is smoothed. Small sources are the pixel art.
+      g.imageSmoothingEnabled = side > 128;
+      g.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 64, 64);
+      const out = await post('/instances/' + encodeURIComponent(row.name) + '/icon', { png: canvas.toDataURL('image/png') });
+      toast('Icon saved.' + (out.appliesOnRestart ? ' Players see it after the next restart.' : ''), 'good');
+      delete img.dataset.none;
+      img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
+      loadIcon();
+    } catch (e) {
+      toast(e.message || 'That image could not be read.', 'bad');
+    }
+  };
+  remove.onclick = async () => {
+    try {
+      await post('/instances/' + encodeURIComponent(row.name) + '/icon/remove');
+      img.src = blank;
+      img.dataset.none = '';
+      toast('Icon removed.', 'good');
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+
+  wrap.append(palette, card, iconRow);
+  return wrap;
+}
+
 /**
  * The steps of a chained task: a list to add to, reorder and remove from, and a few ready-made
  * chains to start from, since most people want one of the same three.
@@ -8892,9 +9096,18 @@ async function renderServerSettings() {
     }
   }
 
+  // How the server looks in a player's multiplayer list: its icon, its name, the MOTD with its
+  // colours. The MOTD box takes Minecraft's own codes (\u00A7c for red), and the swatches insert
+  // them, so nobody has to know them - but the text stays the text the file holds.
+  const motd = controls.get('motd');
+  if (motd) motd.input.parentElement.append(serverListPreview(row, motd.input));
+
   // What SpawnLoft's own settings looked like when the form was drawn, so Save can tell a change
   // from a visit. Updated after each save so the next one is measured from there.
-  const mine = { autoRestart: row.autoRestart === true, webhook: row.webhook || '', java: row.java || 'java', memory: row.memory || '4G' };
+  const mine = {
+    autoRestart: row.autoRestart === true, webhook: row.webhook || '', java: row.java || 'java', memory: row.memory || '4G',
+    jvmFlags: Array.isArray(row.jvmFlags) && row.jvmFlags.length ? row.jvmFlags.join(' ') : '',
+  };
 
   // ---- if it crashes: SpawnLoft's own settings, not server.properties -----------
   // Saved by the one Save with everything else. It goes through a different endpoint and takes
@@ -9035,6 +9248,55 @@ async function renderServerSettings() {
       value: () => memInput.value.trim(),
       invalid: () => !checkMemory(memInput, memBad),
       reset: () => { memInput.value = mine.memory; checkMemory(memInput, memBad); },
+    },
+  });
+
+  // ---- the Java arguments ------------------------------------------------------
+  // SpawnLoft's recommended flags (Aikar's) unless the owner writes their own. The whole launch line
+  // is shown under it, so what the checkbox and the box mean is visible rather than described.
+  const flagsWrap = el('div', 'set-stack');
+  const flagsOwn = el('label', 'check');
+  const flagsBox = el('input');
+  flagsBox.type = 'checkbox';
+  flagsBox.checked = Boolean(mine.jvmFlags);
+  flagsOwn.append(flagsBox, document.createTextNode(' Use my own Java arguments'));
+  const flagsText = el('textarea', 'mono');
+  flagsText.id = 's_jvmFlags';
+  flagsText.rows = 3;
+  flagsText.spellcheck = false;
+  flagsText.value = mine.jvmFlags;
+  flagsText.hidden = !flagsBox.checked;
+  flagsText.setAttribute('aria-label', 'Java arguments');
+  const flagsLine = el('code', 'launch-line');
+  flagsWrap.append(flagsOwn, flagsText, flagsLine);
+  const jarName = (row.jar || 'server.jar').split(/[\\/]/).pop();
+  const showLaunch = () => {
+    const mem = memInput.value.trim() || mine.memory;
+    const flags = flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean) : (row.defaultJvmFlags || []);
+    flagsLine.textContent = ['java', '-Xms' + mem, '-Xmx' + mem, ...flags, '-jar', jarName, '--nogui'].join(' ');
+  };
+  flagsBox.onchange = () => {
+    flagsText.hidden = !flagsBox.checked;
+    // Starting from the recommended set is easier than from nothing: most people want to add one.
+    if (flagsBox.checked && !flagsText.value.trim()) flagsText.value = (row.defaultJvmFlags || []).join(' ');
+    showLaunch();
+    update();
+  };
+  flagsText.addEventListener('input', () => { showLaunch(); update(); });
+  memInput.addEventListener('input', showLaunch);
+  showLaunch();
+  addRow(jv, {
+    id: flagsText.id,
+    label: 'Java arguments',
+    help: 'How Java runs the server, beyond memory. The recommended set suits almost every server; your own replaces it. Memory stays with the setting above, and takes effect at the next start.',
+    control: flagsWrap,
+    entry: {
+      kind: 'own', key: 'jvmFlags',
+      // Compared as one space-separated line, and saved as one: Save copies the value into `mine`,
+      // and the next comparison has to be against the same shape.
+      changed: () => (flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean).join(' ') : '') !== (mine.jvmFlags || ''),
+      value: () => (flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean).join(' ') || null : null),
+      reset: () => { flagsBox.checked = Boolean(mine.jvmFlags); flagsText.value = mine.jvmFlags || ''; flagsText.hidden = !flagsBox.checked; showLaunch(); },
     },
   });
 
@@ -11390,9 +11652,19 @@ show('empty');
 loadSettings();
 loadJavas();
 refresh().then(() => {
+  if (consoleOnly) {
+    if (rowOf(consoleOnly)) select(consoleOnly);
+    return;
+  }
   if (!state.current && (state.view === 'empty' || state.view === 'home')) showHome();
   // One server and nothing selected is not a choice worth making anyone click through.
   if (state.rows.length === 1) select(state.rows[0].name);
 });
 setInterval(refresh, 4000);
+
+$('#bPopConsole').onclick = () => {
+  if (!state.current) return;
+  // Named per server, so asking twice brings the one already open forward rather than a second.
+  window.open('/?console=' + encodeURIComponent(state.current), 'spawnloft-console-' + state.current, 'width=980,height=660');
+};
 </script>

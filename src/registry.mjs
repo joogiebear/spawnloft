@@ -185,6 +185,30 @@ export function jvmFlagsFor(memory) {
 }
 
 /**
+ * A server's own Java arguments, in place of the flags above, checked. Space- or line-separated
+ * text, or a list; empty means "SpawnLoft's recommended flags" and comes back null.
+ *
+ * <p>Memory is not one of them: -Xms and -Xmx come from the server's Memory setting, which the
+ * panel, the overview's reserved-memory sum and crash diagnosis all read. Nor is -jar, or what
+ * follows it - which jar runs is the server's jar. Everything else is the owner's to choose.
+ */
+export function cleanJvmFlags(input) {
+  if (input == null) return null
+  const tokens = (Array.isArray(input) ? input.map(String) : String(input).split(/\s+/))
+    .map((t) => t.trim())
+    .filter(Boolean)
+  if (!tokens.length) return null
+  if (tokens.length > 60) fail('that is more than 60 Java arguments')
+  for (const t of tokens) {
+    if (t.length > 300) fail(`"${t.slice(0, 40)}..." is too long for one argument`)
+    if (!t.startsWith('-')) fail(`"${t}" is not a Java option - each starts with a dash, like -XX:+UseG1GC`)
+    if (/^-Xm[sx]/i.test(t)) fail(`${t}: memory is set by the Memory setting, so both stay in step`)
+    if (/^-(jar|cp|classpath)$/i.test(t) || /^--class-path$/i.test(t)) fail(`${t}: which jar runs is the server's own jar`)
+  }
+  return tokens
+}
+
+/**
  * Which server software family an instance runs. Absent means paper: every instance made
  * before the field existed is one, and defaulting here migrates them all without a write.
  */
