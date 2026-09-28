@@ -447,6 +447,17 @@ anyone. `mcctl plugins <name>` lists the full inventory, manual jars included, w
 SOURCE column saying which is which. Enable/disable renames the jar in place, so a
 disabled plugin keeps its spot and its config.
 
+**Files** — the server's folder: browse it, open any text file in an editor that colours YAML,
+JSON and properties files, upload by dropping files onto the list, download a file or a folder
+(zipped), rename, move, zip, unzip and find by name. Unlike the AI assistant's config tools it shows
+every file as it is, since the person using it owns them. Every edit, replaced file and delete
+snapshots what it changes first, on its own, so Backups can put back exactly that. A save is
+refused if the file changed since it was opened - the server rewrote it, or something else did -
+and a tab in YAML or broken JSON asks before saving. While the server runs, what it holds open
+(the active world, its jar, the plugins it loaded) can be read and edited but not moved, replaced
+or deleted. The ports and RCON settings SpawnLoft writes into `server.properties` are refused here
+as everywhere else.
+
 **Backups** — take one at a chosen scope, see every snapshot with its size, age and coverage, and
 restore or delete any of them. Restoring is refused while the server runs, because extracting over
 files a live server holds open corrupts a world rather than replacing it. Automatic backups run on

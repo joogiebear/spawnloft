@@ -1195,6 +1195,91 @@
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
 
+  /*
+    Files. The listing is the snapshot grid's shape - a column header, dense rows, sizes lined up
+    on the right - with a checkbox in front, because what you do to a file you usually do to a few.
+  */
+  .fm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-3); }
+  .fm-crumbs { flex: 1 1 260px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; font: var(--t-3)/1.3 var(--mono); }
+  .fm-crumbs button { padding: 3px 6px; font: inherit; color: var(--ink-2); }
+  .fm-crumbs button[aria-current] { color: var(--ink); font-weight: 600; }
+  .fm-crumbs .sep { color: var(--ink-4); }
+  .fm-search { flex: 0 1 220px; min-width: 140px; }
+  .fm-sel {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2);
+    margin-bottom: var(--s-3); padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--lapis-edge); border-radius: var(--r-sm); background: var(--lapis-wash);
+  }
+  .fm-sel > b { font: 600 var(--t-2)/1 var(--ui); color: var(--ink); margin-right: var(--s-2); }
+  .fm-sel button { padding: 4px 10px; font-size: var(--t-2); }
+  .fm-list { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .fm-row {
+    display: grid; grid-template-columns: 20px minmax(0, 1fr) 84px 132px; column-gap: var(--s-3);
+    align-items: center; min-height: 38px; padding: 0 var(--s-4);
+    border-bottom: 1px solid var(--line); transition: background var(--ease);
+  }
+  .fm-row:last-child { border-bottom: 0; }
+  .fm-row:not(.fm-head):hover { background: rgba(var(--ink-rgb), .035); }
+  .fm-row[data-selected] { background: var(--lapis-wash); }
+  .fm-head { min-height: 34px; background: rgba(var(--ink-rgb), .02); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .fm-head .fm-size { text-align: right; }
+  .fm-row input[type="checkbox"] { margin: 0; }
+  .fm-open {
+    display: flex; align-items: center; gap: var(--s-2); min-width: 0; justify-self: start; max-width: 100%;
+    padding: 4px 0; background: none; border: 0; box-shadow: none; color: var(--ink);
+    font: var(--t-3)/1.3 var(--ui); text-align: left; cursor: pointer;
+  }
+  .fm-open > span:not(.pill) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fm-open .ico { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
+  .fm-open:hover:not(:disabled) { background: none; transform: none; color: var(--lapis-ink); }
+  .fm-open:hover .ico { color: var(--lapis-ink); }
+  .fm-row .fm-size { font: var(--t-2)/1 var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
+  .fm-row .fm-when { font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .pane[data-drop] .fm-list { outline: 2px dashed var(--lapis-edge); outline-offset: 4px; }
+  @container pane (max-width: 560px) {
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 72px; }
+    .fm-row .fm-when { display: none; }
+  }
+
+  /* The editor: a transparent textarea over a <pre> painted with the same text. Both layers must
+     lay text out identically, so they share every font, padding and wrapping rule. */
+  .fm-editor {
+    display: grid; grid-template-columns: auto minmax(0, 1fr);
+    height: 360px;
+    background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-sm);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+    font: var(--t-3)/1.6 var(--mono); overflow: hidden;
+  }
+  .fm-editor:focus-within { border-color: var(--lapis-edge); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
+  .fm-gutter {
+    padding: var(--s-3) var(--s-2) var(--s-3) var(--s-3); min-width: 3.5em;
+    text-align: right; white-space: pre; color: var(--ink-4); user-select: none; overflow: hidden;
+    border-right: 1px solid var(--line-soft);
+  }
+  .fm-code { position: relative; min-width: 0; }
+  .fm-code pre, .fm-code textarea {
+    position: absolute; inset: 0; margin: 0; padding: var(--s-3) var(--s-4);
+    font: inherit; letter-spacing: 0; tab-size: 2; white-space: pre; overflow-wrap: normal; word-break: normal;
+    border: 0; border-radius: 0;
+  }
+  .fm-code pre { overflow: hidden; color: var(--ink); pointer-events: none; }
+  .fm-code textarea {
+    width: 100%; height: 100%; overflow: auto; resize: none;
+    background: transparent; color: transparent; caret-color: var(--ink); box-shadow: none;
+  }
+  .fm-code textarea:focus { outline: none; box-shadow: none; background: transparent; }
+  .fm-code textarea::selection { background: rgba(var(--accent-rgb), .3); color: transparent; }
+  .fm-code.plain pre { display: none; }
+  .fm-code.plain textarea { color: var(--ink); }
+  .fm-code.plain textarea::selection { color: var(--ink); }
+  .hl-key { color: var(--lapis-ink); }
+  .hl-str { color: var(--live-ink); }
+  .hl-num, .hl-bool { color: var(--warn-ink); }
+  .hl-com { color: var(--ink-4); font-style: italic; }
+  .fm-dirty { width: 8px; height: 8px; border-radius: 50%; background: var(--lapis); }
+  .fm-dirty[hidden] { display: none; }
+  .fm-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); margin-top: var(--s-2); }
+
   .section { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
   .section h3 { margin: 0; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
   .where { margin: 0 0 10px; gap: 10px; }
@@ -1969,6 +2054,9 @@
   <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z"/><path d="M9.5 2v3h3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 11v2.5h11V11"/></symbol>
+  <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></symbol>
   <symbol id="i-dots" viewBox="0 0 16 16"><path d="M3.25 8h.5M7.75 8h.5M12.25 8h.5" stroke-width="2.5"/></symbol>
   <symbol id="i-caret" viewBox="0 0 16 16"><path d="M4 6.5 8 10.5l4-4"/></symbol>
 
@@ -2182,6 +2270,9 @@
           <div class="pane pane-scroll" id="panePlugins" tabindex="-1">
             <div class="pane-body wide" id="pluginsBody"></div>
           </div>
+          <div class="pane pane-scroll" id="paneFiles" tabindex="-1">
+            <div class="pane-body wide" id="filesBody"></div>
+          </div>
           <div class="pane pane-scroll" id="paneWorlds" tabindex="-1">
             <div class="pane-body wide" id="worldsBody"></div>
           </div>
@@ -2210,6 +2301,7 @@
 
       <nav class="dock" aria-label="Server tools">
         <button type="button" id="tabPlugins" data-pane="plugins" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span class="lbl">Plugins</span><b class="dock-badge" hidden></b></button>
+        <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
         <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
         <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
         <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
@@ -2843,12 +2935,12 @@ function show(view) {
  * hidden, which costs nothing, and means coming back to it has the scrollback intact.
  */
 const TOOL_NAMES = {
-  plugins: 'Plugins', worlds: 'Worlds', backups: 'Backups', players: 'Players',
+  plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', players: 'Players',
   performance: 'Stats', scheduler: 'Schedule', settings: 'Settings',
 };
-// A settings form and a dense backup grid are cramped at 480px; the rest read fine beside the
+// A settings form, a dense backup grid and a file listing are cramped at 480px; the rest read fine beside the
 // console. Each opens where it fits, and a tool someone moved stays where they put it.
-const POPPED_BY_DEFAULT = new Set(['settings', 'backups']);
+const POPPED_BY_DEFAULT = new Set(['settings', 'backups', 'files']);
 // A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps.
 const DB_TOOLS = new Set(['performance', 'backups', 'settings']);
 const NARROW = window.matchMedia('(max-width: 1279px)');
@@ -2915,6 +3007,7 @@ function setTool(tool, popped) {
   if (t === 'players') renderPlayers();
   if (t === 'plugins') renderPlugins();
   if (t === 'worlds') renderWorlds();
+  if (t === 'files') renderFiles();
   if (t === 'performance') renderPerformance();
   // Only a visible Stats tool polls. A graph nobody is looking at is a request every ten seconds
   // for as long as the app is open.
@@ -6717,6 +6810,693 @@ function taskCard(task, data, base, again, editor) {
   return el;
 }
 
+// ------------------------------------------------------------------ files ---
+
+/**
+ * The Files tool: the server's folder, browsed, and any text file in it edited.
+ *
+ * <p>Not a second Explorer. It is here so the file SpawnLoft has no form for - a plugin's config, a
+ * datapack, a list a plugin keeps - can be changed without leaving the server, with the safety net
+ * the rest of the panel has: an edit, a replaced file or a delete copies what it changes first,
+ * and Backups can put back exactly that.
+ *
+ * <p>Where you were is kept per server, open file and unsaved text included, so closing the tool or
+ * looking at another server loses nothing.
+ */
+const filesByServer = new Map();
+
+function filesStateFor(name) {
+  if (!filesByServer.has(name)) filesByServer.set(name, { dir: '', selected: new Set(), query: '', editing: null });
+  return filesByServer.get(name);
+}
+
+function fileSize(n) {
+  if (n == null) return '';
+  if (n < 1024) return n + ' B';
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + units[i];
+}
+
+const ARCHIVE_RE = /\.(zip|mrpack|tar\.gz|tgz)$/i;
+
+function downloadPath(row, p) {
+  const a = document.createElement('a');
+  a.href = '/api/instances/' + encodeURIComponent(row.name) + '/files/download?path=' + encodeURIComponent(p);
+  a.download = p.split('/').pop();
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+async function renderFiles(opts) {
+  const force = Boolean(opts && opts.force);
+  const row = rowOf(state.current);
+  const body = $('#filesBody');
+  if (!row) { body.textContent = ''; clearPaneHead(body); return; }
+  if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  body.dataset.for = row.name;
+  const view = filesStateFor(row.name);
+  if (view.editing) return renderFileEditor(row, view);
+
+  const base = '/instances/' + encodeURIComponent(row.name) + '/files';
+  let data;
+  try {
+    data = view.query
+      ? await api(base + '/search?path=' + encodeURIComponent(view.dir) + '&q=' + encodeURIComponent(view.query))
+      : await api(base + '?path=' + encodeURIComponent(view.dir));
+  } catch (e) {
+    // A folder that went away (renamed outside, deleted) takes you back to the top rather than
+    // leaving you in front of an error with nowhere to go.
+    if (view.dir && !view.query) { view.dir = ''; view.selected.clear(); return renderFiles({ force: true }); }
+    body.textContent = '';
+    const bad = document.createElement('div');
+    bad.className = 'bad';
+    bad.textContent = e.message;
+    body.append(bad);
+    body.dataset.for = '';
+    return;
+  }
+  if (body.dataset.for !== row.name || view.editing) return;
+  const running = data.running;
+  const entries = view.query ? data.results : data.entries;
+  for (const p of [...view.selected]) if (!entries.some((e) => e.path === p)) view.selected.delete(p);
+
+  body.textContent = '';
+  paneHead(body, 'folder', 'Files',
+    'Everything in this server’s folder. An edit, a replaced file or a delete keeps a copy first, which Backups can put back.');
+  const again = () => renderFiles({ force: true });
+  const go = (dir) => { view.dir = dir; view.query = ''; view.selected.clear(); again(); };
+
+  if (running) {
+    const how = document.createElement('div');
+    how.className = 'hint';
+    how.textContent = 'The server is running. What it holds open - the active world, its jar, the plugins it loaded - '
+      + 'can be read and edited but not moved, replaced or deleted until it stops. A changed config applies when the plugin reloads or the server restarts.';
+    body.append(how);
+  }
+
+  // ---- where, and what to do here -----------------------------------------------
+  const bar = document.createElement('div');
+  bar.className = 'fm-bar';
+  const crumbs = document.createElement('nav');
+  crumbs.className = 'fm-crumbs';
+  crumbs.setAttribute('aria-label', 'Folder');
+  const parts = view.dir ? view.dir.split('/') : [];
+  const crumb = (label, dir, current) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ghost';
+    b.textContent = label;
+    if (current) b.setAttribute('aria-current', 'location');
+    b.onclick = () => go(dir);
+    return b;
+  };
+  crumbs.append(crumb(row.label || row.name, '', !parts.length && !view.query));
+  parts.forEach((p, i) => {
+    const sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = '/';
+    crumbs.append(sep, crumb(p, parts.slice(0, i + 1).join('/'), i === parts.length - 1 && !view.query));
+  });
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'fm-search';
+  search.placeholder = view.dir ? 'Find in this folder' : 'Find a file';
+  search.setAttribute('aria-label', 'Find files by name');
+  search.value = view.query;
+  search.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = search.value.trim();
+      if (q && q.length < 2) { toast('Search for at least two characters.', 'bad'); return; }
+      view.query = q;
+      view.selected.clear();
+      again();
+    }
+  };
+  search.onsearch = () => { if (!search.value && view.query) { view.query = ''; again(); } };
+
+  const newFile = iconButton('file', 'New file');
+  const newFolder = iconButton('folder', 'New folder');
+  const upload = iconButton('upload', 'Upload');
+  const picker = document.createElement('input');
+  picker.type = 'file';
+  picker.multiple = true;
+  picker.hidden = true;
+  bar.append(crumbs, search, newFile, newFolder, upload, picker);
+  body.append(bar);
+
+  newFile.onclick = async () => {
+    const got = await ask({ title: 'New file in ' + (view.dir || 'the server folder'), input: { label: 'Name', placeholder: 'config.yml' }, confirmLabel: 'Create' });
+    if (!got || !got.text) return;
+    const p = view.dir ? view.dir + '/' + got.text : got.text;
+    try {
+      const out = await post(base + '/write', { path: p, text: '', create: true });
+      view.editing = { path: out.path, text: '', original: '', version: out.version };
+      again();
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  newFolder.onclick = async () => {
+    const got = await ask({ title: 'New folder in ' + (view.dir || 'the server folder'), input: { label: 'Name' }, confirmLabel: 'Create' });
+    if (!got || !got.text) return;
+    try {
+      const out = await post(base + '/mkdir', { dir: view.dir, name: got.text });
+      go(out.path);
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  upload.onclick = () => picker.click();
+  picker.onchange = () => { uploadFiles(row, view, [...picker.files]).then(again); picker.value = ''; };
+
+  // ---- what is selected -------------------------------------------------------
+  const sel = [...view.selected];
+  const selEntries = entries.filter((e) => view.selected.has(e.path));
+  if (sel.length) {
+    const acts = document.createElement('div');
+    acts.className = 'fm-sel';
+    const count = document.createElement('b');
+    count.textContent = sel.length + ' selected';
+    const dl = iconButton('download', 'Download');
+    dl.hidden = sel.length !== 1;
+    const rename = iconButton('pencil', 'Rename or move');
+    rename.hidden = sel.length !== 1;
+    const zip = iconButton('archive', 'Zip');
+    const unzip = iconButton('archive', 'Unzip');
+    unzip.hidden = !(sel.length === 1 && selEntries[0] && selEntries[0].type === 'file' && ARCHIVE_RE.test(sel[0]));
+    const del = iconButton('trash', 'Delete', 'danger');
+    const busy = selEntries.filter((e) => e.inUse);
+    if (busy.length) {
+      del.disabled = true;
+      del.title = busy[0].name + ' is in use by the running server';
+      rename.disabled = true;
+      rename.title = del.title;
+    }
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'ghost';
+    clear.textContent = 'Clear';
+    acts.append(count, dl, rename, zip, unzip, del, clear);
+    body.append(acts);
+
+    clear.onclick = () => { view.selected.clear(); again(); };
+    dl.onclick = () => downloadPath(row, sel[0]);
+    rename.onclick = async () => {
+      const got = await ask({
+        title: 'Rename or move ' + sel[0].split('/').pop(),
+        text: 'A new name, or a path from the server folder to move it somewhere else.',
+        input: { label: 'New path', value: sel[0] },
+        confirmLabel: 'Rename',
+      });
+      if (!got || !got.text || got.text === sel[0]) return;
+      try {
+        await post(base + '/move', { from: sel[0], to: got.text });
+        view.selected.clear();
+        again();
+      } catch (e) { toast(e.message, 'bad'); }
+    };
+    zip.onclick = async () => {
+      const first = sel[0].split('/').pop();
+      const got = await ask({ title: 'Zip ' + (sel.length === 1 ? first : sel.length + ' items'), input: { label: 'Archive name', value: (sel.length === 1 ? first.replace(/\.[^.]+$/, '') : 'archive') + '.zip' }, confirmLabel: 'Zip' });
+      if (!got || !got.text) return;
+      zip.disabled = true;
+      try {
+        const out = await post(base + '/archive', { paths: sel, name: got.text });
+        toast('Made ' + out.path + ' (' + fileSize(out.size) + ').', 'good');
+        view.selected.clear();
+        again();
+      } catch (e) { toast(e.message, 'bad'); zip.disabled = false; }
+    };
+    unzip.onclick = async () => {
+      unzip.disabled = true;
+      try {
+        const out = await post(base + '/extract', { path: sel[0] });
+        toast('Unpacked into ' + out.path + '.', 'good');
+        go(out.path);
+      } catch (e) { toast(e.message, 'bad'); unzip.disabled = false; }
+    };
+    del.onclick = () => deleteFiles(row, view, sel).then(again);
+  }
+
+  // ---- the listing ------------------------------------------------------------
+  if (view.query) {
+    const t = document.createElement('h3');
+    t.className = 'hist-title';
+    t.textContent = entries.length + (data.truncated ? '+' : '') + ' named like “' + view.query + '”';
+    body.append(t);
+  }
+  const list = document.createElement('div');
+  list.className = 'fm-list';
+  list.setAttribute('role', 'table');
+  list.setAttribute('aria-label', 'Files');
+  const head = document.createElement('div');
+  head.className = 'fm-row fm-head';
+  head.setAttribute('role', 'row');
+  const all = document.createElement('input');
+  all.type = 'checkbox';
+  all.setAttribute('aria-label', 'Select all');
+  all.checked = entries.length > 0 && entries.every((e) => view.selected.has(e.path));
+  all.onchange = () => { if (all.checked) for (const e of entries) view.selected.add(e.path); else view.selected.clear(); again(); };
+  for (const [cls, text] of [['fm-name', 'Name'], ['fm-size', 'Size'], ['fm-when', 'Modified']]) {
+    const c = document.createElement('span');
+    c.className = cls;
+    c.setAttribute('role', 'columnheader');
+    c.textContent = text;
+    head.append(c);
+  }
+  head.prepend(all);
+  list.append(head);
+
+  if (view.dir && !view.query) {
+    const up = document.createElement('div');
+    up.className = 'fm-row';
+    up.setAttribute('role', 'row');
+    const spacer = document.createElement('span');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fm-name fm-open';
+    b.append(icon('folder'), document.createTextNode('..'));
+    b.setAttribute('aria-label', 'Up one folder');
+    b.onclick = () => go(parts.slice(0, -1).join('/'));
+    up.append(spacer, b);
+    list.append(up);
+  }
+
+  for (const e of entries) {
+    const line = document.createElement('div');
+    line.className = 'fm-row';
+    line.setAttribute('role', 'row');
+    if (view.selected.has(e.path)) line.setAttribute('data-selected', '');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = view.selected.has(e.path);
+    box.setAttribute('aria-label', 'Select ' + e.name);
+    box.onchange = () => { if (box.checked) view.selected.add(e.path); else view.selected.delete(e.path); again(); };
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'fm-name fm-open';
+    open.append(icon(e.type === 'dir' ? 'folder' : 'file'));
+    const nm = document.createElement('span');
+    nm.textContent = view.query ? e.path : e.name;
+    open.append(nm);
+    if (e.inUse) {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.dataset.tone = 'on';
+      pill.textContent = 'In use';
+      pill.title = 'The running server holds this. Stop it to move, replace or delete it.';
+      open.append(pill);
+    }
+    if (e.type === 'link') open.title = 'A link that leads outside the server folder';
+    const size = document.createElement('span');
+    size.className = 'fm-size';
+    size.textContent = fileSize(e.size);
+    const when = document.createElement('span');
+    when.className = 'fm-when';
+    when.textContent = stamp(e.modified);
+    when.title = new Date(e.modified).toLocaleString();
+    line.append(box, open, size, when);
+    list.append(line);
+
+    open.onclick = () => {
+      if (e.type === 'dir') go(e.path);
+      else if (e.type === 'file') openFile(row, view, e.path);
+    };
+  }
+  if (!entries.length) {
+    body.append(list);
+    body.append(emptyState(view.query ? 'search' : 'folder', view.query
+      ? 'Nothing here is named like that.'
+      : 'This folder is empty. Drop files here, or use Upload.'));
+  } else {
+    body.append(list);
+  }
+
+  const note = document.createElement('div');
+  note.className = 'hint';
+  note.textContent = 'Drop files onto this list to upload them here.';
+  body.append(note);
+
+  // Files dragged in from the desktop land in the folder on screen.
+  const pane = body.closest('.pane');
+  pane.ondragover = (ev) => {
+    if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+    ev.preventDefault();
+    pane.setAttribute('data-drop', '');
+  };
+  pane.ondragleave = (ev) => { if (!pane.contains(ev.relatedTarget)) pane.removeAttribute('data-drop'); };
+  pane.ondrop = async (ev) => {
+    pane.removeAttribute('data-drop');
+    if (!ev.dataTransfer || !ev.dataTransfer.files.length || filesStateFor(row.name).editing) return;
+    ev.preventDefault();
+    const items = [...ev.dataTransfer.items];
+    if (items.some((it) => it.webkitGetAsEntry && it.webkitGetAsEntry() && it.webkitGetAsEntry().isDirectory)) {
+      toast('A folder cannot be dropped in as it is. Zip it, drop the zip, then Unzip it here.', 'bad');
+      return;
+    }
+    await uploadFiles(row, view, [...ev.dataTransfer.files]);
+    again();
+  };
+}
+
+async function uploadFiles(row, view, list) {
+  if (!list.length) return;
+  const base = '/api/instances/' + encodeURIComponent(row.name) + '/files/upload';
+  const where = view.dir || 'the server folder';
+  const note = toast('Uploading ' + (list.length === 1 ? list[0].name : list.length + ' files') + ' to ' + where + '…');
+  let done = 0;
+  for (const file of list) {
+    const send = (overwrite) => fetch(base + '?dir=' + encodeURIComponent(view.dir) + '&name=' + encodeURIComponent(file.name)
+      + (overwrite ? '&overwrite=1' : ''), { method: 'POST', body: file });
+    try {
+      let res = await send(false);
+      let out = await res.json().catch(() => ({}));
+      if (!res.ok && out.code === 'exists') {
+        const ok = await ask({
+          title: 'Replace ' + file.name + '?',
+          text: file.name + ' is already in ' + where + '. The one there now is copied to Backups first.',
+          confirmLabel: 'Replace',
+          danger: true,
+        });
+        if (!ok) continue;
+        res = await send(true);
+        out = await res.json().catch(() => ({}));
+      }
+      if (!res.ok) throw new Error(out.error || res.statusText);
+      done++;
+    } catch (e) {
+      toast(file.name + ': ' + e.message, 'bad');
+    }
+  }
+  note.remove();
+  if (done) toast('Uploaded ' + (done === 1 ? '1 file' : done + ' files') + ' to ' + where + '.', 'good');
+}
+
+async function deleteFiles(row, view, paths) {
+  const base = '/instances/' + encodeURIComponent(row.name) + '/files';
+  const what = paths.length === 1 ? paths[0].split('/').pop() : paths.length + ' items';
+  const ok = await ask({
+    title: 'Delete ' + what + '?',
+    text: 'A copy is kept first, so Backups can put ' + (paths.length === 1 ? 'it' : 'them') + ' back.',
+    confirmLabel: 'Delete',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await post(base + '/delete', { paths: paths });
+    view.selected.clear();
+    toast('Deleted ' + what + '. A copy is in Backups.', 'good');
+  } catch (e) {
+    if (e.code !== 'large') { toast(e.message, 'bad'); return; }
+    const sure = await ask({
+      title: 'Delete ' + what + ' without a copy?',
+      text: 'That is ' + e.message.replace(/^that is /, '') + '. Deleted without one, there is no way back. '
+        + 'Take a full backup first if there is any doubt.',
+      typeToConfirm: paths.length === 1 ? paths[0].split('/').pop() : 'delete',
+      confirmLabel: 'Delete for good',
+      danger: true,
+    });
+    if (!sure) return;
+    try {
+      await post(base + '/delete', { paths: paths, withoutCopy: true });
+      view.selected.clear();
+      toast('Deleted ' + what + '.', 'good');
+    } catch (e2) { toast(e2.message, 'bad'); }
+  }
+}
+
+async function openFile(row, view, p) {
+  const base = '/instances/' + encodeURIComponent(row.name) + '/files';
+  let out;
+  try {
+    out = await api(base + '/read?path=' + encodeURIComponent(p));
+  } catch (e) { toast(e.message, 'bad'); return; }
+  if (out.text == null) {
+    const ok = await ask({
+      title: p.split('/').pop() + ' is not something to edit here',
+      text: out.reason === 'large'
+        ? 'It is ' + fileSize(out.size) + ', too big for the editor. Download it to open it in something made for files that size.'
+        : 'It is not text - a jar, a world file or an image. Download it to open it elsewhere.',
+      confirmLabel: 'Download',
+    });
+    if (ok) downloadPath(row, p);
+    return;
+  }
+  view.editing = { path: out.path, text: out.text.replace(/\r\n/g, '\n'), original: out.text.replace(/\r\n/g, '\n'), version: out.version };
+  renderFiles({ force: true });
+}
+
+// ------------------------------------------------------------ the editor ---
+
+/**
+ * A plain textarea over a highlighted copy of the same text.
+ *
+ * <p>No editor library: the panel is one file that works offline, and what configs need is modest -
+ * keys picked out from values, comments dimmed, line numbers, spaces for Tab because YAML refuses
+ * tabs. The textarea does the editing, so selection, undo, find and the clipboard are the
+ * browser's own; the <pre> behind it only paints. Past a size the painting is skipped and it is a
+ * plain textarea, since re-highlighting a large file on every keystroke is what makes typing lag.
+ */
+const HIGHLIGHT_MAX = 300 * 1024;
+
+function langOf(p) {
+  const ext = (p.match(/\.([a-z0-9]+)$/i) || [])[1];
+  const e = ext ? ext.toLowerCase() : '';
+  if (e === 'yml' || e === 'yaml') return 'yaml';
+  if (e === 'json' || e === 'json5' || e === 'mcmeta') return 'json';
+  if (['properties', 'toml', 'cfg', 'ini', 'conf', 'hocon', 'env'].includes(e)) return 'props';
+  return 'plain';
+}
+
+const LANG_NAMES = { yaml: 'YAML', json: 'JSON', props: 'Key = value', plain: 'Plain text' };
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const tok = (cls, s) => s ? '<span class="hl-' + cls + '">' + escHtml(s) + '</span>' : '';
+
+function hlValue(v) {
+  // The comment first: a " #" outside quotes ends the value.
+  let body = v;
+  let comment = '';
+  const quoted = /^\s*(["']).*\1/.exec(v);
+  const hash = quoted ? v.indexOf(' #', quoted[0].length) : v.search(/(^|\s)#/);
+  if (hash >= 0) { body = v.slice(0, hash); comment = v.slice(hash); }
+  const t = body.trim();
+  const lead = body.slice(0, body.indexOf(t.charAt(0)) < 0 ? body.length : body.indexOf(t.charAt(0)));
+  const tail = body.slice(lead.length + t.length);
+  let painted;
+  if (!t) painted = '';
+  else if (/^(["']).*\1$/.test(t)) painted = tok('str', t);
+  else if (/^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t)) painted = tok('num', t);
+  else if (/^(true|false|yes|no|on|off|null|~)$/i.test(t)) painted = tok('bool', t);
+  else painted = escHtml(t);
+  return escHtml(lead) + painted + escHtml(tail) + tok('com', comment);
+}
+
+function highlightLine(line, lang) {
+  if (lang === 'yaml') {
+    if (/^\s*#/.test(line)) return tok('com', line);
+    const m = /^(\s*(?:-\s+)?)((?:"[^"]*"|'[^']*'|[^\s#'"-][^:#]*?|-[^\s:#][^:#]*?))(\s*:)(?=\s|$)(.*)$/.exec(line);
+    if (m) return escHtml(m[1]) + tok('key', m[2]) + escHtml(m[3]) + hlValue(m[4]);
+    const item = /^(\s*-\s?)(.*)$/.exec(line);
+    if (item) return escHtml(item[1]) + hlValue(item[2]);
+    return hlValue(line);
+  }
+  if (lang === 'props') {
+    if (/^\s*[#!;]/.test(line)) return tok('com', line);
+    if (/^\s*\[.*\]\s*$/.test(line)) return tok('key', line);
+    const m = /^(\s*)([^=:#!\s][^=:]*?)(\s*[=:])(.*)$/.exec(line);
+    if (m) return escHtml(m[1]) + tok('key', m[2]) + escHtml(m[3]) + hlValue(m[4]);
+    return escHtml(line);
+  }
+  if (lang === 'json') {
+    let out = '';
+    let at = 0;
+    const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|(\/\/.*$)/g;
+    let m;
+    while ((m = re.exec(line))) {
+      out += escHtml(line.slice(at, m.index));
+      if (m[1]) out += tok(m[2] ? 'key' : 'str', m[1]) + escHtml(m[2] || '');
+      else if (m[3]) out += tok('num', m[3]);
+      else if (m[4]) out += tok('bool', m[4]);
+      else out += tok('com', m[5]);
+      at = re.lastIndex;
+    }
+    return out + escHtml(line.slice(at));
+  }
+  return escHtml(line);
+}
+
+function renderFileEditor(row, view) {
+  const body = $('#filesBody');
+  const ed = view.editing;
+  const base = '/instances/' + encodeURIComponent(row.name) + '/files';
+  const lang = langOf(ed.path);
+  const painted = lang !== 'plain' && ed.text.length <= HIGHLIGHT_MAX;
+  body.textContent = '';
+  paneHead(body, 'file', ed.path.split('/').pop(), ed.path);
+
+  const bar = document.createElement('div');
+  bar.className = 'fm-bar';
+  const back = iconButton('folder', 'All files', 'ghost');
+  const dot = document.createElement('span');
+  dot.className = 'fm-dirty';
+  dot.title = 'Unsaved changes';
+  const grow = document.createElement('span');
+  grow.className = 'grow';
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.className = 'ghost';
+  reload.textContent = 'Reload';
+  const dl = iconButton('download', 'Download');
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'primary';
+  save.textContent = 'Save';
+  bar.append(back, dot, grow, reload, dl, save);
+  body.append(bar);
+
+  const box = document.createElement('div');
+  box.className = 'fm-editor';
+  const gutter = document.createElement('div');
+  gutter.className = 'fm-gutter';
+  gutter.setAttribute('aria-hidden', 'true');
+  const code = document.createElement('div');
+  code.className = 'fm-code' + (painted ? '' : ' plain');
+  const pre = document.createElement('pre');
+  pre.setAttribute('aria-hidden', 'true');
+  const ta = document.createElement('textarea');
+  ta.spellcheck = false;
+  ta.wrap = 'off';
+  ta.setAttribute('autocapitalize', 'off');
+  ta.setAttribute('aria-label', ed.path);
+  ta.value = ed.text;
+  code.append(pre, ta);
+  box.append(gutter, code);
+  body.append(box);
+
+  const foot = document.createElement('div');
+  foot.className = 'fm-foot hint';
+  const where = document.createElement('span');
+  const how = document.createElement('span');
+  how.textContent = LANG_NAMES[lang] + '  ·  Ctrl+S saves  ·  Tab indents with spaces; Esc, then Tab, moves on';
+  foot.append(where, how);
+  body.append(foot);
+
+  let lines = -1;
+  const paint = () => {
+    const n = ta.value.split('\n').length;
+    if (n !== lines) {
+      lines = n;
+      let s = '';
+      for (let i = 1; i <= n; i++) s += i + '\n';
+      gutter.textContent = s + ' ';
+    }
+    // A trailing space keeps the last empty line's height, so the two layers scroll the same.
+    if (painted) pre.innerHTML = ta.value.split('\n').map((l) => highlightLine(l, lang)).join('\n') + '\n ';
+    const dirty = ta.value !== ed.original;
+    dot.hidden = !dirty;
+    save.disabled = !dirty;
+  };
+  const sync = () => {
+    pre.scrollTop = ta.scrollTop;
+    pre.scrollLeft = ta.scrollLeft;
+    gutter.scrollTop = ta.scrollTop;
+  };
+  const caret = () => {
+    const before = ta.value.slice(0, ta.selectionStart);
+    const ln = before.split('\n').length;
+    where.textContent = 'Line ' + ln + ', column ' + (before.length - before.lastIndexOf('\n'));
+  };
+  ta.addEventListener('input', () => { ed.text = ta.value; paint(); caret(); });
+  ta.addEventListener('scroll', sync);
+  ta.addEventListener('keyup', caret);
+  ta.addEventListener('click', caret);
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input'));
+    } else if (e.key === 'Escape') {
+      // Out of the text, not out of the tool: the next Escape, from the buttons, closes it, and
+      // the text stays as it is for when it opens again.
+      e.preventDefault();
+      e.stopPropagation();
+      save.disabled ? back.focus() : save.focus();
+    }
+  });
+  box.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (!save.disabled) save.click(); }
+  });
+  paint();
+  caret();
+  // As tall as the pane allows, measured rather than guessed: the pane is shorter docked beside the
+  // console than popped out, and shorter again with the window.
+  const pane = body.closest('.pane');
+  const fit = () => {
+    if (!box.isConnected) { ro.disconnect(); return; }
+    const top = box.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+    const pad = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+    let h = Math.max(320, pane.clientHeight - top - foot.offsetHeight - 8 - pad);
+    box.style.height = h + 'px';
+    // Whatever margin that arithmetic missed shows up as the pane scrolling; take it back off.
+    const over = pane.scrollHeight - pane.clientHeight;
+    if (over > 0 && h - over >= 320) box.style.height = (h - over) + 'px';
+  };
+  const ro = new ResizeObserver(fit);
+  ro.observe(pane);
+  fit();
+  requestAnimationFrame(() => ta.focus({ preventScroll: true }));
+
+  const leave = async () => {
+    if (ta.value !== ed.original) {
+      const ok = await ask({ title: 'Leave without saving?', text: 'Your changes to ' + ed.path.split('/').pop() + ' are not saved.', confirmLabel: 'Discard changes', danger: true });
+      if (!ok) return false;
+    }
+    return true;
+  };
+  back.onclick = async () => {
+    if (!(await leave())) return;
+    view.editing = null;
+    renderFiles({ force: true });
+  };
+  reload.onclick = async () => {
+    if (!(await leave())) return;
+    await openFile(row, view, ed.path);
+  };
+  dl.onclick = () => downloadPath(row, ed.path);
+
+  const write = async (force) => {
+    save.disabled = true;
+    save.textContent = 'Saving…';
+    try {
+      const out = await post(base + '/write', { path: ed.path, text: ta.value, version: ed.version, force: force });
+      ed.version = out.version;
+      ed.original = ta.value;
+      ed.text = ta.value;
+      toast('Saved ' + ed.path.split('/').pop() + (out.snapshot ? '. The previous version is in Backups' : '')
+        + (out.appliesOnRestart ? '; reload the plugin or restart the server to use it.' : '.'), 'good');
+    } catch (e) {
+      if (e.code === 'format') {
+        const ok = await ask({ title: 'Save it with a mistake in it?', text: e.message + '. Whatever reads this file may refuse to load it.', confirmLabel: 'Save anyway', danger: true });
+        if (ok) { save.textContent = 'Save'; return write(true); }
+      } else if (e.code === 'changed') {
+        const ok = await ask({ title: ed.path.split('/').pop() + ' changed on disk', text: e.message + ' Reloading discards what you typed here; copy it first if you need it.', confirmLabel: 'Reload it', danger: true });
+        if (ok) { await openFile(row, view, ed.path); return; }
+      } else {
+        toast(e.message, 'bad');
+      }
+    }
+    save.textContent = 'Save';
+    paint();
+  };
+  save.onclick = () => write(false);
+}
+
 // ---------------------------------------------------------------- backups ---
 
 const STAMP = new Intl.DateTimeFormat(undefined, {
@@ -6765,6 +7545,13 @@ const AUTO_INTERVALS = [
  * snapshots name folders (plugins, world, config), so a lone file with an extension is a snapshot
  * of just that file, and saying so is true whichever way it came about.
  */
+/** The copies the Files tool takes, by the label it gives them. */
+const FILES_SNAPSHOT = {
+  'file-edit': { tag: 'before an edit', why: 'as it was before it was edited in Files' },
+  'file-replace': { tag: 'before a replace', why: 'as it was before an upload replaced it' },
+  'file-delete': { tag: 'deleted', why: 'as it was when it was deleted in Files' },
+};
+
 function singleFileOf(snap) {
   const members = snap.members || [];
   if (members.length !== 1 || (snap.databases && snap.databases.length)) return null;
@@ -7175,14 +7962,20 @@ function renderBackupHistory(row, data, signature) {
       // it holds that file and nothing else, and a restore puts back only that file - so it says
       // which file rather than leaving it to read as a copy of the whole configuration.
       const onlyFile = singleFileOf(snap);
-      if (onlyFile) {
+      // The Files tool copies what it is about to edit, replace or delete - one file, or the few
+      // things selected - and says which in the same way.
+      const fromFiles = FILES_SNAPSHOT[snap.label] && snap.scope === 'files' ? FILES_SNAPSHOT[snap.label] : null;
+      const onlyWhat = onlyFile || (fromFiles ? describeMembers(snap.members) : null);
+      if (onlyWhat) {
         const which = document.createElement('div');
         which.className = 'hint';
-        which.textContent = 'Only ' + onlyFile;
+        which.textContent = 'Only ' + onlyWhat;
         // The row truncates, so the path is the line and the reason is the tooltip.
         which.title = snap.label === 'before-edit'
-          ? onlyFile + ' as it was before an AI assistant changed it. Restoring puts back this file and nothing else.'
-          : 'Restoring puts back ' + onlyFile + ' and nothing else.';
+          ? onlyWhat + ' as it was before an AI assistant changed it. Restoring puts back this file and nothing else.'
+          : fromFiles
+          ? onlyWhat + ' ' + fromFiles.why + '. Restoring puts back ' + (onlyFile ? 'this file' : 'these') + ' and nothing else.'
+          : 'Restoring puts back ' + onlyWhat + ' and nothing else.';
         what.append(which);
       }
       const size = document.createElement('div');
@@ -7190,8 +7983,8 @@ function renderBackupHistory(row, data, signature) {
       size.textContent = snap.sizeHuman;
       const tag = document.createElement('div');
       tag.className = 'tag';
-      tag.textContent = (onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
-      if (onlyFile) tag.title = 'Holds only ' + onlyFile + '. Restoring it puts back that file and nothing else.';
+      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
+      if (onlyWhat) tag.title = 'Holds only ' + onlyWhat + '. Restoring it puts back ' + (onlyFile ? 'that file' : 'those') + ' and nothing else.';
       if (snap.databases && snap.databases.length) {
         tag.title = 'Includes a dump of ' + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ');
       }
