@@ -1146,7 +1146,7 @@
     display: grid;
     /* Named areas, not auto-flow: an item with a definite grid-row is placed BEFORE the auto-flow
        items, so giving the buttons a row span sent them to column 1 and pushed the date right. */
-    grid-template-columns: minmax(0, 1fr) 132px 84px 172px;
+    grid-template-columns: minmax(0, 1fr) 132px 84px 262px;
     column-gap: var(--s-4);
     align-items: center;
     padding: 0 var(--s-4);
@@ -1194,6 +1194,13 @@
   .snap button { padding: 4px 10px; font-size: var(--t-2); }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
+  .snap-actions .icon-btn { width: 28px; height: 28px; padding: 0; }
+  .snap[data-locked] .snap-actions { opacity: 1; }
+  .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
+  .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
+  details.leave-out > summary { cursor: pointer; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+  details.leave-out[open] > summary { margin-bottom: var(--s-2); }
+  details.leave-out textarea { width: 100%; resize: vertical; font: var(--t-2)/1.5 var(--mono); }
 
   /*
     Files. The listing is the snapshot grid's shape - a column header, dense rows, sizes lined up
@@ -2124,6 +2131,8 @@
   <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 4.9-.7"/></symbol>
   <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.8 9.5A5.5 5.5 0 1 0 4 4.2"/><path d="M3.5 1.8v2.7h2.7"/><path d="M8 5v3.2l2.2 1.5"/></symbol>
   <symbol id="i-file" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z"/><path d="M9.5 2v3h3"/></symbol>
   <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 11v2.5h11V11"/></symbol>
@@ -7794,7 +7803,7 @@ function renderFileEditor(row, view) {
  */
 const ACTIVITY_TEXT = {
   start: 'Started', stop: 'Stopped', kill: 'Forced to stop', command: 'Ran', crash: 'Crashed',
-  backup: 'Backed up', restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-prune': 'Cleared old backups',
+  backup: 'Backed up', restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-prune': 'Cleared old backups', 'backup-lock': 'Locked the backup', 'backup-unlock': 'Unlocked the backup', 'backup-note': 'Noted the backup',
   'file-edit': 'Edited', 'file-create': 'Created', 'folder-create': 'Made a folder', 'file-upload': 'Uploaded',
   'file-replace': 'Replaced', 'file-move': 'Moved', 'file-delete': 'Deleted', 'file-zip': 'Zipped', 'file-unzip': 'Unzipped',
   'config-edit': 'Changed', 'config-create': 'Created', undo: 'Put back', settings: 'Changed settings:',
@@ -8234,6 +8243,43 @@ async function renderBackups(opts) {
   now.append(nowTitle, nowRow, nowNote);
   body.append(now);
 
+  // What this server's backups skip: a map plugin's rendered tiles, logs a plugin keeps. Applies
+  // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
+  // edit takes, which exists to hold exactly that file.
+  const skip = document.createElement('details');
+  skip.className = 'section leave-out';
+  if (data.exclude && data.exclude.length) skip.open = true;
+  const skipTitle = document.createElement('summary');
+  skipTitle.textContent = 'Leave out of backups' + (data.exclude && data.exclude.length ? ' (' + data.exclude.length + ')' : '');
+  const skipText = document.createElement('textarea');
+  skipText.className = 'mono';
+  skipText.rows = 4;
+  skipText.spellcheck = false;
+  skipText.placeholder = 'plugins/dynmap/web\n*.log';
+  skipText.value = (data.exclude || []).join('\n');
+  skipText.setAttribute('aria-label', 'Paths to leave out of backups, one per line');
+  const skipRow = document.createElement('div');
+  skipRow.className = 'row';
+  const skipSave = document.createElement('button');
+  skipSave.type = 'button';
+  skipSave.textContent = 'Save';
+  const skipHint = document.createElement('span');
+  skipHint.className = 'hint';
+  skipHint.textContent = 'One per line, from the server folder; * matches anything. Big things that rebuild themselves are the usual candidates. A restore cannot bring back what was left out.';
+  skipRow.append(skipSave, skipHint);
+  skip.append(skipTitle, skipText, skipRow);
+  body.append(skip);
+  skipSave.onclick = async () => {
+    skipSave.disabled = true;
+    try {
+      const out = await post(base + '/exclude', { patterns: skipText.value });
+      skipText.value = out.exclude.join('\n');
+      skipTitle.textContent = 'Leave out of backups' + (out.exclude.length ? ' (' + out.exclude.length + ')' : '');
+      toast(out.exclude.length ? 'Backups will leave out ' + out.exclude.length + (out.exclude.length === 1 ? ' path.' : ' paths.') : 'Backups leave nothing out.', 'good');
+    } catch (e) { toast(e.message, 'bad'); }
+    skipSave.disabled = false;
+  };
+
   go.onclick = async () => {
     go.disabled = true;
     const was = nowNote.textContent;
@@ -8487,6 +8533,12 @@ function renderBackupHistory(row, data, signature) {
           : 'Restoring puts back ' + onlyWhat + ' and nothing else.';
         what.append(which);
       }
+      if (snap.note) {
+        const note = document.createElement('div');
+        note.className = 'snap-note';
+        note.textContent = snap.note;
+        what.prepend(note);
+      }
       const size = document.createElement('div');
       size.className = 'size';
       size.textContent = snap.sizeHuman;
@@ -8505,9 +8557,60 @@ function renderBackupHistory(row, data, signature) {
         ? 'Stop the server first'
         : 'Extract this snapshot back over the server files';
       const drop = iconButton('trash', 'Delete', 'danger');
-      actions.append(restore, drop);
+      const glyph = (name, label) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'icon-btn';
+        b.append(icon(name));
+        b.setAttribute('aria-label', label);
+        b.title = label;
+        return b;
+      };
+      const lock = glyph(snap.locked ? 'lock' : 'unlock', snap.locked ? 'Locked - nothing deletes it. Unlock' : 'Lock, so nothing deletes it');
+      lock.setAttribute('aria-pressed', String(Boolean(snap.locked)));
+      const noteBtn = glyph('pencil', snap.note ? 'Change its note' : 'Add a note');
+      const download = glyph('download', 'Download');
+      if (snap.locked) {
+        el.setAttribute('data-locked', '');
+        drop.disabled = true;
+        drop.title = 'Locked. Unlock it first.';
+      }
+      actions.append(lock, noteBtn, download, restore, drop);
       el.append(when, size, tag, actions, what);
       list.append(el);
+
+      lock.onclick = async () => {
+        lock.disabled = true;
+        try {
+          await post(base + '/lock', { snapshot: snap.name, locked: !snap.locked });
+          toast(snap.locked ? 'Unlocked. Retention can remove it again.' : 'Locked. Neither Delete nor a schedule\u2019s retention will remove it.', 'good');
+          await renderBackups({ force: true });
+        } catch (e) {
+          toast(e.message, 'bad');
+          lock.disabled = false;
+        }
+      };
+      noteBtn.onclick = async () => {
+        const got = await ask({
+          title: 'A note for this snapshot',
+          text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
+          input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
+          confirmLabel: 'Save',
+        });
+        if (!got) return;
+        try {
+          await post(base + '/note', { snapshot: snap.name, note: got.text });
+          await renderBackups({ force: true });
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+      download.onclick = () => {
+        const a = document.createElement('a');
+        a.href = '/api' + base + '/download?snapshot=' + encodeURIComponent(snap.name);
+        a.download = snap.name;
+        document.body.append(a);
+        a.click();
+        a.remove();
+      };
 
       restore.onclick = async () => {
         const covers = describeMembers(snap.members);
@@ -8516,11 +8619,17 @@ function renderBackupHistory(row, data, signature) {
             + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ')
             + ') are imported too, which needs that database running.'
           : '';
+        const left = snap.excluded && snap.excluded.length
+          ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
+          : '';
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
           text: 'This puts back ' + covers + ' as they were on '
-            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten, and '
-            + 'restoring is not itself undoable - take a backup first if you are unsure.' + dbs,
+            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
+          choices: [
+            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. Not undoable; take a backup first if you are unsure.' },
+            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of what was there is kept in this list, so this can be undone.' },
+          ],
           confirmLabel: 'Restore',
           danger: true,
           typeToConfirm: row.name,
@@ -8528,7 +8637,8 @@ function renderBackupHistory(row, data, signature) {
         if (!ok) return;
         const note = toast('Restoring ' + snap.name + '.');
         try {
-          const out = await post(base + '/restore', { snapshot: snap.name });
+          const out = await post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean' });
+          if (out.safety) toast('What was there before is kept as ' + out.safety + '.', 'good');
           note.remove();
           const imported = (out.databases && out.databases.imported) || [];
           const skipped = (out.databases && out.databases.skipped) || [];
