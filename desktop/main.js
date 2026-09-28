@@ -165,9 +165,43 @@ function createWindow(loadUrl, theme = 'classic') {
   // Links to anywhere else belong in the real browser, not in a chrome-less app window the person
   // cannot navigate back out of. Held to the same rule as the IPC bridge: https only, so a page
   // cannot use window.open to launch a file: or ms-settings: handler that the bridge would refuse.
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  const external = ({ url }) => {
     if (typeof url === 'string' && url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }
+  }
+  // The one window the panel may open of its own: a server's console on its own, which is the
+  // panel itself at ?console=<name>. Same origin, same preload, same locked-down page.
+  win.webContents.setWindowOpenHandler((details) => {
+    const { url } = details
+    if (typeof url === 'string' && url.startsWith(loadUrl) && /^\?console=[^&#]+$/.test(url.slice(loadUrl.length))) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 980,
+          height: 660,
+          minWidth: 520,
+          minHeight: 360,
+          backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
+          icon: fs.existsSync(ICON) ? ICON : undefined,
+          autoHideMenuBar: true,
+          webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+          },
+        },
+      }
+    }
+    return external(details)
+  })
+  // A console window is held to the main window's rules: it opens nothing but real links, and
+  // stays on the panel.
+  win.webContents.on('did-create-window', (child) => {
+    child.webContents.setWindowOpenHandler(external)
+    child.webContents.on('will-navigate', (e, url) => {
+      if (!url.startsWith(loadUrl)) e.preventDefault()
+    })
   })
   // And the panel itself must stay on the panel. Nothing legitimate navigates the top frame away
   // from the loopback URL it was opened at.

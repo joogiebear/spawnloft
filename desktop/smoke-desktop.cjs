@@ -552,6 +552,18 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(await historyRow('Edited').locator('.act-undo').count(), 1, 'An edit that kept a copy must offer Undo')
     await showConsole()
     record('PASS: Files edits a config with a copy kept first, and deletes with another; Activity lists both as yours')
+
+    // The console in a window of its own: the app allows exactly this one window, the panel at
+    // ?console=<name>, and it shows that server's console and nothing else.
+    const popped = app.waitForEvent('window')
+    await page.locator('#bPopConsole').click()
+    const consolePage = await popped
+    await consolePage.waitForLoadState('domcontentloaded')
+    await consolePage.locator('#log').waitFor({ state: 'visible' })
+    assert.equal(await consolePage.locator('.dock').isVisible(), false, 'The console window must not show the tool dock')
+    assert.equal(await consolePage.title(), `${name} — console`)
+    await consolePage.close()
+    record('PASS: a server console opens in its own window, without the rest of the panel')
     if (isMac) await require('./smoke-scheduler.cjs')({ api, cli, close, launch, data, name, record })
     // Oracle publishes no small MySQL build for Linux on arm64. There the one-click button must be
     // off and say why, rather than be offered and refused; Redis below still runs.

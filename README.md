@@ -516,6 +516,16 @@ difficulty, game mode, max players, PvP, whitelist, view distance, spawn protect
 else stays in the file for `mcctl props` or an editor, and nothing the panel writes disturbs
 another key or a comment.
 
+Under **World and load** the MOTD has a preview of the server as the multiplayer list shows it -
+icon, name and the MOTD in its colours - with swatches that insert Minecraft's `§` codes, and
+**Change icon** turns any image into the 64 by 64 `server-icon.png` Minecraft wants. Under **Java and
+memory**, **Java arguments** replaces SpawnLoft's recommended (Aikar's) flags with your own; `-Xms`,
+`-Xmx` and `-jar` are refused there, since memory and the jar have their own settings, and the full
+launch line is shown either way.
+
+The console's toolbar opens it **in its own window** (`/?console=<name>`), showing that server's
+strip and console and nothing else.
+
 **Changing who can join** on a world that already has players warns first. Minecraft derives an
 offline UUID from the player's name and uses the real Mojang one otherwise, so flipping this hands
 everybody a different identity — permissions, homes, inventories and anything else a plugin keyed
