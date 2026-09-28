@@ -20,6 +20,8 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 
 - **Activity.** Every server has a history: what was done to it, when, and by whom - you, a scheduled task by name, an AI assistant by the name of its app, or SpawnLoft's own crash guard. Starts, stops and crashes, commands, backups, file and config edits, plugins, settings, worlds, players and schedules all appear, and can be narrowed to one kind of doer. A change that kept a copy of what it changed has Undo beside it, so "what did the assistant change last night" is one screen and one button. The Overview shows the last few things done on any server, and a line there opens that server's history. AI assistants can read it too, with `get_activity`.
 
+- **Scheduled tasks can be several steps.** A task can now warn the players with a countdown, take a backup, and restart - in that order, in one run, each step waiting for the one before it, so a restart never overtakes its backup. Steps can also run commands, wait, verify backups, stop and start. A failed step stops the rest unless you say otherwise, and a task can be set to run only while the server is up. Three ready-made chains cover the usual nightly routines.
+
 SpawnLoft does not insert database credentials into plugin configuration files.
 
 

@@ -217,3 +217,30 @@ test('a java that does not exist fails the start instead of hanging', { timeout:
   assert.equal(outcome.ready, false)
   assert.equal(outcome.failed, true)
 })
+
+test('a chained task tells the players, backs up and restarts, in one run', { timeout: 60000 }, async () => {
+  const name = await makeInstance('chain')
+  await sup.start(name, { timeout: 15000 })
+  const firstPid = readState(name).state.javaPid
+  // Written straight into the task file: `task run` is what the system scheduler calls, and this
+  // is that call, without asking the system scheduler to make one.
+  const id = `${name}-steps`
+  fs.writeFileSync(path.join(scratch, 'schedules.json'), JSON.stringify({ version: 1, tasks: {
+    [id]: { instance: name, name: 'Nightly restart', enabled: true, schedule: { kind: 'daily', at: '03:00' },
+      action: { type: 'steps', onlyWhenRunning: false, keepGoing: false, steps: [
+        { do: 'say', text: 'chain says hello' }, { do: 'backup', keep: 1 }, { do: 'restart' },
+      ] } },
+  } }))
+  execFileSync(process.execPath, [fileURLToPath(new URL('../spawnloft.mjs', import.meta.url)), 'task', 'run', id],
+    { encoding: 'utf8', timeout: 45000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MCCTL_DATA_ROOT: scratch } })
+
+  const log = fs.readFileSync(path.join(scratch, 'run', name, 'tasks.log'), 'utf8').trim().split('\n').at(-1)
+  assert.match(log, new RegExp(`\t${id}\tok\tsteps\ttold the players "chain says hello"; backed up .*\.tar\.gz .*; restarted$`))
+  assert.equal(readState(name).status, 'running')
+  assert.notEqual(readState(name).state.javaPid, firstPid, 'the restart step must have started a new process')
+  // Who: every entry the run made is the schedule's, by the task's name.
+  const { readActivity } = await import('../src/activity.mjs')
+  const byTask = readActivity({ server: name, by: 'schedule' }).entries.map((e) => e.action)
+  assert.deepEqual(byTask, ['start', 'stop', 'backup', 'command'])
+  await sup.stop(name)
+})

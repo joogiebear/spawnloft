@@ -1308,6 +1308,27 @@
   .act-undo { padding: 3px 9px; font-size: var(--t-2); }
   .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
   .act-more { margin-top: var(--s-3); }
+  .steps { display: grid; gap: var(--s-2); }
+  .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
+  .step {
+    counter-increment: step; display: grid; grid-template-columns: 22px 150px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2);
+    padding: 6px var(--s-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .step::before { content: counter(step); font: 600 var(--t-1)/1 var(--mono); color: var(--ink-3); text-align: center; }
+  .step > b { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); }
+  .step-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
+  .step-fields input:not([type="number"]) { flex: 1 1 160px; min-width: 0; }
+  .step-acts { display: flex; gap: 2px; }
+  .step-acts .icon-btn { width: 26px; height: 26px; font-size: 13px; }
+  /* The task form styles every label as a field's heading and every input at full width; these are
+     a sentence with a box in front. */
+  .task-form .steps label.check { display: flex; align-items: center; gap: 8px; font: 400 var(--t-2)/1.4 var(--ui); text-transform: none; letter-spacing: 0; color: var(--ink-2); }
+  .task-form .steps label.check input { width: auto; flex: none; margin: 0; }
+  @container pane (max-width: 560px) {
+    .step { grid-template-columns: 22px minmax(0, 1fr) auto; }
+    .step-fields { grid-column: 2 / -1; grid-row: 2; }
+    .step-acts { grid-column: 3; grid-row: 1; }
+  }
   .home-activity { margin-top: var(--s-6); }
   .home-activity .act-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .act-row.act-home {
@@ -6416,7 +6437,25 @@ function whenNext(text) {
   return Number.isNaN(d.getTime()) ? String(text) : stamp(d.toISOString());
 }
 
+/** A chain's steps as one line: "5-minute countdown, then back up, then restart". */
+function describeChain(action) {
+  const phrase = (st) => {
+    switch (st.do) {
+      case 'say': return 'tell the players \u201c' + st.text + '\u201d';
+      case 'command': return 'run ' + st.line;
+      case 'wait': return 'wait ' + (st.seconds % 60 === 0 ? st.seconds / 60 + ' min' : st.seconds + ' s');
+      case 'countdown': return st.minutes + '-minute countdown';
+      case 'backup': return 'back up' + (st.keep ? ' (keep ' + st.keep + ')' : '');
+      case 'verify': return 'verify the backups';
+      default: return st.do;
+    }
+  };
+  const text = action.steps.map(phrase).join(', then ');
+  return text.charAt(0).toUpperCase() + text.slice(1) + (action.onlyWhenRunning ? ' \u2014 only while running' : '');
+}
+
 function actionSummary(task, actions) {
+  if (task.action.type === 'steps') return describeChain(task.action);
   const meta = actions.find((a) => a.type === task.action.type);
   const label = meta ? meta.label : task.action.type;
   if (task.action.type === 'command') return label + ': ' + task.action.line;
@@ -6427,6 +6466,147 @@ function actionSummary(task, actions) {
     return label + ' after a ' + task.action.warnMinutes + '-minute warning';
   }
   return label;
+}
+
+/**
+ * The steps of a chained task: a list to add to, reorder and remove from, and a few ready-made
+ * chains to start from, since most people want one of the same three.
+ *
+ * <p>Returns the element and a `value()` for the form to send. The server checks every step again;
+ * this only keeps the form from offering what it would refuse.
+ */
+const STEP_LABELS = {
+  say: 'Tell the players', command: 'Run a command', wait: 'Wait', countdown: 'Count down',
+  backup: 'Take a backup', verify: 'Verify the backups', stop: 'Stop the server', start: 'Start the server', restart: 'Restart the server',
+};
+const STEP_PRESETS = [
+  { label: 'Restart with a warning and a backup first', steps: [{ do: 'countdown', minutes: 5 }, { do: 'backup', keep: 7 }, { do: 'restart' }] },
+  { label: 'Back up, telling the players', steps: [{ do: 'say', text: 'Backing up - expect a moment of lag' }, { do: 'backup', keep: 7 }, { do: 'say', text: 'Backup done' }] },
+  { label: 'Stop, take a full backup, start again', steps: [{ do: 'countdown', minutes: 1, message: 'Server stopping for a backup' }, { do: 'stop' }, { do: 'backup', keep: 7 }, { do: 'start' }] },
+];
+
+function stepsEditor(action) {
+  const el = document.createElement('div');
+  el.className = 'steps';
+  let steps = action ? action.steps.map((st) => ({ ...st })) : STEP_PRESETS[0].steps.map((st) => ({ ...st }));
+  const list = document.createElement('ol');
+  list.className = 'step-list';
+  const tools = document.createElement('div');
+  tools.className = 'row';
+  const add = document.createElement('select');
+  add.setAttribute('aria-label', 'Add a step');
+  add.append(new Option('Add a step\u2026', ''));
+  for (const [k, label] of Object.entries(STEP_LABELS)) add.append(new Option(label, k));
+  const preset = document.createElement('select');
+  preset.setAttribute('aria-label', 'Start from a ready-made chain');
+  preset.append(new Option('Start from\u2026', ''));
+  STEP_PRESETS.forEach((p, i) => preset.append(new Option(p.label, String(i))));
+  tools.append(add, preset);
+
+  const running = document.createElement('label');
+  running.className = 'check';
+  const runningBox = document.createElement('input');
+  runningBox.type = 'checkbox';
+  runningBox.checked = Boolean(action && action.onlyWhenRunning);
+  running.append(runningBox, document.createTextNode(' Only while the server is running - otherwise the whole task is skipped'));
+  const going = document.createElement('label');
+  going.className = 'check';
+  const goingBox = document.createElement('input');
+  goingBox.type = 'checkbox';
+  goingBox.checked = Boolean(action && action.keepGoing);
+  going.append(goingBox, document.createTextNode(' Keep going if a step fails'));
+  el.append(list, tools, running, going);
+
+  const num = (value, min, max, width) => {
+    const i = document.createElement('input');
+    i.type = 'number';
+    i.min = String(min);
+    i.max = String(max);
+    i.value = String(value);
+    i.style.maxWidth = width || '80px';
+    return i;
+  };
+
+  const draw = () => {
+    list.textContent = '';
+    steps.forEach((st, i) => {
+      const li = document.createElement('li');
+      li.className = 'step';
+      const name = document.createElement('b');
+      name.textContent = STEP_LABELS[st.do] || st.do;
+      const fields = document.createElement('span');
+      fields.className = 'step-fields';
+      if (st.do === 'say' || st.do === 'command') {
+        const t = document.createElement('input');
+        t.maxLength = 400;
+        t.value = st.do === 'say' ? (st.text || '') : (st.line || '');
+        t.placeholder = st.do === 'say' ? 'What the players see' : 'save-all';
+        t.oninput = () => { if (st.do === 'say') st.text = t.value; else st.line = t.value; };
+        fields.append(t);
+      } else if (st.do === 'wait') {
+        const n = num(st.seconds != null ? Math.round(st.seconds / 60 * 10) / 10 : 1, 0.1, 60);
+        n.step = '0.5';
+        n.oninput = () => { st.seconds = Math.round(Number(n.value) * 60); };
+        fields.append(n, document.createTextNode(' minutes'));
+      } else if (st.do === 'countdown') {
+        const n = num(st.minutes || 5, 1, 60);
+        n.oninput = () => { st.minutes = Number(n.value); };
+        const m = document.createElement('input');
+        m.maxLength = 120;
+        m.value = st.message || 'Server restarting';
+        m.title = 'Said as "<this> in 5 minutes", then at one minute and ten seconds';
+        m.oninput = () => { st.message = m.value; };
+        fields.append(n, document.createTextNode(' minutes: '), m);
+      } else if (st.do === 'backup') {
+        const n = num(st.keep || 7, 1, 365);
+        n.oninput = () => { st.keep = Number(n.value); };
+        fields.append(document.createTextNode('keeping '), n);
+      }
+      const acts = document.createElement('span');
+      acts.className = 'step-acts';
+      const mv = (label, glyph, d) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'icon-btn';
+        b.textContent = glyph;
+        b.setAttribute('aria-label', label);
+        b.title = label;
+        const j = i + d;
+        b.disabled = j < 0 || j >= steps.length;
+        b.onclick = () => { [steps[i], steps[j]] = [steps[j], steps[i]]; draw(); };
+        return b;
+      };
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'icon-btn';
+      rm.setAttribute('aria-label', 'Remove this step');
+      rm.title = 'Remove this step';
+      rm.append(icon('close'));
+      rm.onclick = () => { steps.splice(i, 1); draw(); };
+      acts.append(mv('Move up', '\u2191', -1), mv('Move down', '\u2193', 1), rm);
+      li.append(name, fields, acts);
+      list.append(li);
+    });
+  };
+  add.onchange = () => {
+    if (!add.value) return;
+    const k = add.value;
+    steps.push(k === 'say' ? { do: k, text: '' } : k === 'command' ? { do: k, line: '' } : k === 'wait' ? { do: k, seconds: 60 }
+      : k === 'countdown' ? { do: k, minutes: 5 } : k === 'backup' ? { do: k, keep: 7 } : { do: k });
+    add.value = '';
+    draw();
+  };
+  preset.onchange = () => {
+    if (preset.value === '') return;
+    steps = STEP_PRESETS[Number(preset.value)].steps.map((st) => ({ ...st }));
+    preset.value = '';
+    draw();
+  };
+  draw();
+  return {
+    el,
+    value: () => ({ steps: steps.map((st) => ({ ...st })), onlyWhenRunning: runningBox.checked, keepGoing: goingBox.checked }),
+  };
 }
 
 /**
@@ -6524,7 +6704,10 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
   cancel.textContent = 'Cancel';
   row.append(save, cancel);
 
-  form.append(actField, lineField, keepField, warnField, whenRow, titleField, note, row);
+  const chain = stepsEditor(task && task.action && task.action.type === 'steps' ? task.action : null);
+  const chainField = mk('Steps, in order', chain.el);
+
+  form.append(actField, lineField, keepField, warnField, chainField, whenRow, titleField, note, row);
 
   const sync = () => {
     const a = act.value;
@@ -6532,6 +6715,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     lineField.hidden = a !== 'command';
     keepField.hidden = a !== 'backup';
     warnField.hidden = a !== 'restart';
+    chainField.hidden = a !== 'steps';
     everyField.hidden = k !== 'minutes' && k !== 'hourly';
     dayField.hidden = k !== 'weekly';
     atField.hidden = k !== 'daily' && k !== 'weekly';
@@ -6549,6 +6733,8 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     title.placeholder = meta ? meta.label : 'Scheduled task';
     note.textContent = meta && meta.needsRunning
       ? 'Skipped, and recorded as skipped, whenever the server is not running at that moment.'
+      : a === 'steps'
+      ? 'One after another in one run: a step waits for the one before it, however long that takes. A step that fails stops the rest unless you say otherwise.'
       : '';
     note.hidden = !note.textContent;
   };
@@ -6565,6 +6751,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     if (act.value === 'backup') action.keep = Math.min(Math.max(Math.round(Number(keep.value)) || 1, 1), 365);
     // Zero is a real choice - an empty 5am server has nobody to warn - so || is not used here.
     if (act.value === 'restart') action.warnMinutes = Math.min(Math.max(Math.round(Number(warn.value) || 0), 0), 60);
+    if (act.value === 'steps') Object.assign(action, chain.value());
     const sched = { kind: kind.value };
     // sync() clamps when a dropdown changes; this catches a number typed straight into the box
     // afterwards, which nothing else was checking before it was sent and bounced.
