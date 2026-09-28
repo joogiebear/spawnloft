@@ -207,6 +207,12 @@ that takes one gets it: this command, the panel's Backups tab, a scheduled
 backup task, and the snapshot taken before a cross-version upgrade. If the
 flush cannot be done the snapshot is still taken and the manifest says so.
 
+In the panel a snapshot can be **locked** (neither Delete nor a schedule's retention removes it),
+given a **note**, and **downloaded**; each server has a **leave-out list** - paths with `*`
+wildcards, one per line - that every backup of it skips, and the manifest records what was left out.
+The panel's restore can also **clear first**: what the snapshot holds is copied aside as a
+`pre-restore` snapshot, removed, then restored, so the server ends exactly as the snapshot was.
+
 `restore` refuses without `--yes` and prints what it would overwrite. It
 extracts over the instance in place and deletes nothing, so a file added after
 the snapshot was taken survives a restore. To get back to exactly what the
@@ -228,7 +234,14 @@ a scheduled `verify <name> --all` can be noticed by whatever runs it.
 | `task run <id>` | Run it now — this is also what the system scheduler calls |
 
 `--do` is one of `backup`, `command` (with `--line "<what to send>"`), `restart`,
-`stop`, `start`. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
+`stop`, `start`. The panel's Schedule tool also makes **chained tasks** - several steps in one run,
+in order: tell the players, run a command, wait, count down (announced at the full time, one minute
+and ten seconds), back up (with its own retention), verify, stop, start, restart. A step waits for
+the one before it, so a restart never overtakes its backup; a step with nothing to act on (telling
+a stopped server something) is skipped, and one that fails stops the rest unless the task says to
+keep going. "Only while the server is running" skips the whole chain on a stopped server. Waits are
+capped at two hours in total and a chain at twelve steps. Ready-made chains: a restart with a
+countdown and a backup first; a backup with the players told; stop, back up, start. When: `--daily 03:00`, `--hourly <n>`, `--minutes <n>`,
 `--weekly SUN --at 03:00`, or `--on-logon`.
 
 Windows Task Scheduler or per-user macOS launchd agents run these, even with SpawnLoft closed.
@@ -458,6 +471,15 @@ and a tab in YAML or broken JSON asks before saving. While the server runs, what
 or deleted. The ports and RCON settings SpawnLoft writes into `server.properties` are refused here
 as everywhere else.
 
+**Activity** — what was done to the server, when, and by whom: you in the app or in a terminal, a
+scheduled task by name, an AI assistant by the name its app gives, or SpawnLoft itself (crash guard).
+Starts, stops and crashes, console commands, backups and restores, file and config edits, plugin
+changes, settings, worlds, players and schedules are all there, filterable by who. A change that kept
+an exact copy of what it changed - an edit, a replaced file, a delete, an assistant's config change -
+has **Undo**, allowed while the server runs on the same terms as an edit. The history is one
+`activity.jsonl` in the data folder, written by whichever process did the thing, and rolls over at
+2 MB. `get_activity` gives an assistant the same view.
+
 **Backups** — take one at a chosen scope, see every snapshot with its size, age and coverage, and
 restore or delete any of them. Restoring is refused while the server runs, because extracting over
 files a live server holds open corrupts a world rather than replacing it. Automatic backups run on
@@ -493,6 +515,16 @@ axis draws every ordinary server as a flat line on the floor.
 difficulty, game mode, max players, PvP, whitelist, view distance, spawn protection. Everything
 else stays in the file for `mcctl props` or an editor, and nothing the panel writes disturbs
 another key or a comment.
+
+Under **World and load** the MOTD has a preview of the server as the multiplayer list shows it -
+icon, name and the MOTD in its colours - with swatches that insert Minecraft's `§` codes, and
+**Change icon** turns any image into the 64 by 64 `server-icon.png` Minecraft wants. Under **Java and
+memory**, **Java arguments** replaces SpawnLoft's recommended (Aikar's) flags with your own; `-Xms`,
+`-Xmx` and `-jar` are refused there, since memory and the jar have their own settings, and the full
+launch line is shown either way.
+
+The console's toolbar opens it **in its own window** (`/?console=<name>`), showing that server's
+strip and console and nothing else.
 
 **Changing who can join** on a world that already has players warns first. Minecraft derives an
 offline UUID from the player's name and uses the real Mojang one otherwise, so flipping this hands

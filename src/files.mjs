@@ -8,6 +8,7 @@ import * as backup from './backup.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { runTar } from './tar.mjs'
 import { fail, humanBytes } from './util.mjs'
+import * as activity from './activity.mjs'
 
 /**
  * A server's folder, as its owner sees it in the Files tool.
@@ -232,6 +233,7 @@ export async function writeFile(inst, relative, { text, version = null, create =
     fail(`${rel} changed while it was being copied; reload it and try again`)
   }
   atomicWrite(full, after)
+  activity.record(inst.name, stat ? 'file-edit' : 'file-create', { detail: rel, snapshot })
   return { path: rel, version: versionOf(Buffer.from(after)), snapshot }
 }
 
@@ -242,6 +244,7 @@ export function makeFolder(inst, parent, name) {
   const { full, rel, stat } = resolvePath(inst, dir ? `${dir}/${n}` : n, { mustExist: false })
   if (stat) fail(`${rel} already exists`)
   fs.mkdirSync(full)
+  activity.record(inst.name, 'folder-create', { detail: rel })
   return { path: rel }
 }
 
@@ -289,6 +292,7 @@ export async function uploadFile(inst, parent, name, stream, { overwrite = false
     fs.rmSync(tmp, { force: true })
     throw err
   }
+  activity.record(inst.name, stat ? 'file-replace' : 'file-upload', { detail: `${rel} (${humanBytes(size)})`, snapshot })
   return { path: rel, size, snapshot }
 }
 
@@ -309,6 +313,7 @@ export function movePath(inst, from, to, { running = false } = {}) {
   const parent = path.dirname(dst.full)
   if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) fail(`${toSlash(path.relative(src.base, parent))} is not a folder`)
   fs.renameSync(src.full, dst.full)
+  activity.record(inst.name, 'file-move', { detail: `${src.rel} to ${dst.rel}` })
   return { from: src.rel, path: dst.rel }
 }
 
@@ -348,6 +353,7 @@ export async function deletePaths(inst, paths, { withoutCopy = false, running = 
     snapshot = await snapshotFirst(inst, rels, 'file-delete')
   }
   for (const r of rels) await fs.promises.rm(path.join(inst.dir, ...r.split('/')), { recursive: true, force: true })
+  activity.record(inst.name, 'file-delete', { detail: rels.join(', ') + (withoutCopy ? ' (no copy kept)' : ''), snapshot })
   return { deleted: rels, snapshot }
 }
 
@@ -370,6 +376,7 @@ export async function archivePaths(inst, paths, name) {
     fs.rmSync(tmp, { force: true })
     throw err
   }
+  activity.record(inst.name, 'file-zip', { detail: out.rel })
   return { path: out.rel, size: fs.statSync(out.full).size }
 }
 
@@ -410,6 +417,7 @@ export async function extractArchive(inst, relative, { running = false } = {}) {
     fs.rmSync(staging, { recursive: true, force: true })
     throw err
   }
+  activity.record(inst.name, 'file-unzip', { detail: `${src.rel} into ${target}` })
   return { path: target }
 }
 
@@ -453,6 +461,32 @@ export async function searchNames(inst, relative, query, { running = false } = {
     level = next
   }
   return { path: rel, query: q, results, truncated: results.length >= MAX_SEARCH_RESULTS || visits >= MAX_SEARCH_VISITS }
+}
+
+/** What the Activity tool can take back with one button: changes whose copy holds exactly them. */
+export const UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit'])
+
+/**
+ * Put back the copy a change took of what it changed - the Activity tool's Undo.
+ *
+ * <p>Only copies of named files and folders (scope files, or config narrowed to a file) qualify: a
+ * whole-server snapshot is a restore, with the Backups tool's warnings, not an undo. Unlike that
+ * restore it is allowed while the server runs, on the same terms as an edit - nothing it puts back
+ * may be something the running server holds open.
+ */
+export async function undoSnapshot(inst, snapshotName, { running = false } = {}) {
+  const snap = backup.resolveSnapshot(inst.name, String(snapshotName))
+  const members = (snap.members ?? []).map((m) => String(m).replace(/\\/g, '/'))
+  // The assistant's and the raw editor's copies are scope config, labelled before-edit; a config
+  // backup a person took can hold a single file too, and is still a backup, not an undo.
+  const narrowed = snap.scope === 'files' || (snap.scope === 'config' && snap.label === 'before-edit' && members.length === 1)
+  if (!narrowed || !members.length || (snap.databases ?? []).length) {
+    fail(`${snap.name} is a backup of the server, not a copy of one change. Restore it from Backups, with the server stopped.`)
+  }
+  for (const m of members) assertFree(inst, m, running, 'put back')
+  await backup.restoreSnapshot(inst, snap, { quiet: true })
+  activity.record(inst.name, 'undo', { detail: members.join(', '), snapshot: snap.name })
+  return { restored: snap.name, members }
 }
 
 /**

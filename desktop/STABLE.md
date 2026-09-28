@@ -18,6 +18,16 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 
 - **Files.** A server's folder is in the panel now, under Files in the dock. Open any text file in an editor that colours YAML, JSON and properties files and numbers its lines, and save it beside the console; upload by dropping files onto the list; download a file or a whole folder; rename, move, zip, unzip, and find anything by name. Every edit, replaced file and delete keeps a copy of what it changed first, and Backups can put back just that. A save over a file that changed since you opened it - the server rewrote it, or it was edited elsewhere - is refused rather than undoing that change, and a tab in YAML or broken JSON asks before it is saved. While the server runs, what it holds open - the active world, its jar, the plugins it loaded - cannot be moved, replaced or deleted.
 
+- **Activity.** Every server has a history: what was done to it, when, and by whom - you, a scheduled task by name, an AI assistant by the name of its app, or SpawnLoft's own crash guard. Starts, stops and crashes, commands, backups, file and config edits, plugins, settings, worlds, players and schedules all appear, and can be narrowed to one kind of doer. A change that kept a copy of what it changed has Undo beside it, so "what did the assistant change last night" is one screen and one button. The Overview shows the last few things done on any server, and a line there opens that server's history. AI assistants can read it too, with `get_activity`.
+
+- **Scheduled tasks can be several steps.** A task can now warn the players with a countdown, take a backup, and restart - in that order, in one run, each step waiting for the one before it, so a restart never overtakes its backup. Steps can also run commands, wait, verify backups, stop and start. A failed step stops the rest unless you say otherwise, and a task can be set to run only while the server is up. Three ready-made chains cover the usual nightly routines.
+
+- **Backups you can keep, name and take with you.** Lock a backup and nothing deletes it - not the Delete button, not a schedule's retention - so the one taken before a big change stays. Give any backup a note ("before the 1.21 upgrade"), download it to keep somewhere else, and list paths each server's backups should leave out, such as a map plugin's rendered tiles. A restore can now clear what the backup holds first, so the server ends up exactly as it was; what was cleared is kept, so that can be undone too.
+
+- **See how your server looks in the multiplayer list.** Settings shows the server's icon, name and message of the day the way players see them, with the colours; swatches insert Minecraft's colour and style codes, and any image becomes the server icon.
+- **Java arguments of your own.** Settings, under Java and memory, keeps SpawnLoft's recommended flags unless you write your own, and shows the whole launch line either way. Memory stays with the Memory setting.
+- **The console in its own window.** A button on the console's toolbar opens that server's console on its own - on a second screen, say - while the main window does something else.
+
 SpawnLoft does not insert database credentials into plugin configuration files.
 
 

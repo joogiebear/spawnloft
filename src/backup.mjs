@@ -9,6 +9,7 @@ import { readProps, worldDirs } from './props.mjs'
 import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
 import { fail, stamp, humanBytes, writeJson, readJson, UserError } from './util.mjs'
+import * as activity from './activity.mjs'
 
 /**
  * The mirror: a second location every snapshot is copied to as it is taken.
@@ -216,10 +217,14 @@ export { runTar, tarBinary } from './tar.mjs'
  * reported in the result and the manifest rather than failing the snapshot: an unflushed copy is
  * still worth more than none.
  */
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null } = {}) {
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false } = {}) {
   // `members` narrows a snapshot to named paths inside the server folder - one config file before
   // an assistant changes it - so restoring it puts back that file and touches nothing else.
-  const members = only ?? membersFor(inst, scope)
+  // What the owner said to leave out of this server's backups - a map's rendered tiles, a log a
+  // plugin keeps - applies to every backup of the server, and never to a copy of named files,
+  // which exists to hold exactly what it names.
+  const leaveOut = only ? [] : excludePatterns(inst)
+  const members = (only ?? membersFor(inst, scope)).filter((m) => !leaveOut.includes(m))
   if (!members.length) fail(`nothing to back up for scope "${scope}" in ${inst.dir}`)
 
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''
@@ -269,7 +274,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       reservation = reserveSnapshot(dir, base)
       // After the flush, so the files are checked in the state tar will find them.
       skipped = await lockedFiles(inst.dir, members)
-      const skipArgs = skipped.flatMap((f) => ['--exclude', literalPattern(f)])
+      const skipArgs = [...skipped.flatMap((f) => ['--exclude', literalPattern(f)]), ...leaveOut.flatMap((p) => ['--exclude', p])]
       ;({ stderr, code } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...skipArgs, ...members, ...dumpArgs], inst.dir))
     } finally {
       // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
@@ -322,6 +327,9 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       // The dumps, by file inside the archive, so a restore knows what to import and verify knows
       // what to look for. Empty when the server is attached to nothing.
       databases: dumps.dumped,
+      // What the owner's leave-out list kept out of this one, so a restore can say what it will not
+      // bring back.
+      ...(leaveOut.length ? { excluded: leaveOut } : {}),
       sourceDir: inst.dir,
       createdAt: new Date().toISOString(),
       size,
@@ -347,6 +355,9 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
     fs.renameSync(pending, file)
     published = true
     const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
+    // A snapshot narrowed to named files - or a quiet one - is the copy taken before something
+    // changes them, and whatever changes them records itself, naming this snapshot as its undo.
+    if (!only && !quiet) activity.record(inst.name, 'backup', { detail: `${scope}${label ? ` (${label})` : ''}, ${humanBytes(size)}`, snapshot: path.basename(file) })
     return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
   } finally {
     if (reservation && !published) {
@@ -378,6 +389,9 @@ export function listSnapshots(name) {
         label: manifest.label ?? '',
         taskId: manifest.taskId ?? null,
         members: manifest.members ?? [],
+        locked: manifest.locked === true,
+        note: manifest.note ?? null,
+        excluded: manifest.excluded ?? [],
         databases: manifest.databases ?? [],
       }
     })
@@ -427,8 +441,11 @@ export function checkRestorable(snapshot) {
   return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
 }
 
-export async function restoreSnapshot(inst, snapshot) {
+export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = false } = {}) {
   if (!fs.existsSync(inst.dir)) fail(`instance directory is missing: ${inst.dir}`)
+  if (clean && !(snapshot.members ?? []).some((m) => m !== 'databases')) {
+    fail(`${snapshot.name} does not record what it holds, so there is nothing it can safely clear first`)
+  }
 
   // Checked before a single file is touched. Extraction overwrites in place and cannot be undone,
   // so an archive that stops partway - as every hot snapshot of a server with a locked plugin
@@ -441,6 +458,25 @@ export async function restoreSnapshot(inst, snapshot) {
     fail(`${snapshot.name} would not restore cleanly, so nothing was changed.\n  ` +
       check.problems.join('\n  ') +
       `\n  Choose an older snapshot; "spawnloft verify ${inst.name} --all" checks every one.`)
+  }
+
+  /*
+    A clean restore clears what the snapshot holds before putting it back, so the server ends up
+    exactly as the snapshot was: a plugin added since, or a region file a world grew since, would
+    otherwise survive an ordinary restore, which only ever adds and overwrites. What is cleared is
+    copied first, whole - including anything the leave-out list kept out of the snapshot - so the
+    clean restore can itself be put back from the same list.
+  */
+  let safety = null
+  if (clean) {
+    const present = snapshot.members
+      .filter((m) => m !== 'databases')
+      .filter((m) => fs.existsSync(path.join(inst.dir, ...m.split(/[\\/]/))))
+    if (present.length) {
+      const res = await createSnapshot(inst, { scope: 'files', label: 'pre-restore', members: present, flush: false })
+      safety = path.basename(res.file)
+      for (const m of present) await fs.promises.rm(path.join(inst.dir, ...m.split(/[\\/]/)), { recursive: true, force: true })
+    }
   }
 
   // runTar accepts exit 1 because bsdtar uses it for warnings while creating an archive. Reading
@@ -468,7 +504,60 @@ export async function restoreSnapshot(inst, snapshot) {
       /* a folder that will not go is not worth failing a restore that already happened */
     }
   }
-  return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases }
+  if (!quiet) activity.record(inst.name, 'restore', { detail: snapshot.name + (safety ? `, cleared first; how it was is kept as ${safety}` : ''), snapshot: safety })
+  return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases, safety }
+}
+
+function manifestOf(snap) {
+  return readJson(snap.path.replace(/\.tar\.gz$/, '.json'), {})
+}
+
+function updateManifest(snap, patch) {
+  const file = snap.path.replace(/\.tar\.gz$/, '.json')
+  // A snapshot taken before manifests existed has none; the lock and the note still belong with it.
+  writeJson(file, { ...readJson(file, {}), ...patch })
+}
+
+/**
+ * Keep a snapshot: nothing deletes it until it is unlocked - not a schedule's retention limit, not
+ * the Delete button. For the one that matters, which retention would otherwise count like any other.
+ */
+export function setSnapshotLocked(name, ref, locked) {
+  const snap = resolveSnapshot(name, ref)
+  updateManifest(snap, { locked: Boolean(locked) })
+  activity.record(name, locked ? 'backup-lock' : 'backup-unlock', { detail: snap.name })
+  return { name: snap.name, locked: Boolean(locked) }
+}
+
+/** A few words saying what a snapshot is - "before the 1.21 upgrade" - shown beside its name. */
+export function setSnapshotNote(name, ref, note) {
+  const snap = resolveSnapshot(name, ref)
+  const clean = String(note ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || null
+  updateManifest(snap, { note: clean })
+  activity.record(name, 'backup-note', { detail: `${snap.name}: ${clean ?? '(note removed)'}` })
+  return { name: snap.name, note: clean }
+}
+
+/** What this server's backups leave out, as the owner wrote it. */
+export function excludePatterns(inst) {
+  return Array.isArray(inst.backupExclude) ? inst.backupExclude : []
+}
+
+/**
+ * Check a leave-out list. Paths inside the server folder, optionally with * wildcards, one per line:
+ * "plugins/dynmap/web", "*.log". Nothing that climbs out, nothing absolute, and not the whole folder.
+ */
+export function cleanExcludePatterns(input) {
+  const lines = (Array.isArray(input) ? input : String(input ?? '').split(/\r?\n/))
+    .map((l) => String(l).trim().replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, ''))
+    .filter((l) => l && !l.startsWith('#'))
+  if (lines.length > 40) fail('keep the list to 40 lines')
+  for (const l of lines) {
+    if (l.length > 200) fail(`"${l.slice(0, 40)}..." is too long`)
+    if (l.startsWith('/') || /^[a-z]:/i.test(l) || l.split('/').includes('..')) fail(`"${l}" must be a path inside the server folder`)
+    if (l === '*' || l === '**' || l === '.') fail(`"${l}" would leave out everything`)
+  }
+  return [...new Set(lines)]
 }
 
 /**
@@ -574,9 +663,11 @@ export async function verifySnapshot(name, ref) {
  */
 export function removeSnapshot(name, ref) {
   const snap = resolveSnapshot(name, ref)
+  if (manifestOf(snap).locked) fail(`${snap.name} is locked. Unlock it first if it really should go.`)
   fs.rmSync(snap.path, { force: true })
   fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
   mirrorRemove(name, snap.name)
+  activity.record(name, 'backup-delete', { detail: snap.name })
   return { removed: snap.name, size: snap.size }
 }
 
@@ -600,11 +691,14 @@ export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) 
     if (taskId && s.taskId !== taskId) return false
     return true
   })
-  const remove = all.slice(keep)
+  // A locked snapshot is one somebody decided to keep - the world before a map change, the last
+  // good one before a bad plugin. It neither counts toward the limit nor is removed by it.
+  const remove = all.filter((s) => !s.locked).slice(keep)
   for (const snap of remove) {
     fs.rmSync(snap.path, { force: true })
     fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
     mirrorRemove(name, snap.name)
   }
+  if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} old snapshot${remove.length === 1 ? '' : 's'} removed, keeping ${keep}` })
   return remove
 }

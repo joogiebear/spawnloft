@@ -120,6 +120,7 @@ Add them after `mcp` in `args`.
 | `performance` | CPU and memory over a window, plus TPS and MSPT from the server when it is running. |
 | `list_snapshots` | A server's backups, newest first. |
 | `verify_snapshot` | Reads a backup end to end and checks it holds what its manifest says. |
+| `get_activity` | What was done to a server, or to all of them, and by whom: the owner, a schedule, SpawnLoft's crash guard, or an AI assistant. Newest first. |
 | `list_plugins` | Installed plugins or mods, and which ones SpawnLoft manages. |
 | `search_plugins` | Search Modrinth and Hangar for plugins or mods this server can load. |
 | `check_plugin_updates` | Newer builds of the plugins SpawnLoft installed. |
@@ -150,6 +151,10 @@ nothing until it is called again with `confirm: true`.
 | `upgrade_minecraft` | Moves to a newer Minecraft version. Worlds migrate one way; a snapshot is taken first. |
 
 Deleting a server, database credentials and settings that hold secrets are not available through MCP.
+
+Everything an assistant changes is recorded in the server's **Activity**, under the name its app gives
+itself ("Claude Desktop", for example), beside what the owner, schedules and SpawnLoft did. A config
+change there has an **Undo** that puts back the file as it was before.
 
 ### Configuration files
 

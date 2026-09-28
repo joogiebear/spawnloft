@@ -42,6 +42,8 @@ import { QUERY_ALIASES, query } from './src/cli-query.mjs'
 import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
 import { serveStdio } from './src/mcp.mjs'
+import * as activity from './src/activity.mjs'
+import { runSteps, describeStep } from './src/task-steps.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
@@ -295,6 +297,7 @@ async function cmdCmd(positional, flags) {
   if (!sup.isRunning(name)) fail(`instance "${name}" is not running`)
 
   const [response] = await rconExec(inst, [command])
+  activity.record(name, 'command', { detail: command })
   const text = flags.raw ? response : stripColors(response)
   if (text.trim()) out(text.trimEnd())
   else out('(no output)')
@@ -1217,7 +1220,7 @@ async function cmdTask(positional, flags) {
       rows.push([
         t.id,
         t.instance,
-        t.action.type,
+        t.action.type === 'steps' ? t.action.steps.map(describeStep).join(', then ') : t.action.type,
         describeSchedule(t.schedule),
         t.enabled ? (w ? w.state : 'NOT IN SCHEDULER') : 'disabled',
         w ? schedule.describeResult(w.lastResult) : '-',
@@ -1246,7 +1249,8 @@ async function cmdTask(positional, flags) {
   if (sub === 'run') {
     const id = positional[1]
     if (!id) fail('usage: mcctl task run <id>')
-    return runTask(id)
+    // Whatever the task does is the schedule's doing, named as the person named it.
+    return activity.asActor({ kind: 'schedule', name: schedule.load().tasks[id]?.name ?? id }, () => runTask(id))
   }
 
   if (sub === 'add') {
@@ -1455,6 +1459,33 @@ async function runTask(id) {
     } else if (action.type === 'start') {
       if (running) return record('skipped', 'it was already running')
       return await startAndReport('started')
+    } else if (action.type === 'steps') {
+      // The chain's rules live in task-steps.mjs; what each step does to the server is here, the
+      // same calls the single-action tasks above make.
+      const res = await runSteps(action, {
+        isRunning: () => sup.isRunning(instance),
+        send: (line) => sup.sendConsole(instance, line),
+        sleep,
+        backup: async ({ keep }) => {
+          const snap = await backup.createSnapshot(inst, { scope: 'standard', label: 'scheduled', running: sup.isRunning(instance), taskId: id })
+          const gone = keep ? backup.pruneSnapshots(instance, keep, { only: 'scheduled', taskId: id }) : []
+          return `backed up ${path.basename(snap.file)} (${humanBytes(snap.size)})${gone.length ? `, pruned ${gone.length}` : ''}`
+        },
+        verify: async () => {
+          const snaps = backup.listSnapshots(instance)
+          const bad = []
+          for (const s of snaps) if (!(await backup.verifySnapshot(instance, s.name)).ok) bad.push(s.name)
+          if (bad.length) throw new Error(`${bad.length} of ${snaps.length} backups do not read back: ${bad.join(', ')}`)
+          return `verified ${snaps.length} backups`
+        },
+        stop: () => sup.stop(instance),
+        start: () => sup.start(instance, { timeout: TASK_START_TIMEOUT }),
+      })
+      if (res.status === 'FAILED') {
+        process.exitCode = 1
+        await alert(res.failures.join('; '))
+      }
+      return record(res.status, res.detail)
     } else {
       fail(`unknown action "${action.type}"`)
     }
@@ -1886,6 +1917,9 @@ const COMMANDS = {
 
 async function main() {
   const [, , command, ...rest] = process.argv
+  // A command typed in a terminal is the person's doing. The panel, a task and the MCP server all
+  // run through here too, and each says who it is for what it does.
+  activity.setDefaultActor({ kind: 'cli' })
   const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow'] })
   cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
   cliContext.json = flags.json !== undefined && flags.json !== false

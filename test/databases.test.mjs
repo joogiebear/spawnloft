@@ -314,6 +314,12 @@ test('a database keeps backups of its own: dumped, listed, put back behind a pre
   await services.deleteDatabaseBackup(DB, taken.name)
   assert.deepEqual(await services.listDatabaseBackups(DB), [])
   assert.deepEqual(fs.readdirSync(dir), [])
+
+  // The database's history: the dump, the restore (naming the copy of how things were), both
+  // deletes - and not the pre-restore dump as a backup of its own, which the restore already names.
+  const { readActivity } = await import('../src/activity.mjs')
+  const history = readActivity({ server: DB, limit: 10 }).entries.map((e) => e.action)
+  assert.deepEqual(history.slice(0, 4), ['backup-delete', 'backup-delete', 'restore', 'backup'])
 })
 
 test('stop goes through the admin tool over TCP and is clean, not forced', { timeout: 30000 }, async () => {

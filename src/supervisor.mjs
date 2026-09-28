@@ -10,6 +10,7 @@ import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError } from './util.mjs'
 import { patternsFor } from './ready.mjs'
+import * as activity from './activity.mjs'
 
 const DAEMON = path.join(path.dirname(fileURLToPath(import.meta.url)), 'daemon.mjs')
 
@@ -86,7 +87,24 @@ async function ensureJava(inst, { force = false } = {}) {
   return updateInstance(inst.name, { java: fallback })
 }
 
-export async function start(name, { wait = true, timeout = 180000, sync = true, force = false } = {}) {
+/**
+ * Start a server, and record that it was started - once a daemon was actually launched. A start
+ * refused before that (already running, no EULA) changed nothing and is not history.
+ */
+export async function start(name, options = {}) {
+  const attempt = { launched: false }
+  try {
+    const out = await launch(name, options, attempt)
+    const failed = out.failed || out.timedOut
+    activity.record(name, 'start', failed ? { ok: false, detail: out.reason ?? 'had not finished starting when SpawnLoft stopped waiting' } : {})
+    return out
+  } catch (err) {
+    if (attempt.launched) activity.record(name, 'start', { ok: false, detail: err.message })
+    throw err
+  }
+}
+
+async function launch(name, { wait = true, timeout = 180000, sync = true, force = false } = {}, attempt = {}) {
   let inst = getInstance(name)
   if (inst.external) fail(`"${name}" is a database that runs elsewhere (${inst.host ?? '127.0.0.1'}:${inst.port}); it is not started or stopped from here`)
   assertInstanceDir(inst)
@@ -127,6 +145,7 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   })
   child.unref()
+  attempt.launched = true
 
   // Wait for the daemon to publish its state file before reporting success.
   const deadline = Date.now() + 15000
@@ -245,10 +264,17 @@ export async function stop(name, { timeout = 90000 } = {}) {
   // releases the control pipe. Wait for it, or a following start races it for
   // the pipe name and comes up with no control channel.
   await waitForPidExit(state.daemonPid)
+  activity.record(name, 'stop')
   return res
 }
 
 export async function kill(name) {
+  const out = await forceStop(name)
+  if (!out.alreadyStopped) activity.record(name, 'kill')
+  return out
+}
+
+async function forceStop(name) {
   const { status, state } = readState(name)
   if (status === 'stopped' || status === 'stale') {
     clearState(name)
@@ -285,6 +311,7 @@ export async function kill(name) {
 export async function sendConsole(name, line) {
   const res = await controlRequest(name, { op: 'send', line })
   if (!res.ok) throw new UserError(res.error || 'send failed')
+  activity.record(name, 'command', { detail: line })
   return res
 }
 

@@ -33,6 +33,7 @@ import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
+import * as activity from './activity.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
@@ -74,7 +75,8 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       if (!isLocalRequest(req)) {
         return json(res, 403, { error: 'this panel only answers requests addressed to localhost' })
       }
-      await route(req, res)
+      // Everything done through the panel is the person at the keyboard's doing.
+      await activity.asActor({ kind: 'panel' }, () => route(req, res))
     } catch (err) {
       // A route that threw after starting a stream (the SSE routes write their headers first)
       // cannot be answered with JSON: writeHead would throw ERR_HTTP_HEADERS_SENT from inside
@@ -470,6 +472,7 @@ async function handleRawProps(req, res, name) {
   // The snapshot took a moment; the server writing its own properties meanwhile must not be lost.
   if (!configFiles.unchangedSince(plan)) fail('server.properties changed while it was being snapshotted; reload it and try again')
   configFiles.applyConfigWrite(plan)
+  activity.record(name, 'config-edit', { detail: 'server.properties', snapshot: path.basename(snap.file) })
   return json(res, 200, {
     snapshot: path.basename(snap.file),
     appliesOnRestart: supervisor.isRunning(name),
@@ -530,6 +533,59 @@ async function handleFiles(req, res, name, seg, url) {
   return json(res, 404, { error: 'not found' })
 }
 
+/**
+ * The server's icon: server-icon.png in its folder, which Minecraft shows beside the server in the
+ * multiplayer list. It must be a 64 by 64 PNG or Minecraft ignores it, so that is checked here; the
+ * panel scales whatever image it is given to that before sending it.
+ */
+async function handleIcon(req, res, name, seg) {
+  const inst = registry.getInstance(name)
+  const file = path.join(inst.dir, 'server-icon.png')
+  if (req.method === 'GET') {
+    let bytes
+    try { bytes = await fs.promises.readFile(file) } catch { return json(res, 404, { error: 'no icon' }) }
+    res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' })
+    return res.end(bytes)
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+  if (seg[4] === 'remove') {
+    await fs.promises.rm(file, { force: true })
+    activity.record(name, 'settings', { detail: 'server icon removed' })
+    return json(res, 200, { icon: false })
+  }
+  const body = await readBody(req)
+  const png = Buffer.from(String(body.png ?? '').replace(/^data:image\/png;base64,/, ''), 'base64')
+  const isPng = png.length > 24 && png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (!isPng) return json(res, 400, { error: 'the icon must be a PNG image' })
+  if (png.readUInt32BE(16) !== 64 || png.readUInt32BE(20) !== 64) return json(res, 400, { error: 'the icon must be 64 by 64 pixels' })
+  if (png.length > 256 * 1024) return json(res, 400, { error: 'that icon is too large' })
+  const tmp = `${file}.${process.pid}.tmp`
+  await fs.promises.writeFile(tmp, png)
+  await fs.promises.rename(tmp, file)
+  activity.record(name, 'settings', { detail: 'server icon changed' })
+  return json(res, 200, { icon: true, appliesOnRestart: supervisor.isRunning(name) })
+}
+
+function activityQuery(url, server = null) {
+  const q = (k) => url.searchParams.get(k) || null
+  const limit = Math.min(500, Math.max(1, Number(q('limit')) || 100))
+  return { server: server ?? q('server'), before: q('before'), since: q('since'), by: q('by'), limit }
+}
+
+/**
+ * One server's history, and Undo for the changes that kept an exact copy of what they changed.
+ * An undo is itself history: it is recorded, naming the copy it put back.
+ */
+async function handleActivity(req, res, name, seg, url) {
+  if (req.method === 'GET' && !seg[4]) return json(res, 200, { ...activity.readActivity(activityQuery(url, name)), running: supervisor.isRunning(name) })
+  if (req.method === 'POST' && seg[4] === 'undo') {
+    const body = await readBody(req)
+    if (!body.snapshot) return json(res, 400, { error: 'which change?' })
+    return json(res, 200, await files.undoSnapshot(registry.getInstance(name), String(body.snapshot), { running: supervisor.isRunning(name) }))
+  }
+  return json(res, 404, { error: 'not found' })
+}
+
 async function handleProps(req, res, name) {
   const inst = registry.getInstance(name)
   const file = path.join(inst.dir, 'server.properties')
@@ -559,6 +615,7 @@ async function handleProps(req, res, name) {
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
 
   writeProps(file, updates)
+  activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => `${k} = ${v}`).join(', ') })
   return json(res, 200, {
     changed: Object.keys(updates),
     appliesOnRestart: supervisor.isRunning(name),
@@ -578,9 +635,24 @@ async function handleBackups(req, res, name, seg) {
   const inst = registry.getInstance(name)
   const action = seg[4] ?? null
 
+  // The archive itself, to keep somewhere this machine is not.
+  if (req.method === 'GET' && action === 'download') {
+    const url = new URL(req.url, 'http://localhost')
+    const snap = backup.resolveSnapshot(name, String(url.searchParams.get('snapshot') ?? ''))
+    res.writeHead(200, {
+      'content-type': 'application/gzip',
+      'content-length': snap.size,
+      'content-disposition': `attachment; filename="${snap.name}"`,
+      'cache-control': 'no-store',
+    })
+    fs.createReadStream(snap.path).pipe(res)
+    return
+  }
+
   if (req.method === 'GET') {
     const history = {
       snapshots: backup.listSnapshots(name),
+      exclude: backup.excludePatterns(inst),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
@@ -643,8 +715,23 @@ async function handleBackups(req, res, name, seg) {
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))
-    const out = await backup.restoreSnapshot(inst, snap)
+    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true })
     return json(res, 200, out)
+  }
+
+  if (action === 'lock') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotLocked(name, String(body.snapshot), body.locked !== false))
+  }
+  if (action === 'note') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotNote(name, String(body.snapshot), body.note))
+  }
+  if (action === 'exclude') {
+    const patterns = backup.cleanExcludePatterns(body.patterns)
+    registry.updateInstance(name, { backupExclude: patterns.length ? patterns : null })
+    activity.record(name, 'settings', { detail: patterns.length ? `backups leave out ${patterns.join(', ')}` : 'backups leave nothing out' })
+    return json(res, 200, { exclude: patterns })
   }
 
   if (action === 'delete') {
@@ -791,17 +878,23 @@ async function handleWorlds(req, res, name, seg) {
   const body = await readBody(req)
 
   if (verb === 'activate') {
-    return json(res, 200, worlds.activateWorld(inst, String(body.name)))
+    const out = worlds.activateWorld(inst, String(body.name))
+    activity.record(name, 'world-activate', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'import') {
     if (!body.source || !body.name) return json(res, 400, { error: 'a source path and a name are required' })
-    return json(res, 200, await worlds.importWorld(inst, String(body.source), { name: String(body.name) }))
+    const out = await worlds.importWorld(inst, String(body.source), { name: String(body.name) })
+    activity.record(name, 'world-import', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'export') {
     return json(res, 200, await worlds.exportWorld(inst, String(body.name)))
   }
   if (verb === 'delete') {
-    return json(res, 200, worlds.deleteWorld(inst, String(body.name)))
+    const out = worlds.deleteWorld(inst, String(body.name))
+    activity.record(name, 'world-delete', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   return json(res, 404, { error: 'not found' })
 }
@@ -941,9 +1034,23 @@ async function handlePlayers(req, res, name, seg) {
   if (!body.uuid) return json(res, 400, { error: 'which player?' })
   const uuid = String(body.uuid)
 
-  if (verb === 'op') return json(res, 200, await players.setOp(inst, uuid, body.on !== false))
-  if (verb === 'ban') return json(res, 200, await players.setBan(inst, uuid, body.on !== false, body.reason))
-  if (verb === 'forget') return json(res, 200, players.forgetPlayer(inst, uuid))
+  // Named for the history by whatever the server knows them as; an id alone means nothing to read.
+  const who = () => players.listPlayers(inst).find((p) => p.uuid === uuid)?.name ?? uuid
+  if (verb === 'op') {
+    const out = await players.setOp(inst, uuid, body.on !== false)
+    activity.record(name, body.on !== false ? 'player-op' : 'player-deop', { detail: who() })
+    return json(res, 200, out)
+  }
+  if (verb === 'ban') {
+    const out = await players.setBan(inst, uuid, body.on !== false, body.reason)
+    activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
+    return json(res, 200, out)
+  }
+  if (verb === 'forget') {
+    const out = players.forgetPlayer(inst, uuid)
+    activity.record(name, 'player-forget', { detail: out.name ?? uuid })
+    return json(res, 200, out)
+  }
 
   return json(res, 404, { error: 'not found' })
 }
@@ -1043,6 +1150,8 @@ async function handleSchedules(req, res, name, seg) {
 
   if (verb === 'run') {
     schedule.runNow(id)
+    // Asked for now by the person; what the task then does is recorded as the schedule's.
+    activity.record(name, 'schedule-run', { detail: owned.name })
     // Fired, not finished: schtasks /Run returns as soon as Windows has started the task. What it
     // did shows up in the run log a moment later, which is what the panel re-reads.
     return json(res, 200, { started: true })
@@ -1109,7 +1218,11 @@ function safeInstance(row) {
   } catch {
     /* a directory that has gone missing is already reported through status */
   }
-  return { ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)) }
+  return {
+    ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)),
+    // What it would launch with were no Java arguments of its own set, for Settings to show.
+    ...(registry.isDatabase(row) ? {} : { defaultJvmFlags: registry.jvmFlagsFor(row.memory ?? '4G') }),
+  }
 }
 
 /**
@@ -1476,6 +1589,11 @@ async function route(req, res) {
   // was last backed up and whether it backs itself up. The schedule is read from SpawnLoft's own
   // task file, not asked of the operating system's scheduler - that starts a process per ask, and
   // this is asked for every server at once. Plus the machine's memory, for "14 of 32 GB reserved".
+  // Every server's history at once, newest first.
+  if (seg[1] === 'activity' && seg.length === 2 && req.method === 'GET') {
+    return json(res, 200, activity.readActivity(activityQuery(url)))
+  }
+
   if (seg[1] === 'overview' && seg.length === 2 && req.method === 'GET') {
     const tasks = Object.values(schedule.load().tasks)
     const servers = {}
@@ -1649,6 +1767,8 @@ async function route(req, res) {
   if (seg[3] === 'pack') return handlePack(req, res, name)
   if (seg[3] === 'worlds') return handleWorlds(req, res, name, seg)
   if (seg[3] === 'files') return handleFiles(req, res, name, seg, url)
+  if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
+  if (seg[3] === 'icon') return handleIcon(req, res, name, seg)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
 
   // What went wrong, in words: the known failure shapes found in this server's console,
@@ -1791,6 +1911,7 @@ async function route(req, res) {
       patch.java = bin
     }
     if (Object.hasOwn(body, 'autoRestart')) patch.autoRestart = body.autoRestart === true
+    if (Object.hasOwn(body, 'jvmFlags')) patch.jvmFlags = registry.cleanJvmFlags(body.jvmFlags)
     // Empty clears it, and the panel falls back to the name.
     if (Object.hasOwn(body, 'label')) patch.label = cleanLabel(body.label)
     if (Object.hasOwn(body, 'webhook')) {
@@ -1801,6 +1922,12 @@ async function route(req, res) {
       patch.webhook = url || null
     }
     registry.updateInstance(name, patch)
+    // The webhook is a credential of sorts - whoever has it can post to that channel - so the
+    // history says it changed, not what to.
+    const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed')
+      : k === 'jvmFlags' ? (v ? `Java arguments: ${v.join(' ')}` : 'Java arguments back to the recommended ones')
+      : `${k} = ${v}`)
+    if (said.length) activity.record(name, 'settings', { detail: said.join(', ') })
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'command') {

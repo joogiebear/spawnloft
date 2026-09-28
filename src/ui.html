@@ -1146,7 +1146,7 @@
     display: grid;
     /* Named areas, not auto-flow: an item with a definite grid-row is placed BEFORE the auto-flow
        items, so giving the buttons a row span sent them to column 1 and pushed the date right. */
-    grid-template-columns: minmax(0, 1fr) 132px 84px 172px;
+    grid-template-columns: minmax(0, 1fr) 132px 84px 262px;
     column-gap: var(--s-4);
     align-items: center;
     padding: 0 var(--s-4);
@@ -1194,6 +1194,13 @@
   .snap button { padding: 4px 10px; font-size: var(--t-2); }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
+  .snap-actions .icon-btn { width: 28px; height: 28px; padding: 0; }
+  .snap[data-locked] .snap-actions { opacity: 1; }
+  .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
+  .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
+  details.leave-out > summary { cursor: pointer; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+  details.leave-out[open] > summary { margin-bottom: var(--s-2); }
+  details.leave-out textarea { width: 100%; resize: vertical; font: var(--t-2)/1.5 var(--mono); }
 
   /*
     Files. The listing is the snapshot grid's shape - a column header, dense rows, sizes lined up
@@ -1279,6 +1286,103 @@
   .fm-dirty { width: 8px; height: 8px; border-radius: 50%; background: var(--lapis); }
   .fm-dirty[hidden] { display: none; }
   .fm-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); margin-top: var(--s-2); }
+
+  /* Activity: a day at a time, one line per thing done - when, who, what - with Undo at the end of
+     the lines that have one. Who is a chip in a colour per kind, since it is the column people scan. */
+  .act-filter { display: inline-flex; flex-wrap: wrap; gap: 2px; margin-bottom: var(--s-3); }
+  .act-list { display: grid; }
+  .act-day { margin: var(--s-4) 0 var(--s-2); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .act-day:first-child { margin-top: 0; }
+  .act-row {
+    display: grid; grid-template-columns: 64px auto minmax(0, 1fr) auto; column-gap: var(--s-3);
+    align-items: center; min-height: 36px; padding: 4px var(--s-2);
+    border-bottom: 1px solid var(--line-soft); transition: background var(--ease);
+  }
+  .act-row:hover { background: rgba(var(--ink-rgb), .035); }
+  .act-when { font: var(--t-2)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .act-who {
+    justify-self: start; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid var(--edge);
+    font: 600 var(--t-1)/1.2 var(--ui); color: var(--ink-2); background: rgba(var(--ink-rgb), .04);
+  }
+  .act-who[data-tone="you"] { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
+  .act-who[data-tone="ai"] { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
+  .act-who[data-tone="sched"] { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
+  .act-what { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+  .act-detail { overflow-wrap: anywhere; color: var(--ink-2); }
+  code.act-detail { font: var(--t-2)/1.4 var(--mono); }
+  .act-row[data-bad] .act-what > span:first-child { color: var(--fault-ink); }
+  .act-undo { padding: 3px 9px; font-size: var(--t-2); }
+  .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
+  .act-more { margin-top: var(--s-3); }
+  .launch-line {
+    display: block; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm);
+    background: var(--sunken); border: 1px solid var(--line-soft);
+    font: var(--t-1)/1.6 var(--mono); color: var(--ink-3); white-space: normal; overflow-wrap: anywhere;
+  }
+  .set-control label.check { display: flex; align-items: center; gap: 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
+  .set-control label.check input { width: auto; margin: 0; }
+  .mc-look { display: grid; gap: var(--s-2); margin-top: var(--s-2); }
+  .mc-palette { display: flex; flex-wrap: wrap; gap: 3px; }
+  .mc-swatch { width: 18px; height: 18px; padding: 0; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .25); box-shadow: none; }
+  .mc-swatch:hover:not(:disabled) { transform: none; outline: 2px solid var(--lapis-edge); }
+  .mc-style { width: 22px; height: 18px; padding: 0; font: 700 11px/1 var(--mono); justify-content: center; }
+  /* The multiplayer list's own look: a near-black strip, white name, grey MOTD, the icon at size. */
+  .mc-entry { display: flex; gap: 10px; align-items: flex-start; padding: 6px; background: #0b0b0b; border: 1px solid #2a2a2a; border-radius: 2px; max-width: 460px; }
+  .mc-icon { width: 64px; height: 64px; flex: none; image-rendering: pixelated; background: #222; }
+  .mc-text { min-width: 0; padding-top: 2px; font: 13px/1.35 var(--mono); }
+  .mc-name { color: #fff; }
+  .mc-motd { color: #aaa; overflow-wrap: anywhere; }
+
+  :root[data-console-only] header,
+  :root[data-console-only] .dock,
+  :root[data-console-only] #toolPanel,
+  :root[data-console-only] #conMini,
+  :root[data-console-only] #bPopConsole,
+  :root[data-console-only] #srvNotice,
+  :root[data-console-only] #bManage { display: none !important; }
+  :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
+  .steps { display: grid; gap: var(--s-2); }
+  .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
+  .step {
+    counter-increment: step; display: grid; grid-template-columns: 22px 150px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2);
+    padding: 6px var(--s-2); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .step::before { content: counter(step); font: 600 var(--t-1)/1 var(--mono); color: var(--ink-3); text-align: center; }
+  .step > b { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); }
+  .step-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
+  .step-fields input:not([type="number"]) { flex: 1 1 160px; min-width: 0; }
+  .step-acts { display: flex; gap: 2px; }
+  .step-acts .icon-btn { width: 26px; height: 26px; font-size: 13px; }
+  /* The task form styles every label as a field's heading and every input at full width; these are
+     a sentence with a box in front. */
+  .task-form .steps label.check { display: flex; align-items: center; gap: 8px; font: 400 var(--t-2)/1.4 var(--ui); text-transform: none; letter-spacing: 0; color: var(--ink-2); }
+  .task-form .steps label.check input { width: auto; flex: none; margin: 0; }
+  @container pane (max-width: 560px) {
+    .step { grid-template-columns: 22px minmax(0, 1fr) auto; }
+    .step-fields { grid-column: 2 / -1; grid-row: 2; }
+    .step-acts { grid-column: 3; grid-row: 1; }
+  }
+  .home-activity { margin-top: var(--s-6); }
+  .home-activity .act-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .act-row.act-home {
+    grid-template-columns: 84px minmax(90px, 160px) auto minmax(0, 1fr); width: 100%;
+    border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none;
+    background: transparent; padding: 6px var(--s-4); text-align: left; font: inherit; color: inherit;
+  }
+  .act-row.act-home:last-child { border-bottom: 0; }
+  button.act-row.act-home:hover:not(:disabled) { background: rgba(var(--ink-rgb), .035); transform: none; }
+  .act-server { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 900px) {
+    .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
+    .act-row.act-home .act-what { grid-column: 1 / -1; }
+  }
+  @container pane (max-width: 560px) {
+    .act-row { grid-template-columns: 56px minmax(0, 1fr) auto; row-gap: 4px; padding: 6px var(--s-2); }
+    .act-who { grid-column: 2; grid-row: 1; }
+    .act-what { grid-column: 1 / -1; grid-row: 2; }
+    .act-undo, .act-undone { grid-column: 3; grid-row: 1; }
+  }
 
   .section { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
   .section h3 { margin: 0; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
@@ -2054,6 +2158,9 @@
   <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
   <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 4.9-.7"/></symbol>
+  <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.8 9.5A5.5 5.5 0 1 0 4 4.2"/><path d="M3.5 1.8v2.7h2.7"/><path d="M8 5v3.2l2.2 1.5"/></symbol>
   <symbol id="i-file" viewBox="0 0 16 16"><path d="M3.5 2h6l3 3v9h-9z"/><path d="M9.5 2v3h3"/></symbol>
   <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6"/><path d="M2.5 11v2.5h11V11"/></symbol>
   <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></symbol>
@@ -2167,6 +2274,10 @@
         <button type="button" class="more-link" id="attMore" hidden></button>
       </section>
       <div class="home-cards" id="homeCards"></div>
+      <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
+        <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
+        <div class="act-list" id="homeActList"></div>
+      </section>
     </div>
 
     <!-- ============ a server is selected ================================= -->
@@ -2225,6 +2336,7 @@
           <span class="con-count" id="conCount"></span>
           <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
           <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
+          <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
           <span class="menu-wrap" id="shareWrap">
             <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
@@ -2279,6 +2391,9 @@
           <div class="pane pane-scroll" id="paneBackups" tabindex="-1">
             <div class="pane-body wide" id="backupsBody"></div>
           </div>
+          <div class="pane pane-scroll" id="paneActivity" tabindex="-1">
+            <div class="pane-body wide" id="activityBody"></div>
+          </div>
           <div class="pane pane-scroll" id="panePlayers" tabindex="-1">
             <div class="pane-body wide" id="playersBody"></div>
           </div>
@@ -2304,6 +2419,7 @@
         <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
         <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
         <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
+        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
         <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
         <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
         <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
@@ -2743,6 +2859,18 @@ const state = {
   health: null,
 };
 
+/*
+  A server's console in a window of its own - on a second screen while the panel does something else
+  - is this same page at ?console=<name>, with everything but that server's strip and console
+  hidden. It never opens a tool and never records one as open, so it cannot change what the main
+  window shows for that server next time.
+*/
+const consoleOnly = new URLSearchParams(location.search).get('console');
+if (consoleOnly) {
+  document.documentElement.setAttribute('data-console-only', '');
+  document.title = consoleOnly + ' \u2014 console';
+}
+
 /** The selected thing, whichever list it is in. */
 function rowOf(name) {
   return state.rows.find((r) => r.name === name) || state.dbs.find((r) => r.name === name) || null;
@@ -2935,14 +3063,15 @@ function show(view) {
  * hidden, which costs nothing, and means coming back to it has the scrollback intact.
  */
 const TOOL_NAMES = {
-  plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', players: 'Players',
+  plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', activity: 'Activity', players: 'Players',
   performance: 'Stats', scheduler: 'Schedule', settings: 'Settings',
 };
 // A settings form, a dense backup grid and a file listing are cramped at 480px; the rest read fine beside the
 // console. Each opens where it fits, and a tool someone moved stays where they put it.
 const POPPED_BY_DEFAULT = new Set(['settings', 'backups', 'files']);
-// A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps.
-const DB_TOOLS = new Set(['performance', 'backups', 'settings']);
+// A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps, and
+// its Activity is its starts, stops and crashes.
+const DB_TOOLS = new Set(['performance', 'backups', 'activity', 'settings']);
 const NARROW = window.matchMedia('(max-width: 1279px)');
 
 const toolView = { tool: null, popped: false };
@@ -2966,7 +3095,7 @@ function recallTool(name) {
 }
 
 function rememberTool() {
-  if (!state.current) return;
+  if (!state.current || consoleOnly) return;
   try { localStorage.setItem(toolKey(state.current), JSON.stringify(toolView)); } catch { /* see recallTool */ }
 }
 
@@ -2979,6 +3108,7 @@ function toolLabel(tool) {
 
 /** Open a tool beside the console, popped out in its place, or close it (tool null). */
 function setTool(tool, popped) {
+  if (consoleOnly) tool = null;
   if (tool && isDb(rowOf(state.current)) && !DB_TOOLS.has(tool)) tool = null;
   toolView.tool = tool || null;
   toolView.popped = Boolean(toolView.tool && popped);
@@ -3008,6 +3138,8 @@ function setTool(tool, popped) {
   if (t === 'plugins') renderPlugins();
   if (t === 'worlds') renderWorlds();
   if (t === 'files') renderFiles();
+  // Always read afresh: history is the one tool whose whole point is what changed since last time.
+  if (t === 'activity') renderActivity();
   if (t === 'performance') renderPerformance();
   // Only a visible Stats tool polls. A graph nobody is looking at is a request every ten seconds
   // for as long as the app is open.
@@ -3865,7 +3997,11 @@ async function loadOverview(force) {
   if (!force && Date.now() - overview.asked < 30000) return;
   overview.asked = Date.now();
   try {
-    overview.data = await api('/overview');
+    // The history rides along: the same "what changed" the servers' Activity tools answer, across
+    // all of them, newest first.
+    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=8').catch(() => null)]);
+    overview.data = data;
+    overview.activity = recent ? recent.entries : null;
   } catch {
     return;
   }
@@ -3893,6 +4029,39 @@ function renderOverview() {
 
   renderAttention();
   renderHomeCards();
+  renderHomeActivity();
+}
+
+/**
+ * The last few things done anywhere, and by whom. A line opens that server's Activity, where the
+ * rest of its history and any Undo are; a server since deleted has nowhere to open, and says so.
+ */
+function renderHomeActivity() {
+  const entries = overview.activity || [];
+  const box = $('#homeActList');
+  $('#homeActivity').hidden = !entries.length;
+  box.textContent = '';
+  for (const e of entries) {
+    const row = rowOf(e.server);
+    const line = document.createElement(row ? 'button' : 'div');
+    line.className = 'act-row act-home';
+    if (row) {
+      line.type = 'button';
+      line.title = 'Open ' + (row.label || row.name) + '\u2019s activity';
+      line.onclick = () => openServerTool(row.name, 'activity');
+    }
+    if (e.ok === false) line.setAttribute('data-bad', '');
+    const when = document.createElement('time');
+    when.className = 'act-when';
+    when.dateTime = e.at;
+    when.textContent = ago(e.at) || stamp(e.at);
+    when.title = new Date(e.at).toLocaleString();
+    const where = document.createElement('b');
+    where.className = 'act-server';
+    where.textContent = row ? (row.label || row.name) : e.server + ' (deleted)';
+    line.append(when, where, activityChip(e.by), activitySentence(e));
+    box.append(line);
+  }
 }
 
 // ---- needs attention ----------------------------------------------------------
@@ -6318,7 +6487,25 @@ function whenNext(text) {
   return Number.isNaN(d.getTime()) ? String(text) : stamp(d.toISOString());
 }
 
+/** A chain's steps as one line: "5-minute countdown, then back up, then restart". */
+function describeChain(action) {
+  const phrase = (st) => {
+    switch (st.do) {
+      case 'say': return 'tell the players \u201c' + st.text + '\u201d';
+      case 'command': return 'run ' + st.line;
+      case 'wait': return 'wait ' + (st.seconds % 60 === 0 ? st.seconds / 60 + ' min' : st.seconds + ' s');
+      case 'countdown': return st.minutes + '-minute countdown';
+      case 'backup': return 'back up' + (st.keep ? ' (keep ' + st.keep + ')' : '');
+      case 'verify': return 'verify the backups';
+      default: return st.do;
+    }
+  };
+  const text = action.steps.map(phrase).join(', then ');
+  return text.charAt(0).toUpperCase() + text.slice(1) + (action.onlyWhenRunning ? ' \u2014 only while running' : '');
+}
+
 function actionSummary(task, actions) {
+  if (task.action.type === 'steps') return describeChain(task.action);
   const meta = actions.find((a) => a.type === task.action.type);
   const label = meta ? meta.label : task.action.type;
   if (task.action.type === 'command') return label + ': ' + task.action.line;
@@ -6329,6 +6516,310 @@ function actionSummary(task, actions) {
     return label + ' after a ' + task.action.warnMinutes + '-minute warning';
   }
   return label;
+}
+
+// ------------------------------------------------------------ server list look ---
+
+const MC_COLOURS = {
+  0: '#000000', 1: '#0000AA', 2: '#00AA00', 3: '#00AAAA', 4: '#AA0000', 5: '#AA00AA', 6: '#FFAA00', 7: '#AAAAAA',
+  8: '#555555', 9: '#5555FF', a: '#55FF55', b: '#55FFFF', c: '#FF5555', d: '#FF55FF', e: '#FFFF55', f: '#FFFFFF',
+};
+
+/**
+ * A MOTD as Minecraft draws it. server.properties spells the section sign as \u00A7 and a line break
+ * as \n; both are read that way here, and a literal \u00a7 too. Obfuscated text (k) is shown plainly.
+ */
+function mcText(raw) {
+  const text = String(raw || '').replace(/\\u00a7/gi, '\u00a7').replace(/\\n/g, '\n');
+  const frag = document.createDocumentFragment();
+  let style = { color: MC_COLOURS[7], b: false, i: false, u: false, s: false };
+  let buf = '';
+  const flush = () => {
+    if (!buf) return;
+    const span = document.createElement('span');
+    span.textContent = buf;
+    span.style.color = style.color;
+    if (style.b) span.style.fontWeight = '700';
+    if (style.i) span.style.fontStyle = 'italic';
+    const lines = [style.u && 'underline', style.s && 'line-through'].filter(Boolean);
+    if (lines.length) span.style.textDecoration = lines.join(' ');
+    frag.append(span);
+    buf = '';
+  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '\u00a7' && i + 1 < text.length) {
+      flush();
+      const code = text[++i].toLowerCase();
+      if (Object.hasOwn(MC_COLOURS, code)) style = { color: MC_COLOURS[code], b: false, i: false, u: false, s: false };
+      else if (code === 'l') style.b = true;
+      else if (code === 'o') style.i = true;
+      else if (code === 'n') style.u = true;
+      else if (code === 'm') style.s = true;
+      else if (code === 'r') style = { color: MC_COLOURS[7], b: false, i: false, u: false, s: false };
+    } else if (ch === '\n') {
+      flush();
+      frag.append(document.createElement('br'));
+    } else {
+      buf += ch;
+    }
+  }
+  flush();
+  return frag;
+}
+
+function serverListPreview(row, input) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mc-look';
+  const palette = document.createElement('div');
+  palette.className = 'mc-palette';
+  palette.setAttribute('role', 'group');
+  palette.setAttribute('aria-label', 'Insert a colour or style');
+  const insert = (code) => {
+    const at = input.selectionStart ?? input.value.length;
+    const tag = '\\u00A7' + code;
+    input.setRangeText(tag, at, input.selectionEnd ?? at, 'end');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  };
+  for (const [code, hex] of Object.entries(MC_COLOURS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mc-swatch';
+    b.style.background = hex;
+    b.title = 'Colour \u00a7' + code;
+    b.setAttribute('aria-label', 'Colour ' + code);
+    b.onclick = () => insert(code);
+    palette.append(b);
+  }
+  for (const [code, label, glyph] of [['l', 'Bold', 'B'], ['o', 'Italic', 'I'], ['n', 'Underline', 'U'], ['m', 'Strikethrough', 'S'], ['r', 'Reset', '\u21ba']]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mc-style';
+    b.textContent = glyph;
+    b.title = label + ' (\u00a7' + code + ')';
+    b.setAttribute('aria-label', label);
+    b.onclick = () => insert(code);
+    palette.append(b);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'mc-entry';
+  card.setAttribute('aria-label', 'How it looks in the multiplayer list');
+  const img = document.createElement('img');
+  img.className = 'mc-icon';
+  img.alt = '';
+  img.width = 64;
+  img.height = 64;
+  const blank = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="#3b3b3b"/><rect x="1" y="1" width="6" height="6" fill="#555"/></svg>');
+  const iconUrl = '/api/instances/' + encodeURIComponent(row.name) + '/icon';
+  const loadIcon = () => { img.src = iconUrl + '?t=' + Date.now(); };
+  img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
+  loadIcon();
+  const text = document.createElement('div');
+  text.className = 'mc-text';
+  const title = document.createElement('div');
+  title.className = 'mc-name';
+  title.textContent = row.label || row.name;
+  const lines = document.createElement('div');
+  lines.className = 'mc-motd';
+  text.append(title, lines);
+  card.append(img, text);
+  const draw = () => { lines.textContent = ''; lines.append(mcText(input.value)); };
+  input.addEventListener('input', draw);
+  draw();
+
+  const iconRow = document.createElement('div');
+  iconRow.className = 'row';
+  const pick = document.createElement('input');
+  pick.type = 'file';
+  pick.accept = 'image/*';
+  pick.hidden = true;
+  const change = iconButton('upload', 'Change icon', 'ghost');
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'ghost';
+  remove.textContent = 'Remove icon';
+  const iconNote = document.createElement('span');
+  iconNote.className = 'hint';
+  iconNote.textContent = 'Any image; it is cut to a square and scaled to 64 by 64. Saved at once.';
+  iconRow.append(change, remove, iconNote, pick);
+  change.onclick = () => pick.click();
+  pick.onchange = async () => {
+    const file = pick.files && pick.files[0];
+    pick.value = '';
+    if (!file) return;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const side = Math.min(bitmap.width, bitmap.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const g = canvas.getContext('2d');
+      // Pixel art stays sharp; a photo is smoothed. Small sources are the pixel art.
+      g.imageSmoothingEnabled = side > 128;
+      g.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 64, 64);
+      const out = await post('/instances/' + encodeURIComponent(row.name) + '/icon', { png: canvas.toDataURL('image/png') });
+      toast('Icon saved.' + (out.appliesOnRestart ? ' Players see it after the next restart.' : ''), 'good');
+      delete img.dataset.none;
+      img.onerror = () => { img.onerror = null; img.src = blank; img.dataset.none = ''; };
+      loadIcon();
+    } catch (e) {
+      toast(e.message || 'That image could not be read.', 'bad');
+    }
+  };
+  remove.onclick = async () => {
+    try {
+      await post('/instances/' + encodeURIComponent(row.name) + '/icon/remove');
+      img.src = blank;
+      img.dataset.none = '';
+      toast('Icon removed.', 'good');
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+
+  wrap.append(palette, card, iconRow);
+  return wrap;
+}
+
+/**
+ * The steps of a chained task: a list to add to, reorder and remove from, and a few ready-made
+ * chains to start from, since most people want one of the same three.
+ *
+ * <p>Returns the element and a `value()` for the form to send. The server checks every step again;
+ * this only keeps the form from offering what it would refuse.
+ */
+const STEP_LABELS = {
+  say: 'Tell the players', command: 'Run a command', wait: 'Wait', countdown: 'Count down',
+  backup: 'Take a backup', verify: 'Verify the backups', stop: 'Stop the server', start: 'Start the server', restart: 'Restart the server',
+};
+const STEP_PRESETS = [
+  { label: 'Restart with a warning and a backup first', steps: [{ do: 'countdown', minutes: 5 }, { do: 'backup', keep: 7 }, { do: 'restart' }] },
+  { label: 'Back up, telling the players', steps: [{ do: 'say', text: 'Backing up - expect a moment of lag' }, { do: 'backup', keep: 7 }, { do: 'say', text: 'Backup done' }] },
+  { label: 'Stop, take a full backup, start again', steps: [{ do: 'countdown', minutes: 1, message: 'Server stopping for a backup' }, { do: 'stop' }, { do: 'backup', keep: 7 }, { do: 'start' }] },
+];
+
+function stepsEditor(action) {
+  const el = document.createElement('div');
+  el.className = 'steps';
+  let steps = action ? action.steps.map((st) => ({ ...st })) : STEP_PRESETS[0].steps.map((st) => ({ ...st }));
+  const list = document.createElement('ol');
+  list.className = 'step-list';
+  const tools = document.createElement('div');
+  tools.className = 'row';
+  const add = document.createElement('select');
+  add.setAttribute('aria-label', 'Add a step');
+  add.append(new Option('Add a step\u2026', ''));
+  for (const [k, label] of Object.entries(STEP_LABELS)) add.append(new Option(label, k));
+  const preset = document.createElement('select');
+  preset.setAttribute('aria-label', 'Start from a ready-made chain');
+  preset.append(new Option('Start from\u2026', ''));
+  STEP_PRESETS.forEach((p, i) => preset.append(new Option(p.label, String(i))));
+  tools.append(add, preset);
+
+  const running = document.createElement('label');
+  running.className = 'check';
+  const runningBox = document.createElement('input');
+  runningBox.type = 'checkbox';
+  runningBox.checked = Boolean(action && action.onlyWhenRunning);
+  running.append(runningBox, document.createTextNode(' Only while the server is running - otherwise the whole task is skipped'));
+  const going = document.createElement('label');
+  going.className = 'check';
+  const goingBox = document.createElement('input');
+  goingBox.type = 'checkbox';
+  goingBox.checked = Boolean(action && action.keepGoing);
+  going.append(goingBox, document.createTextNode(' Keep going if a step fails'));
+  el.append(list, tools, running, going);
+
+  const num = (value, min, max, width) => {
+    const i = document.createElement('input');
+    i.type = 'number';
+    i.min = String(min);
+    i.max = String(max);
+    i.value = String(value);
+    i.style.maxWidth = width || '80px';
+    return i;
+  };
+
+  const draw = () => {
+    list.textContent = '';
+    steps.forEach((st, i) => {
+      const li = document.createElement('li');
+      li.className = 'step';
+      const name = document.createElement('b');
+      name.textContent = STEP_LABELS[st.do] || st.do;
+      const fields = document.createElement('span');
+      fields.className = 'step-fields';
+      if (st.do === 'say' || st.do === 'command') {
+        const t = document.createElement('input');
+        t.maxLength = 400;
+        t.value = st.do === 'say' ? (st.text || '') : (st.line || '');
+        t.placeholder = st.do === 'say' ? 'What the players see' : 'save-all';
+        t.oninput = () => { if (st.do === 'say') st.text = t.value; else st.line = t.value; };
+        fields.append(t);
+      } else if (st.do === 'wait') {
+        const n = num(st.seconds != null ? Math.round(st.seconds / 60 * 10) / 10 : 1, 0.1, 60);
+        n.step = '0.5';
+        n.oninput = () => { st.seconds = Math.round(Number(n.value) * 60); };
+        fields.append(n, document.createTextNode(' minutes'));
+      } else if (st.do === 'countdown') {
+        const n = num(st.minutes || 5, 1, 60);
+        n.oninput = () => { st.minutes = Number(n.value); };
+        const m = document.createElement('input');
+        m.maxLength = 120;
+        m.value = st.message || 'Server restarting';
+        m.title = 'Said as "<this> in 5 minutes", then at one minute and ten seconds';
+        m.oninput = () => { st.message = m.value; };
+        fields.append(n, document.createTextNode(' minutes: '), m);
+      } else if (st.do === 'backup') {
+        const n = num(st.keep || 7, 1, 365);
+        n.oninput = () => { st.keep = Number(n.value); };
+        fields.append(document.createTextNode('keeping '), n);
+      }
+      const acts = document.createElement('span');
+      acts.className = 'step-acts';
+      const mv = (label, glyph, d) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'icon-btn';
+        b.textContent = glyph;
+        b.setAttribute('aria-label', label);
+        b.title = label;
+        const j = i + d;
+        b.disabled = j < 0 || j >= steps.length;
+        b.onclick = () => { [steps[i], steps[j]] = [steps[j], steps[i]]; draw(); };
+        return b;
+      };
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'icon-btn';
+      rm.setAttribute('aria-label', 'Remove this step');
+      rm.title = 'Remove this step';
+      rm.append(icon('close'));
+      rm.onclick = () => { steps.splice(i, 1); draw(); };
+      acts.append(mv('Move up', '\u2191', -1), mv('Move down', '\u2193', 1), rm);
+      li.append(name, fields, acts);
+      list.append(li);
+    });
+  };
+  add.onchange = () => {
+    if (!add.value) return;
+    const k = add.value;
+    steps.push(k === 'say' ? { do: k, text: '' } : k === 'command' ? { do: k, line: '' } : k === 'wait' ? { do: k, seconds: 60 }
+      : k === 'countdown' ? { do: k, minutes: 5 } : k === 'backup' ? { do: k, keep: 7 } : { do: k });
+    add.value = '';
+    draw();
+  };
+  preset.onchange = () => {
+    if (preset.value === '') return;
+    steps = STEP_PRESETS[Number(preset.value)].steps.map((st) => ({ ...st }));
+    preset.value = '';
+    draw();
+  };
+  draw();
+  return {
+    el,
+    value: () => ({ steps: steps.map((st) => ({ ...st })), onlyWhenRunning: runningBox.checked, keepGoing: goingBox.checked }),
+  };
 }
 
 /**
@@ -6426,7 +6917,10 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
   cancel.textContent = 'Cancel';
   row.append(save, cancel);
 
-  form.append(actField, lineField, keepField, warnField, whenRow, titleField, note, row);
+  const chain = stepsEditor(task && task.action && task.action.type === 'steps' ? task.action : null);
+  const chainField = mk('Steps, in order', chain.el);
+
+  form.append(actField, lineField, keepField, warnField, chainField, whenRow, titleField, note, row);
 
   const sync = () => {
     const a = act.value;
@@ -6434,6 +6928,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     lineField.hidden = a !== 'command';
     keepField.hidden = a !== 'backup';
     warnField.hidden = a !== 'restart';
+    chainField.hidden = a !== 'steps';
     everyField.hidden = k !== 'minutes' && k !== 'hourly';
     dayField.hidden = k !== 'weekly';
     atField.hidden = k !== 'daily' && k !== 'weekly';
@@ -6451,6 +6946,8 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     title.placeholder = meta ? meta.label : 'Scheduled task';
     note.textContent = meta && meta.needsRunning
       ? 'Skipped, and recorded as skipped, whenever the server is not running at that moment.'
+      : a === 'steps'
+      ? 'One after another in one run: a step waits for the one before it, however long that takes. A step that fails stops the rest unless you say otherwise.'
       : '';
     note.hidden = !note.textContent;
   };
@@ -6467,6 +6964,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
     if (act.value === 'backup') action.keep = Math.min(Math.max(Math.round(Number(keep.value)) || 1, 1), 365);
     // Zero is a real choice - an empty 5am server has nobody to warn - so || is not used here.
     if (act.value === 'restart') action.warnMinutes = Math.min(Math.max(Math.round(Number(warn.value) || 0), 0), 60);
+    if (act.value === 'steps') Object.assign(action, chain.value());
     const sched = { kind: kind.value };
     // sync() clamps when a dropdown changes; this catches a number typed straight into the box
     // afterwards, which nothing else was checking before it was sent and bounced.
@@ -7497,6 +7995,230 @@ function renderFileEditor(row, view) {
   save.onclick = () => write(false);
 }
 
+// --------------------------------------------------------------- activity ---
+
+/**
+ * The Activity tool: what was done to this server, when, and by whom.
+ *
+ * <p>Whom is what it is for. A server that was fine last night and is not this morning was changed
+ * by somebody - you, a schedule, an AI assistant you gave it to, or SpawnLoft's own crash guard -
+ * and this says which, in sentences. A change that kept an exact copy of what it changed (an edit,
+ * a replaced file, a delete, an assistant's config change) has Undo beside it.
+ */
+const ACTIVITY_TEXT = {
+  start: 'Started', stop: 'Stopped', kill: 'Forced to stop', command: 'Ran', crash: 'Crashed',
+  backup: 'Backed up', restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-prune': 'Cleared old backups', 'backup-lock': 'Locked the backup', 'backup-unlock': 'Unlocked the backup', 'backup-note': 'Noted the backup',
+  'file-edit': 'Edited', 'file-create': 'Created', 'folder-create': 'Made a folder', 'file-upload': 'Uploaded',
+  'file-replace': 'Replaced', 'file-move': 'Moved', 'file-delete': 'Deleted', 'file-zip': 'Zipped', 'file-unzip': 'Unzipped',
+  'config-edit': 'Changed', 'config-create': 'Created', undo: 'Put back', settings: 'Changed settings:',
+  'plugin-install': 'Installed', 'plugin-update': 'Updated', 'plugin-enable': 'Turned on', 'plugin-disable': 'Turned off', 'plugin-remove': 'Removed',
+  upgrade: 'Changed the server software:', 'world-activate': 'Switched to the world', 'world-import': 'Imported the world', 'world-delete': 'Deleted the world',
+  'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
+  'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
+  'schedule-run': 'Ran the schedule now:',
+  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset', delete: 'Deleted this server',
+};
+// Changes whose copy holds exactly what they changed. The server makes the same list; this one only
+// decides where a button is drawn.
+const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit']);
+const ACTIVITY_FILTERS = [['', 'Everything'], ['you', 'You'], ['assistant', 'AI assistants'], ['schedule', 'Schedules'], ['spawnloft', 'SpawnLoft']];
+const activityView = { by: '' };
+
+function activityActor(by) {
+  const k = by && by.kind;
+  if (k === 'panel') return { text: 'You', tone: 'you' };
+  if (k === 'cli') return { text: 'You, in a terminal', tone: 'you' };
+  if (k === 'assistant') return { text: by.name || 'AI assistant', tone: 'ai', title: 'An AI assistant, through SpawnLoft’s MCP tools' };
+  if (k === 'schedule') return { text: by.name ? 'Schedule: ' + by.name : 'A schedule', tone: 'sched' };
+  return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
+}
+
+/** What happened, as a sentence: the verb, then what it was done to, then whether it failed. */
+function activitySentence(e) {
+  const what = document.createElement('div');
+  what.className = 'act-what';
+  const verb = document.createElement('span');
+  // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
+  // the webhook; it reads as its own line rather than after a verb that says it twice.
+  if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
+  else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
+  what.append(verb);
+  if (e.detail && e.action !== 'crash') {
+    const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
+    d.className = 'act-detail';
+    d.textContent = e.detail;
+    what.append(d);
+  }
+  if (e.ok === false) {
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.dataset.tone = 'ban';
+    pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
+    what.append(pill);
+  }
+  return what;
+}
+
+/** Who did it, as the chip both screens show. */
+function activityChip(by) {
+  const who = activityActor(by);
+  const chip = document.createElement('span');
+  chip.className = 'act-who';
+  chip.dataset.tone = who.tone;
+  chip.textContent = who.text;
+  if (who.title) chip.title = who.title;
+  return chip;
+}
+
+function activityDay(iso) {
+  const d = new Date(iso);
+  const today = new Date();
+  const y = new Date(today);
+  y.setDate(today.getDate() - 1);
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  if (same(d, today)) return 'Today';
+  if (same(d, y)) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+async function renderActivity(opts) {
+  const row = rowOf(state.current);
+  const body = $('#activityBody');
+  if (!row) { body.textContent = ''; clearPaneHead(body); return; }
+  body.dataset.for = row.name;
+  const base = '/instances/' + encodeURIComponent(row.name) + '/activity';
+  const q = (before) => '?limit=60' + (activityView.by ? '&by=' + activityView.by : '') + (before ? '&before=' + encodeURIComponent(before) : '');
+
+  let data;
+  try {
+    data = await api(base + q());
+  } catch (e) {
+    body.textContent = '';
+    const bad = document.createElement('div');
+    bad.className = 'bad';
+    bad.textContent = e.message;
+    body.append(bad);
+    return;
+  }
+  if (body.dataset.for !== row.name) return;
+  body.textContent = '';
+  paneHead(body, 'history', 'Activity',
+    'What was done to this server and who did it: you, a schedule, an AI assistant, or SpawnLoft itself.');
+
+  const seg = document.createElement('div');
+  seg.className = 'seg act-filter';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Show');
+  for (const [value, label] of ACTIVITY_FILTERS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', String(activityView.by === value));
+    b.onclick = () => { activityView.by = value; renderActivity(); };
+    seg.append(b);
+  }
+  body.append(seg);
+
+  if (!data.entries.length) {
+    body.append(emptyState('history', activityView.by
+      ? 'Nothing from them yet.'
+      : 'Nothing yet. Starts and stops, backups, edits and anything an assistant or a schedule does will show here.'));
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'act-list';
+  body.append(list);
+  // An undo names the copy it put back; the change that copy undid says so rather than offering
+  // the same undo twice.
+  const undone = new Set();
+  let lastDay = null;
+
+  const draw = (entries) => {
+    for (const e of entries) if (e.action === 'undo' && e.snapshot) undone.add(e.snapshot);
+    for (const e of entries) {
+      const day = activityDay(e.at);
+      if (day !== lastDay) {
+        lastDay = day;
+        const h = document.createElement('h3');
+        h.className = 'act-day';
+        h.textContent = day;
+        list.append(h);
+      }
+      list.append(activityRow(e));
+    }
+  };
+
+  const activityRow = (e) => {
+    const line = document.createElement('div');
+    line.className = 'act-row';
+    if (e.ok === false) line.setAttribute('data-bad', '');
+    const when = document.createElement('time');
+    when.className = 'act-when';
+    when.dateTime = e.at;
+    when.textContent = new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    when.title = new Date(e.at).toLocaleString();
+    line.append(when, activityChip(e.by), activitySentence(e));
+
+    if (ACTIVITY_UNDOABLE.has(e.action) && e.snapshot) {
+      if (undone.has(e.snapshot)) {
+        const note = document.createElement('span');
+        note.className = 'act-undone';
+        note.textContent = 'Undone';
+        line.append(note);
+      } else {
+        const undo = iconButton('restore', 'Undo', 'ghost');
+        undo.className = 'ghost act-undo';
+        undo.title = 'Put back what this changed, as it was just before';
+        line.append(undo);
+        undo.onclick = async () => {
+          const ok = await ask({
+            title: 'Undo this change?',
+            text: 'Puts back ' + (e.detail || 'what it changed') + ' as it was just before. '
+              + 'Anything changed there since is replaced. The undo is recorded here too.',
+            confirmLabel: 'Undo',
+          });
+          if (!ok) return;
+          undo.disabled = true;
+          try {
+            await post(base + '/undo', { snapshot: e.snapshot });
+            toast('Put back ' + (e.detail || 'the change') + '.', 'good');
+            // What the Files tool has on screen may be the file that just changed.
+            const fsView = filesByServer.get(row.name);
+            if (fsView && !fsView.editing) $('#filesBody').dataset.for = '';
+            renderActivity();
+          } catch (err) {
+            toast(err.message, 'bad');
+            undo.disabled = false;
+          }
+        };
+      }
+    }
+    return line;
+  };
+
+  draw(data.entries);
+
+  if (data.more) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'ghost act-more';
+    more.textContent = 'Show older';
+    body.append(more);
+    let oldest = data.entries[data.entries.length - 1].at;
+    more.onclick = async () => {
+      more.disabled = true;
+      try {
+        const next = await api(base + q(oldest));
+        draw(next.entries);
+        if (next.entries.length) oldest = next.entries[next.entries.length - 1].at;
+        more.hidden = !next.more;
+      } catch (err) { toast(err.message, 'bad'); }
+      more.disabled = false;
+    };
+  }
+}
+
 // ---------------------------------------------------------------- backups ---
 
 const STAMP = new Intl.DateTimeFormat(undefined, {
@@ -7724,6 +8446,43 @@ async function renderBackups(opts) {
     : 'standard covers plugins, worlds and config. full is everything except caches and logs.';
   now.append(nowTitle, nowRow, nowNote);
   body.append(now);
+
+  // What this server's backups skip: a map plugin's rendered tiles, logs a plugin keeps. Applies
+  // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
+  // edit takes, which exists to hold exactly that file.
+  const skip = document.createElement('details');
+  skip.className = 'section leave-out';
+  if (data.exclude && data.exclude.length) skip.open = true;
+  const skipTitle = document.createElement('summary');
+  skipTitle.textContent = 'Leave out of backups' + (data.exclude && data.exclude.length ? ' (' + data.exclude.length + ')' : '');
+  const skipText = document.createElement('textarea');
+  skipText.className = 'mono';
+  skipText.rows = 4;
+  skipText.spellcheck = false;
+  skipText.placeholder = 'plugins/dynmap/web\n*.log';
+  skipText.value = (data.exclude || []).join('\n');
+  skipText.setAttribute('aria-label', 'Paths to leave out of backups, one per line');
+  const skipRow = document.createElement('div');
+  skipRow.className = 'row';
+  const skipSave = document.createElement('button');
+  skipSave.type = 'button';
+  skipSave.textContent = 'Save';
+  const skipHint = document.createElement('span');
+  skipHint.className = 'hint';
+  skipHint.textContent = 'One per line, from the server folder; * matches anything. Big things that rebuild themselves are the usual candidates. A restore cannot bring back what was left out.';
+  skipRow.append(skipSave, skipHint);
+  skip.append(skipTitle, skipText, skipRow);
+  body.append(skip);
+  skipSave.onclick = async () => {
+    skipSave.disabled = true;
+    try {
+      const out = await post(base + '/exclude', { patterns: skipText.value });
+      skipText.value = out.exclude.join('\n');
+      skipTitle.textContent = 'Leave out of backups' + (out.exclude.length ? ' (' + out.exclude.length + ')' : '');
+      toast(out.exclude.length ? 'Backups will leave out ' + out.exclude.length + (out.exclude.length === 1 ? ' path.' : ' paths.') : 'Backups leave nothing out.', 'good');
+    } catch (e) { toast(e.message, 'bad'); }
+    skipSave.disabled = false;
+  };
 
   go.onclick = async () => {
     go.disabled = true;
@@ -7978,6 +8737,12 @@ function renderBackupHistory(row, data, signature) {
           : 'Restoring puts back ' + onlyWhat + ' and nothing else.';
         what.append(which);
       }
+      if (snap.note) {
+        const note = document.createElement('div');
+        note.className = 'snap-note';
+        note.textContent = snap.note;
+        what.prepend(note);
+      }
       const size = document.createElement('div');
       size.className = 'size';
       size.textContent = snap.sizeHuman;
@@ -7996,9 +8761,60 @@ function renderBackupHistory(row, data, signature) {
         ? 'Stop the server first'
         : 'Extract this snapshot back over the server files';
       const drop = iconButton('trash', 'Delete', 'danger');
-      actions.append(restore, drop);
+      const glyph = (name, label) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'icon-btn';
+        b.append(icon(name));
+        b.setAttribute('aria-label', label);
+        b.title = label;
+        return b;
+      };
+      const lock = glyph(snap.locked ? 'lock' : 'unlock', snap.locked ? 'Locked - nothing deletes it. Unlock' : 'Lock, so nothing deletes it');
+      lock.setAttribute('aria-pressed', String(Boolean(snap.locked)));
+      const noteBtn = glyph('pencil', snap.note ? 'Change its note' : 'Add a note');
+      const download = glyph('download', 'Download');
+      if (snap.locked) {
+        el.setAttribute('data-locked', '');
+        drop.disabled = true;
+        drop.title = 'Locked. Unlock it first.';
+      }
+      actions.append(lock, noteBtn, download, restore, drop);
       el.append(when, size, tag, actions, what);
       list.append(el);
+
+      lock.onclick = async () => {
+        lock.disabled = true;
+        try {
+          await post(base + '/lock', { snapshot: snap.name, locked: !snap.locked });
+          toast(snap.locked ? 'Unlocked. Retention can remove it again.' : 'Locked. Neither Delete nor a schedule\u2019s retention will remove it.', 'good');
+          await renderBackups({ force: true });
+        } catch (e) {
+          toast(e.message, 'bad');
+          lock.disabled = false;
+        }
+      };
+      noteBtn.onclick = async () => {
+        const got = await ask({
+          title: 'A note for this snapshot',
+          text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
+          input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
+          confirmLabel: 'Save',
+        });
+        if (!got) return;
+        try {
+          await post(base + '/note', { snapshot: snap.name, note: got.text });
+          await renderBackups({ force: true });
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+      download.onclick = () => {
+        const a = document.createElement('a');
+        a.href = '/api' + base + '/download?snapshot=' + encodeURIComponent(snap.name);
+        a.download = snap.name;
+        document.body.append(a);
+        a.click();
+        a.remove();
+      };
 
       restore.onclick = async () => {
         const covers = describeMembers(snap.members);
@@ -8007,11 +8823,17 @@ function renderBackupHistory(row, data, signature) {
             + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ')
             + ') are imported too, which needs that database running.'
           : '';
+        const left = snap.excluded && snap.excluded.length
+          ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
+          : '';
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
           text: 'This puts back ' + covers + ' as they were on '
-            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten, and '
-            + 'restoring is not itself undoable - take a backup first if you are unsure.' + dbs,
+            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
+          choices: [
+            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. Not undoable; take a backup first if you are unsure.' },
+            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of what was there is kept in this list, so this can be undone.' },
+          ],
           confirmLabel: 'Restore',
           danger: true,
           typeToConfirm: row.name,
@@ -8019,7 +8841,8 @@ function renderBackupHistory(row, data, signature) {
         if (!ok) return;
         const note = toast('Restoring ' + snap.name + '.');
         try {
-          const out = await post(base + '/restore', { snapshot: snap.name });
+          const out = await post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean' });
+          if (out.safety) toast('What was there before is kept as ' + out.safety + '.', 'good');
           note.remove();
           const imported = (out.databases && out.databases.imported) || [];
           const skipped = (out.databases && out.databases.skipped) || [];
@@ -8273,9 +9096,18 @@ async function renderServerSettings() {
     }
   }
 
+  // How the server looks in a player's multiplayer list: its icon, its name, the MOTD with its
+  // colours. The MOTD box takes Minecraft's own codes (\u00A7c for red), and the swatches insert
+  // them, so nobody has to know them - but the text stays the text the file holds.
+  const motd = controls.get('motd');
+  if (motd) motd.input.parentElement.append(serverListPreview(row, motd.input));
+
   // What SpawnLoft's own settings looked like when the form was drawn, so Save can tell a change
   // from a visit. Updated after each save so the next one is measured from there.
-  const mine = { autoRestart: row.autoRestart === true, webhook: row.webhook || '', java: row.java || 'java', memory: row.memory || '4G' };
+  const mine = {
+    autoRestart: row.autoRestart === true, webhook: row.webhook || '', java: row.java || 'java', memory: row.memory || '4G',
+    jvmFlags: Array.isArray(row.jvmFlags) && row.jvmFlags.length ? row.jvmFlags.join(' ') : '',
+  };
 
   // ---- if it crashes: SpawnLoft's own settings, not server.properties -----------
   // Saved by the one Save with everything else. It goes through a different endpoint and takes
@@ -8416,6 +9248,55 @@ async function renderServerSettings() {
       value: () => memInput.value.trim(),
       invalid: () => !checkMemory(memInput, memBad),
       reset: () => { memInput.value = mine.memory; checkMemory(memInput, memBad); },
+    },
+  });
+
+  // ---- the Java arguments ------------------------------------------------------
+  // SpawnLoft's recommended flags (Aikar's) unless the owner writes their own. The whole launch line
+  // is shown under it, so what the checkbox and the box mean is visible rather than described.
+  const flagsWrap = el('div', 'set-stack');
+  const flagsOwn = el('label', 'check');
+  const flagsBox = el('input');
+  flagsBox.type = 'checkbox';
+  flagsBox.checked = Boolean(mine.jvmFlags);
+  flagsOwn.append(flagsBox, document.createTextNode(' Use my own Java arguments'));
+  const flagsText = el('textarea', 'mono');
+  flagsText.id = 's_jvmFlags';
+  flagsText.rows = 3;
+  flagsText.spellcheck = false;
+  flagsText.value = mine.jvmFlags;
+  flagsText.hidden = !flagsBox.checked;
+  flagsText.setAttribute('aria-label', 'Java arguments');
+  const flagsLine = el('code', 'launch-line');
+  flagsWrap.append(flagsOwn, flagsText, flagsLine);
+  const jarName = (row.jar || 'server.jar').split(/[\\/]/).pop();
+  const showLaunch = () => {
+    const mem = memInput.value.trim() || mine.memory;
+    const flags = flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean) : (row.defaultJvmFlags || []);
+    flagsLine.textContent = ['java', '-Xms' + mem, '-Xmx' + mem, ...flags, '-jar', jarName, '--nogui'].join(' ');
+  };
+  flagsBox.onchange = () => {
+    flagsText.hidden = !flagsBox.checked;
+    // Starting from the recommended set is easier than from nothing: most people want to add one.
+    if (flagsBox.checked && !flagsText.value.trim()) flagsText.value = (row.defaultJvmFlags || []).join(' ');
+    showLaunch();
+    update();
+  };
+  flagsText.addEventListener('input', () => { showLaunch(); update(); });
+  memInput.addEventListener('input', showLaunch);
+  showLaunch();
+  addRow(jv, {
+    id: flagsText.id,
+    label: 'Java arguments',
+    help: 'How Java runs the server, beyond memory. The recommended set suits almost every server; your own replaces it. Memory stays with the setting above, and takes effect at the next start.',
+    control: flagsWrap,
+    entry: {
+      kind: 'own', key: 'jvmFlags',
+      // Compared as one space-separated line, and saved as one: Save copies the value into `mine`,
+      // and the next comparison has to be against the same shape.
+      changed: () => (flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean).join(' ') : '') !== (mine.jvmFlags || ''),
+      value: () => (flagsBox.checked ? flagsText.value.trim().split(/\s+/).filter(Boolean).join(' ') || null : null),
+      reset: () => { flagsBox.checked = Boolean(mine.jvmFlags); flagsText.value = mine.jvmFlags || ''; flagsText.hidden = !flagsBox.checked; showLaunch(); },
     },
   });
 
@@ -10771,9 +11652,19 @@ show('empty');
 loadSettings();
 loadJavas();
 refresh().then(() => {
+  if (consoleOnly) {
+    if (rowOf(consoleOnly)) select(consoleOnly);
+    return;
+  }
   if (!state.current && (state.view === 'empty' || state.view === 'home')) showHome();
   // One server and nothing selected is not a choice worth making anyone click through.
   if (state.rows.length === 1) select(state.rows[0].name);
 });
 setInterval(refresh, 4000);
+
+$('#bPopConsole').onclick = () => {
+  if (!state.current) return;
+  // Named per server, so asking twice brings the one already open forward rather than a second.
+  window.open('/?console=' + encodeURIComponent(state.current), 'spawnloft-console-' + state.current, 'width=980,height=660');
+};
 </script>

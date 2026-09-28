@@ -17,6 +17,7 @@ import { fail, humanBytes, humanDuration } from './util.mjs'
 import { DATA_ROOT } from './paths.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
+import * as activity from './activity.mjs'
 
 /**
  * What an AI client may do to this machine's servers, and exactly that much.
@@ -205,6 +206,25 @@ const readTools = [
     },
   },
   {
+    name: 'get_activity', title: 'What was done, and by whom', annotations: READ,
+    description: 'The history of changes: starts and stops, crashes, console commands, backups, file and config edits, plugin installs, settings, schedules. Each entry says who did it - the person in the app or a terminal, a scheduled task, SpawnLoft itself (crash guard), or an AI assistant, including you. Newest first. Use it to answer "what changed" before guessing, and to check what a schedule or an earlier conversation did.',
+    inputSchema: object({
+      name: { type: 'string', description: 'One server; leave out for every server' },
+      since: { type: 'string', description: 'Only entries at or after this ISO time, e.g. "2026-09-28T00:00:00Z"' },
+      limit: { type: 'integer', minimum: 1, maximum: 200, description: 'How many entries (default 50)' },
+    }, []),
+    run({ name: n = null, since = null, limit = 50 }) {
+      const { entries, more } = activity.readActivity({ server: n, since, limit })
+      const who = (by) => by?.kind === 'assistant' ? `AI assistant${by.name ? ` (${by.name})` : ''}`
+        : by?.kind === 'schedule' ? `schedule${by.name ? ` "${by.name}"` : ''}`
+        : by?.kind === 'panel' ? 'the owner, in SpawnLoft' : by?.kind === 'cli' ? 'the owner, in a terminal' : 'SpawnLoft'
+      const text = entries.length
+        ? entries.map((e) => `${e.at}  ${e.server}  ${e.action}${e.ok === false ? ' (failed)' : ''}${e.detail ? `: ${e.detail}` : ''}  - by ${who(e.by)}`).join('\n') + (more ? '\n(older entries exist; narrow with since or raise limit)' : '')
+        : `Nothing recorded${n ? ` for ${n}` : ''}${since ? ` since ${since}` : ''}.`
+      return { data: { entries, more }, text }
+    },
+  },
+  {
     name: 'verify_snapshot', title: 'Verify a backup', annotations: READ,
     description: 'Prove a backup restores: reads the whole archive and checks it holds what its manifest says.',
     inputSchema: object({ name, snapshot: { type: 'string', description: 'Snapshot name, or "latest" (default)' } }, ['name']),
@@ -378,6 +398,7 @@ const actionTools = [
       }
       requireRunning(n)
       const [reply] = await rconExec(inst, [line])
+      activity.record(n, 'command', { detail: line })
       const text = stripColors(reply ?? '').trimEnd()
       return { data: { name: n, command: line, reply: text }, text: text || '(no output)' }
     },
@@ -457,6 +478,7 @@ const actionTools = [
         if (!configFiles.unchangedSince(plan)) fail(`${plan.shown} changed while it was being snapshotted; read it again`)
       }
       configFiles.applyConfigWrite(plan)
+      activity.record(n, plan.existed ? 'config-edit' : 'config-create', { detail: plan.shown, snapshot })
       const running = sup.isRunning(n)
       const diff = configFiles.summarizeChange(plan.before, plan.after)
       const text = [

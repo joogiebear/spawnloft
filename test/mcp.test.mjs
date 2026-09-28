@@ -336,3 +336,20 @@ test('config files: listed, read with secrets hidden, changed with a one-file sn
   assert.match(fs.readFileSync(cfg, 'utf8'), /radius: 5\n$/)
   assert.equal(fs.readFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'utf8'), 'untouched: changed later\n')
 })
+
+test('what an assistant does is in the activity log, under the name its app gives', async () => {
+  const s = await session([
+    { id: 1, method: 'initialize', params: { ...LEGACY, clientInfo: { name: 'Fixture Assistant', version: '1' } } },
+    { method: 'notifications/initialized' },
+    call(2, 'write_config_file', { name: 'royalplugins', path: 'plugins/Activity/config.yml', content: 'enabled: true\n' }),
+    call(3, 'get_activity', { name: 'royalplugins', limit: 5 }),
+  ])
+  assert.equal(s.byId.get(2).result.isError, undefined, s.byId.get(2).result.content[0].text)
+  const { entries } = s.byId.get(3).result.structuredContent
+  assert.equal(entries[0].action, 'config-create')
+  assert.equal(entries[0].detail, 'plugins/Activity/config.yml')
+  assert.deepEqual(entries[0].by, { kind: 'assistant', name: 'Fixture Assistant' })
+  assert.match(s.byId.get(3).result.content[0].text, /config-create: plugins\/Activity\/config\.yml {2}- by AI assistant \(Fixture Assistant\)/)
+  // A modern request that names no app is still the assistant's doing.
+  assert.ok(entries.some((e) => e.action === 'backup' && e.by.kind === 'assistant'))
+})
