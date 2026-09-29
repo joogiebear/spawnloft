@@ -2,7 +2,7 @@
 
 Minecraft servers on your own PC, without the terminal. A local control plane for this machine:
 multiple server instances with detached launch, captured console, RCON command/response, stdin
-injection, and snapshot/restore. The site is [spawnloft.com](https://spawnloft.com).
+injection, and snapshot/restore. The site is [spawnloft.com](https://www.spawnloft.com).
 
 SpawnLoft is the product and the preferred command-line name. `mcctl` remains a compatible
 alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for packaged
@@ -413,7 +413,7 @@ This is built for **localhost and LAN only**.
 
 The project page and the docs live in their own repository,
 [joogiebear/mcctl-site](https://github.com/joogiebear/mcctl-site), served at
-[spawnloft.com](https://spawnloft.com): a VitePress site deployed by Vercel on every push. The
+[spawnloft.com](https://www.spawnloft.com): a VitePress site deployed by Vercel on every push. The
 banner artwork partner sites embed lives there too, under `public/banner/`.
 
 ## The panel
