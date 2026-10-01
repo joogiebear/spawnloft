@@ -107,6 +107,21 @@ test('--allow-destructive adds restore, kill and upgrade_minecraft, marked destr
   assert.ok(!tools.some((t) => t.name === 'rm'))
 })
 
+test('a modern tools/list says how long it may be cached; a legacy one carries no cache fields', async () => {
+  const s = await session([
+    { id: 'm', method: 'tools/list', params: { _meta: meta() } },
+    { id: 'l', method: 'tools/list' },
+  ])
+  const modern = s.byId.get('m').result
+  assert.equal(modern.resultType, 'complete')
+  assert.equal(typeof modern.ttlMs, 'number')
+  assert.ok(['public', 'private'].includes(modern.cacheScope))
+  assert.ok(modern.tools.length > 0)
+  const legacy = s.byId.get('l').result
+  assert.equal(legacy.ttlMs, undefined)
+  assert.equal(legacy.cacheScope, undefined)
+})
+
 test('modern requests are served statelessly, with resultType and serverInfo', async () => {
   const s = await session([
     { id: 'd', method: 'server/discover', params: { _meta: meta() } },
