@@ -20,6 +20,7 @@ import { asActor } from './activity.mjs'
 export const MODERN_VERSIONS = ['2026-07-28']
 export const LEGACY_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
 const META = 'io.modelcontextprotocol/'
+const LIST_TTL_MS = 300000
 
 const INVALID_REQUEST = -32600
 const METHOD_NOT_FOUND = -32601
@@ -98,7 +99,10 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
       case 'server/discover':
         return { supportedVersions: [...MODERN_VERSIONS], capabilities, instructions }
       case 'tools/list':
-        return { tools: listing }
+        // 2026-07-28 clients reject a list that doesn't say how long it may be cached. The listing
+        // is fixed for the life of the process but depends on how the person launched it
+        // (--allow-destructive), so it is private to this client rather than shareable.
+        return modern ? { tools: listing, ttlMs: LIST_TTL_MS, cacheScope: 'private' } : { tools: listing }
       case 'tools/call':
         return callTool(params, params?._meta)
       default:
