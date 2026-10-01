@@ -206,6 +206,9 @@ of a world mid-write. That happens inside the snapshot itself, so every path
 that takes one gets it: this command, the panel's Backups tab, a scheduled
 backup task, and the snapshot taken before a cross-version upgrade. If the
 flush cannot be done the snapshot is still taken and the manifest says so.
+The flush is allowed two minutes, and `save-on` is sent whether the flush worked
+or not; if the server does not confirm it, the result and the manifest say
+autosave may still be off.
 
 In the panel a snapshot can be **locked** (neither Delete nor a schedule's retention removes it),
 given a **note**, and **downloaded**; each server has a **leave-out list** - paths with `*`

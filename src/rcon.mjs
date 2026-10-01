@@ -17,6 +17,12 @@ function encodePacket(id, type, body) {
   return buf
 }
 
+// How long an ordinary command may take to answer. The override exists for the tests, which would
+// otherwise spend eight seconds every time they need a command to be too slow.
+export const RCON_TIMEOUT_MS = Number(process.env.MCCTL_RCON_TIMEOUT_MS) > 0
+  ? Number(process.env.MCCTL_RCON_TIMEOUT_MS)
+  : 8000
+
 /**
  * Minimal RCON client. Speaks the Source protocol Minecraft uses.
  *
@@ -25,7 +31,7 @@ function encodePacket(id, type, body) {
  * treat its echo as end-of-response.
  */
 export class Rcon {
-  constructor({ host = '127.0.0.1', port, password, timeout = 8000 }) {
+  constructor({ host = '127.0.0.1', port, password, timeout = RCON_TIMEOUT_MS }) {
     this.host = host
     this.port = port
     this.password = password
@@ -45,7 +51,9 @@ export class Rcon {
       const onError = (err) => {
         socket.destroy()
         if (err.code === 'ECONNREFUSED') {
-          reject(new UserError(`RCON refused on ${this.host}:${this.port} - is the server running with enable-rcon=true?`))
+          // Nothing is listening: a server that is down, as opposed to one that is up and not
+          // answering. Callers that must tell the two apart read the code, not the message.
+          reject(Object.assign(new UserError(`RCON refused on ${this.host}:${this.port} - is the server running with enable-rcon=true?`), { code: 'ECONNREFUSED' }))
         } else {
           reject(new UserError(`RCON connection failed: ${err.message}`))
         }
@@ -148,6 +156,8 @@ export class Rcon {
 
 /** Errors that mean "the socket died", as opposed to "the server said no". */
 const TRANSIENT = /connection closed|ECONNRESET|EPIPE|ECONNABORTED|timed out/i
+/** The same without the slow ones: a socket that was cut, not a server that took too long. */
+const DROPPED = /connection closed|ECONNRESET|EPIPE|ECONNABORTED/i
 
 /**
  * Connect, run one or more commands, disconnect.
@@ -156,23 +166,35 @@ const TRANSIENT = /connection closed|ECONNRESET|EPIPE|ECONNABORTED|timed out/i
  * one-shot commands reliably loses one partway through. A fresh connection
  * succeeds immediately, so transient socket failures are retried. Auth
  * failures and command errors are not retried; they would fail identically.
+ *
+ * <p>`timeout` is how long a command may take to answer, for one that is expected to be slow.
+ * `retryTimeouts: false` is for the same commands: a second attempt after a timeout does not make
+ * a slow command faster, it asks again and waits again. A socket that was cut is still retried.
+ *
+ * <p>An error thrown from here has `unsent: true` when it came before anything could have been
+ * written, on any attempt: no port, a refused connection, a wrong password. A caller that has to
+ * know whether a command may have run - `save-off`, say - needs that, because a timeout after the
+ * write says nothing about what the server did, and one before it says the server did nothing.
  */
-export async function rconExec(inst, commands, { attempts = 3 } = {}) {
+export async function rconExec(inst, commands, { attempts = 3, timeout = RCON_TIMEOUT_MS, retryTimeouts = true } = {}) {
   if (!inst.rcon?.port) {
-    throw new UserError(`instance "${inst.name}" has no RCON port configured`)
+    throw Object.assign(new UserError(`instance "${inst.name}" has no RCON port configured`), { unsent: true })
   }
 
+  const retryable = retryTimeouts ? TRANSIENT : DROPPED
   let lastErr
+  let connected = false
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const rcon = new Rcon({ port: inst.rcon.port, password: inst.rcon.password })
+    const rcon = new Rcon({ port: inst.rcon.port, password: inst.rcon.password, timeout })
     try {
       await rcon.connect()
+      connected = true
       const out = []
       for (const cmd of commands) out.push(await rcon.send(cmd))
       return out
     } catch (err) {
       lastErr = err
-      if (attempt === attempts || !TRANSIENT.test(err.message)) throw err
+      if (attempt === attempts || !retryable.test(err.message)) throw Object.assign(err, { unsent: !connected })
       await sleep(120 * attempt)
     } finally {
       rcon.close()
