@@ -12,6 +12,7 @@ import { diagnose } from './diagnose.mjs'
 import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
+import { mcpNotice } from './private-copy.mjs'
 import { readState } from './control.mjs'
 import { fail, humanBytes, humanDuration } from './util.mjs'
 import { DATA_ROOT } from './paths.mjs'
@@ -319,11 +320,15 @@ const readTools = [
   },
   {
     name: 'doctor', title: 'Check this machine', annotations: READ,
-    description: 'Environment checks: Java, tar, every server\'s folder, jar, EULA, port collisions, orphaned processes and RCON exposure. Changes nothing.',
+    description: 'Environment checks: Java, tar, every server\'s folder, jar, EULA, port collisions, orphaned processes, RCON exposure, and on Windows a second copy of SpawnLoft\'s data kept for a packaged app. Changes nothing.',
     inputSchema: object(),
     async run() {
       const data = await runDoctor({ repair: false })
-      return { data, text: data.healthy ? 'No problems found.' : `${data.problems.length} problem(s):\n- ${data.problems.join('\n- ')}` }
+      // A client that is itself the one being redirected reads the copy as the real thing, so for it
+      // the check finds nothing to compare: it must not be left with a bare "No problems found."
+      const notice = mcpNotice(data.privateCopies)
+      const text = data.healthy ? 'No problems found.' : `${data.problems.length} problem(s):\n- ${data.problems.join('\n- ')}`
+      return { data, text: notice ? `${text}\n${notice}` : text }
     },
   },
 ]

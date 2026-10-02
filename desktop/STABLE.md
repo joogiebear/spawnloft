@@ -27,6 +27,7 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 - **See how your server looks in the multiplayer list.** Settings shows the server's icon, name and message of the day the way players see them, with the colours; swatches insert Minecraft's colour and style codes, and any image becomes the server icon.
 - **Java arguments of your own.** Settings, under Java and memory, keeps SpawnLoft's recommended flags unless you write your own, and shows the whole launch line either way. Memory stays with the Memory setting.
 - **The console in its own window.** A button on the console's toolbar opens that server's console on its own - on a second screen, say - while the main window does something else.
+- **Doctor notices a second copy of your data on Windows.** An AI assistant installed as a Windows package is given a private copy of what it writes under AppData, and the programs it starts read that copy from then on - so it can keep seeing the servers as they were the last time it wrote the registry - a server missing, a memory setting out of date - while its backups pile up where the Backups tab never looks. `spawnloft doctor` now finds the copy and says what differs and what to do about it, and the assistant is told at the start to ask you to run it outside the assistant, since a program that is itself redirected cannot see the difference. See [MCP.md](https://github.com/joogiebear/spawnloft/blob/main/MCP.md).
 
 ## Fixed
 

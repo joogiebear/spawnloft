@@ -97,6 +97,40 @@ tend to call the wrong tool or invent server names.
 
 `node spawnloft.mjs mcp`, with Node 20 or later. No `ELECTRON_RUN_AS_NODE` is needed.
 
+### If the server list or backups look out of date (Windows)
+
+An AI client installed as a Windows package (an MSIX, as some desktop apps are) is given a private
+copy of whatever it writes under `%LOCALAPPDATA%`, and the programs it starts - `spawnloft mcp`
+included - read that copy from then on, not the real file. If one of them has ever written SpawnLoft's
+registry, it keeps seeing the servers as they were that day: a server made later in the app is
+missing, a setting changed there reads as it used to, and the backups and the activity it records
+land in a folder the app never opens. Nothing is wrong with any file; two programs are reading two
+files that share a path.
+
+Run `spawnloft doctor` **from a terminal, or from the app - not through the assistant.** It looks for
+the copy, in `%LOCALAPPDATA%\Packages\<package>\LocalCache`, and says what differs. A program that is
+itself being redirected reads the copy as the real registry, so it has nothing to compare: the
+assistant's `doctor` tool can only mention that a copy exists, and the MCP server says so when it
+starts, so that the assistant asks you to run doctor outside it.
+
+What doctor reports, and what to do about it:
+
+- **A registry that disagrees.** Rename the copy's `instances.json` that doctor names, so those
+  programs read the real one. If doctor says a server exists only in the copy, copy its entry into
+  the real registry first, or renaming drops it.
+- **Backups only in the copy.** They are not in the Backups tab and may go if that program is reset
+  or uninstalled. Copy each server's `.tar.gz` and `.json` files into the same folder under the
+  app's backups folder.
+- **Files from servers' folders in the copy.** Programs that were reading it also saw different
+  plugin settings and the like. Renaming the registry does not undo that.
+- **Settings that differ.** They decide where the data folder is. Rename the copy's `settings.json`
+  if the real one is right.
+
+The copy can return the next time such a program writes the registry. Keeping SpawnLoft's data
+outside `%LOCALAPPDATA%` stops it, but nothing moves a data folder for you yet: `spawnloft config
+set-root` and the app's Change the data folder start a new, empty registry and leave existing servers
+where they are.
+
 ## Options
 
 | Option | Effect |
@@ -127,7 +161,7 @@ Add them after `mcp` in `args`.
 | `check_server_update` | A newer build of the server's software (Paper, Purpur, Folia or Advanced Slime Paper), and newer Minecraft versions it supports. |
 | `list_config_files` | A server's text configuration files, or those in one folder such as `plugins/EcoItems`. |
 | `read_config_file` | One configuration file, with secret values shown as `[redacted]`. |
-| `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports. |
+| `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports, and on Windows a second copy of SpawnLoft's data kept for a packaged app (see above). |
 
 **Actions.** Marked as changes, so your AI app asks before running them.
 
