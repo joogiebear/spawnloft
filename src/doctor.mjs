@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { DATA_ROOT, ROOT } from './paths.mjs'
+import { DATA_ROOT, LAYOUT, ROOT } from './paths.mjs'
 import { describeServersElsewhere } from './settings.mjs'
+import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
 import { rconExposure } from './exposure.mjs'
@@ -37,6 +38,13 @@ export async function runDoctor({ repair = false } = {}) {
   if (!listInstances().length) {
     for (const line of describeServersElsewhere(DATA_ROOT)) problems.push(line)
   }
+
+  // Two programs reading two files that share a path: see private-copy.mjs. Asked of every doctor,
+  // because the program that is wrong cannot tell - a registry that reads as it does is all it has.
+  const privateCopies = await findPrivateCopies()
+  const described = describePrivateCopies(privateCopies, { backupsDir: LAYOUT.backupsDir })
+  problems.push(...described.problems)
+  notes.push(...described.notes)
 
   const seenPorts = new Map()
   for (const inst of listInstances()) {
@@ -76,5 +84,7 @@ export async function runDoctor({ repair = false } = {}) {
     }
     notes.push(`${inst.name}: ${humanBytes(dirSize(inst.dir))} on disk at ${inst.dir}`)
   }
-  return { healthy: problems.length === 0, notes, problems }
+  // `privateCopies` is for the MCP tool, which says more than "no problems" about one; the CLI's JSON
+  // names its fields, so its documented shape is unchanged.
+  return { healthy: problems.length === 0, notes, problems, privateCopies }
 }

@@ -45,6 +45,7 @@ import { serveStdio } from './src/mcp.mjs'
 import * as activity from './src/activity.mjs'
 import { runSteps, describeStep } from './src/task-steps.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
+import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
@@ -1726,9 +1727,12 @@ async function cmdMcp(positional, flags) {
   try {
     version = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')).version
   } catch { /* a checkout without package.json still serves */ }
+  // A client started as a Windows package can be reading a private copy of SpawnLoft's data and not
+  // know it, so it is told once, here. See private-copy.mjs.
+  const notice = mcpNotice(await findPrivateCopies())
   await serveStdio({
     info: { name: 'spawnloft', title: 'SpawnLoft', version: version ?? '0.0.0' },
-    instructions: INSTRUCTIONS,
+    instructions: notice ? `${INSTRUCTIONS}\n${notice}` : INSTRUCTIONS,
     tools: toolsFor({ allowDestructive: flags.allowDestructive === true }),
     scrub: scrubber({ showIps: flags.showIps === true }),
   })
