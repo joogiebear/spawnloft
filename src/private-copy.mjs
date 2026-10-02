@@ -245,9 +245,9 @@ const plural = (n, one, many) => (n === 1 ? one : many)
  * <p>The way out offered is the one that works without moving anything: rename the copy's file, so the
  * programs that were reading it read the real one. It is not a cure - the next time one of them writes,
  * Windows makes a new copy - and the text says so. And it is not offered blind: a server that is only in
- * the copy goes with it. Moving the data out of AppData is the cure, and is only mentioned elsewhere
- * because nothing here moves a data root: `config set-root` leaves existing servers where they are and
- * starts a new, empty registry.
+ * the copy goes with it. The cure is `spawnloft data move <folder>` (data-move.mjs), which moves the data
+ * out of AppData and leaves a link, so the problem text points there. `config set-root` is not it: that
+ * leaves existing servers where they are and starts a new, empty registry.
  */
 export function describePrivateCopies(copies, { backupsDir } = {}) {
   const problems = []
@@ -268,7 +268,7 @@ export function describePrivateCopies(copies, { backupsDir } = {}) {
         `${copy.package} has its own copy of SpawnLoft's registry, ${registry.file}, and it disagrees with the one read here (${sides}). ` +
           `Windows gives a program installed as a package a private copy of what it writes under AppData, and every program that one starts - "spawnloft mcp" among them - reads that copy from then on, ` +
           `so what they report about servers and their settings can differ from the SpawnLoft app's. ` +
-          `${loses}To stop them reading different registries, rename ${registry.file}: those programs then read the real one. It can come back the next time one of them writes to it.`,
+          `${loses}To stop them reading different registries, rename ${registry.file}: those programs then read the real one. It can come back the next time one of them writes to it; to stop it for good, \`spawnloft data move <folder>\` moves the data out of AppData and leaves a link, so nothing else needs changing.`,
       )
     } else if (registry.state === 'unreadable') {
       problems.push(`${copy.package} has its own copy of SpawnLoft's registry, ${registry.file}, and it could not be read, so what the programs it starts report about servers cannot be trusted. Rename it so they read the real registry.`)

@@ -252,6 +252,7 @@ test('a registry that differs is a problem that names the copy, the two sides, a
   assert.ok(text.includes(path.join(privateData(m), 'instances.json')), 'the file to rename, in full')
   assert.match(text, /rename .*instances\.json/i)
   assert.match(text, /can come back/)
+  assert.match(text, /for good, `spawnloft data move <folder>` moves the data out of AppData/)
   assert.doesNotMatch(text, /drop/, 'nothing is lost by renaming this one, so nothing is said about losing it')
 })
 

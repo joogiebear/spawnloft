@@ -47,6 +47,7 @@ import { runSteps, describeStep } from './src/task-steps.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
+import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -860,8 +861,9 @@ function cmdConfig(positional, flags) {
       : {})
     out(`Saved. ${sub === 'set-root' ? 'Data root' : 'Instances directory'}: ${abs}`)
     out('')
-    out('Takes effect on the next command. Existing servers do NOT move — the registry stores')
-    out('their absolute paths, so they keep running where they are; only new ones land here.')
+    out('Takes effect on the next command. Nothing is moved: the registry is inside the data root, so')
+    out('the servers you already have are not listed under the new one, and keep running where they are.')
+    out('To move the data and keep everything working: spawnloft data move <folder>')
     return
   }
 
@@ -891,6 +893,138 @@ function cmdConfig(positional, flags) {
   }
 
   fail('usage: mcctl config [show|set-root <path>|set-instances <path>|same-drive]')
+}
+
+// ----------------------------------------------------------------------- data
+
+/**
+ * Moving the data folder, and leaving a link where it was. See data-move.mjs for why a link and not
+ * a setting: the registry lives inside the folder, so changing where the folder is would lose the
+ * servers, and the paths they are stored under would all be wrong.
+ */
+async function cmdData(positional, flags) {
+  checkFlags(flags, ['json', 'yes', 'thorough', 'setAsidePrivateCopies'])
+  // The older commands put `--yes` last and it is not a declared boolean, so `data move --yes <folder>`
+  // reads the folder as its value. It is a folder.
+  if (typeof flags.yes === 'string') {
+    positional = [...positional, flags.yes]
+    flags.yes = true
+  }
+  const [sub, ...args] = positional
+  const root = paths.DATA_ROOT
+  const json = flags.json === true
+  const usage = 'Usage: spawnloft data move <folder> [--yes] [--thorough] [--set-aside-private-copies] | status | finish [--yes] | rollback'
+
+  if (sub === 'move') {
+    if (args.length !== 1) throw new UsageError(usage)
+    const dryRun = flags.yes !== true
+    let lastShown = 0
+    const done = await moveData({
+      root,
+      dest: args[0],
+      dryRun,
+      thorough: flags.thorough === true,
+      setAsidePrivateCopies: flags.setAsidePrivateCopies === true,
+      onStep: (step) => { if (!json) out(`  ${step}...`) },
+      onProgress: json ? null : (p) => {
+        if (Date.now() - lastShown < 2000) return
+        lastShown = Date.now()
+        out(`  copied ${p.files.toLocaleString()} of ${p.totalFiles.toLocaleString()} files (${humanBytes(p.bytes)} of ${humanBytes(p.totalBytes)})`)
+      },
+    })
+    const { plan } = done
+    if (json) {
+      process.stdout.write(jsonLine('data', {
+        action: 'move', executed: done.executed, from: plan.from, to: plan.to, mode: plan.mode,
+        files: plan.stats?.files ?? null, bytes: plan.stats?.bytes ?? null, problems: plan.problems, warnings: plan.warnings, result: done.result ?? null,
+      }, plan.ok ? undefined : { error: { code: 'CHECK_FAILED', message: `${plan.problems.length} problem(s) stop the move` } }))
+      if (!plan.ok) process.exitCode = 1
+      return
+    }
+    if (!done.executed) {
+      out('Move the data folder')
+      out(table([
+        ['from:', plan.from],
+        ['to:', plan.to],
+        ['how:', plan.mode === 'rename' ? 'rename it: same drive, instant, nothing is copied' : 'copy it, check the copy, then park the original: another drive'],
+        ['size:', plan.stats ? `${plan.stats.files.toLocaleString()} files, ${humanBytes(plan.stats.bytes)}` : '-'],
+      ]))
+      out('A link is left at the old path, so every path SpawnLoft has stored stays true.')
+      for (const note of plan.warnings) out(`  note: ${note}`)
+      if (!plan.ok) {
+        out('')
+        out('Cannot move yet:')
+        for (const problem of plan.problems) out(`  - ${problem}`)
+        process.exitCode = 1
+        return
+      }
+      out('')
+      out('Nothing was changed. Run it again with --yes to move the data.')
+      return
+    }
+    const r = done.result
+    out('')
+    out(`Moved in ${r.seconds}s. The data is now at ${r.to}, and ${r.from} is a link to it.`)
+    if (r.parked) {
+      out(`The original is parked at ${r.parked}. When you have checked that everything works,`)
+      out('`spawnloft data finish` deletes it.')
+    }
+    for (const a of r.privateAside) out(`Renamed the private copy ${a.from} to ${a.to}.`)
+    for (const note of r.notes) out(`  note: ${note}`)
+    out('Open the SpawnLoft app again.')
+    return
+  }
+
+  if (sub === 'status') {
+    if (args.length) throw new UsageError(usage)
+    const s = await moveStatus(root)
+    if (json) {
+      process.stdout.write(jsonLine('data', { action: 'status', root: s.root, isLink: s.link.isLink, target: s.link.target ?? null, dangling: s.link.dangling ?? false, move: s.journal, leftovers: s.leftovers }))
+      return
+    }
+    out(table([
+      ['data folder:', s.root],
+      ['is:', !s.link.exists ? 'missing' : s.link.isLink ? `a link to ${s.link.target ?? '(unreadable)'}` : 'an ordinary folder'],
+    ]))
+    if (s.link.isLink && s.link.dangling) {
+      out('')
+      out(`The link leads to ${s.link.target}, which is not there. If that is a drive, plug it in or restore the folder.`)
+    }
+    if (s.journal) {
+      out('')
+      out(`Last move: ${s.journal.from} -> ${s.journal.to}, ${s.journal.step === 'done' ? 'finished' : `stopped at "${s.journal.step}"`}.`)
+      if (s.journal.step !== 'done') out('`spawnloft data rollback` puts everything back.')
+    }
+    for (const l of s.leftovers) out(`Parked original: ${l.path}${l.bytes === null ? '' : ` (${humanBytes(l.bytes)})`}; \`spawnloft data finish\` deletes it.`)
+    return
+  }
+
+  if (sub === 'finish') {
+    if (args.length) throw new UsageError(usage)
+    const s = await moveStatus(root)
+    const parked = s.journal?.parked
+    if (!s.journal) throw new UserError(`no move is recorded for ${s.root}`)
+    if (flags.yes !== true) {
+      out(parked
+        ? `This deletes the original, parked at ${parked}${s.leftovers[0]?.bytes != null ? ` (${humanBytes(s.leftovers[0].bytes)})` : ''}. The data now lives at ${s.journal.to}.`
+        : 'There is no parked original to delete (the move was a rename); this only clears the record of it.')
+      out('Run it again with --yes to go ahead.')
+      return
+    }
+    const r = await finishMove(root)
+    out(r.parked ? `Deleted ${r.parked} (${humanBytes(r.removedBytes)}).` : 'Cleared the record of the move.')
+    return
+  }
+
+  if (sub === 'rollback') {
+    if (args.length) throw new UsageError(usage)
+    const { notes } = await rollbackMove(root)
+    out('Put back. The data folder is where it was.')
+    for (const note of notes) out(`  note: ${note}`)
+    return
+  }
+
+  throw new UsageError(usage)
 }
 
 function cmdRename(positional) {
@@ -1836,6 +1970,10 @@ OTHER
   mcctl config                       Show where servers, jars and backups live
   mcctl config set-root <path>       Move the data root (new servers only)
   mcctl config set-instances <path>  Put servers on a different drive
+  mcctl data move <folder> [--yes]   Move the whole data folder and leave a link where it was,
+                                     so nothing stored needs changing (default: show the plan)
+  mcctl data status|finish|rollback  Where the data is; delete the parked original; undo a move
+                                     that was interrupted
   mcctl config set-backup-mirror <path>|off
                                      Copy every new snapshot to a second drive too
   mcctl rename <old> <new>           Rename an instance (and its folder)
@@ -1906,6 +2044,7 @@ const COMMANDS = {
   jars: cmdJars,
   paper: cmdPaper,
   config: cmdConfig,
+  data: cmdData,
   rename: cmdRename,
   rebuild: cmdRebuild,
   reveal: cmdReveal,
@@ -1933,7 +2072,7 @@ async function main() {
   // A command typed in a terminal is the person's doing. The panel, a task and the MCP server all
   // run through here too, and each says who it is for what it does.
   activity.setDefaultActor({ kind: 'cli' })
-  const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow'] })
+  const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow', 'thorough', 'setAsidePrivateCopies'] })
   cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
   cliContext.json = flags.json !== undefined && flags.json !== false
   if (cliContext.json && flags.json !== true) throw new UsageError('--json does not take a value')
@@ -1951,10 +2090,12 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
-  ensureDirs()
+  // Not for `data`: it is what puts things right after a move was interrupted, when the data folder
+  // is not there, and making its folders again - empty - is the very thing in its way.
+  if (command !== 'data') ensureDirs()
   await handler(positional, flags)
 }
 
