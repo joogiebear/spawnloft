@@ -205,6 +205,46 @@ function membersFor(inst, scope) {
 
 export { runTar, tarBinary } from './tar.mjs'
 
+// How long a world may take to flush to disk before the flush is given up on. Two minutes: well
+// past an ordinary command's eight seconds, because a large world writes a lot, and short enough
+// that a server which has stopped answering does not hold a backup for long. The override exists
+// for the tests, which would otherwise have to wait it out.
+export const FLUSH_TIMEOUT_MS = Number(process.env.MCCTL_FLUSH_TIMEOUT_MS) > 0
+  ? Number(process.env.MCCTL_FLUSH_TIMEOUT_MS)
+  : 120 * 1000
+
+/**
+ * Hand saving back to a server that `save-off` took it from.
+ *
+ * <p>Returns what to tell the person when that could not be confirmed, and null when it was or
+ * when there is nothing to confirm. A server that stopped partway through the backup refuses the
+ * connection and has no saving left to turn on; one that is up and did not answer may still have
+ * saving off, and has to be said so, because nothing else will.
+ */
+async function turnSavingBackOn(inst) {
+  try {
+    await rconExec(inst, ['save-on'])
+    return null
+  } catch (err) {
+    if (err.refused) return null
+    return `autosave may still be off: save-on was not confirmed (${err.message}). Type save-on in the server's console if it is`
+  }
+}
+
+/**
+ * Add a line to what an error says. The stack is changed with the message because it is the stack
+ * that is printed for an error that is not one of SpawnLoft's own - a file system error, say - and
+ * its first line is the message as it was. Whether that line is built when the error is made or
+ * when the stack is first read depends on the engine and on who has read it, so the stack is read
+ * first, which fixes it, and then changed once.
+ */
+function appendToError(err, line) {
+  const before = err.message
+  const stack = typeof err.stack === 'string' ? err.stack : null
+  err.message = `${before}\n  ${line}`
+  if (stack && before) err.stack = stack.replace(before, () => err.message)
+}
+
 /**
  * Take a snapshot.
  *
@@ -254,11 +294,29 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   const dumpArgs = dumps.dumped.length ? ['-C', dumpDir, 'databases'] : []
   const archived = dumps.dumped.length ? [...members, 'databases'] : members
 
+  // save-off may have taken effect the moment it was sent, whether or not its answer ever arrives:
+  // a reply lost to a timeout or a cut socket says nothing about what the server did with it. So
+  // this is set before the call, and from then on saving is owed back - not only after a flush
+  // that went well, which is how a slow one used to leave a server with saving off.
+  let savingMayBeOff = false
+  let saveOnWarning = null
   let flushed = false
   let flushWarning = null
   if (running && flush) {
     try {
-      await rconExec(inst, ['save-off', 'save-all flush'])
+      try {
+        savingMayBeOff = true
+        await rconExec(inst, ['save-off'])
+      } catch (err) {
+        // A call that failed before it could write anything cannot have switched saving off: no
+        // RCON, a wrong password. Saying "autosave may be off" then would be a second, false alarm.
+        if (err.unsent) savingMayBeOff = false
+        throw err
+      }
+      // Its own connection and its own clock. A big world takes longer than the few seconds an
+      // ordinary command gets. One that has not answered in all that time is given up on, not
+      // asked again: the backup would only wait as long again.
+      await rconExec(inst, ['save-all flush'], { timeout: FLUSH_TIMEOUT_MS, retryTimeouts: false })
       flushed = true
     } catch (err) {
       flushWarning = `could not flush the world before the snapshot (${err.message}); the copy may be torn`
@@ -277,15 +335,9 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       const skipArgs = [...skipped.flatMap((f) => ['--exclude', literalPattern(f)]), ...leaveOut.flatMap((p) => ['--exclude', p])]
       ;({ stderr, code } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...skipArgs, ...members, ...dumpArgs], inst.dir))
     } finally {
-      // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
-      // any failed backup.
-      if (flushed) {
-        try {
-          await rconExec(inst, ['save-on'])
-        } catch {
-          /* the server may have stopped mid-backup; nothing is left to turn back on */
-        }
-      }
+      // save-on whether or not tar succeeded, and whether or not the flush did: leaving a live
+      // server with saving off is worse than any failed backup.
+      if (savingMayBeOff) saveOnWarning = await turnSavingBackOn(inst)
       if (dumpDir) fs.rmSync(dumpDir, { recursive: true, force: true })
     }
 
@@ -341,6 +393,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
       // meets a locked file. That carries no signal.
       warnings: [
         ...(flushWarning ? [flushWarning] : []),
+        ...(saveOnWarning ? [saveOnWarning] : []),
         ...dumps.skipped.map((d) => `database ${d.database} on ${d.service} not included: ${d.reason}`),
         ...skipped.map((f) => `${f} not included: another program has it locked, usually the running server`),
         ...stderr
@@ -358,7 +411,12 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
     // A snapshot narrowed to named files - or a quiet one - is the copy taken before something
     // changes them, and whatever changes them records itself, naming this snapshot as its undo.
     if (!only && !quiet) activity.record(inst.name, 'backup', { detail: `${scope}${label ? ` (${label})` : ''}, ${humanBytes(size)}`, snapshot: path.basename(file) })
-    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
+    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning, saveOnWarning }
+  } catch (err) {
+    // The backup failed, and then the one thing that had to happen after it did not either. The
+    // failure is what the person is about to read, so that is where this goes.
+    if (saveOnWarning && err instanceof Error) appendToError(err, saveOnWarning)
+    throw err
   } finally {
     if (reservation && !published) {
       // Keep the name reserved until its metadata is gone. Releasing it first

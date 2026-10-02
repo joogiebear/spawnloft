@@ -420,7 +420,8 @@ const actionTools = [
         warnings: res.manifest?.warnings ?? [], mirrored: Boolean(res.mirrored), mirrorError: res.mirrorError ?? null }
       return { data, text: `Wrote ${data.snapshot} (${Math.round(res.size / 1048576 * 10) / 10} MiB): ${res.members.join(', ')}` +
         (data.databasesSkipped.length ? `\nWARNING: ${data.databasesSkipped.map((d) => `${d.database} not included: ${d.reason}`).join('; ')}` : '') +
-        (data.skipped.length ? `\nWARNING: locked by another program, so not included: ${data.skipped.join(', ')}` : '') }
+        (data.skipped.length ? `\nWARNING: locked by another program, so not included: ${data.skipped.join(', ')}` : '') +
+        (res.saveOnWarning ? `\nWARNING: ${res.saveOnWarning}` : '') }
     },
   },
   {
