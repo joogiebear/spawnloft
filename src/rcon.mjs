@@ -29,6 +29,18 @@ export const RCON_TIMEOUT_MS = Number(process.env.MCCTL_RCON_TIMEOUT_MS) > 0
  * Responses larger than 4096 bytes arrive split across packets with no length
  * hint, so after each command we send a sentinel packet with a distinct id and
  * treat its echo as end-of-response.
+ *
+ * <p>The sentinel goes out once the server has begun to answer, never along with the command.
+ * Minecraft's RCON thread reads one packet at a time and hangs up on a read that holds two, and
+ * two packets written back to back land in one read often enough to matter. Against a real server
+ * (Advanced Slime Paper 26.3, on Windows) between one and seventeen commands in a hundred were
+ * hung up on, depending on the run, and a command and its marker forced into one segment were hung
+ * up on every time. Sent after the first reply packet, the marker is alone in the socket when the
+ * thread reads it, and the server answers it after the rest of the reply, as before.
+ *
+ * <p>That makes the first reply packet the proof that the command was read. Minecraft always
+ * sends one, an empty one for a command with nothing to say. A server that sent none would now
+ * time out where the marker's echo used to complete the command.
  */
 export class Rcon {
   constructor({ host = '127.0.0.1', port, password, timeout = RCON_TIMEOUT_MS }) {
@@ -113,6 +125,10 @@ export class Rcon {
       }
       if (id === cmdId) {
         entry.chunks.push(body)
+        if (!entry.markerSent) {
+          entry.markerSent = true
+          if (this.socket.writable) this.socket.write(encodePacket(entry.sentinelId, TYPE_RESPONSE, ''))
+        }
         return
       }
     }
@@ -133,11 +149,16 @@ export class Rcon {
 
   send(command) {
     return new Promise((resolve, reject) => {
+      // Nothing tells a socket that was closed earlier about what is written to it afterwards, so
+      // a command sent on one would wait out the whole timeout for an answer that cannot come.
+      // Closed by the server, or by close() here: neither can be written to.
+      if (!this.socket || !this.socket.writable) {
+        return reject(new UserError('RCON error: RCON connection closed'))
+      }
       const id = this.nextId++
       const sentinelId = this.nextId++
-      this.pending.set(id, { resolve, reject, chunks: [], sentinelId })
+      this.pending.set(id, { resolve, reject, chunks: [], sentinelId, markerSent: false })
       this.socket.write(encodePacket(id, TYPE_COMMAND, command))
-      this.socket.write(encodePacket(sentinelId, TYPE_RESPONSE, ''))
       setTimeout(() => {
         const entry = this.pending.get(id)
         if (entry) {
@@ -164,10 +185,12 @@ const DROPPED = /connection closed|ECONNRESET|EPIPE|ECONNABORTED/i
 /**
  * Connect, run one or more commands, disconnect.
  *
- * Paper drops RCON sockets when connections churn quickly - firing a burst of
- * one-shot commands reliably loses one partway through. A fresh connection
- * succeeds immediately, so transient socket failures are retried. Auth
- * failures and command errors are not retried; they would fail identically.
+ * A fresh connection succeeds where a dropped one did not, so transient socket
+ * failures are retried. That used to be needed far more than it should have been:
+ * a burst of one-shot commands reliably lost one partway through, which looked like
+ * Paper dropping sockets under churn and was the client hanging up on itself (see
+ * Rcon). What is retried now is a server that really did drop one. Auth failures and
+ * command errors are not retried; they would fail identically.
  *
  * <p>`timeout` is how long a command may take to answer, for one that is expected to be slow.
  * `retryTimeouts: false` is for the same commands: a second attempt after a timeout does not make
