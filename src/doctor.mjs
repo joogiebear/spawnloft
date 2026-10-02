@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { DATA_ROOT, LAYOUT, ROOT } from './paths.mjs'
-import { describeServersElsewhere } from './settings.mjs'
+import { describeServersElsewhere, inspect as inspectSettings } from './settings.mjs'
 import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
@@ -35,6 +35,11 @@ export async function runDoctor({ repair = false } = {}) {
   notes.push(`node: ${process.version}`)
   notes.push(`root: ${ROOT}`)
   notes.push(`data root: ${DATA_ROOT}`)
+  // The file that says where the data is. Unreadable, it reads as the defaults - see settings.load.
+  const stored = inspectSettings()
+  if (!stored.ok) {
+    problems.push(`settings file ${stored.file} could not be read (${stored.error}), so SpawnLoft is using the defaults and the data root in use may not be the data folder you chose. Fix the file or delete it.`)
+  }
   if (!listInstances().length) {
     for (const line of describeServersElsewhere(DATA_ROOT)) problems.push(line)
   }

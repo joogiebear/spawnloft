@@ -269,6 +269,9 @@ ipcMain.handle('mcctl:getSetup', async () => {
     current: roots,
     coreDir: core.dir,
     coreMode: core.mode,
+    // Nobody sees stderr in the desktop app, so a settings file that cannot be read is told to the
+    // wizard, which is where it shows: as an empty first-run screen with no word of why.
+    settingsProblem: settings.inspect(),
   }
 })
 
@@ -282,11 +285,18 @@ ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate 
     if (!check.ok) return { ok: false, error: `Cannot write to ${dir}\n${check.error}` }
   }
 
-  settings.save({
-    dataRoot,
-    separateInstances: Boolean(separate),
-    instancesDir: separate ? instancesDir : null,
-  })
+  // The person is choosing the data folder, so a settings file whose content is damaged is replaced -
+  // kept beside the new one, not deleted - rather than leaving the wizard stuck on it. A write that
+  // still fails is returned, so the person sees the reason itself and not Electron's wrapper around it.
+  try {
+    settings.save({
+      dataRoot,
+      separateInstances: Boolean(separate),
+      instancesDir: separate ? instancesDir : null,
+    }, { replaceUnreadable: true, onSetAside: (kept) => console.warn(`SpawnLoft: the settings file could not be read, so it was kept as ${kept}`) })
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
 
   // Read it back before relaunching into it.
   //
