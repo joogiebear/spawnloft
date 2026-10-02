@@ -1412,7 +1412,9 @@ async function runTask(id) {
         const gone = backup.pruneSnapshots(instance, action.keep, { only: 'scheduled', taskId: id })
         if (gone.length) pruned = `, pruned ${gone.length} over the limit of ${action.keep}`
       }
-      record('ok', `${res.file} (${humanBytes(res.size)})${pruned}`)
+      // Nobody is watching a scheduled backup, so a server it may have left with autosave off is
+      // said in the run's own line, not only in a manifest nobody opens.
+      record('ok', `${res.file} (${humanBytes(res.size)})${pruned}${res.saveOnWarning ? `; WARNING: ${res.saveOnWarning}` : ''}`)
     } else if (action.type === 'verify') {
       const snaps = backup.listSnapshots(instance)
       if (!snaps.length) return record('skipped', 'no snapshots to verify yet')
@@ -1470,7 +1472,7 @@ async function runTask(id) {
         backup: async ({ keep }) => {
           const snap = await backup.createSnapshot(inst, { scope: 'standard', label: 'scheduled', running: sup.isRunning(instance), taskId: id })
           const gone = keep ? backup.pruneSnapshots(instance, keep, { only: 'scheduled', taskId: id }) : []
-          return `backed up ${path.basename(snap.file)} (${humanBytes(snap.size)})${gone.length ? `, pruned ${gone.length}` : ''}`
+          return `backed up ${path.basename(snap.file)} (${humanBytes(snap.size)})${gone.length ? `, pruned ${gone.length}` : ''}${snap.saveOnWarning ? `; WARNING: ${snap.saveOnWarning}` : ''}`
         },
         verify: async () => {
           const snaps = backup.listSnapshots(instance)

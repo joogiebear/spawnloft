@@ -226,9 +226,23 @@ async function turnSavingBackOn(inst) {
     await rconExec(inst, ['save-on'])
     return null
   } catch (err) {
-    if (err.code === 'ECONNREFUSED') return null
+    if (err.refused) return null
     return `autosave may still be off: save-on was not confirmed (${err.message}). Type save-on in the server's console if it is`
   }
+}
+
+/**
+ * Add a line to what an error says. The stack is changed with the message because it is the stack
+ * that is printed for an error that is not one of SpawnLoft's own - a file system error, say - and
+ * its first line is the message as it was. Whether that line is built when the error is made or
+ * when the stack is first read depends on the engine and on who has read it, so the stack is read
+ * first, which fixes it, and then changed once.
+ */
+function appendToError(err, line) {
+  const before = err.message
+  const stack = typeof err.stack === 'string' ? err.stack : null
+  err.message = `${before}\n  ${line}`
+  if (stack && before) err.stack = stack.replace(before, () => err.message)
 }
 
 /**
@@ -300,7 +314,8 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
         throw err
       }
       // Its own connection and its own clock. A big world takes longer than the few seconds an
-      // ordinary command gets, and asking again after a timeout only waits again.
+      // ordinary command gets. One that has not answered in all that time is given up on, not
+      // asked again: the backup would only wait as long again.
       await rconExec(inst, ['save-all flush'], { timeout: FLUSH_TIMEOUT_MS, retryTimeouts: false })
       flushed = true
     } catch (err) {
@@ -400,7 +415,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   } catch (err) {
     // The backup failed, and then the one thing that had to happen after it did not either. The
     // failure is what the person is about to read, so that is where this goes.
-    if (saveOnWarning && err instanceof Error) err.message += `\n  ${saveOnWarning}`
+    if (saveOnWarning && err instanceof Error) appendToError(err, saveOnWarning)
     throw err
   } finally {
     if (reservation && !published) {

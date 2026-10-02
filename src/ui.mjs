@@ -703,6 +703,7 @@ async function handleBackups(req, res, name, seg) {
       skipped: out.skipped,
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
+      saveOnWarning: out.saveOnWarning,
     })
   }
 

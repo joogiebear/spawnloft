@@ -30,7 +30,7 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 
 ## Fixed
 
-- A backup of a running server could leave it with autosave switched off, if its world took longer than eight seconds to write out: the backup gave up on the flush, and with it on the step that turns saving back on. The flush now has two minutes, and saving is switched back on whether the flush worked, failed or timed out. If the server does not confirm it, the backup says autosave may still be off and what to type.
+- A backup of a running server could leave it with autosave switched off, if its world took longer than eight seconds to write out: the backup gave up on the flush, and with it on the step that turns saving back on. The flush now has two minutes, and the command that turns saving back on is sent whether the flush worked, failed or timed out. If the server does not confirm it, the backup says autosave may still be off and what to type - in the panel, in a scheduled task's log, on the command line and to an AI assistant.
 
 SpawnLoft does not insert database credentials into plugin configuration files.
 

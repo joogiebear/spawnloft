@@ -5,17 +5,19 @@ import os from 'node:os'
 import path from 'node:path'
 import { startFakeRcon } from './fixtures/fake-rcon.mjs'
 
-// An ordinary RCON command gets 300 ms and a flush 1.5 s, so "slower than an ordinary command but
-// within what a flush is allowed" is a fraction of a second here and eight to a hundred and
-// twenty seconds in life.
-process.env.MCCTL_RCON_TIMEOUT_MS = '300'
-process.env.MCCTL_FLUSH_TIMEOUT_MS = '1500'
+// An ordinary RCON command gets half a second and a flush two, so "slower than an ordinary command
+// but within what a flush is allowed" is a second here and eight to a hundred and twenty seconds
+// in life. Half a second, not less: it also covers connecting and logging in, and a runner that
+// stalls for longer than that makes a command retry, which these tests count.
+process.env.MCCTL_RCON_TIMEOUT_MS = '500'
+process.env.MCCTL_FLUSH_TIMEOUT_MS = '2000'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-backup-flush-'))
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 const backup = await import('../src/backup.mjs')
+const { rconExec } = await import('../src/rcon.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
 let n = 0
@@ -32,7 +34,7 @@ async function server(t, options) {
 const snapshot = (inst, extra = {}) => backup.createSnapshot(inst, { scope: 'plugins', running: true, ...extra })
 
 test('a flush slower than an ordinary command is waited for, and saving is switched back on', async (t) => {
-  const { rcon, inst } = await server(t, { delays: { 'save-all flush': 800 } })
+  const { rcon, inst } = await server(t, { delays: { 'save-all flush': 1000 } })
   const res = await snapshot(inst)
   assert.deepEqual(rcon.sent(), ['save-off', 'save-all flush', 'save-on'])
   assert.equal(res.flushed, true)
@@ -92,6 +94,34 @@ test('a backup that fails after save-off still switches saving on, and says so i
   // A member that is not there makes tar fail, after the flush and before the manifest.
   await assert.rejects(snapshot(inst, { members: ['missing.txt'] }), /autosave may still be off/)
   assert.equal(rcon.sent().at(-1), 'save-on')
+})
+
+// An error that is not one of SpawnLoft's own is printed from its stack, and whether the stack's
+// first line already holds the message depends on whether anything has read the stack yet.
+for (const [when, readStackFirst] of [['read before the warning is added', true], ['not yet read when the warning is added', false]]) {
+  test(`a file system error after save-off carries the warning once, in its message and its stack (stack ${when})`, async (t) => {
+    const { inst } = await server(t, { drop: { 'save-on': Infinity } })
+    const open = fs.openSync
+    t.mock.method(fs, 'openSync', (file, ...rest) => {
+      if (!String(file).endsWith('.pending')) return open(file, ...rest)
+      const error = Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' })
+      if (readStackFirst) void error.stack
+      throw error
+    })
+    const err = await snapshot(inst).then(() => null, (e) => e)
+    assert.equal(err?.code, 'EACCES', 'not one of SpawnLoft\'s own errors, so it is printed from its stack')
+    const times = (text) => text.split('autosave may still be off').length - 1
+    assert.equal(times(err.message), 1)
+    assert.equal(times(err.stack), 1)
+  })
+}
+
+test('a refused connection is marked as refused and keeps the error code it always had', async (t) => {
+  const { rcon, inst } = await server(t)
+  await rcon.close()
+  const err = await rconExec(inst, ['list']).then(() => null, (e) => e)
+  assert.equal(err.refused, true)
+  assert.equal(err.code, undefined, 'the CLI and the panel pass `code` on to whoever is calling')
 })
 
 test('a save-off that could not be sent is not followed by a claim that saving is off', async (t) => {

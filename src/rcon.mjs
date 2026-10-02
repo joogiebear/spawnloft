@@ -52,8 +52,10 @@ export class Rcon {
         socket.destroy()
         if (err.code === 'ECONNREFUSED') {
           // Nothing is listening: a server that is down, as opposed to one that is up and not
-          // answering. Callers that must tell the two apart read the code, not the message.
-          reject(Object.assign(new UserError(`RCON refused on ${this.host}:${this.port} - is the server running with enable-rcon=true?`), { code: 'ECONNREFUSED' }))
+          // answering. Callers that must tell the two apart read `refused`, not the message. Not
+          // `code`: that is what the CLI's JSON errors and the panel's error bodies hand to
+          // whoever is calling, and it has been COMMAND_FAILED for this.
+          reject(Object.assign(new UserError(`RCON refused on ${this.host}:${this.port} - is the server running with enable-rcon=true?`), { refused: true }))
         } else {
           reject(new UserError(`RCON connection failed: ${err.message}`))
         }
