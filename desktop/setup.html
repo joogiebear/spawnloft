@@ -531,6 +531,17 @@ async function init() {
     return;
   }
   $('#root').value = defaults.defaultDataRoot;
+  const problem = defaults.settingsProblem;
+  if (problem && !problem.ok) {
+    // Why this screen is here at all, when the person may have servers already: the file that says
+    // where they are could not be read. Choosing a folder keeps that file beside the new one.
+    fail(
+      'SpawnLoft could not read its settings file, so it does not know where your servers are.\n\n' +
+      problem.file + '\n(' + problem.error + ')\n\n' +
+      'If you already have servers, close SpawnLoft and mend or delete that file, or choose the folder that holds them below. ' +
+      'The damaged file is kept next to the new one.'
+    );
+  }
   // Seeded from the layout the core actually resolved, not from a guessed folder name.
   $('#servers').value =
     (defaults.current && defaults.current.instancesDir) || serversUnder(defaults.defaultDataRoot);

@@ -849,9 +849,15 @@ function cmdConfig(positional, flags) {
     if (!check.ok) fail(`cannot write to ${abs}
   ${check.error}`)
 
+    // set-root names the data folder, which is what a damaged settings file would have held, so it may
+    // replace one - keeping the damaged file, and saying so. set-instances does not name it, and would
+    // drop it along with the damage: it refuses instead.
     settings.save(sub === 'set-root'
       ? { dataRoot: abs }
-      : { instancesDir: abs, separateInstances: true })
+      : { instancesDir: abs, separateInstances: true },
+    sub === 'set-root'
+      ? { replaceUnreadable: true, onSetAside: (kept) => out(`The settings file could not be read, so it was kept as ${kept}.`) }
+      : {})
     out(`Saved. ${sub === 'set-root' ? 'Data root' : 'Instances directory'}: ${abs}`)
     out('')
     out('Takes effect on the next command. Existing servers do NOT move — the registry stores')

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UserError } from './util.mjs'
 
 /** Where the code lives. Distinct from where data lives — see below. */
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -20,20 +21,146 @@ export function settingsFile() {
   return path.join(base, 'mcctl', 'settings.json')
 }
 
-export function load() {
+/**
+ * What the settings file holds: nothing when there is no file, and a reason when there is one that
+ * cannot be used. `kind` says which sort of reason: 'content' when the file was read and is not
+ * usable (empty, not JSON, not an object), 'io' when it could not be read at all (permissions, a
+ * lock, a folder where the file should be). Only the first is damage that setting the file aside
+ * could mend; the second is about the file's surroundings, and moving it would be a guess.
+ */
+function read(file) {
+  let text
   try {
-    return JSON.parse(fs.readFileSync(settingsFile(), 'utf8'))
-  } catch {
-    return {}
+    text = fs.readFileSync(file, 'utf8')
+  } catch (err) {
+    return err.code === 'ENOENT' ? { settings: {}, exists: false } : { settings: {}, exists: true, error: err.message, kind: 'io' }
+  }
+  try {
+    // Some Windows editors begin a UTF-8 file with a byte-order mark, which JSON.parse takes for garbage.
+    const parsed = JSON.parse(text.replace(/^﻿/, ''))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { settings: {}, exists: true, error: 'it is not a JSON object', kind: 'content' }
+    return { settings: parsed, exists: true }
+  } catch (err) {
+    return { settings: {}, exists: true, error: err.message, kind: 'content' }
   }
 }
 
-export function save(patch) {
+let lastWarning = null
+
+/**
+ * The settings, or the defaults when there is no file.
+ *
+ * <p>A file that exists and cannot be used also gives the defaults - the program has to start, and
+ * doctor has to be able to run to say what is wrong - but not silently. This used to be `{}` with no
+ * word, and the file is where the data folder is chosen: a settings file cut off by a crash sent
+ * SpawnLoft back to the default folder, where the servers were not, and the only sign was an empty
+ * list or the first-run wizard. Said once per process while it stays the same, since this is read on
+ * most requests, and again if it is mended and then breaks.
+ */
+export function load() {
   const file = settingsFile()
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  const merged = { ...load(), ...patch }
-  fs.writeFileSync(file, JSON.stringify(merged, null, 2) + '\n')
+  const found = read(file)
+  if (!found.error) {
+    lastWarning = null
+    return found.settings
+  }
+  const said = `settings file ${file} could not be read (${found.error}); using the defaults until you fix it or delete it`
+  if (said !== lastWarning) {
+    lastWarning = said
+    process.stderr.write(`spawnloft: ${said}\n`)
+  }
+  return found.settings
+}
+
+/** Whether the settings file can be used, for doctor: `{ ok: true, exists }`, or `{ ok: false, file, error }`. */
+export function inspect() {
+  const file = settingsFile()
+  const found = read(file)
+  return found.error ? { ok: false, file, error: found.error } : { ok: true, exists: found.exists }
+}
+
+/**
+ * Change settings, keeping the rest.
+ *
+ * <p>Written to a file beside it and renamed into place, so a crash or a full disk leaves the old
+ * file whole instead of a stump. And not at all when the old file cannot be read: merging the change
+ * into nothing and writing that back would erase whatever it said, the data folder first of all.
+ *
+ * <p>`replaceUnreadable` is for a person choosing the data folder on purpose - the first-run wizard,
+ * `config set-root` - where refusing would leave them stuck with a file they may not know how to
+ * mend, and where the choice they are making is the one the file would have held. Not for a command
+ * that changes something else: it would drop the data folder along with the damage. The damaged file
+ * is kept, beside the new one, and `onSetAside` is told where. Only damage to the CONTENT is replaced;
+ * a file that cannot be read at all (permissions, a lock) is not moved on a guess.
+ *
+ * <p>Nothing is ever moved before the replacement is safely written: the new file is written and
+ * flushed first, the damaged one is copied, and only then does the new one take its place - so there
+ * is no moment, and no failure, that leaves no settings file. A file that is a link is changed where
+ * the link points.
+ */
+export function save(patch, { replaceUnreadable = false, onSetAside = null } = {}) {
+  const file = linkTarget(settingsFile())
+  const found = read(file)
+  const damaged = Boolean(found.error)
+  if (damaged && !(replaceUnreadable && found.kind === 'content')) {
+    throw new UserError(`settings file ${file} could not be read (${found.error}), so it was not changed; fix it or delete it (a deleted file forgets your data folder: spawnloft config set-root <folder> sets it again), then try again`)
+  }
+  const merged = { ...found.settings, ...patch }
+  const tmp = `${file}.${process.pid}.tmp`
+  let aside = null
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    const fd = fs.openSync(tmp, 'w')
+    try {
+      fs.writeFileSync(fd, JSON.stringify(merged, null, 2) + '\n')
+      fs.fsyncSync(fd)
+    } finally {
+      fs.closeSync(fd)
+    }
+    if (damaged) {
+      aside = `${file}.unreadable-${new Date().toISOString().replace(/[:.]/g, '-')}`
+      fs.copyFileSync(file, aside, fs.constants.COPYFILE_EXCL)
+    }
+    renameOver(tmp, file)
+  } catch (err) {
+    // Whatever was half done is undone: the old file is as it was, and a copy of it is not wanted.
+    for (const leftover of [tmp, aside]) {
+      if (!leftover) continue
+      try {
+        fs.rmSync(leftover, { force: true })
+      } catch { /* the error that matters is the one below */ }
+    }
+    throw err instanceof UserError ? err : new UserError(`could not write settings file ${file} (${err.message}); it was left as it was`)
+  }
+  if (aside && onSetAside) onSetAside(aside)
   return merged
+}
+
+/** Where a settings file that may be a link really is: a dotfile manager's link is changed through, not replaced. */
+function linkTarget(file) {
+  try {
+    return fs.lstatSync(file).isSymbolicLink() ? fs.realpathSync(file) : file
+  } catch {
+    return file
+  }
+}
+
+/**
+ * Rename over an existing file. On Windows a file written a moment ago is often still held by a
+ * virus scanner or a sync client, and renaming over it fails with EPERM, EBUSY or EACCES until it lets
+ * go; a few short waits are what the usual atomic-write libraries do. Only on that failure does this
+ * block, and for no more than about 350 ms.
+ */
+function renameOver(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(from, to)
+      return
+    } catch (err) {
+      if (attempt >= 3 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * 2 ** attempt)
+    }
+  }
 }
 
 /** The default data location for a fresh install: per-user, writable, and not inside the program. */
