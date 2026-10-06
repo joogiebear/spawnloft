@@ -256,7 +256,11 @@ export function makeFolder(inst, parent, name) {
 export async function uploadFile(inst, parent, name, stream, { overwrite = false, running = false } = {}) {
   const { rel: dir, stat: dirStat } = resolvePath(inst, parent, { allowRoot: true })
   if (!dirStat.isDirectory()) fail(`${dir} is not a folder`)
-  const n = checkName(name)
+  // A dropped folder arrives file by file, each with its path inside the folder ("Pack/sub/a.yml");
+  // every segment is held to the same rule as a name typed into New file.
+  const segments = String(name ?? '').replace(/\\/g, '/').split('/').filter(Boolean)
+  if (!segments.length) fail('a file needs a name')
+  const n = segments.map(checkName).join('/')
   const { full, rel, stat } = resolvePath(inst, dir ? `${dir}/${n}` : n, { mustExist: false })
   if (stat && !overwrite) {
     const err = new Error(`${rel} already exists`)
@@ -269,6 +273,13 @@ export async function uploadFile(inst, parent, name, stream, { overwrite = false
   // replacing one it holds open is not.
   if (stat) assertFree(inst, rel, running, 'replace')
 
+  if (segments.length > 1) {
+    try {
+      fs.mkdirSync(path.dirname(full), { recursive: true })
+    } catch (err) {
+      fail(`could not make the folders for ${rel}: ${err.code === 'ENOTDIR' || err.code === 'EEXIST' ? 'a file is in the way' : err.message}`)
+    }
+  }
   const tmp = `${full}.spawnloft-${process.pid}-${Date.now()}.part`
   let size = 0
   try {

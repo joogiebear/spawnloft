@@ -141,6 +141,17 @@ test('an upload lands whole, asks before replacing, and copies what it replaces'
   assert.ok(!fs.readdirSync(path.join(inst.dir, 'plugins')).some((f) => f.endsWith('.part')))
 })
 
+test('a dropped folder arrives with its structure, and cannot climb out', async () => {
+  const inst = server()
+  const out = await files.uploadFile(inst, 'plugins', 'Pack/lang/en.yml', Readable.from(['hi']))
+  assert.equal(out.path, 'plugins/Pack/lang/en.yml')
+  assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins/Pack/lang/en.yml'), 'utf8'), 'hi')
+  await assert.rejects(files.uploadFile(inst, 'plugins', 'Pack/lang/en.yml', Readable.from(['v2'])), code('exists'))
+  await assert.rejects(files.uploadFile(inst, 'plugins', '../evil.yml', Readable.from(['x'])), /no slashes|stay inside|not a name/)
+  await assert.rejects(files.uploadFile(inst, 'plugins', 'Pack/../../evil.yml', Readable.from(['x'])), /no slashes|stay inside|not a name/)
+  await assert.rejects(files.uploadFile(inst, 'plugins', 'Pack/lang/en.yml/x.yml', Readable.from(['x'])), /in the way|not a folder/)
+})
+
 test('while running, a loaded plugin is not replaced but a new one can be added', async () => {
   const inst = server()
   await assert.rejects(files.uploadFile(inst, 'plugins', 'Example.jar', Readable.from(['v2']), { overwrite: true, running: true }), /in use by the running server/)

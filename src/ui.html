@@ -2157,6 +2157,7 @@
   <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 3l8 5-8 5z"/></symbol>
   <symbol id="i-stop" viewBox="0 0 16 16"><path d="M4 4h8v8H4z"/></symbol>
   <symbol id="i-restart" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.8-3.85"/><path d="M13 2v3h-3"/></symbol>
+  <symbol id="i-external" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5"/><path d="M12 9.5v4H2.5v-9.5h4"/></symbol>
   <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4h4.5l1.5 2H14v7H2z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 5 0v2"/></symbol>
   <symbol id="i-unlock" viewBox="0 0 16 16"><path d="M3.5 7.5h9v6h-9z"/><path d="M5.5 7.5V5.5a2.5 2.5 0 0 1 4.9-.7"/></symbol>
@@ -7440,12 +7441,18 @@ async function renderFiles(opts) {
 
   const newFile = iconButton('file', 'New file');
   const newFolder = iconButton('folder', 'New folder');
-  const upload = iconButton('upload', 'Upload');
+  const upload = iconButton('upload', 'Upload files');
+  const uploadDir = iconButton('folder', 'Upload a folder');
+  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER);
   const picker = document.createElement('input');
   picker.type = 'file';
   picker.multiple = true;
   picker.hidden = true;
-  bar.append(crumbs, search, newFile, newFolder, upload, picker);
+  const dirPicker = document.createElement('input');
+  dirPicker.type = 'file';
+  dirPicker.webkitdirectory = true;
+  dirPicker.hidden = true;
+  bar.append(crumbs, search, newFile, newFolder, upload, uploadDir, reveal, picker, dirPicker);
   body.append(bar);
 
   newFile.onclick = async () => {
@@ -7467,7 +7474,19 @@ async function renderFiles(opts) {
     } catch (e) { toast(e.message, 'bad'); }
   };
   upload.onclick = () => picker.click();
-  picker.onchange = () => { uploadFiles(row, view, [...picker.files]).then(again); picker.value = ''; };
+  picker.onchange = () => { uploadFiles(row, view, [...picker.files].map((f) => ({ file: f, name: f.name }))).then(again); picker.value = ''; };
+  uploadDir.onclick = () => dirPicker.click();
+  dirPicker.onchange = () => {
+    // webkitRelativePath is "Folder/sub/file": the folder's own name is kept, as a drop keeps it.
+    const picked = [...dirPicker.files].map((f) => ({ file: f, name: f.webkitRelativePath || f.name }));
+    dirPicker.value = '';
+    if (!picked.length) { toast('Nothing to upload: the folder is empty.', 'bad'); return; }
+    uploadFiles(row, view, picked).then(again);
+  };
+  reveal.onclick = async () => {
+    try { await post('/instances/' + encodeURIComponent(row.name) + '/reveal', { folder: view.dir }); }
+    catch (e) { toast(e.message, 'bad'); }
+  };
 
   // ---- what is selected -------------------------------------------------------
   const sel = [...view.selected];
@@ -7627,14 +7646,14 @@ async function renderFiles(opts) {
     body.append(list);
     body.append(emptyState(view.query ? 'search' : 'folder', view.query
       ? 'Nothing here is named like that.'
-      : 'This folder is empty. Drop files here, or use Upload.'));
+      : 'This folder is empty. Drop files or folders here, or use Upload.'));
   } else {
     body.append(list);
   }
 
   const note = document.createElement('div');
   note.className = 'hint';
-  note.textContent = 'Drop files onto this list to upload them here.';
+  note.textContent = 'Drop files or whole folders onto this list to upload them here.';
   body.append(note);
 
   // Files dragged in from the desktop land in the folder on screen.
@@ -7647,49 +7666,103 @@ async function renderFiles(opts) {
   pane.ondragleave = (ev) => { if (!pane.contains(ev.relatedTarget)) pane.removeAttribute('data-drop'); };
   pane.ondrop = async (ev) => {
     pane.removeAttribute('data-drop');
-    if (!ev.dataTransfer || !ev.dataTransfer.files.length || filesStateFor(row.name).editing) return;
+    if (!ev.dataTransfer || filesStateFor(row.name).editing) return;
     ev.preventDefault();
-    const items = [...ev.dataTransfer.items];
-    if (items.some((it) => it.webkitGetAsEntry && it.webkitGetAsEntry() && it.webkitGetAsEntry().isDirectory)) {
-      toast('A folder cannot be dropped in as it is. Zip it, drop the zip, then Unzip it here.', 'bad');
+    // The entries must be taken before the first await: the browser empties the drop's item list
+    // once the event handler has returned.
+    const roots = [...ev.dataTransfer.items]
+      .filter((it) => it.kind === 'file')
+      .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null) || it.getAsFile());
+    const fallback = [...ev.dataTransfer.files];
+    const found = roots.some((r) => r) ? await collectDropped(roots) : fallback.map((f) => ({ file: f, name: f.name }));
+    if (!found.length) {
+      toast('Nothing to upload: the folder is empty.', 'bad');
       return;
     }
-    await uploadFiles(row, view, [...ev.dataTransfer.files]);
+    await uploadFiles(row, view, found);
     again();
   };
 }
 
+/** Every file under what was dropped, each with its path inside the dropped folder. */
+async function collectDropped(roots) {
+  const out = [];
+  const readAll = (reader) => new Promise((resolve, reject) => {
+    const all = [];
+    const next = () => reader.readEntries((batch) => {
+      if (!batch.length) resolve(all);
+      else { all.push(...batch); next(); }
+    }, reject);
+    next();
+  });
+  const walk = async (entry, prefix) => {
+    if (!entry) return;
+    if (entry instanceof File) { out.push({ file: entry, name: prefix + entry.name }); return; }
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      out.push({ file, name: prefix + entry.name });
+    } else if (entry.isDirectory) {
+      for (const child of await readAll(entry.createReader())) await walk(child, prefix + entry.name + '/');
+    }
+  };
+  for (const r of roots) {
+    try { await walk(r, ''); } catch (e) { toast('Could not read ' + (r && r.name ? r.name : 'a dropped item') + ': ' + e.message, 'bad'); }
+  }
+  return out;
+}
+
+/** `list` is [{ file, name }]: name is the path inside the upload folder, slashes for subfolders. */
 async function uploadFiles(row, view, list) {
+  list = list.map((it) => (it instanceof File ? { file: it, name: it.webkitRelativePath || it.name } : it));
   if (!list.length) return;
   const base = '/api/instances/' + encodeURIComponent(row.name) + '/files/upload';
   const where = view.dir || 'the server folder';
-  const note = toast('Uploading ' + (list.length === 1 ? list[0].name : list.length + ' files') + ' to ' + where + '…');
+  const top = new Set(list.map((it) => it.name.split('/')[0]));
+  const label = list.length === 1 ? list[0].name : list.length + ' files';
+  const note = toast('Uploading ' + label + ' to ' + where + '…');
+  const send = (it, overwrite) => fetch(base + '?dir=' + encodeURIComponent(view.dir) + '&name=' + encodeURIComponent(it.name)
+    + (overwrite ? '&overwrite=1' : ''), { method: 'POST', body: it.file });
   let done = 0;
-  for (const file of list) {
-    const send = (overwrite) => fetch(base + '?dir=' + encodeURIComponent(view.dir) + '&name=' + encodeURIComponent(file.name)
-      + (overwrite ? '&overwrite=1' : ''), { method: 'POST', body: file });
+  const exists = [];
+  for (const it of list) {
     try {
-      let res = await send(false);
-      let out = await res.json().catch(() => ({}));
-      if (!res.ok && out.code === 'exists') {
-        const ok = await ask({
-          title: 'Replace ' + file.name + '?',
-          text: file.name + ' is already in ' + where + '. The one there now is copied to Backups first.',
-          confirmLabel: 'Replace',
-          danger: true,
-        });
-        if (!ok) continue;
-        res = await send(true);
-        out = await res.json().catch(() => ({}));
-      }
+      const res = await send(it, false);
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok && out.code === 'exists') { exists.push(it); continue; }
       if (!res.ok) throw new Error(out.error || res.statusText);
       done++;
     } catch (e) {
-      toast(file.name + ': ' + e.message, 'bad');
+      toast(it.name + ': ' + e.message, 'bad');
+    }
+  }
+  // One question for the lot, so a folder dropped over an older copy of itself is not a hundred prompts.
+  if (exists.length) {
+    const ok = await ask({
+      title: exists.length === 1 ? 'Replace ' + exists[0].name + '?' : 'Replace ' + exists.length + ' files?',
+      text: (exists.length === 1 ? exists[0].name + ' is' : exists.length + ' of the files are') + ' already in ' + where
+        + '. What is there now is copied to Backups first.',
+      confirmLabel: 'Replace',
+      danger: true,
+    });
+    if (ok) {
+      for (const it of exists) {
+        try {
+          const res = await send(it, true);
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(out.error || res.statusText);
+          done++;
+        } catch (e) {
+          toast(it.name + ': ' + e.message, 'bad');
+        }
+      }
     }
   }
   note.remove();
-  if (done) toast('Uploaded ' + (done === 1 ? '1 file' : done + ' files') + ' to ' + where + '.', 'good');
+  if (done) {
+    const what = top.size === 1 && list.some((it) => it.name.includes('/')) ? [...top][0] + ' (' + (done === 1 ? '1 file' : done + ' files') + ')'
+      : (done === 1 ? '1 file' : done + ' files');
+    toast('Uploaded ' + what + ' to ' + where + '.', 'good');
+  }
 }
 
 async function deleteFiles(row, view, paths) {
