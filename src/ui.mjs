@@ -1874,7 +1874,7 @@ async function route(req, res) {
   }
   if (seg[3] === 'reveal') {
     const body = await readBody(req)
-    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null) })
+    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
   }
   if (seg[3] === 'settings') {
     const body = await readBody(req)

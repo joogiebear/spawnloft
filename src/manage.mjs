@@ -11,6 +11,7 @@ import { writeLaunchers } from './create.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import { UserError, validateName } from './util.mjs'
 import * as activity from './activity.mjs'
+import * as files from './files.mjs'
 
 /** Written once, because every editor and shell between here and the file mangles it. */
 const NL = String.fromCharCode(10)
@@ -243,12 +244,18 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
 }
 
 /** Open an instance's folder (or one named subfolder of it) in the system file manager. */
-export function reveal(name, sub = null) {
+export function reveal(name, sub = null, folder = null) {
   const inst = getInstance(name)
   // A fixed allowlist, not a path: sub arrives over HTTP, and "open a folder in Explorer"
-  // must never become "open anything on the machine".
+  // must never become "open anything on the machine". `folder` is the Files tool's current folder:
+  // it is confined to the server's folder by files.resolvePath and must be a real directory.
   const SUBS = new Set(['crash-reports', 'plugins', 'mods', 'logs'])
-  const target = sub && SUBS.has(sub) ? path.join(inst.dir, sub) : inst.dir
+  let target = sub && SUBS.has(sub) ? path.join(inst.dir, sub) : inst.dir
+  if (folder) {
+    const r = files.resolvePath(inst, folder, { allowRoot: true })
+    if (!r.stat.isDirectory()) throw new UserError(`${r.rel} is not a folder`)
+    target = r.full
+  }
   const [cmd, args] =
     process.platform === 'win32' ? ['explorer.exe', [target]]
     : process.platform === 'darwin' ? ['open', [target]]
