@@ -142,3 +142,32 @@ test('an unknown subcommand, or none, is a usage error', () => {
   assert.equal(s.run('move').status, 2)
   assert.match(s.run('move').stderr, /Usage: spawnloft data move <folder>/)
 })
+
+test('a start, a backup or a registry write holding its lock stops the move, read from the real folder', () => {
+  const s = setup()
+  fs.writeFileSync(path.join(s.data, 'instances.json'), JSON.stringify({
+    version: 1,
+    instances: { Srv: { kind: 'server', dir: path.join(s.data, 'instances', 'Srv'), jar: 'server.jar', memory: '1G', port: 25565, rconPort: 25575, rconPassword: 'x' } },
+  }, null, 2) + '\n')
+  // Held by this very test process, which is alive: the record acquireLock writes.
+  const held = JSON.stringify({ pid: process.pid, token: 'test' })
+  const locks = [
+    [path.join(s.data, 'run', 'Srv', 'start.lock'), /Srv \(being started\)/],
+    [path.join(s.data, 'backups', 'Srv', '.snapshot.lock'), /Srv \(being backed up\)/],
+    [path.join(s.data, 'instances.json.lock'), /the server registry \(being changed\)/],
+  ]
+  for (const [file, expected] of locks) {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, held)
+    const run = s.run('move', s.dest, '--yes')
+    assert.notEqual(run.status, 0, `${path.basename(file)} held: the move must refuse`)
+    assert.match(run.stdout + run.stderr, expected)
+    assert.match(run.stdout + run.stderr, /in use right now/)
+    assert.equal(isLink(s.data), false, 'nothing was moved')
+    assert.equal(fs.existsSync(s.dest), false)
+    fs.rmSync(file)
+  }
+  const free = s.run('move', s.dest, '--yes')
+  assert.equal(free.status, 0, free.stdout + free.stderr)
+  assert.equal(isLink(s.data), true, 'with the locks released, the same move goes ahead')
+})

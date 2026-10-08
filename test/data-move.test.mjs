@@ -32,11 +32,12 @@ function world(name = `w${++n}`) {
 }
 
 /** What is going on around a move, with a record of what was asked. */
-function env({ running = [], tasks = [], copies = [] } = {}) {
+function env({ running = [], locked = [], tasks = [], copies = [] } = {}) {
   const calls = []
   return {
     calls,
     running: () => running,
+    heldLocks: () => locked,
     tasks: {
       list: async () => tasks,
       setEnabled: async (id, on) => { calls.push([id, on]) },
@@ -105,6 +106,13 @@ test('servers and databases that are running stop it, by name', async () => {
   assert.equal(describeLink(w.root).isLink, false)
 })
 
+test('a start or a backup holding its lock stops it, though no server shows as running', async () => {
+  const w = world()
+  const { plan, executed } = await move(w, {}, { locked: ['Survival (being started)', 'Lobby (being backed up)'] })
+  assert.equal(executed, false)
+  assert.match(plan.problems.join('\n'), /Survival \(being started\), Lobby \(being backed up\) are in use right now; wait for them to finish/)
+  assert.equal(describeLink(w.root).isLink, false)
+})
 test('an interrupted move recorded earlier stops a new one, and says how to put it back', async () => {
   const w = world()
   fs.writeFileSync(journalPath(w.root), JSON.stringify({ step: 'copying' }))

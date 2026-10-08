@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import childProcess from 'node:child_process'
 
-import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable, acquireLock, acquireLockAsync, withLock } from '../src/util.mjs'
+import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable, acquireLock, acquireLockAsync, withLock, lockHolder } from '../src/util.mjs'
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lock-'))
 
@@ -228,4 +228,26 @@ test('many processes taking over one dead holder\'s lock never hold it together'
   }))
   await Promise.all(runs)
   assert.equal(Number(fs.readFileSync(counter, 'utf8')), 240, 'every increment survived: no two held the lock at once')
+})
+
+test('lockHolder reads a lock as acquireLock writes it, without taking or clearing anything', () => {
+  const lock = path.join(scratch(), 'held.lock')
+  assert.equal(lockHolder(lock), null, 'no file: free')
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.equal(lockHolder(lock), process.pid, 'a lock taken the real way names its holder')
+  release()
+  assert.equal(lockHolder(lock), null, 'released: free')
+
+  fs.writeFileSync(lock, String(process.ppid))
+  assert.equal(lockHolder(lock), process.ppid, 'a pid-only lock from before the record existed is still read')
+  fs.writeFileSync(lock, '999999999')
+  assert.equal(lockHolder(lock), null, 'a dead holder reads as free')
+  assert.ok(fs.existsSync(lock), 'and reading never clears it')
+
+  fs.writeFileSync(lock, '')
+  assert.equal(lockHolder(lock), -1, 'created a moment ago and not yet written: held by someone not yet named')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(lock, old, old)
+  assert.equal(lockHolder(lock), null, 'an empty lock nobody finished writing is not a holder')
+  fs.rmSync(lock)
 })

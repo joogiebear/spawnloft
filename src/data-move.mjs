@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { UserError, humanBytes, readJson, writeJson, sleep } from './util.mjs'
+import { UserError, humanBytes, readJson, writeJson, sleep, lockHolder } from './util.mjs'
 import { copyTree, compareTrees, treeStats, removeTree, TreeError } from './tree.mjs'
 
 /**
@@ -139,12 +139,24 @@ async function realEnv() {
   const { readState } = await import('./control.mjs')
   const schedule = await import('./schedule.mjs')
   const { findPrivateCopies } = await import('./private-copy.mjs')
+  const { REGISTRY_FILE, BACKUPS_DIR, runDir } = await import('./paths.mjs')
   return {
     running: () => listAll().filter((i) => !i.external)
       .filter((i) => ['running', 'orphaned', 'stopping'].includes(readState(i.name).status)).map((i) => i.name),
     tasks: {
       list: async () => (await schedule.list()).filter((t) => t.enabled).map((t) => ({ id: t.id, instance: t.instance, name: t.name })),
       setEnabled: (id, on) => schedule.setEnabled(id, on),
+    },
+    heldLocks: () => {
+      // A start between its status check and its daemon publishing state reads as "stopped" above, and
+      // a backup of a stopped server never shows as running at all; only the locks they hold say so.
+      const held = []
+      if (lockHolder(`${REGISTRY_FILE}.lock`)) held.push('the server registry (being changed)')
+      for (const i of listAll().filter((i) => !i.external)) {
+        if (lockHolder(path.join(runDir(i.name), 'start.lock'))) held.push(`${i.name} (being started)`)
+        if (lockHolder(path.join(BACKUPS_DIR, i.name, '.snapshot.lock'))) held.push(`${i.name} (being backed up)`)
+      }
+      return held
     },
     privateCopies: () => findPrivateCopies(),
     now: () => new Date(),
@@ -241,6 +253,9 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
   // Nothing running: a database or a world is not copied or renamed while it is being written.
   const busy = env.running()
   if (busy.length) problems.push(`${busy.join(', ')} ${plural(busy.length, 'is', 'are')} running; stop ${plural(busy.length, 'it', 'them')} first (\`spawnloft stop <name>\`)`)
+  // Also not while a start or a backup holds its lock: neither shows as a running server.
+  const locked = env.heldLocks?.() ?? []
+  if (locked.length) problems.push(`${locked.join(', ')} ${plural(locked.length, 'is', 'are')} in use right now; wait for ${plural(locked.length, 'it', 'them')} to finish and try again`)
 
   // Scheduled tasks are paused for the move: one that starts a server or a backup halfway through is a hazard.
   let pauseTasks = []
