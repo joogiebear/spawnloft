@@ -52,7 +52,12 @@ export function writeProps(file, updates) {
   for (const [key, value] of pending) out.push(`${key}=${value}`)
   out.push('')
 
-  fs.writeFileSync(file, out.join('\n'))
+  // Atomic (temp file + rename): this runs on every server start, so a crash mid-write would
+  // truncate the file and the next start would read it back empty - silently dropping the RCON
+  // password and port back to Minecraft's defaults instead of the ones mcctl just set.
+  const tmp = `${file}.tmp-${process.pid}`
+  fs.writeFileSync(tmp, out.join('\n'))
+  fs.renameSync(tmp, file)
 }
 
 /** All world directories the server owns, derived from level-name. */

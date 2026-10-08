@@ -8,7 +8,7 @@ import * as services from './services.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
-import { fail, stamp, humanBytes, writeJson, readJson, UserError } from './util.mjs'
+import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync } from './util.mjs'
 import * as activity from './activity.mjs'
 
 /**
@@ -271,6 +271,24 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   const base = `${slug}${scope}_${stamp()}`
   const dir = backupDir(inst.name)
 
+  // Two snapshots of the same instance running at once would each flip save-off/save-on around
+  // their own tar independently - whichever finishes first turns saving back on while the other's
+  // tar is still reading, handing it a torn copy. Serialized per instance rather than refused, so
+  // a scheduled task and a person clicking "Backup now" both still get their snapshot, just not
+  // at the same moment. Waits rather than failing fast: a backup can legitimately take minutes,
+  // and the point is to queue behind it, not to make the second request start over. Async so a
+  // second snapshot of the same instance requested from this same process - two panel requests,
+  // not just a separate CLI call - waits by yielding, not by freezing the one thread the first
+  // snapshot's own awaits need in order to ever finish and release it.
+  const release = await acquireLockAsync(path.join(dir, '.snapshot.lock'), { timeoutMs: 30 * 60 * 1000 })
+  try {
+    return await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut })
+  } finally {
+    release()
+  }
+}
+
+async function createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut }) {
   /*
     The databases this server is attached to go in too, as a `databases/` member holding one SQL
     dump per database. Dumped into a scratch folder and added from there with -C, so the server's

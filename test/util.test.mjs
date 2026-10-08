@@ -3,8 +3,11 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import childProcess from 'node:child_process'
 
-import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable } from '../src/util.mjs'
+import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable, acquireLock, acquireLockAsync, withLock } from '../src/util.mjs'
+
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lock-'))
 
 test('bytes read at the right unit, whole below 1 KB', () => {
   assert.equal(humanBytes(0), '0 B')
@@ -55,6 +58,85 @@ test('writeJson round-trips and leaves no .tmp behind', () => {
   writeJson(file, { version: 1, instances: {} })
   assert.deepEqual(readJson(file), { version: 1, instances: {} })
   assert.ok(!fs.existsSync(`${file}.tmp`), 'the temp file should have been renamed away')
+})
+
+// ---- locking -----------------------------------------------------------------
+
+test('withLock serializes two read-modify-writes that would otherwise clobber each other', () => {
+  const file = path.join(scratch(), 'counter.json')
+  writeJson(file, { n: 0 })
+  for (let i = 0; i < 20; i++) {
+    withLock(`${file}.lock`, () => {
+      const data = readJson(file)
+      writeJson(file, { n: data.n + 1 })
+    })
+  }
+  assert.equal(readJson(file).n, 20)
+  assert.ok(!fs.existsSync(`${file}.lock`), 'the lock file is removed once released')
+})
+
+test('acquireLock with mode "fail" reports the conflict instead of waiting for it', () => {
+  const lock = path.join(scratch(), 'start.lock')
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release, 'nothing else holds it yet')
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'already held by this same (live) process')
+  release()
+  assert.ok(acquireLock(lock, { mode: 'fail' }), 'free again once released')
+})
+
+test('a lock left behind by a pid that is no longer alive is taken over, not waited for', () => {
+  const lock = path.join(scratch(), 'stale.lock')
+  // A pid essentially nothing will ever legitimately be, standing in for "that process is gone".
+  fs.writeFileSync(lock, '999999', { flag: 'wx' })
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release, 'a dead holder does not block a new one')
+  release()
+})
+
+test('acquireLock mode "wait" blocks until a holder in another process releases it', async () => {
+  // acquireLock's "wait" blocks this thread (Atomics.wait), which only a separate process can
+  // unblock - a timer in this same process could never fire while this thread is stuck waiting on
+  // it, which is exactly why acquireLockAsync exists for anything that shares a process with its
+  // holder. A real child process is the only honest way to exercise this mode's wait at all.
+  const lock = path.join(scratch(), 'wait.lock')
+  const holder = childProcess.spawn(process.execPath, ['-e',
+    `require('fs').writeFileSync(${JSON.stringify(lock)}, String(process.pid), { flag: 'wx' });
+     setTimeout(() => require('fs').rmSync(${JSON.stringify(lock)}, { force: true }), 150)`,
+  ])
+  await new Promise((resolve, reject) => {
+    const deadline = setTimeout(() => reject(new Error('holder never created the lock')), 2000)
+    const check = setInterval(() => {
+      if (fs.existsSync(lock)) { clearInterval(check); clearTimeout(deadline); resolve() }
+    }, 5)
+  })
+  const t0 = Date.now()
+  const release = acquireLock(lock, { timeoutMs: 5000 })
+  assert.ok(Date.now() - t0 >= 100, 'it actually waited for the other process to release it')
+  release()
+  await new Promise((resolve) => holder.on('exit', resolve))
+})
+
+test('acquireLockAsync waits by yielding, not by blocking the holder\'s own progress', async () => {
+  const lock = path.join(scratch(), 'async.lock')
+  const release = acquireLock(lock, { mode: 'fail' })
+  let holderProgressed = false
+  // The holder's own "work" is just another timer - if the waiter blocked the thread instead of
+  // yielding, this would never get to run, and acquireLockAsync below would time out instead of
+  // succeeding once release() runs.
+  setTimeout(() => { holderProgressed = true; release() }, 30)
+  const second = await acquireLockAsync(lock, { timeoutMs: 2000 })
+  assert.ok(holderProgressed, 'the holder\'s own timer fired while the second request was waiting')
+  second()
+})
+
+test('acquireLockAsync times out with the holder named, rather than waiting forever', async () => {
+  const lock = path.join(scratch(), 'timeout.lock')
+  const release = acquireLock(lock, { mode: 'fail' })
+  await assert.rejects(
+    acquireLockAsync(lock, { timeoutMs: 50 }),
+    new RegExp(`timed out waiting for lock .*held by pid ${process.pid}`),
+  )
+  release()
 })
 
 // ---- the things that must not hold the event loop --------------------------
