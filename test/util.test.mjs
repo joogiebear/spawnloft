@@ -178,17 +178,15 @@ test('a lock taken over after this holder was judged dead is not deleted by this
   fs.rmSync(lock)
 })
 
-test('a lock whose pid is alive but belongs to another program is taken over', (t) => {
-  const lock = path.join(scratch(), 'reused.lock')
-  // The parent process is alive and certainly not "no-such-program.exe": what a reused pid looks like.
-  if (sameProcess(process.ppid, 'no-such-program.exe')) return t.skip('this platform cannot tell programs apart by name')
-  fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, image: 'no-such-program.exe', token: 'old' }))
-  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a young lock held by a live pid is held; no process table is read for it')
-  const old = new Date(Date.now() - 120000)
+test('a lock held by a live process is never taken from it, however old the lock is', () => {
+  const lock = path.join(scratch(), 'live.lock')
+  // The parent process is alive: a holder that is slow, not gone.
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, token: 'slow' }))
+  const old = new Date(Date.now() - 600000)
   fs.utimesSync(lock, old, old)
-  const release = acquireLock(lock, { mode: 'fail' })
-  assert.ok(release, 'a recycled pid does not keep a dead holder\'s lock held')
-  release()
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'age alone does not make a live holder dead')
+  assert.ok(fs.existsSync(lock))
+  fs.rmSync(lock)
 })
 
 test('a lock still being written is not mistaken for an abandoned one', () => {
