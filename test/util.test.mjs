@@ -168,3 +168,64 @@ test('the process table refreshes without blocking and keeps knowing this proces
   assert.equal(a, b)
   await a
 })
+
+test('a lock taken over after this holder was judged dead is not deleted by this holder\'s release', () => {
+  const lock = path.join(scratch(), 'owned.lock')
+  const release = acquireLock(lock, { mode: 'fail' })
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, image: 'node', token: 'someone-else' }))
+  release()
+  assert.ok(fs.existsSync(lock), 'a release only removes the lock it took')
+  fs.rmSync(lock)
+})
+
+test('a lock held by a live process is never taken from it, however old the lock is', () => {
+  const lock = path.join(scratch(), 'live.lock')
+  // The parent process is alive: a holder that is slow, not gone.
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, token: 'slow' }))
+  const old = new Date(Date.now() - 600000)
+  fs.utimesSync(lock, old, old)
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'age alone does not make a live holder dead')
+  assert.ok(fs.existsSync(lock))
+  fs.rmSync(lock)
+})
+
+test('a lock still being written is not mistaken for an abandoned one', () => {
+  const lock = path.join(scratch(), 'young.lock')
+  fs.writeFileSync(lock, '') // created, owner has not written its pid yet
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a brand-new empty lock is held')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(lock, old, old)
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release, 'an empty lock nobody finished writing is cleared once it is old')
+  release()
+})
+
+test('while one waiter is clearing a dead holder\'s lock, another does not clear it too', () => {
+  const lock = path.join(scratch(), 'breaking.lock')
+  fs.writeFileSync(lock, '999999')
+  fs.writeFileSync(`${lock}.break`, String(process.pid)) // another waiter is mid-clear
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'waits for the clear in progress')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(`${lock}.break`, old, old)
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a dead clearer\'s marker is removed, and the next try proceeds')
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release)
+  release()
+})
+
+test('many processes taking over one dead holder\'s lock never hold it together', async () => {
+  const dir = scratch()
+  const lock = path.join(dir, 'race.lock')
+  const counter = path.join(dir, 'count')
+  fs.writeFileSync(lock, '999999') // abandoned before anyone starts
+  fs.writeFileSync(counter, '0')
+  const util = new URL('../src/util.mjs', import.meta.url).href
+  const code = `import('${util}').then(({ withLock }) => { for (let i = 0; i < 40; i++) withLock(${JSON.stringify(lock)}, () => {
+    const fs = require('fs'); const n = Number(fs.readFileSync(${JSON.stringify(counter)}, 'utf8')); fs.writeFileSync(${JSON.stringify(counter)}, String(n + 1)) }, { timeoutMs: 20000 }) })`
+  const runs = Array.from({ length: 6 }, () => new Promise((resolve, reject) => {
+    const child = childProcess.spawn(process.execPath, ['-e', code], { stdio: 'inherit' })
+    child.on('exit', (c) => (c === 0 ? resolve() : reject(new Error(`worker exited ${c}`))))
+  }))
+  await Promise.all(runs)
+  assert.equal(Number(fs.readFileSync(counter, 'utf8')), 240, 'every increment survived: no two held the lock at once')
+})

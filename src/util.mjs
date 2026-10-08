@@ -226,25 +226,113 @@ export async function acquireLockAsync(lockFile, { timeoutMs = 10000 } = {}) {
   }
 }
 
-function tryLock(lockFile) {
-  fs.mkdirSync(path.dirname(lockFile), { recursive: true })
+/**
+ * What a lock file says about its holder: the pid, the executable it was running as, and a token
+ * only this acquisition knows. A file holding just a number is one written before the rest existed.
+ * Null for a file that is empty or unreadable, which is a lock being written or a damaged one.
+ */
+function lockRecord(text) {
+  const t = String(text ?? '').trim()
+  if (!t) return null
+  if (/^\d+$/.test(t)) return { pid: Number(t) }
   try {
-    fs.writeFileSync(lockFile, String(process.pid), { flag: 'wx' })
-    return { ok: true, release: () => fs.rmSync(lockFile, { force: true }) }
-  } catch (err) {
-    if (err.code !== 'EEXIST') throw err
-    const holder = Number(readLockHolder(lockFile))
-    if (!holder || !pidAlive(holder)) {
-      fs.rmSync(lockFile, { force: true })
-      return tryLock(lockFile)
-    }
-    return { ok: false, holder }
+    const rec = JSON.parse(t)
+    return Number.isInteger(rec?.pid) && rec.pid > 0 ? rec : null
+  } catch {
+    return null
   }
 }
 
-function readLockHolder(lockFile) {
+/**
+ * Whether the process a lock names is still running. Only the pid is checked. Checking that the
+ * pid is still the same *program* (so a pid reused after a crash does not keep the lock held) was
+ * tried and taken out: in the packaged Windows app it declared a live holder dead, and the lock
+ * was then taken from under it. A reused pid keeps a lock held until that process exits.
+ */
+function holderAlive(rec) {
+  if (!rec) return false
+  if (rec.pid === process.pid) return true
+  return pidAlive(rec.pid)
+}
+
+/**
+ * What Windows reports for a file that was just deleted while another process still has it open:
+ * it stays, unopenable, until that handle closes - milliseconds, but long enough to throw. Seen
+ * as EPERM when several processes took over one abandoned lock at the same moment.
+ */
+const LOCK_BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
+/** `rmSync` waits out a handle that is still closing, instead of throwing EPERM or EBUSY. */
+const RM_RETRY = { force: true, maxRetries: 10, retryDelay: 10 }
+
+function pauseSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/** A lock file this young may still be between being created and being written. */
+const LOCK_WRITE_GRACE_MS = 2000
+/** A break lock this old was left by a process that died while clearing a stale lock. */
+const LOCK_BREAK_STALE_MS = 10000
+
+function fileAgeMs(file) {
+  try { return Date.now() - fs.statSync(file).mtimeMs } catch { return Infinity }
+}
+
+/**
+ * Clear a lock whose holder is gone - once, whoever else is trying. Two waiters that both see the
+ * same dead holder must not both delete: the second delete would remove the live lock the first
+ * had just taken. So clearing is itself exclusive (`.break`), and the lock is removed only if it
+ * still reads exactly as it did when it was judged dead.
+ */
+function breakStaleLock(lockFile, seen) {
+  const breaker = `${lockFile}.break`
   try {
-    return fs.readFileSync(lockFile, 'utf8').trim()
+    fs.writeFileSync(breaker, String(process.pid), { flag: 'wx' })
+  } catch (err) {
+    if (err.code !== 'EEXIST' && !LOCK_BUSY.has(err.code)) throw err
+    if (err.code === 'EEXIST' && fileAgeMs(breaker) > LOCK_BREAK_STALE_MS) fs.rmSync(breaker, RM_RETRY)
+    return false
+  }
+  try {
+    if (readLockText(lockFile) === seen) fs.rmSync(lockFile, RM_RETRY)
+    return true
+  } finally {
+    fs.rmSync(breaker, RM_RETRY)
+  }
+}
+
+/** Remove the lock only if it is still this acquisition's: a lock taken over since is not ours to delete. */
+function releaseLock(lockFile, token) {
+  if (lockRecord(readLockText(lockFile))?.token === token) fs.rmSync(lockFile, RM_RETRY)
+}
+
+function tryLock(lockFile) {
+  fs.mkdirSync(path.dirname(lockFile), { recursive: true })
+  for (let attempt = 0; ; attempt++) {
+    // Bounded, so a lock file that stays unopenable is reported as held rather than spun on.
+    if (attempt > 60) return { ok: false, holder: null }
+    const token = crypto.randomUUID()
+    const body = JSON.stringify({ pid: process.pid, token })
+    try {
+      fs.writeFileSync(lockFile, body, { flag: 'wx' })
+      return { ok: true, release: () => releaseLock(lockFile, token) }
+    } catch (err) {
+      if (LOCK_BUSY.has(err.code)) { pauseSync(5); continue }
+      if (err.code !== 'EEXIST') throw err
+    }
+    const seen = readLockText(lockFile)
+    if (seen === null) { pauseSync(2); continue } // released between the create and the read, or briefly unreadable
+    const rec = lockRecord(seen)
+    if (holderAlive(rec)) return { ok: false, holder: rec.pid }
+    // Empty: its owner is between creating and writing it. Not dead until it has had time to write.
+    if (!rec && fileAgeMs(lockFile) < LOCK_WRITE_GRACE_MS) return { ok: false, holder: null }
+    if (attempt >= 5 || !breakStaleLock(lockFile, seen)) return { ok: false, holder: rec?.pid ?? null }
+  }
+}
+
+/** The lock file's text, or null when there is no file. */
+function readLockText(lockFile) {
+  try {
+    return fs.readFileSync(lockFile, 'utf8')
   } catch {
     return null
   }
