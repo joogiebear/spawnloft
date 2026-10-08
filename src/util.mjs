@@ -338,6 +338,20 @@ function readLockText(lockFile) {
   }
 }
 
+/**
+ * The pid holding a lock file, or null when it is free - absent, or left behind by a process that
+ * is no longer alive. A lock created a moment ago and not yet written reads as held, by -1: its
+ * owner is there, it has just not said who it is. Read-only: unlike `acquireLock` it never takes
+ * the lock or clears a stale one.
+ */
+export function lockHolder(lockFile) {
+  const text = readLockText(lockFile)
+  if (text === null) return null
+  const rec = lockRecord(text)
+  if (!rec) return fileAgeMs(lockFile) < LOCK_WRITE_GRACE_MS ? -1 : null
+  return holderAlive(rec) ? rec.pid : null
+}
+
 /** `acquireLock`, held for the duration of a synchronous `fn`. */
 export function withLock(lockFile, fn, opts) {
   const release = acquireLock(lockFile, opts)

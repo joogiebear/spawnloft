@@ -278,7 +278,29 @@ tasks with it, and deleting one takes them away.
 | `templates` / `templates save <inst> <tpl>` | Reusable plugin+config sets |
 | `jars` / `jars import <path>` | Server jar store used by `new` |
 | `doctor` | Environment, port collisions, EULA, disk, stale state |
+| `data move <folder> [--yes]` | Move the whole data folder to another place or drive and leave a link where it was, so nothing stored needs changing. Shows the plan unless `--yes`; `data status`, `data finish` (deletes the parked original) and `data rollback` (puts an interrupted move back). See below |
 | `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
+
+### Moving the data folder
+
+Changing the data-folder setting does not move anything, and the registry that lists your servers is
+inside the folder, so pointing the setting somewhere else loses them from the list. `spawnloft data move
+<folder>` moves the folder and leaves a link (a junction on Windows, a symlink elsewhere) at the old
+path instead, so every path SpawnLoft has stored - each server's folder, the databases' configuration,
+the scheduled tasks - stays true, and nothing is rewritten.
+
+On the same drive it is one rename. To another drive it copies, compares the copy (sizes, times, and
+file contents for the small files; `--thorough` reads the large ones too), and parks the original
+beside the link instead of deleting it; `spawnloft data finish` deletes it once you have looked. The
+original is never touched before the copy has been checked, and any failure puts everything back.
+Modification times are kept, since the order of your backups depends on them.
+
+It refuses while a server or database is running, pauses scheduled tasks for the length of the move
+and switches them back on, and wants the SpawnLoft app closed, since a folder with a file open cannot
+be renamed. Run it from a terminal or from the app. On Windows it also looks for the private copy
+that a program installed as a package keeps of this folder (see [MCP.md](MCP.md)): one that holds
+servers or backups found nowhere else stops the move until you have copied them out, and one that would
+only hide the link is renamed, never deleted, when you add `--set-aside-private-copies`.
 
 ## How it works
 

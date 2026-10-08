@@ -126,10 +126,14 @@ What doctor reports, and what to do about it:
 - **Settings that differ.** They decide where the data folder is. Rename the copy's `settings.json`
   if the real one is right.
 
-The copy can return the next time such a program writes the registry. Keeping SpawnLoft's data
-outside `%LOCALAPPDATA%` stops it, but nothing moves a data folder for you yet: `spawnloft config
-set-root` and the app's Change the data folder start a new, empty registry and leave existing servers
-where they are.
+The copy can return the next time such a program writes the registry. What stops it for good is moving
+the data out of `%LOCALAPPDATA%`: **`spawnloft data move <folder>`** moves it and leaves a link at the
+old path. Writes through a link that leads outside AppData are not redirected, so the program's
+reads and writes then reach the real data, and nothing SpawnLoft has stored needs changing. Run it
+from a terminal or the app, not through the assistant; with `--set-aside-private-copies` it renames
+the stale private copy instead of leaving it to hide the link. See [the README](README.md#moving-the-data-folder).
+(`spawnloft config set-root` and the app's Change the data folder do not move anything: they start a
+new, empty registry and leave existing servers where they are.)
 
 ## Options
 
