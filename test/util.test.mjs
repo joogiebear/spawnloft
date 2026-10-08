@@ -183,6 +183,9 @@ test('a lock whose pid is alive but belongs to another program is taken over', (
   // The parent process is alive and certainly not "no-such-program.exe": what a reused pid looks like.
   if (sameProcess(process.ppid, 'no-such-program.exe')) return t.skip('this platform cannot tell programs apart by name')
   fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, image: 'no-such-program.exe', token: 'old' }))
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a young lock held by a live pid is held; no process table is read for it')
+  const old = new Date(Date.now() - 120000)
+  fs.utimesSync(lock, old, old)
   const release = acquireLock(lock, { mode: 'fail' })
   assert.ok(release, 'a recycled pid does not keep a dead holder\'s lock held')
   release()

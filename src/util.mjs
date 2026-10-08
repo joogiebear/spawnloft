@@ -248,11 +248,17 @@ function lockRecord(text) {
  * pids are reused, and after a crash the number can belong to an unrelated program, which would
  * keep the lock "held" until that program exits. The executable name recorded with the pid is the
  * contradiction `sameProcess` looks for; it is lenient everywhere it cannot tell.
+ *
+ * <p>Asked only of a lock that is not young. Reading the process table can mean running a program
+ * and waiting for it, and this runs on the contended path - in the panel, on the thread everything
+ * else shares. A lock taken moments ago by a live pid is held, whatever the pid once was; reuse
+ * only matters for a lock that has outlived the process that took it, and that is old by definition.
  */
-function holderAlive(rec) {
+function holderAlive(rec, lockFile) {
   if (!rec) return false
   if (rec.pid === process.pid) return true // this process: no table lookup needed to know it is itself
-  return pidAlive(rec.pid) && sameProcess(rec.pid, rec.image)
+  if (!pidAlive(rec.pid)) return false
+  return fileAgeMs(lockFile) < LOCK_IDENTITY_CHECK_AFTER_MS || sameProcess(rec.pid, rec.image)
 }
 
 /**
@@ -267,6 +273,9 @@ const RM_RETRY = { force: true, maxRetries: 10, retryDelay: 10 }
 function pauseSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
+
+/** Only a lock older than this has its holder's identity checked against the process table. */
+const LOCK_IDENTITY_CHECK_AFTER_MS = 30000
 
 /** A lock file this young may still be between being created and being written. */
 const LOCK_WRITE_GRACE_MS = 2000
@@ -322,7 +331,7 @@ function tryLock(lockFile) {
     const seen = readLockText(lockFile)
     if (seen === null) { pauseSync(2); continue } // released between the create and the read, or briefly unreadable
     const rec = lockRecord(seen)
-    if (holderAlive(rec)) return { ok: false, holder: rec.pid }
+    if (holderAlive(rec, lockFile)) return { ok: false, holder: rec.pid }
     // Empty: its owner is between creating and writing it. Not dead until it has had time to write.
     if (!rec && fileAgeMs(lockFile) < LOCK_WRITE_GRACE_MS) return { ok: false, holder: null }
     if (attempt >= 5 || !breakStaleLock(lockFile, seen)) return { ok: false, holder: rec?.pid ?? null }
