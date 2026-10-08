@@ -179,6 +179,88 @@ export function writeJson(file, data) {
   fs.renameSync(tmp, file)
 }
 
+/**
+ * A lock file other callers also create with the exclusive flag, so at most one of them holds it
+ * at a time - across processes (CLI, panel, daemon), not just within one.
+ *
+ * <p>The file carries the holder's pid, so a lock left behind by a process that died while
+ * holding it - killed, crashed, the machine lost power - is told apart from one a live process is
+ * still using: both lock functions take it over the moment the pid is no longer alive, rather than
+ * waiting out a fixed age that would either steal it from a slow but healthy holder or sit on a
+ * dead one for too long.
+ *
+ * <p>Waits by blocking the thread, which only another *process* can be holding the lock while
+ * this one does nothing else: the one JS thread cannot be both polling this loop and running the
+ * code that would release the lock. Good for `withLock`'s synchronous critical sections (a quick
+ * registry or player-list read-modify-write), wrong for anything that awaits while it holds the
+ * lock - see `acquireLockAsync` for that.
+ *
+ * <p>`mode: 'wait'` (the default) retries quietly until it gets the lock or `timeoutMs` passes.
+ * `mode: 'fail'` reports the conflict straight away instead, by returning null - for a start or
+ * install where a second attempt queuing up silently is worse than being told to retry.
+ */
+export function acquireLock(lockFile, { mode = 'wait', timeoutMs = 10000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const result = tryLock(lockFile)
+    if (result.ok) return result.release
+    if (mode === 'fail') return null
+    if (Date.now() > deadline) throw new Error(`timed out waiting for lock ${lockFile} (held by pid ${result.holder})`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
+  }
+}
+
+/**
+ * `acquireLock`'s `mode: 'wait'`, but waiting by awaiting a real timer instead of blocking the
+ * thread - so another holder *in this same process* (a backup running in one request while a
+ * second request for the same instance waits its turn) gets to keep running its own awaits
+ * instead of being frozen out by this one spinning the thread it needs to finish and let go.
+ */
+export async function acquireLockAsync(lockFile, { timeoutMs = 10000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const result = tryLock(lockFile)
+    if (result.ok) return result.release
+    if (Date.now() > deadline) throw new Error(`timed out waiting for lock ${lockFile} (held by pid ${result.holder})`)
+    await sleep(20)
+  }
+}
+
+function tryLock(lockFile) {
+  fs.mkdirSync(path.dirname(lockFile), { recursive: true })
+  try {
+    fs.writeFileSync(lockFile, String(process.pid), { flag: 'wx' })
+    return { ok: true, release: () => fs.rmSync(lockFile, { force: true }) }
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err
+    const holder = Number(readLockHolder(lockFile))
+    if (!holder || !pidAlive(holder)) {
+      fs.rmSync(lockFile, { force: true })
+      return tryLock(lockFile)
+    }
+    return { ok: false, holder }
+  }
+}
+
+function readLockHolder(lockFile) {
+  try {
+    return fs.readFileSync(lockFile, 'utf8').trim()
+  } catch {
+    return null
+  }
+}
+
+/** `acquireLock`, held for the duration of a synchronous `fn`. */
+export function withLock(lockFile, fn, opts) {
+  const release = acquireLock(lockFile, opts)
+  if (!release) fail(`could not get a lock on ${lockFile}`)
+  try {
+    return fn()
+  } finally {
+    release()
+  }
+}
+
 /** Signal 0 is a liveness probe on both Windows and POSIX. */
 export function pidAlive(pid) {
   if (!pid) return false

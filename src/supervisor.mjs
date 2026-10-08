@@ -8,7 +8,7 @@ import { mcVersionOf } from './plugins.mjs'
 import { readState, clearState, controlRequest } from './control.mjs'
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
-import { fail, sleep, pidAlive, killProcessGroup, UserError } from './util.mjs'
+import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
 import { patternsFor } from './ready.mjs'
 import * as activity from './activity.mjs'
 
@@ -116,64 +116,77 @@ async function launch(name, { wait = true, timeout = 180000, sync = true, force 
     inst = await ensureJava(inst, { force })
   }
 
-  const { status, state } = readState(name)
-  if (status === 'running') fail(`instance "${name}" is already running (java pid ${state.javaPid})`)
-  if (status === 'stopping') fail(`instance "${name}" is still shutting down - wait for it to finish`)
-  if (status === 'orphaned') {
-    fail(
-      `instance "${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon.\n` +
-        `  Reattach is not possible; stop it with: mcctl kill ${name}`,
-    )
-  }
-  if (status === 'stale') clearState(name)
-  // A failure record from a previous attempt would otherwise be read as this attempt's failure, so
-  // a server that had one bad start could never be started again without deleting a file by hand.
-  if (state?.error) clearState(name)
-
-  if (sync && !database) syncProps(inst)
   fs.mkdirSync(runDir(name), { recursive: true })
 
-  const child = spawn(process.execPath, [DAEMON, name], {
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: true,
-    cwd: path.dirname(DAEMON),
-    // The desktop app runs this code INSIDE Electron, where process.execPath is mcctl.exe rather
-    // than node. Without this flag that spawn re-launches the whole application - a second hidden
-    // copy of the GUI, no daemon, and a fifteen-second wait ending in "did not come up". Plain
-    // node ignores the variable, so the CLI path is unaffected.
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-  })
-  child.unref()
-  attempt.launched = true
+  // The window this closes: the status check just below reads "not running", but nothing stopped
+  // a second start() - another CLI call, the panel, a scheduled task - from reading the very same
+  // thing microseconds earlier and already spawning its own daemon. Held from the check through
+  // the daemon publishing its own state (or failing to), the same span the race actually spans;
+  // released well before `wait`'s much longer run-until-ready, which readState already guards.
+  const release = acquireLock(path.join(runDir(name), 'start.lock'), { mode: 'fail' })
+  if (!release) fail(`"${name}" is already being started by another request - wait for it to finish.`)
 
-  // Wait for the daemon to publish its state file before reporting success.
-  const deadline = Date.now() + 15000
-  let live = null
-  while (Date.now() < deadline) {
-    await sleep(150)
-    const cur = readState(name)
-    // A stopped daemon leaves its state and console behind. On a quick restart,
-    // those can still describe the previous launch while this child is booting.
-    // Only this child's state can acknowledge this start (or report its failure).
-    if (cur.state?.daemonPid !== child.pid) continue
-    // A daemon that failed during startup writes its reason and nothing else. Watching only for a
-    // successful launch meant waiting the full fifteen seconds and then reporting that nothing came
-    // up, when the answer had been sitting on disk since the first tick.
-    if (cur.state?.error) fail(`"${name}" could not start: ${cur.state.error}`)
-    if (cur.state && cur.state.daemonPid && cur.state.startedAt) {
-      live = cur
-      break
+  let live
+  try {
+    const { status, state } = readState(name)
+    if (status === 'running') fail(`instance "${name}" is already running (java pid ${state.javaPid})`)
+    if (status === 'stopping') fail(`instance "${name}" is still shutting down - wait for it to finish`)
+    if (status === 'orphaned') {
+      fail(
+        `instance "${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon.\n` +
+          `  Reattach is not possible; stop it with: mcctl kill ${name}`,
+      )
     }
+    if (status === 'stale') clearState(name)
+    // A failure record from a previous attempt would otherwise be read as this attempt's failure, so
+    // a server that had one bad start could never be started again without deleting a file by hand.
+    if (state?.error) clearState(name)
+
+    if (sync && !database) syncProps(inst)
+
+    const child = spawn(process.execPath, [DAEMON, name], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      cwd: path.dirname(DAEMON),
+      // The desktop app runs this code INSIDE Electron, where process.execPath is mcctl.exe rather
+      // than node. Without this flag that spawn re-launches the whole application - a second hidden
+      // copy of the GUI, no daemon, and a fifteen-second wait ending in "did not come up". Plain
+      // node ignores the variable, so the CLI path is unaffected.
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    })
+    child.unref()
+    attempt.launched = true
+
+    // Wait for the daemon to publish its state file before reporting success.
+    const deadline = Date.now() + 15000
+    while (Date.now() < deadline) {
+      await sleep(150)
+      const cur = readState(name)
+      // A stopped daemon leaves its state and console behind. On a quick restart,
+      // those can still describe the previous launch while this child is booting.
+      // Only this child's state can acknowledge this start (or report its failure).
+      if (cur.state?.daemonPid !== child.pid) continue
+      // A daemon that failed during startup writes its reason and nothing else. Watching only for a
+      // successful launch meant waiting the full fifteen seconds and then reporting that nothing came
+      // up, when the answer had been sitting on disk since the first tick.
+      if (cur.state?.error) fail(`"${name}" could not start: ${cur.state.error}`)
+      if (cur.state && cur.state.daemonPid && cur.state.startedAt) {
+        live = cur
+        break
+      }
+    }
+    if (!live) {
+      // Naming a log file that was never written sends people looking for a file that is not there.
+      const log = daemonLog(name)
+      fail(fs.existsSync(log)
+        ? `"${name}" did not start - see ${log}`
+        : `"${name}" did not start: the supervisor process never came up.`)
+    }
+    if (live.state.error) fail(`failed to launch "${name}": ${live.state.error}`)
+  } finally {
+    release()
   }
-  if (!live) {
-    // Naming a log file that was never written sends people looking for a file that is not there.
-    const log = daemonLog(name)
-    fail(fs.existsSync(log)
-      ? `"${name}" did not start - see ${log}`
-      : `"${name}" did not start: the supervisor process never came up.`)
-  }
-  if (live.state.error) fail(`failed to launch "${name}": ${live.state.error}`)
 
   if (!wait) return { started: true, javaPid: live.state.javaPid, ready: false }
 
