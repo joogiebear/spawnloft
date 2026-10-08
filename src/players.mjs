@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { readProps } from './props.mjs'
-import { fail } from './util.mjs'
+import { fail, writeJson, withLock } from './util.mjs'
 import { rconExec, stripColors } from './rcon.mjs'
 import * as supervisor from './supervisor.mjs'
 
@@ -81,7 +81,24 @@ function readList(dir, file) {
 }
 
 function writeList(dir, file, rows) {
-  fs.writeFileSync(path.join(dir, file), JSON.stringify(rows, null, 2) + '\n')
+  // Atomic (temp file + rename): the panel and the CLI can both reach for this file, and a crash
+  // mid-write must never leave ops.json / banned-players.json / whitelist.json half-written - that
+  // reads back as empty, which is indistinguishable from "nobody is opped/banned/whitelisted".
+  writeJson(path.join(dir, file), rows)
+}
+
+/**
+ * Read, change, and write back one of the four files, as a single step a concurrent call cannot
+ * land in the middle of. Without this, the panel and the CLI changing two different players at
+ * the same moment can each read before the other writes, and the second write silently undoes the
+ * first - no error, just one ban or op that never took.
+ */
+function updateList(dir, file, mutate) {
+  return withLock(path.join(dir, `${file}.lock`), () => {
+    const rows = mutate(readList(dir, file))
+    writeList(dir, file, rows)
+    return rows
+  })
 }
 
 /**
@@ -261,18 +278,20 @@ export async function setOp(inst, uuid, on) {
     const [reply] = await rconExec(inst, [`${on ? 'op' : 'deop'} ${name}`])
     return { uuid: who.uuid, op: on, via: 'console', reply: stripColors(reply || '').trim() }
   }
-  const rows = readList(inst.dir, OPS).filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
-  if (on) {
-    rows.push({
-      uuid: who.uuid,
-      name: who.name || '',
-      // Level 4 is what the `op` command grants. Anything less is a partial operator that the
-      // console cannot create, so offering it here would be a setting only half the app honours.
-      level: 4,
-      bypassesPlayerLimit: false,
-    })
-  }
-  writeList(inst.dir, OPS, rows)
+  updateList(inst.dir, OPS, (rows) => {
+    const filtered = rows.filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
+    if (on) {
+      filtered.push({
+        uuid: who.uuid,
+        name: who.name || '',
+        // Level 4 is what the `op` command grants. Anything less is a partial operator that the
+        // console cannot create, so offering it here would be a setting only half the app honours.
+        level: 4,
+        bypassesPlayerLimit: false,
+      })
+    }
+    return filtered
+  })
   return { uuid: who.uuid, op: on, via: 'file' }
 }
 
@@ -286,19 +305,21 @@ export async function setBan(inst, uuid, on, reason) {
     const [reply] = await rconExec(inst, [cmd])
     return { uuid: who.uuid, banned: on, via: 'console', reply: stripColors(reply || '').trim() }
   }
-  const rows = readList(inst.dir, BANNED).filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
-  if (on) {
-    rows.push({
-      uuid: who.uuid,
-      name: who.name || '',
-      // The format Minecraft writes, so the file stays one the server can read back.
-      created: banStamp(new Date()),
-      source: BAN_SOURCE,
-      expires: 'forever',
-      reason: why || 'Banned by an operator.',
-    })
-  }
-  writeList(inst.dir, BANNED, rows)
+  updateList(inst.dir, BANNED, (rows) => {
+    const filtered = rows.filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
+    if (on) {
+      filtered.push({
+        uuid: who.uuid,
+        name: who.name || '',
+        // The format Minecraft writes, so the file stays one the server can read back.
+        created: banStamp(new Date()),
+        source: BAN_SOURCE,
+        expires: 'forever',
+        reason: why || 'Banned by an operator.',
+      })
+    }
+    return filtered
+  })
   return { uuid: who.uuid, banned: on, via: 'file' }
 }
 
