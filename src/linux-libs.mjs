@@ -109,6 +109,28 @@ function readOsRelease() {
   try { return fs.readFileSync('/etc/os-release', 'utf8') } catch { return '' }
 }
 
+/**
+ * Whether the system's C library is musl (Alpine and a few others) rather than glibc.
+ *
+ * <p>Everything below this assumes glibc's `ldd`/`ldconfig` output format, because the engines it
+ * installs libraries for are themselves built against glibc - no package this module could fetch
+ * makes a glibc binary run against musl, that is an ABI mismatch, not a missing file. On musl,
+ * `ldd` is a different program with different output: parseLdd's regex does not match any of it,
+ * so missingLibraries() silently returns no missing libraries, and an engine that cannot run at
+ * all is reported as fully satisfied. Checked by name rather than left to fall out of the parse
+ * mismatch, so the refusal says what is actually wrong instead of surfacing later as an opaque
+ * native crash.
+ */
+export function isMusl(run = spawnSync) {
+  try {
+    const res = run('ldd', ['--version'], { encoding: 'utf8', timeout: 5000 })
+    if (/musl/i.test(res.stdout || '') || /musl/i.test(res.stderr || '')) return true
+  } catch { /* fall through to the loader check */ }
+  return ['ld-musl-x86_64.so.1', 'ld-musl-aarch64.so.1', 'ld-musl-armhf.so.1'].some(
+    (f) => fs.existsSync(path.join('/lib', f)),
+  )
+}
+
 /** Step two: the library is here, under its t64 name. Link it under the name that was asked for. */
 function linkRenamed(missing, libs) {
   const res = spawnSync('ldconfig', ['-p'], { encoding: 'utf8', timeout: 15000, env: { ...process.env, LC_ALL: 'C' } })
@@ -218,6 +240,10 @@ function copyLibraries(from, to) {
  */
 export function ensureLibraries(engineRoot, binaries, { onProgress = null, engineLabel = 'MySQL', allowFetch = true } = {}) {
   if (process.platform !== 'linux') return { missing: [], supplied: [] }
+  if (isMusl()) {
+    fail(`${engineLabel} needs glibc, which this system's C library (musl, as on Alpine Linux) does not provide. ` +
+      'No package install fixes this - run SpawnLoft on a glibc-based distribution (Debian, Ubuntu, Fedora, and most others) instead.')
+  }
   const libs = path.join(engineRoot, LIBS_FOLDER)
   const check = () => missingLibraries(binaries, libraryEnv(binaries[0]))
   let missing = check()

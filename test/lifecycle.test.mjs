@@ -115,6 +115,22 @@ test('a second start while running is refused; a stop of a stopped server is a n
   assert.equal(again.alreadyStopped, true)
 })
 
+test('two near-simultaneous starts of the same instance never both spawn a daemon', { timeout: 30000 }, async () => {
+  // Before the start.lock, both of these would read "not running" and each spawn its own daemon -
+  // two java processes against the same world. Firing them back to back (not awaiting the first)
+  // is what exercises the race; sequential starts, above, never hit the lock at all.
+  const name = await makeInstance('race')
+  const [a, b] = await Promise.allSettled([sup.start(name, { timeout: 15000 }), sup.start(name, { timeout: 15000 })])
+  const results = [a, b]
+  const fulfilled = results.filter((r) => r.status === 'fulfilled')
+  const rejected = results.filter((r) => r.status === 'rejected')
+  assert.equal(fulfilled.length, 1, `expected exactly one start to succeed: ${JSON.stringify(results)}`)
+  assert.equal(rejected.length, 1)
+  assert.match(rejected[0].reason.message, /already (being started by another request|running)/)
+  assert.equal(readState(name).status, 'running')
+  await sup.stop(name)
+})
+
 test('CLI Minecraft startup retains its Java pid and RCON port', { timeout: 30000 }, async () => {
   const name = await makeInstance('cli-ready')
   const output = execFileSync(process.execPath,

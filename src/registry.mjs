@@ -1,7 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { REGISTRY_FILE, INSTANCES_DIR } from './paths.mjs'
-import { readJson, writeJson, fail, validateName } from './util.mjs'
+import { readJson, writeJson, fail, validateName, withLock } from './util.mjs'
+
+// One lock for the whole registry file: putInstance/updateInstance/removeInstance each read it,
+// change one entry, and write it back, and the daemon recording a pid at the same moment the
+// panel changes a setting is exactly the kind of overlap a plain read-modify-write loses silently.
+const REGISTRY_LOCK = `${REGISTRY_FILE}.lock`
 
 const EMPTY = { version: 1, instances: {} }
 
@@ -76,17 +81,21 @@ export function hasInstance(name) {
 
 export function putInstance(name, cfg) {
   validateName(name)
-  const reg = loadRegistry()
-  reg.instances[name] = cfg
-  saveRegistry(reg)
+  withLock(REGISTRY_LOCK, () => {
+    const reg = loadRegistry()
+    reg.instances[name] = cfg
+    saveRegistry(reg)
+  })
 }
 
 export function updateInstance(name, patch) {
-  const reg = loadRegistry()
-  if (!Object.hasOwn(reg.instances, name)) fail(`no instance named "${name}"`)
-  reg.instances[name] = { ...reg.instances[name], ...patch }
-  saveRegistry(reg)
-  return { name, ...reg.instances[name] }
+  return withLock(REGISTRY_LOCK, () => {
+    const reg = loadRegistry()
+    if (!Object.hasOwn(reg.instances, name)) fail(`no instance named "${name}"`)
+    reg.instances[name] = { ...reg.instances[name], ...patch }
+    saveRegistry(reg)
+    return { name, ...reg.instances[name] }
+  })
 }
 
 /**
@@ -104,9 +113,11 @@ export function freeName(base) {
 }
 
 export function removeInstance(name) {
-  const reg = loadRegistry()
-  delete reg.instances[name]
-  saveRegistry(reg)
+  withLock(REGISTRY_LOCK, () => {
+    const reg = loadRegistry()
+    delete reg.instances[name]
+    saveRegistry(reg)
+  })
 }
 
 /** Ports already claimed in the registry, so allocation never double-books. */
