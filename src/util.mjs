@@ -226,30 +226,101 @@ export async function acquireLockAsync(lockFile, { timeoutMs = 10000 } = {}) {
   }
 }
 
-function tryLock(lockFile) {
-  fs.mkdirSync(path.dirname(lockFile), { recursive: true })
+/**
+ * What a lock file says about its holder: the pid, the executable it was running as, and a token
+ * only this acquisition knows. A file holding just a number is one written before the rest existed.
+ * Null for a file that is empty or unreadable, which is a lock being written or a damaged one.
+ */
+function lockRecord(text) {
+  const t = String(text ?? '').trim()
+  if (!t) return null
+  if (/^\d+$/.test(t)) return { pid: Number(t) }
   try {
-    fs.writeFileSync(lockFile, String(process.pid), { flag: 'wx' })
-    return { ok: true, release: () => fs.rmSync(lockFile, { force: true }) }
-  } catch (err) {
-    if (err.code !== 'EEXIST') throw err
-    const holder = Number(readLockHolder(lockFile))
-    if (!holder || !pidAlive(holder)) {
-      fs.rmSync(lockFile, { force: true })
-      return tryLock(lockFile)
-    }
-    return { ok: false, holder }
-  }
-}
-
-function readLockHolder(lockFile) {
-  try {
-    return fs.readFileSync(lockFile, 'utf8').trim()
+    const rec = JSON.parse(t)
+    return Number.isInteger(rec?.pid) && rec.pid > 0 ? rec : null
   } catch {
     return null
   }
 }
 
+/**
+ * Whether the process a lock names is still the one that took it. A live pid alone is not enough:
+ * pids are reused, and after a crash the number can belong to an unrelated program, which would
+ * keep the lock "held" until that program exits. The executable name recorded with the pid is the
+ * contradiction `sameProcess` looks for; it is lenient everywhere it cannot tell.
+ */
+function holderAlive(rec) {
+  if (!rec) return false
+  if (rec.pid === process.pid) return true // this process: no table lookup needed to know it is itself
+  return pidAlive(rec.pid) && sameProcess(rec.pid, rec.image)
+}
+
+/** A lock file this young may still be between being created and being written. */
+const LOCK_WRITE_GRACE_MS = 2000
+/** A break lock this old was left by a process that died while clearing a stale lock. */
+const LOCK_BREAK_STALE_MS = 10000
+
+function fileAgeMs(file) {
+  try { return Date.now() - fs.statSync(file).mtimeMs } catch { return Infinity }
+}
+
+/**
+ * Clear a lock whose holder is gone - once, whoever else is trying. Two waiters that both see the
+ * same dead holder must not both delete: the second delete would remove the live lock the first
+ * had just taken. So clearing is itself exclusive (`.break`), and the lock is removed only if it
+ * still reads exactly as it did when it was judged dead.
+ */
+function breakStaleLock(lockFile, seen) {
+  const breaker = `${lockFile}.break`
+  try {
+    fs.writeFileSync(breaker, String(process.pid), { flag: 'wx' })
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err
+    if (fileAgeMs(breaker) > LOCK_BREAK_STALE_MS) fs.rmSync(breaker, { force: true })
+    return false
+  }
+  try {
+    if (readLockText(lockFile) === seen) fs.rmSync(lockFile, { force: true })
+    return true
+  } finally {
+    fs.rmSync(breaker, { force: true })
+  }
+}
+
+/** Remove the lock only if it is still this acquisition's: a lock taken over since is not ours to delete. */
+function releaseLock(lockFile, token) {
+  if (lockRecord(readLockText(lockFile))?.token === token) fs.rmSync(lockFile, { force: true })
+}
+
+function tryLock(lockFile) {
+  fs.mkdirSync(path.dirname(lockFile), { recursive: true })
+  for (let attempt = 0; ; attempt++) {
+    const token = crypto.randomUUID()
+    const body = JSON.stringify({ pid: process.pid, image: path.basename(process.execPath), token })
+    try {
+      fs.writeFileSync(lockFile, body, { flag: 'wx' })
+      return { ok: true, release: () => releaseLock(lockFile, token) }
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err
+    }
+    const seen = readLockText(lockFile)
+    if (seen === null) continue // released between the create and the read; take it
+    const rec = lockRecord(seen)
+    if (holderAlive(rec)) return { ok: false, holder: rec.pid }
+    // Empty: its owner is between creating and writing it. Not dead until it has had time to write.
+    if (!rec && fileAgeMs(lockFile) < LOCK_WRITE_GRACE_MS) return { ok: false, holder: null }
+    if (attempt >= 5 || !breakStaleLock(lockFile, seen)) return { ok: false, holder: rec?.pid ?? null }
+  }
+}
+
+/** The lock file's text, or null when there is no file. */
+function readLockText(lockFile) {
+  try {
+    return fs.readFileSync(lockFile, 'utf8')
+  } catch {
+    return null
+  }
+}
 /** `acquireLock`, held for the duration of a synchronous `fn`. */
 export function withLock(lockFile, fn, opts) {
   const release = acquireLock(lockFile, opts)
