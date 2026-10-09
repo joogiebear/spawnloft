@@ -260,3 +260,28 @@ test('a chained task tells the players, backs up and restarts, in one run', { ti
   assert.deepEqual(byTask, ['start', 'stop', 'backup', 'command'])
   await sup.stop(name)
 })
+
+test('a failed console write does not take the daemon down or orphan the server', { timeout: 30000 }, async () => {
+  // The server closes its console; the daemon's next writes hit EPIPE. That used to be an
+  // uncaughtException, which exited the daemon and left the detached JVM running with no
+  // supervisor, reported as stopped.
+  const name = await makeInstance('epipe')
+  await sup.start(name, { timeout: 15000 })
+  const before = readState(name).state
+
+  await sup.sendConsole(name, 'closestdin')
+  await sleep(300)
+  for (let i = 0; i < 3; i++) {
+    await sup.sendConsole(name, `after close ${i}`).catch(() => {})
+    await sleep(100)
+  }
+  await sleep(500)
+
+  const { status, state } = readState(name)
+  assert.equal(status, 'running', `daemon should survive a closed console, got ${status}`)
+  assert.equal(state.javaPid, before.javaPid)
+  assert.ok(pidAlive(state.daemonPid), 'the daemon is still up')
+
+  await sup.kill(name)
+  assert.equal(readState(name).status, 'stopped')
+})

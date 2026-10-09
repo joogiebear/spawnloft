@@ -36,6 +36,11 @@ export function controlRequest(name, req, { timeout = 120000 } = {}) {
         finish(reject, new UserError(`bad response from daemon: ${err.message}`))
       }
     })
+    // A daemon that closes the connection without answering (it exited mid-request) would
+    // otherwise leave this waiting out the whole timeout - two minutes, or longer for a stop.
+    socket.on('close', () => {
+      finish(reject, new UserError(`daemon for "${name}" closed the connection without replying to "${req.op}"`))
+    })
     socket.on('error', (err) => {
       const notRunning = ['ENOENT', 'ECONNREFUSED'].includes(err.code)
       finish(

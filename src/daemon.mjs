@@ -40,6 +40,11 @@ const dir = runDir(name)
 fs.mkdirSync(dir, { recursive: true })
 
 const diag = fs.createWriteStream(daemonLog(name), { flags: 'a' })
+// A log stream with no 'error' listener turns a full disk into an uncaughtException, and
+// the handler for that used to take the daemon down while the detached JVM kept running. The
+// log is a convenience; losing it must never cost the server its supervisor. There is nowhere
+// left to report a failure of the log itself, so it is dropped.
+diag.on('error', () => {})
 function log(msg) {
   diag.write(`[${new Date().toISOString()}] ${msg}\n`)
 }
@@ -63,13 +68,30 @@ function die(err) {
   } catch {
     /* nothing left to try */
   }
+  // The JVM is spawned detached, so it outlives this process. If the daemon exits and leaves it
+  // running, the state file says "stopped" while the server holds the port and the world lock,
+  // and the next start fights it. A supervisor that cannot continue takes its child down with
+  // it. `child` is read inside try because die() can run before it is initialised.
+  let javaPid = null
   try {
+    if (child && child.exitCode === null && child.signalCode === null) {
+      javaPid = child.pid
+      forceKill()
+    }
+  } catch {
+    /* not launched yet, or already gone */
+  }
+  try {
+    // Keep what the failed run knew about the child, so the record shows which process this
+    // daemon was responsible for when it died.
     writeJson(stateFile(name), {
+      ...(javaPid !== null && state ? state : {}),
       name,
       daemonPid: process.pid,
       running: false,
       error: reason,
       failedAt: Date.now(),
+      ...(javaPid !== null ? { javaPid, killedOnDaemonFailure: true } : {}),
     })
   } catch {
     /* nothing left to try */
@@ -85,6 +107,15 @@ process.on('uncaughtException', die)
 // Finish truncating before publishing this daemon's state. An asynchronous open can leave
 // the previous session's ready line visible to a caller waiting for this launch.
 const out = fs.createWriteStream(consoleLog(name), { fd: fs.openSync(consoleLog(name), 'w') })
+// Same reasoning as `diag`: a failing console file (disk full) must not kill the supervisor of a
+// running server. The pipe from the child unpipes itself on a destination error; the 'data'
+// listeners below keep draining the child's output so it never blocks on a full pipe.
+let consoleFailed = false
+out.on('error', (err) => {
+  if (consoleFailed) return
+  consoleFailed = true
+  log(`console log write failed: ${err.message}; console capture stopped`)
+})
 
 // ---- one run of the server --------------------------------------------------
 
@@ -172,6 +203,9 @@ function launch({ first }) {
 
   child.stdout.pipe(out, { end: false })
   child.stderr.pipe(out, { end: false })
+  // The server can close its console while the daemon still holds it (EPIPE on the next write).
+  // That is a state of the child, reported to whoever wrote the line, not a reason to exit.
+  child.stdin.on('error', (err) => log(`stdin error: ${err.message}`))
 
   // A ring of the child's last output, kept so the moment it dies the daemon can say WHY -
   // the child is gone by then, and the daemon is the only thing still holding its last words.
@@ -491,6 +525,7 @@ async function handle(req) {
       if (isDatabase(inst)) return { ok: false, error: 'a database has no console input - use its client, or the panel' }
       if (!child || child.exitCode !== null) return { ok: false, error: 'server process is not running' }
       if (typeof req.line !== 'string') return { ok: false, error: 'send requires a line' }
+      if (!child.stdin.writable) return { ok: false, error: 'the server console is closed' }
       child.stdin.write(`${req.line.replace(/\r?\n$/, '')}\n`)
       log(`console <- ${req.line}`)
       return { ok: true }
@@ -547,5 +582,13 @@ listenWithRetry()
 // Keep the daemon alive even if the terminal that spawned it goes away.
 process.on('SIGINT', () => {})
 process.on('SIGTERM', () => {
-  handleStop(90000).then(() => process.exit(0))
+  // Exit only when the server is actually down. A stop that failed (a database checkpoint that
+  // did not save) leaves the child running; exiting anyway would orphan it with no supervisor.
+  handleStop(90000).then(
+    (res) => {
+      if (res?.ok) process.exit(0)
+      log(`SIGTERM: stop did not complete (${res?.error ?? 'unknown'}); staying up to supervise the server`)
+    },
+    (err) => log(`SIGTERM: stop failed: ${err?.message ?? err}; staying up to supervise the server`),
+  )
 })
