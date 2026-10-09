@@ -109,3 +109,53 @@ test('the tick sampler keeps its one connection across many readings', async (t)
   assert.equal(server.connections(), 1)
   assert.equal(server.hangups(), 0)
 })
+
+// A length field outside what RCON allows is not a packet. With -4 the read loop used to keep
+// slicing nothing off the buffer for ever, freezing the event loop - timers included - so no
+// timeout could rescue the caller. These servers send the bad length and nothing else.
+async function badLengthServer(t, size, { afterAuth = false } = {}) {
+  const bad = Buffer.alloc(16)
+  bad.writeInt32LE(size, 0)
+  const ok = Buffer.alloc(14)
+  ok.writeInt32LE(10, 0)
+  ok.writeInt32LE(0, 4)
+  ok.writeInt32LE(2, 8) // auth response, id 0
+  const server = net.createServer((socket) => {
+    socket.on('error', () => {})
+    socket.once('data', () => {
+      if (afterAuth) {
+        socket.write(ok)
+        socket.once('data', () => socket.write(bad))
+      } else {
+        socket.write(bad)
+      }
+    })
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => server.close())
+  return server.address().port
+}
+
+for (const size of [-4, 0, 9, 4111, 0x7fffffff]) {
+  test(`a length of ${size} fails the connection instead of hanging the client`, async (t) => {
+    const port = await badLengthServer(t, size)
+    const client = new Rcon({ port, password: 'pw', timeout: 2000 })
+    t.after(() => client.close())
+    await assert.rejects(client.connect(), /invalid packet length/)
+  })
+}
+
+test('a bad length after a good login fails the waiting command and drops the socket', async (t) => {
+  const port = await badLengthServer(t, -4, { afterAuth: true })
+  const client = new Rcon({ port, password: 'pw', timeout: 2000 })
+  t.after(() => client.close())
+  await client.connect()
+  await assert.rejects(client.send('list'), /invalid packet length/)
+  await assert.rejects(client.send('list'), /connection closed/)
+})
+
+test('the largest legal packet still gets through', async (t) => {
+  const big = 'y'.repeat(4096)
+  const { client } = await connected(t, { replies: { big } })
+  assert.equal(await client.send('big'), big)
+})
