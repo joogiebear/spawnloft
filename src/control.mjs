@@ -76,6 +76,43 @@ export function readState(name) {
   return { status: 'stopped', state }
 }
 
+/**
+ * Is anything of this instance still alive?
+ *
+ * <p>"running" is only one of three answers. A server in its shutdown, or in the pause before a
+ * crash restart, is `stopping`: its daemon is up and can relaunch java into the directory at any
+ * moment. A server whose daemon died is `orphaned`: nothing supervises it, but java still holds
+ * the world and the port. Every one of them owns the files, so every guard in front of a deletion,
+ * a restore or a rename asks this, not whether the status is exactly "running".
+ *
+ * <p>`running` alone stays right where the question is "can I talk to it" - sending a console
+ * line, reading player counts, saying a change applies on restart.
+ */
+export const ACTIVE_STATUSES = ['running', 'stopping', 'orphaned']
+
+export function isActiveStatus(status) {
+  return ACTIVE_STATUSES.includes(status)
+}
+
+/**
+ * Why an operation on this instance's files has to wait, or null when it need not.
+ *
+ * <p>The way out differs by status, which is why the message is built here rather than at each
+ * guard: an orphaned server cannot be stopped, only killed, and telling someone to "stop it first"
+ * sends them to a command that refuses.
+ *
+ * @param verb what the caller was about to do, as in "deleting it" or "restoring"
+ */
+export function activeBlock(name, verb) {
+  const { status, state } = readState(name)
+  if (status === 'running') return `"${name}" is running - stop it before ${verb}.`
+  if (status === 'stopping') return `"${name}" is still shutting down - wait for it to finish before ${verb}.`
+  if (status === 'orphaned') {
+    return `"${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon - run "mcctl kill ${name}" before ${verb}.`
+  }
+  return null
+}
+
 export function clearState(name) {
   try {
     fs.unlinkSync(stateFile(name))

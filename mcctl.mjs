@@ -21,7 +21,7 @@ import * as mrpack from './src/mrpack.mjs'
 import * as neoforge from './src/neoforge.mjs'
 import * as worlds from './src/worlds.mjs'
 import { diagnose, crashReports } from './src/diagnose.mjs'
-import { readState } from './src/control.mjs'
+import { readState, activeBlock } from './src/control.mjs'
 import * as services from './src/services.mjs'
 import { listServices, isDatabase } from './src/registry.mjs'
 import * as sup from './src/supervisor.mjs'
@@ -525,7 +525,8 @@ async function cmdAdopt(positional, flags) {
 function cmdRemove(positional, flags) {
   const name = requireName(positional, 'rm')
   const inst = getInstance(name)
-  if (sup.isRunning(name)) fail(`instance "${name}" is running - stop it first`)
+  const blocked = activeBlock(name, 'removing it')
+  if (blocked) fail(blocked)
   if (flags.purge && !flags.yes) {
     fail(`--purge deletes ${inst.dir} permanently. Re-run with --yes to confirm.`)
   }
@@ -719,7 +720,8 @@ function cmdSnapshots(positional) {
 async function cmdRestore(positional, flags) {
   const name = requireName(positional, 'restore')
   const inst = getInstance(name)
-  if (sup.isRunning(name)) fail(`instance "${name}" is running - stop it before restoring`)
+  const blocked = activeBlock(name, 'restoring')
+  if (blocked) fail(blocked)
   const snap = backup.resolveSnapshot(name, positional[1] ?? 'latest')
 
   if (!flags.yes) {

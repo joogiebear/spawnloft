@@ -13,7 +13,7 @@ import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
 import { mcpNotice } from './private-copy.mjs'
-import { readState } from './control.mjs'
+import { readState, activeBlock } from './control.mjs'
 import { fail, humanBytes, humanDuration } from './util.mjs'
 import { DATA_ROOT } from './paths.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
@@ -522,7 +522,8 @@ const destructiveTools = [
     inputSchema: object({ name, snapshot: { type: 'string', description: 'Snapshot name, or "latest" (default)' }, confirm }, ['name']),
     async run({ name: n, snapshot = 'latest', confirm: yes = false }, { progress }) {
       const inst = getInstance(n)
-      if (sup.isRunning(n)) fail(`"${n}" is running - stop it before restoring`)
+      const blocked = activeBlock(n, 'restoring')
+      if (blocked) fail(blocked)
       const snap = backup.resolveSnapshot(n, snapshot)
       if (!yes) {
         // The preview reads the archive too, so a broken one is caught before anyone confirms it.

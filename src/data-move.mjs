@@ -136,13 +136,13 @@ function writable(dir) {
 /** The real things around a move: which servers run, which tasks are scheduled, which private copies exist. */
 async function realEnv() {
   const { listAll } = await import('./registry.mjs')
-  const { readState } = await import('./control.mjs')
+  const { readState, isActiveStatus } = await import('./control.mjs')
   const schedule = await import('./schedule.mjs')
   const { findPrivateCopies } = await import('./private-copy.mjs')
   const { REGISTRY_FILE, BACKUPS_DIR, runDir } = await import('./paths.mjs')
   return {
     running: () => listAll().filter((i) => !i.external)
-      .filter((i) => ['running', 'orphaned', 'stopping'].includes(readState(i.name).status)).map((i) => i.name),
+      .filter((i) => isActiveStatus(readState(i.name).status)).map((i) => i.name),
     tasks: {
       list: async () => (await schedule.list()).filter((t) => t.enabled).map((t) => ({ id: t.id, instance: t.instance, name: t.name })),
       setEnabled: (id, on) => schedule.setEnabled(id, on),
