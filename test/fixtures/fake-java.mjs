@@ -10,6 +10,8 @@
  *   <li>`crash` - exits 3 with a ticking exception in the console, so crash recovery can be
  *       exercised.</li>
  *   <li>`hang`  - stops reading the console, so a graceful stop has to time out and be forced.</li>
+ *   <li>`closestdin` - closes its console input, so the daemon's next write to it fails with EPIPE
+ *       while the process itself keeps running.</li>
  *   <li>`fork`  - starts a helper process of its own and prints its pid, the way a JVM running a
  *       plugin that shells out does, so that a force kill can be checked to reach it too.</li>
  *   <li>anything else is echoed, which is how a test proves a line reached the server.</li>
@@ -17,6 +19,7 @@
  *
  * <p>FAKE_JAVA_FAIL=start makes it die during startup the way a server with a taken port does.
  */
+import fs from 'node:fs'
 import readline from 'node:readline'
 import { spawn } from 'node:child_process'
 
@@ -44,6 +47,18 @@ rl.on('line', (raw) => {
   if (line === 'fork') {
     const helper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1 << 30)'], { stdio: 'ignore' })
     say(`forked helper pid ${helper.pid}`)
+    return
+  }
+  if (line === 'closestdin') {
+    rl.close()
+    process.stdin.destroy()
+    // destroy() alone leaves the descriptor open on a pipe; closing fd 0 is what makes the
+    // writer's next write fail.
+    try {
+      fs.closeSync(0)
+    } catch {
+      /* already closed */
+    }
     return
   }
   if (line === 'hang') {
