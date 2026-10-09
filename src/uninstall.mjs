@@ -74,7 +74,7 @@ export async function run({ data = false, log = () => {} } = {}) {
 
   // Servers first: a daemon that outlives the program is a Java process nobody can stop from here.
   for (const inst of listAll()) {
-    if (!supervisor.isRunning(inst.name)) continue
+    if (!supervisor.isActive(inst.name)) continue
     log(`stopping ${inst.name}`)
     try {
       await supervisor.stop(inst.name, { timeout: 60000 })

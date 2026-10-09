@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { getInstance, assertInstanceDir, updateInstance, isDatabase } from './registry.mjs'
 import * as java from './java.mjs'
 import { mcVersionOf } from './plugins.mjs'
-import { readState, clearState, controlRequest } from './control.mjs'
+import { readState, clearState, controlRequest, isActiveStatus } from './control.mjs'
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
@@ -328,8 +328,14 @@ export async function sendConsole(name, line) {
   return res
 }
 
+/** Up and answering: the question for sending it a command. Not for deciding what is safe to delete. */
 export function isRunning(name) {
   return readState(name).status === 'running'
+}
+
+/** Running, shutting down or orphaned - anything that still owns the instance's files. See control.mjs. */
+export function isActive(name) {
+  return isActiveStatus(readState(name).status)
 }
 
 /** Read the last `count` lines of an instance's captured console. */

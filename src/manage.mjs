@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { BACKUPS_DIR, INSTANCES_DIR, runDir } from './paths.mjs'
 import { getInstance, hasInstance, putInstance, removeInstance } from './registry.mjs'
 import * as backup from './backup.mjs'
-import * as supervisor from './supervisor.mjs'
+import { activeBlock } from './control.mjs'
 import * as schedule from './schedule.mjs'
 import { writeLaunchers } from './create.mjs'
 import { readProps, worldDirs } from './props.mjs'
@@ -25,9 +25,8 @@ const NL = String.fromCharCode(10)
  */
 
 function assertStopped(name, verb) {
-  if (supervisor.isRunning(name)) {
-    throw new UserError(`"${name}" is running — stop it before ${verb}.`)
-  }
+  const why = activeBlock(name, verb)
+  if (why) throw new UserError(why)
 }
 
 /**

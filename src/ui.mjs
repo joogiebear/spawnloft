@@ -38,6 +38,7 @@ import { diagnose, crashReports } from './diagnose.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
+import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
@@ -709,10 +710,11 @@ async function handleBackups(req, res, name, seg) {
 
   if (action === 'restore') {
     if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
-    if (supervisor.isRunning(name)) {
+    const blocked = activeBlock(name, 'restoring')
+    if (blocked) {
       return json(res, 409, {
-        error: `"${name}" is running. Stop it before restoring - extracting over a server that has `
-          + 'those files open corrupts a world rather than replacing it.',
+        error: `${blocked} Extracting over a server that has those files open corrupts a world `
+          + 'rather than replacing it.',
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))

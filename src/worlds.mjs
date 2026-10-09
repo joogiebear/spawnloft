@@ -18,7 +18,7 @@ import path from 'node:path'
 
 import { BACKUPS_DIR } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
-import { readState } from './control.mjs'
+import { readState, activeBlock, isActiveStatus } from './control.mjs'
 import { runTar, EXCLUDE_ARGS } from './backup.mjs'
 import { tarHandlesZip } from './tar.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
@@ -97,10 +97,8 @@ export async function listWorlds(inst) {
  */
 export function activateWorld(inst, name) {
   safeWorldName(name)
-  const { status } = readState(inst.name)
-  if (status === 'running' || status === 'stopping') {
-    fail(`"${inst.name}" is running - stop it before switching worlds`)
-  }
+  const why = activeBlock(inst.name, 'switching worlds')
+  if (why) fail(why)
   if (!isWorldDir(path.join(inst.dir, name))) {
     fail(`"${name}" is not a world in ${inst.dir} (no level.dat)`)
   }
@@ -220,7 +218,7 @@ export async function exportWorld(inst, name) {
   }
   const active = activeWorld(inst)
   const { status } = readState(inst.name)
-  if (name === active && (status === 'running' || status === 'stopping')) {
+  if (name === active && isActiveStatus(status)) {
     fail(`"${name}" is the world the running server is saving into - stop the server first, or take a backup instead`)
   }
 
@@ -249,10 +247,8 @@ export async function exportWorld(inst, name) {
  */
 export function deleteWorld(inst, name) {
   safeWorldName(name)
-  const { status } = readState(inst.name)
-  if (status === 'running' || status === 'stopping') {
-    fail(`"${inst.name}" is running - stop it before deleting worlds`)
-  }
+  const why = activeBlock(inst.name, 'deleting worlds')
+  if (why) fail(why)
   const active = activeWorld(inst)
   if (name === active) {
     fail(`"${name}" is the active world - switch to another world first, or use rebuild to reset it`)

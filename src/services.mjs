@@ -9,7 +9,7 @@ import {
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
 import * as mysql from './mysql.mjs'
-import { readState, clearState } from './control.mjs'
+import { readState, clearState, activeBlock } from './control.mjs'
 import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel, stamp, humanBytes } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
 import * as activity from './activity.mjs'
@@ -238,8 +238,8 @@ export async function createForServer(serverName, { engine = defaultEngine(), ve
 /** Remove a stopped database from the registry and, if asked, from disk. */
 export function removeDatabase(name, { purge = false } = {}) {
   const inst = getDatabase(name)
-  const { status } = readState(name)
-  if (status === 'running' || status === 'stopping') fail(`"${name}" is running - stop it before deleting it`)
+  const why = activeBlock(name, 'deleting it')
+  if (why) fail(why)
   const attached = Object.keys(inst.attachments ?? {})
   if (purge && inst.dir && !inst.external) {
     try {
