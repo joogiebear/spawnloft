@@ -692,7 +692,9 @@ export async function verifyArchive(file, expectedMembers = [], expectedFiles = 
         reject(new Error(err.code === 'ENOENT'
           ? 'tar was not found on PATH (Windows 10/11 ships tar.exe in System32)'
           : err.message)))
-      child.on('exit', (code) => {
+      // 'close', not 'exit': exit can fire while the listing is still in the stdout pipe, and a
+      // verify that stops reading early reports an intact archive as holding no entries.
+      child.on('close', (code) => {
         sawEntry(tail)
         if (code === 0) resolve()
         else reject(new Error(stderr.trim().split(/\r?\n/)[0] || `tar exited ${code}`))
