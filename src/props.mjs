@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { writeFileWithMode, PRIVATE_FILE_MODE } from './util.mjs'
 
 /**
  * Minimal server.properties reader/writer that preserves comment lines and
@@ -56,7 +57,8 @@ export function writeProps(file, updates) {
   // truncate the file and the next start would read it back empty - silently dropping the RCON
   // password and port back to Minecraft's defaults instead of the ones mcctl just set.
   const tmp = `${file}.tmp-${process.pid}`
-  fs.writeFileSync(tmp, out.join('\n'))
+  // server.properties carries rcon.password, so it is owner-only. The server runs as the same user.
+  writeFileWithMode(tmp, out.join('\n'), PRIVATE_FILE_MODE)
   fs.renameSync(tmp, file)
 }
 
