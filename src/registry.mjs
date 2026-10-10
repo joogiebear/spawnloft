@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { REGISTRY_FILE, INSTANCES_DIR } from './paths.mjs'
-import { readJson, writeJson, fail, validateName, withLock } from './util.mjs'
+import { readJson, writeJson, fail, validateName, withLock, PRIVATE_FILE_MODE } from './util.mjs'
 
 // One lock for the whole registry file: putInstance/updateInstance/removeInstance each read it,
 // change one entry, and write it back, and the daemon recording a pid at the same moment the
@@ -16,8 +16,10 @@ export function loadRegistry() {
   return data
 }
 
+// The registry holds every instance's RCON password, the database root and attachment passwords and
+// the Discord webhook URL, so it is owner-only.
 export function saveRegistry(data) {
-  writeJson(REGISTRY_FILE, data)
+  writeJson(REGISTRY_FILE, data, { mode: PRIVATE_FILE_MODE })
 }
 
 /**

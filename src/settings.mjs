@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { UserError } from './util.mjs'
+import { UserError, PRIVATE_FILE_MODE } from './util.mjs'
 
 /** Where the code lives. Distinct from where data lives — see below. */
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -110,8 +110,11 @@ export function save(patch, { replaceUnreadable = false, onSetAside = null } = {
   let aside = null
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    const fd = fs.openSync(tmp, 'w')
+    // Owner-only: the replacement file takes the place of the old one, so a settings file written
+    // earlier with wider permissions is tightened by this write.
+    const fd = fs.openSync(tmp, 'w', PRIVATE_FILE_MODE)
     try {
+      if (process.platform !== 'win32') fs.fchmodSync(fd, PRIVATE_FILE_MODE)
       fs.writeFileSync(fd, JSON.stringify(merged, null, 2) + '\n')
       fs.fsyncSync(fd)
     } finally {

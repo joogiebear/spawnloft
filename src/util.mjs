@@ -172,10 +172,37 @@ export function readJson(file, fallback = null) {
   }
 }
 
-export function writeJson(file, data) {
+/**
+ * Mode for a file that holds a secret (RCON and database passwords, a webhook URL, deletion
+ * tokens): readable and writable by the owner alone. Windows has no such mode and ignores it.
+ */
+export const PRIVATE_FILE_MODE = 0o600
+
+/**
+ * Create `file` with `mode` and make an existing one match it.
+ *
+ * <p>The mode passed to a write only applies when the write creates the file, so a leftover temp
+ * file or an older, wider file would keep its old mode; the explicit chmod covers both. The temp
+ * file is the one that gets it, so the file renamed into place is never visible with a wider mode.
+ */
+export function writeFileWithMode(file, data, mode) {
+  fs.writeFileSync(file, data, { mode })
+  if (process.platform !== 'win32') fs.chmodSync(file, mode)
+}
+
+/**
+ * Write JSON to `file` through a temp file and a rename, so a crash leaves the old file whole.
+ *
+ * <p>`mode` is for files that hold secrets (see PRIVATE_FILE_MODE). Because every write replaces
+ * the file, a file written earlier with wider permissions is tightened by its next write, with no
+ * separate migration step.
+ */
+export function writeJson(file, data, { mode } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
-  fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`)
+  const text = `${JSON.stringify(data, null, 2)}\n`
+  if (mode === undefined) fs.writeFileSync(tmp, text)
+  else writeFileWithMode(tmp, text, mode)
   fs.renameSync(tmp, file)
 }
 
