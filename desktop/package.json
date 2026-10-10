@@ -1,6 +1,6 @@
 {
   "name": "mcctl-desktop",
-  "version": "1.5.0-beta.5",
+  "version": "1.5.0-beta.6",
   "private": true,
   "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
   "productName": "SpawnLoft",
