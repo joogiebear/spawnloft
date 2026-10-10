@@ -297,7 +297,7 @@ test('a full backup of a folder holding option-shaped file names runs nothing an
   assert.equal(fs.existsSync(path.join(dir, 'PWNED2')), false)
   const listing = spawnSync(tarBinary(), ['-tzf', snap.file], { encoding: 'utf8' })
   assert.equal(listing.status, 0, listing.stderr)
-  const entries = listing.stdout.split('\n').filter(Boolean)
+  const entries = listing.stdout.split(/\r?\n/).filter(Boolean)
   assert.ok(entries.some((e) => e === 'world/level.dat'), 'ordinary members keep their names')
   assert.ok(entries.some((e) => e === 'server.properties'))
   assert.ok(entries.some((e) => e.endsWith('--checkpoint=1')), 'the odd file was archived, not skipped')
@@ -312,7 +312,7 @@ test('a leading @ is a file name, not an archive to copy from', async () => {
   const snap = await backup.createSnapshot({ name: 'hardening-at', dir }, { scope: 'full', flush: false })
   const listing = spawnSync(tarBinary(), ['-tzf', snap.file], { encoding: 'utf8' })
   assert.equal(listing.status, 0, listing.stderr)
-  assert.ok(listing.stdout.split('\n').some((e) => e.endsWith('@secret.tar')))
+  assert.ok(listing.stdout.split(/\r?\n/).some((e) => e.endsWith('@secret.tar')))
 })
 
 // ---- what a snapshot's manifest may name ----------------------------------------------------------
