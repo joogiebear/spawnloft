@@ -6,6 +6,13 @@ const TYPE_AUTH_RESPONSE = 2
 const TYPE_COMMAND = 2
 const TYPE_RESPONSE = 0
 
+// A packet's length field counts id (4) + type (4) + body + two terminator bytes, so the smallest
+// legal packet is 10. Minecraft caps a body at 4096 bytes, which makes 4110 the largest. Anything
+// outside that is not RCON: a negative or tiny length used to leave the read loop spinning on the
+// same bytes forever, and a huge one made it buffer without end waiting for a packet that never came.
+const MIN_PACKET_SIZE = 10
+const MAX_PACKET_SIZE = 4110
+
 function encodePacket(id, type, body) {
   const payload = Buffer.from(body, 'utf8')
   const buf = Buffer.alloc(14 + payload.length)
@@ -92,10 +99,24 @@ export class Rcon {
     this.pending.clear()
   }
 
+  /** The peer is not speaking RCON. Drop the connection and fail whatever was waiting on it. */
+  #protocolError(size) {
+    const err = new UserError(`RCON error: invalid packet length ${size} from ${this.host}:${this.port}`)
+    this.buffer = Buffer.alloc(0)
+    if (this.authPending) {
+      const { reject } = this.authPending
+      this.authPending = null
+      reject(err)
+    }
+    this.#failAll(err)
+    this.socket?.destroy()
+  }
+
   #onData(chunk) {
     this.buffer = Buffer.concat([this.buffer, chunk])
     while (this.buffer.length >= 4) {
       const size = this.buffer.readInt32LE(0)
+      if (size < MIN_PACKET_SIZE || size > MAX_PACKET_SIZE) return this.#protocolError(size)
       if (this.buffer.length < size + 4) break
       const id = this.buffer.readInt32LE(4)
       const type = this.buffer.readInt32LE(8)
