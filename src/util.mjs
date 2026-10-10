@@ -534,6 +534,43 @@ export async function dirSizeAsync(dir) {
   return total
 }
 
+/**
+ * A version string that is safe to build a file name and a URL path from.
+ *
+ * <p>Loader and game versions come from places the person did not write - a modpack's index, a
+ * command line - and are then put into a name under the jars store and into a download URL. A value
+ * like `1/../x` would leave the store and change which URL is fetched, so only the characters a real
+ * version uses get through, and `..` never does, even though each dot on its own is fine.
+ */
+const SAFE_VERSION = /^\w[\w.+-]*$/
+export function assertSafeVersion(value, label) {
+  const v = typeof value === 'string' ? value : String(value ?? '')
+  if (!SAFE_VERSION.test(v) || v.includes('..') || v.length > 64) {
+    fail(`${label} "${v.slice(0, 40)}" is not a valid version`)
+  }
+  return v
+}
+
+/** Whether `child` is `parent` or somewhere under it, judged on the paths as written. */
+export function isInside(parent, child) {
+  const rel = path.relative(parent, child)
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel))
+}
+
+/**
+ * A relative path from a file we did not write - a pack index, a snapshot manifest - normalised to
+ * forward slashes, or null when it is not a plain path below the folder it will be joined to:
+ * absolute, a drive letter, a `..` segment, a NUL, or nothing at all.
+ */
+export function safeRelativePath(raw) {
+  if (typeof raw !== 'string') return null
+  const clean = raw.replace(/\\/g, '/')
+  if (!clean || clean.includes('\0') || clean.startsWith('/') || /^[a-z]:/i.test(clean)) return null
+  const parts = clean.split('/').filter((part) => part && part !== '.')
+  if (!parts.length || parts.includes('..')) return null
+  return parts.join('/')
+}
+
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i
 
 export function validateName(name) {

@@ -3,12 +3,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { BACKUPS_DIR } from './paths.mjs'
-import { runTar, tarBinary } from './tar.mjs'
+import { runTar, tarBinary, tarMember } from './tar.mjs'
 import * as services from './services.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
-import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync } from './util.mjs'
+import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync, safeRelativePath } from './util.mjs'
 import * as activity from './activity.mjs'
 
 /**
@@ -203,7 +203,7 @@ function membersFor(inst, scope) {
   }
 }
 
-export { runTar, tarBinary } from './tar.mjs'
+export { runTar, tarBinary, tarMember } from './tar.mjs'
 
 // How long a world may take to flush to disk before the flush is given up on. Two minutes: well
 // past an ordinary command's eight seconds, because a large world writes a lot, and short enough
@@ -264,7 +264,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   // plugin keeps - applies to every backup of the server, and never to a copy of named files,
   // which exists to hold exactly what it names.
   const leaveOut = only ? [] : excludePatterns(inst)
-  const members = (only ?? membersFor(inst, scope)).filter((m) => !leaveOut.includes(m))
+  const members = (only ?? membersFor(inst, scope)).filter((m) => !leaveOut.includes(m)).map(tarMember)
   if (!members.length) fail(`nothing to back up for scope "${scope}" in ${inst.dir}`)
 
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''
@@ -522,6 +522,12 @@ export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = f
   if (clean && !(snapshot.members ?? []).some((m) => m !== 'databases')) {
     fail(`${snapshot.name} does not record what it holds, so there is nothing it can safely clear first`)
   }
+  // A clean restore deletes what the manifest names, so the manifest is not trusted to name only
+  // things inside the server folder: one that lists "../x" would have the delete walk out of it.
+  const outside = clean ? (snapshot.members ?? []).find((m) => m !== 'databases' && safeRelativePath(m) === null) : undefined
+  if (outside !== undefined) {
+    fail(`${snapshot.name} lists "${outside}", which is not inside the server folder, so it cannot clear anything first; nothing was changed`)
+  }
 
   // Checked before a single file is touched. Extraction overwrites in place and cannot be undone,
   // so an archive that stops partway - as every hot snapshot of a server with a locked plugin
@@ -572,7 +578,10 @@ export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = f
   const dumps = snapshot.databases ?? []
   if (dumps.length) {
     databases = await services.importDumps(inst.name, dumps, inst.dir)
-    for (const d of databases.imported) fs.rmSync(path.join(inst.dir, d.file), { force: true })
+    for (const d of databases.imported) {
+      const rel = safeRelativePath(d.file)
+      if (rel !== null) fs.rmSync(path.join(inst.dir, ...rel.split('/')), { force: true })
+    }
     const folder = path.join(inst.dir, 'databases')
     try {
       if (fs.existsSync(folder) && fs.readdirSync(folder).length === 0) fs.rmdirSync(folder)

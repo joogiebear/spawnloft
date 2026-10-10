@@ -17,7 +17,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
-import { fail, humanBytes } from './util.mjs'
+import { fail, humanBytes, assertSafeVersion, isInside } from './util.mjs'
 
 const API = 'https://meta.fabricmc.net/v2'
 const HEADERS = { 'User-Agent': 'SpawnLoft (github.com/joogiebear/spawnloft)', Accept: 'application/json' }
@@ -60,20 +60,29 @@ export function launcherName(game, loader, installer) {
  * always the newest stable; it only bootstraps.
  */
 export async function fetchLauncher(game, { loader: pinned = null, force = false, onProgress = null } = {}) {
+  // A modpack's index names the loader, and a command line names the game: neither is trusted to be
+  // a version. Both go into a file name under the jars store and into the URL below.
+  assertSafeVersion(game, 'the Minecraft version')
+  if (pinned != null) assertSafeVersion(pinned, 'the Fabric loader version')
   const [loader, installer] = await Promise.all([
     pinned ?? latestStable('/versions/loader', 'loader'),
     latestStable('/versions/installer', 'installer'),
   ])
+  assertSafeVersion(loader, 'the Fabric loader version')
+  assertSafeVersion(installer, 'the Fabric installer version')
   const name = launcherName(game, loader, installer)
 
   fs.mkdirSync(JARS_DIR, { recursive: true })
   const dest = path.join(JARS_DIR, name)
+  if (!isInside(JARS_DIR, dest) || path.dirname(dest) !== path.resolve(JARS_DIR)) {
+    fail(`the Fabric launcher name "${name}" would land outside the jars folder`)
+  }
   if (fs.existsSync(dest) && !force) {
     onProgress?.({ received: fs.statSync(dest).size, total: fs.statSync(dest).size, cached: true })
     return { name, path: dest, game, loader, installer, cached: true }
   }
 
-  const url = `${API}/versions/loader/${encodeURIComponent(game)}/${loader}/${installer}/server/jar`
+  const url = `${API}/versions/loader/${encodeURIComponent(game)}/${encodeURIComponent(loader)}/${encodeURIComponent(installer)}/server/jar`
   let res
   try {
     res = await fetch(url, { headers: { 'User-Agent': HEADERS['User-Agent'] } })

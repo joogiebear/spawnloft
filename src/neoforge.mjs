@@ -19,7 +19,7 @@ import { spawn } from 'node:child_process'
 import { JARS_DIR } from './paths.mjs'
 import * as create from './create.mjs'
 import { removeInstance, updateInstance } from './registry.mjs'
-import { fail, UserError, humanBytes } from './util.mjs'
+import { fail, UserError, humanBytes, assertSafeVersion, isInside } from './util.mjs'
 
 const MAVEN = 'https://maven.neoforged.net'
 const API = `${MAVEN}/api/maven/versions/releases/net/neoforged/neoforge`
@@ -89,12 +89,18 @@ export async function resolveBuild(mc, wanted = null) {
  * publishes beside every artifact.
  */
 export async function fetchInstaller(neoVersion, { onProgress = () => {} } = {}) {
+  // From a modpack's index, so not trusted to be a version: it becomes a file name under the jars
+  // store and a path on the maven.
+  assertSafeVersion(neoVersion, 'the NeoForge version')
   fs.mkdirSync(JARS_DIR, { recursive: true })
   const name = `neoforge-${neoVersion}-installer.jar`
   const dest = path.join(JARS_DIR, name)
+  if (!isInside(JARS_DIR, dest) || path.dirname(dest) !== path.resolve(JARS_DIR)) {
+    fail(`the NeoForge installer name "${name}" would land outside the jars folder`)
+  }
   if (fs.existsSync(dest)) return { name, path: dest, version: neoVersion, cached: true }
 
-  const url = `${MAVEN}/releases/net/neoforged/neoforge/${neoVersion}/${name}`
+  const url = `${MAVEN}/releases/net/neoforged/neoforge/${encodeURIComponent(neoVersion)}/${encodeURIComponent(name)}`
   onProgress({ message: `Downloading the NeoForge ${neoVersion} installer`, percent: null })
   let res
   try {
