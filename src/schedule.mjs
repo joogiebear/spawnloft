@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawnSync, execFile } from 'node:child_process'
 
 import { DATA_ROOT, ROOT, RUN_DIR } from './paths.mjs'
-import { readJson, writeJson, fail, validateName } from './util.mjs'
+import { readJson, writeJson, fail, validateName, acquireLock } from './util.mjs'
 import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as mac from './schedule-mac.mjs'
 import * as linux from './schedule-linux.mjs'
@@ -38,6 +38,24 @@ const native = process.platform === 'darwin' ? mac : process.platform === 'linux
  */
 
 const TASKS_FILE = () => path.join(DATA_ROOT, 'schedules.json')
+const TASKS_LOCK = () => path.join(DATA_ROOT, 'schedules.lock')
+
+/**
+ * Every change to schedules.json is read, modified and written back, so two at once (the panel
+ * and the MCP server, or two CLI calls) would silently drop one of them. Changes take a lock for
+ * the whole cycle. A change that calls another (renaming an instance updates its tasks) is already
+ * holding it, so nested calls pass straight through.
+ */
+let tasksLockDepth = 0
+function withTasksLock(fn) {
+  if (tasksLockDepth > 0) return fn()
+  fs.mkdirSync(DATA_ROOT, { recursive: true })
+  let release
+  try { release = acquireLock(TASKS_LOCK(), { mode: 'wait', timeoutMs: 10000 }) }
+  catch { fail('another change to the scheduled tasks is still in progress; try again in a moment') }
+  tasksLockDepth++
+  try { return fn() } finally { tasksLockDepth--; release() }
+}
 
 /** One folder, so everything mcctl created can be removed in a single call at uninstall. */
 export const TASK_FOLDER = 'mcctl'
@@ -414,7 +432,7 @@ function writeWindowsTask(id, task) {
  */
 export const OWNER_BACKUPS = 'backups'
 
-export function create({ instance, name, action, schedule, enabled = true, owner = null }) {
+function createLocked({ instance, name, action, schedule, enabled = true, owner = null }) {
   validateName(instance)
   const cleanAction = normaliseAction(action)
   const cleanSchedule = normaliseSchedule(schedule)
@@ -461,7 +479,7 @@ export function create({ instance, name, action, schedule, enabled = true, owner
  * what the run log is keyed by - so editing the time on a nightly backup would have orphaned every
  * record of it having ever run.
  */
-export function update(id, patch) {
+function updateLocked(id, patch) {
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
   const current = data.tasks[id]
@@ -495,7 +513,7 @@ export function update(id, patch) {
   return { id, ...task }
 }
 
-export function setEnabled(id, enabled) {
+function setEnabledLocked(id, enabled) {
   if (native) return update(id, { enabled })
   const data = load()
   if (!Object.hasOwn(data.tasks, id)) fail(`no scheduled task "${id}"`)
@@ -522,7 +540,7 @@ function stillInWindows(id) {
   return res.status === 0
 }
 
-export function remove(id) {
+function removeLocked(id) {
   const data = load()
   // Checked, like every other id-addressed call here. Without it a mistyped id reported success
   // while the real task kept firing, and the id went on to build a path that rmSync would follow.
@@ -627,7 +645,7 @@ export function recentRuns(instance, limit = 40) {
  * Lines already in the run log keep the old id, which is correct: that is what the task was called
  * when it ran.
  */
-export function renameInstance(oldName, newName) {
+function renameInstanceLocked(oldName, newName) {
   const data = load()
   const moved = []
   // Ids claimed during this rename count as taken. Checking only data.tasks would let two tasks
@@ -699,7 +717,7 @@ export function renameInstance(oldName, newName) {
  * <p>A trigger outliving its server is the worst kind of leftover: it fires forever, fails every
  * time, and turns up months later in Task Scheduler with nothing to explain it.
  */
-export function removeForInstance(name) {
+function removeForInstanceLocked(name) {
   const data = load()
   const ids = Object.entries(data.tasks).filter(([, t]) => t.instance === name).map(([id]) => id)
   for (const id of ids) {
@@ -718,7 +736,7 @@ export function removeForInstance(name) {
  * <p>For uninstall. Tasks left behind would keep firing at a program that is no longer there, which
  * is the kind of thing people find months later in Task Scheduler and cannot explain.
  */
-export function removeAll() {
+function removeAllLocked() {
   const data = load()
   for (const id of Object.keys(data.tasks)) {
     try {
@@ -739,3 +757,11 @@ export function removeAll() {
   if (!remaining.length) fs.rmSync(path.join(DATA_ROOT, 'tasks'), { recursive: true, force: true })
   return { removed: remaining.length === 0, remaining }
 }
+
+export const create = (...args) => withTasksLock(() => createLocked(...args))
+export const update = (...args) => withTasksLock(() => updateLocked(...args))
+export const setEnabled = (...args) => withTasksLock(() => setEnabledLocked(...args))
+export const remove = (...args) => withTasksLock(() => removeLocked(...args))
+export const renameInstance = (...args) => withTasksLock(() => renameInstanceLocked(...args))
+export const removeForInstance = (...args) => withTasksLock(() => removeForInstanceLocked(...args))
+export const removeAll = (...args) => withTasksLock(() => removeAllLocked(...args))

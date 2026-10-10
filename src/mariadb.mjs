@@ -461,19 +461,54 @@ export function detachSql({ database, user, drop = false }) {
 
 // ---- dumps ------------------------------------------------------------------------------------
 
-function runToFile(cmd, args, env, { stdout = null, stdin = null, label }) {
+/**
+ * Run a MariaDB tool with its output sent to a stream, or a stream sent to its input.
+ *
+ * <p>Settles when the process has CLOSED, not when it has exited: 'exit' can fire while the last of
+ * its output is still in the pipe, and a dump that is declared finished then is a dump that stops
+ * short - which was recorded as a good backup, because the only check on it is that the file
+ * exists. The same goes for its error output, which is what says why it failed.
+ *
+ * <p>Every stream involved gets an error handler, because a stream error nobody listens for is an
+ * uncaught exception, and this runs inside the panel's process. A client that refuses the login
+ * exits while its input is still being fed to it (EPIPE) - its exit code is what says so, so that
+ * write error is not a second, process-ending failure. A file that cannot be read or written ends
+ * the run with that reason and stops the tool.
+ */
+export function runToFile(cmd, args, env, { stdout = null, stdin = null, label }) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { env, windowsHide: true, stdio: [stdin ? 'pipe' : 'ignore', stdout ? 'pipe' : 'ignore', 'pipe'] })
     let stderr = ''
+    let settled = false
+    const settle = (fn, value) => {
+      if (settled) return
+      settled = true
+      fn(value)
+    }
+    const abort = (message) => {
+      try {
+        child.kill()
+      } catch {
+        /* already gone */
+      }
+      settle(reject, new UserError(message))
+    }
     child.stderr.on('data', (c) => {
       stderr += c.toString()
     })
-    if (stdout) child.stdout.pipe(stdout, { end: false })
-    if (stdin) stdin.pipe(child.stdin)
-    child.on('error', (err) => reject(new UserError(`could not run the MariaDB ${label}: ${err.message}`)))
-    child.on('exit', (code) => {
-      if (code === 0) resolve()
-      else reject(new UserError(`MariaDB ${label} exited ${code}: ${stderr.trim().split(/\r?\n/)[0] || 'no reason given'}`))
+    if (stdout) {
+      stdout.on('error', (err) => abort(`could not write the output of the MariaDB ${label}: ${err.message}`))
+      child.stdout.pipe(stdout, { end: false })
+    }
+    if (stdin) {
+      child.stdin.on('error', () => {})
+      stdin.on('error', (err) => abort(`could not read the input for the MariaDB ${label}: ${err.message}`))
+      stdin.pipe(child.stdin)
+    }
+    child.on('error', (err) => settle(reject, new UserError(`could not run the MariaDB ${label}: ${err.message}`)))
+    child.on('close', (code) => {
+      if (code === 0) settle(resolve)
+      else settle(reject, new UserError(`MariaDB ${label} exited ${code}: ${stderr.trim().split(/\r?\n/)[0] || 'no reason given'}`))
     })
   })
 }
@@ -501,7 +536,17 @@ export async function dump(inst, database, file) {
     fs.rmSync(file, { force: true })
     throw err
   }
-  await new Promise((resolve) => out.end(resolve))
+  // Ended only now, so every byte the tool wrote has been handed to the file first; a failure to
+  // flush it (a full disk) is the dump failing, not something to find out from its size.
+  try {
+    await new Promise((resolve, reject) => {
+      out.once('error', reject)
+      out.end(resolve)
+    })
+  } catch (err) {
+    fs.rmSync(file, { force: true })
+    throw new UserError(`could not finish writing the dump of "${database}": ${err.message}`)
+  }
   return { file, bytes: fs.statSync(file).size }
 }
 
