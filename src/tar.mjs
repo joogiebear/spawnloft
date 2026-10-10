@@ -40,6 +40,19 @@ export function tarHandlesZip() {
   return zipCapable
 }
 
+/**
+ * A file name as a member on tar's command line.
+ *
+ * <p>tar reads an argument that starts with `-` as an option - on GNU tar a file called
+ * `--checkpoint-action=exec=...` in the server folder would run a command during the backup - and
+ * bsdtar reads one that starts with `@` as an archive to copy entries out of. A `./` in front makes
+ * either an ordinary path. Every other name is left exactly as it is, so the entries in the archive
+ * keep the names they have always had.
+ */
+export function tarMember(name) {
+  return /^[-@]/.test(name) ? `./${name}` : name
+}
+
 export function runTar(args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(tarBinary(), args, { cwd, windowsHide: true })

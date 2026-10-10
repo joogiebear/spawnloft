@@ -10,7 +10,7 @@ import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
 import * as mysql from './mysql.mjs'
 import { readState, clearState, activeBlock } from './control.mjs'
-import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel, stamp, humanBytes } from './util.mjs'
+import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel, stamp, humanBytes, safeRelativePath, isInside } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
 import * as activity from './activity.mjs'
 
@@ -544,9 +544,21 @@ export async function importDumps(serverName, dumps, baseDir) {
   const imported = []
   const skipped = []
   for (const d of dumps) {
-    const file = path.join(baseDir, d.file)
+    // The manifest is the only thing that says which file to import, and the import runs it as the
+    // database's root user, so it is held to what a snapshot really writes: a file in databases/
+    // inside the server folder. Not a path that climbs out of it, and not a link that leads out.
+    const rel = safeRelativePath(d.file)
+    if (rel === null || !rel.startsWith('databases/')) {
+      skipped.push({ ...d, reason: 'the manifest names a dump outside the server folder\'s databases folder; it was not imported' })
+      continue
+    }
+    const file = path.join(baseDir, ...rel.split('/'))
     if (!fs.existsSync(file)) {
       skipped.push({ ...d, reason: 'the dump is missing from the archive' })
+      continue
+    }
+    if (!isInside(fs.realpathSync(baseDir), fs.realpathSync(file))) {
+      skipped.push({ ...d, reason: 'the dump leads outside the server folder; it was not imported' })
       continue
     }
     if (!hasInstance(d.service) || !isDatabase(getInstance(d.service))) {

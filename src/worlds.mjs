@@ -19,7 +19,7 @@ import path from 'node:path'
 import { BACKUPS_DIR } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { readState, activeBlock, isActiveStatus } from './control.mjs'
-import { runTar, EXCLUDE_ARGS } from './backup.mjs'
+import { runTar, tarMember, EXCLUDE_ARGS } from './backup.mjs'
 import { tarHandlesZip } from './tar.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { fail, dirSizeAsync, humanBytes, stamp, validateName } from './util.mjs'
@@ -229,7 +229,7 @@ export async function exportWorld(inst, name) {
     .filter((d) => isWorldDir(path.join(inst.dir, d)))]
   // -a lets bsdtar pick the format from the extension: .zip in, zip out. GNU tar takes the same
   // flags, exits 0, and writes a tar archive called .zip - so it is never asked.
-  if (tarHandlesZip()) await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members], inst.dir)
+  if (tarHandlesZip()) await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members.map(tarMember)], inst.dir)
   else await createZip(file, inst.dir, members, { exclude: EXCLUDE_ARGS.filter((arg) => arg !== '--exclude') })
   const size = fs.statSync(file).size
   if (size === 0) {
