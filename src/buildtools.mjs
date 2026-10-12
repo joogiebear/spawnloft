@@ -1,17 +1,5 @@
-/**
- * Spigot and CraftBukkit, compiled here by SpigotMC's BuildTools.
- *
- * <p>SpigotMC publishes no server jars - it is not allowed to, so every Spigot server in the
- * world was built on somebody's machine from source. BuildTools is the tool that does it:
- * clone Bukkit, CraftBukkit and Spigot, decompile and patch the vanilla server, compile, and
- * leave a jar behind. mcctl runs it the way a person would, in a work folder under the jar
- * store, and moves the result into the store named like every other jar.
- *
- * <p>Two things make it unlike the other sources and are said wherever it is offered: it needs
- * a JDK (javac, not just java), and the first build for a version takes five to ten minutes and
- * about a gigabyte of clones and Maven cache. Later builds reuse the clones. BuildTools fetches
- * a portable git for itself on Windows when none is installed.
- */
+// Spigot and CraftBukkit, compiled locally with SpigotMC's BuildTools (SpigotMC publishes no jars).
+// Needs a JDK, and the first build for a version takes five to ten minutes and about 1 GB.
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
@@ -23,13 +11,8 @@ import { downloadFile } from './download.mjs'
 const BUILDTOOLS_URL = 'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar'
 const VERSIONS_URL = 'https://hub.spigotmc.org/versions/'
 
-/**
- * The versions BuildTools can build, out of the index page of hub.spigotmc.org/versions.
- *
- * <p>That page lists one JSON per revision: Minecraft versions (`1.21.4.json`, `26.2.json`)
- * beside plain Jenkins build numbers (`4647.json`) and `latest.json`. Only the ones shaped
- * like a Minecraft version are versions. Exported pure for its test.
- */
+// The index lists Minecraft versions (`1.21.4.json`) beside Jenkins build numbers (`4647.json`)
+// and `latest.json`; only the Minecraft-shaped ones are versions.
 export function parseVersionIndex(html) {
   const seen = new Set()
   for (const m of String(html).matchAll(/href="(\d+\.\d+(?:\.\d+)?)\.json"/g)) seen.add(m[1])
@@ -59,7 +42,7 @@ export function jarName(flavour, mc) {
   return `${flavour}-${mc}.jar`
 }
 
-/** javac beside the java that will run the server, or on PATH. BuildTools compiles; a JRE cannot. */
+// javac beside the java that will run the server, or on PATH. A JRE can't compile.
 function assertJdk(java) {
   const javac = /[\\/]/.test(java) ? path.join(path.dirname(java), process.platform === 'win32' ? 'javac.exe' : 'javac') : 'javac'
   const res = spawnSync(javac, ['-version'], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
@@ -69,12 +52,7 @@ function assertJdk(java) {
   }
 }
 
-/**
- * Build one flavour for one Minecraft version into the jar store.
- *
- * <p>Progress is the tool's own output, a line at a time, because there is no percentage to
- * be had from a compile and its last line is the honest answer to "is it still going".
- */
+// Progress is BuildTools' own output a line at a time; a compile has no percentage.
 export async function build(mc, { flavour = 'spigot', java = 'java', force = false, onProgress = null } = {}) {
   if (flavour !== 'spigot' && flavour !== 'craftbukkit') fail(`BuildTools does not build "${flavour}"`)
   fs.mkdirSync(JARS_DIR, { recursive: true })
@@ -89,8 +67,7 @@ export async function build(mc, { flavour = 'spigot', java = 'java', force = fal
   const work = path.join(JARS_DIR, 'buildtools')
   const outDir = path.join(work, 'out')
   fs.mkdirSync(outDir, { recursive: true })
-  // Always refreshed: BuildTools is small and updates itself for every Minecraft release, and
-  // an old copy fails on a new version with a message about nothing in particular.
+  // Always re-download: an old BuildTools fails on a newer Minecraft version with a vague error.
   onProgress?.({ message: 'Downloading BuildTools from SpigotMC' })
   await downloadFile(BUILDTOOLS_URL, path.join(work, 'BuildTools.jar'), { minBytes: 100 * 1024, label: 'BuildTools.jar' })
 

@@ -1,17 +1,7 @@
-/**
- * Modrinth modpacks (.mrpack), as servers.
- *
- * <p>An .mrpack is a zip holding one honest manifest and two override folders:
- * `modrinth.index.json` lists every file the pack needs - path, hashes, download URLs, and
- * whether the server side wants it at all - and names the Minecraft version and loader the
- * pack was built against. `overrides/` and `server-overrides/` are config laid on top, the
- * second winning where they collide.
- *
- * <p>The flow here downloads and validates EVERYTHING it can before an instance exists, so
- * "this pack needs NeoForge" or a dead download URL costs nothing but time. Only once the
- * pack is proven installable is the instance created - and if laying the files in fails
- * partway, the half-built instance is torn down rather than left looking created.
- */
+// Modrinth modpacks (.mrpack) as servers. modrinth.index.json lists the files, hashes and download
+// URLs; overrides/ and server-overrides/ are config laid on top, the latter winning.
+// Everything is downloaded and validated before the instance is created, and a failed install
+// removes the instance.
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -29,20 +19,17 @@ import { readState } from './control.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import { fail, UserError, writeJson, assertSafeVersion, safeRelativePath, humanBytes } from './util.mjs'
 
-/** The provenance record for a whole pack, written into the instance root. */
+// Provenance record for a whole pack, in the instance root.
 export const PACK_FILE = '.mcctl-pack.json'
 
-/**
- * Where a pack may fetch its files from: the hosts the Modrinth pack format allows. A pack is
- * written by a stranger, and without this its index could point a download at any address the
- * machine can reach - a service on localhost, say - not just at a mod host.
- */
+// Hosts the Modrinth pack format allows. Packs come from strangers, so the index must not be able
+// to point a download at an arbitrary address (a service on localhost, say).
 export const ALLOWED_PACK_HOSTS = ['cdn.modrinth.com', 'github.com', 'raw.githubusercontent.com', 'gitlab.com']
 
 const HEX_SHA1 = /^[0-9a-f]{40}$/i
 const HEX_SHA512 = /^[0-9a-f]{128}$/i
 
-/** The URL as a normalised string when a pack may use it, or null: https, an allowed host, no login. */
+// Normalised URL if https, an allowed host and no login; otherwise null.
 export function allowedPackUrl(raw) {
   let url
   try {
@@ -56,10 +43,7 @@ export function allowedPackUrl(raw) {
   return url.href
 }
 
-/**
- * What the index says, reduced to what the install needs - and refused early when it names
- * a loader mcctl cannot run yet. Exported pure, so the refusals are testable without a pack.
- */
+// Reduces the index to what the install needs and refuses loaders mcctl can't run.
 export function parseIndex(index) {
   if (!index || index.game !== 'minecraft' || !Array.isArray(index.files)) {
     fail('that file does not look like a Modrinth modpack index')
@@ -78,8 +62,7 @@ export function parseIndex(index) {
       ? { kind: 'neoforge', version: deps.neoforge }
       : null
   if (!loader) fail('the pack names no loader SpawnLoft can run (Fabric or NeoForge)')
-  // The pack author wrote these, and they become a file name in the jars store and part of a
-  // download URL, so only version-shaped values are accepted - before anything is fetched.
+  // These become a jars-store file name and part of a download URL, so only version-shaped values pass.
   assertSafeVersion(mc, "the pack's Minecraft version")
   assertSafeVersion(loader.version, `the pack's ${loader.kind === 'fabric' ? 'Fabric loader' : 'NeoForge'} version`)
 
@@ -93,7 +76,7 @@ export function parseIndex(index) {
     }))
     .map((f) => ({ ...f, url: f.downloads.map(allowedPackUrl).find(Boolean) ?? null }))
   for (const f of files) {
-    // Paths come from the pack author. Confined here once, so nothing later has to re-decide.
+    // Confine author-supplied paths here, once.
     const safe = safeRelativePath(f.path)
     if (safe === null) {
       fail(`the pack lists a file outside its own folder ("${f.path}"); refusing the whole pack`)
@@ -103,8 +86,8 @@ export function parseIndex(index) {
     if (!f.url) {
       fail(`"${f.path}" is only offered from a host a pack may not use (https from ${ALLOWED_PACK_HOSTS.join(', ')} only); refusing the whole pack`)
     }
-    // A hash the author did not publish is a hash nothing was checked against, so a file with none
-    // is refused rather than trusted. Whatever hashes ARE published are all checked at download.
+    // A file with no published hash can't be verified, so it is refused. Every published hash is
+    // checked at download.
     for (const [kind, shape] of [['sha1', HEX_SHA1], ['sha512', HEX_SHA512]]) {
       if (f.hashes[kind] != null && !shape.test(String(f.hashes[kind]))) {
         fail(`the pack's ${kind} checksum for "${f.path}" is not a checksum; refusing the whole pack`)
@@ -133,11 +116,8 @@ export function parseIndex(index) {
   }
 }
 
-/**
- * Put the pack's loader in place. Fabric is a launcher jar fetched before the instance
- * exists; NeoForge is an installer run INTO the instance, so it can only happen after -
- * which is why this takes the instance dir and answers with the jar name to record.
- */
+// Fabric's launcher is fetched before the instance exists; NeoForge's installer runs inside the
+// instance, so this takes the instance and returns the jar name to record.
 async function installLoader(inst, index, onProgress) {
   if (index.loader.kind === 'fabric') {
     onProgress({ message: `Fetching Fabric ${index.loader.version} for ${index.mc}`, percent: null })
@@ -161,16 +141,13 @@ async function download(url, { timeoutMs = 180000 } = {}) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-/**
- * The most one pack file may be. A mod is megabytes, a big one tens; this is far past any real file
- * and exists so a pack cannot fill the disk by lying about, or never ending, a download.
- */
+// Cap on a single pack file, so a pack can't fill the disk by lying about (or never ending) a download.
 export const MAX_PACK_FILE_BYTES = 1024 * 1024 * 1024
-// What a file may be when the pack states no size - the format requires one, but a pack is a stranger's file.
+// Cap when the pack states no size (the format requires one, but packs aren't trusted).
 export const DEFAULT_PACK_FILE_BYTES = 256 * 1024 * 1024
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
 
-/** An address that is this machine or its own network, which a mod host never is. */
+// Loopback, private, link-local and other non-public addresses.
 function isLocalHost(hostname) {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, '')
   if (h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '::') return true
@@ -181,15 +158,9 @@ function isLocalHost(hostname) {
   return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
 }
 
-/**
- * Download one pack file to `dest`, checked against everything the pack says about it.
- *
- * <p>Streamed to a `.part` file beside `dest` rather than held in memory, and only renamed into
- * place once it is the declared size and matches every checksum the pack published - so a bad file
- * never has the right name. The size the pack declares is also the most that will be read, which is
- * what stops a download that never ends. Redirects are followed by hand, because a CDN does
- * redirect (GitHub release assets do) but never to anything that is not https on the internet.
- */
+// Streams to `dest.part` and renames into place only when the size and every published checksum
+// match, so a bad file never has the final name. The declared size is also the read cap.
+// Redirects are followed by hand because each hop must still be https on a public address.
 export async function downloadVerified(url, dest, {
   size = 0, sha1 = null, sha512 = null, label = url, timeoutMs = 180000, maxRedirects = 5, fetchImpl = fetch,
 } = {}) {
@@ -263,7 +234,6 @@ export async function downloadVerified(url, dest, {
   return { bytes: received }
 }
 
-/** The newest installable release of a pack, or a readable refusal. */
 async function resolvePackVersion(projectId) {
   const RUNNABLE = ['fabric', 'neoforge']
   const versions = await modrinthRequest(`/project/${encodeURIComponent(projectId)}/version?${new URLSearchParams({ loaders: JSON.stringify(RUNNABLE) })}`)
@@ -274,7 +244,6 @@ async function resolvePackVersion(projectId) {
   return { version, packFile }
 }
 
-/** Download one pack archive into a scratch dir, checksummed, and read its index. */
 async function fetchPackArchive(packFile, onProgress) {
   onProgress({ message: `Downloading ${packFile.filename}`, percent: null })
   const packBytes = await download(packFile.url)
@@ -296,12 +265,7 @@ async function fetchPackArchive(packFile, onProgress) {
   }
 }
 
-/**
- * Every server-side file the index lists, downloaded and checksummed into `tmp`.
- *
- * <p>On disk rather than in memory: a pack is hundreds of files, and holding all of them at once
- * is a lot of RAM for what is only a waiting room. `tmp` is the scratch folder the caller removes.
- */
+// Downloads to disk rather than memory since a pack is hundreds of files. `tmp` is removed by the caller.
 export async function stagePackFiles(index, tmp, onProgress, { fetchImpl = fetch } = {}) {
   const dir = path.join(tmp, 'staged')
   fs.mkdirSync(dir, { recursive: true })
@@ -319,23 +283,14 @@ export async function stagePackFiles(index, tmp, onProgress, { fetchImpl = fetch
   return staged
 }
 
-/**
- * Build a new server from a Modrinth modpack, end to end.
- *
- * <p>Progress lands on `onProgress({ message, percent })` - a pack is dozens of downloads,
- * and dozens of downloads with no narration reads as a hang.
- */
 export async function createFromModpack(name, projectId, {
   memory = '4G', port = null, onlineMode = true, onProgress = () => {},
 } = {}) {
-  // ---- resolve and fetch the pack itself, before anything exists ------------
   onProgress({ message: 'Finding the pack on Modrinth', percent: null })
   const { version, packFile } = await resolvePackVersion(projectId)
   const { tmp, mrpack, index } = await fetchPackArchive(packFile, onProgress)
 
-  // ---- everything the pack needs, downloaded and verified up front ----------
-  // Fabric's launcher and NeoForge's installer both cache into the jars store here, so the
-  // loader step after the instance exists is a cache hit, not a fresh gamble.
+  // Fetching the loader here caches it in the jars store, so the later install is a cache hit.
   let staged
   let inst
   try {
@@ -348,7 +303,6 @@ export async function createFromModpack(name, projectId, {
 
     staged = await stagePackFiles(index, tmp, onProgress)
 
-    // ---- only now does the instance exist -------------------------------------
     onProgress({ message: 'Creating the server', percent: null })
     inst = await create.newInstance(name, {
       jar: null,
@@ -361,7 +315,7 @@ export async function createFromModpack(name, projectId, {
       motd: index.name,
     })
   } catch (err) {
-    // Nothing exists yet but the scratch folder, which now holds the staged files: not left behind.
+    // Only the scratch folder exists at this point.
     fs.rmSync(tmp, { recursive: true, force: true })
     throw err
   }
@@ -373,8 +327,7 @@ export async function createFromModpack(name, projectId, {
       const target = path.join(inst.dir, ...f.path.split('/'))
       fs.mkdirSync(path.dirname(target), { recursive: true })
       fs.copyFileSync(f.file, target)
-      // Pack-owned mods are managed BY THE PACK: shown in the Mods tab, but never offered an
-      // individual update - updating one mod out of a pack is how packs break.
+      // Pack-owned mods show in the Mods tab but are never offered individual updates.
       if (f.path.startsWith('mods/') && f.path.endsWith('.jar') && !f.path.slice(5).includes('/')) {
         recordManaged(inst, path.posix.basename(f.path), {
           source: 'modpack',
@@ -402,8 +355,7 @@ export async function createFromModpack(name, projectId, {
       skippedClientOnly: index.skipped,
     })
   } catch (err) {
-    // A half-laid pack must not sit there looking like a server. The instance was created by
-    // this call, so this call cleans it up before failing.
+    // This call created the instance, so it removes the half-laid pack.
     try {
       removeInstance(name)
       fs.rmSync(inst.dir, { recursive: true, force: true })
@@ -427,12 +379,11 @@ export async function createFromModpack(name, projectId, {
   }
 }
 
-/** An older record wrote fabricLoader; a newer one writes loader. Read either. */
+// Records carry `loader`, or the older `fabricLoader`.
 function loaderOfRecord(pack) {
   return pack.loader ?? (pack.fabricLoader ? { kind: 'fabric', version: pack.fabricLoader } : null)
 }
 
-/** The pack record for an instance, or null for a server no pack built. */
 export function packOf(inst) {
   try {
     return JSON.parse(fs.readFileSync(path.join(inst.dir, PACK_FILE), 'utf8'))
@@ -441,17 +392,9 @@ export function packOf(inst) {
   }
 }
 
-// ---- updating an installed pack --------------------------------------------
-
-/**
- * What an update may DELETE: files the old pack owned that the new one does not - and
- * nothing else, ever. Exported pure, because this list is the entire safety argument of a
- * pack update and it deserves tests that need no pack.
- *
- * <p>`protect` guards what must survive even a confused record: the worlds (a pack that
- * shipped one has long since had it overwritten by real play), the server's own root files,
- * and mcctl's provenance. A path is matched exactly or as a directory prefix.
- */
+// What an update may delete: files the old pack owned that the new one doesn't, and nothing else.
+// `protect` entries (worlds, root server files, mcctl records) survive even a bad record; a path
+// matches exactly or as a directory prefix.
 export function planRemovals(oldFiles = [], newFiles = [], { protect = [] } = {}) {
   const keep = new Set(newFiles.map((p) => String(p).replace(/\\/g, '/')))
   const guarded = (p) => protect.some((g) => p === g || p.startsWith(`${g}/`))
@@ -469,7 +412,6 @@ function protectedPaths(inst) {
   ]
 }
 
-/** Whether a newer installable release of this server's pack exists. */
 export async function checkPackUpdate(inst) {
   const pack = packOf(inst)
   if (!pack) fail(`"${inst.name}" was not built from a modpack`)
@@ -481,15 +423,8 @@ export async function checkPackUpdate(inst) {
   }
 }
 
-/**
- * Move an installed pack server to the pack's newest release.
- *
- * <p>The order is the whole design. Everything new is downloaded and checksummed FIRST, so
- * a dead URL costs nothing; a standard snapshot is taken next, so the way back exists before
- * anything changes; only then are new files laid in, and only files the OLD record owned and
- * the new pack dropped are deleted - the worlds and everything the person added are not the
- * pack's to touch. The provenance record and managed-mod store are rewritten to match.
- */
+// Order matters: download and checksum everything first, snapshot, and only then change files.
+// Only files the old record owned and the new pack dropped are deleted.
 export async function updatePack(name, { onProgress = () => {} } = {}) {
   const inst = getInstance(name)
   const { status } = readState(name)
@@ -507,8 +442,7 @@ export async function updatePack(name, { onProgress = () => {} } = {}) {
 
   const { tmp, mrpack, index } = await fetchPackArchive(packFile, onProgress)
   try {
-    // Warm the loader artifact into the store now, so the install step after the snapshot is
-    // a cache hit rather than a fresh download that could fail mid-change.
+    // Cache the loader now so the install after the snapshot can't fail on a download mid-change.
     if (index.loader.kind === 'fabric') {
       onProgress({ message: `Fetching Fabric ${index.loader.version} for ${index.mc}`, percent: null })
       await fabric.fetchLauncher(index.mc, { loader: index.loader.version })
@@ -520,7 +454,6 @@ export async function updatePack(name, { onProgress = () => {} } = {}) {
     onProgress({ message: 'Snapshotting before anything changes', percent: null })
     const snap = await createSnapshot(inst, { scope: 'standard', label: 'pre-pack-update', running: false })
 
-    // ---- lay the new pack in ------------------------------------------------
     onProgress({ message: 'Applying the new pack', percent: null })
     for (const f of staged) {
       const target = path.join(inst.dir, ...f.path.split('/'))
@@ -533,13 +466,11 @@ export async function updatePack(name, { onProgress = () => {} } = {}) {
     const laidServer = extractZip(mrpack, inst.dir, { mapPath: strip('server-overrides/') })
     const newOwned = [...index.files.map((f) => f.path), ...laid, ...laidServer]
 
-    // ---- retire what the old pack owned and the new one dropped -------------
     const removals = planRemovals(pack.files, newOwned, { protect: protectedPaths(inst) })
     for (const p of removals) {
       fs.rmSync(path.join(inst.dir, ...p.split('/')), { force: true })
     }
 
-    // ---- the loader, the registry, and the records --------------------------
     const oldLoader = loaderOfRecord(pack)
     if (!oldLoader || index.loader.kind !== oldLoader.kind || index.loader.version !== oldLoader.version) {
       const jarName = await installLoader(inst, index, onProgress)
@@ -588,7 +519,6 @@ export async function updatePack(name, { onProgress = () => {} } = {}) {
   }
 }
 
-/** Where a managed-store filename actually lives for this instance's content kind. */
 function contentPathFor(inst, file) {
   return path.join(inst.loader === 'fabric' || inst.loader === 'neoforge' ? 'mods' : 'plugins', file)
 }
