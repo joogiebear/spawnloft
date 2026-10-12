@@ -147,6 +147,11 @@ test('paths stay inside the server folder and away from worlds, logs and player 
   for (const [p, why] of Object.entries(refused)) assert.throws(() => resolveConfigPath(inst, p), why, p)
 })
 
+test('a folder whose name starts with two dots is inside the server, not outside it', () => {
+  const inst = server({ '..cache/settings.yml': 'a: 1\n' })
+  assert.equal(resolveConfigPath(inst, '..cache/settings.yml').shown, '..cache/settings.yml')
+})
+
 test('a link that leads out of the server folder is refused', (t) => {
   const inst = server({ 'plugins/.keep': '' })
   const outside = fs.mkdtempSync(path.join(scratch, 'outside-'))

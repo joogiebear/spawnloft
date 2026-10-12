@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseProps, readProps, worldDirs } from './props.mjs'
-import { fail } from './util.mjs'
+import { fail, isInside } from './util.mjs'
 
 /**
  * A server's text configuration, as an AI assistant may see and change it: plugin configs,
@@ -142,11 +142,6 @@ export function redactConfig(text) {
     if (body.includes('=')) body = redactQuery(body)
     return body.replace(URL_CREDENTIAL, '$1[redacted]$3') + eol
   }).join('\n')
-}
-
-function isInside(parent, child) {
-  const rel = path.relative(parent, child)
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
 }
 
 function excludedTops(inst) {
