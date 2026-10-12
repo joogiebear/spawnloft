@@ -298,7 +298,7 @@ async function cmdCmd(positional, flags) {
   const inst = getInstance(name)
   if (!sup.isRunning(name)) fail(`instance "${name}" is not running`)
 
-  const [response] = await rconExec(inst, [command])
+  const [response] = await rconExec(inst, [command], { retrySent: false })
   activity.record(name, 'command', { detail: command })
   const text = flags.raw ? response : stripColors(response)
   if (text.trim()) out(text.trimEnd())

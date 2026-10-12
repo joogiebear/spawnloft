@@ -19,7 +19,7 @@
  *       that holds more. Whether two packets written back to back land in one read is a race on a
  *       real machine; here the thread wakes a few milliseconds after the first byte, so they
  *       always do, and a client that writes two at once is always hung up on.</li>
- *   <li>`replies`   - replies by command, over the defaults. One longer than 4096 characters goes
+ *   <li>`replies`   - replies by command, over the defaults. One longer than 4096 bytes goes
  *       out in several packets, as Minecraft sends it.</li>
  * </ul>
  */
@@ -27,7 +27,7 @@ import net from 'node:net'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 function packet(id, type, body) {
-  const payload = Buffer.from(body, 'utf8')
+  const payload = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8')
   const buf = Buffer.alloc(14 + payload.length)
   buf.writeInt32LE(10 + payload.length, 0)
   buf.writeInt32LE(id, 4)
@@ -110,12 +110,13 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
       parse()
     }
 
-    // Minecraft sends a reply in pieces of at most 4096 characters, and an empty one as one empty piece.
+    // Minecraft sends a reply in pieces of at most 4096 bytes, cut wherever that falls, and an empty
+    // one as one empty piece.
     function respond(id, text) {
-      let rest = text
+      let rest = Buffer.from(text, 'utf8')
       do {
-        socket.write(packet(id, 0, rest.slice(0, 4096)))
-        rest = rest.slice(4096)
+        socket.write(packet(id, 0, rest.subarray(0, 4096)))
+        rest = rest.subarray(4096)
       } while (rest.length)
     }
 

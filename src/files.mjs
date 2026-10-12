@@ -7,7 +7,7 @@ import { checkFormat, MANAGED_PROPS } from './config-files.mjs'
 import * as backup from './backup.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { runTar } from './tar.mjs'
-import { fail, humanBytes } from './util.mjs'
+import { fail, humanBytes, isInside } from './util.mjs'
 import * as activity from './activity.mjs'
 
 /**
@@ -36,9 +36,11 @@ const MAX_SEARCH_VISITS = 50000
 
 const FILE_NAME_BAD = /[<>:"|?*\u0000-\u001f]/
 
-function isInside(parent, child) {
-  const rel = path.relative(parent, child)
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+/** Where a link at `full` really points must still be inside the server folder. */
+function assertLinkStaysInside(base, full, rel) {
+  let real
+  try { real = fs.realpathSync(full) } catch { return }
+  if (!isInside(base, real)) fail(`${rel} leads outside the server folder`)
 }
 
 const toSlash = (p) => p.split(path.sep).join('/')
@@ -145,7 +147,8 @@ const versionOf = (buf) => crypto.createHash('sha1').update(buf).digest('hex')
  * and the panel offers the download instead.
  */
 export async function readFile(inst, relative) {
-  const { full, rel } = resolvePath(inst, relative)
+  const { base: root, full, rel } = resolvePath(inst, relative)
+  assertLinkStaysInside(root, full, rel)
   const s = await fs.promises.stat(full)
   if (!s.isFile()) fail(`${rel} is not a file`)
   const base = { path: rel, size: s.size, modified: s.mtime.toISOString() }
@@ -505,7 +508,8 @@ export async function undoSnapshot(inst, snapshotName, { running = false } = {})
  * caller streams `file` and calls `done` when the response has finished with it.
  */
 export async function downloadable(inst, relative) {
-  const { full, rel, stat } = resolvePath(inst, relative)
+  const { base, full, rel, stat } = resolvePath(inst, relative)
+  assertLinkStaysInside(base, full, rel)
   const real = stat.isSymbolicLink() ? fs.statSync(full) : stat
   if (real.isFile()) return { file: full, name: rel.split('/').pop(), size: real.size, done: () => {} }
   if (!real.isDirectory()) fail(`${rel} cannot be downloaded`)

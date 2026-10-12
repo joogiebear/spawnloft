@@ -402,7 +402,7 @@ const actionTools = [
         fail(`"${verb}" is not run over RCON here: ${verb === 'stop' ? 'use the stop tool' : verb === 'restart' ? 'use the restart tool' : 'reloading plugins in place breaks them; use the restart tool'}`)
       }
       requireRunning(n)
-      const [reply] = await rconExec(inst, [line])
+      const [reply] = await rconExec(inst, [line], { retrySent: false })
       activity.record(n, 'command', { detail: line })
       const text = stripColors(reply ?? '').trimEnd()
       return { data: { name: n, command: line, reply: text }, text: text || '(no output)' }

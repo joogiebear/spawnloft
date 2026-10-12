@@ -20,6 +20,24 @@ export const MARIADB_FAILED_RE = /\[ERROR\] (?:Aborting|Can't start server|maria
 export const GARNET_READY_RE = /ready to accept connections/i
 export const GARNET_FAILED_RE = /address already in use|only one usage of each socket|unhandled exception|cannot bind/i
 
+// Longer than any line the patterns above have to see whole.
+const OVERLAP = 512
+
+/**
+ * Look for the ready or failed line in newly read console text.
+ *
+ * <p>A read can end in the middle of a line, so what is searched is the end of the previous read
+ * plus this one. Pass the returned `carry` back in with the next text.
+ */
+export function scanConsole(carry, text, { ready, failed }) {
+  const scan = carry + text
+  const hit = ready.exec(scan)
+  if (hit) return { carry: '', ready: hit[0] }
+  const bad = failed.exec(scan)
+  if (bad) return { carry: '', failed: bad[0] }
+  return { carry: scan.slice(-OVERLAP) }
+}
+
 /** The pair that fits an instance: a database's engine has its own lines. */
 export function patternsFor(inst) {
   if (inst?.kind === 'database') {

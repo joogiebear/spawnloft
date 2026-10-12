@@ -59,6 +59,23 @@ test('a link that leads out of the server folder cannot be walked into', (t) => 
   assert.equal(entry.type, 'link')
 })
 
+test('a file link that leads out of the server folder cannot be read or downloaded', async (t) => {
+  const inst = server()
+  const outside = path.join(fs.mkdtempSync(path.join(scratch, 'outside-')), 'secret.txt')
+  fs.writeFileSync(outside, 'nope')
+  try {
+    fs.symlinkSync(outside, path.join(inst.dir, 'plugins', 'leak.yml'), 'file')
+    fs.symlinkSync(path.join(inst.dir, 'plugins', 'Example', 'config.yml'), path.join(inst.dir, 'plugins', 'inside.yml'), 'file')
+  } catch {
+    t.skip('this machine cannot make links')
+    return
+  }
+  await assert.rejects(files.readFile(inst, 'plugins/leak.yml'), /leads outside/)
+  await assert.rejects(files.downloadable(inst, 'plugins/leak.yml'), /leads outside/)
+  assert.match((await files.readFile(inst, 'plugins/inside.yml')).text, /enabled: true/)
+  assert.equal((await files.downloadable(inst, 'plugins/inside.yml')).size, 'enabled: true\nlimit: 5\n'.length)
+})
+
 test('a folder lists folders first, and while running marks what the server holds', () => {
   const inst = server()
   const stopped = files.listDir(inst, '')

@@ -9,7 +9,7 @@ import { readState, clearState, controlRequest, isActiveStatus } from './control
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
-import { patternsFor } from './ready.mjs'
+import { patternsFor, scanConsole } from './ready.mjs'
 import * as activity from './activity.mjs'
 
 const DAEMON = path.join(path.dirname(fileURLToPath(import.meta.url)), 'daemon.mjs')
@@ -199,13 +199,13 @@ export async function waitForReady(name, timeout = 180000) {
   const file = consoleLog(name)
   const deadline = Date.now() + timeout
   let offset = 0
+  let carry = ''
   let patterns
   try {
     patterns = patternsFor(getInstance(name))
   } catch {
     patterns = patternsFor(null)
   }
-  const { ready: READY_RE, failed: FAILED_RE } = patterns
 
   while (Date.now() < deadline) {
     let text = ''
@@ -224,13 +224,10 @@ export async function waitForReady(name, timeout = 180000) {
     }
 
     if (text) {
-      if (READY_RE.test(text)) {
-        const m = READY_RE.exec(text)
-        return { ready: true, readyLine: m[0] }
-      }
-      if (FAILED_RE.test(text)) {
-        return { ready: false, failed: true, reason: FAILED_RE.exec(text)[0] }
-      }
+      const found = scanConsole(carry, text, patterns)
+      if (found.ready) return { ready: true, readyLine: found.ready }
+      if (found.failed) return { ready: false, failed: true, reason: found.failed }
+      carry = found.carry
     }
 
     const cur = readState(name)
