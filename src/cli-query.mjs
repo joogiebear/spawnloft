@@ -11,8 +11,7 @@ export const QUERY_ALIASES = {
   snapshots: 'backups', backups: 'backups', why: 'diagnostics', diagnostics: 'diagnostics',
 }
 
-/** Status is a public automation record, not a dump of the registry. In particular,
- * RCON passwords, database users/passwords, webhook URLs, and JVM arguments stay out. */
+// Public record: RCON passwords, database credentials, webhook URLs and JVM arguments stay out.
 export function statusRecord(name) {
   const row = statusOf(name)
   return {

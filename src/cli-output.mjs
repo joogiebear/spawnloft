@@ -2,9 +2,8 @@ import { UserError } from './util.mjs'
 
 export class UsageError extends UserError {}
 
-/** A versioned envelope is shared by snapshots, stream events, and errors. Ordinary
- * output never reaches a JSON stream. Command data is deliberately projected at each
- * call site rather than serializing registry records that contain credentials. */
+// Shared by snapshots, stream events and errors. Callers project the data themselves
+// because registry records contain credentials.
 export function envelope(command, data, { error = null, type } = {}) {
   return { schemaVersion: 1, command, ok: error === null, ...(type ? { type } : {}),
     ...(data === undefined ? {} : { data }), ...(error ? { error } : {}) }
