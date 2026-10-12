@@ -14,8 +14,6 @@ const { parseTps, parseList, readTick, startTickSampler } = await import('../src
 const { sampleLine, readSamples, latestSample, metricsFile } = await import('../src/metrics.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-// ---- reading what a server says --------------------------------------------
-
 test('Paper TPS is the one-minute figure, capped values included', () => {
   assert.equal(parseTps({ tps: 'TPS from last 1m, 5m, 15m: 19.87, 20.0, 20.0' }), 19.87)
   assert.equal(parseTps({ tps: 'TPS from last 1m, 5m, 15m: *20.0, *20.0, *20.0' }), 20)
@@ -58,8 +56,6 @@ test('a server that knows tps is not also asked tick query, and a refusal is not
   assert.deepEqual(broken, { replies: {}, tps: null })
 })
 
-// ---- the samples file -------------------------------------------------------
-
 test('server figures are appended columns that an old reading of the file ignores', () => {
   assert.equal(sampleLine({ at: 100, cpu: 12.25, rss: 512 }, null), '100 12.3 512\n')
   assert.equal(sampleLine({ at: 100, cpu: 1, rss: 512 }, { tps: 19.5, online: 3, max: 20 }), '100 1.0 512 19.5 3 20\n')
@@ -86,8 +82,6 @@ test('the newest sample is read from the end of the file, and only while it is c
   assert.equal(await latestSample('newest', { now: 5100 * 1000 }), null, 'A stopped server is not still using memory')
   assert.equal(await latestSample('never-ran'), null)
 })
-
-// ---- the standing connection ------------------------------------------------
 
 /**
  * Just enough of Minecraft's RCON listener to count connections: authenticates any password,
@@ -135,8 +129,7 @@ test('the sampler keeps one connection for many readings, and opens another only
     mspt: 'Server tick times',
     list: 'There are 1 of a max of 20 players online: Alex',
   })
-  // Readings further apart than the client's timeout: the connection has to survive sitting idle,
-  // which is the whole point of keeping one.
+  // readings further apart than the client's timeout: the connection has to survive sitting idle
   const ticks = startTickSampler({ rcon: { port, password: 'x' } }, { intervalMs: 90, timeoutMs: 40 })
   try {
     const deadline = Date.now() + 3000

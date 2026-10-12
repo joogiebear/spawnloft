@@ -119,9 +119,8 @@ test('same-second concurrent snapshots of one instance serialize instead of raci
   const first = backup.createSnapshot(inst, { scope: 'plugins' })
   const second = backup.createSnapshot(inst, { scope: 'plugins' })
   const { child: child0, file: file0 } = await spawned(children, 0)
-  // The second request's tar must not start until the first snapshot has published and released
-  // the lock - two tars racing the same instance's save-off/save-on is exactly the torn-copy risk
-  // this lock exists to close.
+  // the second tar must not start until the first snapshot has published and released the lock;
+  // two tars racing one instance's save-off/save-on risk a torn copy
   assert.equal(children.length, 1)
   assert.deepEqual(backup.listSnapshots(inst.name), [])
   fs.writeFileSync(file0, `contents of ${path.basename(file0)}`)
@@ -244,7 +243,7 @@ test('a restore reads the archive first and refuses a broken one without touchin
   const good = await backup.createSnapshot(inst, { scope: 'plugins', label: 'good' })
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'second version')
   const broken = await backup.createSnapshot(inst, { scope: 'plugins', label: 'broken' })
-  // Cut it off halfway, the way a hot snapshot with a locked plugin file used to come out.
+  // cut it off halfway, like a hot snapshot with a locked plugin file
   const bytes = fs.readFileSync(broken.file)
   fs.writeFileSync(broken.file, bytes.subarray(0, Math.floor(bytes.length / 2)))
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'current version')
@@ -255,7 +254,6 @@ test('a restore reads the archive first and refuses a broken one without touchin
     /would not restore cleanly, so nothing was changed[\s\S]*verify restore-refusal --all/)
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'current version')
 
-  // The good one still restores.
   await backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, path.basename(good.file)))
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'fixture plugin contents')
 })

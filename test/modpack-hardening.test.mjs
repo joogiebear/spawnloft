@@ -6,9 +6,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-// What a modpack, or a snapshot's manifest, is allowed to make this program do. Each test hands
-// the code something hostile and checks what it refuses - and, where it matters, that nothing was
-// written or fetched on the way to refusing.
+// What a modpack or a snapshot manifest may make this program do. Each test hands the code
+// something hostile and checks what it refuses, and where it matters that nothing was written or
+// fetched on the way.
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-hardening-'))
 process.env.APPDATA = path.join(scratch, 'config')
@@ -32,9 +32,6 @@ const folder = (name) => {
 const sha = (kind, data) => crypto.createHash(kind).update(data).digest('hex')
 const URL_OK = 'https://cdn.modrinth.com/data/x/versions/y/file.jar'
 
-// ---- downloadVerified -----------------------------------------------------------------------
-
-/** A fetch that answers from a script: each call takes the next entry, and records what it was asked. */
 function scripted(...answers) {
   const calls = []
   const impl = async (url, init) => {
@@ -212,8 +209,6 @@ test('an error status, and a transport failure, are readable refusals that leave
   assert.deepEqual(fs.readdirSync(dir), [])
 })
 
-// ---- staging a whole pack ------------------------------------------------------------------------
-
 const packOf = (files) => parseIndex({
   game: 'minecraft',
   name: 'Staged',
@@ -250,8 +245,6 @@ test('one bad file in a pack stops the staging and names the file', async () => 
   assert.equal(fetchImpl.calls.length, 2)
 })
 
-// ---- loader versions reach the jars store only as versions -------------------------------------
-
 test('a loader or game version that is not a version is refused before any request or write', async (t) => {
   const asked = []
   t.mock.method(globalThis, 'fetch', async (url) => { asked.push(String(url)); throw new Error('no network in this test') })
@@ -266,8 +259,6 @@ test('a loader or game version that is not a version is refused before any reque
   assert.deepEqual(fs.existsSync(JARS_DIR) ? fs.readdirSync(JARS_DIR) : [], before, 'nothing was written')
   assert.equal(fs.existsSync(path.join(scratch, 'x')), false)
 })
-
-// ---- tar members -------------------------------------------------------------------------------
 
 test('a name that tar would read as an option or an archive gets a ./ in front, and no other does', () => {
   assert.equal(tarMember('--checkpoint-action=exec=sh x'), './--checkpoint-action=exec=sh x')
@@ -314,8 +305,6 @@ test('a leading @ is a file name, not an archive to copy from', async () => {
   assert.equal(listing.status, 0, listing.stderr)
   assert.ok(listing.stdout.split(/\r?\n/).some((e) => e.endsWith('@secret.tar')))
 })
-
-// ---- what a snapshot's manifest may name ----------------------------------------------------------
 
 const dump = (file) => ({ service: 'db', engine: 'mariadb', version: '11', database: 'd', user: 'u', file, bytes: 1 })
 

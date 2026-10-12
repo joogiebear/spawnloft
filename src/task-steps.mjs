@@ -1,16 +1,8 @@
 import { fail } from './util.mjs'
 
-/**
- * A scheduled task that is several things in order: warn the players, wait, back up, restart.
- *
- * <p>The single-action tasks each do one thing, and the one people most want - a nightly restart
- * with a warning and a backup before it - was two tasks timed against each other and hoping the
- * backup finished first. A chain runs its steps one after another in one run, so the restart waits
- * for the backup however long it takes.
- *
- * <p>What a step does to the server comes in through `deps`, so the chain's own rules - skipping,
- * stopping at a failure, the wait budget - are tested without a server or a system scheduler.
- */
+// A task of several steps run in order in one run (warn, wait, back up, restart), so the
+// restart waits for the backup. What a step does comes in through `deps` so the chain rules
+// can be tested without a server or scheduler.
 
 export const STEP_KINDS = {
   say: { label: 'Tell the players' },
@@ -24,8 +16,7 @@ export const STEP_KINDS = {
   restart: { label: 'Restart the server' },
 }
 export const MAX_STEPS = 12
-// Waits and countdowns added up. A chain that sleeps for most of a day is a typo, and it holds a
-// scheduler slot and a process for all of it.
+// total of waits and countdowns; a chain sleeping for most of a day is a typo and holds a process
 export const MAX_WAIT_SECONDS = 2 * 60 * 60
 
 const clampInt = (v, lo, hi, dflt) => {
@@ -54,7 +45,6 @@ function normaliseStep(input, i) {
   return { do: kind }
 }
 
-/** A chain as the task file stores it, checked. */
 export function normaliseSteps(input) {
   const raw = Array.isArray(input?.steps) ? input.steps : []
   if (!raw.length) fail('add at least one step')
@@ -68,7 +58,6 @@ export function normaliseSteps(input) {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const duration = (s) => (s % 60 === 0 ? plural(s / 60, 'minute') : s < 60 ? plural(s, 'second') : `${Math.floor(s / 60)}m ${s % 60}s`)
 
-/** One step, as a phrase for the task list and the run log. */
 export function describeStep(step) {
   switch (step.do) {
     case 'say': return `tell the players "${step.text}"`
@@ -81,18 +70,11 @@ export function describeStep(step) {
   }
 }
 
-/**
- * Run the chain.
- *
- * <p>A step that has nothing to act on is skipped, not failed, the way a single command task is:
- * telling an empty, stopped server something is not an error, and stopping one that is already
- * stopped is done. A step that fails ends the chain - a restart after a backup that did not happen
- * is exactly what a chain exists to prevent - unless the task says to keep going.
- *
- * @param deps isRunning(), send(line), sleep(ms), backup({ keep }) -> text, verify() -> text,
- *        stop(), start() -> { failed, timedOut, reason }
- * @returns { status: 'ok' | 'skipped' | 'FAILED', detail, failures }
- */
+// A step with nothing to act on is skipped, not failed. A failed step ends the chain unless
+// keepGoing is set, so a restart never follows a backup that didn't happen.
+// deps: isRunning(), send(line), sleep(ms), backup({ keep }) -> text, verify() -> text,
+// stop(), start() -> { failed, timedOut, reason }
+// returns { status: 'ok' | 'skipped' | 'FAILED', detail, failures }
 export async function runSteps(action, deps) {
   if (action.onlyWhenRunning && !(await deps.isRunning())) {
     return { status: 'skipped', detail: 'the server was not running, and this task only runs while it is', failures: [] }
@@ -137,8 +119,7 @@ async function runStep(step, deps) {
       return `waited ${duration(step.seconds)}`
     case 'countdown': {
       if (!running) return 'no countdown (not running)'
-      // The shape the single restart task has always used: the full figure, then one minute, then
-      // ten seconds. Announcements are best-effort; a server that dies mid-countdown made it moot.
+      // announces the full figure, then one minute, then ten seconds; announcements are best-effort
       const say = (msg) => deps.send(`say ${msg}`).catch(() => {})
       let remaining = step.minutes * 60
       await say(`${step.message} in ${plural(step.minutes, 'minute')}`)

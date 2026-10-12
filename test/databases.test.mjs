@@ -1,12 +1,8 @@
 /**
- * A database, end to end, against the real daemon and a fake MariaDB.
- *
- * <p>The engine store gets test/fixtures/fake-mariadb as version 0.0.0-fake, so nothing is
- * downloaded: the four scripts stand in for mariadb-install-db, mariadbd, mariadb-admin and the
- * client, and everything else - the registry entry, my.ini, the daemon, the console log, the
- * control pipe, ready detection, the TCP shutdown, attach and detach - is the real thing.
- *
- * <p>Isolated by MCCTL_DATA_ROOT the way lifecycle.test.mjs is.
+ * A database end to end, against the real daemon and a fake MariaDB. The engine store gets
+ * test/fixtures/fake-mariadb as version 0.0.0-fake, so nothing is downloaded; the fake scripts
+ * replace mariadb-install-db, mariadbd, mariadb-admin and the client, everything else is real.
+ * Isolated by MCCTL_DATA_ROOT like lifecycle.test.mjs.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -118,7 +114,6 @@ test('attach creates the database and user for the server, and the credentials c
   assert.ok(log.includes(`GRANT ALL PRIVILEGES ON \`${SRV}\`.* TO '${SRV}'@'localhost', '${SRV}'@'127.0.0.1'`), log)
   assert.ok(log.includes(`IDENTIFIED BY '${creds.password}'`))
 
-  // Again: the same credentials, not new ones.
   assert.deepEqual(await services.attach(DB, SRV), creds)
   assert.deepEqual(services.credentials(DB, SRV), creds)
 
@@ -252,7 +247,6 @@ test('a snapshot of an attached server carries a dump of its database, and verif
   assert.equal(lie.ok, false)
   assert.match(lie.problems.join('\n'), /database dump "databases\/nope__x.sql"/)
 
-  // Only the scopes that mean "the data" carry dumps.
   const plugins = await backup.createSnapshot({ ...srv }, { scope: 'worlds', label: 'worlds-only', running: false })
   assert.equal(plugins.databases.length, 0)
   assert.ok(!plugins.members.includes('databases'))
@@ -360,9 +354,9 @@ test('detach while stopped keeps the record consistent, and dropping needs the d
 })
 
 test('a database that dies during startup is reported as failed, with the engine\'s reason', { timeout: 30000 }, async () => {
-  // This daemon inherits the scripted failure environment. Keep it separate from the healthy
-  // database, and leave auto-restart off: seeing its error line can precede the child exit, when
-  // the daemon rereads the setting. Turning it back on then races into repeated scripted failures.
+  // this daemon inherits the scripted failure environment, so keep it apart from the healthy
+  // database. Auto-restart stays off: the error line can precede the child exit, when the daemon
+  // rereads the setting, and turning it back on races into repeated scripted failures
   await services.createDatabase(FAILED_DB, { engine: 'mariadb', version: VERSION })
   updateInstance(FAILED_DB, { autoRestart: false })
   process.env.FAKE_MARIADB_FAIL = 'start'

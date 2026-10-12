@@ -102,7 +102,7 @@ test('the mclogs deletion-token file is owner-only', { skip }, async () => {
   const sourceFile = path.join(dir, 'console.log')
   fs.writeFileSync(sourceFile, '[12:00:00] [Server thread/INFO]: Done\n')
   const tokenFile = path.join(dir, 'mclogs.json')
-  // An older token file from before the fix, readable by everyone.
+  // an existing token file readable by everyone
   fs.writeFileSync(tokenFile, '[]', { mode: 0o644 })
   fs.chmodSync(tokenFile, 0o644)
   const fetchImpl = async () => ({

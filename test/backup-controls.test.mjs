@@ -81,7 +81,6 @@ test('a leave-out list cannot climb out or leave out everything', () => {
 test('a clean restore ends exactly as the snapshot was, and keeps what it cleared', async () => {
   const inst = server()
   const snap = await backup.createSnapshot(inst, { scope: 'standard' })
-  // Since the snapshot: a plugin added, a region grown, a file changed.
   fs.writeFileSync(path.join(inst.dir, 'plugins/New.jar'), 'new')
   fs.writeFileSync(path.join(inst.dir, 'world/region/r.1.0.mca'), 'grown')
   fs.writeFileSync(path.join(inst.dir, 'plugins/A.jar'), 'changed')

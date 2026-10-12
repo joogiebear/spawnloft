@@ -2,20 +2,10 @@ import readline from 'node:readline'
 import { UserError } from './util.mjs'
 import { asActor } from './activity.mjs'
 
-/**
- * SpawnLoft as an MCP server: `spawnloft mcp`, spoken over stdio by an AI client the person
- * chose and configured themselves. Hand-written rather than the official SDK so the core stays
- * free of dependencies - a tools-only server is a small, stable corner of the protocol.
- *
- * <p>Dual-era, because the protocol changed shape in 2026-07-28 and clients will take a while
- * to follow. A modern request carries its protocol version in `_meta` and is served on its own
- * (no session); an `initialize` request selects the older handshake-based revisions. Nothing
- * here keeps per-client state either way - the only difference between the two is the shape of
- * a result.
- *
- * <p>Nothing opens a port. stdout carries protocol messages and nothing else; the caller
- * points console output at stderr before any tool runs.
- */
+// SpawnLoft as an MCP server (`spawnloft mcp`) over stdio, hand-written to keep the core free of dependencies.
+// Dual-era: a modern (2026-07-28) request carries its protocol version in _meta and is served without a
+// session, while initialize selects the older handshake revisions. No per-client state either way; only
+// the result shape differs. No port is opened, and stdout carries protocol messages only.
 
 export const MODERN_VERSIONS = ['2026-07-28']
 export const LEGACY_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']
@@ -37,13 +27,9 @@ class RpcError extends Error {
   }
 }
 
-/**
- * The protocol, without a transport: `handle(message)` takes one parsed JSON-RPC message and
- * resolves to the reply (or null), sending progress through `notify` while it works.
- *
- * <p>`tools` is a list of `{ name, title, description, inputSchema, annotations, run }`, where
- * `run(args, ctx)` returns `{ text, data }` or throws. `scrub` sees every string that leaves.
- */
+// handle(message) takes one parsed JSON-RPC message and resolves to the reply (or null), sending progress
+// through notify. tools are { name, title, description, inputSchema, annotations, run }; run(args, ctx)
+// returns { text, data } or throws. scrub sees every string that leaves.
 export function createServer({ info, instructions, tools, notify = () => {}, scrub = (s) => s }) {
   const byName = new Map(tools.map((t) => [t.name, t]))
   // Only a request still in flight can be cancelled; ids are reused once answered.
@@ -52,9 +38,8 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
   const capabilities = { tools: { listChanged: false } }
   const listing = tools.map(({ name, title, description, inputSchema, annotations }) =>
     ({ name, title, description, inputSchema, annotations }))
-  // Which app is asking - "Claude Desktop", "claude-code" - as it names itself, so the activity
-  // log can say which assistant changed what. A modern request carries it every time; a
-  // handshake-era client says it once, in initialize.
+  // the client's self-reported name, so the activity log can say which assistant changed what; modern
+  // requests carry it every time, handshake clients once in initialize
   let clientName = null
 
   function reply(id, result, modern) {
@@ -85,8 +70,7 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
       if (tool.failed?.(data)) body.isError = true
       return body
     } catch (err) {
-      // A person's mistake and a crash both go back as tool errors the model can read and act on;
-      // neither carries a stack trace out of the process.
+      // a user mistake and a crash both go back as tool errors the model can read; neither carries a stack trace out
       const message = err instanceof UserError ? err.message : `${tool.name} failed: ${err?.message ?? err}`
       return toolError(scrub(message))
     }
@@ -99,9 +83,8 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
       case 'server/discover':
         return { supportedVersions: [...MODERN_VERSIONS], capabilities, instructions }
       case 'tools/list':
-        // 2026-07-28 clients reject a list that doesn't say how long it may be cached. The listing
-        // is fixed for the life of the process but depends on how the person launched it
-        // (--allow-destructive), so it is private to this client rather than shareable.
+        // 2026-07-28 clients reject a list that doesn't say how long it may be cached. The listing depends on
+        // how the person launched it (--allow-destructive), so it is private to this client.
         return modern ? { tools: listing, ttlMs: LIST_TTL_MS, cacheScope: 'private' } : { tools: listing }
       case 'tools/call':
         return callTool(params, params?._meta)
@@ -143,8 +126,8 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
       }
       const meta = params?._meta ?? {}
       const version = meta[`${META}protocolVersion`]
-      // No version in _meta is a client on the handshake revisions, after its initialize.
-      // Served the same way even without one: there is no session here for it to be missing from.
+      // no version in _meta means a handshake-era client; served the same way even without an initialize,
+      // since there is no session for it to be missing from
       if (version === undefined || LEGACY_VERSIONS.includes(version)) return reply(id, await dispatch(method, params, false), false)
       if (!MODERN_VERSIONS.includes(version)) {
         throw new RpcError(UNSUPPORTED_VERSION, 'Unsupported protocol version',
@@ -182,11 +165,8 @@ function scrubDeep(value, scrub) {
   return value
 }
 
-/**
- * Just enough JSON Schema for the schemas in this server: an object of primitive properties with
- * `required`, `enum`, integer bounds and no extras. Anything richer belongs in a real validator,
- * and a tool that needs one should say so rather than have this quietly accept it.
- */
+// Just enough JSON Schema for this server: an object of primitive properties with required, enum,
+// integer bounds and no extras. Anything richer needs a real validator.
 export function validate(schema, args) {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return 'arguments must be an object'
   const props = schema.properties ?? {}
@@ -210,10 +190,8 @@ export function validate(schema, args) {
   return null
 }
 
-/**
- * Serve over this process's stdin and stdout until stdin closes. Console output from anything
- * underneath is sent to stderr first: one stray line on stdout would corrupt the stream.
- */
+// Serves until stdin closes. Console output from anything underneath goes to stderr first, since one
+// stray line on stdout would corrupt the stream.
 export function serveStdio(options, { input = process.stdin, output = process.stdout } = {}) {
   for (const level of ['log', 'info', 'warn', 'debug']) {
     console[level] = (...args) => process.stderr.write(`${args.map(String).join(' ')}\n`)
@@ -232,16 +210,14 @@ export function serveStdio(options, { input = process.stdin, output = process.st
       send(error(null, PARSE_ERROR, 'Parse error'))
       return
     }
-    // Requests run side by side: a server that takes a minute to start must not hold up a status
-    // check behind it.
+    // requests run side by side so a slow start doesn't hold up a status check
     const job = server.handle(message).then(send, (err) => process.stderr.write(`mcp: ${err?.stack ?? err}\n`))
     pending.add(job)
     job.finally(() => pending.delete(job))
   })
   return new Promise((resolve) => {
-    // Closing stdin is how a client says it is done. Work already under way - a snapshot half
-    // written, a start waiting for ready - is let finish, since each leaves the server in a state
-    // someone will want described; a client that cannot wait kills the process instead.
+    // closing stdin is how a client says it is done; work under way (a half-written snapshot, a start
+    // waiting for ready) is allowed to finish, and a client that can't wait kills the process
     lines.on('close', async () => {
       await Promise.allSettled([...pending])
       resolve()

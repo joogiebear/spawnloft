@@ -1,29 +1,26 @@
 import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 
-/** Read the kernel's own account of a process. `stat` carries cumulative CPU time in clock ticks
- * and the start time that identifies the process, so a reused PID cannot silently continue its
- * graph. The command name sits in brackets and may itself hold spaces and brackets - "(Server
- * thread)" - so fields are counted from the LAST closing bracket, which is the only safe anchor.
- * `status` carries resident memory in KiB, which spares asking for the page size. */
+// `stat` has cumulative CPU in clock ticks and the start time, which identifies the process so a
+// reused PID can't continue the graph. The command name may contain spaces and brackets, so
+// fields are counted from the last ")". `status` has resident memory in KiB.
 export function parseProcSample(stat, status, ticksPerSecond) {
   const close = String(stat).lastIndexOf(')')
   const fields = close < 0 ? [] : String(stat).slice(close + 2).trim().split(/\s+/)
-  // Field 3 (state) is the first after the name; utime is 14, stime 15, starttime 22.
+  // field 3 (state) is the first after the name; utime is 14, stime 15, starttime 22
   const [utime, stime, identity] = [fields[11], fields[12], fields[19]]
   const resident = /^VmRSS:\s+(\d+)\s+kB$/m.exec(String(status))
   if (!/^\d+$/.test(utime ?? '') || !/^\d+$/.test(stime ?? '') || !/^\d+$/.test(identity ?? '')) {
     throw new Error('Linux returned an unreadable process measurement')
   }
-  // A zombie, and a kernel thread, have no VmRSS line: the process holds no memory to report.
+  // zombies and kernel threads have no VmRSS line
   const bytes = resident ? Number(resident[1]) * 1024 : 0
   const seconds = (Number(utime) + Number(stime)) / ticksPerSecond
   if (!Number.isFinite(seconds) || !Number.isSafeInteger(bytes)) throw new Error('Linux returned an invalid process measurement')
   return { seconds, bytes, identity }
 }
 
-/** Clock ticks per second. 100 on every mainstream kernel build, but it is a build option and the
- * wrong value scales the whole CPU graph, so it is asked once rather than assumed. */
+// Usually 100, but it's a kernel build option and a wrong value scales the whole CPU graph.
 let ticks = null
 export function clockTicks() {
   if (ticks) return ticks
@@ -33,8 +30,6 @@ export function clockTicks() {
   return ticks
 }
 
-/** Two small file reads per interval. No child process, helper installation, elevated
- * permissions, or persistent service; a read finishes before the next is scheduled. */
 export function startLinuxSampler(pid, {
   onSample, onError, intervalMs = 10000, read = fs.promises.readFile,
   ticksPerSecond = clockTicks(), now = () => Date.now() / 1000,
@@ -64,7 +59,7 @@ export function startLinuxSampler(pid, {
     } catch (error) {
       if (stopped) return
       stop()
-      // The process is gone, or went between the two reads. That is the end of the graph, not a fault.
+      // process exited, possibly between the two reads
       if (error?.code !== 'ENOENT' && error?.code !== 'ESRCH') onError(error)
       return
     }

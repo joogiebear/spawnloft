@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-// The product name is the preferred entry point. Keeping the existing implementation
-// also keeps scripts, launchers, and Windows scheduled tasks compatible.
+// product-name entry point; delegates to mcctl.mjs so existing scripts, launchers and Windows
+// scheduled tasks keep working
 import './mcctl.mjs'

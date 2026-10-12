@@ -11,11 +11,9 @@ export const TARGETS = [
   { platform: 'linux', arch: 'x64' },
   { platform: 'linux', arch: 'arm64' },
 ]
-// Each packaging system has its own names for the architectures, and electron-builder puts the
-// native one in the filename: amd64 and arm64 for a .deb, x86_64 and aarch64 for an .rpm.
+// electron-builder puts each packaging system's native arch name in the filename
 const DEB_ARCH = { x64: 'amd64', arm64: 'arm64' }
 const RPM_ARCH = { x64: 'x86_64', arm64: 'aarch64' }
-/** The installable Linux packages for one architecture, without their feeds. */
 export const linuxPackages = ({ arch, version }) => [`SpawnLoft-${version}-linux-${DEB_ARCH[arch]}.deb`, `SpawnLoft-${version}-linux-${RPM_ARCH[arch]}.rpm`]
 export const manifestName = ({ platform, arch }) => `preview-build-${platform}-${arch}.json`
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => crypto.createHash(algorithm).update(bytes).digest(encoding)
@@ -56,15 +54,14 @@ export function artifactNames({ platform, arch, version }) {
     return ['dmg', 'zip'].map(ext => `SpawnLoft-${version}-mac-${arch}.${ext}`)
   }
   if (platform === 'linux' && Object.hasOwn(DEB_ARCH, arch)) {
-    // The command-line packages are released and verified with the rest, and are in no feed: nothing
-    // updates them but the package manager that installed them.
+    // the command-line packages are in no updater feed; only their package manager updates them
     return [...linuxPackages({ arch, version }), ...linuxFeedNames(arch), ...cliPackageNames({ arch, version })]
   }
   throw new Error('Unexpected build platform or architecture')
 }
 
-// Beta installations prefer beta.yml and fall back to latest.yml. Validate the
-// small electron-builder schema without adding YAML to the core's dependencies.
+// Beta installs prefer beta.yml and fall back to latest.yml. Validates the small electron-builder
+// schema by hand to avoid a YAML dependency in the core.
 export function verifyWindowsFeed(text, version, installerName, installerBytes) {
   const fields = []
   for (const line of text.split(/\r?\n/)) {
@@ -94,8 +91,7 @@ export function verifyWindowsFeed(text, version, installerName, installerBytes) 
 
 export function createManifest(dir, info, target, policy = {}) {
   const identity = { sourceVersion: info.sourceVersion, version: info.version, commit: info.commit, dirty: info.dirty, ...target }
-  // New builds record the native identity in after-pack. A supplied target must
-  // agree with that provenance, rather than merely relabelling an artifact.
+  // after-pack records the native identity; the supplied target must agree with it
   validateIdentity(identity, policy)
   if (info.platform !== target.platform) throw new Error('Build provenance platform mismatch')
   if (info.arch !== target.arch) throw new Error('Build provenance architecture mismatch')
@@ -166,13 +162,9 @@ function verifyWindowsFeeds(dir, version, installerName) {
   verifyWindowsFeed(latest.toString('utf8'), version, installerName, fs.readFileSync(path.join(dir, installerName)))
 }
 
-/**
- * A Linux feed lists every package built for one architecture - the .deb and the .rpm - and the
- * installed app takes the one matching the marker its own package left behind. So unlike the
- * Windows feed it has several `files`, and each has to describe the bytes that ship under that name:
- * a feed that is right about the .deb and wrong about the .rpm strands every Fedora install on the
- * version it has. `path` and the top-level hash must agree with one of them.
- */
+// A Linux feed lists every package for one architecture (.deb and .rpm) and the installed app
+// picks the one matching its own package marker. Each entry must describe the shipped bytes: a
+// feed wrong about the .rpm strands Fedora installs. `path` and the top-level hash must match one.
 export function verifyLinuxFeed(text, version, packages) {
   const fields = []
   for (const line of text.split(/\r?\n/)) {
@@ -210,8 +202,8 @@ export function verifyLinuxFeed(text, version, packages) {
   if (!primary || primary.sha512 !== top('sha512')) throw new Error('Linux updater feed names a package it does not list')
 }
 
-// electron-updater names the Linux feed for the machine: latest-linux.yml on x64 and
-// latest-linux-arm64.yml on arm64, with a beta- twin for an installation on the beta channel.
+// electron-updater names the feed per machine: latest-linux.yml on x64, latest-linux-arm64.yml on
+// arm64, each with a beta- twin for the beta channel
 export const linuxFeedNames = arch => ['latest', 'beta'].map(channel => `${channel}-linux${arch === 'x64' ? '' : `-${arch}`}.yml`)
 
 function verifyLinuxFeeds(dir, version, arch, packageNames) {

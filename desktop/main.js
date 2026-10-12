@@ -7,30 +7,16 @@ const { pathToFileURL } = require('node:url')
 const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
 const updateChannel = require('./update-channel')
-// Ad-hoc packages cannot participate in Squirrel.Mac updates. Signed betas use
-// the same updater as stable builds; missing provenance fails closed on Mac.
+// ad-hoc packages can't take Squirrel.Mac updates; signed betas use the normal updater,
+// and missing provenance fails closed on mac
 const manualUpdates = process.platform === 'darwin' && (!app.isPackaged || buildInfo()?.macSigningMode !== 'signed')
 const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases'
 
-/**
- * mcctl desktop.
- *
- * A window around the same panel the CLI serves, plus the two things a browser cannot do: a native
- * folder picker, and a first-run setup that happens before anything exists.
- *
- * The core runs IN THIS PROCESS rather than as a spawned server. Electron already is a Node
- * runtime, so importing mcctl directly is what "bundled" actually means here - one process, no
- * second Node to ship, and no orphaned child if the window dies.
- */
+// Window around the panel the CLI serves, plus a native folder picker and first-run setup.
+// The core runs in this process (imported directly), so there is no second Node to ship
+// and no orphaned child if the window dies.
 
-/**
- * Where the mcctl core lives.
- *
- * Packaged: alongside the app in resources. Development: the checkout, so the app under test is the
- * code being edited rather than a copy that drifts from it.
- *
- *   npm start -- --core S:\Claude\mcctl        (or set MCCTL_CORE)
- */
+// packaged: core sits in resources. dev: the checkout, or --core <dir> / MCCTL_CORE.
 function resolveCore() {
   const flagIndex = process.argv.indexOf('--core')
   const fromFlag = flagIndex !== -1 ? process.argv[flagIndex + 1] : null
@@ -45,7 +31,6 @@ function resolveCore() {
 
 const core = resolveCore()
 
-/** Import an ESM module out of the resolved core by file URL, so the path can vary at runtime. */
 function loadCore(rel) {
   return import(pathToFileURL(path.join(core.dir, rel)).href)
 }
@@ -55,53 +40,35 @@ let win = null
 
 async function startPanel() {
   const ui = await loadCore('src/ui.mjs')
-  // Port 0: let the OS pick. A fixed port would collide with a CLI panel already running, and the
-  // desktop app has no reason to be reachable at a predictable address.
+  // port 0: a fixed port would collide with a CLI panel already running
   const { url } = await ui.serve({ port: 0, host: '127.0.0.1', open: false })
   return url
 }
 
-/** Whether the first-run wizard should be shown: nothing configured, and no existing layout found. */
 async function needsSetup() {
   const settings = await loadCore('src/settings.mjs')
   const saved = settings.load()
-  // A saved root only counts if it is still there. Uninstalling leaves settings.json behind, so a
-  // reinstall - or a data folder that lived on a drive which is no longer plugged in - would
-  // otherwise skip the wizard and open a panel pointed at nothing.
+  // settings.json survives an uninstall and the data folder may be on an unplugged drive,
+  // so a saved root only counts if it still exists
   if (saved.dataRoot && fs.existsSync(saved.dataRoot)) return false
-  // An existing checkout already holding instances.json is a configured install in all but name;
-  // asking that person where to put their servers would be asking about servers they already have.
+  // a checkout that already has instances.json is configured
   return !fs.existsSync(path.join(core.dir, 'instances.json'))
 }
 
-/**
- * The app icon.
- *
- * <p>electron-builder stamps build/icon.ico onto the packaged executable and the installer, but an
- * unpackaged `npm start` gets Electron's own atom - and so does the BrowserWindow unless it is
- * told. Pointing at the same file keeps development, the taskbar and the installer showing one
- * icon rather than three.
- *
- * <p>Linux cannot read an .ico, and its executable carries no icon of its own: the window's icon is
- * whatever the window is given, and that is what the dock and the task switcher show. Packaged, it
- * is copied beside the app as resources/icon.png, because build/ is not inside app.asar.
- */
+// electron-builder stamps icon.ico on the packaged exe, but unpackaged runs and the BrowserWindow
+// need it passed explicitly. Linux can't read .ico; packaged, icon.png is copied to
+// resources/ because build/ is not inside app.asar.
 const ICON = process.platform === 'linux'
   ? (app.isPackaged ? path.join(process.resourcesPath, 'icon.png') : path.join(__dirname, 'build', 'icon.png'))
   : path.join(__dirname, 'build', 'icon.ico')
 
-// ---- window size and position ------------------------------------------------
-
-/** Where the window was last time. Kept with Electron's own state, not in the core's settings. */
+// kept in Electron's userData, not the core's settings
 function windowStateFile() {
   return path.join(app.getPath('userData'), 'window-state.json')
 }
 
-/**
- * The app was called mcctl until 0.11.x, and Electron keys its per-app folder by product name, so
- * the first SpawnLoft start would otherwise open at the default size and place. The saved window
- * state is copied across once; the old folder is left where it is.
- */
+// the app was called mcctl until 0.11.x and Electron keys userData by product name, so copy the
+// saved window state across once or the first SpawnLoft start opens at the default size
 function carryOverWindowState() {
   const to = windowStateFile()
   if (fs.existsSync(to)) return
@@ -111,11 +78,10 @@ function carryOverWindowState() {
     fs.mkdirSync(path.dirname(to), { recursive: true })
     fs.copyFileSync(from, to)
   } catch {
-    // A lost window position is not worth a dialog.
+    // a lost window position is not worth a dialog
   }
 }
 
-/** The work area of every attached display, as plain rectangles. */
 function displayAreas() {
   return require('electron').screen.getAllDisplays().map((d) => d.workArea)
 }
@@ -132,45 +98,38 @@ function createWindow(loadUrl, theme = 'classic') {
     backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
     title: 'SpawnLoft',
     icon: fs.existsSync(ICON) ? ICON : undefined,
-    // Painting a half-built page is worse than painting nothing. The window is created hidden and
-    // shown once the panel has actually rendered, so the first frame anyone sees is the finished
-    // one rather than a white flash and a jumping layout.
+    // hidden until ready-to-show, to avoid a white flash and a jumping layout
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      // The page is local and trusted, but there is no reason for it to hold Node: everything it
-      // needs comes through preload as a handful of named calls. sandbox is the Electron default
-      // since 20; stated so the posture is in the config rather than in a version's defaults.
+      // the page gets no Node; preload exposes a few named calls. sandbox is already the
+      // default since Electron 20, set explicitly
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
   })
-  // Maximise before showing, so a window that was left maximised does not appear at its restored
-  // size and then jump.
+  // maximise before showing so it doesn't appear at the restored size and jump
   if (state.maximized) win.maximize()
   windowState.track(win, windowStateFile())
 
   win.loadURL(loadUrl)
   win.once('ready-to-show', () => win.show())
-  // A page that fails to load would otherwise leave a hidden window and a process with no UI.
+  // otherwise a failed load leaves a hidden window and no UI
   win.webContents.on('did-fail-load', (_e, code, desc) => {
-    // ERR_ABORTED is Chromium's word for a navigation that was superseded or cancelled, not one
-    // that failed; it must not pop a modal.
+    // ERR_ABORTED: navigation superseded or cancelled, not a failure
     if (code === -3) return
     if (win && !win.isDestroyed()) win.show()
     dialog.showErrorBox('SpawnLoft could not open its panel', `${desc} (${code})\n\n${loadUrl}`)
   })
 
-  // Links to anywhere else belong in the real browser, not in a chrome-less app window the person
-  // cannot navigate back out of. Held to the same rule as the IPC bridge: https only, so a page
-  // cannot use window.open to launch a file: or ms-settings: handler that the bridge would refuse.
+  // external links go to the real browser. https only, same as the IPC bridge, so window.open
+  // can't launch a file: or ms-settings: handler
   const external = ({ url }) => {
     if (typeof url === 'string' && url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }
   }
-  // The one window the panel may open of its own: a server's console on its own, which is the
-  // panel itself at ?console=<name>. Same origin, same preload, same locked-down page.
+  // the one window the panel may open itself: a server console at ?console=<name>
   win.webContents.setWindowOpenHandler((details) => {
     const { url } = details
     if (typeof url === 'string' && url.startsWith(loadUrl) && /^\?console=[^&#]+$/.test(url.slice(loadUrl.length))) {
@@ -195,36 +154,30 @@ function createWindow(loadUrl, theme = 'classic') {
     }
     return external(details)
   })
-  // A console window is held to the main window's rules: it opens nothing but real links, and
-  // stays on the panel.
+  // console windows follow the same rules as the main window
   win.webContents.on('did-create-window', (child) => {
     child.webContents.setWindowOpenHandler(external)
     child.webContents.on('will-navigate', (e, url) => {
       if (!url.startsWith(loadUrl)) e.preventDefault()
     })
   })
-  // And the panel itself must stay on the panel. Nothing legitimate navigates the top frame away
-  // from the loopback URL it was opened at.
+  // the top frame must stay on the loopback URL it was opened at
   win.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(loadUrl)) e.preventDefault()
   })
   return win
 }
 
-// ---- IPC: the things a web page cannot do for itself -------------------------
-
 ipcMain.handle('mcctl:pickFolder', async (_e, { title } = {}) => {
   const res = await dialog.showOpenDialog(win, {
     title: title || 'Choose a folder',
-    // createDirectory lets someone make the folder in the dialog instead of alt-tabbing to
-    // Explorer to make it and coming back.
     properties: ['openDirectory', 'createDirectory'],
   })
   return res.canceled ? null : res.filePaths[0]
 })
 
-// A file chooser, for world archives. Windows cannot offer files AND folders in one native
-// dialog, so this picks files; the page keeps its text field for pasting a folder path.
+// for world archives. Windows can't offer files and folders in one native dialog, so this
+// picks files; the page has a text field for pasting a folder path.
 ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
   const res = await dialog.showOpenDialog(win, {
     title: title || 'Choose a file',
@@ -237,24 +190,13 @@ ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
   return res.canceled ? null : res.filePaths[0]
 })
 
-/**
- * Is Java installed?
- *
- * <p>Asked by the first-run wizard before anything is downloaded. Java is the one prerequisite
- * mcctl cannot supply, and finding out at the first press of Start - after setup and a fifty-
- * megabyte download - is the difference between a missing dependency and a broken application.
- */
+// asked by the first-run wizard: Java is the one prerequisite we can't supply
 ipcMain.handle('mcctl:checkJava', async () => {
   const java = await loadCore('src/java.mjs')
   return { ...(await java.health()), downloadUrl: java.DOWNLOAD_URL }
 })
 
-/**
- * Open a link in the real browser.
- *
- * <p>Allowlisted to https, so a compromised page cannot use this to launch a local executable or
- * reach a file:// path.
- */
+// https only, so a compromised page can't launch a local executable or reach a file:// path
 ipcMain.handle('mcctl:openExternal', async (_e, url) => {
   if (typeof url !== 'string' || !url.startsWith('https://')) return { ok: false }
   await shell.openExternal(url)
@@ -269,8 +211,7 @@ ipcMain.handle('mcctl:getSetup', async () => {
     current: roots,
     coreDir: core.dir,
     coreMode: core.mode,
-    // Nobody sees stderr in the desktop app, so a settings file that cannot be read is told to the
-    // wizard, which is where it shows: as an empty first-run screen with no word of why.
+    // nobody sees stderr in the desktop app, so an unreadable settings file is reported to the wizard
     settingsProblem: settings.inspect(),
   }
 })
@@ -278,16 +219,15 @@ ipcMain.handle('mcctl:getSetup', async () => {
 ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate }) => {
   const settings = await loadCore('src/settings.mjs')
 
-  // Written to, not merely inspected. A drive that has been unplugged, a read-only mount and a
-  // network share all look fine until the first write.
+  // write-test the folders: unplugged drives, read-only mounts and network shares look fine
+  // until the first write
   for (const dir of [dataRoot, separate ? instancesDir : null].filter(Boolean)) {
     const check = settings.checkWritable(dir)
     if (!check.ok) return { ok: false, error: `Cannot write to ${dir}\n${check.error}` }
   }
 
-  // The person is choosing the data folder, so a settings file whose content is damaged is replaced -
-  // kept beside the new one, not deleted - rather than leaving the wizard stuck on it. A write that
-  // still fails is returned, so the person sees the reason itself and not Electron's wrapper around it.
+  // a damaged settings file is set aside (kept beside the new one) so the wizard isn't stuck on it;
+  // a failed write is returned so the real reason is shown, not Electron's wrapper
   try {
     settings.save({
       dataRoot,
@@ -298,13 +238,9 @@ ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate 
     return { ok: false, error: err.message }
   }
 
-  // Read it back before relaunching into it.
-  //
-  // The app resolves its data root once, at import, so the choice made here only survives via this
-  // file. If the write did not land - a roaming profile that is read-only, a sync client holding
-  // the file, anything - the relaunched app silently falls back to the default location and shows
-  // the wizard again, while the servers created in the meantime sit in a folder it no longer looks
-  // at. Failing here is recoverable; relaunching into a lost setting is not obviously anything.
+  // read back before relaunching: the core resolves its data root once at import, so the choice
+  // only survives via this file. If the write didn't land (read-only roaming profile, sync client
+  // holding the file) the relaunch silently falls back to the default location.
   const written = settings.load()
   if (path.resolve(written.dataRoot ?? '') !== path.resolve(dataRoot)) {
     return {
@@ -317,50 +253,30 @@ ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate 
     }
   }
 
-  // The core resolves its locations once at import, so the new layout only takes effect on a fresh
-  // start. Relaunching is honest about that rather than leaving a half-configured process running.
+  // the new layout only takes effect on a fresh start
   app.relaunch({ args: process.argv.slice(1) })
   app.exit(0)
   return { ok: true }
 })
 
-
-// ---- updates -----------------------------------------------------------------
-
-/** How often a running copy asks GitHub whether there is anything newer. */
 const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000
 
-/** Long enough after start that the first check never competes with opening the panel. */
+// keeps the first check from competing with opening the panel
 const UPDATE_FIRST_DELAY_MS = 20 * 1000
 
-/**
- * Updates: fetched in the background, applied on restart, with no installer ever on screen.
- *
- * <p>Only ever runs from a packaged build. In development the version is whatever package.json says
- * and there is no installer to replace, so a check would either do nothing or try to overwrite a
- * checkout — the guard is not politeness, it is what stops the updater touching source.
- *
- * <p>Downloading and installing are different promises and are kept differently. The download is
- * automatic: it is a few megabytes over a connection nobody is watching, electron-updater sends
- * only the changed blocks, and doing it ahead of time means the only thing left when an update
- * matters is a restart. Replacing the running program is the part that interrupts, so it waits for
- * the person to ask — or for them to close the window, which the updater treats as the same
- * permission and uses to apply the update on the way out.
- *
- * <p>The install runs the NSIS package with `/S`: no wizard, no progress dialog, no UAC prompt —
- * the app installs per-user, so there is nothing to elevate. The window closes and comes back on
- * the new version. That is the whole visible update.
- */
-/** Which releases this copy follows. Kept with the window's state: it is about this install, not the servers. */
+// which releases this copy follows; kept in userData because it is about this install, not the servers
 function updateChannelFile() {
   return path.join(app.getPath('userData'), 'update-channel.json')
 }
 
+// Downloads happen in the background; installing waits for the user, or for the window closing
+// (the updater applies it on quit). Packaged builds only, so a dev run never touches a checkout.
+// The NSIS install runs with /S, per-user, so there is no UAC prompt.
 function setupUpdates() {
   if (manualUpdates) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
-  // Initial Mac support uses complete signed ZIPs. Windows keeps differential updates.
+  // mac updates use complete signed zips; windows keeps differential updates
   if (process.platform === 'darwin') autoUpdater.disableDifferentialDownload = true
   autoUpdater.logger = null
   updateChannel.apply(autoUpdater, updateChannel.describe(updateChannelFile(), app.getVersion()).beta)
@@ -372,23 +288,13 @@ function setupUpdates() {
   autoUpdater.on('update-downloaded', (info) => send('update:ready', { version: info.version }))
 
   setTimeout(checkForUpdatesQuietly, UPDATE_FIRST_DELAY_MS).unref?.()
-  // Six-hourly rather than once at start, because this app is left open for days next to servers
-  // that are left running for weeks.
+  // periodic because this app is left open for days
   setInterval(checkForUpdatesQuietly, UPDATE_INTERVAL_MS).unref?.()
 }
 
-/**
- * A check nobody asked for.
- *
- * <p>Whether anyone wants to hear about the result is the renderer's business, not this process's:
- * the window knows whether a person pressed the button, because they pressed it there. Deciding it
- * here would mean one shared flag standing for every check at once, and a background check landing
- * on top of someone's would answer the wrong question - their "Up to date" swallowed as though
- * nobody had asked, or a quiet failure raised at them as a toast.
- *
- * <p>checkForUpdates rejects as well as emitting 'error'. Unhandled, that rejection would take the
- * process down over a missing network, so it is swallowed here.
- */
+// The renderer decides whether to show a result, since only it knows if the user pressed the
+// button. checkForUpdates rejects as well as emitting 'error'; swallow it so a missing network
+// doesn't crash the process.
 function checkForUpdatesQuietly() {
   if (!app.isPackaged || manualUpdates) return
   autoUpdater.checkForUpdates().catch(() => {})
@@ -400,12 +306,8 @@ function send(channel, payload) {
 
 ipcMain.handle('mcctl:updateChannel', async () => updateChannel.describe(updateChannelFile(), app.getVersion()))
 
-/**
- * Follow the betas, or stop following them.
- *
- * <p>Takes effect on the next check, which is asked for straight away so that opting in shows
- * something happening. Opting out is never a downgrade; see update-channel.js.
- */
+// takes effect on the next check, which runs immediately so opting in shows something happening;
+// opting out is never a downgrade (see update-channel.js)
 ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
   if (typeof beta !== 'boolean') return { ok: false }
   try {
@@ -433,30 +335,16 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
   }
 })
 
-/**
- * Install now: close, replace, reopen.
- *
- * <p>Silent, and restarted afterwards. `/S` means the NSIS package never draws a window, and
- * `--force-run` brings the app back on the new version rather than leaving someone looking at an
- * empty desktop wondering whether it worked.
- *
- * <p>The caller is expected to have warned about running servers first. Servers survive this — they
- * are detached daemons — but the panel disappears mid-restart, and being told that beforehand is the
- * difference between an update and a glitch.
- */
+// quitAndInstall(true, true): silent NSIS install (/S), then reopen on the new version.
+// Servers survive (detached daemons) but the panel goes away mid-restart, so the caller should
+// warn about running servers first.
 ipcMain.handle('mcctl:installUpdate', async () => {
   if (manualUpdates || !app.isPackaged) return { ok: false }
   autoUpdater.quitAndInstall(true, true)
   return { ok: true }
 })
 
-/**
- * What this copy is, precisely.
- *
- * <p>A version number is a label someone typed; the commit is what actually produced the binary.
- * Written into resources at build time, so a bug report can name the exact code rather than
- * "0.2.7", of which there could be several.
- */
+// written into resources at build time so a bug report can name the exact commit
 function buildInfo() {
   try {
     const file = app.isPackaged
@@ -464,7 +352,7 @@ function buildInfo() {
       : path.join(__dirname, 'dist', 'build-info.json')
     return JSON.parse(fs.readFileSync(file, 'utf8'))
   } catch {
-    // Running from a checkout, or a build that predates this. Neither is worth an error.
+    // running from a checkout, or a build without build-info
     return null
   }
 }
@@ -483,38 +371,19 @@ ipcMain.handle('mcctl:appInfo', async () => {
   }
 })
 
-// ---- lifecycle ---------------------------------------------------------------
-
-/**
- * Windows groups taskbar buttons, jump lists and notifications by AppUserModelID. Without this
- * call the running app is a different identity from the shortcut the installer wrote, so it gets
- * its own taskbar button with the wrong icon and cannot be pinned usefully. It must match the
- * appId in package.json.
- */
+// must match appId in package.json, or the running app gets its own taskbar button with the
+// wrong icon instead of sharing the installer's shortcut identity
 if (process.platform === 'win32') app.setAppUserModelId('io.github.joogiebear.mcctl')
 
-/**
- * No menu bar.
- *
- * <p>Electron's default menu is File / Edit / View / Window / Help built for a text editor, and on
- * a control panel it is a strip of items that either do nothing useful or open developer tools.
- * Copy, paste and select-all keep working - Chromium handles those in the renderer on Windows
- * without a menu to hang them off.
- */
-// macOS routes standard editing shortcuts and Quit through the application menu.
+// no menu bar elsewhere: the default one is for a text editor, and copy/paste still work without
+// it. macOS routes editing shortcuts and Quit through the application menu.
 Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
   { role: 'appMenu' },
   { role: 'editMenu' },
   { role: 'windowMenu' },
 ]) : null)
 
-/**
- * One instance.
- *
- * <p>Not a nicety here: two copies of this process would bind two panels and, worse, two
- * supervisors could race the same instance's control pipe. A second launch raises the window that
- * already exists, which is also what someone double-clicking the shortcut again meant.
- */
+// two copies would bind two panels, and two supervisors could race the same instance's control pipe
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
@@ -527,8 +396,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     carryOverWindowState()
-    // Read through the core's normalizer before creating the native window. The wizard cannot
-    // ask the panel for this setting yet; passing it in its file URL avoids a blue first frame.
+    // the wizard can't ask the panel for the theme yet, so it goes in the setup URL to avoid a
+    // wrong-coloured first frame
     const appearance = await loadCore('src/appearance.mjs')
     const openApp = async () => {
       if (await needsSetup()) {
@@ -547,16 +416,14 @@ if (!app.requestSingleInstanceLock()) {
     await openApp()
 
     app.on('activate', () => {
-      // Closing the last window keeps a Mac app alive, including during first setup.
+      // closing the last window keeps a mac app alive, including during first setup
       if (BrowserWindow.getAllWindows().length === 0) {
         openApp().catch(err => dialog.showErrorBox('SpawnLoft could not reopen', String(err?.message ?? err)))
       }
     })
   }).catch((err) => {
-    // Without this, a failure in here rejects silently: no window, no message, and an mcctl.exe in
-    // Task Manager that the person can only find by looking for it. Quarantined resources and a
-    // security product blocking the loopback listen both land here, and both are plausible for an
-    // unsigned build on a stranger's machine.
+    // otherwise a startup failure is silent: no window, just a stray process. Quarantined
+    // resources and security software blocking the loopback listen both land here.
     dialog.showErrorBox(
       'SpawnLoft could not start',
       `${err?.message ?? err}\n\n${err?.stack ?? ''}`.trim(),
@@ -566,8 +433,6 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on('window-all-closed', () => {
-  // Closing the window closes the app, but the SERVERS keep running: mcctl starts each one as a
-  // detached daemon that does not belong to this process. Quitting a control panel must never take
-  // a running Minecraft server down with it.
+  // servers are detached daemons, not children of this process; quitting must not stop them
   if (process.platform !== 'darwin') app.quit()
 })

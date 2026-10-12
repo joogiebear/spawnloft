@@ -1,19 +1,12 @@
-/**
- * Inventory the block types actually present in a world's region files.
- *
- * Each region file begins with a 4096-byte location table (1024 entries of a
- * 3-byte sector offset plus a 1-byte sector count). A present chunk starts with
- * a 4-byte payload length and a 1-byte compression id (1 gzip, 2 zlib, 3 raw),
- * then compressed NBT.
- *
- * Rather than implement a full NBT reader, this decompresses each chunk and
- * scans the bytes for `minecraft:<id>` strings. Those are overwhelmingly the
- * block-state palette entries, so it answers "which blocks exist, and in how
- * many chunks" - which is the question - without decoding packed block indices.
- *
- * It counts CHUNKS CONTAINING a block, not blocks. A type in 500 chunks is
- * widespread; one in 3 is incidental.
- */
+// Inventory of the block types present in a world's region files.
+//
+// Each region file starts with a 4096-byte location table (1024 entries: 3-byte sector offset,
+// 1-byte sector count). A present chunk starts with a 4-byte payload length and a 1-byte
+// compression id (1 gzip, 2 zlib, 3 raw), then compressed NBT.
+//
+// Instead of a full NBT reader it decompresses each chunk and scans for `minecraft:<id>` strings,
+// which are mostly block-state palette entries. It counts chunks containing a block, not blocks:
+// a type in 500 chunks is widespread, one in 3 is incidental.
 import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'

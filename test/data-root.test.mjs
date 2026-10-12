@@ -66,9 +66,8 @@ test('list_servers says which folder it read instead of only "no servers"', asyn
 })
 
 test('a server in a folder picked at setup is found by a fresh MCP server with nothing else configured', async () => {
-  // What a person's machine looks like after the setup wizard: settings.json names the folder they
-  // chose, and the MCP client launches `spawnloft mcp` with no location of its own. No
-  // MCCTL_DATA_ROOT - that override exists for tests, and no real client sets it.
+  // a machine after the setup wizard: settings.json names the chosen folder and the MCP client
+  // launches spawnloft mcp with no location of its own (MCCTL_DATA_ROOT is a test-only override)
   const home = path.join(scratch, 'person')
   const chosen = path.join(home, 'Games', 'Minecraft Servers')
   const serverDir = path.join(chosen, 'instances', 'Survival')

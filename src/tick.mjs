@@ -1,53 +1,32 @@
 import { Rcon, stripColors } from './rcon.mjs'
 
-/**
- * How well a running server is keeping up, and who is on it, as the server itself says.
- *
- * <p>Both numbers only exist inside the JVM, so they are asked for over RCON. Two readers want
- * them: the assistant's performance tool, once, when it is asked; and the daemon, every ten
- * seconds, so the panel can show them without asking anything itself. The asking and the reading
- * of the answers live here so the two cannot disagree about what a reply means.
- */
+// TPS and player counts only exist inside the JVM, so they are read over RCON. The assistant
+// asks once on demand; the daemon samples every ten seconds for the panel.
 
-/** Paper answers `tps` and `mspt`; vanilla and Fabric answer `tick query`. */
+// Paper answers `tps` and `mspt`; vanilla and Fabric answer `tick query`.
 export const TICK_COMMANDS = ['tps', 'mspt', 'tick query']
 
-/** A reply that means the server has no such command, rather than an answer. */
+// a reply meaning the server has no such command
 const REFUSED = /unknown|incorrect argument|<--\[HERE\]/i
 
-/**
- * Ask a server how it is ticking, through whatever `send` is: a one-shot connection per command
- * for the assistant, the daemon's standing one for the sampler.
- *
- * <p>Stops at the first command family that answers: a Paper server that knows `tps` is not also
- * asked `tick query`, which it would answer too, in a second format saying the same thing. A
- * command that throws is skipped rather than failing the rest; the replies that came back stand.
- *
- * @returns {Promise<{ replies: Record<string, string>, tps: number | null }>}
- */
+// `send` is a one-shot connection for the assistant or the daemon's standing one. Stops at the
+// first command family that answers, so Paper isn't also asked `tick query`. A command that
+// throws is skipped.
 export async function readTick(send) {
   const replies = {}
   for (const cmd of TICK_COMMANDS) {
     try {
       const text = stripColors((await send(cmd)) ?? '').trim()
       if (text && !REFUSED.test(text)) replies[cmd] = text
-    } catch { /* RCON unavailable for this one: whatever else answered still stands */ }
+    } catch { /* RCON unavailable for this one */ }
     if (cmd === 'mspt' && replies.tps) break
   }
   return { replies, tps: parseTps(replies) }
 }
 
-/**
- * Ticks per second, from whichever reply carries it.
- *
- * <p>Paper: "TPS from last 1m, 5m, 15m: 20.0, 19.98, 20.0", with a leading * on a value it has
- * capped at 20. The first figure is the one-minute average, which is the recent past a glance at
- * the panel is asking about.
- *
- * <p>Vanilla's `tick query` has no TPS line. It gives the target rate and the average time a tick
- * takes; a server whose ticks fit inside the target runs at the target, and one whose ticks do not
- * runs at 1000 / that many milliseconds. A frozen game ticks at nothing.
- */
+// Paper: "TPS from last 1m, 5m, 15m: 20.0, 19.98, 20.0", with a leading * on a value capped at
+// 20; the first figure is the one-minute average. Vanilla's `tick query` has no TPS line, only
+// the target rate and average tick time, so TPS is min(target, 1000 / ms). Frozen is 0.
 export function parseTps(replies) {
   const paper = /TPS from last[^:]*:\s*\*?(\d+(?:\.\d+)?)/i.exec(replies.tps ?? '')
   if (paper) return round(Number(paper[1]))
@@ -63,14 +42,8 @@ export function parseTps(replies) {
   return round(ms > 0 ? Math.min(target, 1000 / ms) : target)
 }
 
-/**
- * Who is on, from the reply to `list`.
- *
- * <p>Vanilla, and Paper after it, say "There are 2 of a max of 20 players online: A, B". Essentials
- * replaces the command and says "out of maximum" instead. Anything else is not guessed at.
- *
- * @returns {{ online: number, max: number } | null}
- */
+// Vanilla and Paper say "There are 2 of a max of 20 players online: A, B"; Essentials replaces
+// `list` and says "out of maximum". Anything else returns null.
 export function parseList(text) {
   const m = /There (?:are|is) (\d+)\s*(?:\/\s*|of a max(?:imum)? of |out of (?:a )?maximum(?: of)? )(\d+)/i
     .exec(stripColors(text ?? ''))
@@ -79,22 +52,10 @@ export function parseList(text) {
 
 const round = (n) => Math.round(n * 100) / 100
 
-/**
- * Keep asking a running server how it is ticking and who is on, over one connection.
- *
- * <p>One connection for the whole run, not one per reading. Every RCON connection a Minecraft
- * server accepts writes two lines to its console - "Thread RCON Client started", then "shutting
- * down" - and a reading every ten seconds would bury the console under seventeen thousand of them
- * a day. A standing connection writes the pair once. It is opened when the server first answers
- * and opened again only if it drops.
- *
- * <p>`latest()` is what the metrics sampler writes beside each CPU and memory reading. A reading
- * older than three intervals is not handed out: a server that has stopped answering is not still
- * at twenty TPS with five players.
- *
- * <p>Nothing here can hurt the server it watches. A failure to connect, a refused password or a
- * server that never enabled RCON costs these two numbers and nothing else.
- */
+// Uses one standing RCON connection: every connection the server accepts logs two console
+// lines ("Thread RCON Client started" / "shutting down"), which at one reading per ten seconds
+// would flood the console. Reopened only if it drops. latest() returns null once a reading is
+// older than three intervals, so a silent server doesn't look healthy.
 export function startTickSampler(inst, { intervalMs = 10000, timeoutMs = 8000, onError = () => {} } = {}) {
   const port = inst?.rcon?.port
   const password = inst?.rcon?.password
@@ -120,9 +81,8 @@ export function startTickSampler(inst, { intervalMs = 10000, timeoutMs = 8000, o
         const next = new Rcon({ port, password, timeout: timeoutMs })
         await next.connect()
         if (stopped) { next.close(); return }
-        // The client's socket timeout is an idle timeout, and it tears the connection down when it
-        // fires - right for a one-shot command, wrong for a connection that sits quiet between
-        // readings by design. Off, once connected; each reply still has its own time limit.
+        // the client's socket timeout is an idle timeout that tears the connection down, which
+        // is wrong for a connection that sits quiet between readings; replies keep their own limit
         next.socket.setTimeout(0)
         rcon = next
       }
@@ -133,8 +93,8 @@ export function startTickSampler(inst, { intervalMs = 10000, timeoutMs = 8000, o
       failures = 0
     } catch (err) {
       drop()
-      // Refused connections are the normal state of a server still starting, so only a run of
-      // failures once it has answered before is worth a line in the daemon log.
+      // refused connections are normal while the server starts; only log repeated failures
+      // after it has answered once
       if (reading && ++failures === 3) onError(err)
     } finally {
       busy = false

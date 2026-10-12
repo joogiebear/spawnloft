@@ -1,8 +1,7 @@
 /**
- * A data root too deep for a unix socket.
- *
- * <p>Its own file because paths are resolved once, at import: the long data root has to be in the
- * environment before anything from src/ is loaded, and each test file is its own process.
+ * A data root too deep for a unix socket. Its own file because paths are resolved once, at import:
+ * the long data root has to be in the environment before anything from src/ loads, and each test
+ * file is its own process.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -63,9 +62,9 @@ async function makeServer(instance) {
     rcon: { port: await findFreePort(port + 1), password: 'test' } })
 }
 
-// Node does not refuse a socket path that is too long: it cuts it to fit and says nothing. Every
-// server under one deep data root is cut to the SAME path, so the second cannot listen - and
-// whatever is sent to it is answered by the first. "Stop B" stopped A.
+// Node does not refuse a too-long socket path, it silently cuts it to fit. Every server under one
+// deep data root would be cut to the same path, so the second cannot listen and commands sent to
+// it are answered by the first.
 test('two servers under a data root that deep each answer to their own name', { skip: !posix, timeout: 60000 }, async () => {
   await makeServer(name)
   await makeServer(other)

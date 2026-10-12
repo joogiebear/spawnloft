@@ -11,18 +11,9 @@ import { GARNET_READY_RE, GARNET_FAILED_RE } from './ready.mjs'
 import { fail, humanBytes } from './util.mjs'
 import { fetchRetry } from './download.mjs'
 
-/**
- * Garnet, for the Redis role.
- *
- * <p>Redis itself ships no Windows binary. Microsoft's Garnet speaks the Redis protocol, is MIT
- * licensed, and publishes native Windows and macOS builds on its GitHub releases page - which is
- * the same feed shape this program already reads for its own updates. Plugins using supported Redis commands can use it for messaging or caching;
- * command compatibility should be checked for each plugin.
- *
- * <p>Unlike MariaDB there is no per-server database or user: Redis has one password and one key
- * space, and plugins are expected to prefix their keys. So an attachment here is the same
- * credentials for every server, recorded so the panel can say who uses it.
- */
+// Garnet fills the Redis role: Redis ships no Windows binary, Garnet speaks the Redis protocol and
+// has native builds. Unlike MariaDB there is no per-server database or user, so an attachment is
+// the same credentials for every server.
 
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
 
@@ -34,7 +25,7 @@ export const DEFAULT_PORT = 6379
 export const READY_RE = GARNET_READY_RE
 export const FAILED_RE = GARNET_FAILED_RE
 
-// Native release assets verified against Microsoft's published SHA-256 digests.
+// pinned to Microsoft's published SHA-256 digests
 export const ARCHIVES = Object.freeze({
   'win32-x64': { name: 'win-x64-based-readytorun.zip', sha256: '3409c9aba39565caa4c6166f2d7c66ac112c2a773d70679b1bb34458dea16473' },
   'darwin-arm64': { name: 'osx-arm64-based.tar.xz', sha256: 'e4b41812a5c554735046022e6f4ab8a8651511444f284935339296bd83e431b9' },
@@ -42,7 +33,6 @@ export const ARCHIVES = Object.freeze({
   'linux-x64': { name: 'linux-x64-based.tar.xz', sha256: 'cd36cd82b5a8b1da91acb0d7e3fba6aa01341f32556b89552058393b3fa9cf2d' },
   'linux-arm64': { name: 'linux-arm64-based.tar.xz', sha256: '9365dc73df63d36cd2d29938e16494cb8ac9942444b22f37eaf4ff778615bd81' },
 })
-/** Is there a verified native build for this machine? What decides whether the panel offers it. */
 export function supports(platform = process.platform, arch = process.arch) {
   return Object.hasOwn(ARCHIVES, `${platform}-${arch}`)
 }
@@ -52,18 +42,16 @@ export function archiveFor(version, platform = process.platform, arch = process.
   return { ...archive, url: `https://github.com/microsoft/garnet/releases/download/v${VERSION}/${archive.name}` }
 }
 
-/** The Windows x64 ReadyToRun zip on a release, or null. */
 export function windowsZipFrom(release) {
   const assets = release?.assets ?? []
   const win = assets.filter((a) => /win-?x64/i.test(a.name) && /\.zip$/i.test(a.name))
-  // Select the native ReadyToRun package. Installation supplies its private .NET runtime.
+  // the ReadyToRun build; installRuntime supplies its private .NET runtime
   const hit = win.find((a) => /readytorun|self-?contained/i.test(a.name))
   if (!hit) return null
   const digest = typeof hit.digest === 'string' && hit.digest.startsWith('sha256:') ? hit.digest.slice(7) : null
   return { name: hit.name, url: hit.browser_download_url, sha256: digest, size: Number(hit.size) || 0 }
 }
 
-/** Select only a native release for this machine. */
 export function archiveFrom(release, platform = process.platform, arch = process.arch) {
   if (platform === 'win32' && arch === 'x64') return windowsZipFrom(release)
   if (!['darwin', 'linux'].includes(platform) || !['arm64', 'x64'].includes(arch)) return null
@@ -101,10 +89,7 @@ export function engineDir(version) {
   return path.join(ENGINES_DIR, `garnet-${version}`)
 }
 
-/**
- * The server binary, wherever the zip put it: the root, bin/, or one folder down. A .mjs is a
- * test standing in for it.
- */
+// The server binary: in the root, bin/, or one folder down. A .mjs is a test stand-in.
 export function binary(dir, role = 'server') {
   if (role !== 'server') return null
   const names = ['GarnetServer.exe', 'GarnetServer', 'GarnetServer.mjs']
@@ -186,8 +171,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     if (process.platform !== 'win32') fs.chmodSync(server.path, 0o755)
     await installRuntime(unpacked, staging, onProgress)
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, platform: process.platform, arch: process.arch, sha256: archive.sha256 }))
-    // Asynchronous, like MySQL's: the engine and its .NET runtime are thousands of files, and a
-    // synchronous move or cleanup under Defender's scan held the panel's event loop for seconds.
+    // async like MySQL's: thousands of files under Defender's scan would block the panel's event loop
     await fs.promises.rename(unpacked, dir)
     return { version, dir, cached: false, sizeHuman: humanBytes(total) }
   } finally {
@@ -201,32 +185,22 @@ export function dataDir(inst) {
   return path.join(inst.dir, 'data')
 }
 
-/** Nothing to initialise but the folder: Garnet makes its checkpoint files on first save. */
+// only the folder is needed; Garnet creates its checkpoint files on first save
 export function initData(inst) {
   fs.mkdirSync(dataDir(inst), { recursive: true })
   return { initialised: true }
 }
 
-/**
- * Loopback, password auth, checkpoints and an append-only log in the data folder, recovered
- * on start. The password is on the command line, which is readable by other processes on this
- * machine; Garnet takes it no other way, and this is one person's PC. Stop waits for SAVE to acknowledge a durable checkpoint, then terminates the process;
- * Garnet does not implement the Redis SHUTDOWN command.
- */
-/**
- * Which storage layer Garnet writes through.
- *
- * <p>On Linux its default is a native device, a shared library that needs libaio and liburing at
- * load time. A stock server install has neither, and Garnet does not find out until the first
- * write: it starts, says it is ready, answers PING and GET - and drops the connection on SET, while
- * SAVE fails in the log and nowhere else. RandomAccess is .NET's own file I/O and needs nothing
- * installed. The files it writes are the same ones, so this can change later without a migration.
- * Windows and macOS keep the default they have always run on.
- */
+// On Linux Garnet's default storage device is a native library needing libaio and liburing, which a
+// stock server lacks. It only fails at the first write: starts, answers PING and GET, drops the
+// connection on SET, and SAVE fails only in the log. RandomAccess is .NET's own file I/O.
 export function storageArgs(platform = process.platform) {
   return platform === 'linux' ? ['--device-type', 'RandomAccess'] : []
 }
 
+// The password is on the command line, readable by other local processes; Garnet takes it no other
+// way. Stop waits for SAVE to acknowledge a checkpoint, then terminates the process, because Garnet
+// has no SHUTDOWN command.
 export function launchSpec(inst) {
   const dir = engineDir(inst.version)
   const server = binary(dir)
@@ -234,8 +208,7 @@ export function launchSpec(inst) {
   const runtime = path.join(dir, '.runtime')
   const env = server.script ? process.env : { ...process.env, DOTNET_ROOT: runtime,
     [`DOTNET_ROOT_${process.arch.toUpperCase()}`]: runtime, DOTNET_MULTILEVEL_LOOKUP: '0',
-    // .NET on Linux loads the system's ICU for culture data and refuses to start without it. A
-    // minimal server install has none, and a key-value store has no use for it.
+    // .NET on Linux refuses to start without the system ICU, which minimal installs lack
     ...(process.platform === 'linux' ? { DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: '1' } : {}) }
   const run = runnable(server, [
     '--port', String(inst.port),
@@ -258,18 +231,15 @@ export function launchSpec(inst) {
   }
 }
 
-// ---- the engine interface ----------------------------------------------------------------------
-
 export function hostOf(inst) {
   return inst.host ?? '127.0.0.1'
 }
 
-/** Is it answering? PING with the password. */
 export async function probe(inst) {
   return respPing(hostOf(inst), inst.port, { password: inst.root?.password || null })
 }
 
-/** One key space, one password: an attachment is a record of who uses it, not a new user. */
+// one key space and one password: an attachment records who uses it, it doesn't create a user
 export function newRecord(serverName, inst) {
   return { database: null, user: null, password: inst.root?.password ?? '', keyPrefix: `${serverName}:`, createdAt: new Date().toISOString() }
 }
@@ -294,7 +264,7 @@ export function credentialsFor(inst, record) {
 
 export const canDump = false
 
-// Official Microsoft runtime archives; private to this engine, without a system install.
+// .NET runtime archives from Microsoft, kept private to this engine instead of a system install
 export const RUNTIME_VERSION = '10.0.12'
 export const RUNTIME_HASHES = Object.freeze({
   'win-x64': '844fa99e16fd6f44e0a7c29def7a82d7846902334d6a955248a9519a4dddb3f5acceb9c9223bef69f8c83b8ae2417537e5b76dddf79fb7117dc85b5039bc1297',
@@ -303,7 +273,7 @@ export const RUNTIME_HASHES = Object.freeze({
   'linux-x64': '58388fdde4f13bd703c7a6f7defb3300b17e42ba5fe8bca50066f80f64ac7406620dcdfb4acc1eff7992750c8cc5cff8369dd12d09730c8a9e8760d6032f7f6e',
   'linux-arm64': 'ac1e0090391085ba70c7457adaaa8f6cc20dc216b9b368b4227a427de271708d783380c7b955b7be4897ff24849fbe5c3b7ec1cb1c38345a725de9a3812280eb',
 })
-/** Microsoft's name for this machine: the runtime identifier its downloads are filed under. */
+// .NET runtime identifier
 export function runtimeId(platform = process.platform, arch = process.arch) {
   return `${{ win32: 'win', darwin: 'osx', linux: 'linux' }[platform]}-${arch}`
 }

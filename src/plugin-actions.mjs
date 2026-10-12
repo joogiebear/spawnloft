@@ -5,14 +5,9 @@ import * as backup from './backup.mjs'
 import * as supervisor from './supervisor.mjs'
 import * as activity from './activity.mjs'
 
-/**
- * Plugin work shared by the panel and the MCP server, so the two cannot drift on what comes
- * first. Kept out of plugins.mjs because it needs backup and the supervisor, and plugins.mjs is
- * the low-level half that both of those can stay ignorant of.
- */
+// Plugin work shared by the panel and the MCP server. Separate from plugins.mjs because it needs backup and the supervisor.
 
-/** Both sources at once. One being down must not blank the other's answers, so each failure
- * becomes a note beside the results rather than an error instead of them. */
+// One source being down must not blank the other's results; failures become notes beside them.
 export async function searchEverywhere(inst, q) {
   const kind = plugins.contentKindFor(inst)
   // Vanilla loads nothing; a search would send Modrinth an empty loader facet and get a 400.
@@ -26,11 +21,10 @@ export async function searchEverywhere(inst, q) {
   return { results: [...(modrinthHits.value ?? []), ...(hangarHits?.value ?? [])], errors }
 }
 
-/** A snapshot of the plugins alone before anything is added or replaced: small, fast, and the
- * way back when the new jar turns out to be the wrong one. Installs used to skip it; a new
- * plugin can rewrite other plugins' data on its first start just as an update can. */
+// Snapshot of the plugins folder alone before adding or replacing a jar: a new plugin can
+// rewrite other plugins' data on first start just as an update can.
 async function snapshotPlugins(inst, label) {
-  // A server's first plugin has nothing before it to keep.
+  // no plugins folder yet, nothing to snapshot
   if (!fs.existsSync(path.join(inst.dir, plugins.contentKindFor(inst).dir))) return null
   return backup.createSnapshot(inst, { scope: 'plugins', label, running: supervisor.isRunning(inst.name), quiet: true })
 }
@@ -53,14 +47,8 @@ export async function updateWithSnapshot(inst, file) {
   return { ...result, snapshot: snap?.file ?? null }
 }
 
-/**
- * Several updates behind one snapshot. The way back is the plugins folder as it was before any of
- * them, which is the state someone rolling back wants - and one snapshot of a folder that can run
- * to hundreds of megabytes, not one per plugin.
- *
- * <p>One at a time, in order. A failure is recorded and the rest carry on: one author pulling a
- * build must not leave every other plugin on its old version.
- */
+// One snapshot for the whole batch (the folder can be hundreds of MB), then updates run in order.
+// A failure is recorded and the rest carry on.
 export async function updateAllWithSnapshot(inst, files, { onProgress = () => {} } = {}) {
   const gameVersion = plugins.mcVersionOf(inst)
   const snap = await snapshotPlugins(inst, 'pre-update')

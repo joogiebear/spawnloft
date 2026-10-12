@@ -21,8 +21,9 @@ cannot be merged.
 - **No build step.** The panel is served from source; the wizard is loaded from disk.
 - **Honesty over polish.** Errors name what went wrong and the way out. Nothing is
   silently capped, silently skipped, or silently retried.
-- **Comments carry the why.** The codebase documents its reasoning next to the code —
-  read a file's comments before reshaping it, and keep yours in the same voice.
+- **Comments say why, not what.** Write one when a line is the way it is for a reason the code
+  can't show: a race, an OS quirk, a protocol detail, a trap in the ordering. Leave out what the
+  code already says. If it takes a paragraph to explain what a function does, change the function.
 
 ## Working on it
 

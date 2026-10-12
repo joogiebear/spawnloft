@@ -1,36 +1,24 @@
 #!/usr/bin/env node
-/**
- * Set SpawnLoft's version, everywhere it is written down.
- *
- * <p>There are three places and they have to agree: the core's package.json, the desktop's, and
- * the two fields at the top of the desktop's lockfile. `npm version` only knows about the folder it
- * is run in, which is how the core and the desktop came to disagree once; publish-stable.mjs now
- * refuses a release where they do, so it is better never to get there.
- *
- *   node desktop/set-version.mjs 1.3.0-beta.1     # the start of a month's work on dev
- *   node desktop/set-version.mjs 1.3.0            # a release branch
- *
- * <p>Text is edited rather than parsed and re-serialised, so nothing else in the files moves and
- * their line endings stay as they were.
- */
+// Sets the version in the core's package.json, the desktop's, and the desktop lockfile, which must
+// agree (publish-stable.mjs refuses a release where they don't). `npm version` only handles its
+// own folder. Text is edited rather than re-serialised so line endings and layout stay put.
+//
+//   node desktop/set-version.mjs 1.3.0-beta.1     # the start of a month's work on dev
+//   node desktop/set-version.mjs 1.3.0            # a release branch
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const VERSION_RE = /^\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/
 
-/** The first `"version": "..."` in a package.json is the package's own. */
 export function setPackageVersion(text, version) {
   const found = /^(\s*"version":\s*")([^"]+)(")/m.exec(text)
   if (!found) throw new Error('no version field found')
   return { text: text.slice(0, found.index) + found[1] + version + found[3] + text.slice(found.index + found[0].length), from: found[2] }
 }
 
-/**
- * A lockfile records the package's own version twice - at the top, and under packages[""] - and
- * then the version of everything it depends on. Only the first two are this package's, and they
- * are the first two in the file.
- */
+// the package's own version appears twice, first in the file (top level and packages[""]),
+// followed by every dependency's
 export function setLockVersion(text, version) {
   const own = JSON.parse(text)
   if (own.version !== own.packages?.['']?.version) throw new Error('the lockfile disagrees with itself about the version')
@@ -54,7 +42,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     [path.join(here, 'package.json'), setPackageVersion],
     [path.join(here, 'package-lock.json'), setLockVersion],
   ]
-  // Every file is worked out before any is written: a failure half way must not leave them disagreeing.
+  // compute every edit before writing any, so a failure can't leave the files disagreeing
   const edits = files.map(([file, set]) => ({ file, ...set(fs.readFileSync(file, 'utf8'), version) }))
   for (const { file, text, from } of edits) {
     fs.writeFileSync(file, text)

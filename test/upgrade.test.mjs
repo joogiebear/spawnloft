@@ -19,7 +19,6 @@ test('newer versions are the ones before the current in the newest-first list', 
   const all = ['26.3', '26.2', '26.1', '25.4']
   assert.deepEqual(newerVersionsOf(all, '26.2'), ['26.3'])
   assert.deepEqual(newerVersionsOf(all, '26.3'), [])
-  // A version Paper never published gets no "newer than" claim at all.
   assert.deepEqual(newerVersionsOf(all, '9.9'), [])
 })
 

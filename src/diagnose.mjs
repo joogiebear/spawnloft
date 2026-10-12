@@ -1,28 +1,15 @@
-/**
- * Log intelligence: recognise the failure shapes people actually hit, and say the fix.
- *
- * <p>The console already tells the truth - in a stack trace, at 3am, in vocabulary only the
- * JVM loves. This module reads the same lines and answers the only question the person has:
- * what is wrong, and what do I do about it. Every shape here is a failure with a known
- * cause and a known way out; anything else stays a stack trace, honestly, rather than
- * being guessed at.
- *
- * <p>Pure over an array of lines, so every shape is testable without a server. The callers
- * decide where the lines come from: the panel and CLI tail the captured console, the
- * daemon keeps a ring of its child's last output for the moment it dies.
- */
+// Recognises known failure shapes in console output and suggests the fix. Anything unrecognised
+// is left as the raw stack trace. Pure over an array of lines; callers supply them (the panel and
+// CLI tail the console, the daemon keeps a ring of its child's last output).
 
 import fs from 'node:fs'
 import path from 'node:path'
 import { humanBytes } from './util.mjs'
 
-/** class-file major version → the Java release that produces it. */
+// class-file major version to Java release
 const CLASS_VERSION_TO_JAVA = (major) => major - 44
 
-/**
- * The shapes. Order matters: the first match of each id wins, and ids earlier in this
- * list are more specific or more actionable than the ones after them.
- */
+// ordered from more specific/actionable to less
 export const SHAPES = [
   {
     id: 'port-in-use',
@@ -123,13 +110,7 @@ export const SHAPES = [
   },
 ]
 
-/**
- * Read a run's lines and name what went wrong.
- *
- * <p>Newest evidence wins: lines are scanned from the end, each shape reports at most once,
- * and at most three findings come back - a failing server can trip several shapes at once,
- * and the third is already past what anyone reads.
- */
+// Scans from the end so the newest evidence wins; each shape reports once, at most three findings.
 export function diagnose(lines, ctx = {}) {
   const findings = []
   const seen = new Set()
@@ -143,17 +124,12 @@ export function diagnose(lines, ctx = {}) {
       findings.push({ id: shape.id, title: shape.title, advice: shape.advice(m, ctx), line, at: i })
     }
   }
-  // Reported in the order they appear in the log, so cause reads before consequence.
+  // log order, so cause reads before consequence
   return findings.sort((a, b) => a.at - b.at)
 }
 
-/**
- * The crash reports Minecraft itself wrote, newest first.
- *
- * <p>These sit in crash-reports/ naming the exact entity, block or mod that took the server
- * down - the file a plugin author asks for - and until now nothing surfaced them. Each row
- * carries the report's own one-line Description, read from the first few hundred bytes.
- */
+// Minecraft's own crash-reports/, newest first, each with its one-line Description read from the
+// first couple of KB.
 export function crashReports(inst, { limit = 10 } = {}) {
   const dir = path.join(inst.dir, 'crash-reports')
   let entries = []
@@ -174,7 +150,7 @@ export function crashReports(inst, { limit = 10 } = {}) {
         fs.closeSync(fd)
         description = /^Description:\s*(.+)$/m.exec(buf.toString('utf8', 0, n))?.[1]?.trim() ?? null
       } catch {
-        /* a report that cannot be read is still listed */
+        /* still listed without a description */
       }
       return { file, mtime: st.mtime, size: st.size, sizeHuman: humanBytes(st.size), description }
     })

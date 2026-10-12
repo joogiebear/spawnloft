@@ -1,9 +1,7 @@
 /**
  * The repair that runs when the installation has moved: task shims and launchers are rewritten
  * for the runtime running now, once, and left alone while nothing has changed.
- *
- * <p>Isolated the way manage.test.mjs is: MCCTL_DATA_ROOT points every path at a scratch folder
- * before the first module that resolves paths is imported.
+ * Isolated like manage.test.mjs: MCCTL_DATA_ROOT points every path at a scratch folder.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -24,7 +22,7 @@ const marker = path.join(scratch, 'runtime.json')
 const tasksFile = path.join(DATA_ROOT, 'schedules.json')
 const posix = process.platform !== 'win32'
 const shim = path.join(DATA_ROOT, 'tasks', posix ? 'nightly.sh' : 'nightly.cmd')
-// Linux gets shell launchers; macOS still gets the batch files it always has.
+// Linux gets shell launchers; macOS gets batch files
 const launcher = (name) => name + (process.platform === 'linux' ? '.sh' : '.bat')
 
 function stale(file, body) {

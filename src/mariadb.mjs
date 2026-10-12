@@ -12,20 +12,9 @@ import { fetchRetry } from './download.mjs'
 import { MARIADB_READY_RE, MARIADB_FAILED_RE } from './ready.mjs'
 import { libraryEnv } from './linux-libs.mjs'
 
-/**
- * MariaDB as an engine SpawnLoft runs: where to get it, how to lay a database out on it, how to
- * start, stop and talk to one.
- *
- * <p>Nothing is installed. MariaDB publishes a portable zip for Windows - `mariadbd`, the init
- * tool, the admin tool, the client and the dump tool, all under bin/ - and a REST API that lists
- * releases with checksums. That is the Paper download pattern exactly: resolve a version, fetch
- * the file, verify it, keep it in a store shared by every database on that version. Windows's own
- * tar unpacks zips, so there is nothing to add for that either.
- *
- * <p>The engine store is `<data>/engines/mariadb-<version>/`. A test drops scripts named like the
- * real binaries into such a folder, and everything here runs them with this Node instead - the
- * same trick the lifecycle tests play with a fake JVM.
- */
+// MariaDB engine: fetch the portable Windows zip, lay out a database, start/stop/talk to one.
+// Engines live in <data>/engines/mariadb-<version>/. Tests drop scripts named like the real
+// binaries into such a folder and they run under this Node instead.
 
 const API = 'https://downloads.mariadb.org/rest-api/mariadb/'
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
@@ -47,7 +36,7 @@ async function api(url) {
   return res.json()
 }
 
-/** Numeric-aware sort key for "11.4.5" style versions, newest first. */
+// numeric-aware comparator for "11.4.5" style versions, newest first
 function byVersionDesc(a, b) {
   const pa = a.split(/[.-]/).map((x) => (Number.isNaN(Number(x)) ? x : Number(x)))
   const pb = b.split(/[.-]/).map((x) => (Number.isNaN(Number(x)) ? x : Number(x)))
@@ -61,20 +50,10 @@ function byVersionDesc(a, b) {
   return 0
 }
 
-/**
- * Releases, newest first, from what the API actually answers.
- *
- * <p>The API is three levels deep and each level has its own shape. The root lists `major_releases`
- * (11.4, 11.8, ...) as an array, and the status - Stable, RC, Preview - lives only there. A major
- * (`/11.4/`) answers `releases`, an object keyed by point release, each with its date and its files,
- * and no status of its own. A point release (`/11.4.5/`) answers `release_data`, keyed the same way.
- * The first cut read `releases` off the root, found nothing, and the panel's version list said "No
- * stable release listed" for every install.
- *
- * <p>So: the stable majors are picked from the root, each is asked for its point releases, and a
- * point release inherits its major's status and support type. Release candidates are left out
- * unless asked for: an RC is not what anyone means by "a database" unless they say so.
- */
+// The API has three levels with different shapes. The root lists major_releases (an array, and the
+// only place status lives), a major answers `releases` keyed by point release, and a point release
+// answers `release_data`. Point releases inherit their major's status and support type. Release
+// candidates are left out unless includeUnstable.
 export function releasesFrom(root, majors = {}, { includeUnstable = false } = {}) {
   const out = []
   for (const m of root?.major_releases ?? []) {
@@ -95,7 +74,6 @@ export function releasesFrom(root, majors = {}, { includeUnstable = false } = {}
   return out.sort((a, b) => byVersionDesc(a.version, b.version))
 }
 
-/** The stable majors the root lists, as the ids the per-major endpoint takes. */
 export function stableMajorsFrom(root, { includeUnstable = false } = {}) {
   return (root?.major_releases ?? [])
     .filter((m) => includeUnstable || /stable/i.test(String(m?.release_status ?? '')))
@@ -105,21 +83,15 @@ export function stableMajorsFrom(root, { includeUnstable = false } = {}) {
 export async function versions(opts = {}) {
   const root = await api(API)
   const ids = stableMajorsFrom(root, opts)
-  // One request per stable series, in parallel: five or six of them, each a few kilobytes.
   const answers = await Promise.all(ids.map((id) => api(`${API}${encodeURIComponent(id)}/`)))
   const majors = {}
   ids.forEach((id, i) => { majors[id] = answers[i] })
   return releasesFrom(root, majors, opts)
 }
 
-/**
- * The Windows x64 zip in a release's file list, or null when the release has none.
- *
- * <p>Takes any of the shapes a file list arrives in: a bare `files` array, a major's `releases`,
- * or a point release's `release_data`, the last two keyed by version. The debug-symbols zip is
- * also a Windows x64 zip and is skipped by name; the API lists it alongside, sometimes first.
- * Download URLs come back as http:// and are asked for over https.
- */
+// Accepts a bare `files` array, a major's `releases` or a point release's `release_data` (both
+// keyed by version). The debug-symbols zip is also Windows x64 and sometimes listed first, so it is
+// skipped by name. Download URLs come back as http:// and are upgraded to https.
 export function windowsZipFrom(payload, version = null) {
   let files = payload?.files
   if (!files) {
@@ -151,8 +123,8 @@ export function engineDir(version) {
   return path.join(ENGINES_DIR, `mariadb-${version}`)
 }
 
-// The names a binary has had. MariaDB renamed them in 10.4+ and ships the old names alongside
-// for a while; older zips have only the mysql names. A .mjs is a test standing in for the binary.
+// MariaDB renamed its binaries in 10.4+ and ships the old names alongside for a while; older zips
+// have only the mysql names. A .mjs is a test stand-in.
 const NAMES = {
   server: ['mariadbd', 'mysqld'],
   init: ['mariadb-install-db', 'mysql_install_db'],
@@ -165,8 +137,7 @@ export function binary(dir, role) {
   if (!dir) return null
   for (const name of NAMES[role]) {
     for (const ext of ['.exe', '', '.mjs']) {
-      // The store keeps bin/ under the version; a tools folder someone points at (XAMPP's
-      // mysql\bin, a MariaDB install's bin) holds the binaries directly.
+      // the store keeps bin/ under the version; a user-selected tools folder (XAMPP's mysql\bin) holds the binaries directly
       for (const p of [path.join(dir, 'bin', name + ext), path.join(dir, name + ext)]) {
         if (fs.existsSync(p)) return { path: p, script: ext === '.mjs' }
       }
@@ -175,18 +146,13 @@ export function binary(dir, role) {
   return null
 }
 
-/**
- * Where the client tools for an instance are: the engine store for one run here, the folder
- * recorded for an external one. An external database with no tools recorded borrows them from
- * any MariaDB in the store, or from the usual install locations on this machine.
- */
+// An external database with no tools recorded borrows them from the engine store or the usual install locations.
 export function toolsDir(inst) {
   if (!inst.external) return engineDir(inst.version)
   if (inst.tools?.dir) return inst.tools.dir
   return findTools()
 }
 
-/** Common places MariaDB/MySQL client tools live on a Windows PC, plus the engine store. */
 export function findTools() {
   const candidates = []
   try {
@@ -232,20 +198,14 @@ export function hasEngine(version) {
   return Boolean(binary(engineDir(version), 'server'))
 }
 
-/** How to run a binary: itself, or - a script standing in for it - this Node told to be Node. */
 function runnable(bin, args, env = process.env) {
   if (bin.script) return { cmd: process.execPath, args: [bin.path, ...args], env: { ...env, ELECTRON_RUN_AS_NODE: '1' } }
-  // A managed Linux engine may carry libraries of its own beside bin/; see linux-libs.mjs.
+  // a managed Linux engine may carry its own libraries beside bin/ (linux-libs.mjs)
   return { cmd: bin.path, args, env: libraryEnv(bin.path, env) }
 }
 
-/**
- * Download and unpack one engine version into the store.
- *
- * <p>The zip is hashed as it arrives and renamed into place only if the hash matches, so a
- * truncated download is a .part file and never a half-engine. Unpacked with --strip-components,
- * so the store holds bin/ directly rather than the zip's own top folder.
- */
+// The zip is hashed as it arrives and renamed from .part only on a match, so a truncated download
+// is never a half-engine. --strip-components drops the zip's own top folder so the store holds bin/.
 export async function fetchEngine(version, { onProgress = null, force = false } = {}) {
   const dir = engineDir(version)
   if (hasEngine(version) && !force) {
@@ -301,8 +261,6 @@ export async function fetchEngine(version, { onProgress = null, force = false } 
   return { version, dir, cached: false, sizeHuman: humanBytes(total) }
 }
 
-// ---- one database on the engine ---------------------------------------------------------------
-
 export function dataDir(inst) {
   return path.join(inst.dir, 'data')
 }
@@ -311,13 +269,8 @@ export function iniFile(inst) {
   return path.join(inst.dir, 'my.ini')
 }
 
-/**
- * The server's configuration, written by us rather than left to the init tool.
- *
- * <p>Loopback only, by the same reasoning as the panel: nothing this program runs listens on an
- * interface the router can see. skip-name-resolve keeps every grant keyed by address, which is
- * what the attach step writes. utf8mb4 because plugins store player names and chat.
- */
+// Loopback only. skip-name-resolve keeps grants keyed by address, as the attach step writes them.
+// utf8mb4 because plugins store player names and chat.
 export function iniFor(inst) {
   const dd = dataDir(inst).replace(/\\/g, '/')
   return [
@@ -338,12 +291,7 @@ export function iniFor(inst) {
   ].join('\n')
 }
 
-/**
- * Lay the database out: system tables with the root password, and our my.ini beside them.
- *
- * <p>Done once. A data folder that already holds system tables is left alone, so re-running is
- * safe and a failed later step never re-initialises a database that has data in it.
- */
+// A data folder that already holds system tables is left alone, so re-running never re-initialises a database with data.
 export function initData(inst) {
   const dir = engineDir(inst.version)
   const init = binary(dir, 'init')
@@ -362,13 +310,8 @@ export function initData(inst) {
   return { initialised: true }
 }
 
-/**
- * What the daemon spawns, what it watches for, and how it asks the process to stop.
- *
- * <p>--console puts the log on stderr, which the daemon captures like stdout. Stop is the admin
- * tool over TCP rather than stdin, because a database takes no console input; the password rides
- * in the environment the way the client tools expect, and never on a command line.
- */
+// --console puts the log on stderr. Stop is the admin tool over TCP, since a database takes no
+// console input; the password goes in the environment, never on a command line.
 export function launchSpec(inst) {
   const dir = engineDir(inst.version)
   const server = binary(dir, 'server')
@@ -389,8 +332,6 @@ export function launchSpec(inst) {
   }
 }
 
-// ---- talking to a running database -----------------------------------------------------------
-
 export function quoteIdent(name) {
   return '`' + String(name).replace(/`/g, '``') + '`'
 }
@@ -399,14 +340,9 @@ export function quoteStr(s) {
   return "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "''") + "'"
 }
 
-/**
- * Run statements as root over TCP. Resolves to stdout; a refusal names the reason.
- *
- * <p>Asynchronous, because the panel calls it: attaching a server to a database it has just created
- * runs this inside the panel's one process. Run with spawnSync, the client's first launch - which
- * Defender scans on a fresh machine - held the panel's event loop for over five seconds, and the
- * panel's own requests timed out behind it (the Windows smoke test's MySQL step, three times).
- */
+// Async because it runs inside the panel's process: with spawnSync, the client's first launch
+// (scanned by Defender on a fresh machine) blocked the event loop for 5+ seconds and the panel's
+// own requests timed out.
 export async function sql(inst, statements) {
   const dir = toolsDir(inst)
   const client = binary(dir, 'client')
@@ -422,8 +358,7 @@ export async function sql(inst, statements) {
     execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 60000, env, maxBuffer: 16 * 1024 * 1024 },
       (err, out, errOut) => resolve({ error: err, stdout: out, stderr: errOut }))
   })
-  // A number is the client's exit code: it ran and said no. Anything else is that it could not
-  // be run at all, or was stopped for taking longer than a minute.
+  // a numeric code is the client's exit status (it ran and refused); anything else means it couldn't run or timed out
   if (error && typeof error.code !== 'number') {
     fail(`could not run the MariaDB client: ${error.killed ? 'it did not answer within a minute' : error.message}`)
   }
@@ -431,14 +366,9 @@ export async function sql(inst, statements) {
   return stdout ?? ''
 }
 
-/**
- * The statements that give a server its own database and user, and take them away again.
- *
- * <p>Two hosts because skip-name-resolve keys TCP connections by address: 'localhost' matches a
- * socket or a named pipe, '127.0.0.1' matches what a plugin actually opens. Granted on that one
- * database and nothing else. IF NOT EXISTS plus ALTER, so attaching twice repairs rather than
- * refuses.
- */
+// Two hosts because skip-name-resolve keys TCP connections by address: 'localhost' matches a socket
+// or named pipe, '127.0.0.1' matches what a plugin opens. IF NOT EXISTS plus ALTER, so attaching
+// twice repairs rather than refuses.
 export function attachSql({ database, user, password }) {
   const db = quoteIdent(database)
   const hosts = ['localhost', '127.0.0.1'].map((h) => `${quoteStr(user)}@${quoteStr(h)}`)
@@ -459,22 +389,13 @@ export function detachSql({ database, user, drop = false }) {
   return lines.join('\n')
 }
 
-// ---- dumps ------------------------------------------------------------------------------------
-
-/**
- * Run a MariaDB tool with its output sent to a stream, or a stream sent to its input.
- *
- * <p>Settles when the process has CLOSED, not when it has exited: 'exit' can fire while the last of
- * its output is still in the pipe, and a dump that is declared finished then is a dump that stops
- * short - which was recorded as a good backup, because the only check on it is that the file
- * exists. The same goes for its error output, which is what says why it failed.
- *
- * <p>Every stream involved gets an error handler, because a stream error nobody listens for is an
- * uncaught exception, and this runs inside the panel's process. A client that refuses the login
- * exits while its input is still being fed to it (EPIPE) - its exit code is what says so, so that
- * write error is not a second, process-ending failure. A file that cannot be read or written ends
- * the run with that reason and stops the tool.
- */
+// Settles on 'close', not 'exit': exit can fire with output still in the pipe, which would cut a
+// dump short and record it as a good backup (the only check is that the file exists). Same for
+// stderr, which carries the failure reason.
+//
+// Every stream gets an error handler, since an unhandled stream error would crash the panel's
+// process. A client that rejects the login exits while its input is still being fed (EPIPE); its
+// exit code reports that, so the write error must not be a second failure.
 export function runToFile(cmd, args, env, { stdout = null, stdin = null, label }) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { env, windowsHide: true, stdio: [stdin ? 'pipe' : 'ignore', stdout ? 'pipe' : 'ignore', 'pipe'] })
@@ -513,13 +434,8 @@ export function runToFile(cmd, args, env, { stdout = null, stdin = null, label }
   })
 }
 
-/**
- * Dump one database to a file, consistently.
- *
- * <p>--single-transaction reads the tables as of one moment without locking them, which is what
- * makes a hot backup of a live server honest. --databases puts the CREATE DATABASE and USE at the
- * top, so the file imports as root without anyone having to pick a database first.
- */
+// --single-transaction gives a consistent snapshot without locking tables. --databases puts CREATE
+// DATABASE and USE at the top, so the file imports without picking a database first.
 export async function dump(inst, database, file) {
   const dir = toolsDir(inst)
   const tool = binary(dir, 'dump')
@@ -536,8 +452,7 @@ export async function dump(inst, database, file) {
     fs.rmSync(file, { force: true })
     throw err
   }
-  // Ended only now, so every byte the tool wrote has been handed to the file first; a failure to
-  // flush it (a full disk) is the dump failing, not something to find out from its size.
+  // end only now so every byte is handed to the file first; a flush failure (full disk) fails the dump
   try {
     await new Promise((resolve, reject) => {
       out.once('error', reject)
@@ -550,7 +465,6 @@ export async function dump(inst, database, file) {
   return { file, bytes: fs.statSync(file).size }
 }
 
-/** Feed a dump back through the client as root. */
 export async function importSql(inst, file) {
   const dir = toolsDir(inst)
   const client = binary(dir, 'client')
@@ -562,9 +476,6 @@ export async function importSql(inst, file) {
   return { file }
 }
 
-// ---- the engine interface ----------------------------------------------------------------------
-
-/** Is it answering? One statement as root; a refusal is the reason. */
 export async function probe(inst) {
   await sql(inst, 'SELECT 1;')
   return true

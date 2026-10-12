@@ -1,15 +1,11 @@
 /**
- * Every guard in front of a deletion, a restore, a rename or a rebuild, against every status.
+ * Every guard in front of a deletion, restore, rename or rebuild, against every status.
+ * "stopping" (including the pause before a crash restart) and "orphaned" (java alive, daemon dead)
+ * hold the files as much as "running" does.
  *
- * <p>The guards used to ask "is the status exactly running". Two other statuses own the files just
- * as much: `stopping`, which includes the pause before a crash restart - the daemon is up and
- * relaunches java into the directory it is being deleted from - and `orphaned`, a java process
- * whose daemon died, still holding the world and the port. Rebuild, rename, delete and purge walked
- * straight through both.
- *
- * <p>No daemon is spawned. The status is read from a state file, so the statuses are written
- * directly with real pids: this process for "alive", and a child that has already exited for "dead".
- * Neither state names an executable, which sameProcess takes as "no contradiction".
+ * No daemon is spawned: statuses are written to a state file with real pids, this process for
+ * "alive" and an exited child for "dead". Neither names an executable, which sameProcess takes as
+ * "no contradiction".
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -34,11 +30,10 @@ const { writeJson, UserError } = await import('../src/util.mjs')
 
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-/** A pid that belonged to a process and no longer does. */
 const DEAD = spawnSync(process.execPath, ['-e', '0']).pid
 const ALIVE = process.pid
 
-// What each status is made of, per readState: the daemon and java pids and whether the file says running.
+// per readState: daemon and java pids, and whether the file says running
 const STATUSES = {
   stopped: { running: false, daemonPid: DEAD, javaPid: DEAD },
   stale: { running: true, daemonPid: DEAD, javaPid: DEAD },
@@ -87,7 +82,7 @@ for (const status of Object.keys(STATUSES)) {
     const { name } = makeServer()
     setStatus(name, status)
     assert.equal(sup.isActive(name), BLOCKED.includes(status))
-    // isRunning is the "can I talk to it" question and must not widen.
+    // isRunning means "can I talk to it" and must not widen
     assert.equal(sup.isRunning(name), status === 'running')
   })
 }

@@ -95,7 +95,7 @@ test('the command line says what logging out does to a schedule, loudest where i
   // Lingering that could not be read is not reported as on.
   assert.doesNotMatch(loggedOutNote({ linger: null, session: 'headless' }, 'linux').join('\n'), /Lingering is on/)
   assert.deepEqual(loggedOutNote({ linger: true, session: 'headless' }, 'linux'), ['Lingering is on for your account: tasks run whether or not you are logged in, from boot.'])
-  // Elsewhere there is no setting, and the sentence that was always there.
+  // elsewhere there is no setting
   for (const platform of ['win32', 'darwin']) {
     assert.deepEqual(loggedOutNote({ linger: null, session: null }, platform), ['Tasks run while you are logged in, including with the screen locked - not after signing out.'])
   }

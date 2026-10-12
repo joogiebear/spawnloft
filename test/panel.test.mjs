@@ -2,12 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-/**
- * The panel is one document with no build step, so its logic cannot be imported. The pure
- * functions worth testing are lifted out of the source by name instead: a const is one line,
- * a function runs to its balanced closing brace. If someone reshapes the file these throw
- * loudly rather than testing nothing.
- */
+// The panel is one document with no build step, so its logic cannot be imported. The pure
+// functions are lifted out of the source by name instead (a const is one line, a function runs to
+// its balanced closing brace) and throw if the file is reshaped, rather than testing nothing.
 const html = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
 
 function constSource(name) {
@@ -31,8 +28,6 @@ const lifted = (names) => new Function(
   `${names.map((n) => (/^[A-Z_]+$/.test(n) ? constSource(n) : fnSource(n))).join('\n')}
    return { ${names.filter((n) => !/^[A-Z_]+$/.test(n)).join(', ')} }`,
 )()
-
-// ---- the console level classifier ------------------------------------------
 
 const { levelOf } = lifted(['MCCTL_RE', 'LEVEL_RE', 'BARE_LEVEL_RE', 'CONT_RE', 'EXC_RE', 'levelOf'])
 const { cleanConsoleText } = lifted(['ANSI_STRING_RE', 'ANSI_CSI_RE', 'ANSI_ESCAPE_RE', 'LOG_CONTROL_RE', 'cleanConsoleText'])
@@ -166,8 +161,6 @@ test('mcctl speaking for itself is sys, never a server level', () => {
   assert.equal(levelOf('[mcctl] server process exited (code=0)'), 'sys')
 })
 
-// ---- the memory ceiling reader ---------------------------------------------
-
 const { memoryCeilingMb } = lifted(['memoryCeilingMb'])
 
 test('the memory graph ceiling accepts both units and refuses junk', () => {
@@ -179,13 +172,8 @@ test('the memory graph ceiling accepts both units and refuses junk', () => {
   assert.equal(memoryCeilingMb(''), null)
 })
 
-// ---- the duplicated token block --------------------------------------------
-
-/**
- * The design tokens are deliberately duplicated between the panel and the setup wizard -
- * "change both or neither". verify-build checks this too, but only during a packaged build;
- * this catches the half-edit the day it happens.
- */
+// The design tokens are deliberately duplicated between the panel and the setup wizard (change
+// both or neither). verify-build checks this only in a packaged build; this catches a half-edit sooner.
 function tokensOf(file, website = false) {
   const src = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const block = (website ? /:root\[data-theme="spawnloft"\]\s*\{([\s\S]*?)\n {2}\}/ : /:root\s*\{([\s\S]*?)\n {2}\}/).exec(src)

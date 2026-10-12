@@ -22,8 +22,7 @@ const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore'
 const currentDev = () => gh(['api', `repos/${repo}/commits/dev`, '--jq', '.sha'])
 if (currentDev() !== verified.commit) throw new Error('dev moved while this build ran; publish the newer build instead')
 const tag = `v${verified.version}`
-// A pre-existing git tag can outlive a removed draft. --target does not move
-// such a tag, so check it before creating or completing any release.
+// a git tag can outlive a removed draft and --target does not move it, so check it first
 let taggedCommit
 try { taggedCommit = gh(['api', `repos/${repo}/commits/${tag}`, '--jq', '.sha']) }
 catch (error) {
@@ -48,8 +47,8 @@ if (release && !release.draft) {
   const notes = path.join(dir, 'release-notes.md')
   fs.writeFileSync(notes, notesRenderer.renderPreviewNotes(fs.readFileSync(path.join(here, 'PREVIEW.md'), 'utf8'), verified.macSigningMode) +
     `\n\nBuilt together from [\`${verified.commit.slice(0, 12)}\`](https://github.com/${repo}/commit/${verified.commit}), based on development version ${sourceVersion}.\n`)
-  // Nothing becomes public until every platform and the Windows updater feed are
-  // uploaded. Published releases are immutable and are never overwritten here.
+  // nothing goes public until every platform and the Windows updater feed are uploaded;
+  // published releases are never overwritten here
   if (!release) gh(['release', 'create', tag, '--repo', repo, '--target', verified.commit, '--draft', '--prerelease', '--title', `SpawnLoft ${verified.version} — Windows, Mac and Linux beta`, '--notes-file', notes])
   gh(['release', 'upload', tag, ...verified.assets.map(asset => asset.path), '--repo', repo, '--clobber'])
   if (currentDev() !== verified.commit) throw new Error('dev moved during upload; leaving the older build as a draft')

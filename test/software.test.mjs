@@ -31,7 +31,6 @@ test('every jar a source stores names its Minecraft version, and the version rea
   assert.equal(versionFromJar(vanillaJarName('26.2')), '26.2')
   assert.equal(versionFromJar('fabric-server-mc.26.2-loader.0.19.3-launcher.1.1.2.jar'), '26.2')
   assert.equal(versionFromJar('server.jar'), null)
-  // The registry's recorded version wins over the filename when both exist.
   assert.equal(mcVersionOf({ jar: 'purpur-26.2-2632.jar', mcVersion: '26.1.2' }), '26.1.2')
   assert.equal(mcVersionOf({ jar: 'purpur-26.2-2632.jar' }), '26.2')
 })

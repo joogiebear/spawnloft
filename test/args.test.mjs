@@ -34,9 +34,7 @@ test('kebab-case becomes camelCase', () => {
   assert.deepEqual(parseArgs(['--paper-version', '26.2']).flags, { paperVersion: '26.2' })
 })
 
-// The "no-" prefix negates the BASE name: --no-open sets `open`, not `noOpen`. Any command
-// reading flags.noOpen is reading a key this parser never writes - which is exactly the
-// mcctl ui bug - so this is the contract, pinned.
+// the no- prefix negates the base name: --no-open sets open, never noOpen
 test('a no- prefix negates the base flag name', () => {
   assert.deepEqual(parseArgs(['--no-open']).flags, { open: false })
   assert.deepEqual(parseArgs(['--no-keep-jars']).flags, { keepJars: false })

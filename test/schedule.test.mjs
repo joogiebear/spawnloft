@@ -4,8 +4,6 @@ import assert from 'node:assert/strict'
 import { normaliseSchedule, normaliseAction, describeResult, DAYS } from '../src/schedule.mjs'
 import { UserError } from '../src/util.mjs'
 
-// ---- normaliseSchedule ------------------------------------------------------
-
 test('an unknown kind is refused', () => {
   assert.throws(() => normaliseSchedule({ kind: 'fortnightly' }), UserError)
   assert.throws(() => normaliseSchedule(undefined), UserError)
@@ -48,8 +46,6 @@ test('weekly upcases its day and refuses one schtasks does not know', () => {
   }
 })
 
-// ---- normaliseAction --------------------------------------------------------
-
 test('an unknown action is refused', () => {
   assert.throws(() => normaliseAction({ type: 'format-c' }), UserError)
   assert.throws(() => normaliseAction(null), UserError)
@@ -82,8 +78,6 @@ test('a restart keeps its warning, whole and capped at an hour', () => {
   assert.equal(normaliseAction({ type: 'restart', warnMinutes: 2.5 }).warnMinutes, 0)
   assert.equal(normaliseAction({ type: 'restart' }).warnMinutes, 0)
 })
-
-// ---- describeResult ---------------------------------------------------------
 
 test('Task Scheduler result codes read as words, not HRESULTs', () => {
   assert.equal(describeResult(0), 'ok')

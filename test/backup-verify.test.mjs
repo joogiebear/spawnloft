@@ -13,7 +13,6 @@ const TAR = process.platform === 'win32'
   ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
   : 'tar'
 
-/** A tiny instance directory and a real archive of the named members, returning the archive path. */
 function makeArchive(members) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-verify-'))
   fs.mkdirSync(path.join(dir, 'plugins'))

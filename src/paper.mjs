@@ -7,18 +7,12 @@ import { pipeline } from 'node:stream/promises'
 import { JARS_DIR } from './paths.mjs'
 import { fail, humanBytes } from './util.mjs'
 
-/**
- * PaperMC downloads, against the v3 "fill" API.
- *
- * The old api.papermc.io/v2 endpoints are sunset — they answer every request with
- * {"ok":false,"error":"sunset"} rather than a 404, so code written against them fails in a way
- * that reads like a network problem rather than a removed API. Everything here uses
- * fill.papermc.io/v3, which is the current one.
- */
+// PaperMC downloads via the v3 "fill" API. The old api.papermc.io/v2 endpoints are sunset and answer
+// {"ok":false,"error":"sunset"} instead of a 404, which reads like a network problem.
 // One API, several projects: Paper and Folia are served identically, so `project` picks which.
 const projectApi = (project) => `https://fill.papermc.io/v3/projects/${project}`
 
-// The API asks for a descriptive agent so they can contact operators of misbehaving clients.
+// the API asks for a descriptive agent so operators can contact misbehaving clients
 const HEADERS = { 'User-Agent': 'SpawnLoft (github.com/joogiebear/spawnloft)', Accept: 'application/json' }
 
 async function api(url) {
@@ -32,19 +26,13 @@ async function api(url) {
   return res.json()
 }
 
-/**
- * Every Minecraft version Paper publishes, newest first.
- *
- * The API groups them by minor ("1.21": ["1.21.11", ...]) and, within a group, lists newest first.
- * Flattening preserves that order, so the first entry is always the newest release.
- */
+// Newest first. The API groups versions by minor and lists newest first within a group; flattening keeps that order.
 export async function versions({ includeUnstable = false, project = 'paper' } = {}) {
   const data = await api(projectApi(project))
   const out = []
   for (const group of Object.values(data.versions ?? {})) {
     for (const v of group) {
-      // Release candidates and pre-releases are published alongside releases; they are not what
-      // anyone means by "latest" unless they say so.
+      // rc and pre-releases are published beside releases and are not what "latest" means
       if (!includeUnstable && /-(rc|pre)/i.test(v)) continue
       out.push(v)
     }
@@ -52,7 +40,6 @@ export async function versions({ includeUnstable = false, project = 'paper' } = 
   return out
 }
 
-/** Builds for a version, newest first, each with its download URL and checksum. */
 export async function builds(version, { project = 'paper' } = {}) {
   const data = await api(`${projectApi(project)}/versions/${encodeURIComponent(version)}/builds`)
   return data.map((b) => {
@@ -69,14 +56,8 @@ export async function builds(version, { project = 'paper' } = {}) {
   })
 }
 
-/**
- * The build to use for a version when the caller does not name one.
- *
- * Prefers the newest STABLE build. Paper marks experimental builds on a new Minecraft version as
- * EXPERIMENTAL until it settles, and silently handing someone an experimental server jar because it
- * happened to be newest is how a test environment becomes an unexplained bug report. Falls back to
- * the newest build of any channel when a version has no stable one yet, saying so.
- */
+// Default is the newest STABLE build, since handing out an EXPERIMENTAL one just because it is newest
+// is a bad surprise. Falls back to the newest of any channel if the version has no stable build yet.
 export async function resolveBuild(version, wanted = null, { project = 'paper' } = {}) {
   const all = await builds(version, { project })
   const label = project === 'paper' ? 'Paper' : project[0].toUpperCase() + project.slice(1)
@@ -89,13 +70,8 @@ export async function resolveBuild(version, wanted = null, { project = 'paper' }
   return all.find((b) => b.channel === 'STABLE') ?? all[0]
 }
 
-/**
- * Download a Paper build into the jars store and verify it.
- *
- * The checksum is not ceremony: a truncated download produces a jar that unzips far enough to look
- * plausible and then fails at runtime with a class-loading error that says nothing about the real
- * cause. Verified before it is put in place, so a bad download never becomes a stored jar.
- */
+// Verified before it is put in place: a truncated download unzips far enough to look fine, then
+// fails at runtime with an unhelpful class-loading error.
 export async function fetchBuild(version, wanted = null, { force = false, onProgress = null, project = 'paper' } = {}) {
   const build = await resolveBuild(version, wanted, { project })
   if (!build.url) fail(`${project} ${version} build ${build.build} publishes no server jar.`)
@@ -113,9 +89,7 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
 
   const hash = crypto.createHash('sha256')
   const source = Readable.fromWeb(res.body)
-  // The panel reports this to someone watching a progress bar, so it is measured from the bytes
-  // that actually arrive rather than estimated. A server jar is ~50MB on a home connection: long
-  // enough that silence reads as a hang.
+  // progress is measured from the bytes that arrive; a ~50MB jar takes long enough that silence reads as a hang
   let received = 0
   const total = Number(res.headers.get('content-length')) || build.size || 0
   source.on('data', (chunk) => {
@@ -130,8 +104,7 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
     fs.rmSync(tmp, { force: true })
     fail(`checksum mismatch for ${build.name}\n  expected ${build.sha256}\n  got      ${got}`)
   }
-  // Rename only after the hash matches, so an interrupted or corrupt download leaves a .part file
-  // rather than a jar that looks stored and is not.
+  // rename only after the hash matches, so a bad download leaves a .part file rather than a jar that looks stored
   fs.renameSync(tmp, dest)
   return { ...build, path: dest, cached: false, sizeHuman: humanBytes(build.size) }
 }

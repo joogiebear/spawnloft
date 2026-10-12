@@ -1,8 +1,7 @@
 import { execFile } from 'node:child_process'
 
-/** Read Apple's ps output without using its moving-average %cpu column. CPU time is
- * cumulative minutes:seconds.hundredths (minutes can exceed 59); RSS is in KiB.
- * lstart identifies the process so a reused PID cannot silently continue its graph. */
+// CPU time is cumulative minutes:seconds.hundredths (minutes can exceed 59); RSS is in KiB.
+// lstart identifies the process so a reused PID can't continue the graph.
 export function parsePsSample(text, pid) {
   const match = /^\s*(\d+)\s+(\d+):([0-5]\d(?:\.\d+)?)\s+(\d+)\s+(\S[^\r\n]*)\s*$/.exec(text)
   if (!match || Number(match[1]) !== pid) throw new Error('macOS returned an unreadable process measurement')
@@ -12,9 +11,7 @@ export function parsePsSample(text, pid) {
   return { seconds, bytes, identity: match[5].trim() }
 }
 
-/** One short, asynchronous native query per interval. A query finishes before the next
- * is scheduled, and stopping cancels both the timer and any query still in flight.
- * No shell, helper installation, elevated permissions, or persistent Mac service. */
+// One ps query per interval, the next scheduled only after the previous finishes.
 export function startDarwinSampler(pid, {
   onSample, onError, intervalMs = 10000, execute = execFile,
   now = () => Date.now() / 1000,
@@ -43,7 +40,7 @@ export function startDarwinSampler(pid, {
     }, (error, stdout, stderr) => {
       child = null
       if (stopped) return
-      // ps exits 1 with no rows when the process is gone. Any other failure needs a reason.
+      // ps exits 1 with no output when the process is gone
       if (error?.code === 1 && !String(stdout || '').trim() && !String(stderr || '').trim()) {
         stop()
         return
