@@ -1,10 +1,4 @@
-/**
- * What a server's console says at the two moments that matter to a supervisor.
- *
- * <p>One definition, shared by the daemon (which watches for it to announce a recovery) and the
- * supervisor (which waits for it on every start). They used to be two identical regexes in two
- * files, which is one edit away from a start that never returns while the daemon says "ready".
- */
+// Console patterns for ready and failed starts, shared by the daemon and the supervisor.
 
 /** Paper, Fabric and NeoForge all print vanilla's line: Done (12.345s)! For help, type "help" */
 export const READY_RE = /Done \([\d.,]+s\)!/
@@ -23,12 +17,8 @@ export const GARNET_FAILED_RE = /address already in use|only one usage of each s
 // Longer than any line the patterns above have to see whole.
 const OVERLAP = 512
 
-/**
- * Look for the ready or failed line in newly read console text.
- *
- * <p>A read can end in the middle of a line, so what is searched is the end of the previous read
- * plus this one. Pass the returned `carry` back in with the next text.
- */
+// A read can end mid-line, so the tail of the previous read is searched along with the new text.
+// Pass the returned `carry` back in with the next text.
 export function scanConsole(carry, text, { ready, failed }) {
   const scan = carry + text
   const hit = ready.exec(scan)

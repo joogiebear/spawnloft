@@ -1,15 +1,7 @@
 /**
- * Instance daemon. Spawned detached by `mcctl start`.
- *
- * Its whole reason to exist: a Minecraft server is an interactive foreground
- * process. Running it directly from a CLI call means the call blocks forever,
- * stdin is unreachable, and console output is lost. The daemon owns the java
- * child, mirrors its output into a log file, and exposes a control socket so
- * short-lived CLI invocations can inject console lines and request shutdown.
- *
- * It also owns crash recovery, because it is the only thing alive at the
- * moment a server dies. With auto-restart on, a crash is relaunched in place
- * after a short delay; the rules live in crashguard.mjs.
+ * Instance daemon, spawned detached by `mcctl start`. Owns the server child, mirrors its
+ * output to a log file, serves a control socket for console input and shutdown, and
+ * relaunches it after a crash when auto-restart is on (rules in crashguard.mjs).
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -40,27 +32,16 @@ const dir = runDir(name)
 fs.mkdirSync(dir, { recursive: true })
 
 const diag = fs.createWriteStream(daemonLog(name), { flags: 'a' })
-// A log stream with no 'error' listener turns a full disk into an uncaughtException, and
-// the handler for that used to take the daemon down while the detached JVM kept running. The
-// log is a convenience; losing it must never cost the server its supervisor. There is nowhere
-// left to report a failure of the log itself, so it is dropped.
+// Without an 'error' listener a full disk becomes an uncaughtException, which would take the
+// daemon down while the detached JVM keeps running. A failure of the log itself is dropped.
 diag.on('error', () => {})
 function log(msg) {
   diag.write(`[${new Date().toISOString()}] ${msg}\n`)
 }
 
-/**
- * Die legibly.
- *
- * <p>Everything below runs while this module is still being evaluated, and a throw there produced
- * absolutely nothing: no state file, no daemon.log - the write stream above has not finished
- * opening yet - and no stderr, because this process is spawned detached with stdio ignored. All
- * the caller could report was that the daemon "never came up", which is true and useless. One bad
- * memory value in the registry was enough to reach it.
- *
- * <p>So the reason is written SYNCHRONOUSLY, to both places the caller looks: appendFileSync lands
- * even when the process is about to exit, and the state file is what `start` is already polling.
- */
+// A throw during module evaluation would leave no trace: the log stream has not opened yet and
+// stdio is ignored. So write the reason synchronously to the daemon log and to the state file
+// that `start` is polling.
 function die(err) {
   const reason = err?.message ?? String(err)
   try {
@@ -68,10 +49,9 @@ function die(err) {
   } catch {
     /* nothing left to try */
   }
-  // The JVM is spawned detached, so it outlives this process. If the daemon exits and leaves it
-  // running, the state file says "stopped" while the server holds the port and the world lock,
-  // and the next start fights it. A supervisor that cannot continue takes its child down with
-  // it. `child` is read inside try because die() can run before it is initialised.
+  // The JVM is detached and outlives us; leaving it running would hold the port and world lock
+  // while the state file says stopped. `child` is read inside try because die() can run before
+  // it is initialised.
   let javaPid = null
   try {
     if (child && child.exitCode === null && child.signalCode === null) {
@@ -82,8 +62,6 @@ function die(err) {
     /* not launched yet, or already gone */
   }
   try {
-    // Keep what the failed run knew about the child, so the record shows which process this
-    // daemon was responsible for when it died.
     writeJson(stateFile(name), {
       ...(javaPid !== null && state ? state : {}),
       name,
@@ -101,23 +79,18 @@ function die(err) {
 
 process.on('uncaughtException', die)
 
-// One console file per daemon, truncated once at the first start so `logs` shows this session
-// only. A crash-restart APPENDS to the same file - the lines before the crash are the reason
-// it crashed, and they must survive the recovery.
-// Finish truncating before publishing this daemon's state. An asynchronous open can leave
-// the previous session's ready line visible to a caller waiting for this launch.
+// One console file per daemon, truncated once at first start; a crash-restart appends so the
+// lines before the crash survive. Truncated synchronously, since an async open could leave the
+// previous session's ready line visible to a caller waiting on this launch.
 const out = fs.createWriteStream(consoleLog(name), { fd: fs.openSync(consoleLog(name), 'w') })
-// Same reasoning as `diag`: a failing console file (disk full) must not kill the supervisor of a
-// running server. The pipe from the child unpipes itself on a destination error; the 'data'
-// listeners below keep draining the child's output so it never blocks on a full pipe.
+// As with `diag`, a failing console file must not kill the supervisor. The pipe from the child
+// unpipes itself on a destination error; the 'data' listeners keep draining so it never blocks.
 let consoleFailed = false
 out.on('error', (err) => {
   if (consoleFailed) return
   consoleFailed = true
   log(`console log write failed: ${err.message}; console capture stopped`)
 })
-
-// ---- one run of the server --------------------------------------------------
 
 let child = null
 let inst = null
@@ -131,26 +104,18 @@ let recent = ''
 const stopWaiters = []
 const crashes = []
 
-// The last webhook in flight, so shutdown can give it a moment to land instead of exiting
-// underneath it. Capped - a dead webhook must not hold a dead server's daemon open.
+// Last webhook in flight, so shutdown can wait briefly for it. The wait is capped so a dead
+// webhook cannot hold the daemon open.
 let lastNotify = Promise.resolve()
-// Every message told is a crash and what crash guard did about it, which belongs in the server's
-// history as much as in a Discord channel: it is the one entry nobody asked for.
+// Crash messages go to the activity history as well as the webhook.
 function tell(message) {
   activity.record(name, 'crash', { ok: false, detail: message })
   lastNotify = notifyInstance(inst, message, { log })
 }
 
-/**
- * What to spawn for an instance's `java`.
- *
- * <p>Normally the binary named, with the JVM arguments as they are. A `java` that is a .mjs or .js
- * file is run by this same Node with the JVM arguments passed through untouched - a script standing
- * in for the JVM. That is what lets the lifecycle tests drive a real daemon, a real control pipe
- * and a real console log without a 50 MB server jar and a JVM on the CI runner. Node would reject
- * `-Xms4G` as a bad option if the script were named as `java` directly, which is why the daemon
- * does the routing rather than the registry.
- */
+// A `java` that is a .mjs/.js file is run by this Node as a stand-in JVM, so lifecycle tests
+// can drive a real daemon without a server jar. Node would reject `-Xms4G` as a bad option if
+// the script were spawned as `java` directly, hence the routing here.
 function javaCommand(inst, args) {
   const bin = inst.java || 'java'
   if (/\.m?js$/i.test(bin)) {
@@ -159,13 +124,9 @@ function javaCommand(inst, args) {
   return { cmd: bin, args, env: process.env }
 }
 
-/**
- * What this instance runs: the command, where, and how it is asked to stop.
- *
- * <p>A Minecraft server is Java with the jar, stopped by writing `stop` to its console. A database
- * is its engine's server binary, stopped by the engine's admin tool over TCP because it takes no
- * console input. Everything after this point - capture, state, crash handling - is the same.
- */
+// A Minecraft server is Java with the jar, stopped by writing `stop` to its console. A database
+// is its engine's server binary, stopped by the engine's admin tool over TCP since it takes no
+// console input.
 let program = null
 
 function programFor(inst) {
@@ -182,8 +143,7 @@ function programFor(inst) {
 }
 
 function launch({ first }) {
-  // Re-read the registry on every launch, not just the first: memory edits, an auto-restart
-  // toggle or a new webhook should apply at the next respawn without a manual cycle.
+  // Re-read the registry each launch so edits apply at the next respawn.
   inst = getInstance(name)
   program = programFor(inst)
   const { cmd, args, env, cwd } = program
@@ -194,21 +154,18 @@ function launch({ first }) {
     cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
-    // Off Windows, the leader of its own process group, so that a force kill can take whatever
-    // the JVM forked along with it. Windows reaches the tree through taskkill /T instead, and
-    // `detached` there would mean a console window of the server's own.
+    // Own process group off Windows so a force kill can take the JVM's forks too. Windows uses
+    // taskkill /T, and `detached` there would give the server its own console window.
     detached: process.platform !== 'win32',
     env,
   })
 
   child.stdout.pipe(out, { end: false })
   child.stderr.pipe(out, { end: false })
-  // The server can close its console while the daemon still holds it (EPIPE on the next write).
-  // That is a state of the child, reported to whoever wrote the line, not a reason to exit.
+  // The server can close its console while we still hold it (EPIPE on the next write).
   child.stdin.on('error', (err) => log(`stdin error: ${err.message}`))
 
-  // A ring of the child's last output, kept so the moment it dies the daemon can say WHY -
-  // the child is gone by then, and the daemon is the only thing still holding its last words.
+  // Tail of the child's output, kept to explain a crash after the child is gone.
   recent = ''
   const remember = (chunk) => {
     recent = (recent + chunk.toString()).slice(-32768)
@@ -216,9 +173,7 @@ function launch({ first }) {
   child.stdout.on('data', remember)
   child.stderr.on('data', remember)
 
-  // Watch this run's output until the server reports ready, so a recovery can say "back up"
-  // rather than merely "trying". Only recoveries notify - a person starting their own server
-  // does not need a message saying they did.
+  // Only recoveries notify: watch for the ready line so we can say "back up".
   if (!first) {
     let tail = ''
     let seen = false
@@ -243,9 +198,9 @@ function launch({ first }) {
     name,
     kind: kindOf(inst),
     daemonPid: process.pid,
-    // "java" by history: the pid and executable of the child, whatever it runs.
+    // javaPid/javaExe describe the child, whatever it runs.
     javaPid: child.pid,
-    // The executables behind the pids, so a status read can tell a reused pid from a live one.
+    // Executable names let a status read tell a reused pid from a live one.
     daemonExe: path.basename(process.execPath),
     javaExe: path.basename(cmd),
     startedAt: Date.now(),
@@ -261,17 +216,14 @@ function launch({ first }) {
   writeJson(stateFile(name), state)
   log(`child pid ${child.pid}`)
 
-  // Performance history starts empty every run. The old file describes a process that no longer
-  // exists, and a graph that silently splices two runs together is worse than one that starts blank.
+  // Performance history starts empty each run so a graph never splices two processes together.
   try {
     fs.rmSync(metricsFile(name), { force: true })
   } catch {
     /* a leftover file only costs a stale first sample */
   }
-  // A graph is worth less than the thing it graphs, so a sampler that cannot start says so in the
-  // daemon log and the server carries on without one.
-  // TPS and who is on come from the server itself, over RCON, and ride along with each sample.
-  // A database has neither.
+  // A sampler that cannot start is logged and the server carries on. TPS and players come from
+  // the server over RCON and ride along with each sample; a database has neither.
   ticks = isDatabase(inst) ? { latest: () => null, stop: () => {} } : startTickSampler(inst, {
     onError: (err) => log(`tick and player readings unavailable: ${err.message}`),
   })
@@ -307,8 +259,7 @@ function shutDown(code, signal, error) {
   } catch {
     /* already closed */
   }
-  // Give the log stream - and a webhook in flight - a moment to land before the process goes
-  // away, without letting either hold it open.
+  // Let the log stream and any webhook in flight land, without letting either hold us open.
   const grace = new Promise((r) => setTimeout(r, 4000))
   Promise.race([lastNotify, grace]).finally(() => setTimeout(() => process.exit(0), 250))
 }
@@ -321,17 +272,12 @@ function onExit(code, signal) {
 
   const crashed = (code !== 0 && code !== null) || Boolean(signal)
   if (crashed && !stopping) crashes.push(Date.now())
-  // Said in the state, so the panel can tell a server that crashed from one somebody stopped - an
-  // exit code alone cannot, because a forced stop exits non-zero too. The next launch writes a
-  // fresh state and clears it.
+  // An exit code alone can't tell a crash from a stop, since a forced stop exits non-zero too.
   state.crashed = crashed && !stopping
 
-  // Name the likely cause while the evidence is at hand. One finding, in the console and on
-  // the webhook - a person woken by "crashed" should not have to open a log to learn "out of
-  // memory" when the daemon already knows.
+  // Name the likely cause in the console and on the webhook. The diagnoses are Minecraft's
+  // failure shapes, so they are not run over a database's log.
   let cause = ''
-  // The diagnoses are Minecraft's failure shapes; a database's log has its own, and running
-  // Minecraft's over it would name causes that are not there.
   if (crashed && !stopping && !isDatabase(inst)) {
     const finding = diagnose(recent.split(/\r?\n/), { port: inst.port, memory: inst.memory, dir: inst.dir })[0]
     if (finding) {
@@ -340,8 +286,7 @@ function onExit(code, signal) {
     }
   }
 
-  // Freshly read, so flipping auto-restart off in the panel counts from the very next exit
-  // rather than from the next manual start.
+  // Re-read so toggling auto-restart off applies from the very next exit.
   let enabled = Boolean(inst.autoRestart)
   try {
     inst = getInstance(name)
@@ -356,8 +301,8 @@ function onExit(code, signal) {
     const wait = Math.round(verdict.delayMs / 1000)
     out.write(`[mcctl] crash ${verdict.recent} of ${CRASH_LIMIT} allowed per ${CRASH_WINDOW_MS / 60000} minutes — restarting in ${wait}s\n`)
     tell(`crashed (exit ${signal || code}).${cause} Restarting in ${wait}s.`)
-    // The state keeps running:true while the timer runs, so readState reports "stopping" rather
-    // than "stopped" - a start racing into this window would collide with the respawn.
+    // State stays running:true during the delay so readState reports "stopping", not "stopped";
+    // a start racing into this window would collide with the respawn.
     state.restarting = true
     writeJson(stateFile(name), state)
     respawnTimer = setTimeout(() => {
@@ -382,8 +327,7 @@ function onExit(code, signal) {
     return shutDown(code, signal, why)
   }
 
-  // Staying down. A crash with auto-restart off is still worth a message - it is the one case
-  // where the server is dead and nothing is going to do anything about it.
+  // Staying down.
   if (crashed && !stopping) {
     tell(`crashed (exit ${signal || code}) and is staying down — auto-restart is off.${cause}`)
   }
@@ -400,7 +344,7 @@ function forceKill() {
   if (!child || child.exitCode !== null) return
   log('force killing')
   if (process.platform === 'win32') {
-    // Kill the whole tree - the JVM may have spawned helpers.
+    // /T takes the whole tree; the JVM may have spawned helpers.
     spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true })
   } else {
     killProcessGroup(child.pid)
@@ -417,8 +361,7 @@ function waitForExit(timeoutMs) {
 
 async function handleStop(timeoutMs) {
   stopping = true
-  // A stop that lands during the respawn delay cancels the respawn - the person asked for a
-  // stopped server, and "stopped" must not mean "back in ten seconds".
+  // A stop during the respawn delay cancels the respawn.
   if (respawnTimer) {
     clearTimeout(respawnTimer)
     respawnTimer = null
@@ -437,8 +380,7 @@ async function handleStop(timeoutMs) {
         log(`stdin write failed: ${err.message}`)
       }
     } else if (program?.stop?.cmd) {
-      // A database is asked over TCP by its own admin tool. Its outcome is not awaited: the
-      // process exiting, or not, is what the wait below is watching.
+      // The tool's outcome isn't awaited; the wait below watches the process exiting.
       log(`asking for shutdown: ${program.stop.cmd} ${maskSecretArgs(program.stop.args).join(' ')}`)
       try {
         const ask = spawn(program.stop.cmd, program.stop.args, { env: program.stop.env, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
@@ -448,7 +390,6 @@ async function handleStop(timeoutMs) {
         log(`shutdown tool failed to run: ${err.message}`)
       }
     } else if (program?.stop?.resp) {
-      // A Redis-speaking engine is asked in its own protocol: checkpoint, then shut down.
       const r = program.stop.resp
       log(`asking for shutdown over the Redis protocol at ${r.host}:${r.port}`)
       if (r.terminateAfterSave) {
@@ -477,8 +418,6 @@ async function handleStop(timeoutMs) {
   }
   return { ok: true, code }
 }
-
-// --- control socket ---------------------------------------------------------
 
 const controlAddr = controlPath(name)
 if (process.platform !== 'win32') {
@@ -547,15 +486,9 @@ async function handle(req) {
   }
 }
 
-/**
- * Bind the control channel, retrying while a previous daemon for this instance
- * still holds the pipe. A restart can spawn us milliseconds after the outgoing
- * daemon's java child exited but before that daemon has released the name.
- *
- * If the channel can never be bound, the server would run unmanageable - no
- * stdin, no graceful stop. That is worse than not running, so we refuse to
- * stay up rather than silently logging the failure.
- */
+// Retry binding while a previous daemon still holds the pipe: a restart can spawn us just after
+// the outgoing java exited but before its daemon released the name. If it never binds, the
+// server would be unmanageable (no stdin, no graceful stop), so we stop it instead.
 const LISTEN_RETRY_MS = 250
 const LISTEN_TIMEOUT_MS = 15000
 
@@ -579,11 +512,10 @@ function listenWithRetry(deadline = Date.now() + LISTEN_TIMEOUT_MS) {
 
 listenWithRetry()
 
-// Keep the daemon alive even if the terminal that spawned it goes away.
+// Survive the spawning terminal going away.
 process.on('SIGINT', () => {})
 process.on('SIGTERM', () => {
-  // Exit only when the server is actually down. A stop that failed (a database checkpoint that
-  // did not save) leaves the child running; exiting anyway would orphan it with no supervisor.
+  // Exit only when the server is actually down; after a failed stop, exiting would orphan it.
   handleStop(90000).then(
     (res) => {
       if (res?.ok) process.exit(0)
