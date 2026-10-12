@@ -37,7 +37,7 @@ import * as schedule from './src/schedule.mjs'
 import * as paths from './src/paths.mjs'
 import { readProps, writeProps } from './src/props.mjs'
 import { UserError, fail, table, humanBytes, humanDuration, sleep, cleanLabel } from './src/util.mjs'
-import { parseArgs } from './src/args.mjs'
+import { parseArgs, BOOLEAN_FLAGS } from './src/args.mjs'
 import { QUERY_ALIASES, query } from './src/cli-query.mjs'
 import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
@@ -46,7 +46,7 @@ import * as activity from './src/activity.mjs'
 import { runSteps, describeStep } from './src/task-steps.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
 import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
-import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
+import { jsonLine, checkFlags, instanceName, keepCount, UsageError } from './src/cli-output.mjs'
 import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
@@ -652,14 +652,12 @@ function cmdProps(positional) {
 // ------------------------------------------------------------------- backups
 
 async function cmdBackup(positional, flags) {
+  const keep = flags.keep === undefined ? null : keepCount(flags.keep)
   if (flags.json) {
     checkFlags(flags, ['json', 'scope', 'label', 'keep', 'flush'])
     instanceName(positional, 'backup')
     if (flags.scope !== undefined && !backup.SCOPES.includes(flags.scope)) throw new UsageError('Invalid backup --scope')
     if (flags.label !== undefined && typeof flags.label !== 'string') throw new UsageError('--label requires a value')
-    if (flags.keep !== undefined && (flags.keep === true || !Number.isInteger(Number(flags.keep)) || Number(flags.keep) < 1)) {
-      throw new UsageError('--keep must be a positive whole number')
-    }
     if (flags.flush !== undefined && typeof flags.flush !== 'boolean') throw new UsageError('--flush does not take a value')
   }
   const name = requireName(positional, 'backup')
@@ -675,7 +673,7 @@ async function cmdBackup(positional, flags) {
   }
   const res = await backup.createSnapshot(inst, { scope, label: flags.label ?? null, running, flush })
   if (flags.json) {
-    const pruned = flags.keep === undefined ? [] : backup.pruneSnapshots(name, Number(flags.keep))
+    const pruned = keep === null ? [] : backup.pruneSnapshots(name, keep)
     process.stdout.write(jsonLine('backup', { instance: name, path: res.file, sizeBytes: res.size,
       scope, members: res.members, databases: res.databases, databasesSkipped: res.databasesSkipped,
       skipped: res.skipped, warnings: res.manifest.warnings, mirrored: res.mirrored, mirrorError: res.mirrorError,
@@ -698,9 +696,9 @@ async function cmdBackup(positional, flags) {
     out('  tar warnings (normal for a live server):')
     for (const w of tarWarnings) out(`    ${w}`)
   }
-  if (flags.keep) {
-    const removed = backup.pruneSnapshots(name, Number(flags.keep))
-    if (removed.length) out(`Pruned ${removed.length} old snapshot(s), keeping ${flags.keep}.`)
+  if (keep !== null) {
+    const removed = backup.pruneSnapshots(name, keep)
+    if (removed.length) out(`Pruned ${removed.length} old snapshot(s), keeping ${keep}.`)
   }
 }
 
@@ -754,7 +752,7 @@ async function cmdRestore(positional, flags) {
 function cmdPrune(positional, flags) {
   const name = requireName(positional, 'prune')
   getInstance(name)
-  const keep = Number(flags.keep ?? 10)
+  const keep = flags.keep === undefined ? 10 : keepCount(flags.keep)
   const removed = backup.pruneSnapshots(name, keep)
   out(removed.length ? `Removed ${removed.length} snapshot(s), keeping the newest ${keep}.` : 'Nothing to prune.')
 }
@@ -906,12 +904,6 @@ function cmdConfig(positional, flags) {
  */
 async function cmdData(positional, flags) {
   checkFlags(flags, ['json', 'yes', 'thorough', 'setAsidePrivateCopies'])
-  // The older commands put `--yes` last and it is not a declared boolean, so `data move --yes <folder>`
-  // reads the folder as its value. It is a folder.
-  if (typeof flags.yes === 'string') {
-    positional = [...positional, flags.yes]
-    flags.yes = true
-  }
   const [sub, ...args] = positional
   const root = paths.DATA_ROOT
   const json = flags.json === true
@@ -2074,7 +2066,7 @@ async function main() {
   // A command typed in a terminal is the person's doing. The panel, a task and the MCP server all
   // run through here too, and each says who it is for what it does.
   activity.setDefaultActor({ kind: 'cli' })
-  const { flags, positional } = parseArgs(rest, { booleanFlags: ['json', 'csv', 'follow', 'thorough', 'setAsidePrivateCopies'] })
+  const { flags, positional } = parseArgs(rest, { booleanFlags: BOOLEAN_FLAGS })
   cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
   cliContext.json = flags.json !== undefined && flags.json !== false
   if (cliContext.json && flags.json !== true) throw new UsageError('--json does not take a value')

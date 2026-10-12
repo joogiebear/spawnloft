@@ -20,6 +20,13 @@ export function checkFlags(flags, allowed) {
   }
 }
 
+export function keepCount(value) {
+  if (typeof value !== 'string' || !/^\d+$/.test(value) || Number(value) < 1) {
+    throw new UsageError('--keep must be a positive whole number')
+  }
+  return Number(value)
+}
+
 export function instanceName(positional, command) {
   if (positional.length !== 1) throw new UsageError(`Usage: spawnloft ${command} <instance>`)
   return positional[0]
