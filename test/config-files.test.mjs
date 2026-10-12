@@ -60,7 +60,7 @@ test('secret values are hidden, and ordinary keys that only look alike are not',
 })
 
 test('a URL password with no user in front of it is hidden too, and URLs without one are left alone', () => {
-  // How TAB and most Redis clients write it; the first real config read through the tool had one.
+  // How TAB and most Redis clients write it.
   assert.equal(redactConfig("    url: 'redis://:r3dis-pass@localhost:6379/0'"), "    url: 'redis://:[redacted]@localhost:6379/0'")
   for (const kept of ["url: 'redis://localhost:6379/0'", 'site: https://example.com:8443/path', 'dl: https://user@host/x']) {
     assert.equal(redactConfig(kept), kept)
@@ -256,8 +256,6 @@ test('a listing cut short keeps the top-level files and loses the deepest ones',
   const paths = files.map((f) => f.path)
   assert.ok(paths.includes('server.properties') && paths.includes('plugins/Zed/config.yml'))
 })
-
-// ---- the panel's raw server.properties editor --------------------------------
 
 test('a file edited as it was shown gets its hidden values back, line for line', () => {
   const inst = server({ 'server.properties': PROPS.replaceAll('\n', '\r\n') })

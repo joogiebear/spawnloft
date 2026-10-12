@@ -3,20 +3,14 @@ import path from 'node:path'
 import { parseProps, readProps, worldDirs } from './props.mjs'
 import { fail, isInside } from './util.mjs'
 
-/**
- * A server's text configuration, as an AI assistant may see and change it: plugin configs,
- * Paper's and Bukkit's own files, server.properties. Nothing else.
- *
- * <p>Confined to the server's own folder, to text formats a person edits by hand, and away from
- * the worlds, logs and the files that hold players' IP addresses. Values under a key that names a
- * password, token or secret are replaced with `[redacted]` on the way out, and any write that
- * would put a placeholder back into a file is refused - an assistant that read a redacted file and
- * wrote it back whole would otherwise replace a real password with the word "redacted".
- *
- * <p>The keys SpawnLoft itself writes into server.properties at every start (ports, RCON) are
- * refused too: a change there would be undone at the next start, and until then would leave
- * SpawnLoft talking to the wrong port.
- */
+// The text configuration an AI assistant may see and change: plugin configs, Paper's and
+// Bukkit's files, server.properties. Confined to the server folder, to hand-edited text formats,
+// and away from worlds, logs and files holding players' IPs.
+//
+// Values under secret-looking keys are replaced with `[redacted]` on the way out, and writes
+// containing a placeholder are refused, so a redacted file written back whole can't replace a
+// real password with the word "redacted". Keys SpawnLoft rewrites at every start (ports, RCON)
+// are refused too.
 
 export const EXTENSIONS = new Set(['.yml', '.yaml', '.json', '.json5', '.properties', '.toml', '.conf', '.cfg', '.ini', '.txt', '.hocon'])
 export const MAX_BYTES = 512 * 1024
@@ -32,7 +26,7 @@ export const MANAGED_PROPS = ['server-port', 'enable-rcon', 'rcon.port', 'rcon.p
 
 export const PLACEHOLDERS = ['[redacted]', '[ip hidden]']
 // A key that names a credential. "token" only as the whole last word, so an eco currency called
-// tokens, or a token-cost, is not taken for one.
+// tokens or a token-cost isn't taken for one.
 const SECRET_KEY = /password|passwd|secret|webhook|api[-_.]?key|private[-_.]?key|access[-_.]?key|(?:^|[-_.])(?:token|pass|pwd)$/i
 const SECRET_CAMEL = /[a-z0-9](?:Token|Pass|Pwd)$/
 const isSecretKey = (key) => SECRET_KEY.test(key) || SECRET_CAMEL.test(key)
@@ -121,7 +115,6 @@ function redactPemSameLine(body) {
   return end === -1 || !PEM_END.test(body.slice(end)) ? body : `${body.slice(0, from)}[redacted]${body.slice(end)}`
 }
 
-/** Replace every secret-looking value in a config file's text, one line at a time. */
 export function redactConfig(text) {
   let inPem = false
   return text.split('\n').map((line) => {
@@ -149,10 +142,7 @@ function excludedTops(inst) {
   return new Set([...EXCLUDED_DIRS, ...worlds].map((d) => d.toLowerCase()))
 }
 
-/**
- * A path an assistant gave, checked and resolved inside the server's folder. Throws a
- * UserError the model can act on for anything outside what this module serves.
- */
+// Resolves an assistant-supplied path inside the server folder. Errors are written for the model to act on.
 export function resolveConfigPath(inst, relative, { mustExist = true } = {}) {
   if (typeof relative !== 'string' || !relative.trim()) fail('path is required, relative to the server folder, e.g. "plugins/EcoItems/config.yml"')
   const clean = relative.trim().replace(/\\/g, '/').replace(/^\.\//, '')
@@ -176,7 +166,7 @@ export function resolveConfigPath(inst, relative, { mustExist = true } = {}) {
     fail(`${shown} is not a text configuration file (${[...EXTENSIONS].join(', ')})`)
   }
 
-  // A link inside the folder may point anywhere; follow what exists and check where it lands.
+  // A link inside the folder may point anywhere; check where the existing part really lands.
   let existing = full
   while (!fs.existsSync(existing)) existing = path.dirname(existing)
   if (!isInside(base, fs.realpathSync(existing))) fail(`${shown} leads outside the server folder`)
@@ -194,7 +184,6 @@ function readText(full, shown) {
   return buf.toString('utf8')
 }
 
-/** The configuration files under a folder of a server, as paths relative to the server. */
 export function listConfigFiles(inst, folder = '') {
   const base = fs.realpathSync(inst.dir)
   let start = base
@@ -210,8 +199,7 @@ export function listConfigFiles(inst, folder = '') {
   const excluded = excludedTops(inst)
   const files = []
   let truncated = false
-  // Breadth first, so a long listing that is cut short loses the depths of one plugin's folder,
-  // never server.properties or a plugin's own config.yml.
+  // Breadth first, so a truncated listing loses deep folders, not server.properties or a plugin's config.yml.
   let level = [start]
   for (let depth = 0; level.length && depth <= MAX_DEPTH && !truncated; depth++) {
     const next = []
@@ -236,7 +224,6 @@ export function listConfigFiles(inst, folder = '') {
   return { files, truncated }
 }
 
-/** One file's text, redacted. */
 export function readConfigFile(inst, relative) {
   const { full, shown } = resolveConfigPath(inst, relative)
   const raw = readText(full, shown)
@@ -244,11 +231,9 @@ export function readConfigFile(inst, relative) {
   return { path: shown, text, sizeBytes: Buffer.byteLength(raw), redacted: text !== raw }
 }
 
-/**
- * Work out the new text of a file without touching it: either `content` (the whole file) or an
- * exact `oldText` -> `newText` replacement that must match once. Everything that would be refused
- * is refused here, so the caller can snapshot and write knowing the write is acceptable.
- */
+// Computes the new text without touching the file: `content` (whole file) or an exact
+// `oldText` -> `newText` replacement that must match once. All refusals happen here, so the
+// caller can snapshot and write knowing the write is acceptable.
 export function planConfigWrite(inst, relative, { content, oldText, newText, hiddenRestored = false } = {}) {
   const whole = content !== undefined
   const edit = oldText !== undefined || newText !== undefined
@@ -266,8 +251,8 @@ export function planConfigWrite(inst, relative, { content, oldText, newText, hid
     }
   }
 
-  // A whole-file write of a file with hidden values could only drop them or guess them - unless
-  // restoreHidden has already put each one back from the file on disk.
+  // A whole-file write over hidden values would drop or guess them, unless restoreHidden
+  // already put them back from the file on disk.
   if (whole && !hiddenRestored && before !== null && redactConfig(before) !== before) {
     fail(`${shown} has values SpawnLoft hides (passwords, tokens), so it is not rewritten whole. Use old_text and new_text to change the lines you mean to.`)
   }
@@ -275,7 +260,7 @@ export function planConfigWrite(inst, relative, { content, oldText, newText, hid
   let after
   if (whole) {
     after = content
-    // Keep the file's own line endings: a Windows-edited config stays CRLF.
+    // Keep the file's CRLF line endings and BOM.
     if (before !== null && before.includes('\r\n') && !after.includes('\r\n')) after = after.replace(/\n/g, '\r\n')
     if (before !== null && before.charCodeAt(0) === 0xfeff && after.charCodeAt(0) !== 0xfeff) after = '\ufeff' + after
   } else {
@@ -310,15 +295,10 @@ export function planConfigWrite(inst, relative, { content, oldText, newText, hid
   return { full, shown, existed: exists, before, after }
 }
 
-/**
- * A whole file edited as it was shown - hidden values and all - with the hidden values put back.
- *
- * <p>For the panel's raw server.properties editor, which shows the file the way read_config_file
- * does, with the RCON password as [redacted]. Hiding is line by line, so a line that still carries
- * a placeholder is matched to the line it was shown as, and that line's real text is written in its
- * place. A placeholder on a line that was not shown that way - a hidden value edited, or pasted
- * somewhere new - is refused: the real value is changed by hand, in the file itself.
- */
+// For the panel's raw server.properties editor, which shows the file as read_config_file does
+// (RCON password as [redacted]). Redaction is per line, so a line still carrying a placeholder is
+// matched to the line it was shown as and replaced with its real text. A placeholder on any other
+// line (edited, or pasted elsewhere) is refused.
 export function restoreHidden(before, shownText) {
   const shown = redactConfig(before).split('\n').map((l) => l.replace(/\r$/, ''))
   const real = before.split('\n').map((l) => l.replace(/\r$/, ''))
@@ -336,11 +316,8 @@ export function restoreHidden(before, shownText) {
   }).join('\n')
 }
 
-/**
- * The mistakes that would stop a plugin loading its config at all, caught before they are
- * written. Not a validator: YAML is only checked for tab indentation, which YAML forbids and
- * which is the usual way a hand- or model-edited file breaks. JSON is parsed.
- */
+// Not a validator: catches only mistakes that stop a config loading at all. YAML is checked for
+// tab indentation (forbidden, and the usual way a hand- or model-edited file breaks); JSON is parsed.
 export function checkFormat(shown, text) {
   const ext = path.extname(shown).toLowerCase()
   if (ext === '.yml' || ext === '.yaml') {
@@ -352,7 +329,6 @@ export function checkFormat(shown, text) {
   }
 }
 
-/** Whether the file still holds what the plan was made from. */
 export function unchangedSince(plan) {
   try {
     return fs.readFileSync(plan.full, 'utf8') === plan.before
@@ -362,7 +338,6 @@ export function unchangedSince(plan) {
   }
 }
 
-/** Write a planned change: to a temporary file beside it, then renamed over it. */
 export function applyConfigWrite(plan) {
   fs.mkdirSync(path.dirname(plan.full), { recursive: true })
   const tmp = `${plan.full}.spawnloft-${process.pid}.tmp`
@@ -375,9 +350,8 @@ export function applyConfigWrite(plan) {
   }
 }
 
-/** A small line diff for the reply: the lines that changed, with a line of context. */
 export function summarizeChange(before, after, maxLines = 40) {
-  // Shown the way read_config_file shows the file, hidden values and all.
+  // Diffed as read_config_file shows the file, with secrets redacted.
   const a = redactConfig((before ?? '').replace(/^﻿/, '')).split(/\r?\n/)
   const b = redactConfig(after.replace(/^﻿/, '')).split(/\r?\n/)
   let start = 0

@@ -1,28 +1,20 @@
-/**
- * An RCON server stand-in, for tests of what a client does when a server is slow or goes away.
- *
- * <p>It speaks the Source protocol the way Minecraft does and handles each connection's packets
- * one at a time, in order, like the per-client thread Minecraft gives it: a slow command holds up
- * the packet behind it, which is what keeps the client's end-of-reply marker last. It is not
- * Minecraft - it cannot say what a real server logs or when a real one drops a socket - so
- * everything it reports is a measurement of the CLIENT: what arrived, on which connection, in
- * what order.
- *
- * <ul>
- *   <li>`delays`    - `{ 'save-all flush': 800 }` holds that command's reply for 800 ms.</li>
- *   <li>`drop`      - `{ 'save-on': 1 }` closes the connection, without replying, the first time
- *       that command arrives; `Infinity` does it every time.</li>
- *   <li>`stopAfter` - a command after whose reply the server goes away entirely, so that the next
- *       connection is refused, the way it is once a server has stopped.</li>
- *   <li>`strict`    - reads the way Minecraft's RCON thread does, which a real server was seen to
- *       do: one `read()` at a time, expecting exactly one packet in it, and hanging up on a read
- *       that holds more. Whether two packets written back to back land in one read is a race on a
- *       real machine; here the thread wakes a few milliseconds after the first byte, so they
- *       always do, and a client that writes two at once is always hung up on.</li>
- *   <li>`replies`   - replies by command, over the defaults. One longer than 4096 bytes goes
- *       out in several packets, as Minecraft sends it.</li>
- * </ul>
- */
+// Stand-in RCON server for testing what a client does when the server is slow or goes away.
+// Packets on a connection are handled one at a time, in order, like Minecraft's per-client thread,
+// so a slow command holds up the packet behind it and the end-of-reply marker stays last. It
+// cannot say what a real server logs or when it drops a socket: what it reports (commands,
+// connections, hangups) is a measurement of the client.
+//
+// Options:
+//   delays     { 'save-all flush': 800 } holds that command's reply for 800 ms.
+//   drop       { 'save-on': 1 } closes the connection without replying the first time that
+//              command arrives; Infinity does it every time.
+//   stopAfter  a command after whose reply the server goes away, so the next connection is refused.
+//   strict     reads like Minecraft's RCON thread: one read() at a time, expecting exactly one
+//              packet, hanging up on a read that holds more. On a real machine whether two packets
+//              written back to back share a read is a race; here the thread wakes a few ms after
+//              the first byte, so they always do and a client that writes two at once is hung up on.
+//   replies    replies by command, over the defaults. A reply over 4096 bytes goes out in several
+//              packets, as Minecraft sends it.
 import net from 'node:net'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -45,10 +37,10 @@ const REPLIES = {
   list: 'There are 0 of a max of 20 players online: ',
 }
 
-// How long Minecraft's RCON thread takes to wake after the first byte of a packet arrives, which
-// is all the time a second packet written straight after it needs to be in the same read.
+// How long Minecraft's RCON thread takes to wake after the first byte of a packet arrives; a second
+// packet written straight after it lands in the same read.
 const WAKE_MS = 3
-// The size of the single read it does.
+// Size of the single read it does.
 const READ_BYTES = 1460
 
 export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, stopAfter = null, strict = false, replies = {} } = {}) {
@@ -63,7 +55,7 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
   const server = net.createServer((socket) => {
     const conn = ++connections
     live.add(socket)
-    // Cancels a reply still being held for a client that has already gone.
+    // Cancels a held reply when the client has gone.
     const gone = new AbortController()
     let buf = Buffer.alloc(0)
     let authed = false
@@ -96,8 +88,8 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
       }
     }
 
-    // One read of whatever has arrived, which must be exactly one packet: the length at its front
-    // says how much follows, and a read that holds more or less than that ends the connection.
+    // One read of whatever has arrived. It must be exactly one packet, as the length at its front
+    // says, or the connection ends.
     function read() {
       waking = false
       if (socket.destroyed || !buf.length) return
@@ -110,8 +102,7 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
       parse()
     }
 
-    // Minecraft sends a reply in pieces of at most 4096 bytes, cut wherever that falls, and an empty
-    // one as one empty piece.
+    // Minecraft splits a reply into pieces of at most 4096 bytes; an empty reply is one empty piece.
     function respond(id, text) {
       let rest = Buffer.from(text, 'utf8')
       do {
@@ -136,11 +127,10 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
         respond(id, answers[body] ?? '')
         if (body === stopAfter) stopping = true
       } else {
-        // What Minecraft answers to a packet type it does not know - which is how the client's
-        // sentinel packet finds the end of a reply.
+        // Minecraft's answer to an unknown packet type, which is how the client's sentinel packet
+        // finds the end of a reply.
         socket.write(packet(id, 0, `Unknown request ${type.toString(16)}`))
-        // Only once that marker is out: a client whose connection is cut before it has the whole
-        // reply sees a dropped connection, not a server that answered and then stopped.
+        // Stop only once the marker is out, so a client never sees a cut connection mid-reply.
         if (stopping) setImmediate(() => stop())
       }
     }
@@ -154,13 +144,11 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   return {
     port: server.address().port,
-    /** Every command that reached the server, in arrival order: `{ conn, cmd }`. */
+    // Every command that reached the server, in arrival order: { conn, cmd }.
     commands,
-    /** Just the command text, in arrival order. */
     sent: () => commands.map((c) => c.cmd),
-    /** How many connections have been opened. */
     connections: () => connections,
-    /** How many times a `strict` server hung up on a read that held more than one packet. */
+    // Times a strict server hung up on a read that held more than one packet.
     hangups: () => hangups,
     close: stop,
   }

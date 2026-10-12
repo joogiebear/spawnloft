@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-/**
- * mcctl - the SpawnLoft command line. A local Minecraft server control plane.
- *
- * Manages multiple server instances on this machine: detached launch with
- * captured console, RCON command/response, stdin injection, and snapshots.
- */
+// mcctl: the SpawnLoft command line.
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -57,8 +52,6 @@ function requireName(positional, command) {
   if (!name) fail(`${command} requires an instance name. See: mcctl list`)
   return name
 }
-
-// -------------------------------------------------------------------- display
 
 const STATUS_LABEL = {
   running: 'running',
@@ -182,11 +175,7 @@ function printFindings(name) {
   return findings.length
 }
 
-/**
- * The question a dead server actually raises, answered from its own console. Reads the
- * known failure shapes out of the last run and lists Minecraft's own crash reports; when
- * nothing matches, it says so instead of guessing.
- */
+/** Explain a dead server from its own console and crash reports; says so when nothing matches. */
 function cmdWhy(positional) {
   const name = requireName(positional, 'why')
   const inst = getInstance(name)
@@ -204,8 +193,6 @@ function cmdWhy(positional) {
     }
   }
 }
-
-// --------------------------------------------------------------- lifecycle
 
 async function cmdStart(positional, flags) {
   const name = requireName(positional, 'start')
@@ -268,8 +255,6 @@ async function cmdKill(positional) {
   if (res.alreadyStopped) out(`"${name}" was not running.`)
   else out(`"${name}" force-killed.`)
 }
-
-// ------------------------------------------------------------------- console
 
 function cmdLogs(positional, flags) {
   const name = requireName(positional, 'logs')
@@ -353,13 +338,11 @@ async function cmdConsole(positional) {
   out(`--- detached from "${name}" (still running) ---`)
 }
 
-// --------------------------------------------------------------- provisioning
-
 async function cmdNew(positional, flags) {
   const name = requireName(positional, 'new')
 
-  // --modpack <slug> is its own creation path: the pack decides the loader, the Minecraft
-  // version, the mods and the config, so the usual flags for those do not apply.
+  // --modpack is its own creation path: the pack decides loader, Minecraft version, mods and
+  // config, so the usual flags for those do not apply.
   if (flags.modpack) {
     const res = await mrpack.createFromModpack(name, String(flags.modpack), {
       memory: flags.memory ?? '4G',
@@ -381,10 +364,8 @@ async function cmdNew(positional, flags) {
     return
   }
 
-  // --paper <version>, --purpur <version>, --spigot <version> and the rest make "spin up a fresh
-  // environment on version X" one command instead of three. Every jar-shaped source goes through
-  // the same fetch: resolve the version, put the jar in the store, place it. Downloading first
-  // means a failed fetch leaves no half-made instance behind.
+  // --paper, --purpur, --spigot etc. all go through the same fetch: resolve the version, store
+  // the jar, place it. Download first so a failed fetch leaves no half-made instance behind.
   let jar = flags.jar ?? null
   let loader = 'paper'
   let mcVersion = null
@@ -399,8 +380,8 @@ async function cmdNew(positional, flags) {
     const sw = software.softwareOf(id)
     if (sw.slow) out(`${sw.label} is compiled here by BuildTools - this takes several minutes the first time.`)
     let lastLine = ''
-    // Which Java, before the download: --java as given, else the newest installed that this
-    // version can run on. Refused when nothing here is new enough, unless --force.
+    // Pick Java before downloading: --java as given, else the newest installed one this version
+    // can run on. Refused if none is new enough, unless --force.
     chosenJava = await java.pickJava({
       explicit: flags.java ?? null,
       needs: java.requiredMajor(version),
@@ -424,8 +405,8 @@ async function cmdNew(positional, flags) {
     loader = id
     mcVersion = version
   }
-  // --neoforge <version>: its installer lays the server down and the starter jar makes it
-  // launch like every other, so this is its own branch rather than a jar to pass along.
+  // --neoforge: its installer lays the server down and a starter jar launches it, so this is its
+  // own branch rather than a jar to pass along.
   if (flags.neoforge) {
     const res = await neoforge.createServer(name, String(flags.neoforge), {
       java: await java.pickJava({
@@ -455,9 +436,8 @@ async function cmdNew(positional, flags) {
     port: flags.port ? Number(flags.port) : null,
     rconPort: flags.rconPort ? Number(flags.rconPort) : null,
     acceptEula: Boolean(flags.acceptEula),
-    // --offline for joining as any name without an account, which is what multi-account testing
-    // needs. It also puts an OFFLINE/INSECURE banner in every log the server writes, so it is a
-    // choice rather than the default.
+    // --offline lets anyone join under any name (multi-account testing) but puts an
+    // OFFLINE/INSECURE banner in every server log, so it is opt-in.
     onlineMode: !flags.offline,
     motd: flags.motd ?? null,
     java: chosenJava,
@@ -531,9 +511,8 @@ function cmdRemove(positional, flags) {
     fail(`--purge deletes ${inst.dir} permanently. Re-run with --yes to confirm.`)
   }
   removeInstance(name)
-  // The panel's delete does this through manage.destroy; this command has its own older path and
-  // was missing it. A trigger that outlives its server fires forever, fails every time, and turns
-  // up months later in Task Scheduler with nothing to say what put it there.
+  // Drop this server's scheduled tasks, as the panel's delete does: a trigger that outlives its
+  // server fails on every run and lingers in Task Scheduler.
   let dropped = 0
   try {
     dropped = schedule.removeForInstance(name).removed
@@ -564,7 +543,7 @@ function cmdSet(positional) {
       case 'memory':
         patch.memory = value
         break
-      // What the panel calls it. Anything goes here; the name stays the folder and the argument.
+      // Display name only; the instance name stays the folder and the argument.
       case 'label':
         patch.label = value.toLowerCase() === 'off' ? null : cleanLabel(value)
         break
@@ -583,8 +562,8 @@ function cmdSet(positional) {
       case 'rcon.password':
         patch.rcon = { ...(patch.rcon ?? inst.rcon), password: value }
         break
-      // The daemon re-reads the registry at every java exit, so both of these apply to a RUNNING
-      // server from its next exit - no restart needed to arm them.
+      // The daemon re-reads the registry at every java exit, so these apply to a running server
+      // from its next exit.
       case 'auto-restart':
         if (!['on', 'off', 'true', 'false'].includes(value.toLowerCase())) {
           fail('auto-restart takes on or off')
@@ -603,9 +582,8 @@ function cmdSet(positional) {
         fail(`unknown setting "${key}" - one of: label, memory, java, jar, port, rcon.port, rcon.password, auto-restart, webhook`)
     }
   }
-  // Before the registry, not after. An instance runs the jar in its own directory, and recording a
-  // filename that is not there yet leaves a server that cannot start - which is what used to
-  // happen, discovered at the next start rather than here.
+  // Place the jar before updating the registry: an instance runs the jar in its own directory,
+  // so recording a filename that is not there leaves a server that cannot start.
   if (patch.jar) create.placeJar(inst.dir, patch.jar)
 
   updateInstance(name, patch)
@@ -613,8 +591,7 @@ function cmdSet(positional) {
   for (const [k, v] of Object.entries(patch)) out(`  ${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`)
 
   if (patch.jar) {
-    // Reported, never deleted. The jar it was running is the way back if the new version turns out
-    // to be wrong, and fifty megabytes is not a good enough reason to take that away from someone.
+    // Reported, never deleted: the old jar is the way back if the new version is wrong.
     const stray = create.strayJars(inst.dir, patch.jar)
     if (stray.length) {
       out('')
@@ -649,8 +626,6 @@ function cmdProps(positional) {
   if (sup.isRunning(name)) out('Restart the instance for changes to take effect.')
 }
 
-// ------------------------------------------------------------------- backups
-
 async function cmdBackup(positional, flags) {
   const keep = flags.keep === undefined ? null : keepCount(flags.keep)
   if (flags.json) {
@@ -666,7 +641,7 @@ async function cmdBackup(positional, flags) {
   const running = sup.isRunning(name)
   const flush = flags.flush !== false
 
-  // The flush itself lives in createSnapshot, so every caller gets it; this only narrates it.
+  // createSnapshot does the flush; this only narrates it.
   if (!flags.json) {
     if (running && flush) out('Flushing world to disk (save-all), then snapshotting...')
     else out(`Snapshotting "${name}" (scope: ${scope})...`)
@@ -757,12 +732,7 @@ function cmdPrune(positional, flags) {
   out(removed.length ? `Removed ${removed.length} snapshot(s), keeping the newest ${keep}.` : 'Nothing to prune.')
 }
 
-/**
- * Prove the snapshots restore, before the day that gets found out the hard way.
- *
- * <p>Exits non-zero when anything fails, so a scheduled `mcctl verify <name> --all` can be
- * noticed by whatever runs it rather than scrolling past as text.
- */
+/** Read snapshots back to prove they restore; exits non-zero on failure so a scheduled run is noticed. */
 async function cmdVerify(positional, flags) {
   const name = requireName(positional, 'verify')
   getInstance(name)
@@ -793,8 +763,6 @@ async function cmdVerify(positional, flags) {
   }
   if (failed) process.exitCode = 1
 }
-
-// ------------------------------------------------------- templates and jars
 
 function cmdTemplates(positional, flags) {
   const sub = positional[0]
@@ -845,14 +813,14 @@ function cmdConfig(positional, flags) {
     if (!dir) fail(`usage: mcctl config ${sub} <path>`)
     const abs = path.resolve(dir)
     const check = settings.checkWritable(abs)
-    // Written to, not merely inspected: permission bits and free-space numbers both lie about a
-    // network share, a read-only mount, or a drive that has been unplugged.
+    // Write-tested rather than inspected: permission bits and free space both lie on network
+    // shares, read-only mounts and unplugged drives.
     if (!check.ok) fail(`cannot write to ${abs}
   ${check.error}`)
 
-    // set-root names the data folder, which is what a damaged settings file would have held, so it may
-    // replace one - keeping the damaged file, and saying so. set-instances does not name it, and would
-    // drop it along with the damage: it refuses instead.
+    // set-root names the data folder a damaged settings file would have held, so it may replace
+    // one (keeping the damaged file). set-instances does not, and would drop it with the damage,
+    // so it refuses.
     settings.save(sub === 'set-root'
       ? { dataRoot: abs }
       : { instancesDir: abs, separateInstances: true },
@@ -895,12 +863,9 @@ function cmdConfig(positional, flags) {
   fail('usage: mcctl config [show|set-root <path>|set-instances <path>|same-drive]')
 }
 
-// ----------------------------------------------------------------------- data
-
 /**
- * Moving the data folder, and leaving a link where it was. See data-move.mjs for why a link and not
- * a setting: the registry lives inside the folder, so changing where the folder is would lose the
- * servers, and the paths they are stored under would all be wrong.
+ * Move the data folder and leave a link where it was. A link rather than a setting because the
+ * registry lives inside the folder; see data-move.mjs.
  */
 async function cmdData(positional, flags) {
   checkFlags(flags, ['json', 'yes', 'thorough', 'setAsidePrivateCopies'])
@@ -1039,9 +1004,7 @@ async function cmdRebuild(positional, flags) {
   }
   const res = await manage.rebuild(name, {
     keepPlugins: !flags.wipePlugins,
-    // The parser turns --no-snapshot into { snapshot: false }, the same as --no-wait and
-    // --no-sync in cmdStart. Reading flags.noSnapshot here read a key it never writes, so the
-    // documented flag was silently ignored and a snapshot taken anyway.
+    // The parser turns --no-snapshot into { snapshot: false }, like --no-wait and --no-sync.
     snapshot: flags.snapshot !== false,
   })
   if (res.snapshot) out(`Snapshot: ${res.snapshot}`)
@@ -1055,12 +1018,9 @@ function cmdReveal(positional) {
 }
 
 /**
- * Move a server to a newer build of its software (Paper, Purpur, Folia or Advanced Slime Paper),
- * or - deliberately harder - a newer Minecraft version.
- *
- * <p>A build update is routine and just happens; the old jar stays in the instance folder as
- * the way back. Crossing Minecraft versions migrates the worlds one-way on the next start, so
- * it takes --yes, and a standard snapshot is taken before anything is swapped.
+ * Move to a newer build of the server software, or a newer Minecraft version. A build update
+ * keeps the old jar as the way back. Crossing Minecraft versions migrates worlds one-way on the
+ * next start, so it needs --yes and takes a standard snapshot first.
  */
 async function cmdUpgrade(positional, flags) {
   const name = requireName(positional, 'upgrade')
@@ -1105,9 +1065,8 @@ async function cmdUpgrade(positional, flags) {
 }
 
 /**
- * A modpack server's pack: what it runs, whether a newer release exists, and moving to it.
- * The update takes a standard snapshot first and only ever deletes files the old pack owned
- * that the new one dropped - the worlds and anything hand-added are not the pack's to touch.
+ * Show, check or update a modpack server's pack. An update snapshots first and only deletes
+ * files the old pack owned that the new one dropped.
  */
 async function cmdPack(positional, flags) {
   const name = requireName(positional, 'pack')
@@ -1149,7 +1108,6 @@ async function cmdPack(positional, flags) {
   fail('usage: mcctl pack <name> [update --yes]')
 }
 
-/** Worlds: list, switch, import, export, delete. The panel's Worlds tab, for a terminal. */
 async function cmdWorlds(positional, flags) {
   const name = requireName(positional, 'worlds')
   const inst = getInstance(name)
@@ -1211,7 +1169,6 @@ async function cmdWorlds(positional, flags) {
   fail('usage: mcctl worlds <name> [use <world> | import <src> --as <name> | export [world] | delete <world> --yes]')
 }
 
-/** List a server's plugins, or flip one on or off. The panel's Plugins tab, for a terminal. */
 function cmdPlugins(positional) {
   const name = requireName(positional, 'plugins')
   const inst = getInstance(name)
@@ -1234,9 +1191,8 @@ function cmdPlugins(positional) {
     out(`No plugins in ${path.join(inst.dir, 'plugins')}. The panel's Plugins tab installs from Modrinth.`)
     return
   }
-  // The CLI is an inventory, so it lists everything - but SOURCE says which jars are mcctl's
-  // to update ("modrinth") and which are the person's own ("manual"). The panel lists only
-  // the former.
+  // Lists everything; SOURCE separates jars mcctl updates ("modrinth") from the user's own
+  // ("manual"). The panel lists only the former.
   const t = [['NAME', 'VERSION', 'STATE', 'SOURCE', 'FILE', 'SIZE']]
   for (const p of rows) {
     t.push([p.name, p.version ?? '-', p.enabled ? 'on' : 'off',
@@ -1247,8 +1203,8 @@ function cmdPlugins(positional) {
 
 
 function cmdLaunchers(positional) {
-  // Backfills instances made before launchers existed, and repairs them if mcctl moves on disk -
-  // the .bat files hold an absolute path to the CLI.
+  // Backfills instances made before launchers existed and repairs them if mcctl moves; the .bat
+  // files hold an absolute path to the CLI.
   const targets = positional.length ? positional.map(getInstance) : listInstances()
   for (const inst of targets) {
     const files = create.writeLaunchers(inst)
@@ -1261,8 +1217,7 @@ function cmdLaunchers(positional) {
 async function cmdUi(positional, flags) {
   const { url } = await ui.serve({
     port: Number(flags.port ?? 8770),
-    // --no-open arrives as { open: false }; flags.noOpen was a key the parser never writes,
-    // so the flag was silently ignored and the browser opened anyway.
+    // --no-open arrives as { open: false }.
     open: flags.open !== false,
   })
   out(`SpawnLoft panel: ${url}`)
@@ -1329,15 +1284,10 @@ function cmdJars(positional, flags) {
   out(table(rows))
 }
 
-// -------------------------------------------------------------------- doctor
-
 /**
- * Scheduled tasks.
- *
- * <p>`task run` is what Windows Task Scheduler actually invokes, through a small batch file, and it
- * is the only thing a trigger is able to call. What a task DOES comes from its stored definition
- * rather than from the command line, so a scheduled task can only ever be one of the handful of
- * things mcctl allows a task to be - not a way to run whatever was written into a trigger.
+ * Scheduled tasks. `task run` is what Task Scheduler invokes, through a small batch file. What a
+ * task does comes from its stored definition, not the command line, so a trigger can only ever
+ * run one of the actions mcctl allows.
  */
 async function cmdTask(positional, flags) {
   const sub = positional[0] ?? 'list'
@@ -1370,8 +1320,8 @@ async function cmdTask(positional, flags) {
   }
 
   if (sub === 'linger') {
-    // Linux only: whether this account's tasks outlive its login session. The panel has a button
-    // for this; a server with no screen needs the same thing in words.
+    // Linux only: whether this account's tasks outlive its login session. The panel has a
+    // button for this; a headless server needs it here.
     if (positional[1] === 'on') {
       schedule.keepRunningLoggedOut()
       out('Lingering is on. Tasks now run whether or not you are logged in, from boot.')
@@ -1385,7 +1335,7 @@ async function cmdTask(positional, flags) {
   if (sub === 'run') {
     const id = positional[1]
     if (!id) fail('usage: mcctl task run <id>')
-    // Whatever the task does is the schedule's doing, named as the person named it.
+    // Attribute the task's actions to the schedule.
     return activity.asActor({ kind: 'schedule', name: schedule.load().tasks[id]?.name ?? id }, () => runTask(id))
   }
 
@@ -1406,7 +1356,7 @@ async function cmdTask(positional, flags) {
       : { kind: 'daily', at: String(flags.daily === true ? '03:00' : flags.daily ?? flags.at ?? '03:00') }
     const made = schedule.create({ instance, name: flags.name ?? null, action, schedule: sched })
     out(`Created "${made.id}" - ${made.name}, ${describeSchedule(made.schedule)}.`)
-    // Said when the task is made, not only when the list is read: this is the moment it matters.
+    // Warn at creation, not only when listing.
     const note = schedule.loggedOutNote()
     if (note[0].startsWith('WARNING')) { out(''); for (const line of note) out(line) }
     return
@@ -1431,12 +1381,8 @@ async function cmdTask(positional, flags) {
   fail('usage: mcctl task [list|add|run|rm|enable|disable|linger]')
 }
 
-/**
- * A scheduler's time, to the minute, on this machine's clock.
- *
- * <p>Windows answers in local time with an offset, launchd and systemd in UTC. Cutting the string
- * at sixteen characters printed whichever it was, so a 04:30 backup read as 09:30 off Windows.
- */
+// Windows reports local time with an offset, launchd and systemd report UTC, so slicing the
+// string would show the wrong clock; convert to this machine's local minute instead.
 function localMinute(iso) {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return String(iso).replace('T', ' ').slice(0, 16)
@@ -1454,18 +1400,12 @@ function describeSchedule(s) {
   }
 }
 
-/**
- * Perform one scheduled task.
- *
- * <p>Runs unattended, so everything it does is written down: Task Scheduler records the exit code,
- * and stdout goes to the instance's own run directory where the panel can show it next to the task
- * that produced it. A failure at 3am that leaves no trace is the reason to bother.
- */
-// How long an unattended start waits for the server to report ready before calling it a failure.
-// Passed explicitly rather than left to the default so the number in the log line cannot drift
-// away from the number actually waited.
+// How long an unattended start waits for ready before calling it a failure. Passed explicitly so
+// the number in the log line matches the number waited.
 const TASK_START_TIMEOUT = 180000
 
+// Runs unattended, so every outcome is logged to the instance's tasks.log and stdout, and
+// failures set the exit code Task Scheduler sees.
 async function runTask(id) {
   const all = schedule.load().tasks
   if (!Object.hasOwn(all, id)) fail(`no scheduled task "${id}"`)
@@ -1473,18 +1413,11 @@ async function runTask(id) {
   const { instance, action } = task
   const started = Date.now()
 
-  /**
-   * One line per run, and the exit code Windows will see.
-   *
-   * <p>Three outcomes, not two. A command task whose server happens to be down did not fail - there
-   * was simply nothing to send - and calling that a failure every hour teaches you to ignore the
-   * word. It is recorded as skipped and reported to Windows as success, so the two records agree;
-   * they did not before, and a log saying FAILED beside a scheduler saying ok is worse than either.
-   */
+  // One log line per run. Three outcomes: ok, FAILED, and skipped (e.g. a command task with the
+  // server down), which counts as success for the scheduler so the log and scheduler agree.
   const record = (status, detail) => {
-    // The id is written down because one instance can have several tasks of the same type -
-    // two backup schedules, say - and a line that only says "backup" cannot say which.
-    // Tabs and newlines are stripped from the detail so one run stays one parseable line.
+    // The id is in the line because one instance can have several tasks of the same type.
+    // Tabs and newlines are stripped so a run stays one parseable line.
     const flat = String(detail).replace(/[\t\r\n]+/g, ' ')
     const line = `${new Date().toISOString()}\t${id}\t${status}\t${action.type}\t${flat}`
     try {
@@ -1497,8 +1430,8 @@ async function runTask(id) {
     out(line)
   }
 
-  // A failed task runs at 3am with nobody watching, which is exactly what the webhook is for.
-  // Awaited so the process does not exit under the delivery; best-effort beyond that.
+  // Scheduled runs have nobody watching, which is what the webhook is for. Awaited so the
+  // process does not exit mid-delivery; best-effort beyond that.
   const alert = async (detail) => {
     try {
       await notifyInstance(getInstance(instance), `scheduled task "${task.name}" FAILED: ${detail}`)
@@ -1507,15 +1440,8 @@ async function runTask(id) {
     }
   }
 
-  /**
-   * Start the server, and wait to find out whether it survived.
-   *
-   * <p>This used to pass `wait: false` and record "restarted" the moment the process existed. A
-   * server that died eight seconds later on a broken plugin therefore reported success to Task
-   * Scheduler and wrote "ok" into the log - and the nightly restart that was quietly leaving the
-   * server down looked healthy for as long as anyone cared to check. Nothing is waiting on this
-   * task, so there is no reason to answer before the answer is known.
-   */
+  // Start the server and wait to see whether it survived, so one that dies shortly after launch
+  // is not logged as ok. Nothing is waiting on the task, so there is no reason to answer early.
   const startAndReport = async (verb) => {
     const res = await sup.start(instance, { timeout: TASK_START_TIMEOUT })
     if (res.failed) {
@@ -1538,17 +1464,14 @@ async function runTask(id) {
     if (action.type === 'backup') {
       const res = await backup.createSnapshot(inst, { scope: 'standard', label: 'scheduled', running, taskId: id })
       let pruned = ''
-      // Pruned AFTER the new one exists, never before: trimming first would mean a failed backup
-      // leaves you with fewer than you had, which is the opposite of what a retention limit is for.
+      // Prune after the new snapshot exists, never before, so a failed backup does not leave
+      // fewer than you had.
       if (Number.isInteger(action.keep) && action.keep > 0) {
-        // Scoped to this task's own snapshots. Scheduled ones taken before snapshots recorded
-        // which task made them have no id and belong to nobody, so they are left where they are
-        // rather than being counted against a limit that was never about them.
+        // Only this task's own snapshots; older scheduled ones have no task id and are left alone.
         const gone = backup.pruneSnapshots(instance, action.keep, { only: 'scheduled', taskId: id })
         if (gone.length) pruned = `, pruned ${gone.length} over the limit of ${action.keep}`
       }
-      // Nobody is watching a scheduled backup, so a server it may have left with autosave off is
-      // said in the run's own line, not only in a manifest nobody opens.
+      // Put a possible autosave-off warning in the run line; nobody opens the manifest.
       record('ok', `${res.file} (${humanBytes(res.size)})${pruned}${res.saveOnWarning ? `; WARNING: ${res.saveOnWarning}` : ''}`)
     } else if (action.type === 'verify') {
       const snaps = backup.listSnapshots(instance)
@@ -1571,9 +1494,8 @@ async function runTask(id) {
       record('ok', action.line)
     } else if (action.type === 'restart') {
       if (running && action.warnMinutes > 0) {
-        // Counted down over the console: the full figure up front, again at one minute, again at
-        // ten seconds. Announcements are best-effort - a server that dies mid-countdown has made
-        // the warning moot, and the stop below already copes with a stopped server.
+        // Announce over the console at the full time, at one minute and at ten seconds.
+        // Best-effort: the stop below already copes with a server that died mid-countdown.
         const say = (msg) => sup.sendConsole(instance, `say ${msg}`).catch(() => {})
         let remaining = action.warnMinutes * 60
         await say(`Server restarting in ${action.warnMinutes} minute${action.warnMinutes === 1 ? '' : 's'}`)
@@ -1598,8 +1520,8 @@ async function runTask(id) {
       if (running) return record('skipped', 'it was already running')
       return await startAndReport('started')
     } else if (action.type === 'steps') {
-      // The chain's rules live in task-steps.mjs; what each step does to the server is here, the
-      // same calls the single-action tasks above make.
+      // Chain rules live in task-steps.mjs; each step here makes the same calls as the
+      // single-action tasks above.
       const res = await runSteps(action, {
         isRunning: () => sup.isRunning(instance),
         send: (line) => sup.sendConsole(instance, line),
@@ -1636,12 +1558,9 @@ async function runTask(id) {
   out(`done in ${Math.round((Date.now() - started) / 1000)}s`)
 }
 
-// ------------------------------------------------------------------------ db
-
 /**
- * Databases: MariaDB run under the same supervision as a server, attached to servers with
- * credentials of their own. start/stop/restart/logs/status take a database's name like a
- * server's; this group is what is specific to them.
+ * Database-specific subcommands. start/stop/restart/logs/status take a database's name like a
+ * server's.
  */
 async function cmdDb(positional, flags) {
   const sub = positional[0] ?? 'list'
@@ -1800,11 +1719,9 @@ function printCredentials(c) {
   out('Configure your plugins manually with these values. SpawnLoft does not edit plugin configs.')
 }
 
-// ----------------------------------------------------------------- uninstall
-
 /**
- * What the Windows uninstaller runs before it removes the program: stop every server, remove every
- * scheduled task, and - only when asked - delete what this program created. See uninstall.mjs.
+ * Run by the Windows uninstaller: stops servers, removes scheduled tasks, and with --data deletes
+ * what SpawnLoft created. See uninstall.mjs.
  */
 async function cmdUninstall(positional, flags) {
   if (!flags.yes) {
@@ -1848,12 +1765,7 @@ async function cmdDoctor(positional, flags = {}) {
   process.exitCode = 1
 }
 
-// ----------------------------------------------------------------------- mcp
-
-/**
- * An MCP server on stdio, for an AI client the person configured to launch it. Never started by
- * SpawnLoft itself and never listening on a port: the client owns this process and its lifetime.
- */
+/** MCP server on stdio, launched by the client, which owns the process. Never listens on a port. */
 async function cmdMcp(positional, flags) {
   checkFlags(flags, ['allowDestructive', 'showIps'])
   if (positional.length) throw new UsageError('Usage: spawnloft mcp [--allow-destructive] [--show-ips]')
@@ -1861,8 +1773,8 @@ async function cmdMcp(positional, flags) {
   try {
     version = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')).version
   } catch { /* a checkout without package.json still serves */ }
-  // A client started as a Windows package can be reading a private copy of SpawnLoft's data and not
-  // know it, so it is told once, here. See private-copy.mjs.
+  // A client started as a Windows package can be reading a private copy of SpawnLoft's data
+  // without knowing it, so tell it once here. See private-copy.mjs.
   const notice = mcpNotice(await findPrivateCopies())
   await serveStdio({
     info: { name: 'spawnloft', title: 'SpawnLoft', version: version ?? '0.0.0' },
@@ -1871,8 +1783,6 @@ async function cmdMcp(positional, flags) {
     scrub: scrubber({ showIps: flags.showIps === true }),
   })
 }
-
-// ---------------------------------------------------------------------- help
 
 function cmdHelp() {
   out(`spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.
@@ -2001,8 +1911,6 @@ DATABASES
 `)
 }
 
-// ---------------------------------------------------------------------- main
-
 const COMMANDS = {
   list: cmdList,
   ls: cmdList,
@@ -2063,8 +1971,8 @@ const COMMANDS = {
 
 async function main() {
   const [, , command, ...rest] = process.argv
-  // A command typed in a terminal is the person's doing. The panel, a task and the MCP server all
-  // run through here too, and each says who it is for what it does.
+  // A terminal command is the person's doing; the panel, tasks and MCP server also run through
+  // here and set their own actor.
   activity.setDefaultActor({ kind: 'cli' })
   const { flags, positional } = parseArgs(rest, { booleanFlags: BOOLEAN_FLAGS })
   cliContext.command = Object.hasOwn(QUERY_ALIASES, command) ? QUERY_ALIASES[command] : (command === 'snapshot' ? 'backup' : command)
@@ -2093,8 +2001,8 @@ async function main() {
   await handler(positional, flags)
 }
 
-// A pipe consumer such as `head` can close stdout deliberately. Do not turn that into
-// a stack trace (or leave a follow process running after its consumer is gone).
+// A pipe consumer such as `head` can close stdout deliberately; exit quietly instead of
+// printing a stack trace or leaving a follow process running.
 process.stdout.on('error', error => {
   if (error.code === 'EPIPE') process.exit(0)
   process.stderr.write(`Output failed: ${error.message}\n`)

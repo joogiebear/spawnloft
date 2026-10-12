@@ -20,19 +20,9 @@ import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
 import * as activity from './activity.mjs'
 
-/**
- * What an AI client may do to this machine's servers, and exactly that much.
- *
- * <p>Three tiers. Reading is always offered. Actions a person could undo - start, stop, a
- * backup, a plugin install with a snapshot before it - are offered and marked as writes, so a
- * client asks before running them. Destructive tools are not offered at all unless the client's
- * own configuration passes `--allow-destructive`; the model cannot talk its way into a tool it
- * was never shown. Those that are offered still answer a first call with a description of what
- * would happen and act only when called again with `confirm: true` - the `--yes` of the CLI.
- *
- * <p>Deliberately absent: deleting a server (worlds go with it), database credentials, and any
- * setting that holds a secret. Every result passes through `scrubber()` on the way out.
- */
+// Tiers: read tools are always offered; undoable actions are offered but marked as writes;
+// destructive tools exist only with `--allow-destructive` and need `confirm: true` after a preview.
+// Deleting a server, database credentials and secret settings are deliberately not exposed.
 
 const MAX_LOG_LINES = 500
 const LEVEL_RE = {
@@ -40,8 +30,8 @@ const LEVEL_RE = {
   error: / (ERROR|SEVERE|FATAL)\]|Exception/,
   warn: / (WARN|WARNING|ERROR|SEVERE|FATAL)\]|Exception/,
 }
-// Commands that would take the server down behind the supervisor's back - it would read the exit
-// as a crash - or run Bukkit's reload, which leaves plugins half-initialised. Each has a tool.
+// These would stop the server behind the supervisor's back (read as a crash) or run Bukkit's
+// reload, which leaves plugins half-initialised. stop and restart have their own tools.
 const REFUSED_COMMANDS = new Set(['stop', 'restart', 'reload', 'rl'])
 const UNRECOGNISED_JAR = 'is not a jar SpawnLoft can update: it updates the Paper, Purpur, Folia and Advanced Slime Paper jars it downloaded itself'
 
@@ -74,8 +64,6 @@ function lines(list) {
   return list.length ? list.join('\n') : '(no lines)'
 }
 
-// ------------------------------------------------------------------- read-only
-
 const readTools = [
   {
     name: 'list_servers', title: 'List servers', annotations: READ,
@@ -86,8 +74,7 @@ const readTools = [
       const rows = [...data.instances, ...data.databases].map((r) =>
         `${r.name}: ${r.status}${r.kind === 'database' ? ` (database, ${r.engine})` : ''}${r.port ? `, port ${r.port}` : ''}`)
       if (rows.length) return { data, text: rows.join('\n') }
-      // An empty list is also what a data root pointed at the wrong folder looks like, so say
-      // which folder was read, and where servers were found instead.
+      // An empty list can mean the data root points at the wrong folder, so say which was read.
       const elsewhere = describeServersElsewhere(DATA_ROOT)
       return { data: { ...data, dataRoot: DATA_ROOT, serversElsewhere: serversElsewhere(DATA_ROOT) },
         text: [`No servers in ${DATA_ROOT}.`, ...elsewhere.map((l) => `NOTE: ${l}`)].join('\n') }
@@ -178,9 +165,8 @@ const readTools = [
         cpuLast: cpu.at(-1) ?? null, memoryMiBLast: rss.at(-1) ?? null, memoryMiBMax: rss.length ? Math.max(...rss) : null }
       let tick = {}
       if (!isDatabase(inst) && sup.isRunning(n)) {
-        // Paper answers tps and mspt; vanilla and Fabric answer tick query. Whatever the server does
-        // not know comes back as an unknown-command line and is left out. The same reader the
-        // daemon uses for the panel, so the two cannot disagree about what a reply means.
+        // Paper answers tps and mspt; vanilla and Fabric answer tick query. Unknown commands are
+        // left out. Same reader as the daemon's panel, so both interpret replies identically.
         tick = (await readTick(async (cmd) => (await rconExec(inst, [cmd]))[0])).replies
       }
       const data = { name: n, running: m.running, windowSeconds: seconds, cores: m.cores, cpuScale: m.cpuScale,
@@ -312,9 +298,8 @@ const readTools = [
     inputSchema: object({ name, path: { type: 'string', minLength: 1, description: 'Path inside the server folder, e.g. "plugins/EcoItems/config.yml"' } }, ['name', 'path']),
     run({ name: n, path: p }) {
       const file = configFiles.readConfigFile(server(n), p)
-      // The file goes in the structured data as well as the reply: a client that has structured data
-      // shows the model that instead of the text (Claude Code does), so leaving it out there
-      // returned a file with no contents.
+      // The file must be in the structured data too: clients that have it (Claude Code) show the
+      // model that instead of the text.
       return { data: { name: n, ...file }, text: file.text || '(the file is empty)' }
     },
   },
@@ -324,16 +309,14 @@ const readTools = [
     inputSchema: object(),
     async run() {
       const data = await runDoctor({ repair: false })
-      // A client that is itself the one being redirected reads the copy as the real thing, so for it
-      // the check finds nothing to compare: it must not be left with a bare "No problems found."
+      // A client that is itself redirected to the private copy sees nothing to compare, so it
+      // gets the notice rather than a bare "No problems found."
       const notice = mcpNotice(data.privateCopies)
       const text = data.healthy ? 'No problems found.' : `${data.problems.length} problem(s):\n- ${data.problems.join('\n- ')}`
       return { data, text: notice ? `${text}\n${notice}` : text }
     },
   },
 ]
-
-// ---------------------------------------------------------------------- actions
 
 async function startTool(n, wait, progress) {
   const inst = getInstance(n)
@@ -513,8 +496,6 @@ const actionTools = [
   },
 ]
 
-// -------------------------------------------------------------------- destructive
-
 const destructiveTools = [
   {
     name: 'restore', title: 'Restore a backup', annotations: DESTROY,
@@ -526,7 +507,7 @@ const destructiveTools = [
       if (blocked) fail(blocked)
       const snap = backup.resolveSnapshot(n, snapshot)
       if (!yes) {
-        // The preview reads the archive too, so a broken one is caught before anyone confirms it.
+        // The preview reads the archive too, so a broken one is caught before confirming.
         progress(`Checking ${snap.name}`)
         const check = await backup.checkRestorable(snap)
         const data = { name: n, confirmed: false, snapshot: snap.name, scope: snap.scope, overwrites: snap.members,
@@ -602,17 +583,10 @@ To change a plugin's settings, find the file with list_config_files, read it wit
 When a server will not start, read diagnostics before get_logs. For get_logs, prefer level "warn" over reading everything.
 Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.`
 
-// ------------------------------------------------------------------ redaction
-
-/**
- * Everything that leaves goes through this. The projections above already leave credentials
- * out; this is the net under them, for a password that turns up somewhere nobody expected - a
- * plugin echoing its database URL into the console, say. Secrets are read fresh on each call so
- * a password changed while the server runs is still caught.
- *
- * <p>Player IP addresses are hidden by default: Paper logs one on every join, and many of the
- * people on these servers are children. `showIps` is the owner's call, made in the client config.
- */
+// Everything that leaves goes through this as a net under the per-tool projections, for secrets
+// that turn up unexpectedly (a plugin echoing its database URL into the console). Secrets are read
+// fresh on each call so a changed password is still caught. Player IPs are hidden unless `showIps`
+// (Paper logs one on every join).
 export function scrubber({ showIps = false, secrets = collectSecrets } = {}) {
   return (text) => {
     if (typeof text !== 'string' || !text) return text

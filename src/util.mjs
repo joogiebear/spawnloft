@@ -4,30 +4,20 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync, execFile } from 'node:child_process'
 
-/** Errors of this class print as a clean one-line message instead of a stack. */
+// Prints as a one-line message instead of a stack.
 export class UserError extends Error {}
 
 export function fail(msg) {
   throw new UserError(msg)
 }
 
-/**
- * The process table, remembered briefly and refreshed in the background.
- *
- * <p>A pid alone cannot say whether a process is the one a state file remembers: Windows hands
- * pids out again quickly, so a daemon that died hours ago could have its number worn by anything
- * by now, and a status read that only asks "is this pid alive" reports a dead server as running
- * forever - and `kill` would taskkill a stranger. The image name is the cheap second question.
- *
- * <p>Cheap to ask, not cheap to answer: `tasklist` takes anything from a third of a second to
- * well over one on a machine that is also running a JVM. The first read is synchronous, because
- * a one-shot CLI call has nothing else to do and the answer has to be right the first time. Every
- * later refresh happens in the background: a read that finds the table stale hands back the table
- * it has and starts a new one, so the panel, which asks on every poll for as long as a server
- * runs, never stops answering requests or feeding the console while `tasklist` runs. Between one
- * table and the next a pid the table has not caught up with yet is trusted, which is the leniency
- * sameProcess already promises.
- */
+// Cached pid -> image name table. A pid alone can't say whether a process is the one a state
+// file remembers (Windows reuses pids quickly, and `kill` would taskkill a stranger), so the
+// image name is the cheap second check.
+//
+// `tasklist` is slow (a third of a second to over one). The first read is synchronous; later
+// refreshes run in the background and a stale read returns the old table, so the panel's polling
+// never blocks. A pid the table hasn't caught up with is trusted (see sameProcess).
 let processTable = { at: 0, names: null }
 let refreshing = null
 const PROCESS_TABLE_MS = 2000
@@ -63,10 +53,7 @@ function readProcessTable() {
   }
 }
 
-/**
- * Refresh the table without blocking. Resolves once the new table is in place; a second call
- * while one is in flight joins it rather than starting another `tasklist`.
- */
+// Refreshes without blocking; a call while one is in flight joins it.
 export function refreshProcessTable() {
   if (refreshing) return refreshing
   const [cmd, args] = TABLE_COMMAND
@@ -74,8 +61,7 @@ export function refreshProcessTable() {
   refreshing = new Promise((resolve) => {
     execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 10000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => {
       refreshing = null
-      // A failed read keeps the previous table rather than replacing it with nothing: an old
-      // answer about a pid beats no answer, and the next read will try again.
+      // A failed read keeps the previous table; an old answer beats none.
       if (!err && queriedAt >= processTable.at) processTable = { at: queriedAt, names: parseProcessTable(stdout) }
       resolve(processTable.names)
     })
@@ -83,7 +69,7 @@ export function refreshProcessTable() {
   return refreshing
 }
 
-/** The executable name behind a pid, or null when the table cannot be read or the pid is not in it. */
+/** The executable name behind a pid, or null if the table can't be read or lacks it. */
 export function processImage(pid) {
   if (!pid) return null
   if (!processTable.names) {
@@ -94,23 +80,12 @@ export function processImage(pid) {
   return processTable.names?.get(pid) ?? null
 }
 
-/**
- * On Linux, the file a pid is actually running, from /proc/<pid>/exe.
- *
- * <p>What `ps` calls a process's name there is not the name of its executable. It is a label on the
- * main thread that starts out as the executable's name and that the program is free to change, and
- * Node does: from version 23 it names its threads, so `ps` reports every Node 24 process as
- * "MainThread". The daemon recorded itself as `node`, was found wearing a different name, and every
- * server came up ORPHANED: running, healthy and refused by every command. The same verdict, for the
- * same kind of reason, as the fifteen-byte limit below - and again invisible from a checkout on the
- * Node that CI happened to use.
- *
- * <p>The link cannot be changed by the process, and is not truncated. It is tried first and only
- * ever says yes: when it cannot be read (another user's process), or names something else (Java
- * started through a link called java21 runs a file called java), the name in the table still gets
- * its say. Once the file has been replaced by an upgrade the kernel appends " (deleted)", which is
- * still the same program.
- */
+// On Linux, the executable a pid is running, from /proc/<pid>/exe. The name `ps` shows is only a
+// thread label the program may change (newer Node names its threads, so `ps` shows "MainThread"),
+// whereas the link can't be changed or truncated. It is tried first and only ever says yes: if it
+// can't be read or names something else (Java started through a link called java21 runs a file
+// called java), the table name still gets its say. The kernel appends " (deleted)" once an
+// upgrade replaces the file.
 export function executableName(pid, readlink = fs.readlinkSync) {
   try {
     return path.basename(String(readlink(`/proc/${pid}/exe`)).replace(/ \(deleted\)$/, ''))
@@ -119,14 +94,9 @@ export function executableName(pid, readlink = fs.readlinkSync) {
   }
 }
 
-/**
- * Whether a live pid is still the process it was recorded as.
- *
- * <p>Lenient in every direction that is not an outright contradiction: no expected name recorded
- * (a state file from before this existed), a table that could not be read, or a pid the table has
- * not caught up with yet all answer true, because the pid IS alive and that was the whole test
- * until now. Only "alive, and wearing a different name" answers false.
- */
+// Whether a live pid is still the process it was recorded as. Lenient unless contradicted: no
+// recorded name (old state file), an unreadable table, or a pid the table hasn't caught up with
+// all answer true. Only "alive, and wearing a different name" answers false.
 export function sameProcess(pid, expectedImage, startedAt = 0) {
   if (!expectedImage) return true
   if (process.platform === 'linux') {
@@ -134,9 +104,8 @@ export function sameProcess(pid, expectedImage, startedAt = 0) {
     if (exe && sameImage(exe, expectedImage)) return true
   }
   let actual = processImage(pid)
-  // A cached PID may belong to an older process when Windows reuses its number.
-  // Recheck a contradiction if that snapshot predates this launch; never reject a
-  // newly started daemon using the previous owner's executable name.
+  // Windows reuses pids: if the snapshot predates this launch, recheck before trusting a
+  // contradiction so a new daemon isn't rejected over the previous owner's name.
   if (actual && startedAt > processTable.at && !sameImage(actual, expectedImage)) {
     const at = Date.now()
     const names = readProcessTable()
@@ -146,16 +115,9 @@ export function sameProcess(pid, expectedImage, startedAt = 0) {
   return sameImage(actual, expectedImage)
 }
 
-/**
- * Is this the name the process table would give that executable?
- *
- * <p>Linux keeps fifteen bytes of a process's name and no more, so `ps` reports the installed app,
- * spawnloft-desktop, as "spawnloft-deskt". Compared whole, that is a live process wearing a
- * different name - the one verdict sameProcess treats as a contradiction - and every server
- * started from the packaged app was declared orphaned the moment it came up: running, healthy, and
- * refused by every command. `node` and `java` are short, which is why nothing but a real install
- * showed it. A table name of exactly fifteen bytes therefore matches whatever it is the start of.
- */
+// Linux keeps only fifteen bytes of a process name, so `ps` shows spawnloft-desktop as
+// "spawnloft-deskt". A table name of exactly fifteen bytes therefore matches whatever it is the
+// start of.
 export function sameImage(actual, expected, platform = process.platform) {
   const strip = (s) => String(s).toLowerCase().replace(/\.exe$/, '')
   const [a, e] = [strip(actual), strip(expected)]
@@ -172,31 +134,19 @@ export function readJson(file, fallback = null) {
   }
 }
 
-/**
- * Mode for a file that holds a secret (RCON and database passwords, a webhook URL, deletion
- * tokens): readable and writable by the owner alone. Windows has no such mode and ignores it.
- */
+// Owner-only mode for files holding secrets (RCON and database passwords, webhook URL, tokens).
+// Windows ignores it.
 export const PRIVATE_FILE_MODE = 0o600
 
-/**
- * Create `file` with `mode` and make an existing one match it.
- *
- * <p>The mode passed to a write only applies when the write creates the file, so a leftover temp
- * file or an older, wider file would keep its old mode; the explicit chmod covers both. The temp
- * file is the one that gets it, so the file renamed into place is never visible with a wider mode.
- */
+// The mode passed to a write only applies when it creates the file, so chmod covers a leftover
+// temp file or an older, wider one.
 export function writeFileWithMode(file, data, mode) {
   fs.writeFileSync(file, data, { mode })
   if (process.platform !== 'win32') fs.chmodSync(file, mode)
 }
 
-/**
- * Write JSON to `file` through a temp file and a rename, so a crash leaves the old file whole.
- *
- * <p>`mode` is for files that hold secrets (see PRIVATE_FILE_MODE). Because every write replaces
- * the file, a file written earlier with wider permissions is tightened by its next write, with no
- * separate migration step.
- */
+// Writes through a temp file and a rename so a crash leaves the old file whole. `mode` is for
+// secrets (PRIVATE_FILE_MODE); each write replaces the file, so wider permissions get tightened.
 export function writeJson(file, data, { mode } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
@@ -206,26 +156,16 @@ export function writeJson(file, data, { mode } = {}) {
   fs.renameSync(tmp, file)
 }
 
-/**
- * A lock file other callers also create with the exclusive flag, so at most one of them holds it
- * at a time - across processes (CLI, panel, daemon), not just within one.
- *
- * <p>The file carries the holder's pid, so a lock left behind by a process that died while
- * holding it - killed, crashed, the machine lost power - is told apart from one a live process is
- * still using: both lock functions take it over the moment the pid is no longer alive, rather than
- * waiting out a fixed age that would either steal it from a slow but healthy holder or sit on a
- * dead one for too long.
- *
- * <p>Waits by blocking the thread, which only another *process* can be holding the lock while
- * this one does nothing else: the one JS thread cannot be both polling this loop and running the
- * code that would release the lock. Good for `withLock`'s synchronous critical sections (a quick
- * registry or player-list read-modify-write), wrong for anything that awaits while it holds the
- * lock - see `acquireLockAsync` for that.
- *
- * <p>`mode: 'wait'` (the default) retries quietly until it gets the lock or `timeoutMs` passes.
- * `mode: 'fail'` reports the conflict straight away instead, by returning null - for a start or
- * install where a second attempt queuing up silently is worse than being told to retry.
- */
+// Cross-process lock via an exclusively created file (CLI, panel and daemon all use it). The
+// file carries the holder's pid, and a lock whose pid is no longer alive is taken over, which
+// beats a fixed age that would steal from a slow holder or sit on a dead one.
+//
+// Waits by blocking the thread, so only another process can be holding the lock; fine for
+// synchronous critical sections (withLock), wrong for anything that awaits while holding it
+// (use acquireLockAsync).
+//
+// mode 'wait' retries until timeoutMs; 'fail' returns null immediately, for a start or install
+// where a silently queued second attempt is worse than being told to retry.
 export function acquireLock(lockFile, { mode = 'wait', timeoutMs = 10000 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
@@ -237,12 +177,8 @@ export function acquireLock(lockFile, { mode = 'wait', timeoutMs = 10000 } = {})
   }
 }
 
-/**
- * `acquireLock`'s `mode: 'wait'`, but waiting by awaiting a real timer instead of blocking the
- * thread - so another holder *in this same process* (a backup running in one request while a
- * second request for the same instance waits its turn) gets to keep running its own awaits
- * instead of being frozen out by this one spinning the thread it needs to finish and let go.
- */
+// acquireLock's 'wait' mode, but awaiting a timer so another holder in this same process (a
+// backup in one request, a second request waiting) can keep running and release the lock.
 export async function acquireLockAsync(lockFile, { timeoutMs = 10000 } = {}) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
@@ -253,11 +189,8 @@ export async function acquireLockAsync(lockFile, { timeoutMs = 10000 } = {}) {
   }
 }
 
-/**
- * What a lock file says about its holder: the pid, the executable it was running as, and a token
- * only this acquisition knows. A file holding just a number is one written before the rest existed.
- * Null for a file that is empty or unreadable, which is a lock being written or a damaged one.
- */
+// Parses a lock file into { pid, token }. A bare number is the legacy format. Null for an empty
+// or unreadable file (a lock being written, or damaged).
 function lockRecord(text) {
   const t = String(text ?? '').trim()
   if (!t) return null
@@ -270,46 +203,35 @@ function lockRecord(text) {
   }
 }
 
-/**
- * Whether the process a lock names is still running. Only the pid is checked. Checking that the
- * pid is still the same *program* (so a pid reused after a crash does not keep the lock held) was
- * tried and taken out: in the packaged Windows app it declared a live holder dead, and the lock
- * was then taken from under it. A reused pid keeps a lock held until that process exits.
- */
+// Only the pid is checked, not the program: a program check declared a live holder dead in the
+// packaged Windows app. A reused pid keeps the lock held until that process exits.
 function holderAlive(rec) {
   if (!rec) return false
   if (rec.pid === process.pid) return true
   return pidAlive(rec.pid)
 }
 
-/**
- * What Windows reports for a file that was just deleted while another process still has it open:
- * it stays, unopenable, until that handle closes - milliseconds, but long enough to throw. Seen
- * as EPERM when several processes took over one abandoned lock at the same moment.
- */
+// Windows leaves a just-deleted file unopenable until the last handle closes, which throws
+// EPERM when several processes take over one abandoned lock at once.
 const LOCK_BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
-/** `rmSync` waits out a handle that is still closing, instead of throwing EPERM or EBUSY. */
 const RM_RETRY = { force: true, maxRetries: 10, retryDelay: 10 }
 
 function pauseSync(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
-/** A lock file this young may still be between being created and being written. */
+// A lock file this young may still be between creation and write.
 const LOCK_WRITE_GRACE_MS = 2000
-/** A break lock this old was left by a process that died while clearing a stale lock. */
+// A break lock this old was left by a process that died while clearing a stale lock.
 const LOCK_BREAK_STALE_MS = 10000
 
 function fileAgeMs(file) {
   try { return Date.now() - fs.statSync(file).mtimeMs } catch { return Infinity }
 }
 
-/**
- * Clear a lock whose holder is gone - once, whoever else is trying. Two waiters that both see the
- * same dead holder must not both delete: the second delete would remove the live lock the first
- * had just taken. So clearing is itself exclusive (`.break`), and the lock is removed only if it
- * still reads exactly as it did when it was judged dead.
- */
+// Two waiters seeing the same dead holder must not both delete, or the second removes the live
+// lock the first just took. So clearing is itself exclusive (`.break`), and the lock is removed
+// only if it still reads as it did when judged dead.
 function breakStaleLock(lockFile, seen) {
   const breaker = `${lockFile}.break`
   try {
@@ -327,7 +249,7 @@ function breakStaleLock(lockFile, seen) {
   }
 }
 
-/** Remove the lock only if it is still this acquisition's: a lock taken over since is not ours to delete. */
+// Only removes the lock if it is still ours; one taken over since isn't ours to delete.
 function releaseLock(lockFile, token) {
   if (lockRecord(readLockText(lockFile))?.token === token) fs.rmSync(lockFile, RM_RETRY)
 }
@@ -335,7 +257,7 @@ function releaseLock(lockFile, token) {
 function tryLock(lockFile) {
   fs.mkdirSync(path.dirname(lockFile), { recursive: true })
   for (let attempt = 0; ; attempt++) {
-    // Bounded, so a lock file that stays unopenable is reported as held rather than spun on.
+    // Bounded so an unopenable lock file is reported as held rather than spun on.
     if (attempt > 60) return { ok: false, holder: null }
     const token = crypto.randomUUID()
     const body = JSON.stringify({ pid: process.pid, token })
@@ -356,7 +278,6 @@ function tryLock(lockFile) {
   }
 }
 
-/** The lock file's text, or null when there is no file. */
 function readLockText(lockFile) {
   try {
     return fs.readFileSync(lockFile, 'utf8')
@@ -365,12 +286,8 @@ function readLockText(lockFile) {
   }
 }
 
-/**
- * The pid holding a lock file, or null when it is free - absent, or left behind by a process that
- * is no longer alive. A lock created a moment ago and not yet written reads as held, by -1: its
- * owner is there, it has just not said who it is. Read-only: unlike `acquireLock` it never takes
- * the lock or clears a stale one.
- */
+// The pid holding a lock, or null if free (absent or stale). A just-created, not yet written
+// lock reads as held by -1. Read-only: never takes the lock or clears a stale one.
 export function lockHolder(lockFile) {
   const text = readLockText(lockFile)
   if (text === null) return null
@@ -379,7 +296,6 @@ export function lockHolder(lockFile) {
   return holderAlive(rec) ? rec.pid : null
 }
 
-/** `acquireLock`, held for the duration of a synchronous `fn`. */
 export function withLock(lockFile, fn, opts) {
   const release = acquireLock(lockFile, opts)
   if (!release) fail(`could not get a lock on ${lockFile}`)
@@ -401,15 +317,9 @@ export function pidAlive(pid) {
   }
 }
 
-/**
- * Kill a process and everything it started, on POSIX.
- *
- * <p>The daemon starts each server as the leader of its own process group, so the negative pid
- * reaches the whole group at once: the JVM and any helper it forked, which a signal to the JVM
- * alone leaves running and holding the port. A server started by an older daemon leads no group,
- * and the group signal fails with ESRCH; the plain pid is the fallback for that and nothing else.
- * Windows has taskkill /T for the same job and does not come through here.
- */
+// POSIX only (Windows uses taskkill /T). The daemon makes each server a process group leader, so
+// the negative pid reaches the JVM and any helper it forked. A server that leads no group fails
+// the group signal with ESRCH; the plain pid is the fallback for that.
 export function killProcessGroup(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 1) return
   try {
@@ -503,13 +413,7 @@ export function dirSize(dir) {
   return total
 }
 
-/**
- * dirSize without holding the event loop.
- *
- * <p>Same walk, one directory at a time, with the stats of each directory's files issued together.
- * It costs the same number of syscalls; what it does not cost is every other request in the
- * process waiting while they run.
- */
+// dirSize without blocking the event loop.
 export async function dirSizeAsync(dir) {
   const fsp = fs.promises
   let total = 0
@@ -534,14 +438,8 @@ export async function dirSizeAsync(dir) {
   return total
 }
 
-/**
- * A version string that is safe to build a file name and a URL path from.
- *
- * <p>Loader and game versions come from places the person did not write - a modpack's index, a
- * command line - and are then put into a name under the jars store and into a download URL. A value
- * like `1/../x` would leave the store and change which URL is fetched, so only the characters a real
- * version uses get through, and `..` never does, even though each dot on its own is fine.
- */
+// Versions from a modpack index or command line end up in a jar file name and a download URL, so
+// a value like `1/../x` must not get through: only real version characters, and never `..`.
 const SAFE_VERSION = /^\w[\w.+-]*$/
 export function assertSafeVersion(value, label) {
   const v = typeof value === 'string' ? value : String(value ?? '')
@@ -551,7 +449,7 @@ export function assertSafeVersion(value, label) {
   return v
 }
 
-/** A command line safe to write to a log: the value after --password or --requirepass is hidden. */
+/** Hides the value after --password or --requirepass so the args can be logged. */
 export function maskSecretArgs(args) {
   return args.map((arg, i) => {
     if (/^--(?:password|requirepass)$/i.test(args[i - 1] ?? '')) return '[redacted]'
@@ -559,17 +457,14 @@ export function maskSecretArgs(args) {
   })
 }
 
-/** Whether `child` is `parent` or somewhere under it, judged on the paths as written. */
+/** Whether `child` is `parent` or under it, judged on the paths as written. */
 export function isInside(parent, child) {
   const rel = path.relative(parent, child)
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel))
 }
 
-/**
- * A relative path from a file we did not write - a pack index, a snapshot manifest - normalised to
- * forward slashes, or null when it is not a plain path below the folder it will be joined to:
- * absolute, a drive letter, a `..` segment, a NUL, or nothing at all.
- */
+// For paths from files we didn't write (pack index, snapshot manifest): normalised to forward
+// slashes, or null if absolute, a drive letter, a `..` segment, a NUL, or empty.
 export function safeRelativePath(raw) {
   if (typeof raw !== 'string') return null
   const clean = raw.replace(/\\/g, '/')
@@ -588,14 +483,9 @@ export function validateName(name) {
   return name
 }
 
-/**
- * A display name, as typed, made safe to store: whitespace collapsed, control characters
- * dropped, at most 48 characters. Null when nothing is left.
- *
- * <p>The instance NAME is a folder, a registry key, a command-line argument and a scheduled-task
- * name, and each of those has rules; the label is none of them, so it can be anything a person
- * would call their server. "Survival (Season 3)" is a label; its name is survival-season-3.
- */
+// The display label: whitespace collapsed, control characters dropped, at most 48 chars, null if
+// empty. Unlike the instance name (a folder, registry key, argument), it is free text:
+// "Survival (Season 3)" is a label, survival-season-3 its name.
 export function cleanLabel(raw) {
   if (raw == null) return null
   // eslint-disable-next-line no-control-regex
@@ -603,11 +493,8 @@ export function cleanLabel(raw) {
   return label || null
 }
 
-/**
- * The instance name a label suggests: the label with everything a name cannot hold turned into
- * dashes, trimmed and capped at the name limit. Never empty - a label made entirely of symbols
- * becomes "server". Case is kept, so "MyServer" stays readable as a folder.
- */
+// A name suggested by a label: invalid characters become dashes, capped at the name limit. Case
+// is kept, and a label of only symbols becomes "server".
 export function slugFor(label) {
   const slug = String(label ?? '')
     .replace(/[^A-Za-z0-9_-]+/g, '-')
