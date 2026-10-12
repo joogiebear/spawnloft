@@ -42,7 +42,6 @@ const LEGACY = { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { 
 const meta = (extra = {}) => ({ 'io.modelcontextprotocol/protocolVersion': '2026-07-28',
   'io.modelcontextprotocol/clientCapabilities': {}, ...extra })
 
-/** Send every message, close stdin, and collect what came back: replies by id, and the rest. */
 function session(messages, args = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp', ...args],
@@ -344,7 +343,6 @@ test('config files: listed, read with secrets hidden, changed with a one-file sn
   assert.ok(!w.stdout.includes('plugin-db-pass'))
   assert.match(fs.readFileSync(cfg, 'utf8'), /password: plugin-db-pass\nradius: 12\n/)
 
-  // The snapshot holds that one file, so restoring it puts the file back and nothing else.
   fs.writeFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'untouched: changed later\n')
   const r = await session([call(1, 'restore', { name: 'royalplugins', snapshot: done.structuredContent.snapshot, confirm: true })], ['--allow-destructive'])
   assert.equal(r.byId.get(1).result.isError, undefined, r.byId.get(1).result.content[0].text)

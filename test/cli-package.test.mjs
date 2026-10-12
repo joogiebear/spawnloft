@@ -67,7 +67,6 @@ test('the runtime is pinned to a version and a published hash for each architect
   assert.match(NODE_VERSION, /^\d+\.\d+\.\d+$/)
   assert.deepEqual(Object.keys(NODE_SHA256).sort(), ['arm64', 'x64'])
   for (const hash of Object.values(NODE_SHA256)) assert.match(hash, /^[0-9a-f]{64}$/)
-  // The core has to run on it.
   const wanted = Number(/>=(\d+)/.exec(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).engines.node)[1])
   assert.ok(Number(NODE_VERSION.split('.')[0]) >= wanted)
 })

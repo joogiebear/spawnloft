@@ -12,7 +12,6 @@ const T0 = new Date('2026-03-14T09:26:53.500Z')
 const REGISTRY = JSON.stringify({ version: 1, instances: { Srv: { dir: 'PLACEHOLDER', jar: 'paper.jar' } } }, null, 2) + '\n'
 
 let n = 0
-/** A data folder with what one holds, and a place beside it to move it to. */
 function world(name = `w${++n}`) {
   const base = path.join(scratch, name)
   const root = path.join(base, 'mcctl')
@@ -31,7 +30,6 @@ function world(name = `w${++n}`) {
   return { base, root, dest: path.join(base, 'moved', 'data') }
 }
 
-/** What is going on around a move, with a record of what was asked. */
 function env({ running = [], locked = [], tasks = [], copies = [] } = {}) {
   const calls = []
   return {
@@ -51,8 +49,6 @@ const move = (w, options = {}, around = {}) => moveData({ root: w.root, dest: w.
 const read = (...p) => fs.readFileSync(path.join(...p), 'utf8')
 const listing = (dir) => fs.readdirSync(dir).sort()
 const mtime = (...p) => fs.statSync(path.join(...p)).mtimeMs
-
-// ---- planning: nothing is changed, and what stands in the way is said -----------------------
 
 test('by default a move is only planned: nothing is created, moved or written', async () => {
   const w = world()
@@ -136,8 +132,6 @@ test('scheduled tasks are said to be paused, and are listed to be', async () => 
   assert.match(plan.warnings.join('\n'), /2 scheduled tasks will be paused/)
 })
 
-// ---- private copies ------------------------------------------------------------------------------
-
 function privateCopy({ archives = 0, onlyInCopy = [], files = 0 } = {}) {
   const dir = path.join(scratch, `priv-${++n}`, 'Local', 'mcctl')
   fs.mkdirSync(dir, { recursive: true })
@@ -179,8 +173,6 @@ test('a program installed as a package is warned about running the move from its
   const plan = await planMove({ root: w.root, dest: w.dest, setAsidePrivateCopies: true, env: env({ copies: [privateCopy()] }) })
   assert.match(plan.warnings.join('\n'), /not from a program installed as a package/)
 })
-
-// ---- moving on the same drive: one rename ---------------------------------------------------------
 
 test('a move on the same drive renames the folder, leaves a link, and everything reads the same through it', async () => {
   const w = world()
@@ -272,8 +264,6 @@ test('a link that does not lead where it should is caught by the check and undon
   assert.equal(read(w.root, 'instances.json'), REGISTRY)
 })
 
-// ---- moving to another drive: copy, compare, park the original -----------------------------------
-
 test('a move to another drive copies, compares, parks the original and links; nothing is deleted', async () => {
   const w = world()
   const { executed, result } = await move(w, { forceCopy: true })
@@ -358,11 +348,9 @@ test('a destination that was an empty folder is emptied again, not removed, afte
   assert.deepEqual(fs.readdirSync(w.dest), [])
 })
 
-// ---- putting an interrupted move back -------------------------------------------------------------
-
 test('an interrupted rename is rolled back, even when a command has since made empty folders where the link was to go', async () => {
   const w = world()
-  // The state a crash between the rename and the link leaves, and what `ensureDirs` then does.
+  // the state a crash between the rename and the link leaves, plus what ensureDirs then does
   fs.mkdirSync(path.dirname(w.dest), { recursive: true })
   fs.renameSync(w.root, w.dest)
   for (const dir of ['instances', 'backups', 'run']) fs.mkdirSync(path.join(w.root, dir), { recursive: true })
@@ -441,8 +429,6 @@ test('finish refuses a move that is not done, and says to roll it back', async (
   fs.writeFileSync(journalPath(w.root), JSON.stringify({ step: 'verifying' }))
   await assert.rejects(finishMove(w.root), /stopped at "verifying".*data rollback/)
 })
-
-// ---- links ----------------------------------------------------------------------------------------
 
 test('removing a link removes the link and not what it leads to, and refuses anything that is not a link', () => {
   const target = path.join(scratch, `link-target-${++n}`)

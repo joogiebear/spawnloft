@@ -1,10 +1,6 @@
 /**
- * The uninstaller and an orphaned server.
- *
- * <p>Its own file, with exactly one instance registered: uninstall.run walks every instance and
- * stops each one that is active, so any other fixture left "running" under this process's own pid
- * would have the uninstaller kill the test runner. That is the behaviour under test, which is why
- * it cannot share a registry with the fixtures in active-guard.test.mjs.
+ * Uninstaller vs an orphaned server. Own file with exactly one instance registered: uninstall.run
+ * stops every active instance, so a fixture "running" under this process's pid would kill the runner.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'

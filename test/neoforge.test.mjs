@@ -20,8 +20,6 @@ test('the newest stable build for a version wins; betas only exist when nothing 
   assert.equal(pickBuild(['26.3.0.1-beta'], '26.3'), '26.3.0.1-beta')
 })
 
-// ---- the mods.toml reader ---------------------------------------------------
-
 const TOML = `
 modLoader = "javafml"
 loaderVersion = "[4,)"

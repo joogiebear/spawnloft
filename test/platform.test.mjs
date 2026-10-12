@@ -30,8 +30,8 @@ test('Windows keeps its capabilities and Mac supports scheduling, metrics, and m
 })
 
 test('Mac panel exposes scheduling and automatic backups without changing server data', async () => {
-  // Exercise the platform branches on every runner, while Node's actual filesystem and
-  // networking remain native. This does not claim to test a packaged Mac application.
+  // runs the platform branches on every runner while the filesystem and networking stay native;
+  // this does not test a packaged Mac app
   const platform = Object.getOwnPropertyDescriptor(process, 'platform')
   Object.defineProperty(process, 'platform', { ...platform, value: 'darwin' })
   try {
@@ -63,8 +63,8 @@ test('Mac panel exposes scheduling and automatic backups without changing server
     const backups = await get(base + '/backups')
     assert.equal(backups.automaticAvailable, true)
     assert.deepEqual(backups.snapshots, [])
-    // The tab draws from history alone, so it carries the scopes "Back up now" offers; the schedule
-    // comes separately, and the two together are the whole of the combined answer.
+    // the tab draws from history alone, so it carries the scopes "Back up now" offers; the schedule
+    // comes separately
     const history = await get(base + '/backups/history')
     assert.deepEqual(history, Object.fromEntries(
       ['snapshots', 'exclude', 'dir', 'root', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),

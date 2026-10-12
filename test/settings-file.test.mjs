@@ -21,7 +21,6 @@ config('init')
 const settings = await import('../src/settings.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-/** Run `fn` and return what was written to stderr while it ran. */
 function stderrOf(fn) {
   const real = process.stderr.write
   let said = ''
@@ -154,9 +153,9 @@ test('nothing is moved until the replacement is safely written: a failure leaves
   assert.deepEqual(fs.readdirSync(dir), ['settings.json'])
   assert.equal(fs.readFileSync(file, 'utf8'), damaged)
 
-  // The final rename, of the new file into place, is refused and keeps being refused. Only that one:
-  // anything else that renames - setting the damaged file aside, say - is let through, so that a
-  // version which moves the damaged file before the new one is in place is caught having done it.
+  // the final rename of the new file into place keeps being refused. Only that one: other renames
+  // (setting the damaged file aside, say) go through, so a version that moves the damaged file
+  // before the new one is in place is caught
   const real = fs.renameSync
   t.mock.method(fs, 'renameSync', (from, to) => {
     if (String(from).endsWith('.tmp')) throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
@@ -238,9 +237,7 @@ test('a settings file that is a link is changed where the link points, and stays
   assert.deepEqual(JSON.parse(fs.readFileSync(real, 'utf8')), { theme: 'dark' })
 })
 
-// ---- the command line ---------------------------------------------------------------------------
-
-/** Run the CLI with every place it looks redirected into the scratch folder, so the real machine is never read. */
+// runs the CLI with every place it looks redirected into the scratch folder, so the real machine is never read
 function cli(args, name) {
   const home = path.join(scratch, `home-${name}`)
   const configDir = path.join(scratch, name)

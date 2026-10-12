@@ -5,10 +5,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { startFakeRcon } from './fixtures/fake-rcon.mjs'
 
-// An ordinary RCON command gets half a second and a flush two, so "slower than an ordinary command
-// but within what a flush is allowed" is a second here and eight to a hundred and twenty seconds
-// in life. Half a second, not less: it also covers connecting and logging in, and a runner that
-// stalls for longer than that makes a command retry, which these tests count.
+// scaled-down timeouts: a command gets 500ms and a flush 2s (8-120s in life). Not less than 500ms,
+// since that also covers connecting and logging in, and a stalled runner makes a command retry,
+// which these tests count.
 process.env.MCCTL_RCON_TIMEOUT_MS = '500'
 process.env.MCCTL_FLUSH_TIMEOUT_MS = '2000'
 
@@ -45,8 +44,7 @@ test('a flush slower than an ordinary command is waited for, and saving is switc
 test('a flush that never answers is given up on once, and saving is still switched back on', async (t) => {
   const { rcon, inst } = await server(t, { delays: { 'save-all flush': 10000 } })
   const res = await snapshot(inst)
-  // One save-off and one flush: a flush that timed out is not run again, and not behind a second
-  // save-off. save-on is what matters: the server must not be left with saving off.
+  // a flush that timed out is not retried; save-on must still go out so saving is not left off
   assert.deepEqual(rcon.sent(), ['save-off', 'save-all flush', 'save-on'])
   assert.equal(res.flushed, false)
   assert.match(res.flushWarning, /could not flush the world.*the copy may be torn/)
@@ -91,13 +89,13 @@ test('a server that stopped during the backup is not reported as having autosave
 
 test('a backup that fails after save-off still switches saving on, and says so if it cannot', async (t) => {
   const { rcon, inst } = await server(t, { drop: { 'save-on': Infinity } })
-  // A member that is not there makes tar fail, after the flush and before the manifest.
+  // a missing member makes tar fail after the flush and before the manifest
   await assert.rejects(snapshot(inst, { members: ['missing.txt'] }), /autosave may still be off/)
   assert.equal(rcon.sent().at(-1), 'save-on')
 })
 
-// An error that is not one of SpawnLoft's own is printed from its stack, and whether the stack's
-// first line already holds the message depends on whether anything has read the stack yet.
+// a foreign error is printed from its stack, and whether the stack's first line already holds the
+// message depends on whether anything has read the stack yet
 for (const [when, readStackFirst] of [['read before the warning is added', true], ['not yet read when the warning is added', false]]) {
   test(`a file system error after save-off carries the warning once, in its message and its stack (stack ${when})`, async (t) => {
     const { inst } = await server(t, { drop: { 'save-on': Infinity } })
@@ -125,7 +123,7 @@ test('a refused connection is marked as refused and keeps the error code it alwa
 })
 
 test('a save-off that could not be sent is not followed by a claim that saving is off', async (t) => {
-  // Nothing reached the server, so nothing was switched off: the failed flush is the whole story.
+  // nothing reached the server, so saving was never switched off
   const { rcon, inst } = await server(t)
   const res = await snapshot({ ...inst, rcon: { ...inst.rcon, password: 'wrong' } })
   assert.deepEqual(rcon.sent(), [])

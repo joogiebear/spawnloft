@@ -15,7 +15,6 @@ const dirLink = (target, at) => fs.symlinkSync(target, at, onWindows ? 'junction
 const T0 = new Date('2026-03-14T09:26:53.500Z')
 
 let n = 0
-/** A tree that holds one of everything a server folder holds. Returns its root. */
 function sample() {
   const root = path.join(scratch, `src-${++n}`)
   const put = (rel, content, when) => {
@@ -177,8 +176,6 @@ test('progress is reported with the totals', async () => {
   assert.equal(last.bytes, last.totalBytes)
 })
 
-// ---- comparing ------------------------------------------------------------------------------
-
 test('a comparison finds a file that is missing, one that is extra, and one that changed size', async () => {
   const src = sample()
   const dest = path.join(scratch, 'dest-c1')
@@ -259,8 +256,6 @@ test('a comparison reports a bounded number of problems, and says how many there
   assert.equal(result.problems.length, 51)
   assert.match(result.problems.at(-1), /and \d+ more/)
 })
-
-// ---- the rest ----------------------------------------------------------------------------------
 
 test('treeStats counts files, folders, links and bytes without following links', async () => {
   const src = sample()

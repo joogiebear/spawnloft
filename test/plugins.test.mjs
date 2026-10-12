@@ -11,7 +11,7 @@ import {
 } from '../src/plugins.mjs'
 import { UserError } from '../src/util.mjs'
 
-// ---- a zip built by hand, so the reader is tested against the format itself ----
+// zip built by hand so the reader is tested against the format itself
 
 function buildZip(entries, { deflate = false } = {}) {
   const locals = []
@@ -66,8 +66,6 @@ function writeJar(dir, name, yml, opts) {
   return file
 }
 
-// ---- the zip reader ---------------------------------------------------------
-
 test('a stored and a deflated entry both read back exactly', () => {
   const dir = scratch()
   for (const deflate of [false, true]) {
@@ -89,8 +87,6 @@ test('a file that is not a zip at all is null', () => {
   fs.writeFileSync(file, 'not a zip, just bytes pretending')
   assert.equal(readZipEntry(file, 'plugin.yml'), null)
 })
-
-// ---- the manifest reader ----------------------------------------------------
 
 test('the common manifest fields come through, quotes stripped', () => {
   const meta = parsePluginYml([
@@ -119,8 +115,6 @@ test('nested blocks like commands are skipped without eating later keys', () => 
   assert.equal(meta.version, '1.2')
   assert.equal(meta.commands, undefined)
 })
-
-// ---- the installed list -----------------------------------------------------
 
 function fakeInstance() {
   const dir = scratch()
@@ -202,8 +196,6 @@ test('a path that walks out of the plugins folder is refused', () => {
   }
 })
 
-// ---- choosing a Modrinth version --------------------------------------------
-
 const v = (over) => ({
   version_type: 'release',
   loaders: ['paper'],
@@ -226,8 +218,6 @@ test('a version for the wrong loader or game version does not fit', () => {
   assert.equal(pickVersion([v({ game_versions: ['25.1'] })], { gameVersion: '26.2' }), null)
   assert.ok(LOADERS.includes('spigot'), 'paper servers load spigot builds')
 })
-
-// ---- choosing a Hangar version ----------------------------------------------
 
 const hv = (over) => ({
   name: '2.0',
@@ -267,8 +257,7 @@ test('the primary file wins; the first stands in when nothing is marked', () => 
 })
 
 test('Hangar search reports how often each project was downloaded', async (t) => {
-  // The shape Hangar's /projects endpoint returns: the count lives at stats.downloads. Reading a
-  // field it does not have showed every Hangar result as never downloaded.
+  // in Hangar's /projects response the count lives at stats.downloads
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ result: [{
     name: 'Chunky', namespace: { owner: 'pop4959', slug: 'Chunky' }, description: 'Pre-generates chunks',
     stats: { views: 252983, downloads: 76528, recentViews: 7015, recentDownloads: 2392, stars: 303, watchers: 157 },

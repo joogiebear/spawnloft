@@ -47,8 +47,6 @@ function buildZip(entries) {
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mrpack-'))
 
-// ---- the index reader -------------------------------------------------------
-
 const SHA1 = 'a'.repeat(40)
 const SHA512 = 'b'.repeat(128)
 const CDN = 'https://cdn.modrinth.com/data/AANobbMI/versions/abc'
@@ -67,7 +65,7 @@ const INDEX = {
   ],
 }
 
-/** INDEX with its one server file replaced by `file`, so a test changes exactly one thing. */
+// INDEX with its one server file replaced, so a test changes exactly one thing
 const withFile = (file) => ({ ...INDEX, files: [{ path: 'mods/x.jar', hashes: { sha1: SHA1 }, downloads: [`${CDN}/x.jar`], ...file }] })
 
 test('a fabric pack index reduces to what the install needs', () => {
@@ -109,8 +107,6 @@ test('a parsed file carries its checksums, its size and the one download it may 
   assert.deepEqual(config, { path: 'config/lithium.properties', sha1: SHA1, sha512: null, url: `${CDN}/c.prop`, size: 0 })
 })
 
-// ---- loader and game versions come from the pack author -------------------------
-
 test('a loader or game version that is not version-shaped refuses the whole pack', () => {
   for (const bad of ['1/../x', '../../etc', '0.19.3/../x', 'a b', '0.19.3?x=1', '..', '', 'x'.repeat(65)]) {
     const fabric = { ...INDEX, dependencies: { minecraft: '26.2', 'fabric-loader': bad } }
@@ -130,8 +126,6 @@ test('the version shapes real loaders use are accepted', () => {
     assert.equal(parseIndex({ ...INDEX, dependencies: { minecraft: mc, 'fabric-loader': '0.19.3' } }).mc, mc)
   }
 })
-
-// ---- where a pack may fetch from, and what it must prove ----------------------------
 
 test('a download must be https from a host the pack format allows', () => {
   for (const host of ALLOWED_PACK_HOSTS) {
@@ -198,8 +192,6 @@ test('a pack path is normalised, and an empty or NUL one is refused', () => {
   }
 })
 
-// ---- what a pack update may delete ------------------------------------------
-
 test('an update deletes only what the old pack owned and the new one dropped', () => {
   const old = ['mods/a-1.0.jar', 'mods/b-1.0.jar', 'config/a.toml']
   const now = ['mods/a-2.0.jar', 'mods/b-1.0.jar', 'config/a.toml']
@@ -208,7 +200,7 @@ test('an update deletes only what the old pack owned and the new one dropped', (
 
 test('what the person added is never a removal candidate, because it was never owned', () => {
   const old = ['mods/pack-mod.jar']
-  // hand-added.jar is on disk but not in either record - it simply never appears here.
+  // hand-added.jar is on disk but in neither record, so it never appears here
   assert.deepEqual(planRemovals(old, []), ['mods/pack-mod.jar'])
 })
 
@@ -228,8 +220,6 @@ test('path tricks in a record never become deletions', () => {
   const removals = planRemovals(old, [])
   assert.deepEqual(removals, ['mods/windows-style.jar'], 'backslashes normalise; escapes are dropped')
 })
-
-// ---- extraction -------------------------------------------------------------
 
 test('overrides extract with their prefix stripped and everything else left behind', () => {
   const dir = scratch()

@@ -2,7 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fetchRetry } from '../src/download.mjs'
 
-/** A fetch that gives the scripted answers in order, and records what it was asked. */
 function scripted(answers) {
   const calls = []
   const fetcher = async (url, init) => {

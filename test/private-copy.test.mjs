@@ -14,19 +14,17 @@ process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 const { findPrivateCopies, describePrivateCopies, mcpNotice } = await import('../src/private-copy.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-// What Windows does for a program installed as a package: what it writes under AppData\Local goes to
-// Packages\<family>\LocalCache\Local\<the same path>, and it reads that copy from then on. These
-// tests build that layout in a scratch folder and pass its places in, so they run on every platform.
+// Windows sends a packaged program's writes under AppData\Local to
+// Packages\<family>\LocalCache\Local\<same path> and reads that copy from then on. These tests
+// build that layout in a scratch folder and pass its places in, so they run on every platform.
 
 const PACKAGE = 'Acme.Client_8wekyb3d8bbwe'
 const registry = (servers) => JSON.stringify({ version: 1, instances: servers }, null, 2)
 const server = (memory) => ({ dir: '/srv/x', jar: 'paper.jar', memory, port: 25565 })
 
 let n = 0
-/**
- * A machine: the data root, and for each package the private copy of it, as files by relative path.
- * `real` and `copies` are under Local\mcctl; `realRoaming` and `copiesRoaming` under Roaming\mcctl.
- */
+// a machine: the data root, and for each package the private copy of it, as files by relative path.
+// real and copies are under Local\mcctl; realRoaming and copiesRoaming under Roaming\mcctl.
 function machine({ real = {}, copies = {}, realRoaming = {}, copiesRoaming = {}, dataRootOutside = false } = {}) {
   const base = path.join(scratch, `m${++n}`)
   const local = path.join(base, 'local')
@@ -51,8 +49,6 @@ function machine({ real = {}, copies = {}, realRoaming = {}, copiesRoaming = {},
 
 const privateData = (m, pkg = PACKAGE) => path.join(m.local, 'Packages', pkg, 'LocalCache', 'Local', 'mcctl')
 const describe = (copies, m) => describePrivateCopies(copies, { backupsDir: m.options.backupsDir })
-
-// ---- finding the copy --------------------------------------------------------------------------
 
 test('nothing is reported where Windows does not redirect, or where nothing the data lives in is under AppData', async () => {
   const m = machine({ real: { 'instances.json': registry({ a: server('4G') }) }, copies: { [PACKAGE]: { 'instances.json': registry({}) } } })
@@ -93,8 +89,8 @@ test('a registry that differs says which servers are on one side only and which 
 })
 
 test('the same values written another way are the same: key order and spacing are not a difference', async () => {
-  // Two programs that write the same settings do not write the keys in the same order, and a
-  // comparison of bytes calls that a disagreement. On one real machine it was the only difference.
+  // two programs that write the same settings do not write the keys in the same order, and a
+  // byte comparison would call that a disagreement
   const m = machine({
     real: { 'instances.json': registry({ a: { dir: '/srv/a', jar: 'p.jar', memory: '4G', port: 1 } }) },
     realRoaming: { 'settings.json': '{\n  "dataRoot": "C:\\\\A",\n  "theme": "classic"\n}\n' },
@@ -236,8 +232,6 @@ test('a Packages folder with a file in it, or an unusable path, is not a reason 
   assert.deepEqual(await findPrivateCopies({ ...m.options, dataRoot: 42 }), [])
 })
 
-// ---- what is said about it ---------------------------------------------------------------------
-
 test('a registry that differs is a problem that names the copy, the two sides, and what to rename', async () => {
   const m = machine({
     real: { 'instances.json': registry({ moved: server('4G'), kept: server('4G') }) },
@@ -291,8 +285,6 @@ test('nothing found says nothing', () => {
   assert.equal(mcpNotice([]), '')
 })
 
-// ---- telling an AI client ---------------------------------------------------------------------
-
 test('the notice sends a client that may itself be redirected to a program that is not', async () => {
   const text = registry({ a: server('4G') })
   const m = machine({ real: { 'instances.json': text }, copies: { [PACKAGE]: { 'instances.json': text } } })
@@ -312,8 +304,6 @@ test('the notice is for a copy that matters: not one with only an activity log, 
   assert.match(mcpNotice(await findPrivateCopies(files.options)), /NOTE/)
 })
 
-// ---- the real programs, on the platform where it applies ---------------------------------------
-
 const onWindows = { skip: process.platform !== 'win32' && 'Windows only: the redirection is a Windows feature' }
 
 function windowsEnv({ copyRegistry }) {
@@ -329,7 +319,6 @@ function windowsEnv({ copyRegistry }) {
     XDG_CONFIG_HOME: path.join(base, 'config'), HOME: base, USERPROFILE: base } }
 }
 
-/** Run the MCP server, send it these messages, and return its replies by id. */
 function mcp(env, messages) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp'], { env, stdio: ['pipe', 'pipe', 'pipe'] })
@@ -365,8 +354,8 @@ test('the MCP server tells the client about a copy when it starts', onWindows, a
 })
 
 test('the MCP doctor tool does not say "no problems" and stop there when the client may be the redirected one', onWindows, async () => {
-  // The copy matches what this process reads - which is what a redirected process sees - so doctor's own
-  // comparison finds nothing wrong; the notice is all that tells the client otherwise.
+  // the copy matches what this process reads (what a redirected process sees), so doctor's own
+  // comparison finds nothing wrong; the notice is all that tells the client otherwise
   const { env } = windowsEnv({ copyRegistry: registry({ here: server('4G') }) })
   const replies = await mcp(env, [initialize, { method: 'notifications/initialized' },
     { id: 2, method: 'tools/call', params: { name: 'doctor', arguments: {} } }])

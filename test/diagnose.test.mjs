@@ -8,8 +8,6 @@ import { diagnose, crashReports, SHAPES } from '../src/diagnose.mjs'
 
 const one = (line, ctx) => diagnose([line], ctx)[0]
 
-// ---- each shape, from a line Paper or the JVM actually writes ----------------
-
 test('a taken port names the port and the way to see who has it', () => {
   const f = one('[12:00:01 WARN]: FAILED TO BIND TO PORT!', { port: 25566 })
   assert.equal(f.id, 'port-in-use')
@@ -79,8 +77,6 @@ test('a missing jar names it', () => {
   assert.match(f.advice, /paper-26\.2-121\.jar/)
 })
 
-// ---- combination rules -------------------------------------------------------
-
 test('each shape reports once, at most three come back, cause before consequence', () => {
   const lines = [
     'You need to agree to the EULA in order to run the server.',
@@ -106,8 +102,6 @@ test('every shape has the fields the surfaces rely on', () => {
     assert.ok(s.id && s.title && typeof s.advice === 'function', s.id)
   }
 })
-
-// ---- crash reports -----------------------------------------------------------
 
 test('crash reports list newest first with their own description line', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-diag-'))
