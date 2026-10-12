@@ -283,13 +283,17 @@ async function fetchPackArchive(packFile, onProgress) {
     if (got !== packFile.hashes.sha1) fail('the pack download did not match its checksum; nothing was installed')
   }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mrpack-'))
-  const mrpack = path.join(tmp, 'pack.mrpack')
-  fs.writeFileSync(mrpack, packBytes)
-
-  const rawIndex = readZipEntry(mrpack, 'modrinth.index.json')
-  if (!rawIndex) fail('the pack has no modrinth.index.json - it is not an mrpack')
-  const index = parseIndex(JSON.parse(rawIndex.toString('utf8')))
-  return { tmp, mrpack, index }
+  try {
+    const mrpack = path.join(tmp, 'pack.mrpack')
+    fs.writeFileSync(mrpack, packBytes)
+    const rawIndex = readZipEntry(mrpack, 'modrinth.index.json')
+    if (!rawIndex) fail('the pack has no modrinth.index.json - it is not an mrpack')
+    const index = parseIndex(JSON.parse(rawIndex.toString('utf8')))
+    return { tmp, mrpack, index }
+  } catch (err) {
+    fs.rmSync(tmp, { recursive: true, force: true })
+    throw err
+  }
 }
 
 /**
