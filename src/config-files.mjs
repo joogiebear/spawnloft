@@ -33,25 +33,113 @@ export const MANAGED_PROPS = ['server-port', 'enable-rcon', 'rcon.port', 'rcon.p
 export const PLACEHOLDERS = ['[redacted]', '[ip hidden]']
 // A key that names a credential. "token" only as the whole last word, so an eco currency called
 // tokens, or a token-cost, is not taken for one.
-const SECRET_KEY = /password|passwd|secret|webhook|api[-_.]?key|(?:^|[-_.])(?:token|pass|pwd)$/i
-// key: value / key = value / "key": "value", with the value up to the end of the line (or the
-// closing quote).
-const KEY_VALUE = /^(\s*-?\s*["']?)([\w.-]+)(["']?\s*[:=]\s*)(["']?)(.+?)\4(\s*,?\s*)$/
+const SECRET_KEY = /password|passwd|secret|webhook|api[-_.]?key|private[-_.]?key|access[-_.]?key|(?:^|[-_.])(?:token|pass|pwd)$/i
+const SECRET_CAMEL = /[a-z0-9](?:Token|Pass|Pwd)$/
+const isSecretKey = (key) => SECRET_KEY.test(key) || SECRET_CAMEL.test(key)
+// A line that starts with a key: `key: value`, `key = value`, `- key: value`, `"key": "value"`.
+const LINE_START = /^(\s*(?:-\s*)?["']?)([\w.-]+)(["']?\s*[:=]\s*)/
+// A key inside a one-line map: `{"a": 1, "password": "x"}`.
+const INLINE_KEY = /([{,]\s*)(["']?)([\w.-]+)\2(\s*[:=]\s*)/g
+// `?password=x` or `;pwd=x` in a URL or JDBC string.
+const QUERY_PARAM = /([?&;])([\w.-]+)=([^&\s"';,]*)/g
 // Credentials inside a URL: scheme://user:password@host, or scheme://:password@host with no user,
 // which is how a Redis URL usually carries one.
 const URL_CREDENTIAL = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)([^\s@/]+)(@)/gi
 // Nothing to hide in an empty value or a switch.
 const NOT_A_SECRET = /^(null|~|none|true|false|""|''|\[\]|\{\})$/i
+const PEM_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/
+const PEM_END = /-----END [A-Z ]*PRIVATE KEY-----/
 
-/** Replace every secret-looking value in a config file's text. */
+const isBlank = (c) => c === ' ' || c === '\t'
+
+function redactLineValue(body) {
+  const m = LINE_START.exec(body)
+  if (!m || !isSecretKey(m[2])) return body
+  const rest = body.slice(m[0].length)
+  let end = rest.length
+  while (end > 0 && isBlank(rest[end - 1])) end--
+  if (rest[end - 1] === ',') {
+    end--
+    while (end > 0 && isBlank(rest[end - 1])) end--
+  }
+  let value = rest.slice(0, end)
+  let quote = ''
+  if (value.length >= 3 && (value[0] === '"' || value[0] === "'") && value.at(-1) === value[0]) {
+    quote = value[0]
+    value = value.slice(1, -1)
+  }
+  if (!value.trim() || NOT_A_SECRET.test(value.trim())) return body
+  return `${m[1]}${m[2]}${m[3]}${quote}[redacted]${quote}${rest.slice(end)}`
+}
+
+function inlineValueEnd(body, from) {
+  const open = body[from]
+  if (open === '"' || open === "'") {
+    for (let i = from + 1; i < body.length; i++) {
+      if (body[i] === '\\' && open === '"') i++
+      else if (body[i] === open) return i + 1
+    }
+    return body.length
+  }
+  let i = from
+  while (i < body.length && !/[\s,}\]]/.test(body[i])) i++
+  return i
+}
+
+function redactInline(body) {
+  let out = ''
+  let copied = 0
+  INLINE_KEY.lastIndex = 0
+  let m
+  while ((m = INLINE_KEY.exec(body))) {
+    const from = m.index + m[0].length
+    INLINE_KEY.lastIndex = from
+    if (!isSecretKey(m[3])) continue
+    const end = inlineValueEnd(body, from)
+    const token = body.slice(from, end)
+    const quoted = token.length >= 2 && (token[0] === '"' || token[0] === "'") && token.at(-1) === token[0]
+    const inner = quoted ? token.slice(1, -1) : token
+    if (!inner.trim() || NOT_A_SECRET.test(inner.trim())) continue
+    const quote = quoted ? token[0] : ''
+    out += body.slice(copied, from) + `${quote}[redacted]${quote}`
+    copied = end
+    INLINE_KEY.lastIndex = end
+  }
+  return copied === 0 ? body : out + body.slice(copied)
+}
+
+function redactQuery(body) {
+  return body.replace(QUERY_PARAM, (all, lead, key, value) =>
+    value && isSecretKey(key) && !NOT_A_SECRET.test(value) ? `${lead}${key}=[redacted]` : all)
+}
+
+function redactPemSameLine(body) {
+  const begin = PEM_BEGIN.exec(body)
+  if (!begin) return body
+  const from = begin.index + begin[0].length
+  const end = body.indexOf('-----END', from)
+  return end === -1 || !PEM_END.test(body.slice(end)) ? body : `${body.slice(0, from)}[redacted]${body.slice(end)}`
+}
+
+/** Replace every secret-looking value in a config file's text, one line at a time. */
 export function redactConfig(text) {
+  let inPem = false
   return text.split('\n').map((line) => {
     const eol = line.endsWith('\r') ? '\r' : ''
     let body = eol ? line.slice(0, -1) : line
-    const m = KEY_VALUE.exec(body)
-    if (m && SECRET_KEY.test(m[2]) && m[5].trim() && !NOT_A_SECRET.test(m[5].trim())) {
-      body = `${m[1]}${m[2]}${m[3]}${m[4]}[redacted]${m[4]}${m[6]}`
+    if (inPem) {
+      if (!PEM_END.test(body)) return `[redacted]${eol}`
+      inPem = false
+      return body + eol
     }
+    if (PEM_BEGIN.test(body)) {
+      const same = redactPemSameLine(body)
+      if (same === body && !PEM_END.test(body)) inPem = true
+      return same + eol
+    }
+    body = redactLineValue(body)
+    if (body.includes('{') || body.includes(',')) body = redactInline(body)
+    if (body.includes('=')) body = redactQuery(body)
     return body.replace(URL_CREDENTIAL, '$1[redacted]$3') + eol
   }).join('\n')
 }
