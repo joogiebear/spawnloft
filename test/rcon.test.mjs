@@ -7,9 +7,8 @@ import { startFakeRcon } from './fixtures/fake-rcon.mjs'
 import { startTickSampler } from '../src/tick.mjs'
 
 // Minecraft's RCON thread reads one packet at a time and hangs up on a read that holds two. The
-// fake server's `strict` mode does the same, so these tests fail for a client that writes a
-// command and its end-of-reply marker back to back - which loses the race on a real server a few
-// times in a hundred, on a machine at rest.
+// fake's `strict` mode does the same, so a client that writes a command and its end-of-reply
+// marker back to back fails here instead of now and then on a real server.
 
 const instance = (rcon) => ({ name: 'strict', rcon: { port: rcon.port, password: 'pw' } })
 
@@ -94,8 +93,8 @@ test('the tick sampler keeps its one connection across many readings', async (t)
   t.after(() => server.close())
   const sampler = startTickSampler(instance(server), { intervalMs: 100, timeoutMs: 600 })
   t.after(() => sampler.stop())
-  // Until it has read six times and holds a fresh reading, not for as long as that ought to take: a
-  // slow runner is given the time, and a sampler that never gets there fails at the deadline.
+  // Waits for six reads and a fresh reading, not a fixed time, so a slow runner still passes; a
+  // sampler that never gets there fails at the deadline.
   const lists = () => server.sent().filter((c) => c === 'list').length
   const deadline = Date.now() + 8000
   let reading = null
@@ -110,9 +109,9 @@ test('the tick sampler keeps its one connection across many readings', async (t)
   assert.equal(server.hangups(), 0)
 })
 
-// A length field outside what RCON allows is not a packet. With -4 the read loop used to keep
-// slicing nothing off the buffer for ever, freezing the event loop - timers included - so no
-// timeout could rescue the caller. These servers send the bad length and nothing else.
+// A length field outside what RCON allows is not a packet. A -4 length made the read loop spin and
+// freeze the event loop, timers included, so no timeout could rescue the caller. These servers send
+// the bad length and nothing else.
 async function badLengthServer(t, size, { afterAuth = false } = {}) {
   const bad = Buffer.alloc(16)
   bad.writeInt32LE(size, 0)

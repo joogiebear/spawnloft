@@ -60,8 +60,6 @@ test('writeJson round-trips and leaves no .tmp behind', () => {
   assert.ok(!fs.existsSync(`${file}.tmp`), 'the temp file should have been renamed away')
 })
 
-// ---- locking -----------------------------------------------------------------
-
 test('withLock serializes two read-modify-writes that would otherwise clobber each other', () => {
   const file = path.join(scratch(), 'counter.json')
   writeJson(file, { n: 0 })
@@ -94,10 +92,8 @@ test('a lock left behind by a pid that is no longer alive is taken over, not wai
 })
 
 test('acquireLock mode "wait" blocks until a holder in another process releases it', async () => {
-  // acquireLock's "wait" blocks this thread (Atomics.wait), which only a separate process can
-  // unblock - a timer in this same process could never fire while this thread is stuck waiting on
-  // it, which is exactly why acquireLockAsync exists for anything that shares a process with its
-  // holder. A real child process is the only honest way to exercise this mode's wait at all.
+  // acquireLock's wait blocks this thread (Atomics.wait), so only a separate process can release
+  // the lock in time. A real child process is the only way to exercise it.
   const lock = path.join(scratch(), 'wait.lock')
   const holder = childProcess.spawn(process.execPath, ['-e',
     `require('fs').writeFileSync(${JSON.stringify(lock)}, String(process.pid), { flag: 'wx' });
@@ -120,9 +116,8 @@ test('acquireLockAsync waits by yielding, not by blocking the holder\'s own prog
   const lock = path.join(scratch(), 'async.lock')
   const release = acquireLock(lock, { mode: 'fail' })
   let holderProgressed = false
-  // The holder's own "work" is just another timer - if the waiter blocked the thread instead of
-  // yielding, this would never get to run, and acquireLockAsync below would time out instead of
-  // succeeding once release() runs.
+  // The holder's "work" is just a timer: if the waiter blocked the thread instead of yielding, it
+  // would never run and acquireLockAsync would time out.
   setTimeout(() => { holderProgressed = true; release() }, 30)
   const second = await acquireLockAsync(lock, { timeoutMs: 2000 })
   assert.ok(holderProgressed, 'the holder\'s own timer fired while the second request was waiting')
@@ -138,8 +133,6 @@ test('acquireLockAsync times out with the holder named, rather than waiting fore
   )
   release()
 })
-
-// ---- the things that must not hold the event loop --------------------------
 
 test('dirSizeAsync agrees with dirSize', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-size-'))
