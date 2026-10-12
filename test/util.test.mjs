@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import childProcess from 'node:child_process'
 
-import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable, acquireLock, acquireLockAsync, withLock, lockHolder } from '../src/util.mjs'
+import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, maskSecretArgs, refreshProcessTable, acquireLock, acquireLockAsync, withLock, lockHolder } from '../src/util.mjs'
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lock-'))
 
@@ -250,4 +250,12 @@ test('lockHolder reads a lock as acquireLock writes it, without taking or cleari
   fs.utimesSync(lock, old, old)
   assert.equal(lockHolder(lock), null, 'an empty lock nobody finished writing is not a holder')
   fs.rmSync(lock)
+})
+
+test('maskSecretArgs hides the value of --password and --requirepass and nothing else', () => {
+  const args = ['--port', '6379', '--password', 'hunter2', '--bind', '127.0.0.1', '--requirepass=also-secret', '--passwordless']
+  assert.deepEqual(maskSecretArgs(args), ['--port', '6379', '--password', '[redacted]', '--bind', '127.0.0.1', '--requirepass=[redacted]', '--passwordless'])
+  assert.equal(maskSecretArgs(args).join(' ').includes('hunter2'), false)
+  assert.deepEqual(maskSecretArgs(['-jar', 'server.jar', 'nogui']), ['-jar', 'server.jar', 'nogui'])
+  assert.deepEqual(args[3], 'hunter2', 'the original arguments are untouched')
 })

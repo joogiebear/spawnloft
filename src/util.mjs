@@ -551,6 +551,14 @@ export function assertSafeVersion(value, label) {
   return v
 }
 
+/** A command line safe to write to a log: the value after --password or --requirepass is hidden. */
+export function maskSecretArgs(args) {
+  return args.map((arg, i) => {
+    if (/^--(?:password|requirepass)$/i.test(args[i - 1] ?? '')) return '[redacted]'
+    return String(arg).replace(/^(--(?:password|requirepass)=).*$/is, '$1[redacted]')
+  })
+}
+
 /** Whether `child` is `parent` or somewhere under it, judged on the paths as written. */
 export function isInside(parent, child) {
   const rel = path.relative(parent, child)

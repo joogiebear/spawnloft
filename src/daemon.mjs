@@ -17,7 +17,7 @@ import net from 'node:net'
 import path from 'node:path'
 import { getInstance, serverJarPath, jvmFlagsFor, isDatabase, kindOf } from './registry.mjs'
 import { runDir, stateFile, consoleLog, daemonLog, controlPath } from './paths.mjs'
-import { writeJson, killProcessGroup } from './util.mjs'
+import { writeJson, killProcessGroup, maskSecretArgs } from './util.mjs'
 import { startSampler, metricsFile } from './metrics.mjs'
 import { startTickSampler } from './tick.mjs'
 import { crashVerdict, CRASH_LIMIT, CRASH_WINDOW_MS } from './crashguard.mjs'
@@ -188,7 +188,7 @@ function launch({ first }) {
   program = programFor(inst)
   const { cmd, args, env, cwd } = program
 
-  log(`starting ${cmd} ${args.join(' ')} (cwd=${cwd})${first ? '' : ' [auto-restart]'}`)
+  log(`starting ${cmd} ${maskSecretArgs(args).join(' ')} (cwd=${cwd})${first ? '' : ' [auto-restart]'}`)
 
   child = spawn(cmd, args, {
     cwd,
@@ -439,7 +439,7 @@ async function handleStop(timeoutMs) {
     } else if (program?.stop?.cmd) {
       // A database is asked over TCP by its own admin tool. Its outcome is not awaited: the
       // process exiting, or not, is what the wait below is watching.
-      log(`asking for shutdown: ${program.stop.cmd} ${program.stop.args.join(' ')}`)
+      log(`asking for shutdown: ${program.stop.cmd} ${maskSecretArgs(program.stop.args).join(' ')}`)
       try {
         const ask = spawn(program.stop.cmd, program.stop.args, { env: program.stop.env, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
         ask.stderr.on('data', (c) => log(`shutdown tool: ${c.toString().trim()}`))
