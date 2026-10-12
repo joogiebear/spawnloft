@@ -20,23 +20,18 @@ export const KIND = 'mariadb'
 export const DEFAULT_PORT = 3306
 export const canDump = true
 export const VERSION = '8.4.11'
-// Downloaded from Oracle's HTTPS CDN; architecture-specific SHA-256 pins prevent
-// an upstream replacement from silently changing executable code in an existing preview.
+// Per-arch SHA-256 pins so an upstream replacement can't silently change the executables we run.
 export const ARCHIVES = Object.freeze({
   arm64: { file: 'mysql-8.4.11-macos15-arm64.tar.gz', sha256: 'b96e00493bc3499b9ffd7f08d65c5d64933af0383a8287d9873b64f94c2d6009' },
   x64: { file: 'mysql-8.4.11-macos15-x86_64.tar.gz', sha256: '90e8aea10698d01b978f0179e72e8d5e2cbe9f9bd5771e88b0b75d7c82244d3f' },
 })
 export const WINDOWS_ARCHIVE = Object.freeze({ file: 'mysql-8.4.11-winx64.zip', sha256: 'a492371d687d2bab088b0062581144a0044b8964baefdf4faa579292b423d25c' })
-// Oracle's "minimal" generic build: the same server without debug binaries and the test suite, 80 MB
-// where the full tarball is 830. Built against glibc 2.28, so Ubuntu 20.04, Debian 10 and RHEL 8
-// onward. The pin was taken from a download whose MD5 matched the one Oracle publishes for it.
-// There is no arm64 entry because Oracle publishes no minimal arm64 build, and 820 MB is not a
-// download to start behind a button marked "Add database".
+// Oracle's "minimal" generic build (80 MB vs 830 MB for the full tarball), built against glibc 2.28.
+// No arm64 entry: Oracle publishes no minimal arm64 build and the full one is too big to download on demand.
 export const LINUX_ARCHIVES = Object.freeze({
   x64: { file: 'mysql-8.4.11-linux-glibc2.28-x86_64-minimal.tar.xz', sha256: '383f54e124d5f325d67f0c6912a8f96814eedc761a17ea30112e52fa4cc6b143' },
 })
 
-/** Is there a verified native build for this machine? What decides whether the panel offers it. */
 export function supports(platform = process.platform, arch = process.arch) {
   if (platform === 'win32') return arch === 'x64'
   if (platform === 'darwin') return Object.hasOwn(ARCHIVES, arch)
@@ -73,7 +68,7 @@ export function hasEngine(version) {
   } catch { return false }
 }
 
-/** Cross-process lock and private staging: a failed download never looks installed. */
+// Lock file plus private staging dir, so a failed download never looks installed.
 export async function fetchEngine(version, { onProgress = null } = {}) {
   assertSupported()
   const archive = archiveFor(version)
@@ -113,12 +108,11 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     onProgress?.({ message: `Unpacking MySQL ${version}` })
     const extracted = await runTar(['-xf', file, '--strip-components=1', '-C', unpacked], staging)
     if (extracted.code !== 0 || !roles.every(role => binary(unpacked, role))) fail('The MySQL archive did not unpack completely. Please retry.')
-    // Before the engine is moved into place: one that cannot load its libraries must not look installed.
+    // must run before the move into place, or an engine that can't load its libraries looks installed
     ensureLibraries(unpacked, ['server', 'client'].map(role => binary(unpacked, role).path), { onProgress, engineLabel: LABEL })
     fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, arch: process.arch, sha256: archive.sha256 }))
-    // Asynchronous on purpose, as is the cleanup below. The engine is thousands of files and the
-    // staging folder holds the whole archive; Defender scans them as they move, and a synchronous
-    // call held the panel's event loop for seconds - long enough for its own requests to time out.
+    // async on purpose (and the cleanup below): thousands of files get scanned by Defender as they
+    // move, and a sync call blocked the panel's event loop long enough for its requests to time out
     await fs.promises.rename(unpacked, dir)
     return { version, dir, cached: false }
   } finally {
@@ -130,7 +124,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
 
 export const dataDir = maria.dataDir
 export const iniFile = maria.iniFile
-/** Short sockets support data folders with spaces and paths beyond the Unix socket limit. */
+// short socket path, so data folders with spaces or paths past the Unix socket limit still work
 export function socketFor(inst) {
   const base = path.join('/tmp', `spawnloft-mysql-${process.getuid()}`)
   fs.mkdirSync(base, { recursive: true, mode: 0o700 })
@@ -169,7 +163,6 @@ function execute(cmd, args, { env = process.env, timeout = 180000 } = {}) {
   })
 }
 
-/** Initialize without TCP, set root credentials, stop, then register the finished database. */
 export async function initData(inst) {
   assertSupported()
   const dir = engineDir(inst.version)
@@ -237,8 +230,8 @@ export function launchSpec(inst) {
   }
 }
 
-// MySQL and MariaDB share SQL and client conventions. Select the managed tools explicitly;
-// external instances retain normal discovery and any user-selected tools directory.
+// MySQL and MariaDB share client conventions. Managed instances use their own tools; external
+// ones keep normal discovery or the user's tools directory.
 function withTools(inst) {
   return inst.external ? inst : { ...inst, external: true, tools: { dir: engineDir(inst.version) } }
 }

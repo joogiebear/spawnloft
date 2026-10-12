@@ -1,13 +1,7 @@
 import net from 'node:net'
 import { UserError } from './util.mjs'
 
-/**
- * Just enough of the Redis protocol to say PING, SAVE and SHUTDOWN to a server.
- *
- * <p>Garnet ships no admin tool the way MariaDB does, and the protocol is small: a command is an
- * array of bulk strings, a reply is one line or one bulk string. Written here rather than pulled
- * in, because there is nothing to pull in - the tool has no dependencies and this is forty lines.
- */
+// Minimal Redis protocol client, enough for PING, SAVE and SHUTDOWN. Garnet ships no admin tool.
 
 function encode(args) {
   let out = `*${args.length}\r\n`
@@ -18,7 +12,7 @@ function encode(args) {
   return out
 }
 
-/** Parse one reply from the front of `buf`; returns { value, rest } or null when incomplete. */
+// returns { value, rest }, or null when the reply is incomplete
 function parse(buf) {
   const nl = buf.indexOf('\r\n')
   if (nl === -1) return null
@@ -49,10 +43,7 @@ function parse(buf) {
   return { value: head, rest: buf.slice(nl + 2) }
 }
 
-/**
- * Send commands in order and return the last reply. AUTH goes first when a password is given.
- * A `-ERR` reply is a refusal, said as one; a socket error names the connection.
- */
+// Sends commands in order and returns the last reply. AUTH goes first when a password is given.
 export function respSend(host, port, commands, { password = null, timeout = 5000 } = {}) {
   const queue = [...(password ? [['AUTH', password]] : []), ...commands]
   return new Promise((resolve, reject) => {
@@ -82,11 +73,11 @@ export function respSend(host, port, commands, { password = null, timeout = 5000
         buf = r.rest
         if (r.error) return done(reject, new UserError(`${host}:${port} refused: ${r.error}`))
         last = r.value
-        // SHUTDOWN closes the socket instead of replying; the close is the answer then.
         next()
       }
     })
     socket.on('close', () => {
+      // SHUTDOWN closes the socket instead of replying, so the close is the answer
       if (sent >= queue.length && queue[queue.length - 1]?.[0] === 'SHUTDOWN') done(resolve, last ?? 'OK')
       else done(reject, new UserError(`${host}:${port} closed the connection`))
     })
