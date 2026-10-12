@@ -1,9 +1,8 @@
 'use strict'
 
-// Run against the actual packaged app on macOS, Windows or Linux, not an Electron development checkout.
-// CI supplies Playwright through NODE_PATH so it never becomes an application dependency.
+// Runs against the packaged app (not a dev checkout). Playwright comes from NODE_PATH so it isn't
+// an application dependency; on Linux a display is needed (CI uses xvfb-run).
 // Usage: node desktop/smoke-desktop.cjs <SpawnLoft.app|win-unpacked|SpawnLoft.exe|linux-unpacked|/opt/SpawnLoft> <artifacts>
-// On Linux it needs a display; CI supplies one with xvfb-run.
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -15,8 +14,8 @@ async function main() {
   assert.ok(['darwin', 'win32', 'linux'].includes(process.platform), 'Packaged desktop smoke tests require macOS, Windows or Linux')
   const isMac = process.platform === 'darwin'
   const isLinux = process.platform === 'linux'
-  // The two unixes share launchers that are shell scripts, a control channel that is a socket with
-  // a short path limit, and a Playwright that waits on the app itself rather than on cmd.exe.
+  // the unixes share shell-script launchers, socket control channels (short path limit), and a
+  // Playwright that waits on the app itself rather than cmd.exe
   const isUnix = isMac || isLinux
   assert.ok(process.argv[2] && process.argv[3], 'Supply an app bundle, unpacked directory, or executable and an artifact directory')
   const bundle = path.resolve(process.argv[2])
@@ -32,7 +31,7 @@ async function main() {
   assert.ok(fs.existsSync(path.join(core, 'mcctl.mjs')), 'The package must contain its own CLI')
   fs.mkdirSync(output, { recursive: true })
 
-  // macOS Unix-domain sockets have a short path limit; the runner's default temp path is too long.
+  // unix-domain sockets have a short path limit; the runner's default temp path is too long
   const tempRoot = path.resolve(isUnix ? '/tmp' : os.tmpdir())
   const scratch = fs.mkdtempSync(path.join(tempRoot, 'sl-'))
   const data = path.join(scratch, 'App data')
@@ -65,9 +64,8 @@ async function main() {
   const name = 'desktop-smoke'
   const consoleFile = path.join(data, 'run', name, 'console.log')
 
-  // A server's tools open beside its console from the dock, and each server remembers which one
-  // was open, so pressing a tool's button is only "open" while it is closed - a second press
-  // closes it. These say what the step wants rather than which button to press.
+  // each server remembers which tool was open and a second press closes it, so these check
+  // aria-expanded rather than blindly clicking
   async function openTool(id) {
     const button = page.locator(`#${id}`)
     if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
@@ -106,14 +104,10 @@ async function main() {
       if (isMac) {
         await current.close()
       } else {
-        // On Linux the server daemon inherits the pipes Playwright drives the app through (they
-        // arrive as descriptors 3 and 4, and spawn only replaces 0 to 2), so Playwright's close
-        // never resolves while a server started by the app is still running. Same remedy as below.
-        // Playwright launches Electron through cmd.exe on Windows and waits for the child
-        // process's `close` event. A detached server can keep inherited stdio handles open
-        // after the app has exited, so waiting for `close` here prevents the restart test.
-        // Still request the normal app quit (and inspector disconnect), but first await
-        // process exit independently. Settle every close promise after daemon cleanup below.
+        // Playwright waits for the child's `close` event, but a detached server can keep inherited
+        // handles open after the app exits (cmd.exe stdio on Windows; descriptors 3 and 4, which
+        // spawn doesn't replace, on Linux), blocking the restart test. So request the normal quit,
+        // await process exit independently, and settle the close promises after daemon cleanup.
         const child = current.process()
         const exited = new Promise((resolve, reject) => {
           if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
@@ -180,8 +174,8 @@ async function main() {
   async function terminal(command, args, expectedCode = 0) {
     const launcher = path.join(path.dirname(core), 'bin', command + (isUnix ? '' : '.cmd'))
     const options = { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
-    // Only fixed test arguments and generated fixture paths enter this cmd.exe command.
-    // The extra quote pair is cmd /s /c's required wrapper around a quoted batch path.
+    // only fixed test arguments and generated fixture paths enter this cmd.exe command; the extra
+    // quote pair is the wrapper cmd /s /c requires around a quoted batch path
     for (const arg of [launcher, ...args]) assert.ok(!/["%\r\n]/.test(arg))
     const child = isUnix ? spawn(launcher, args, options)
       : spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c',
@@ -245,21 +239,20 @@ async function main() {
     }
     await close()
 
-    // Keep relaunches under Playwright control; test the real wizard above and normal saved setup below.
+    // the wizard relaunches the app itself, so skip it here and seed saved settings instead
     fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
     fs.writeFileSync(settingsFile, JSON.stringify({ dataRoot: data, theme: 'classic' }))
     const instanceDir = path.join(data, 'instances', name)
     fs.mkdirSync(instanceDir, { recursive: true })
     const fakeJava = path.join(scratch, 'fake-java.mjs')
     fs.copyFileSync(path.join(__dirname, '..', 'test', 'fixtures', 'fake-java.mjs'), fakeJava)
-    // Real process output passes through the daemon, SSE stream, and renderer. Splitting the
-    // searchable phrase with SGR codes proves the panel cleans text before searching/classifying.
+    // real output goes through daemon, SSE and renderer; SGR codes inside the phrase prove the
+    // panel strips them before searching and classifying
     const warningText = 'desktop smoke warning ' + 'a long plugin diagnostic with useful details '.repeat(24)
     const warningOutput = '[00:00:01 \u001b[33mWARN\u001b[0m]: desktop smoke \u001b[38;2;255;180;0mwarning\u001b[0m '
       + 'a long plugin diagnostic with useful details '.repeat(24)
     fs.appendFileSync(fakeJava, `\nprocess.stdout.write(${JSON.stringify(warningOutput + '\n')})\n`)
-    // Touch real memory and consume a bounded amount of CPU so the native sampler must
-    // measure the server process, not draw a plausible empty chart or measure the panel.
+    // touch real memory and burn some CPU so the sampler has to measure the server process
     fs.appendFileSync(fakeJava, `
 globalThis.smokeMemory = Buffer.alloc(32 * 1024 * 1024, 1);
 setInterval(() => { const end = performance.now() + 50; while (performance.now() < end) {} }, 100);
@@ -308,8 +301,8 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     }
     record('PASS: packaged spawnloft and mcctl terminal launchers return clean JSON and preserve success/failure exit codes')
 
-    // The launch line Settings gives an AI app: the executable itself with ELECTRON_RUN_AS_NODE,
-    // not the .cmd launcher, spoken to over piped stdin the way an MCP client does.
+    // the launch line Settings gives an AI app: the executable with ELECTRON_RUN_AS_NODE (not the
+    // .cmd launcher), driven over piped stdin like an MCP client
     const mcp = await new Promise((resolve, reject) => {
       const child = spawn(executable, [path.join(core, 'spawnloft.mjs'), 'mcp'], {
         env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
@@ -355,8 +348,8 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     const provenance = JSON.parse(fs.readFileSync(path.join(path.dirname(core), 'build-info.json'), 'utf8'))
     const manual = isMac && provenance.macSigningMode !== 'signed'
     assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows and Linux keep their updater')
-    // Exercise the no-network manual path only for ad-hoc packages. Signed
-    // installed upgrades have their own native Squirrel.Mac smoke test.
+    // the no-network manual path applies only to ad-hoc packages; signed ones have their own
+    // Squirrel.Mac smoke test
     if (manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
     await page.locator('#bSettings').click()
     await page.locator('input[name="appTheme"][value="spawnloft"]').check()
@@ -366,7 +359,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '02-theme-picker.png') })
     record('PASS: theme picker changes and persists the real application setting')
 
-    // Read, never clicked: changing it asks GitHub for an update, and this test owes it nothing.
+    // read only: changing the setting triggers an update check against GitHub
     if (manual) {
       assert.equal(await page.locator('#setUpdates').isVisible(), false, 'A build that updates by hand offers no beta setting')
     } else {
@@ -517,8 +510,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.screenshot({ path: path.join(output, '05-backup-refresh.png') })
     record('PASS: bundled CLI backups appear while Backups is open and after tab reentry without reload or lost form state')
 
-    // Files: a config edited and saved through the packaged panel, with a copy taken first, then
-    // deleted with another. Its own file, so the plugin configs later steps compare stay as they were.
+    // uses its own file so the plugin configs later steps compare stay untouched
     const filesConfig = path.join(instanceDir, 'plugins', 'SmokeFiles', 'config.yml')
     fs.mkdirSync(path.dirname(filesConfig), { recursive: true })
     fs.writeFileSync(filesConfig, 'enabled: true\nlimit: 5\n')
@@ -544,7 +536,6 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await page.locator('#toasts .toast').filter({ hasText: 'Deleted config.yml' }).waitFor({ state: 'visible' })
     assert.ok(!fs.existsSync(filesConfig))
     assert.equal(snapshotsLabelled('file-delete').length, 1, 'A delete must copy what it removes first')
-    // Both are in the server's history, as the person's doing, the edit with its Undo.
     await openTool('tabActivity')
     const historyRow = (verb) => page.locator('#activityBody .act-row').filter({ hasText: new RegExp(`${verb}\\s*plugins/SmokeFiles/config\\.yml`) })
     await historyRow('Deleted').waitFor({ state: 'visible' })
@@ -553,8 +544,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await showConsole()
     record('PASS: Files edits a config with a copy kept first, and deletes with another; Activity lists both as yours')
 
-    // The console in a window of its own: the app allows exactly this one window, the panel at
-    // ?console=<name>, and it shows that server's console and nothing else.
+    // the app allows exactly one extra window: the panel at ?console=<name>
     const popped = app.waitForEvent('window')
     await page.locator('#bPopConsole').click()
     const consolePage = await popped
@@ -565,8 +555,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await consolePage.close()
     record('PASS: a server console opens in its own window, without the rest of the panel')
     if (isMac) await require('./smoke-scheduler.cjs')({ api, cli, close, launch, data, name, record })
-    // Oracle publishes no small MySQL build for Linux on arm64. There the one-click button must be
-    // off and say why, rather than be offered and refused; Redis below still runs.
+    // Oracle publishes no small MySQL build for Linux arm64, so the button must be off and say why
     if (isLinux && process.arch !== 'x64') {
       await openTool('tabSettings')
       const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
@@ -583,7 +572,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     if (page && !page.isClosed()) await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {})
     throw error
   } finally {
-    // Shut the test daemon down before removing its control socket and settings, even after failure.
+    // stop the test daemon before removing its socket and settings, even after a failure
     let safeToRemove = true
     if (fs.existsSync(path.join(data, 'instances.json'))) {
       const instances = JSON.parse(fs.readFileSync(path.join(data, 'instances.json'), 'utf8')).instances
@@ -613,9 +602,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
       const source = path.join(data, 'run', name, filename)
       if (fs.existsSync(source)) fs.copyFileSync(source, path.join(output, filename))
     }
-    // The panel's own log, which records every time its event loop was held for longer than it
-    // should be. A request that timed out - the MySQL step's 4 s poll has, three times - is either
-    // the panel blocking or the runner being slow, and this is the file that says which.
+    // records event-loop stalls, which tells a blocked panel from a slow runner when a request times out
     const panelLog = path.join(data, 'run', 'panel.log')
     if (fs.existsSync(panelLog)) fs.copyFileSync(panelLog, path.join(output, 'panel.log'))
     fs.writeFileSync(path.join(output, 'smoke.log'), log.join('\n'))

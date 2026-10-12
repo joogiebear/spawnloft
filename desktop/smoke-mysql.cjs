@@ -4,10 +4,10 @@ const path = require('node:path')
 const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 
-/** Native Oracle binaries, created through the packaged GUI from an empty engine store. */
+// native Oracle binaries, created through the packaged GUI from an empty engine store
 module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record }) {
   const dbName = `${name}-db`
-  // A second press on an open tool closes it, so press only if Settings is not already open.
+  // a second press on an open tool closes it, so only press if Settings isn't already open
   if (await page.locator('#tabSettings').getAttribute('aria-expanded') !== 'true') await page.locator('#tabSettings').click()
   const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
   await create.scrollIntoViewIfNeeded()
@@ -16,7 +16,7 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
   const configBefore = fs.readFileSync(config, 'utf8')
   assert.deepEqual(fs.readdirSync(path.join(data, 'engines')), [], 'GUI must exercise the first download')
   await create.click()
-  // Even initialization must yield to the panel so progress, console, and other servers work.
+  // even initialization must yield to the panel so progress, console and other servers keep working
   const deadline = Date.now() + 600000
   let created = false, polls = 0
   while (Date.now() < deadline) {

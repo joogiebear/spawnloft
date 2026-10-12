@@ -1,7 +1,7 @@
 'use strict'
-// Install a published updater-enabled beta in isolation and replace it using the
-// real bundled updater and Squirrel.Mac. Only the HTTP source is redirected to
-// the candidate ZIP; signatures, checksums and the native installer stay real.
+// Installs a published updater-enabled beta in isolation and replaces it with the real bundled
+// updater and Squirrel.Mac. Only the HTTP source is redirected to the candidate zip; signatures,
+// checksums and the native installer stay real.
 const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
@@ -40,7 +40,7 @@ async function main() {
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.MCCTL_CORE
-  // Authentication belongs only to CI release discovery, never the installed app.
+  // the token is for CI release discovery only, never the installed app
   delete env.GITHUB_TOKEN
   delete env.GH_TOKEN
   const preserved = new Map()
@@ -88,7 +88,7 @@ async function main() {
     await app.evaluate(({ app, autoUpdater: nativeUpdater }, url) => {
       const updater = process.mainModule.require('electron-updater').autoUpdater
       updater.setFeedURL({ provider: 'generic', url })
-      updater.autoRunAppAfterInstall = false // Relaunch under Playwright after native replacement.
+      updater.autoRunAppAfterInstall = false // relaunch under Playwright after native replacement
       globalThis.__nativeUpdateReady = false
       globalThis.__updateErrors = []
       nativeUpdater.once('update-downloaded', () => { globalThis.__nativeUpdateReady = true })
@@ -125,7 +125,6 @@ async function main() {
     if (app) await app.close().catch(() => {})
     server.closeAllConnections()
     await new Promise(resolve => server.close(resolve))
-    // Keep a failed installation for CI diagnostics; successful jobs are ephemeral too.
   }
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

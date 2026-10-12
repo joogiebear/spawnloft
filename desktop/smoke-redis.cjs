@@ -8,8 +8,8 @@ module.exports = async function smokeRedis({ page, api, cli, core, executable, e
   const dbName = `${name}-cache`
   const engines = await api('databases/engines')
   assert.deepEqual(engines.map(e => e.id).sort(), ['garnet', 'mysql'])
-  // Redis is managed everywhere SpawnLoft ships. MySQL is too, except Linux on arm64, where Oracle
-  // publishes no small build; there it must say so rather than claim an install it cannot do.
+  // Redis is managed everywhere; MySQL is too except Linux arm64, where Oracle publishes no small
+  // build and the panel must say so
   const mysqlExpected = !(process.platform === 'linux' && process.arch !== 'x64')
   assert.deepEqual(Object.fromEntries(engines.map(e => [e.id, e.managed])), { garnet: true, mysql: mysqlExpected })
   await page.locator('#bNew').click()

@@ -1,14 +1,5 @@
-/**
- * Window state, checked without launching an application.
- *
- * <p>The interesting part of remembering a window is not the storing, it is deciding whether a
- * remembered position is still somewhere a person can reach. That decision depends on which
- * monitors are attached, which is exactly the thing you cannot arrange on the machine running the
- * test - so window-state.js takes the display list as an argument and this passes it fictional
- * ones.
- *
- *   node window-state.test.js      (or: npm test, from desktop/)
- */
+// window-state.js takes the display list as an argument, so these tests pass fictional monitors.
+// Run: node window-state.test.js (or npm test, from desktop/)
 const assert = require('node:assert')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -19,7 +10,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-ws-'))
 const file = path.join(tmp, 'window-state.json')
 const write = (o) => fs.writeFileSync(file, JSON.stringify(o))
 
-// Your actual layout: two 2560x1392 displays side by side.
+// two 2560x1392 displays side by side
 const TWO = [{ x: 0, y: 0, width: 2560, height: 1392 }, { x: 2560, y: 0, width: 2560, height: 1392 }]
 const ONE = [{ x: 0, y: 0, width: 2560, height: 1392 }]
 

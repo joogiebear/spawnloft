@@ -17,8 +17,8 @@ if (target.platform === 'win32') {
   }
   fs.copyFileSync(path.join(dir, 'latest.yml'), path.join(dir, 'beta.yml'))
 }
-// Linux has no signature to check: no Authenticode, no notarization. The package is verified by the
-// hash in its feed, and both feed names ship so a beta installation can move to the stable.
+// Linux has no signature to check; the package is verified by the hash in its feed. Both feed
+// names ship so a beta install can move to stable.
 if (target.platform === 'linux') {
   const [latest, beta] = linuxFeedNames(target.arch)
   fs.copyFileSync(path.join(dir, latest), path.join(dir, beta))

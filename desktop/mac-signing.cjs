@@ -7,8 +7,8 @@ exports.signingMode = function (env = process.env) {
   return mode
 }
 
-// Check before packaging. electron-builder otherwise permits missing credentials to
-// skip notarization, which must never silently downgrade a signed release.
+// checked before packaging: electron-builder would otherwise skip notarization when credentials
+// are missing, silently downgrading a signed release
 exports.requireCredentials = function (env = process.env) {
   const required = ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']
   const missing = required.filter(key => !env[key]?.trim())
