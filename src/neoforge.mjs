@@ -144,7 +144,7 @@ export function installServer(dir, installerPath, { java = 'java', onProgress = 
     child.stderr.on('data', keepTail)
     child.on('error', (err) => reject(new UserError(
       err.code === 'ENOENT' ? `could not run ${java} to install NeoForge` : `NeoForge install failed: ${err.message}`)))
-    child.on('exit', (code) => {
+    child.on('close', (code) => {
       const starter = path.join(dir, 'server.jar')
       if (code === 0 && fs.existsSync(starter)) {
         fs.rmSync(path.join(dir, `${path.basename(installerPath)}.log`), { force: true })

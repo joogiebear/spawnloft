@@ -116,7 +116,7 @@ export async function build(mc, { flavour = 'spigot', java = 'java', force = fal
     child.stderr.on('data', onChunk)
     child.on('error', (err) => reject(new UserError(
       err.code === 'ENOENT' ? `could not run ${java} to build ${flavour}` : `BuildTools failed to start: ${err.message}`)))
-    child.on('exit', (code) => {
+    child.on('close', (code) => {
       const built = path.join(outDir, name)
       if (code === 0 && fs.existsSync(built)) {
         resolve()

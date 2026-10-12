@@ -71,7 +71,7 @@ export function runTar(args, cwd) {
         ),
       ),
     )
-    child.on('exit', (code) => {
+    child.on('close', (code) => {
       // bsdtar exits 1 on warnings such as "file changed as we read it",
       // which is expected when snapshotting a running server.
       if (code === 0 || code === 1) resolve({ code, stderr })
