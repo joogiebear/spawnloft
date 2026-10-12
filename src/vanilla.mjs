@@ -1,14 +1,6 @@
-/**
- * Mojang's own server jar, from the launcher's version manifest.
- *
- * <p>The manifest lists every version with a link to its metadata; the metadata names the
- * server download with its sha1. Vanilla loads no plugins and no mods, so an instance made
- * from here has nothing for the content tab to manage - which the software table says.
- *
- * <p>The metadata also says which Java the version needs, and that is passed up: Minecraft
- * has raised its floor twice in three years, and a server that refuses to start on the Java
- * that ran last year's is better explained before the download than after it.
- */
+// Mojang's server jar, via the launcher's version manifest. Each version's metadata names the download
+// with its sha1 and the Java major version it needs; that is passed up so a Java mismatch can be
+// explained before the download.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -23,7 +15,6 @@ async function manifest() {
   return fetchJson(MANIFEST, { label: LABEL })
 }
 
-/** Release versions, newest first, as Mojang lists them. */
 export async function versions({ includeSnapshots = false } = {}) {
   const data = await manifest()
   return (data.versions ?? [])

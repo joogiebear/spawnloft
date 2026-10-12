@@ -6,46 +6,17 @@ import { fail, writeJson, withLock } from './util.mjs'
 import { rconExec, stripColors } from './rcon.mjs'
 import * as supervisor from './supervisor.mjs'
 
-/**
- * Who a world already knows about, and under which kind of identity.
- *
- * <p>Minecraft stores one `<uuid>.dat` per player who has joined, and the UUID it uses depends on
- * whether the server was in online mode at the time:
- *
- * <ul>
- *   <li><b>Online</b> - the account's real Mojang UUID, which is a random (version 4) UUID.</li>
- *   <li><b>Offline</b> - a UUID derived from the player's name by hashing it, which is a
- *       name-based (version 3) UUID.</li>
- * </ul>
- *
- * <p>The version is the first hex digit of a UUID's third group, so the two are told apart by
- * reading the filename. That distinction is the whole reason this exists: turning online mode on
- * for a world that has offline players in it does not migrate them, it gives everyone a different
- * identity. Permissions, homes, inventories and anything else a plugin keyed by UUID stay attached
- * to the old one, and the same person joins as a stranger.
- *
- * <p>Worth a warning before the switch rather than a support question after it.
- */
+// Players a server knows about. Minecraft stores one <uuid>.dat per joined player; the UUID is
+// v4 online and v3 (a hash of the name) offline, which is how the two are told apart. Turning on
+// online mode for a world with offline players gives everyone a new identity, hence the warning.
 
-// The version digit is the first character of a UUID's third group. The extension varies by which
-// directory the file came from - .dat for saved player state, .json for stats and advancements.
+// the version digit is the first character of the UUID's third group; .dat is player state,
+// .json is stats and advancements
 const UUID_FILE = /^([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f])([0-9a-f]{3})-([0-9a-f]{4})-([0-9a-f]{12})\.(dat|json)$/i
 
-/**
- * Every directory a joined player might have left a file in.
- *
- * <p>Minecraft moved these. Up to and including the classic layout a server kept
- * `<level>/playerdata/<uuid>.dat` with `stats` and `advancements` as siblings; Paper 26.2 keeps all
- * three under `<level>/players/`, and nests the nether and the end inside `<level>/dimensions/`
- * rather than as `<level>_nether` beside it. Looking only in the old place is how the first version
- * of this reported zero players for a world that had one - and the online-mode warning it feeds
- * therefore never appeared.
- *
- * <p>All of them are read and unioned by UUID rather than picking a layout, because both exist in
- * the wild, and because a player who has joined but whose state has not been written yet still has
- * a stats file. The question being answered is "has this world seen this player", not "is there a
- * .dat".
- */
+// Where a joined player may have left files. Older layouts use <level>/playerdata, stats and
+// advancements; Paper 26.2 puts them under <level>/players/ and nests nether/end in dimensions/.
+// All are unioned by UUID: the question is whether the world has seen the player, not whether a .dat exists.
 function playerDirs(instDir, level) {
   return [
     path.join(instDir, level, 'players', 'data'),
@@ -57,13 +28,10 @@ function playerDirs(instDir, level) {
   ]
 }
 
-/**
- * The nil UUID. Minecraft writes a player file under it for the console and for singleplayer
- * conversions; it is not a person, and listing it as one has people trying to ban nobody.
- */
+// the nil UUID is written for the console and singleplayer conversions; it is not a person
 const NIL_UUID = '00000000-0000-0000-0000-000000000000'
 
-/** The four files a server keeps its people in, none of which is a complete list on its own. */
+// none of these is a complete list on its own
 const OPS = 'ops.json'
 const BANNED = 'banned-players.json'
 const WHITELIST = 'whitelist.json'
@@ -74,25 +42,17 @@ function readList(dir, file) {
     const parsed = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
     return Array.isArray(parsed) ? parsed : []
   } catch {
-    // Absent is normal on a server nobody has joined, and a half-written file during a save is
-    // not worth failing a screen over - the next read gets it.
+    // absent is normal, and a half-written file mid-save is picked up on the next read
     return []
   }
 }
 
 function writeList(dir, file, rows) {
-  // Atomic (temp file + rename): the panel and the CLI can both reach for this file, and a crash
-  // mid-write must never leave ops.json / banned-players.json / whitelist.json half-written - that
-  // reads back as empty, which is indistinguishable from "nobody is opped/banned/whitelisted".
+  // atomic write: a half-written file reads back as empty, which looks like nobody is opped/banned/whitelisted
   writeJson(path.join(dir, file), rows)
 }
 
-/**
- * Read, change, and write back one of the four files, as a single step a concurrent call cannot
- * land in the middle of. Without this, the panel and the CLI changing two different players at
- * the same moment can each read before the other writes, and the second write silently undoes the
- * first - no error, just one ban or op that never took.
- */
+// Read-modify-write under a lock, so two concurrent changes (panel and CLI) can't undo each other.
 function updateList(dir, file, mutate) {
   return withLock(path.join(dir, `${file}.lock`), () => {
     const rows = mutate(readList(dir, file))
@@ -101,20 +61,8 @@ function updateList(dir, file, mutate) {
   })
 }
 
-/**
- * Everyone this server knows about, from every place it records them.
- *
- * <p>No single file is the list. ops.json holds operators, banned-players.json holds the banned,
- * whitelist.json holds the allowed, usercache.json holds names the server has resolved, and the
- * world folder holds a .dat for anyone who has actually joined. Someone can be in one and none of
- * the others - a player who joined once is only in the world folder, and a name banned before it
- * ever connected is only in the ban list.
- *
- * <p>Unioned by UUID, because that is the only identifier all five agree on. Names are looked up
- * afterwards and can genuinely be missing: an offline-mode UUID is a hash of a name, not a
- * reversible encoding of it, so a player who joined an offline server and was never opped,
- * banned, whitelisted or cached has left a UUID and nothing else.
- */
+// Union of ops, bans, whitelist, usercache and the world's player files, keyed by UUID (the only id
+// they share). Names can be missing: an offline UUID is a hash of a name, not reversible.
 export function listPlayers(inst) {
   const dir = inst.dir
   const props = readProps(path.join(dir, 'server.properties'))
@@ -155,8 +103,7 @@ export function listPlayers(inst) {
     p.banned = true
     p.banReason = row.reason || null
     p.banSource = row.source || null
-    // "forever" is what Minecraft writes for a permanent ban. Showing that word as if it were a
-    // date is worse than showing nothing.
+    // "forever" is Minecraft's marker for a permanent ban, not a date
     p.banExpires = row.expires && row.expires !== 'forever' ? row.expires : null
     if (row.name) p.name = row.name
   }
@@ -166,8 +113,7 @@ export function listPlayers(inst) {
     p.whitelisted = true
     if (row.name) p.name = row.name
   }
-  // Last, and allowed to win: the cache holds the name the server most recently resolved, which is
-  // the one that matters after a rename.
+  // last so the cache wins: it holds the most recently resolved name, which matters after a rename
   for (const row of readList(dir, USERCACHE)) {
     const p = at(row.uuid)
     if (!p) continue
@@ -192,37 +138,23 @@ export function listPlayers(inst) {
         const seen = fs.statSync(path.join(d, entry.name)).mtime.toISOString()
         if (!p.lastSeen || seen > p.lastSeen) p.lastSeen = seen
       } catch {
-        /* the file went away between listing and stat; it still counts as having joined */
+        /* file vanished between listing and stat; it still counts as joined */
       }
     }
   }
 
   return [...people.values()].sort((a, b) => {
-    // Named before nameless, then alphabetical. A screen that opens with a column of UUIDs is not
-    // a list of people.
+    // named before nameless, then alphabetical
     if (Boolean(a.name) !== Boolean(b.name)) return a.name ? -1 : 1
     return (a.name || a.uuid).localeCompare(b.name || b.uuid)
   })
 }
 
-/**
- * Changing what a server thinks of somebody.
- *
- * <p>There are two ways to do this and only one of them is right at any moment.
- *
- * <p>A <b>running</b> server holds ops, bans and the whitelist in memory and writes them back over
- * the files when it feels like it - on shutdown, and after its own edits. Editing the file under a
- * live server therefore does nothing at best, and is silently reverted at worst. So while it runs,
- * the change goes through RCON as a console command, which is the server changing its own mind.
- *
- * <p>A <b>stopped</b> server has no console to talk to, and the files are then the whole truth. So
- * the change is written to the file.
- *
- * <p>Which one applies is decided here rather than by the caller, because getting it wrong is
- * invisible: the panel would say "opped" and the next start would quietly disagree.
- */
+// A running server keeps ops, bans and the whitelist in memory and overwrites the files, so while
+// it runs changes go through RCON; a stopped server has only the files. Decided here so the panel
+// can't report "opped" and have the next start disagree.
 
-/** Ban entries record who did it. Anything a server writes itself says "Server". */
+// ban entries record who did it; the server itself writes "Server"
 const BAN_SOURCE = 'mcctl'
 
 function findPlayer(inst, uuid) {
@@ -231,13 +163,7 @@ function findPlayer(inst, uuid) {
   return who
 }
 
-/**
- * A console command needs a name, and an offline UUID is a hash rather than an encoding of one.
- *
- * <p>So a player who joined an offline server and was never opped, banned, whitelisted or cached
- * has left an identifier the server cannot turn back into a name. Saying so beats sending
- * `op undefined`.
- */
+// A console command needs a name, and an offline UUID can't be turned back into one.
 function requireName(who, verb) {
   if (who.name) return who.name
   fail(
@@ -247,23 +173,13 @@ function requireName(who, verb) {
   )
 }
 
-/**
- * Who is connected right now.
- *
- * <p>Nothing on disk answers this. Minecraft writes a player's .dat when they log out or when the
- * world saves, so someone who joined a minute ago has left no trace in the world folder at all -
- * and a screen that reads only files says "has never joined" about the person currently standing
- * in front of you.
- *
- * <p>So the server is asked. Failure is not an error: the list still means something without it,
- * and the alternative is a page that shows nothing because one extra question went unanswered.
- */
+// Nothing on disk says who is connected (a .dat is written on logout or world save), so ask the
+// server. Failure returns an empty list rather than breaking the page.
 export async function onlineNow(inst) {
   if (!supervisor.isRunning(inst.name)) return []
   try {
     const [reply] = await rconExec(inst, ['list'])
-    // "There are 1 of a max of 10 players online: Wunga_" - and with nobody on, the same sentence
-    // ending in a colon and nothing after it.
+    // "There are 1 of a max of 10 players online: Wunga_"; with nobody on, the same sentence ends at the colon
     const after = stripColors(reply || '').split(':').slice(1).join(':')
     return after.split(',').map((n) => n.trim()).filter(Boolean)
   } catch {
@@ -284,8 +200,7 @@ export async function setOp(inst, uuid, on) {
       filtered.push({
         uuid: who.uuid,
         name: who.name || '',
-        // Level 4 is what the `op` command grants. Anything less is a partial operator that the
-        // console cannot create, so offering it here would be a setting only half the app honours.
+        // level 4 is what the op command grants; lower levels can't be created from the console
         level: 4,
         bypassesPlayerLimit: false,
       })
@@ -300,7 +215,7 @@ export async function setBan(inst, uuid, on, reason) {
   const why = String(reason || '').trim().slice(0, 200)
   if (supervisor.isRunning(inst.name)) {
     const name = requireName(who, on ? 'banning' : 'pardoning')
-    // Banning a player who is connected also kicks them, which is the point of doing it live.
+    // banning a connected player also kicks them
     const cmd = on ? `ban ${name}${why ? ' ' + why : ''}` : `pardon ${name}`
     const [reply] = await rconExec(inst, [cmd])
     return { uuid: who.uuid, banned: on, via: 'console', reply: stripColors(reply || '').trim() }
@@ -311,7 +226,7 @@ export async function setBan(inst, uuid, on, reason) {
       filtered.push({
         uuid: who.uuid,
         name: who.name || '',
-        // The format Minecraft writes, so the file stays one the server can read back.
+        // Minecraft's own timestamp format, so the server can read it back
         created: banStamp(new Date()),
         source: BAN_SOURCE,
         expires: 'forever',
@@ -323,7 +238,7 @@ export async function setBan(inst, uuid, on, reason) {
   return { uuid: who.uuid, banned: on, via: 'file' }
 }
 
-/** Minecraft's ban timestamps look like `2026-08-30 18:41:07 -0500`, not like ISO. */
+// ban timestamps look like 2026-08-30 18:41:07 -0500, not ISO
 function banStamp(d) {
   const two = (n) => String(n).padStart(2, '0')
   const off = -d.getTimezoneOffset()
@@ -334,16 +249,9 @@ function banStamp(d) {
     + `${sign}${two(Math.floor(abs / 60))}${two(abs % 60)}`
 }
 
-/**
- * Delete everything a world holds about one player: inventory, position, stats, advancements.
- *
- * <p>Refused while the server is running. A live server holds a joined player's state in memory
- * and writes it back on logout, so deleting the file underneath either achieves nothing or races
- * a write - and the panel would report a reset that did not happen.
- *
- * <p>Does not touch ops, bans or the whitelist. Those are about permission and survive the loss of
- * a player's things; wiping a banned player's inventory should not quietly unban them.
- */
+// Deletes a player's inventory, position, stats and advancements. Refused while the server runs,
+// since it writes player state back on logout. Ops, bans and the whitelist are left alone so
+// wiping a banned player doesn't unban them.
 export function forgetPlayer(inst, uuid) {
   if (supervisor.isRunning(inst.name)) {
     fail(
@@ -363,8 +271,7 @@ export function forgetPlayer(inst, uuid) {
       continue
     }
     for (const entry of entries) {
-      // .dat_old too: Minecraft keeps the previous save beside the current one, and leaving it
-      // behind means the next start can restore what was just deleted.
+      // also matches .dat_old, the previous save, which could otherwise be restored
       if (!entry.toLowerCase().startsWith(who.uuid)) continue
       fs.rmSync(path.join(d, entry), { force: true })
       removed.push(path.join(path.basename(path.dirname(d)), path.basename(d), entry))
@@ -377,15 +284,14 @@ export function storedPlayers(instDir) {
   const props = readProps(path.join(instDir, 'server.properties'))
   const level = props.get('level-name') || 'world'
 
-  // Keyed by UUID: the same player appears in several of these directories, and counting files
-  // would report one person three times.
+  // keyed by UUID: one player appears in several of these directories
   const seen = new Map()
   for (const dir of playerDirs(instDir, level)) {
     let entries
     try {
       entries = fs.readdirSync(dir)
     } catch {
-      // Absent is the normal case for most of these; nobody having joined is not an error.
+      // absent is normal
       continue
     }
     for (const entry of entries) {

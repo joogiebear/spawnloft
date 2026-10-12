@@ -1,11 +1,7 @@
 import fs from 'node:fs'
 import { writeFileWithMode, PRIVATE_FILE_MODE } from './util.mjs'
 
-/**
- * Minimal server.properties reader/writer that preserves comment lines and
- * key order. Rewriting via a generic properties dump would scramble the file
- * every time we touch one key, which makes diffs useless.
- */
+// Minimal server.properties reader/writer that keeps comments and key order, so diffs stay useful.
 export function parseProps(text) {
   const map = new Map()
   for (const line of text.split(/\r?\n/)) {
@@ -48,21 +44,18 @@ export function writeProps(file, updates) {
     return `${key}=${value}`
   })
 
-  // Keys that did not already exist get appended at the end.
   while (out.length && out[out.length - 1] === '') out.pop()
   for (const [key, value] of pending) out.push(`${key}=${value}`)
   out.push('')
 
-  // Atomic (temp file + rename): this runs on every server start, so a crash mid-write would
-  // truncate the file and the next start would read it back empty - silently dropping the RCON
-  // password and port back to Minecraft's defaults instead of the ones mcctl just set.
+  // atomic write (temp + rename): this runs on every start, and a truncated file would reset the RCON
+  // password and port to Minecraft's defaults
   const tmp = `${file}.tmp-${process.pid}`
-  // server.properties carries rcon.password, so it is owner-only. The server runs as the same user.
+  // owner-only: it contains rcon.password
   writeFileWithMode(tmp, out.join('\n'), PRIVATE_FILE_MODE)
   fs.renameSync(tmp, file)
 }
 
-/** All world directories the server owns, derived from level-name. */
 export function worldDirs(props) {
   const level = props.get('level-name') || 'world'
   return [level, `${level}_nether`, `${level}_the_end`]

@@ -3,25 +3,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-/**
- * Is a server's RCON port open to the internet?
- *
- * <p>RCON is an admin console: whoever is let in can op themselves, stop the server, run anything a
- * plugin exposes. It is unencrypted and guarded by one password, and Minecraft binds it wherever it
- * binds the game - there is no setting to keep it on loopback while the game listens publicly.
- *
- * <p>On a PC behind a home router that does not matter: the machine has a private address and the
- * router is a firewall whether anyone meant it to be or not. The same is true of Windows, whose own
- * firewall refuses inbound connections to a new program until someone allows them. A Linux VPS is
- * the opposite on both counts - a public address on the interface itself, and very often no
- * firewall at all - and that is exactly the machine a headless Linux build invites. So this speaks
- * only there: Linux, a public address, RCON bound beyond loopback, and no firewall that can be seen.
- *
- * <p>Everything is read without root. That limits what can be known about a firewall, and the
- * wording stays inside it: "none was found", not "there is none".
- */
+// Is a server's RCON port open to the internet? RCON is an unencrypted admin console behind one password,
+// and Minecraft binds it wherever it binds the game. Behind a home router or the Windows firewall that
+// doesn't matter, so this only speaks on Linux with a public address, RCON bound beyond loopback, and no
+// firewall that can be seen. Everything is read without root, so the wording stays at "none was found".
 
-/** An IPv4 address the internet can route to: not private, shared, link-local, loopback or reserved. */
+// routable on the internet: not private, shared, link-local, loopback or reserved
 export function isPublicIPv4(address) {
   const parts = String(address).split('.')
   if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false
@@ -37,21 +24,14 @@ export function isPublicIPv4(address) {
   return true
 }
 
-/** This machine's public IPv4 addresses, from the interfaces themselves. */
 export function publicAddresses(interfaces = os.networkInterfaces()) {
   return Object.values(interfaces).flat()
     .filter(entry => entry && !entry.internal && entry.family === 'IPv4' && isPublicIPv4(entry.address))
     .map(entry => entry.address)
 }
 
-/**
- * Whether a firewall can be seen to be on. True, false, or null for "could not tell".
- *
- * <p>ufw records its state in a world-readable file, and firewalld is a service whose state anyone
- * may ask. Hand-written nftables or iptables rules can only be listed as root, so their absence
- * here proves nothing - which is why the answer for "neither of the two was found" is null on a
- * machine that has nft or iptables rulesets configured, and false only when nothing is installed.
- */
+// True, false, or null for "could not tell". ufw and firewalld state can be read without root; hand-written
+// nftables/iptables rules cannot be listed, so a saved ruleset file gives null and false means none was found.
 export function firewallActive({ read = file => fs.readFileSync(file, 'utf8'), run = spawnSync } = {}) {
   try {
     if (/^\s*ENABLED\s*=\s*yes\s*$/im.test(read('/etc/ufw/ufw.conf'))) return true
@@ -65,7 +45,7 @@ export function firewallActive({ read = file => fs.readFileSync(file, 'utf8'), r
   return false
 }
 
-/** `server-ip` from server.properties; empty means every interface, which is Minecraft's default. */
+// server-ip from server.properties; empty means every interface, Minecraft's default
 export function boundAddress(dir, read = file => fs.readFileSync(file, 'utf8')) {
   try {
     const hit = /^\s*server-ip\s*=\s*(.*)$/m.exec(read(path.join(dir, 'server.properties')))
@@ -73,12 +53,7 @@ export function boundAddress(dir, read = file => fs.readFileSync(file, 'utf8')) 
   } catch { return '' }
 }
 
-/**
- * The finding for one instance, or null when there is nothing to say.
- *
- * <p>Shaped like a console diagnosis (id, title, advice) so the panel shows it where it shows
- * those, and `doctor` prints the same sentence.
- */
+// Shaped like a console diagnosis (id, title, advice) so the panel shows it with those and doctor prints the same sentence.
 export function rconExposure(inst, {
   platform = process.platform, addresses = publicAddresses(), firewall = undefined, bound = undefined,
 } = {}) {

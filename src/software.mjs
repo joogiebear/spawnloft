@@ -1,25 +1,9 @@
-/**
- * Every kind of server mcctl can create, described once.
- *
- * <p>Pure: no network, no filesystem, so plugins.mjs can read "what does this loader load"
- * from it without dragging every download client into the import graph, and so the table
- * itself is testable. Where each one is fetched from lives in sources.mjs.
- *
- * <p>`family` is what the daemon and the content tab care about:
- * <ul>
- *   <li><b>bukkit</b> - Paper and everything downstream or upstream of it. Loads plugins from
- *       plugins/. Purpur, Folia and Advanced Slime Paper are Paper forks; Spigot and CraftBukkit
- *       are what Paper forked from.</li>
- *   <li><b>fabric</b>, <b>neoforge</b> - mod loaders. Load mods from mods/.</li>
- *   <li><b>vanilla</b> - Mojang's own server. Loads nothing.</li>
- * </ul>
- *
- * <p>`modrinth` is the loader facet a search sends, widest-compatible first. Paper runs Spigot
- * and Bukkit plugins; Purpur runs all of those and its own; Folia runs only plugins built for
- * it, and Spigot cannot load a plugin that needs Paper's API - so the lists narrow down the tree.
- * `hangar` says whether PaperMC's plugin platform is a sensible second source: it hosts Paper
- * plugins, which are exactly what a Spigot server cannot promise to run.
- */
+// Table of the server software mcctl can create. Pure data (no network or filesystem) so plugins.mjs
+// can import it cheaply; the fetch clients are in sources.mjs.
+// family: bukkit loads plugins/ (Paper and the forks and ancestors around it), fabric and neoforge load mods/,
+// vanilla loads nothing. modrinth is the search loader facet, widest-compatible first, narrowing down
+// the tree (Folia only runs Folia plugins; Spigot can't load plugins needing Paper's API). hangar says
+// whether PaperMC's platform is a useful second source.
 export const SOFTWARE = [
   {
     id: 'paper',
@@ -64,8 +48,7 @@ export const SOFTWARE = [
     content: 'plugins',
     modrinth: ['spigot', 'bukkit'],
     hangar: false,
-    // SpigotMC publishes no jars: BuildTools compiles one here from source. Said up front,
-    // because a create that takes ten minutes with no warning reads as a hang.
+    // SpigotMC publishes no jars; BuildTools compiles one here. slow warns up front so a ten-minute create doesn't read as a hang.
     slow: true,
     blurb: 'Compiled on this machine by SpigotMC’s BuildTools. Needs a JDK and takes five to ten minutes the first time.',
   },
@@ -110,7 +93,7 @@ export const SOFTWARE = [
 
 const BY_ID = new Map(SOFTWARE.map((s) => [s.id, s]))
 
-/** The table row for a loader id. Unknown and absent both mean Paper - see registry.loaderOf. */
+// unknown and absent both mean Paper (see registry.loaderOf)
 export function softwareOf(loader) {
   return BY_ID.get(loader) ?? BY_ID.get('paper')
 }
@@ -119,13 +102,10 @@ export function isSoftware(id) {
   return BY_ID.has(id)
 }
 
-/** Ids whose server is one jar fetched into the store; NeoForge is installed instead. */
+// ids whose server is one jar fetched into the store; NeoForge is installed instead
 export const JAR_IDS = SOFTWARE.filter((s) => s.id !== 'neoforge').map((s) => s.id)
 
-/**
- * The Minecraft version a jar's own name says it is for, or null. Every source names its jar
- * `<id>-<mc>...` on purpose so an instance made before mcVersion was recorded still answers.
- */
+// Every source names its jar <id>-<mc>... so instances made before mcVersion was recorded still answer.
 export function versionFromJar(jar) {
   const name = String(jar || '')
   const m = /^(?:paper|purpur|folia|asp|spigot|craftbukkit|vanilla)-(\d+\.\d+(?:\.\d+)?)/i.exec(name)
@@ -133,11 +113,8 @@ export function versionFromJar(jar) {
   return m ? m[1] : null
 }
 
-/**
- * Which software an adopted server is, guessed the way a person would: from the jar's name,
- * and for NeoForge from the libraries tree its installer leaves. Anything unrecognised is
- * treated as Paper, which is what every adopted server had been until there were choices.
- */
+// Guessed from the jar name, and for NeoForge from the libraries tree its installer leaves.
+// Anything unrecognised is Paper.
 export function guessLoader(jar, { hasNeoforgeLibs = false } = {}) {
   const name = String(jar || '')
   if (/^fabric-server/i.test(name)) return 'fabric'

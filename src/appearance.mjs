@@ -3,8 +3,7 @@ import { fail } from './util.mjs'
 
 export const THEMES = Object.freeze(['classic', 'spawnloft'])
 
-// An older settings file has no theme. An unknown value must not select an
-// arbitrary HTML attribute or leave the app without a usable palette.
+// older settings files have no theme, and an unknown value must not become an arbitrary HTML attribute
 export function normalizeTheme(value) {
   return THEMES.includes(value) ? value : 'classic'
 }
