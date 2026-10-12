@@ -5,31 +5,14 @@ import { DATA_ROOT, LAYOUT } from './paths.mjs'
 import { settingsFile as defaultSettingsFile } from './settings.mjs'
 import { humanBytes } from './util.mjs'
 
-/**
- * A second copy of SpawnLoft's data that Windows keeps for a program installed as a package.
- *
- * <p>A program installed that way - an MSIX, which is how some desktop apps ship - is given a
- * private copy of whatever it writes under AppData: the write lands in
- * `Packages\<family>\LocalCache\Local\...`, beside the original, and from then on the program reads
- * the copy, not the file in the usual place, even after the original changes. The programs it starts
- * inherit that. So an AI client installed like that, which starts `spawnloft mcp`, can write the
- * registry once and then keep seeing the servers as they were that day: a server made later in the
- * panel is missing, a setting changed there reads as it used to, and the backups and the activity it
- * records pile up in a folder the panel never opens. Nothing is wrong with any file; two programs
- * are reading two files that share a path.
- *
- * <p>Found by looking where Windows puts the copy, which can be done from any process: the private
- * folder is an ordinary folder at an ordinary path. What cannot be known from a program that is itself
- * redirected is which side it is on - what it reads as the registry IS the copy - so a copy that
- * matches is reported as a copy, and only one that differs, or holds things the real folder lacks, as a
- * problem. A comparison made from a program that is not redirected (a terminal, the app) is the one
- * that can tell, and that is what the advice sends a redirected one to.
- *
- * <p>Read-only, and meant never to throw: this runs inside doctor and at the start of the MCP server,
- * and a check that fails must not take them with it.
- */
+// Windows gives a program installed as a package (MSIX) a private copy of whatever it writes under
+// AppData, at `Packages\<family>\LocalCache\Local\...`, and the program (and anything it starts,
+// such as `spawnloft mcp`) reads that copy from then on. This finds those copies and compares them
+// with the real files. A process that is itself redirected can't tell which side it is on, so a
+// matching copy is only a note; a differing one, or one holding things the real folder lacks, is a
+// problem. Read-only and must never throw: it runs inside doctor and at MCP server start.
 
-/** How many files of a server's folder are counted before the count stops: enough to say "some". */
+// stop counting a server's files at this many; enough to say "some"
 const FILE_LIMIT = 50
 
 export async function findPrivateCopies({
@@ -44,7 +27,6 @@ export async function findPrivateCopies({
   try {
     return await look({ localAppData, roamingAppData, dataRoot, backupsDir, settingsFile })
   } catch {
-    // Whatever went wrong is not worth stopping doctor or the MCP server for.
     return []
   }
 }
@@ -55,8 +37,7 @@ async function look({ localAppData, roamingAppData, dataRoot, backupsDir, settin
     const rel = path.relative(base, target)
     return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : null
   }
-  // Only what lives under AppData is redirected. Each of the three is asked separately: a data root on
-  // another drive is not redirected while the settings that chose it, under Roaming, still can be.
+  // only paths under AppData are redirected; checked separately since the data root may be on another drive
   const dataRel = within(localAppData, dataRoot)
   const backupsRel = within(localAppData, backupsDir)
   const settingsRel = within(roamingAppData, settingsFile)
@@ -115,7 +96,7 @@ async function countLines(file) {
   return text === null ? 0 : text.split(/\r?\n/).filter((line) => line.trim()).length
 }
 
-/** Files under a folder, counted until `limit`: a server's folder can hold a world, and "some" is the answer. */
+// counts files under a folder up to `limit`, since a server folder can hold a whole world
 async function countFiles(dir, limit) {
   let count = 0
   const pending = [dir]
@@ -135,14 +116,14 @@ async function countFiles(dir, limit) {
   return count
 }
 
-/** The same values with their keys in one order, so two writers' habits do not look like a disagreement. */
+// sort keys so differing key order doesn't count as a difference
 function sorted(value) {
   if (Array.isArray(value)) return value.map(sorted)
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sorted(value[k])]))
   return value
 }
 
-/** JSON as its values, whatever the key order or spacing; anything else as the text it is. */
+// JSON compared by value (ignoring key order and spacing), anything else as raw text
 function canonical(text) {
   if (text === null) return null
   try {
@@ -152,7 +133,7 @@ function canonical(text) {
   }
 }
 
-/** 'absent' when the copy has no such file, 'same' when it holds the same values, 'differs' otherwise. */
+// 'absent', 'same' or 'differs'
 async function compareFiles(real, copy) {
   const there = await readText(copy)
   if (there === null) return 'absent'
@@ -161,14 +142,9 @@ async function compareFiles(real, copy) {
 
 const absentRegistry = (file) => ({ state: 'absent', file, onlyInCopy: [], onlyInRegistry: [], changed: [], realMissing: false })
 
-/** The servers in a registry document, as an object, whatever the document turns out to be. */
 const serversOf = (doc) => (doc && typeof doc === 'object' && doc.instances && typeof doc.instances === 'object' && !Array.isArray(doc.instances) ? doc.instances : {})
 
-/**
- * The registry read here against the copy's: which servers are in one and not the other, and which are in
- * both with settings that differ - the last being how a server's memory read 8G in one place and 4G in the
- * other. "Registry" is the one this process reads at the usual path, "copy" the private one.
- */
+// "registry" is the one read at the usual path, "copy" the private one
 async function compareRegistries(real, copy) {
   const there = await readText(copy)
   if (there === null) return absentRegistry(copy)
@@ -185,7 +161,6 @@ async function compareRegistries(real, copy) {
   try {
     if (here !== null) realDoc = JSON.parse(here)
   } catch {
-    // The registry read here is the broken one, so the copy must not be blamed for it.
     return { ...base, state: 'registry-unreadable' }
   }
   const inCopy = serversOf(copyDoc)
@@ -200,10 +175,7 @@ async function compareRegistries(real, copy) {
   }
 }
 
-/**
- * The archives in the copy's backups folder that the real one does not have, by instance and name.
- * Only a file that is plainly not there counts: one that cannot be checked is left out, not counted.
- */
+// archives in the copy's backups folder that the real one lacks; files that can't be checked aren't counted
 async function backupsOnlyHere(realDir, copyDir) {
   let archives = 0
   let bytes = 0
@@ -228,7 +200,7 @@ async function backupsOnlyHere(realDir, copyDir) {
         try {
           bytes += (await fs.promises.stat(path.join(copyDir, inst, file))).size
           archives++
-        } catch { /* gone since it was listed */ }
+        } catch { /* removed since listing */ }
       }
     }
   }
@@ -238,17 +210,10 @@ async function backupsOnlyHere(realDir, copyDir) {
 const list = (names) => names.map((n) => `"${n}"`).join(', ')
 const plural = (n, one, many) => (n === 1 ? one : many)
 
-/**
- * What to tell a person, as doctor's two kinds of line: problems for what is out of step, a note for a
- * copy that matches today.
- *
- * <p>The way out offered is the one that works without moving anything: rename the copy's file, so the
- * programs that were reading it read the real one. It is not a cure - the next time one of them writes,
- * Windows makes a new copy - and the text says so. And it is not offered blind: a server that is only in
- * the copy goes with it. The cure is `spawnloft data move <folder>` (data-move.mjs), which moves the data
- * out of AppData and leaves a link, so the problem text points there. `config set-root` is not it: that
- * leaves existing servers where they are and starts a new, empty registry.
- */
+// Returns doctor's two kinds of line: problems for what is out of step, notes for a copy that
+// matches today. Renaming the copy's file is a stopgap (Windows recreates it on the next write);
+// `spawnloft data move <folder>` is the real fix. `config set-root` is not: it leaves existing
+// servers behind and starts an empty registry.
 export function describePrivateCopies(copies, { backupsDir } = {}) {
   const problems = []
   const notes = []
@@ -308,23 +273,13 @@ export function describePrivateCopies(copies, { backupsDir } = {}) {
   return { problems, notes }
 }
 
-/**
- * Whether a copy is worth telling an AI client about: it holds a registry, or something the real
- * folder lacks. A copy with only an activity log, or one whose registry has been renamed away, is not -
- * which is also how the notice goes quiet once the way out in the problem text has been followed.
- */
+// A copy worth telling an AI client about: it holds a registry or something the real folder lacks.
+// Once the registry is renamed away the notice goes quiet.
 const concerns = (copy) => copy.registry.state !== 'absent' || copy.backups.archives > 0 || copy.instances.files > 0 || copy.settings === 'differs'
 
-/**
- * One paragraph for the instructions the MCP server hands its client when it starts, and for what its
- * doctor tool says.
- *
- * <p>The client cannot see this for itself - to it the registry just reads as it does - and it is the
- * one most likely to act on a server list that is out of date, so it is told at the start. It is not
- * told which side is right, because a process cannot know that about itself: if it is the one being
- * redirected, its own doctor reads the same copy and finds nothing to compare. So it is sent to a
- * program that is not redirected.
- */
+// Paragraph for the MCP server's start-up instructions and its doctor tool. It doesn't say which
+// side is right: a redirected process reads the same copy in its own doctor, so the client is
+// sent to a program that isn't redirected.
 export function mcpNotice(copies) {
   const relevant = copies.filter(concerns)
   if (!relevant.length) return ''

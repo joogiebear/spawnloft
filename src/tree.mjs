@@ -3,18 +3,11 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { UserError, sleep } from './util.mjs'
 
-/**
- * Copying a folder tree and checking the copy, for moving a whole data folder.
- *
- * <p>Not `fs.cp`, for what a data folder needs that it does not promise: every modification time kept
- * (backup history is ordered by them, so a copier that resets them makes "latest" arbitrary and lets
- * retention delete the newest snapshots), links inside the tree recreated and not followed (a server
- * folder may hold one, and following it copies the data twice), a file that is held open retried for a
- * moment and then named instead of failing the lot silently, nothing ever overwritten, and every
- * failure collected before any is reported - one run says everything that is locked.
- */
+// Copies a folder tree and verifies the copy, for moving the data folder. Not fs.cp because we
+// need: modification times kept (backup history and retention are ordered by them), links
+// recreated rather than followed, locked files retried then named, nothing overwritten, and all
+// failures collected before reporting.
 
-/** Some files that could not be copied, or a copy that is not the original: what the person needs to read. */
 export class TreeError extends UserError {
   constructor(message, problems) {
     super(problems.length ? `${message}: ${problems.slice(0, 3).join('; ')}${problems.length > 3 ? `; and ${problems.length - 3} more` : ''}` : message)
@@ -24,7 +17,7 @@ export class TreeError extends UserError {
 
 const plural = (n, one, many) => (n === 1 ? one : many)
 
-/** Everything under a root, in name order, links reported as links and never followed. */
+// name order; links are yielded as links, never followed
 async function* walk(root, rel = '') {
   const entries = (await fs.promises.readdir(path.join(root, rel), { withFileTypes: true }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
@@ -38,7 +31,6 @@ async function* walk(root, rel = '') {
   }
 }
 
-/** How much is in a tree: files, folders, links, anything else, and the bytes in the files. */
 export async function treeStats(root) {
   const stats = { files: 0, dirs: 0, links: 0, other: 0, bytes: 0 }
   for await (const entry of walk(root)) {
@@ -52,13 +44,13 @@ export async function treeStats(root) {
   return stats
 }
 
-/** Held open by something else, for the moment: Windows says so with one of these. */
+// Windows error codes for a file held open by something else
 const LOCKED = ['EBUSY', 'EPERM', 'EACCES']
 
 async function copyFile(from, to, delays) {
   for (let attempt = 0; ; attempt++) {
     try {
-      // Never over something that is there: a destination that is not empty is somebody's data.
+      // EXCL: never overwrite, an existing destination is somebody's data
       return await fs.promises.copyFile(from, to, fs.constants.COPYFILE_EXCL)
     } catch (err) {
       if (attempt >= delays.length || !LOCKED.includes(err.code)) throw err
@@ -67,7 +59,7 @@ async function copyFile(from, to, delays) {
   }
 }
 
-/** A link recreated with the target it had. A directory link on Windows is a junction, which needs no elevation. */
+// a directory link on Windows becomes a junction, which needs no elevation
 async function copyLink(entry, to) {
   const target = await fs.promises.readlink(entry.abs)
   let type
@@ -75,20 +67,15 @@ async function copyLink(entry, to) {
     let isDirectory = false
     try {
       isDirectory = (await fs.promises.stat(entry.abs)).isDirectory()
-    } catch { /* a link to nothing: kept as the file link it has to be */ }
+    } catch { /* dangling link: stays a file link */ }
     type = isDirectory ? 'junction' : 'file'
   }
   await fs.promises.symlink(target, to, type)
 }
 
-/**
- * Copy `src` to `dest`, which must not hold any of the same files.
- *
- * <p>Returns what was copied, and what was left out and why (`skipped`: a pipe or a device, say, which
- * a server folder has no business holding). Throws a TreeError naming every file that could not be
- * copied, after trying the rest - so the person learns all that is locked in one go, not one per run.
- * What was copied before the error is left where it is: the caller knows whether it made the folder.
- */
+// `dest` must not hold any of the same files. `skipped` lists things like pipes and devices.
+// Throws a TreeError naming every file that failed, after trying the rest. Whatever was copied
+// before the error is left in place; the caller knows whether it created the folder.
 export async function copyTree(src, dest, { onProgress = null, retryDelays = [100, 300, 900] } = {}) {
   const totals = await treeStats(src)
   await fs.promises.mkdir(dest, { recursive: true })
@@ -122,17 +109,17 @@ export async function copyTree(src, dest, { onProgress = null, retryDelays = [10
       done.skipped.push({ path: entry.rel, reason: 'not a file, folder or link' })
     }
   }
-  // A folder's own time moves whenever something is put in it, so it is set last, deepest first.
+  // a folder's mtime changes when anything is put in it, so set them last, deepest first
   for (const entry of folders.reverse()) {
     try {
       await fs.promises.utimes(path.join(dest, entry.rel), entry.stat.atime, entry.stat.mtime)
-    } catch { /* a folder's time is not worth failing a copy for */ }
+    } catch { /* not worth failing the copy */ }
   }
   if (problems.length) throw new TreeError(`${problems.length} ${plural(problems.length, 'file', 'files')} could not be copied`, problems)
   return done
 }
 
-/** Files up to this size are compared byte for byte; larger ones by size and time, unless asked to be thorough. */
+// files up to this size are compared byte for byte; larger ones by size and time unless `thorough`
 const SMALL = 1024 * 1024
 
 async function hashOf(file) {
@@ -162,14 +149,9 @@ const sameLink = (a, b) => {
   return process.platform === 'win32' ? norm(a).toLowerCase() === norm(b).toLowerCase() : norm(a) === norm(b)
 }
 
-/**
- * Whether `copy` is `original`: the same files, sizes, links, and modification times (within
- * `mtimeToleranceMs`, since a drive that keeps times coarsely rounds them), and the same contents - byte
- * for byte for small files, and for larger ones only when `thorough`, since reading several gigabytes
- * twice is a cost the person should choose. Folders are compared for being there, not for their times.
- *
- * <p>Reports at most `maxProblems`, then how many more there were.
- */
+// Compares files, sizes, links, mtimes (within `mtimeToleranceMs`, since some drives round times
+// coarsely) and contents. Large files are only content-checked when `thorough`, because that reads
+// gigabytes twice. Folders are checked for presence only. Reports at most `maxProblems`.
 export async function compareTrees(original, copy, { thorough = false, mtimeToleranceMs = 2000, maxProblems = 50 } = {}) {
   const left = await index(original)
   const right = await index(copy)
@@ -205,7 +187,7 @@ export async function compareTrees(original, copy, { thorough = false, mtimeTole
   return { ok: total === 0, problems, files }
 }
 
-/** Delete a tree. A link in it is removed as a link; what it points at is left alone. */
+// links inside are removed as links; their targets are left alone
 export async function removeTree(dir) {
   await fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
 }

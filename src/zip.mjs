@@ -5,19 +5,10 @@ import { pipeline } from 'node:stream/promises'
 import { Transform, Writable } from 'node:stream'
 import { fail } from './util.mjs'
 
-/**
- * Zip, written and read here, for the machines whose tar cannot.
- *
- * <p>Worlds travel as zips: it is the format maps are shared in and the one Windows opens
- * bare-handed. On Windows and macOS `tar` is bsdtar, which reads and writes zip, and that is what
- * those platforms go on using. GNU tar does neither - and says so badly: asked for `-a -cf x.zip`
- * it exits 0 having written a tar archive under a .zip name, which is an export nobody the map is
- * sent to can open. See tar.mjs for how the two are told apart.
- *
- * <p>Both directions stream. A world is gigabytes of region files, so nothing here holds more than
- * a chunk of one file in memory, and zip64 is written whenever - and only when - a size or an
- * offset outgrows 32 bits, so that a small export stays readable by the oldest unzip there is.
- */
+// Zip reader/writer for machines whose tar can't do zip. bsdtar (Windows, macOS) handles zip; GNU
+// tar doesn't, and `-a -cf x.zip` exits 0 with a tar archive under a .zip name (see tar.mjs).
+// Both directions stream, since worlds are gigabytes. zip64 is written only when a size or offset
+// exceeds 32 bits, so small exports stay readable by old unzip tools.
 
 const LOCAL_SIG = 0x04034b50
 const CENTRAL_SIG = 0x02014b50
@@ -27,15 +18,14 @@ const LOCATOR64_SIG = 0x07064b50
 const MAX32 = 0xffffffff
 const MAX16 = 0xffff
 const UTF8_NAMES = 0x0800
-// Deflate can grow incompressible data by a few bytes per block, so a file this close to four
-// gigabytes gets its 64-bit fields reserved before it is known whether it needed them.
+// deflate can grow incompressible data, so files this close to 4 GiB reserve zip64 fields up front
 const NEAR_4G = 0xffff0000
 
 const CRC_TABLE = zlib.crc32 ? null : Array.from({ length: 256 }, (_, n) => {
   for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1
   return n >>> 0
 })
-/** zlib.crc32 arrived in Node 20.15 and 22.2; the table covers the Node 20 releases before it. */
+// zlib.crc32 arrived in Node 20.15 and 22.2; the table covers earlier releases
 function crc32(chunk, crc) {
   if (zlib.crc32) return zlib.crc32(chunk, crc)
   let c = ~crc
@@ -43,21 +33,16 @@ function crc32(chunk, crc) {
   return ~c >>> 0
 }
 
-// The upper half of code page 437, which is what a zip name is in unless it says otherwise.
+// upper half of code page 437, the default zip name encoding
 const CP437 = 'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ '
 const strictUtf8 = new TextDecoder('utf-8', { fatal: true })
 
-/**
- * An entry's name, in whichever encoding it was written.
- *
- * <p>A flag says UTF-8. Without it the format means code page 437, and bsdtar on Windows takes it
- * at its word - "ü" arrives as 0x81 - but macOS writes UTF-8 and leaves the flag off. So unflagged
- * bytes that are valid UTF-8 are read as UTF-8, which 437 text with accents in it never is, and
- * only the rest as 437. Read wrongly, an imported world lands in a folder named in mojibake.
- */
+// Without the UTF-8 flag the format means CP437 (bsdtar on Windows honours that), but macOS writes
+// UTF-8 and leaves the flag off. So unflagged bytes that are valid UTF-8 are read as UTF-8 (437
+// text with accents never is), the rest as 437. Otherwise worlds import into mojibake folders.
 export function decodeName(bytes, flags) {
   if (!(flags & UTF8_NAMES)) {
-    try { return strictUtf8.decode(bytes) } catch { /* not UTF-8, so it is what the format says */ }
+    try { return strictUtf8.decode(bytes) } catch { /* not UTF-8: fall through to CP437 */ }
     let name = ''
     for (const byte of bytes) name += byte < 0x80 ? String.fromCharCode(byte) : CP437[byte - 0x80]
     return name
@@ -66,7 +51,7 @@ export function decodeName(bytes, flags) {
 }
 
 function dosTime(date) {
-  // The format has no year before 1980 and no timezone; local time is what every unzip assumes.
+  // the format has no year before 1980 and no timezone; unzip assumes local time
   const year = Math.min(Math.max(date.getFullYear(), 1980), 2107)
   return {
     time: (date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1),
@@ -74,7 +59,7 @@ function dosTime(date) {
   }
 }
 
-/** Everything under the members, directories before their contents, in a stable order. */
+// directories before their contents, in a stable order
 function* walk(cwd, members, excluded) {
   for (const member of members) {
     const stack = [member]
@@ -89,22 +74,14 @@ function* walk(cwd, members, excluded) {
       } else if (stat.isFile()) {
         yield { rel, stat, dir: false }
       }
-      // Links, sockets and devices are left out: a world has none, and a link is a way out of it.
+      // links, sockets and devices are skipped; a link could point outside the world
     }
   }
 }
 
-/**
- * Write `members` (paths relative to `cwd`) into a new zip at `file`.
- *
- * <p>The file is written once, front to back, and each local header is filled in after its data:
- * sizes and the checksum are only known then, and going back for them keeps the archive free of
- * trailing data descriptors, which are the part of the format readers disagree about most.
- *
- * @param exclude basenames to leave out, wherever they sit
- * @param forceZip64 write every 64-bit structure regardless of size - for tests, which cannot
- *        reasonably carry a four gigabyte fixture
- */
+// Writes `members` (relative to `cwd`) into a new zip. Each local header is patched after its data
+// is written, which avoids trailing data descriptors that readers disagree about.
+// `exclude`: basenames to skip anywhere. `forceZip64`: for tests, which can't carry a 4 GiB fixture.
 export async function createZip(file, cwd, members, { exclude = [], forceZip64 = false } = {}) {
   const excluded = new Set(exclude)
   const fd = fs.openSync(file, 'w')
@@ -151,8 +128,8 @@ export async function createZip(file, cwd, members, { exclude = [], forceZip64 =
           fail(`"${rel}" grew past four gigabytes while it was being read; stop whatever is writing it and try again`)
         }
       }
-      // A file that emptied out between the stat and the read was still declared deflated, and
-      // deflate of nothing is two bytes rather than none - so the sizes are whatever was written.
+      // sizes are what was actually written: a file emptied between stat and read is still declared
+      // deflated, and deflate of nothing is two bytes
       header.writeUInt32LE(entry.crc, 14)
       header.writeUInt32LE(wide ? MAX32 : entry.packed, 18)
       header.writeUInt32LE(wide ? MAX32 : entry.size, 22)
@@ -172,7 +149,7 @@ export async function createZip(file, cwd, members, { exclude = [], forceZip64 =
       if (farOffset) extra.push(entry.offset)
       const record = Buffer.alloc(46 + entry.name.length + (extra.length ? 4 + extra.length * 8 : 0))
       record.writeUInt32LE(CENTRAL_SIG, 0)
-      // Made by: Unix (3), so the mode in the external attributes means what it says.
+      // made by Unix (3), so the mode in the external attributes is honoured
       record.writeUInt16LE((3 << 8) | 45, 4)
       record.writeUInt16LE(extra.length ? 45 : 20, 6)
       record.writeUInt16LE(UTF8_NAMES, 8)
@@ -238,20 +215,16 @@ function readAt(fd, length, position) {
   return buffer
 }
 
-/** Where the central directory is and how many entries it holds, from whichever end record says. */
 function findDirectory(fd, size) {
   if (size < 22) fail('that file is too small to be a zip')
-  // The end record sits at the very end, behind a comment of at most 64 KiB.
+  // the end record is at the end, behind a comment of at most 64 KiB
   const tailSize = Math.min(size, 22 + MAX16)
   const tail = readAt(fd, tailSize, size - tailSize)
-  // The four signature bytes can turn up INSIDE a zip's comment, and scanning backwards meets those
-  // first. Taken at their word they usually describe an archive with nothing in it - a world zip
-  // that imports as "contains no world". Two things tell the real record from a lookalike. Its
-  // comment runs exactly to the end of the file. And it sits directly after the directory it
-  // describes (or after the zip64 locator that does): a decoy can be given a comment length that
-  // fits, even a whole well-formed empty record can, but not a directory that ends where it begins.
-  // A record that passes only the first test is kept as a fallback, for the rare archive with
-  // something prepended to it, whose offsets are all out by that much.
+  // The signature bytes can appear inside a zip's comment, and scanning backwards meets those
+  // first; taken as real they describe an empty archive. A real record has a comment running
+  // exactly to end of file and sits directly after the directory it describes (or the zip64
+  // locator). One that passes only the first test is kept as a fallback for archives with data
+  // prepended, whose offsets are all shifted.
   let fallback = null
   for (let i = tailSize - 22; i >= 0; i--) {
     if (tail.readUInt32LE(i) !== EOCD_SIG) continue
@@ -272,7 +245,6 @@ function findDirectory(fd, size) {
   fail('that file is not a zip archive')
 }
 
-/** Every entry of an open zip, with 64-bit sizes and offsets resolved. */
 export function* zipEntries(fd, size) {
   const directory = findDirectory(fd, size)
   if (directory.offset + directory.size > size) fail('the zip index points past the end of the file; the archive is cut short')
@@ -293,7 +265,7 @@ export function* zipEntries(fd, size) {
       offset: cd.readUInt32LE(at + 42),
     }
     entry.name = decodeName(cd.subarray(at + 46, at + 46 + nameLength), entry.flags)
-    // The zip64 field holds only the values that overflowed, in this fixed order.
+    // the zip64 field holds only the values that overflowed, in this fixed order
     let p = at + 46 + nameLength
     const extraEnd = p + extraLength
     while (p + 4 <= extraEnd) {
@@ -312,28 +284,22 @@ export function* zipEntries(fd, size) {
   }
 }
 
-/** Is this a zip? Asked of the bytes, because a file's extension is only what someone called it. */
+// checks the bytes, not the extension
 export function isZip(file) {
   const fd = fs.openSync(file, 'r')
   try {
     const head = Buffer.alloc(4)
     if (fs.readSync(fd, head, 0, 4, 0) < 4) return false
-    // A zip with entries starts with a local header; an empty one is only its end record.
+    // a zip with entries starts with a local header; an empty one is only its end record
     return head.readUInt32LE(0) === LOCAL_SIG || head.readUInt32LE(0) === EOCD_SIG
   } finally {
     fs.closeSync(fd)
   }
 }
 
-/**
- * Extract a whole zip into `dest`.
- *
- * <p>Every name is confined to `dest` before a byte is written. Names arrive from the archive, and
- * "../" or a drive letter in one would otherwise turn "import a map" into "write anywhere" - the
- * guard bsdtar brings with it has to be brought along by hand here. Links are not recreated, for
- * the same reason. Each file's checksum is verified as it is written, so a damaged download fails
- * on the file that is damaged rather than later, in the game, as a corrupt chunk.
- */
+// Every name is confined to `dest` before anything is written (zip-slip guard; "../" or a drive
+// letter would otherwise write anywhere). Links are not recreated for the same reason. Checksums
+// are verified as files are written so a damaged download fails here, not as a corrupt chunk later.
 export async function extractZip(file, dest) {
   const root = path.resolve(dest)
   const fd = fs.openSync(file, 'r')
@@ -341,7 +307,7 @@ export async function extractZip(file, dest) {
   try {
     const size = fs.fstatSync(fd).size
     for (const entry of zipEntries(fd, size)) {
-      // Windows tools have been known to write backslashes, which the format forbids.
+      // some Windows tools write backslashes, which the format forbids
       const name = entry.name.replaceAll('\\', '/')
       if (!name || name.startsWith('/') || /^[a-z]:/i.test(name) || name.split('/').includes('..')) {
         fail(`the archive tried to write outside its folder ("${entry.name}"); nothing more was extracted`)
@@ -357,8 +323,7 @@ export async function extractZip(file, dest) {
 
       const local = readAt(fd, 30, entry.offset)
       if (local.readUInt32LE(0) !== LOCAL_SIG) fail(`"${entry.name}" is not where the zip index says it is; the archive is damaged`)
-      // The local header repeats the name and extra field, and its extra field may differ in
-      // length from the central one - so it is read, not assumed.
+      // the local extra field can differ in length from the central one, so read it
       const dataAt = entry.offset + 30 + local.readUInt16LE(26) + local.readUInt16LE(28)
       if (dataAt + entry.packed > size) fail(`"${entry.name}" runs past the end of the file; the archive is cut short`)
 

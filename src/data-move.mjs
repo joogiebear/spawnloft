@@ -3,28 +3,16 @@ import path from 'node:path'
 import { UserError, humanBytes, readJson, writeJson, sleep, lockHolder } from './util.mjs'
 import { copyTree, compareTrees, treeStats, removeTree, TreeError } from './tree.mjs'
 
-/**
- * Moving SpawnLoft's data folder, and leaving a link where it was.
- *
- * <p>The folder is where it is for no reason a person chose, and sometimes the reason to move it is
- * strong: a drive that is filling up, or a program installed as a package that is given a private copy
- * of whatever it writes under AppData and reads that copy from then on (see private-copy.mjs). Moving
- * the folder and changing the setting that names it would strand the servers - the registry is inside
- * the folder, and records every server's folder as an absolute path, as do the database configs, the
- * scheduled tasks' shims and the systemd units. So the folder is moved and a LINK is left at the old
- * path - a junction on Windows, which needs no elevation, a symlink elsewhere - and every path anyone
- * has stored stays true. Nothing is rewritten. Writes through a link that leads outside AppData are
- * not redirected, which is the point on Windows, and was checked.
- *
- * <p>Two ways to move, chosen by whether the new place is on the same drive. On the same drive it is a
- * single rename: instant, atomic, every time kept. On another it is a copy, a comparison, and a rename of
- * the original to a parked name beside the link. Either way the original is never deleted by the move:
- * `finishMove` does that, later, when the person has looked.
- *
- * <p>Between the rename and the link there is no folder at the old path, for the length of two adjacent
- * synchronous calls. Nothing may touch the data root in that gap, or it would be recreated empty
- * where the link has to go.
- */
+// Moves the data folder and leaves a link at the old path (a junction on Windows, which needs no
+// elevation; a symlink elsewhere). The registry, database configs, task shims and systemd units
+// all store absolute paths, so the link keeps them valid without rewriting anything. It also
+// escapes Windows' private AppData copies (see private-copy.mjs).
+//
+// Same drive: a single atomic rename. Another drive: copy, compare, then rename the original to a
+// parked name beside the link. The move never deletes the original; finishMove does that later.
+//
+// Between the rename and makeLink there is no folder at the old path (two adjacent sync calls).
+// Nothing may touch the data root in that gap or it would be recreated empty where the link goes.
 
 export const journalPath = (root) => `${path.resolve(root)}.move.json`
 
@@ -33,13 +21,11 @@ const plural = (n, one, many) => (n === 1 ? one : many)
 const same = (a, b) => (process.platform === 'win32' ? path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase() : path.normalize(a) === path.normalize(b))
 const trimmed = (p) => path.normalize(p).replace(/[\\/]+$/, '')
 
-/** Is `child` inside `parent`, or the same place? */
 function inside(parent, child) {
   const rel = path.relative(parent, child)
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
 }
 
-/** What is at a path: nothing, a plain file or folder, or a link (and where it leads, and whether that is still there). */
 export function describeLink(p) {
   let stat
   try {
@@ -51,7 +37,7 @@ export function describeLink(p) {
   let target = null
   try {
     target = fs.readlinkSync(p)
-  } catch { /* a link that cannot be read is reported as one with no target */ }
+  } catch { /* unreadable link: reported with no target */ }
   let dangling = false
   try {
     fs.statSync(p)
@@ -61,12 +47,11 @@ export function describeLink(p) {
   return { exists: true, isLink: true, target, dangling }
 }
 
-/** A directory link: a junction on Windows (no elevation), a symlink elsewhere. */
 export function makeLink(target, at) {
   fs.symlinkSync(path.resolve(target), at, process.platform === 'win32' ? 'junction' : 'dir')
 }
 
-/** Remove a link and nothing it leads to. Refuses a path that is not a link: that would be deleting data. */
+// refuses a path that isn't a link, since that would delete data
 export function removeLink(at) {
   if (!describeLink(at).isLink) throw new UserError(`${at} is not a link, so it was not removed`)
   fs.rmSync(at, { recursive: true, force: true })
@@ -74,11 +59,8 @@ export function removeLink(at) {
 
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
-/**
- * Rename a folder, trying again for a moment when Windows says it is held. A rename of a folder fails
- * while anything has a file inside it open - the SpawnLoft app keeps its logs there, and a scanner may
- * hold a file it is looking at - so the failure is named for what it usually is.
- */
+// Windows fails a folder rename while any file inside is open (the app's logs, a scanner), so
+// retry briefly and then report it as that.
 function renameFolder(from, to, delays = [100, 300, 900]) {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -97,7 +79,7 @@ function renameFolder(from, to, delays = [100, 300, 900]) {
   }
 }
 
-/** Whether a folder holds no files at all, however deep: what a command that makes folders leaves behind. */
+// true if a folder tree holds no files, only the empty folders a command can leave behind
 function isSkeleton(dir) {
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -119,7 +101,6 @@ function nearestExisting(p) {
   return here
 }
 
-/** Whether something can be written in a folder, checked by writing. */
 function writable(dir) {
   const probe = path.join(dir, `.spawnloft-write-test-${process.pid}`)
   try {
@@ -131,9 +112,7 @@ function writable(dir) {
   }
 }
 
-// ---- what is going on around the move, which a test replaces -----------------------------------
-
-/** The real things around a move: which servers run, which tasks are scheduled, which private copies exist. */
+// the environment around a move (running servers, tasks, locks); tests replace it
 async function realEnv() {
   const { listAll } = await import('./registry.mjs')
   const { readState, isActiveStatus } = await import('./control.mjs')
@@ -148,8 +127,8 @@ async function realEnv() {
       setEnabled: (id, on) => schedule.setEnabled(id, on),
     },
     heldLocks: () => {
-      // A start between its status check and its daemon publishing state reads as "stopped" above, and
-      // a backup of a stopped server never shows as running at all; only the locks they hold say so.
+      // a starting server reads as stopped until its daemon publishes state, and a backup of a
+      // stopped server never shows as running; only their locks reveal them
       const held = []
       if (lockHolder(`${REGISTRY_FILE}.lock`)) held.push('the server registry (being changed)')
       for (const i of listAll().filter((i) => !i.external)) {
@@ -163,7 +142,7 @@ async function realEnv() {
   }
 }
 
-/** Copies of the data folder that Windows keeps for a packaged program, sorted into what stops a move and what only gets in its way. */
+// splits private copies into blockers (hold data found nowhere else) and shadows (only get in the way)
 function sortPrivateCopies(copies) {
   const blockers = []
   const shadows = []
@@ -182,14 +161,8 @@ function sortPrivateCopies(copies) {
   return { blockers, shadows }
 }
 
-// ---- planning ----------------------------------------------------------------------------------
-
-/**
- * What a move would do, and what stands in its way. Changes nothing.
- *
- * <p>`problems` stop the move; `warnings` are things to know. Everything that can be checked first is
- * checked first, because a move that fails halfway is the expensive kind.
- */
+// Changes nothing. `problems` stop the move, `warnings` are informational. Everything checkable is
+// checked up front because a move that fails halfway is expensive.
 export async function planMove({ root, dest, forceCopy = false, setAsidePrivateCopies = false, env = null }) {
   env ??= await realEnv()
   const problems = []
@@ -217,7 +190,7 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
   if (path.parse(to).root === to || trimmed(path.parse(to).root) === trimmed(to)) problems.push(`${to} is a whole drive; choose a folder on it`)
   if (process.platform === 'win32' && /^[\\/]{2}/.test(to)) problems.push(`${to} is a network location; a link cannot lead to one, so the data cannot live there`)
 
-  // The destination: not there, or an empty folder. Never merged into.
+  // destination must be absent or an empty folder; never merged into
   const existed = fs.existsSync(to)
   if (existed) {
     const kind = describeLink(to)
@@ -228,12 +201,11 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
   const cannotWrite = fs.existsSync(probeIn) && describeLink(probeIn).isDirectory ? writable(probeIn) : `${probeIn} is not a folder`
   if (cannotWrite) problems.push(`cannot write to ${probeIn} (${cannotWrite})`)
 
-  // How: one rename on the same drive, a copy to another.
   let mode = 'rename'
   let sameDrive = false
   try {
     sameDrive = fs.statSync(from).dev === fs.statSync(nearestExisting(to)).dev
-  } catch { /* not knowing is treated as a different drive: the copy is the careful one */ }
+  } catch { /* unknown counts as a different drive; copying is the safe mode */ }
   if (!sameDrive || forceCopy) mode = 'copy'
 
   let stats = null
@@ -250,14 +222,14 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
     }
   }
 
-  // Nothing running: a database or a world is not copied or renamed while it is being written.
+  // nothing may be running: a database or world can't be copied or renamed while being written
   const busy = env.running()
   if (busy.length) problems.push(`${busy.join(', ')} ${plural(busy.length, 'is', 'are')} running; stop ${plural(busy.length, 'it', 'them')} first (\`spawnloft stop <name>\`)`)
-  // Also not while a start or a backup holds its lock: neither shows as a running server.
+  // a start or backup in progress doesn't show as running, but holds a lock
   const locked = env.heldLocks?.() ?? []
   if (locked.length) problems.push(`${locked.join(', ')} ${plural(locked.length, 'is', 'are')} in use right now; wait for ${plural(locked.length, 'it', 'them')} to finish and try again`)
 
-  // Scheduled tasks are paused for the move: one that starts a server or a backup halfway through is a hazard.
+  // tasks are paused so none starts a server or backup mid-move
   let pauseTasks = []
   try {
     pauseTasks = (await env.tasks.list()).map((t) => t.id)
@@ -266,7 +238,7 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
   }
   if (pauseTasks.length) warnings.push(`${pauseTasks.length} scheduled ${plural(pauseTasks.length, 'task', 'tasks')} will be paused for the move and switched back on after`)
 
-  // Windows' private copies of this folder would hide the link from the program that has them.
+  // a private copy would hide the link from the program that has it
   let asidePrivate = []
   const copies = await env.privateCopies()
   if (copies.length) {
@@ -287,9 +259,7 @@ export async function planMove({ root, dest, forceCopy = false, setAsidePrivateC
   return { from, to, mode, destExisted: existed, stats, problems, warnings, pauseTasks, asidePrivate, ok: problems.length === 0 }
 }
 
-// ---- moving ------------------------------------------------------------------------------------
-
-/** The journal: written before each step, so an interrupted move can be put back. */
+// the journal is written before each step so an interrupted move can be put back
 function journalWriter(file, journal) {
   return (patch) => {
     Object.assign(journal, patch)
@@ -297,7 +267,7 @@ function journalWriter(file, journal) {
   }
 }
 
-/** Take a link to `to` out of the way and put the original back. Never deletes the original; deletes a copy only once the original is home. */
+// Never deletes the original; deletes the copy only once the original is back.
 export async function undoMove(journal, { env = null } = {}) {
   env ??= await realEnv()
   const notes = []
@@ -308,9 +278,8 @@ export async function undoMove(journal, { env = null } = {}) {
     else notes.push(`${from} is a link to ${at.target}, not to ${to}, so it was left`)
     at = describeLink(from)
   }
-  // A command run in between can have made the folders again, empty, where the link was to go. They are
-  // cleared away only when the data is known to be somewhere else - an original that is simply empty
-  // (a fresh install) is the data, and is left.
+  // A command run meanwhile may have recreated empty folders where the link was to go. Clear them
+  // only when the data is known to be elsewhere; an empty original (fresh install) is left alone.
   const dataElsewhere = (parked && fs.existsSync(parked)) || (journal.mode === 'rename' && fs.existsSync(to) && !isSkeleton(to))
   if (at.exists && !at.isLink && at.isDirectory && dataElsewhere && isSkeleton(from)) {
     await removeTree(from)
@@ -323,11 +292,11 @@ export async function undoMove(journal, { env = null } = {}) {
       renameFolder(to, from)
     }
   }
-  // A destination that was an empty folder before the move is an empty folder after it.
+  // a destination that was an empty folder stays one
   if (journal.mode === 'rename' && journal.destExisted && !fs.existsSync(to)) fs.mkdirSync(to, { recursive: true })
   const home = describeLink(from)
   if (journal.mode === 'copy' && home.exists && !home.isLink && fs.existsSync(to) && journal.step !== 'done') {
-    // The original is home, so the copy is only a copy: what the move made is taken away, and a folder that was there is left empty.
+    // the original is home, so remove what the move made
     if (journal.destExisted) {
       for (const name of fs.readdirSync(to)) await removeTree(path.join(to, name))
     } else {
@@ -346,7 +315,7 @@ export async function undoMove(journal, { env = null } = {}) {
   return notes
 }
 
-/** Probe the link: it leads where it should, and what is written through it arrives there. */
+// checks the link leads to `to` and that writes through it arrive there
 function probeLink(from, to) {
   const link = describeLink(from)
   if (!link.isLink) throw new UserError(`${from} is not a link`)
@@ -370,13 +339,8 @@ function probeLink(from, to) {
   if (registry(from) !== registry(to)) throw new UserError('the registry reads differently through the link than in the new folder')
 }
 
-/**
- * Plan a move and, unless `dryRun`, carry it out.
- *
- * <p>Returns `{ plan, executed, result }`. A plan with problems is returned and nothing is done. On any
- * failure the move is undone - the original put back, a copy taken away, paused tasks switched on - and
- * the error says what happened and what state things are in.
- */
+// Returns { plan, executed, result }. A plan with problems is returned without doing anything.
+// Any failure undoes the move (original put back, copy removed, tasks re-enabled).
 export async function moveData({ root, dest, dryRun = true, thorough = false, forceCopy = false, setAsidePrivateCopies = false, onStep = () => {}, onProgress = null, env = null }) {
   env ??= await realEnv()
   const plan = await planMove({ root, dest, forceCopy, setAsidePrivateCopies, env })
@@ -401,7 +365,7 @@ export async function moveData({ root, dest, dryRun = true, thorough = false, fo
       if (plan.destExisted) fs.rmdirSync(plan.to)
       fs.mkdirSync(path.dirname(plan.to), { recursive: true })
       renameFolder(plan.from, plan.to)
-      // No folder at the old path now: the next call is the link, with nothing between them.
+      // no folder at the old path now; keep the link call directly after the rename
       makeLink(plan.to, plan.from)
     } else {
       onStep('copying')
@@ -459,7 +423,7 @@ export async function moveData({ root, dest, dryRun = true, thorough = false, fo
   }
 }
 
-/** Put an interrupted move back. Not for one that finished: by then the data has been used. */
+// only for interrupted moves; a finished one has already been written to
 export async function rollbackMove(root, { env = null } = {}) {
   const file = journalPath(root)
   const journal = readJson(file, null)
@@ -472,7 +436,7 @@ export async function rollbackMove(root, { env = null } = {}) {
   return { notes }
 }
 
-/** Delete the parked original of a finished move. The point of no return, so it is its own command. */
+// deletes the parked original; the point of no return, hence its own command
 export async function finishMove(root) {
   const file = journalPath(root)
   const journal = readJson(file, null)
@@ -488,7 +452,6 @@ export async function finishMove(root) {
   return { parked: journal.parked, removedBytes: removed }
 }
 
-/** Where the data is, whether the link is whole, and what an earlier move left behind. */
 export async function moveStatus(root) {
   const from = path.resolve(root)
   const here = describeLink(from)
@@ -499,7 +462,7 @@ export async function moveStatus(root) {
     for (const name of fs.readdirSync(path.dirname(from))) {
       if (name.startsWith(`${base}.moved-`)) leftovers.push(path.join(path.dirname(from), name))
     }
-  } catch { /* the parent cannot be listed: no leftovers are claimed */ }
+  } catch { /* parent not listable: report no leftovers */ }
   const sizes = []
   for (const p of leftovers) {
     try {
