@@ -159,3 +159,38 @@ test('the largest legal packet still gets through', async (t) => {
   const { client } = await connected(t, { replies: { big } })
   assert.equal(await client.send('big'), big)
 })
+
+test('a reply cut in the middle of a multi-byte character is put back together', async (t) => {
+  const text = '\u20ac'.repeat(2000)
+  assert.notEqual(Buffer.byteLength(text) % 4096, 0)
+  const { client } = await connected(t, { replies: { euros: text } })
+  assert.equal(await client.send('euros'), text)
+})
+
+test('a typed command is not sent a second time once the connection was up', async (t) => {
+  const server = await startFakeRcon({ drop: { 'give Steve diamond 1': 1 }, replies: { 'give Steve diamond 1': 'Gave 1' } })
+  t.after(() => server.close())
+  await assert.rejects(rconExec(instance(server), ['give Steve diamond 1'], { retrySent: false, timeout: 500 }), /RCON/)
+  assert.deepEqual(server.sent(), ['give Steve diamond 1'])
+})
+
+test('a command that timed out is not repeated either', async (t) => {
+  const server = await startFakeRcon({ delays: { slow: 1500 } })
+  t.after(() => server.close())
+  await assert.rejects(rconExec(instance(server), ['slow'], { retrySent: false, timeout: 200 }), /timed out/)
+  assert.deepEqual(server.sent(), ['slow'])
+})
+
+test('retrySent: false still retries a connection that could not be made', async (t) => {
+  const server = await startFakeRcon()
+  const inst = instance(server)
+  await server.close()
+  await assert.rejects(rconExec(inst, ['list'], { retrySent: false, timeout: 200 }), /refused/)
+})
+
+test('without retrySent: false a dropped command is sent again, as before', async (t) => {
+  const server = await startFakeRcon({ drop: { ping: 1 }, replies: { ping: 'pong' } })
+  t.after(() => server.close())
+  assert.deepEqual(await rconExec(instance(server), ['ping'], { timeout: 500 }), ['pong'])
+  assert.deepEqual(server.sent(), ['ping', 'ping'])
+})

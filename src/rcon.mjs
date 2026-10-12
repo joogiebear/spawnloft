@@ -13,6 +13,12 @@ const TYPE_RESPONSE = 0
 const MIN_PACKET_SIZE = 10
 const MAX_PACKET_SIZE = 4110
 
+// A reply over 4096 bytes is split on a byte boundary, which can fall inside a multi-byte
+// character. Decoding each packet on its own would turn both halves into replacement characters.
+function decodeChunks(chunks) {
+  return Buffer.concat(chunks).toString('utf8')
+}
+
 function encodePacket(id, type, body) {
   const payload = Buffer.from(body, 'utf8')
   const buf = Buffer.alloc(14 + payload.length)
@@ -120,7 +126,7 @@ export class Rcon {
       if (this.buffer.length < size + 4) break
       const id = this.buffer.readInt32LE(4)
       const type = this.buffer.readInt32LE(8)
-      const body = this.buffer.subarray(12, 4 + size - 2).toString('utf8')
+      const body = Buffer.from(this.buffer.subarray(12, 4 + size - 2))
       this.buffer = this.buffer.subarray(4 + size)
       this.#dispatch(id, type, body)
     }
@@ -141,7 +147,7 @@ export class Rcon {
     for (const [cmdId, entry] of this.pending) {
       if (id === entry.sentinelId) {
         this.pending.delete(cmdId)
-        entry.resolve(entry.chunks.join(''))
+        entry.resolve(decodeChunks(entry.chunks))
         return
       }
       if (id === cmdId) {
@@ -185,7 +191,7 @@ export class Rcon {
         if (entry) {
           this.pending.delete(id)
           // A response may have partially arrived; return what we have.
-          if (entry.chunks.length) entry.resolve(entry.chunks.join(''))
+          if (entry.chunks.length) entry.resolve(decodeChunks(entry.chunks))
           else reject(new UserError(`RCON command timed out: ${command}`))
         }
       }, this.timeout).unref?.()
@@ -217,12 +223,16 @@ const DROPPED = /connection closed|ECONNRESET|EPIPE|ECONNABORTED/i
  * `retryTimeouts: false` is for the same commands: a second attempt after a timeout does not make
  * a slow command faster, it asks again and waits again. A socket that was cut is still retried.
  *
+ * <p>`retrySent: false` is for a command somebody typed. Once the connection is up, a failure is
+ * not retried: the server may have run the command already, and `give` or `kill` twice is not what
+ * was asked for. Failures before that point, when nothing could have been sent, still retry.
+ *
  * <p>An error thrown from here has `unsent: true` when it came before anything could have been
  * written, on any attempt: no port, a refused connection, a wrong password. A caller that has to
  * know whether a command may have run - `save-off`, say - needs that, because a timeout after the
  * write says nothing about what the server did, and one before it says the server did nothing.
  */
-export async function rconExec(inst, commands, { attempts = 3, timeout = RCON_TIMEOUT_MS, retryTimeouts = true } = {}) {
+export async function rconExec(inst, commands, { attempts = 3, timeout = RCON_TIMEOUT_MS, retryTimeouts = true, retrySent = true } = {}) {
   if (!inst.rcon?.port) {
     throw Object.assign(new UserError(`instance "${inst.name}" has no RCON port configured`), { unsent: true })
   }
@@ -240,7 +250,7 @@ export async function rconExec(inst, commands, { attempts = 3, timeout = RCON_TI
       return out
     } catch (err) {
       lastErr = err
-      if (attempt === attempts || !retryable.test(err.message)) throw Object.assign(err, { unsent: !connected })
+      if (attempt === attempts || (connected && !retrySent) || !retryable.test(err.message)) throw Object.assign(err, { unsent: !connected })
       await sleep(120 * attempt)
     } finally {
       rcon.close()
