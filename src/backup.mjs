@@ -769,6 +769,7 @@ export function removeSnapshot(name, ref) {
  * have deleted both within five hours of them being made.
  */
 export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) {
+  if (!Number.isInteger(keep) || keep < 1) throw new UserError('keep must be a whole number of at least 1')
   const all = listSnapshots(name).filter((s) => {
     if (only && s.label !== only) return false
     // A limit belongs to the task that set it. Two scheduled backups on one server - a nightly

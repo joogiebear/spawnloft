@@ -1,3 +1,9 @@
+export const BOOLEAN_FLAGS = [
+  'json', 'csv', 'follow', 'f', 'thorough', 'setAsidePrivateCopies',
+  'yes', 'force', 'purge', 'all', 'drop', 'check', 'raw', 'unstable', 'offline', 'acceptEula',
+  'withWorlds', 'wipePlugins', 'data', 'detach', 'wait', 'sync', 'open', 'flush', 'onLogon', 'showIps', 'allowDestructive',
+]
+
 /**
  * Parse a command line into flags and positional arguments.
  *
@@ -38,7 +44,8 @@ export function parseArgs(argv, { booleanFlags = [] } = {}) {
       }
     } else if (/^-[a-zA-Z]$/.test(arg)) {
       const key = arg.slice(1)
-      if (argv[i + 1] && !argv[i + 1].startsWith('-')) flags[key] = argv[++i]
+      if (booleanFlags.includes(key)) flags[key] = true
+      else if (argv[i + 1] && !argv[i + 1].startsWith('-')) flags[key] = argv[++i]
       else flags[key] = true
     } else {
       positional.push(arg)
