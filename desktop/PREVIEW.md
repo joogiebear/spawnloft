@@ -1,8 +1,8 @@
 ## SpawnLoft desktop development preview
 
 Separate Windows, Mac and Linux installers, built from the same development commit with the
-same version. The release is published only after Windows x64, Apple Silicon, Intel Mac and
-Linux x64 packages all pass their native checks. Each release is immutable and numbered.
+same version. The release is published only after Windows x64, Apple Silicon Mac and Linux
+(x64 and arm64) packages all pass their native checks. Intel Macs are no longer built. Each release is immutable and numbered.
 
 ### Fixes to try
 
@@ -109,8 +109,7 @@ production builds use the existing Azure signing profile on the release machine.
 
 ### Mac
 
-- **Apple Silicon (M-series):** download the `mac-arm64.dmg` asset.
-- **Intel:** download the `mac-x64.dmg` asset.
+- **Apple Silicon (M-series):** download the `mac-arm64.dmg` asset. Intel Macs are not supported.
 - Requires **macOS 13 Ventura or later** and a Java version suitable for your server.
 
 Quit SpawnLoft, open the DMG, and drag SpawnLoft to Applications to replace the previous

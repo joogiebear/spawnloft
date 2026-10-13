@@ -22,12 +22,6 @@ jobs:
             arch: arm64
             app: desktop/dist/mac-arm64/SpawnLoft.app
             smoke: desktop/dist/mac-arm64/SpawnLoft.app
-          - runner: macos-15-intel
-            platform: darwin
-            target: mac
-            arch: x64
-            app: desktop/dist/mac/SpawnLoft.app
-            smoke: desktop/dist/mac/SpawnLoft.app
           # Windows is built and signed on the Azure signing host, not here. Linux has no signing
           # step, so it is built where the Macs are. Pinned to 24.04: see desktop-preview.yml.
           - runner: ubuntu-24.04
