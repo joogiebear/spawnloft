@@ -316,6 +316,9 @@
     -webkit-font-smoothing: antialiased;
     font-variant-numeric: tabular-nums;
     display: grid;
+    /* minmax(0, 1fr): an implicit auto column grows to the widest child's content, and a long
+       tab strip then pushed the header's right end and the page's buttons past the window. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     overflow: hidden;
   }
