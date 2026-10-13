@@ -72,12 +72,6 @@ jobs:
             arch: arm64
             app: desktop/dist/mac-arm64/SpawnLoft.app
             smoke: desktop/dist/mac-arm64/SpawnLoft.app
-          - runner: macos-15-intel
-            platform: darwin
-            target: mac
-            arch: x64
-            app: desktop/dist/mac/SpawnLoft.app
-            smoke: desktop/dist/mac/SpawnLoft.app
           # Pinned to 24.04 rather than -latest: it is the release whose AppArmor policy blocks
           # Chromium's sandbox for programs without a profile, which is the thing worth testing.
           - runner: ubuntu-24.04

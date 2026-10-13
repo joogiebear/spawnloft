@@ -6,8 +6,7 @@ SpawnLoft 1.5 puts a server's files in the panel: browse them, edit any text fil
 
 - **Windows 10/11 x64:** download `SpawnLoft-Setup-1.5.0.exe`, signed through Microsoft Azure Artifact Signing.
 - **Mac with Apple Silicon:** download `SpawnLoft-1.5.0-mac-arm64.dmg`.
-- **Mac with Intel:** download `SpawnLoft-1.5.0-mac-x64.dmg`.
-- Both Mac builds are Developer ID signed, hardened, Apple-notarized and stapled. The app requires macOS 13 or later; managed MySQL requires macOS 15 or later.
+- The Mac build is Developer ID signed, hardened, Apple-notarized and stapled. The app requires macOS 13 or later; managed MySQL requires macOS 15 or later.
 - **Linux, Debian and Ubuntu (22.04+, Debian 12+):** `SpawnLoft-1.5.0-linux-amd64.deb`, or `-linux-arm64.deb` on arm64. Install with `sudo apt install ./<file>`.
 - **Linux, Fedora, RHEL-family and openSUSE:** `SpawnLoft-1.5.0-linux-x86_64.rpm`, or `-linux-aarch64.rpm` on arm64. Install with `sudo dnf install ./<file>`.
 - Java is separate on every platform, and which one depends on your Minecraft version. On Debian and Ubuntu: `sudo apt install openjdk-25-jre-headless`. On Fedora the newest is `sudo dnf install java-latest-openjdk-headless`.

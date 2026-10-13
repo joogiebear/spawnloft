@@ -116,7 +116,7 @@ reconstruction from a month of commit messages.
 ### Betas
 
 The `desktop-preview` workflow builds the same `dev` commit natively on Windows x64, Apple
-Silicon, Intel Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all five
+Silicon Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all four
 pass core tests, bundle verification and the packaged-app smoke checks; on Linux the `.deb` is
 installed with apt on Ubuntu 24.04 and the installed app is what gets opened, and the `.rpm` is
 installed with dnf in a Fedora container. It is all or nothing: one platform failing holds back the

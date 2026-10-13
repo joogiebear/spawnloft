@@ -78,6 +78,6 @@ need one manual replacement to enable automatic updates.
 
 Download the appropriate DMG from the new beta release using a browser on a Mac, replace
 the previous app, and launch normally. Test the GUI, bundled CLI, server startup, console,
-backups/restore, and managed MySQL. Apple Silicon and Intel still need their own native checks.
+backups/restore, and managed MySQL. Apple Silicon needs its own native checks.
 This first signed run is needed to validate the real credentials and entitlements; local
 unit tests cannot prove notarization or Gatekeeper behavior.

@@ -53,5 +53,5 @@ if (release && !release.draft) {
   gh(['release', 'upload', tag, ...verified.assets.map(asset => asset.path), '--repo', repo, '--clobber'])
   if (currentDev() !== verified.commit) throw new Error('dev moved during upload; leaving the older build as a draft')
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease', '--latest=false'])
-  console.log(`Published ${tag} with Windows, Apple Silicon, and Intel Mac packages.`)
+  console.log(`Published ${tag} with Windows, Apple Silicon Mac, and Linux packages.`)
 }

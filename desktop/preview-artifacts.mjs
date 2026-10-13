@@ -7,7 +7,6 @@ import { cliPackageNames } from './build-cli-package.mjs'
 export const TARGETS = [
   { platform: 'win32', arch: 'x64' },
   { platform: 'darwin', arch: 'arm64' },
-  { platform: 'darwin', arch: 'x64' },
   { platform: 'linux', arch: 'x64' },
   { platform: 'linux', arch: 'arm64' },
 ]
@@ -50,7 +49,7 @@ export function artifactNames({ platform, arch, version }) {
     const installer = `SpawnLoft-Setup-${version}.exe`
     return [installer, installer + '.blockmap', 'latest.yml', 'beta.yml']
   }
-  if (platform === 'darwin' && ['arm64', 'x64'].includes(arch)) {
+  if (platform === 'darwin' && arch === 'arm64') {
     return ['dmg', 'zip'].map(ext => `SpawnLoft-${version}-mac-${arch}.${ext}`)
   }
   if (platform === 'linux' && Object.hasOwn(DEB_ARCH, arch)) {
@@ -130,7 +129,7 @@ export function verifyRelease(dir, expected) {
   if (macModes.some(mode => !['ad-hoc', 'signed'].includes(mode)) || new Set(macModes).size !== 1 ||
       (expected.stable && macModes[0] !== 'signed') ||
       (expected.macSigningMode !== undefined && macModes[0] !== expected.macSigningMode)) {
-    throw new Error('Mac signing mode must match on both architectures and the release policy')
+    throw new Error('Mac signing mode must be valid and match the release policy')
   }
   const assets = []
   for (const { name, info } of manifests) {

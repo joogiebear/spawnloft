@@ -53,7 +53,7 @@ function modifyManifest(dir, target, change) {
 test('paired release verifies Windows, both native Mac builds and both Linux architectures, including every updater feed', t => {
   const verified = verifyRelease(fixture(t), identity)
   // 4 Windows + 2 x 2 Mac + 2 x (deb, rpm, two feeds, command-line deb and rpm) Linux, and one manifest per target.
-  assert.equal(verified.assets.length, 4 + 4 + 12 + TARGETS.length)
+  assert.equal(verified.assets.length, 4 + 2 + 12 + TARGETS.length)
   assert.equal(verified.version, identity.version)
   assert.deepEqual(verified.assets.filter(asset => asset.name.endsWith('.yml')).map(asset => asset.name),
     ['latest.yml', 'beta.yml', 'latest-linux.yml', 'beta-linux.yml', 'latest-linux-arm64.yml', 'beta-linux-arm64.yml'])
@@ -199,14 +199,14 @@ test('already published prereleases are a no-op only for the same commit and eve
   }
 })
 
-test('signed publication refuses ad-hoc, missing, or mixed Mac provenance', t => {
+test('signed publication refuses ad-hoc or missing Mac provenance', t => {
   const dir = fixture(t)
   assert.throws(() => verifyRelease(dir, { ...identity, macSigningMode: 'signed' }), /Mac signing mode/)
   modifyManifest(dir, TARGETS[1], info => { info.macSigningMode = 'signed' })
-  assert.throws(() => verifyRelease(dir, identity), /Mac signing mode/)
-  modifyManifest(dir, TARGETS[2], info => { delete info.macSigningMode })
-  assert.throws(() => verifyRelease(dir, identity), /Mac signing mode/)
-  modifyManifest(dir, TARGETS[2], info => { info.macSigningMode = 'signed' })
+  assert.throws(() => verifyRelease(dir, { ...identity, macSigningMode: 'ad-hoc' }), /Mac signing mode/)
+  modifyManifest(dir, TARGETS[1], info => { delete info.macSigningMode })
+  assert.throws(() => verifyRelease(dir, { ...identity, macSigningMode: 'signed' }), /Mac signing mode/)
+  modifyManifest(dir, TARGETS[1], info => { info.macSigningMode = 'signed' })
   assert.equal(verifyRelease(dir, { ...identity, macSigningMode: 'signed' }).macSigningMode, 'signed')
 })
 
@@ -222,7 +222,7 @@ test('stable release requires matching clean versions and signed builds on every
     const info = { ...stable, ...target, windowsSigningMode: 'azure', macSigningMode: 'signed' }
     writeManifest(dir, target, createManifest(dir, info, target, { stable: true }))
   }
-  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 4 + 4 + 12 + TARGETS.length)
+  assert.equal(verifyRelease(dir, { ...stable, stable: true }).assets.length, 4 + 2 + 12 + TARGETS.length)
   assert.throws(() => verifyRelease(dir, stable), /development/)
   modifyManifest(dir, TARGETS[0], info => { info.windowsSigningMode = 'unsigned' })
   assert.throws(() => verifyRelease(dir, { ...stable, stable: true }), /Azure signing/)

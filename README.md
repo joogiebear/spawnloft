@@ -592,7 +592,7 @@ Installers and the update feeds live on **this repository's releases**. Windows,
 Linux are always one release, built from one commit.
 
 **Betas are published by CI.** `dev` carries a prerelease version. Every push to it builds
-Windows x64, Apple Silicon, Intel Mac and Linux x64, opens each packaged app and runs the same
+Windows x64, Apple Silicon Mac, Linux x64 and Linux arm64, opens each packaged app and runs the same
 smoke test against it - on Linux the `.deb` is installed with apt on Ubuntu 24.04 first - and
 publishes one release, numbered from the workflow run, only if all four pass. A pull request
 into `dev` runs the same builds and tests without publishing. See

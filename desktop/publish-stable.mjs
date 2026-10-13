@@ -56,5 +56,5 @@ if (release && !release.draft) {
   checkUploaded(uploaded[0])
   if (gh(['api', `repos/${repo}/commits/main`, '--jq', '.sha']) !== commit) throw new Error('main moved; leaving release as a draft')
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease=false', '--latest'])
-  console.log(`Published ${tag}: signed Windows, Apple Silicon and Intel Mac packages and the Linux package, with stable and beta updater feeds.`)
+  console.log(`Published ${tag}: signed Windows and Apple Silicon Mac packages and the Linux packages, with stable and beta updater feeds.`)
 }

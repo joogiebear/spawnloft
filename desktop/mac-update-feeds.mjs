@@ -2,11 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-// both architectures share one channel file, so builders must not race to overwrite
-// latest-mac.yml with a feed containing only their own zip
+// Apple Silicon is the only Mac architecture built, so the channel file lists one ZIP
 export function prepareMacFeeds(dir, verified) {
   if (verified.macSigningMode !== 'signed') return []
-  const files = ['arm64', 'x64'].map(arch => {
+  const files = ['arm64'].map(arch => {
     const name = `SpawnLoft-${verified.version}-mac-${arch}.zip`
     const artifact = verified.assets.find(a => a.name === name)
     if (!artifact) throw new Error(`Missing verified Mac ZIP: ${name}`)
@@ -16,7 +15,7 @@ export function prepareMacFeeds(dir, verified) {
   })
   // JSON is valid YAML, so electron-updater's reader accepts it. Hashes come from the verified
   // bytes, never from an independently uploaded feed.
-  const body = JSON.stringify({ version: verified.version, files, path: files[1].url, sha512: files[1].sha512 }, null, 2) + '\n'
+  const body = JSON.stringify({ version: verified.version, files, path: files[0].url, sha512: files[0].sha512 }, null, 2) + '\n'
   return ['beta-mac.yml', 'latest-mac.yml'].map(name => {
     const file = path.join(dir, name)
     fs.writeFileSync(file, body)
