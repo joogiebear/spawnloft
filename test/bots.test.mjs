@@ -28,7 +28,7 @@ fs.writeFileSync(path.join(online, 'server.properties'), 'online-mode=true\nserv
 fs.writeFileSync(path.join(offline, 'server.properties'), 'online-mode=false\nserver-ip=127.0.0.1\n')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { validateScenario, checkInstance, hostInstall, formatReport, MAX_BOTS } = await import('../src/bots.mjs')
+const { validateScenario, checkInstance, hostInstall, hostIsPinned, formatReport, MAX_BOTS, MINEFLAYER_VERSION } = await import('../src/bots.mjs')
 
 function cli(args) {
   try {
@@ -97,6 +97,24 @@ test('no install means no host, and the CLI says how to get one', () => {
   const res = cli(['bot', 'check', 'offline'])
   assert.equal(res.code, 1)
   assert.match(res.stdout, /not running/)
+})
+
+test('bot setup installs a pinned tree: exact mineflayer, every package hashed, no install scripts', () => {
+  const dir = path.join(root, 'src', 'bot-host')
+  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+  const lock = JSON.parse(fs.readFileSync(path.join(dir, 'package-lock.json'), 'utf8'))
+  assert.match(MINEFLAYER_VERSION, /^\d+\.\d+\.\d+$/, 'mineflayer is pinned to one version, not a range')
+  assert.deepEqual(Object.keys(pkg.dependencies), ['mineflayer'])
+  assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies, 'the lockfile was made from this package.json')
+  assert.equal(lock.packages['node_modules/mineflayer'].version, MINEFLAYER_VERSION)
+  const installed = Object.entries(lock.packages).filter(([k]) => k)
+  assert.ok(installed.length > 10)
+  for (const [name, entry] of installed) {
+    assert.match(entry.resolved ?? '', /^https:\/\/registry\.npmjs\.org\//, `${name} comes from the npm registry`)
+    assert.match(entry.integrity ?? '', /^sha512-/, `${name} has a hash npm ci checks`)
+    assert.notEqual(entry.hasInstallScript, true, `${name} has no install script (setup runs with --ignore-scripts)`)
+  }
+  assert.equal(hostIsPinned(), false)
 })
 
 test('the report reads one line per step and exits non-zero on a failure', () => {

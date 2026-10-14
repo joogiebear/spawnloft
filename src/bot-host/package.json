@@ -1,0 +1,8 @@
+{
+  "name": "spawnloft-bot-host",
+  "private": true,
+  "description": "mineflayer, for spawnloft bot. Pinned, with its lockfile: spawnloft bot setup installs exactly this tree.",
+  "dependencies": {
+    "mineflayer": "4.39.0"
+  }
+}

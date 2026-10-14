@@ -1847,10 +1847,11 @@ async function cmdBot(positional, flags) {
     checkFlags(flags, ['force'])
     if (rest.length) throw new UsageError(usage)
     const have = bots.hostInstall()
-    if (have && flags.force !== true) {
+    if (have && bots.hostIsPinned() && flags.force !== true) {
       out(`mineflayer ${have.version} is installed in ${have.dir}. Reinstall with --force.`)
       return
     }
+    if (have && !bots.hostIsPinned()) out(`The mineflayer in ${have.dir} was not installed from this SpawnLoft's lockfile; replacing it.`)
     const installed = bots.ensureHost({ force: flags.force === true, onProgress: (m) => out(m) })
     out(`mineflayer ${installed.version} is installed in ${installed.dir}.`)
     return
