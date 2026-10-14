@@ -115,6 +115,13 @@ test('bot setup installs a pinned tree: exact mineflayer, every package hashed, 
     assert.notEqual(entry.hasInstallScript, true, `${name} has no install script (setup runs with --ignore-scripts)`)
   }
   assert.equal(hostIsPinned(), false)
+  // The pinned files without npm having finished (setup cut short) are not an install to trust.
+  const host = path.join(data, 'bot-host')
+  fs.mkdirSync(path.join(host, 'node_modules', 'mineflayer'), { recursive: true })
+  for (const f of ['package.json', 'package-lock.json']) fs.copyFileSync(path.join(dir, f), path.join(host, f))
+  fs.writeFileSync(path.join(host, 'node_modules', 'mineflayer', 'package.json'), JSON.stringify({ version: MINEFLAYER_VERSION }))
+  assert.equal(hostIsPinned(), false)
+  fs.rmSync(host, { recursive: true, force: true })
 })
 
 test('the report reads one line per step and exits non-zero on a failure', () => {
