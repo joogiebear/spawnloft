@@ -82,7 +82,11 @@ timeout passes.
 | `leave` | Disconnect the bot. |
 
 Up to five bots per scenario. Bot names are Minecraft names: 3 to 16 letters, digits or
-underscores, all different.
+underscores, all different. A bot cannot run `stop`, `restart` or `reload` either, opped or not.
+
+What a run does to the server stays: an opped bot is still in `ops.json`, items given are in its
+player data, and a plugin's records of it persist. Use a server kept for testing, and reset it
+(or snapshot it first with `spawnloft backup`) when a scenario needs a clean slate.
 
 ## From an AI
 

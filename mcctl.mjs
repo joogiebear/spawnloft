@@ -1856,18 +1856,20 @@ async function cmdBot(positional, flags) {
     return
   }
   if (sub === 'check') {
-    checkFlags(flags, [])
+    checkFlags(flags, ['json'])
     if (rest.length !== 1) throw new UsageError(usage)
     const res = bots.checkInstance(rest[0])
-    for (const w of res.warnings) out(`warning: ${w}`)
-    if (!res.ok) {
-      for (const p of res.problems) out(p)
-      process.exitCode = 1
-      return
-    }
     const have = bots.hostInstall()
-    out(`"${rest[0]}" will take bots${res.version ? ` (Minecraft ${res.version})` : ''}. mineflayer ${have ? `${have.version} is installed` : 'is not installed yet: run "spawnloft bot setup"'}.`)
-    if (!have) process.exitCode = 1
+    const problems = [...res.problems, ...(have ? [] : ['mineflayer is not installed yet: run "spawnloft bot setup" (about 500 MB)'])]
+    if (flags.json === true) {
+      const data = { name: rest[0], ok: !problems.length, problems, warnings: res.warnings, minecraftVersion: res.version, mineflayer: have?.version ?? null, maxBots: bots.MAX_BOTS }
+      process.stdout.write(jsonLine('bot', data, data.ok ? undefined : { error: { code: 'BOTS_REFUSED', message: problems[0] } }))
+    } else {
+      for (const w of res.warnings) out(`warning: ${w}`)
+      for (const p of problems) out(p)
+      if (!problems.length) out(`"${rest[0]}" will take up to ${bots.MAX_BOTS} bots${res.version ? ` (Minecraft ${res.version})` : ''}. mineflayer ${have.version} is installed.`)
+    }
+    if (problems.length) process.exitCode = 1
     return
   }
   if (sub === 'run') {

@@ -114,8 +114,9 @@ are separate planned additions.
 ## Test players
 
 `spawnloft bot run <scenario.json> --json` writes one report envelope with `command` `bot` and exits
-1 when a step fails, so a plugin's scenarios can run in a script or CI. [BOTS.md](BOTS.md) has the
-scenario format.
+1 when a step fails, so a plugin's scenarios can run in a script or CI. `spawnloft bot check <inst>
+--json` does the same for whether the server will take bots (exit 1 with the first problem as the
+error when it will not). [BOTS.md](BOTS.md) has the scenario format.
 
 ## AI assistants
 

@@ -32,7 +32,7 @@ function loadMineflayer(dir) {
   try {
     return createRequire(path.join(dir, 'package.json'))('mineflayer')
   } catch (err) {
-    throw new Error(`mineflayer is not installed in ${dir}: run "spawnloft bot setup" (${err.message})`)
+    throw new Error(`mineflayer could not be loaded from ${dir}: ${err.message}\n  Run "spawnloft bot setup" (or "spawnloft bot setup --force" to reinstall)`)
   }
 }
 
@@ -220,6 +220,9 @@ async function runStep(step, players, job) {
   if ('expectMessage' in step) {
     const match = matcher(step.expectMessage)
     const hit = await player.waitFor(() => player.since().find((m) => match(m.text)), timeout, `a message matching ${JSON.stringify(step.expectMessage)}`)
+    // The next expectMessage looks after this line, so two in a row want two messages, in order,
+    // rather than both being satisfied by the first.
+    player.mark = player.messages.indexOf(hit) + 1
     return { matched: hit.text }
   }
   if ('waitWindow' in step) {
@@ -232,7 +235,13 @@ async function runStep(step, players, job) {
     if (!player.bot.currentWindow) throw new Error(`${player.name} has no window open to click in`)
     const slot = Number(step.click)
     const item = player.bot.currentWindow.slots[slot]
-    await player.bot.clickWindow(slot, step.button === 'right' ? 1 : 0, 0)
+    // clickWindow resolves when the server confirms the click, and a plugin that cancels the event
+    // or closes the window first never confirms it: without a deadline this step would hang.
+    let timer
+    await Promise.race([
+      player.bot.clickWindow(slot, step.button === 'right' ? 1 : 0, 0),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`timed out after ${timeout} ms waiting for the server to confirm a click on slot ${slot}`)), timeout) }),
+    ]).finally(() => clearTimeout(timer))
     return { clicked: slot, item: item ? { name: item.name, count: item.count } : null }
   }
   if ('closeWindow' in step) {
@@ -368,12 +377,22 @@ async function main() {
   }
   report.log = logSince(job)
   report.durationMs = now() - startedAt
-  process.stdout.write(JSON.stringify(report) + '\n')
+  await emit(report)
   // mineflayer keeps timers alive after quit; the report is out, so nothing else matters.
   setTimeout(() => process.exit(0), 200).unref()
 }
 
-main().catch((err) => {
-  process.stdout.write(JSON.stringify({ ok: false, error: err.message, steps: [], bots: {} }) + '\n')
-  process.exit(1)
-})
+/** Write the report and resolve once the pipe has taken it: exiting before that can lose it. */
+function emit(report) {
+  return new Promise((resolve) => process.stdout.write(JSON.stringify(report) + '\n', () => resolve()))
+}
+
+if (require.main === module) {
+  main().catch(async (err) => {
+    await emit({ ok: false, error: err.message, steps: [], bots: {} })
+    process.exit(1)
+  })
+} else {
+  // Required by the tests, which exercise the parts that need no server.
+  module.exports = { matcher, itemMatches, chatToString, logSince, Player }
+}

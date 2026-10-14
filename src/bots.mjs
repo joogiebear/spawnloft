@@ -9,7 +9,7 @@ import { readProps } from './props.mjs'
 import { rconExec, stripColors } from './rcon.mjs'
 import { mcVersionOf } from './plugins.mjs'
 import { boundAddress } from './exposure.mjs'
-import { fail, readJson } from './util.mjs'
+import { fail, UserError } from './util.mjs'
 
 /**
  * Scripted test players for plugin testing: `spawnloft bot ...` and the `bot_*` MCP tools.
@@ -31,17 +31,30 @@ export const MINEFLAYER_SPEC = '^4.39.0'
 const HOST_SCRIPT = fileURLToPath(new URL('./bot-host.cjs', import.meta.url))
 export const MAX_BOTS = 5
 const STEP_KEYS = ['chat', 'command', 'expectMessage', 'waitWindow', 'click', 'closeWindow', 'expectItem', 'expectState', 'expectLog', 'leave']
+const STEP_EXTRAS = ['bot', 'timeout', 'button']
 const BOT_NAME_RE = /^[A-Za-z0-9_]{3,16}$/
-// What run_command refuses, refused here too: a scenario's setup runs as the server console.
-const REFUSED_SETUP = new Set(['stop', 'restart', 'reload', 'rl'])
+// Commands that would take the server down behind the supervisor's back - it would read the exit
+// as a crash - or run Bukkit's reload, which leaves plugins half-initialised. The run_command MCP
+// tool refuses them, and so does a scenario, whether as setup (the console) or as a bot: an opped
+// bot's "/stop" stops the server just as well.
+export const REFUSED_CONSOLE = new Set(['stop', 'restart', 'reload', 'rl'])
 // What the console answers when a setup command did nothing. Paper's words, with vanilla's.
 const SETUP_FAILED_RE = /No player was found|Unknown or incomplete command|Unknown command|Incorrect argument|Expected whitespace|You do not have permission/i
+// What the core and the host say to each other; see runHost and awaitSetup in the host.
+const JOINED_LINE = '{"event":"joined"}'
+
+/** The command word of a console or chat line: "/minecraft:stop now" is "stop". */
+export function commandVerb(line) {
+  return String(line).trim().replace(/^\//, '').split(/\s+/)[0].toLowerCase().replace(/^[a-z0-9_.-]+:/, '')
+}
 
 /** Where mineflayer is, or null when `spawnloft bot setup` has not run on this machine. */
 export function hostInstall() {
   const pkg = path.join(HOST_DIR, 'node_modules', 'mineflayer', 'package.json')
-  const meta = readJson(pkg)
-  return meta ? { dir: HOST_DIR, version: meta.version } : null
+  let meta
+  // A half-written or unreadable package.json is "not installed" too: setup --force puts it right.
+  try { meta = JSON.parse(fs.readFileSync(pkg, 'utf8')) } catch { return null }
+  return meta?.version ? { dir: HOST_DIR, version: meta.version } : null
 }
 
 function npmCommand() {
@@ -100,6 +113,9 @@ export function ensureHost({ onProgress = () => {}, force = false } = {}) {
  * every interface, so requiring loopback would refuse every server made with it until a file was
  * edited by hand. The warning names the actual risk: an offline server reachable from the network
  * lets anyone on it join under any name.
+ *
+ * <p>`host` is where the bots connect: the bound address when there is one, because a server on
+ * 192.168.1.5 alone does not answer on 127.0.0.1; loopback when the server listens everywhere.
  */
 export function checkInstance(name) {
   const inst = getInstance(name)
@@ -112,10 +128,11 @@ export function checkInstance(name) {
   }
   if (!sup.isRunning(name)) problems.push(`"${name}" is not running. Start it first: spawnloft start ${name}`)
   const bound = boundAddress(inst.dir)
-  if (!['127.0.0.1', 'localhost', '::1'].includes(bound)) {
-    warnings.push(`"${name}" listens on every interface in offline mode, so anyone who can reach port ${inst.port} can join under any name. For a test server, set server-ip=127.0.0.1.`)
+  const everywhere = ['', '0.0.0.0', '::'].includes(bound)
+  if (everywhere || !['127.0.0.1', 'localhost', '::1'].includes(bound)) {
+    warnings.push(`"${name}" listens on ${everywhere ? 'every interface' : bound} in offline mode, so anyone who can reach port ${inst.port} can join under any name. For a test server, set server-ip=127.0.0.1.`)
   }
-  return { inst, ok: problems.length === 0, problems, warnings, version: mcVersionOf(inst) ?? null }
+  return { inst, ok: problems.length === 0, problems, warnings, version: mcVersionOf(inst) ?? null, host: everywhere ? '127.0.0.1' : bound }
 }
 
 /** The scenario as a checked object, with the file's name as a fallback for its own. */
@@ -125,6 +142,20 @@ export function loadScenario(file) {
   let data
   try { data = JSON.parse(raw) } catch (err) { fail(`${file} is not valid JSON: ${err.message}`) }
   return validateScenario(data, { name: path.basename(file, '.json') })
+}
+
+/**
+ * A pattern is plain text, or `/.../flags` for a regular expression. Checked here so that a typo
+ * fails the scenario before any bot joins, not in step 7 after thirty seconds of setup. The g and
+ * y flags are refused because they make `test()` stateful: the same pattern would match a line
+ * once and then miss it.
+ */
+function checkPattern(where, field, pattern) {
+  if (typeof pattern !== 'string' || !pattern) fail(`${where}: "${field}" must be text or /a regular expression/`)
+  const m = /^\/(.+)\/([a-z]*)$/s.exec(pattern)
+  if (!m) return
+  if (/[gy]/.test(m[2])) fail(`${where}: "${field}" uses the ${m[2].includes('g') ? 'g' : 'y'} flag, which has no meaning for a match here; drop it`)
+  try { new RegExp(m[1], m[2]) } catch (err) { fail(`${where}: "${field}" is not a valid regular expression: ${err.message}`) }
 }
 
 export function validateScenario(data, { name = null } = {}) {
@@ -138,22 +169,44 @@ export function validateScenario(data, { name = null } = {}) {
   if (new Set(scenario.bots.map((b) => b.toLowerCase())).size !== scenario.bots.length) fail('bot names must differ')
   if (!Array.isArray(scenario.setup) || scenario.setup.some((s) => typeof s !== 'string')) fail('"setup" must be a list of console commands')
   for (const cmd of scenario.setup) {
-    const verb = cmd.trim().replace(/^\//, '').split(/\s+/)[0].toLowerCase().replace(/^[a-z0-9_.-]+:/, '')
-    if (REFUSED_SETUP.has(verb)) fail(`setup command "${verb}" would take the server down or half-reload it; a scenario cannot run it`)
+    const verb = commandVerb(cmd)
+    if (REFUSED_CONSOLE.has(verb)) fail(`setup command "${verb}" would take the server down or half-reload it; a scenario cannot run it`)
   }
   if (!Array.isArray(scenario.steps) || !scenario.steps.length) fail('"steps" must list at least one step')
   scenario.steps.forEach((step, i) => {
     const where = `step ${i + 1}`
-    if (!step || typeof step !== 'object') fail(`${where} is not an object`)
+    if (!step || typeof step !== 'object' || Array.isArray(step)) fail(`${where} is not an object`)
     const keys = Object.keys(step).filter((k) => STEP_KEYS.includes(k))
     if (keys.length !== 1) fail(`${where} must have exactly one of ${STEP_KEYS.join(', ')}; it has ${keys.length ? keys.join(', ') : 'none'}`)
+    const unknown = Object.keys(step).filter((k) => !STEP_KEYS.includes(k) && !STEP_EXTRAS.includes(k))
+    if (unknown.length) fail(`${where} has ${unknown.map((k) => JSON.stringify(k)).join(', ')}, which is not a step key; the keys are ${[...STEP_KEYS, ...STEP_EXTRAS].join(', ')}`)
     const [kind] = keys
     if (kind !== 'expectLog' && !scenario.bots.includes(step.bot)) fail(`${where} (${kind}) names bot ${JSON.stringify(step.bot ?? null)}, which is not in "bots"`)
     if (step.timeout !== undefined && !(Number.isInteger(step.timeout) && step.timeout > 0 && step.timeout <= 300000)) fail(`${where}: "timeout" is milliseconds, 1 to 300000`)
-    if (kind === 'expectLog' && (typeof step.expectLog !== 'object' || (step.expectLog.present === undefined) === (step.expectLog.absent === undefined))) {
-      fail(`${where}: expectLog takes {"present": pattern} or {"absent": pattern}`)
+    if (kind === 'chat' || kind === 'command') {
+      const text = step[kind]
+      if (typeof text !== 'string' || !text.trim()) fail(`${where}: "${kind}" must be text`)
+      // A chat line starting with "/" is a command too: the server does not know the difference.
+      const verb = kind === 'command' || text.trimStart().startsWith('/') ? commandVerb(text) : null
+      if (verb && REFUSED_CONSOLE.has(verb)) fail(`${where}: "${verb}" would take the server down or half-reload it; a bot cannot run it`)
+    }
+    if (kind === 'expectMessage' || kind === 'waitWindow') checkPattern(where, kind, step[kind])
+    if (kind === 'expectLog') {
+      const want = step.expectLog
+      if (!want || typeof want !== 'object' || (want.present === undefined) === (want.absent === undefined)) {
+        fail(`${where}: expectLog takes {"present": pattern} or {"absent": pattern}`)
+      }
+      checkPattern(where, want.present !== undefined ? 'present' : 'absent', want.present ?? want.absent)
     }
     if (kind === 'click' && !Number.isInteger(step.click)) fail(`${where}: "click" is a slot number`)
+    if (kind === 'expectItem') {
+      const want = step.expectItem
+      const ok = typeof want === 'string' ? Boolean(want) : (want && typeof want === 'object' && typeof want.name === 'string' && (want.count === undefined || Number.isInteger(want.count)))
+      if (!ok) fail(`${where}: expectItem is an item name such as "minecraft:diamond", or {"name": ..., "count": n}`)
+    }
+    if (kind === 'expectState' && (!step.expectState || typeof step.expectState !== 'object' || Array.isArray(step.expectState))) {
+      fail(`${where}: expectState is an object of what to wait for (gameMode, minHealth, maxHealth, dimension, near, nearBot, seesPlayer)`)
+    }
   })
   return scenario
 }
@@ -162,9 +215,9 @@ export function validateScenario(data, { name = null } = {}) {
  * Run one scenario end to end and return its report.
  *
  * <p>`instance` on the command line beats the file's, so one scenario file serves several test
- * servers. Setup runs first, as the console, and its replies are in the report: a setup command
- * that fails ("Unknown command") is the usual reason a later step times out, so it is in plain
- * view rather than swallowed.
+ * servers. The bots join first; then setup runs as the console and its replies are in the report:
+ * a setup command that fails ("Unknown command") is the usual reason a later step times out, so
+ * it is in plain view rather than swallowed.
  */
 export async function runScenario(scenario, { instance = null, onProgress = () => {} } = {}) {
   const name = instance ?? scenario.instance
@@ -197,12 +250,12 @@ export async function runScenario(scenario, { instance = null, onProgress = () =
   }
 
   const job = {
-    name: scenario.name, hostDir: host.dir, host: '127.0.0.1', port: inst.port, version: check.version,
+    name: scenario.name, hostDir: host.dir, host: check.host, port: inst.port, version: check.version,
     bots: scenario.bots, steps: scenario.steps, consoleLog: log, logOffset, waitForSetup: true,
   }
   const jobFile = path.join(HOST_DIR, `job-${process.pid}-${Date.now()}.json`)
   fs.writeFileSync(jobFile, JSON.stringify(job))
-  onProgress(`${scenario.bots.length} bot(s) joining ${name} on 127.0.0.1:${inst.port}` + (check.version ? ` (Minecraft ${check.version})` : ''))
+  onProgress(`${scenario.bots.length} bot(s) joining ${name} on ${check.host}:${inst.port}` + (check.version ? ` (Minecraft ${check.version})` : ''))
   let report
   try {
     report = await runHost(jobFile, { onProgress, onJoined: runSetup })
@@ -213,36 +266,70 @@ export async function runScenario(scenario, { instance = null, onProgress = () =
 }
 
 /**
- * The host speaks JSON lines on stdout: `{event: "joined"}` once the bots are in, then the report
- * as its last line. The one word it takes back on stdin is whether to go on after setup.
+ * Start the host and wait for its report.
+ *
+ * <p>The host speaks JSON lines on stdout: `{event: "joined"}` once the bots are in, then the
+ * report as its last line. The one word it takes back on stdin is whether to go on after setup.
+ * `onJoined` runs setup and resolves to a problem (abort) or null (go); a throw aborts too.
+ *
+ * <p>The host can die at any point - a server that kicks the bots, a crash in mineflayer - and
+ * the core must come out with a readable error rather than go down with it. So stdin errors are
+ * swallowed (writing to a dead child is EPIPE, which would otherwise crash the core), "joined" is
+ * acted on once even if it arrives split across chunks, and the report is whichever stdout line
+ * parses as one, so a stray line printed after it does not hide it.
+ *
+ * <p>`script` is for tests, which stand in a small script for the real host.
  */
-function runHost(jobFile, { onProgress, onJoined }) {
+export function runHost(jobFile, { onProgress = () => {}, onJoined = async () => null, script = HOST_SCRIPT } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [HOST_SCRIPT, jobFile], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+    // ELECTRON_RUN_AS_NODE: under the desktop app process.execPath is Electron, which would open a
+    // window instead of running the script. The supervisor and daemon spawn themselves the same way.
+    const child = spawn(process.execPath, [script, jobFile], {
+      stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    })
+    child.stdin.on('error', () => { /* the host is gone; its exit code says so below */ })
+    const tell = (word) => { if (!child.stdin.destroyed) child.stdin.write(JSON.stringify(word) + '\n') }
     let stdout = ''
     let stderr = ''
+    let signalled = false
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     child.stdout.on('data', (d) => {
       stdout += d
-      if (!stdout.includes('{"event":"joined"}')) return
-      stdout = stdout.replace('{"event":"joined"}\n', '')
+      if (signalled || !stdout.includes(JOINED_LINE)) return
+      signalled = true
+      stdout = stdout.replace(JOINED_LINE, '')
       Promise.resolve().then(onJoined).then(
-        (problem) => child.stdin.write(JSON.stringify(problem ? { abort: problem } : { go: true }) + '\n'),
-        (err) => child.stdin.write(JSON.stringify({ abort: err.message }) + '\n'),
+        (problem) => tell(problem ? { abort: String(problem) } : { go: true }),
+        (err) => tell({ abort: err.message }),
       )
     })
     child.stderr.on('data', (d) => {
       stderr += d
-      for (const line of String(d).split(/\r?\n/)) if (line.trim()) onProgress(line.trim())
+      for (const line of d.split(/\r?\n/)) if (line.trim()) onProgress(line.trim())
     })
     child.on('error', reject)
     child.on('close', (code) => {
-      const line = stdout.trim().split('\n').pop()
-      let report = null
-      try { report = line ? JSON.parse(line) : null } catch { /* not a report */ }
+      const report = parseReport(stdout)
       if (report) return resolve(report)
-      reject(new Error(`the bot host exited with code ${code} and no report${stderr.trim() ? `:\n${stderr.trim().split('\n').slice(-10).join('\n')}` : ''}`))
+      const tail = stderr.trim().split('\n').filter(Boolean).slice(-10).join('\n')
+      reject(new UserError(`the bot host exited with code ${code} and no report${tail ? `:\n${tail}` : ''}\nIf this keeps happening, reinstall it: spawnloft bot setup --force`))
     })
   })
+}
+
+/** The last stdout line that is a report, searching from the end past anything printed after it. */
+function parseReport(stdout) {
+  const lines = stdout.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line.startsWith('{')) continue
+    try {
+      const obj = JSON.parse(line)
+      if (obj && Array.isArray(obj.steps)) return obj
+    } catch { /* not a report */ }
+  }
+  return null
 }
 
 /** One line per step, for a terminal. */

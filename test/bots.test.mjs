@@ -135,3 +135,133 @@ test('the MCP tools are offered and bot_check reads like the CLI', async () => {
   assert.match(res.text, /online mode/)
   assert.match(res.text, /mineflayer is not installed/)
 })
+
+// ---- the core/host handshake, with a stand-in host (test/fixtures/bot-host-stub.cjs)
+
+const { runHost, commandVerb, REFUSED_CONSOLE } = await import('../src/bots.mjs')
+const { UserError } = await import('../src/util.mjs')
+const stub = path.join(root, 'test', 'fixtures', 'bot-host-stub.cjs')
+let jobs = 0
+function stubJob(mode, extra = {}) {
+  const file = path.join(scratch, `job-${++jobs}.json`)
+  const wordFile = `${file}.word`
+  fs.writeFileSync(file, JSON.stringify({ name: mode, mode, wordFile, ...extra }))
+  return { file, word: () => JSON.parse(fs.readFileSync(wordFile, 'utf8')) }
+}
+
+test('the host hears "go" once setup has run, and the report comes back', async () => {
+  const job = stubJob('plain')
+  let setupRan = 0
+  const report = await runHost(job.file, { script: stub, onJoined: async () => { setupRan++; return null } })
+  assert.equal(report.ok, true)
+  assert.equal(setupRan, 1)
+  assert.deepEqual(job.word(), { go: true })
+})
+
+test('a failed setup aborts the host, which reports the reason', async () => {
+  const job = stubJob('plain')
+  const report = await runHost(job.file, { script: stub, onJoined: async () => 'setup command "op nobody" failed' })
+  assert.equal(report.ok, false)
+  assert.match(report.error, /op nobody/)
+  assert.deepEqual(job.word(), { abort: 'setup command "op nobody" failed' })
+})
+
+test('setup that throws aborts the host too, rather than leaving it waiting', async () => {
+  const job = stubJob('plain')
+  const report = await runHost(job.file, { script: stub, onJoined: async () => { throw new Error('RCON refused the connection') } })
+  assert.equal(report.ok, false)
+  assert.match(report.error, /RCON refused/)
+})
+
+test('"joined" split across two chunks is acted on once', async () => {
+  const job = stubJob('split')
+  let setupRan = 0
+  const report = await runHost(job.file, { script: stub, onJoined: async () => { setupRan++; return null } })
+  assert.equal(report.ok, true)
+  assert.equal(setupRan, 1)
+})
+
+test('a host that dies mid-setup is an error naming its exit, not a crash of the core', async () => {
+  const job = stubJob('dies-after-joined')
+  const seen = []
+  // Setup takes long enough for the host to be gone by the time the core answers it.
+  await assert.rejects(
+    runHost(job.file, { script: stub, onProgress: (m) => seen.push(m), onJoined: () => new Promise((r) => setTimeout(() => r(null), 300)) }),
+    (err) => err instanceof UserError && /exited with code 3/.test(err.message) && /blew up/.test(err.message) && /bot setup --force/.test(err.message),
+  )
+  assert.ok(seen.includes('mineflayer blew up'))
+})
+
+test('a line printed after the report does not hide it', async () => {
+  const job = stubJob('stray')
+  const report = await runHost(job.file, { script: stub })
+  assert.equal(report.ok, true)
+  assert.equal(report.steps.length, 1)
+})
+
+// ---- what a scenario may not do, and what the host's helpers make of patterns
+
+test('a bot cannot stop or reload the server, as a command or as chat', () => {
+  const bad = (steps, re) => assert.throws(() => validateScenario({ ...good, steps }), re)
+  bad([{ bot: 'alice', command: '/stop' }], /step 1: "stop" would take the server down/)
+  bad([{ bot: 'alice', command: 'minecraft:reload confirm' }], /"reload"/)
+  bad([{ bot: 'alice', chat: '/rl' }], /"rl"/)
+  bad([{ bot: 'alice', chat: '' }], /"chat" must be text/)
+  assert.doesNotThrow(() => validateScenario({ ...good, steps: [{ bot: 'alice', chat: 'please do not stop' }] }))
+  assert.equal(commandVerb('  /Minecraft:Stop now'), 'stop')
+  assert.ok(REFUSED_CONSOLE.has('restart'))
+})
+
+test('patterns and shapes are checked before any bot joins', () => {
+  const bad = (steps, re) => assert.throws(() => validateScenario({ ...good, steps }), re)
+  bad([{ bot: 'alice', expectMessage: '/(unclosed/' }], /not a valid regular expression/)
+  bad([{ bot: 'alice', expectMessage: '/hello/g' }], /uses the g flag/)
+  bad([{ bot: 'alice', expectMessage: 42 }], /"expectMessage" must be text/)
+  bad([{ expectLog: { present: '/[/' } }], /"present" is not a valid regular expression/)
+  bad([{ bot: 'alice', waitWindow: '' }], /"waitWindow" must be text/)
+  bad([{ bot: 'alice', expectItem: { count: 2 } }], /expectItem is an item name/)
+  bad([{ bot: 'alice', expectState: 'creative' }], /expectState is an object/)
+  bad([{ bot: 'alice', chat: 'hi', timeuot: 100 }], /"timeuot", which is not a step key/)
+  assert.doesNotThrow(() => validateScenario({ ...good, steps: [{ bot: 'alice', expectMessage: '/hello/i' }, { bot: 'alice', expectItem: 'minecraft:diamond' }] }))
+})
+
+test('the host matches plain text anywhere and /regexes/ with flags, and counts items', async () => {
+  const { createRequire } = await import('node:module')
+  const host = createRequire(import.meta.url)('../src/bot-host.cjs')
+  assert.equal(host.matcher('hello')('say hello bob'), true)
+  assert.equal(host.matcher('/^hello/i')('Hello bob'), true)
+  assert.equal(host.matcher('/^hello/')('say hello'), false)
+  const items = [{ name: 'diamond', count: 3, displayName: null }, { name: 'diamond', count: 2, displayName: null }]
+  assert.equal(host.itemMatches(items, 'minecraft:diamond'), 5)
+  assert.equal(host.itemMatches(items, { name: 'diamond', count: 6 }), false)
+  assert.equal(host.chatToString({ text: 'a', extra: [{ text: 'b' }, 'c'] }), 'abc')
+})
+
+test('a bound address is where the bots go; every interface means loopback', () => {
+  assert.equal(checkInstance('offline').host, '127.0.0.1')
+  assert.equal(checkInstance('online').host, '127.0.0.1')
+  const lan = path.join(data, 'instances', 'lan')
+  fs.mkdirSync(lan, { recursive: true })
+  fs.writeFileSync(path.join(lan, 'server.properties'), 'online-mode=false\nserver-ip=192.168.1.5\n')
+  const reg = JSON.parse(fs.readFileSync(path.join(data, 'instances.json'), 'utf8'))
+  reg.instances.lan = { dir: lan, jar: 'paper-1.21.4-100.jar', memory: '1G', port: 45627, rcon: { port: 45628, password: 'x' } }
+  fs.writeFileSync(path.join(data, 'instances.json'), JSON.stringify(reg))
+  const res = checkInstance('lan')
+  assert.equal(res.host, '192.168.1.5')
+  assert.match(res.warnings[0], /listens on 192\.168\.1\.5/)
+})
+
+test('bot run --json is one envelope and exit 1 when the scenario cannot be read', () => {
+  const res = cli(['bot', 'run', path.join(scratch, 'broken.json'), '--json'])
+  assert.equal(res.code, 1)
+  const lines = res.stdout.trim().split('\n')
+  assert.equal(lines.length, 1)
+  const env = JSON.parse(lines[0])
+  assert.equal(env.ok, false)
+  assert.match(env.error.message, /not valid JSON/)
+  const check = cli(['bot', 'check', 'offline', '--json'])
+  assert.equal(check.code, 1)
+  const c = JSON.parse(check.stdout.trim())
+  assert.equal(c.ok, false)
+  assert.match(c.error.message, /not running/)
+})
