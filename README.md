@@ -280,6 +280,7 @@ tasks with it, and deleting one takes them away.
 | `doctor` | Environment, port collisions, EULA, disk, stale state |
 | `data move <folder> [--yes]` | Move the whole data folder to another place or drive and leave a link where it was, so nothing stored needs changing. Shows the plan unless `--yes`; `data status`, `data finish` (deletes the parked original) and `data rollback` (puts an interrupted move back). See below |
 | `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
+| `bot setup` / `bot check <inst>` / `bot run <scenario.json>` | Scripted test players for plugin testing. See [BOTS.md](BOTS.md) |
 
 ### Moving the data folder
 

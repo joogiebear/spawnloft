@@ -1,0 +1,18 @@
+{
+  "name": "two players run commands on each other",
+  "instance": "test",
+  "bots": ["alice", "bob"],
+  "setup": ["op alice", "gamemode survival bob"],
+  "steps": [
+    { "bot": "alice", "expectState": { "seesPlayer": "bob" } },
+    { "bot": "alice", "chat": "hello bob" },
+    { "bot": "bob", "expectMessage": "/<alice> hello bob/" },
+    { "bot": "alice", "command": "/tp alice bob" },
+    { "bot": "alice", "expectState": { "nearBot": "bob", "radius": 3 }, "timeout": 4000 },
+    { "bot": "alice", "command": "/gamemode creative bob" },
+    { "bot": "bob", "expectState": { "gameMode": "creative" } },
+    { "bot": "bob", "command": "/gamemode survival alice" },
+    { "bot": "bob", "expectMessage": "/permission|Unknown|not allowed/i", "timeout": 3000 },
+    { "expectLog": { "absent": "/Exception|ERROR/" } }
+  ]
+}
