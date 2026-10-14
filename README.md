@@ -262,6 +262,7 @@ tasks with it, and deleting one takes them away.
 | `jars` / `jars import <path>` | Server jar store used by `new` |
 | `doctor` | Environment, port collisions, EULA, disk, stale state |
 | `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
+| `bot setup` / `bot check <inst>` / `bot run <scenario.json>` | Scripted test players for plugin testing. See [BOTS.md](BOTS.md) |
 
 ## How it works
 

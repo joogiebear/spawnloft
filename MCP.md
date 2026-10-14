@@ -127,6 +127,7 @@ Add them after `mcp` in `args`.
 | `list_config_files` | A server's text configuration files, or those in one folder such as `plugins/EcoItems`. |
 | `read_config_file` | One configuration file, with secret values shown as `[redacted]`. |
 | `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports. |
+| `bot_check` | Whether scripted test players can join a server: offline mode, running, mineflayer installed. See [BOTS.md](BOTS.md). |
 
 **Actions.** Marked as changes, so your AI app asks before running them.
 
@@ -139,6 +140,7 @@ Add them after `mcp` in `args`.
 | `install_plugin` / `update_plugin` | Takes a plugins snapshot first, then installs. Takes effect at the next restart. |
 | `write_config_file` | Changes one configuration file: an exact `old_text` to `new_text` replacement, or `content` for a whole or new file. Snapshots the file first. |
 | `upgrade_build` | The newest build of the same software and Minecraft version. The old jar is kept. |
+| `bot_run_scenario` | Join a server as up to five scripted players and run a test scenario against a plugin: commands, chat, GUI clicks and checks on messages, items, state and the console. Setup commands run as the console, like `run_command`. |
 
 **Destructive**, only with `--allow-destructive`. Each describes what it would do and changes
 nothing until it is called again with `confirm: true`.
