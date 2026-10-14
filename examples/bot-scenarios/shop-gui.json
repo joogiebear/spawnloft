@@ -1,0 +1,15 @@
+{
+  "name": "shop opens and charges",
+  "instance": "test",
+  "bots": ["alice"],
+  "setup": ["give alice minecraft:diamond 5"],
+  "steps": [
+    { "bot": "alice", "expectItem": { "name": "minecraft:diamond", "count": 5 } },
+    { "bot": "alice", "command": "/shop" },
+    { "bot": "alice", "waitWindow": "Shop", "timeout": 3000 },
+    { "bot": "alice", "click": 11 },
+    { "bot": "alice", "expectMessage": "You bought", "timeout": 2000 },
+    { "bot": "alice", "closeWindow": true },
+    { "expectLog": { "absent": "Exception" } }
+  ]
+}
