@@ -15,6 +15,11 @@ Mineflayer is not part of SpawnLoft. It is installed once, with npm, into the da
 spawnloft bot setup        # about 500 MB into <data>/bot-host; needs npm (comes with Node.js)
 ```
 
+Setup installs one exact mineflayer and the exact tree of packages under it, from the lockfile in
+`src/bot-host`: `npm ci` checks every package against its hash in that lockfile and runs no install
+scripts. Nothing newer than what SpawnLoft was tested with arrives on the day you run it, and an
+install from an older SpawnLoft is replaced the next time `bot setup` runs.
+
 The desktop app's bundled runtime has no npm. On a machine with the app and no Node.js, install
 Node.js from nodejs.org first, then run the command above from a terminal.
 

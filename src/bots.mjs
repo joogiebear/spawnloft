@@ -27,7 +27,12 @@ import { fail, UserError } from './util.mjs'
  */
 
 export const HOST_DIR = path.join(DATA_ROOT, 'bot-host')
-export const MINEFLAYER_SPEC = '^4.39.0'
+// What `bot setup` installs: an exact mineflayer and a lockfile for its whole tree, shipped with
+// SpawnLoft. A version range here would hand each user whatever the registry served on the day
+// they ran setup - about ninety packages none of us had tested - instead of the tree that was.
+const PINNED_DIR = fileURLToPath(new URL('./bot-host/', import.meta.url))
+const PINNED_FILES = ['package.json', 'package-lock.json']
+export const MINEFLAYER_VERSION = JSON.parse(fs.readFileSync(path.join(PINNED_DIR, 'package.json'), 'utf8')).dependencies.mineflayer
 const HOST_SCRIPT = fileURLToPath(new URL('./bot-host.cjs', import.meta.url))
 export const MAX_BOTS = 5
 const STEP_KEYS = ['chat', 'command', 'expectMessage', 'waitWindow', 'click', 'closeWindow', 'expectItem', 'expectState', 'expectLog', 'leave']
@@ -61,26 +66,35 @@ function npmCommand() {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
+/** Whether the install in HOST_DIR came from the lockfile this SpawnLoft ships. */
+export function hostIsPinned() {
+  try {
+    return PINNED_FILES.every((f) => fs.readFileSync(path.join(HOST_DIR, f), 'utf8') === fs.readFileSync(path.join(PINNED_DIR, f), 'utf8'))
+  } catch { return false }
+}
+
 /**
  * Install mineflayer into the data root, once.
  *
- * <p>Through npm, because that is the only honest way to get a package with a hundred and seventy
- * transitive dependencies onto a machine: pinning and re-downloading them by hand is a package
- * manager written badly. npm comes with Node, which a source checkout already has. The desktop app
- * bundles a runtime without npm, so there this fails with the way out spelled out; a prebuilt
- * download for that case is a later step.
+ * <p>Through npm, because that is the only honest way to get a package with ninety transitive
+ * dependencies onto a machine. npm comes with Node, which a source checkout already has. The
+ * desktop app bundles a runtime without npm, so there this fails with the way out spelled out; a
+ * prebuilt download for that case is a later step.
+ *
+ * <p>What npm installs is not left to the registry: `npm ci` against the lockfile in src/bot-host
+ * installs exactly that tree, checks every package against the lockfile's hash, and refuses if
+ * anything disagrees. `--ignore-scripts` because nothing in the tree has an install script, so a
+ * package that grew one later would be running code nobody reviewed. An install made from a
+ * different lockfile (an older SpawnLoft's range) is replaced rather than trusted.
  *
  * <p>The install is around 500 MB, most of it game data for every Minecraft version there has
  * been. That is mineflayer's shape, not a choice made here.
  */
 export function ensureHost({ onProgress = () => {}, force = false } = {}) {
   const have = hostInstall()
-  if (have && !force) return have
+  if (have && hostIsPinned() && !force) return have
   fs.mkdirSync(HOST_DIR, { recursive: true })
-  fs.writeFileSync(path.join(HOST_DIR, 'package.json'), JSON.stringify({
-    name: 'spawnloft-bot-host', private: true, description: 'mineflayer, for spawnloft bot',
-    dependencies: { mineflayer: MINEFLAYER_SPEC },
-  }, null, 2) + '\n')
+  for (const f of PINNED_FILES) fs.copyFileSync(path.join(PINNED_DIR, f), path.join(HOST_DIR, f))
   const npm = npmCommand()
   const probe = spawnSync(npm, ['--version'], { encoding: 'utf8', shell: process.platform === 'win32' })
   if (probe.error || probe.status !== 0) {
@@ -90,15 +104,15 @@ export function ensureHost({ onProgress = () => {}, force = false } = {}) {
       `  The install goes into ${HOST_DIR} and is about 500 MB.`,
     ].join('\n'))
   }
-  onProgress(`Installing mineflayer ${MINEFLAYER_SPEC} into ${HOST_DIR} with npm ${probe.stdout.trim()} (about 500 MB, a few minutes)`)
-  const res = spawnSync(npm, ['install', '--no-audit', '--no-fund', '--omit=dev', '--loglevel=error'], {
+  onProgress(`Installing mineflayer ${MINEFLAYER_VERSION} and its locked dependencies into ${HOST_DIR} with npm ${probe.stdout.trim()} (about 500 MB, a few minutes)`)
+  const res = spawnSync(npm, ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel=error'], {
     cwd: HOST_DIR, encoding: 'utf8', shell: process.platform === 'win32', stdio: ['ignore', 'pipe', 'pipe'],
   })
   if (res.status !== 0) {
-    fail(`npm install failed (exit ${res.status}) in ${HOST_DIR}:\n${(res.stderr || res.stdout || '').trim().split('\n').slice(-15).join('\n')}`)
+    fail(`npm ci failed (exit ${res.status}) in ${HOST_DIR}:\n${(res.stderr || res.stdout || '').trim().split('\n').slice(-15).join('\n')}`)
   }
   const installed = hostInstall()
-  if (!installed) fail(`npm install finished but mineflayer is not in ${HOST_DIR}/node_modules`)
+  if (!installed) fail(`npm ci finished but mineflayer is not in ${HOST_DIR}/node_modules`)
   return installed
 }
 
