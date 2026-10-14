@@ -32,6 +32,8 @@ export const HOST_DIR = path.join(DATA_ROOT, 'bot-host')
 // they ran setup - about ninety packages none of us had tested - instead of the tree that was.
 const PINNED_DIR = fileURLToPath(new URL('./bot-host/', import.meta.url))
 const PINNED_FILES = ['package.json', 'package-lock.json']
+// Written into HOST_DIR only after npm ci has finished, so an install cut short is not taken for a good one.
+const PINNED_MARKER = '.spawnloft-pinned'
 export const MINEFLAYER_VERSION = JSON.parse(fs.readFileSync(path.join(PINNED_DIR, 'package.json'), 'utf8')).dependencies.mineflayer
 const HOST_SCRIPT = fileURLToPath(new URL('./bot-host.cjs', import.meta.url))
 export const MAX_BOTS = 5
@@ -66,11 +68,14 @@ function npmCommand() {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
-/** Whether the install in HOST_DIR came from the lockfile this SpawnLoft ships. */
+/** The shipped pin as one string, line endings evened out: a Windows checkout ships CRLF, a Linux one LF. */
+function pinnedStamp() {
+  return PINNED_FILES.map((f) => fs.readFileSync(path.join(PINNED_DIR, f), 'utf8').replace(/\r\n/g, '\n')).join('\0')
+}
+
+/** Whether the install in HOST_DIR is a finished install of the lockfile this SpawnLoft ships. */
 export function hostIsPinned() {
-  try {
-    return PINNED_FILES.every((f) => fs.readFileSync(path.join(HOST_DIR, f), 'utf8') === fs.readFileSync(path.join(PINNED_DIR, f), 'utf8'))
-  } catch { return false }
+  try { return fs.readFileSync(path.join(HOST_DIR, PINNED_MARKER), 'utf8') === pinnedStamp() } catch { return false }
 }
 
 /**
@@ -85,7 +90,8 @@ export function hostIsPinned() {
  * installs exactly that tree, checks every package against the lockfile's hash, and refuses if
  * anything disagrees. `--ignore-scripts` because nothing in the tree has an install script, so a
  * package that grew one later would be running code nobody reviewed. An install made from a
- * different lockfile (an older SpawnLoft's range) is replaced rather than trusted.
+ * different lockfile (an older SpawnLoft's range), or one that npm did not finish, is replaced rather
+ * than trusted.
  *
  * <p>The install is around 500 MB, most of it game data for every Minecraft version there has
  * been. That is mineflayer's shape, not a choice made here.
@@ -94,6 +100,7 @@ export function ensureHost({ onProgress = () => {}, force = false } = {}) {
   const have = hostInstall()
   if (have && hostIsPinned() && !force) return have
   fs.mkdirSync(HOST_DIR, { recursive: true })
+  fs.rmSync(path.join(HOST_DIR, PINNED_MARKER), { force: true })
   for (const f of PINNED_FILES) fs.copyFileSync(path.join(PINNED_DIR, f), path.join(HOST_DIR, f))
   const npm = npmCommand()
   const probe = spawnSync(npm, ['--version'], { encoding: 'utf8', shell: process.platform === 'win32' })
@@ -113,6 +120,7 @@ export function ensureHost({ onProgress = () => {}, force = false } = {}) {
   }
   const installed = hostInstall()
   if (!installed) fail(`npm ci finished but mineflayer is not in ${HOST_DIR}/node_modules`)
+  fs.writeFileSync(path.join(HOST_DIR, PINNED_MARKER), pinnedStamp())
   return installed
 }
 
