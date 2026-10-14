@@ -58,9 +58,10 @@ spawnloft bot run examples/bot-scenarios/commands-between-bots.json
 spawnloft bot run shop.json --instance other --json    # one JSON line; exit 1 if a step fails
 ```
 
-`setup` runs as the server console over RCON before the bots join, the same way `spawnloft cmd`
-does; `stop`, `restart` and `reload` are refused. Then the bots join, in order, and the steps run
-in order. The first failing step ends the run; the report lists every step, the messages each bot
+The bots join first, in order. Then `setup` runs as the server console over RCON, the same way
+`spawnloft cmd` does, so commands that name a bot (`op`, `gamemode`, `give`, `tp`) find it online;
+`stop`, `restart` and `reload` are refused, and a reply such as "No player was found" or "Unknown
+command" fails the run before any step. Then the steps run in order. The first failing step ends the run; the report lists every step, the messages each bot
 received, the setup replies, and the console lines written during the run.
 
 Each step has one of these keys, a `bot` (except `expectLog`), and an optional `timeout` in

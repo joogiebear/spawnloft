@@ -34,6 +34,8 @@ const STEP_KEYS = ['chat', 'command', 'expectMessage', 'waitWindow', 'click', 'c
 const BOT_NAME_RE = /^[A-Za-z0-9_]{3,16}$/
 // What run_command refuses, refused here too: a scenario's setup runs as the server console.
 const REFUSED_SETUP = new Set(['stop', 'restart', 'reload', 'rl'])
+// What the console answers when a setup command did nothing. Paper's words, with vanilla's.
+const SETUP_FAILED_RE = /No player was found|Unknown or incomplete command|Unknown command|Incorrect argument|Expected whitespace|You do not have permission/i
 
 /** Where mineflayer is, or null when `spawnloft bot setup` has not run on this machine. */
 export function hostInstall() {
@@ -178,35 +180,56 @@ export async function runScenario(scenario, { instance = null, onProgress = () =
   let logOffset = 0
   try { logOffset = fs.statSync(log).size } catch { /* no console yet: read it from the start */ }
 
+  // Setup waits for the bots to be on the server (see awaitSetup in the host): most of what it
+  // does - op, gamemode, give, tp - names a bot, and the server answers "No player was found" for
+  // one that has not joined. A reply that says so is a failed setup, not a line to scroll past.
   const setup = []
-  if (scenario.setup.length) {
+  async function runSetup() {
+    if (!scenario.setup.length) return null
     onProgress(`running ${scenario.setup.length} setup command(s) as the console`)
     const replies = await rconExec(inst, scenario.setup.map((c) => c.replace(/^\//, '')))
-    scenario.setup.forEach((command, i) => setup.push({ command, reply: stripColors(replies[i] ?? '').trim() }))
+    scenario.setup.forEach((command, i) => {
+      const reply = stripColors(replies[i] ?? '').trim()
+      setup.push({ command, reply, ok: !SETUP_FAILED_RE.test(reply) })
+    })
+    const bad = setup.find((s) => !s.ok)
+    return bad ? `setup command "${bad.command}" failed: ${bad.reply}` : null
   }
 
   const job = {
     name: scenario.name, hostDir: host.dir, host: '127.0.0.1', port: inst.port, version: check.version,
-    bots: scenario.bots, steps: scenario.steps, consoleLog: log, logOffset,
+    bots: scenario.bots, steps: scenario.steps, consoleLog: log, logOffset, waitForSetup: true,
   }
   const jobFile = path.join(HOST_DIR, `job-${process.pid}-${Date.now()}.json`)
   fs.writeFileSync(jobFile, JSON.stringify(job))
   onProgress(`${scenario.bots.length} bot(s) joining ${name} on 127.0.0.1:${inst.port}` + (check.version ? ` (Minecraft ${check.version})` : ''))
   let report
   try {
-    report = await runHost(jobFile, { onProgress })
+    report = await runHost(jobFile, { onProgress, onJoined: runSetup })
   } finally {
     try { fs.unlinkSync(jobFile) } catch { /* already gone */ }
   }
   return { ...report, instance: name, setup, mineflayer: host.version, warnings: check.warnings }
 }
 
-function runHost(jobFile, { onProgress }) {
+/**
+ * The host speaks JSON lines on stdout: `{event: "joined"}` once the bots are in, then the report
+ * as its last line. The one word it takes back on stdin is whether to go on after setup.
+ */
+function runHost(jobFile, { onProgress, onJoined }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [HOST_SCRIPT, jobFile], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+    const child = spawn(process.execPath, [HOST_SCRIPT, jobFile], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
     let stdout = ''
     let stderr = ''
-    child.stdout.on('data', (d) => { stdout += d })
+    child.stdout.on('data', (d) => {
+      stdout += d
+      if (!stdout.includes('{"event":"joined"}')) return
+      stdout = stdout.replace('{"event":"joined"}\n', '')
+      Promise.resolve().then(onJoined).then(
+        (problem) => child.stdin.write(JSON.stringify(problem ? { abort: problem } : { go: true }) + '\n'),
+        (err) => child.stdin.write(JSON.stringify({ abort: err.message }) + '\n'),
+      )
+    })
     child.stderr.on('data', (d) => {
       stderr += d
       for (const line of String(d).split(/\r?\n/)) if (line.trim()) onProgress(line.trim())
@@ -226,7 +249,7 @@ function runHost(jobFile, { onProgress }) {
 export function formatReport(report) {
   const out = []
   if (report.error) out.push(`error: ${report.error}`)
-  for (const s of report.setup ?? []) out.push(`setup  ${s.command}${s.reply ? `  -> ${s.reply.split('\n')[0]}` : ''}`)
+  for (const s of report.setup ?? []) out.push(`${s.ok === false ? 'FAIL ' : 'setup'}  ${s.command}${s.reply ? `  -> ${s.reply.split('\n')[0]}` : ''}`)
   for (const s of report.steps ?? []) {
     const { bot, timeout, ...rest } = s.step
     const what = (bot ? `${bot} ` : '') + JSON.stringify(rest)

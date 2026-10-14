@@ -100,12 +100,14 @@ test('no install means no host, and the CLI says how to get one', () => {
 })
 
 test('the report reads one line per step and exits non-zero on a failure', () => {
-  const text = formatReport({ ok: false, durationMs: 42, setup: [{ command: 'op alice', reply: 'Made alice a server operator' }], steps: [
+  const text = formatReport({ ok: false, durationMs: 42, setup: [{ command: 'op alice', reply: 'Made alice a server operator', ok: true },
+    { command: 'gamemode survival nobody', reply: 'No player was found', ok: false }], steps: [
     { index: 0, step: { bot: 'alice', command: '/tp bob' }, status: 'passed', durationMs: 1 },
     { index: 1, step: { bot: 'bob', expectMessage: 'teleported', timeout: 2000 }, status: 'failed', durationMs: 2000, error: 'timed out' },
     { index: 2, step: { expectLog: { absent: 'Exception' } }, status: 'skipped' },
   ] })
   assert.match(text, /setup {2}op alice {2}-> Made alice/)
+  assert.match(text, /FAIL {3}gamemode survival nobody {2}-> No player was found/)
   assert.match(text, /ok {5}1\. alice \{"command":"\/tp bob"\}/)
   assert.match(text, /FAIL {3}2\. bob \{"expectMessage":"teleported"\}/)
   assert.match(text, /skip {3}3\. \{"expectLog"/)

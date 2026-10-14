@@ -301,6 +301,34 @@ async function runStep(step, players, job) {
   throw new Error(`unknown step: ${describe(step)}`)
 }
 
+/**
+ * Setup runs once the bots are on the server, not before: "op alice" works on a name the server
+ * has never seen, but "gamemode survival bob" answers "No player was found" for a bob who has not
+ * joined yet. The core owns RCON, so the host says the bots are in, the core runs setup, and the
+ * host waits for its word before the first step. A core that stops instead sends an abort.
+ */
+function awaitSetup(job) {
+  if (!job.waitForSetup) return Promise.resolve()
+  process.stdout.write(JSON.stringify({ event: 'joined' }) + '\n')
+  return new Promise((resolve, reject) => {
+    let buf = ''
+    const onData = (chunk) => {
+      buf += chunk
+      const nl = buf.indexOf('\n')
+      if (nl < 0) return
+      process.stdin.removeListener('data', onData)
+      process.stdin.pause()
+      let msg
+      try { msg = JSON.parse(buf.slice(0, nl)) } catch (err) { return reject(new Error(`unreadable word from the core: ${err.message}`)) }
+      if (msg.abort) return reject(new Error(msg.abort))
+      resolve()
+    }
+    process.stdin.setEncoding('utf8')
+    process.stdin.on('data', onData)
+    process.stdin.once('end', () => reject(new Error('the core went away before setup finished')))
+  })
+}
+
 async function main() {
   const jobFile = process.argv[2]
   if (!jobFile) throw new Error('usage: bot-host.cjs <job.json>')
@@ -315,6 +343,7 @@ async function main() {
       players.set(name, await join(mineflayer, job, name))
       process.stderr.write(`${name} joined\n`)
     }
+    await awaitSetup(job)
     let failed = false
     for (const [index, step] of job.steps.entries()) {
       if (failed) { report.steps.push({ index, step, status: 'skipped' }); continue }
