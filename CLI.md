@@ -111,6 +111,12 @@ stdout yourself when capturing an ongoing stream. JSON and CSV are mutually excl
 Safe local JAR deployment, required-plugin readiness checks, and automatic PATH installation
 are separate planned additions.
 
+## Test players
+
+`spawnloft bot run <scenario.json> --json` writes one report envelope with `command` `bot` and exits
+1 when a step fails, so a plugin's scenarios can run in a script or CI. [BOTS.md](BOTS.md) has the
+scenario format.
+
 ## AI assistants
 
 `spawnloft mcp` is a Model Context Protocol server on stdio, started by an AI app such as

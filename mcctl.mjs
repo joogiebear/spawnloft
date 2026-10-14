@@ -43,6 +43,7 @@ import { cmdMetrics } from './src/cli-metrics.mjs'
 import { runDoctor } from './src/doctor.mjs'
 import { serveStdio } from './src/mcp.mjs'
 import { toolsFor, scrubber, INSTRUCTIONS } from './src/mcp-tools.mjs'
+import * as bots from './src/bots.mjs'
 import { jsonLine, checkFlags, instanceName, UsageError } from './src/cli-output.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
@@ -1802,6 +1803,13 @@ OTHER
   mcctl jars import <path> [--as x]  Add a server jar to the store
   mcctl why <name>                   Say what is wrong with a server, from its own console
 
+BOTS (plugin testing with scripted players)
+  mcctl bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
+  mcctl bot check <server>           Say whether bots can join: offline mode, running, bound address
+  mcctl bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report
+      --instance <server>            Use this server instead of the scenario's
+      --json                         The report as one JSON line; exit 1 when a step fails
+
 DATABASES
   mcctl db                           List databases
   mcctl db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
@@ -1823,6 +1831,57 @@ DATABASES
   mcctl doctor                       Check environment, ports, EULA, disk, stale state
   mcctl uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what mcctl made
 `)
+}
+
+// ----------------------------------------------------------------------- bots
+
+/**
+ * Scripted test players. `setup` installs mineflayer once; `check` says whether a server will
+ * take bots; `run` plays a scenario file and exits non-zero on any failed step, so it works in a
+ * script or CI as well as by hand.
+ */
+async function cmdBot(positional, flags) {
+  const [sub, ...rest] = positional
+  const usage = 'Usage: spawnloft bot setup | bot check <server> | bot run <scenario.json> [--instance <server>] [--json]'
+  if (sub === 'setup') {
+    checkFlags(flags, ['force'])
+    if (rest.length) throw new UsageError(usage)
+    const have = bots.hostInstall()
+    if (have && flags.force !== true) {
+      out(`mineflayer ${have.version} is installed in ${have.dir}. Reinstall with --force.`)
+      return
+    }
+    const installed = bots.ensureHost({ force: flags.force === true, onProgress: (m) => out(m) })
+    out(`mineflayer ${installed.version} is installed in ${installed.dir}.`)
+    return
+  }
+  if (sub === 'check') {
+    checkFlags(flags, [])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const res = bots.checkInstance(rest[0])
+    for (const w of res.warnings) out(`warning: ${w}`)
+    if (!res.ok) {
+      for (const p of res.problems) out(p)
+      process.exitCode = 1
+      return
+    }
+    const have = bots.hostInstall()
+    out(`"${rest[0]}" will take bots${res.version ? ` (Minecraft ${res.version})` : ''}. mineflayer ${have ? `${have.version} is installed` : 'is not installed yet: run "spawnloft bot setup"'}.`)
+    if (!have) process.exitCode = 1
+    return
+  }
+  if (sub === 'run') {
+    checkFlags(flags, ['instance', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const scenario = bots.loadScenario(rest[0])
+    const quiet = flags.json === true
+    const report = await bots.runScenario(scenario, { instance: flags.instance ?? null, onProgress: (m) => { if (!quiet) process.stderr.write(`${m}\n`) } })
+    if (quiet) process.stdout.write(jsonLine('bot', report, report.ok ? undefined : { error: { code: 'SCENARIO_FAILED', message: report.error ?? 'a step failed' } }))
+    else out(bots.formatReport(report))
+    if (!report.ok) process.exitCode = 1
+    return
+  }
+  throw new UsageError(usage)
 }
 
 // ---------------------------------------------------------------------- main
@@ -1880,6 +1939,7 @@ const COMMANDS = {
   doctor: cmdDoctor,
   db: cmdDb,
   mcp: cmdMcp,
+  bot: cmdBot,
   uninstall: cmdUninstall,
   help: cmdHelp,
 }
@@ -1904,7 +1964,7 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'bot'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
   ensureDirs()
