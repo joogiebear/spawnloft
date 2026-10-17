@@ -760,6 +760,7 @@
   button.more-link { justify-self: start; padding: 2px 0; background: none; border: 0; box-shadow: none; color: var(--lapis-ink); font: 500 var(--t-3)/1.4 var(--ui); }
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
+  .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
   .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
   /*
     The Overview's tiers, measured on the stage (the window less the sidebar). Wide: the databases
@@ -775,16 +776,17 @@
   }
   @container stage (min-width: 2000px) {
     .home { padding: 40px 56px 56px; gap: var(--s-7); }
+    .home-main { gap: var(--s-7); }
     .home-cards, .att-grid, .dbs-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
     /* The well cap: one server on a 4K screen gets a 1400px card, not a 2600px one. */
     .home-cards > .scard, .dbs-grid > .dcard, .att-grid > .att { max-width: 1400px; }
     .home:has(> .home-activity:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(420px, 32%, 820px); column-gap: var(--s-7); }
     .home:has(> .home-activity:not([hidden])) > .home-head,
     .home:has(> .home-activity:not([hidden])) > .attention { grid-column: 1 / -1; }
-    .home:has(> .home-activity:not([hidden])) > .home-cards,
-    .home:has(> .home-activity:not([hidden])) > .home-dbs { grid-column: 1; }
-    .home:has(> .home-activity:not([hidden])) { grid-auto-flow: row dense; }
-    .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; grid-row: span 2; margin-top: 0; align-self: start; }
+    /* Two items in one row, each its own height. The feed must not span rows: a spanning item hands
+       its height to the rows it crosses, and a long feed then stretched the server card to match it. */
+    .home:has(> .home-activity:not([hidden])) > .home-main { grid-column: 1; align-self: start; }
+    .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; margin-top: 0; align-self: start; }
     .home-activity .act-row.act-home:nth-child(n + 9) { display: grid; }
   }
   .scard {
@@ -2475,11 +2477,14 @@
         <div class="att-grid" id="attGrid"></div>
         <button type="button" class="more-link" id="attMore" hidden></button>
       </section>
-      <div class="home-cards" id="homeCards"></div>
-      <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
-        <h2 class="hist-title" id="homeDbTitle">Databases</h2>
-        <div class="dbs-grid" id="dbsGrid"></div>
-      </section>
+      <!-- the cards and the databases share a column, so a feed beside them sizes nothing of theirs -->
+      <div class="home-main">
+        <div class="home-cards" id="homeCards"></div>
+        <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
+          <h2 class="hist-title" id="homeDbTitle">Databases</h2>
+          <div class="dbs-grid" id="dbsGrid"></div>
+        </section>
+      </div>
       <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
         <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
         <div class="act-list" id="homeActList"></div>
