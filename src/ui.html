@@ -9060,6 +9060,9 @@ async function buildServerSettings(row, body) {
   */
   const showSection = (key) => {
     shown = key;
+    // Remembered on the body, so a rebuild after Save, Attach or Create brings the same section back.
+    body.dataset.section = key;
+    body.dataset.sectionFor = row.name;
     for (const [k, sec] of sections) sec.hidden = k !== key;
     markNav(key);
     const scroller = body.closest('.pane-scroll');
@@ -9748,8 +9751,12 @@ async function buildServerSettings(row, body) {
   rawNav.classList.add('mono');
   rawNav.onclick = () => { showRaw(true); rawText.focus(); };
 
-  // The first section is the one on screen until another is picked.
-  if (sections.size) showSection(sections.keys().next().value);
+  // The section that was showing before a rebuild of the same server's form comes back; otherwise
+  // the first section is the one on screen until another is picked. Databases is built below, so a
+  // form that is coming back to it waits for it.
+  const keep = body.dataset.sectionFor === row.name ? body.dataset.section : null;
+  if (keep && sections.has(keep)) showSection(keep);
+  else if (sections.size && keep !== 'databases') showSection(sections.keys().next().value);
 
   // Last, after the file-backed sections: the databases this server is attached to. It is one of
   // the sections, so it goes in the list too.
