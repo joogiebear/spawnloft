@@ -1654,6 +1654,21 @@
   }
   .set-raw textarea:focus { outline: none; border-color: var(--lapis-edge); background-color: var(--field-focus); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
 
+  /*
+    Wide pane: sections flow into columns instead of one 820px strip with half the window empty.
+    Each column is still about 620 to 820px, so a label and its control stay together. Multi-column
+    rather than a grid so a short section does not leave a hole under it while its neighbour is tall;
+    break-inside keeps a section whole. Capped at three columns so a 4K window does not scatter them.
+  */
+  @container pane (min-width: 1240px) {
+    /* min-height and the 1fr row keep the save bar at the bottom of the pane: with columns the form is
+       short enough that, in a tall window, the bar would otherwise sit in the middle of it. */
+    #settingsBody.set-screen { grid-template-columns: 220px minmax(0, 2480px); grid-template-rows: 1fr auto; min-height: 100%; }
+    .set-form { display: block; column-width: 620px; column-gap: var(--s-7); max-width: 2480px; }
+    .set-form > .section { break-inside: avoid; margin-bottom: var(--s-6); }
+    .set-form > .section:last-child { margin-bottom: 0; }
+  }
+
   /* Docked beside the console the form has 480px: the list becomes a row above it, and each
      setting's control goes under its name. */
   @container pane (max-width: 760px) {
