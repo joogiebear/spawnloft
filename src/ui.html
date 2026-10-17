@@ -241,7 +241,7 @@
 
   /* Appearance is one local preference, so it stays a small labelled choice in Settings. The
      fixed previews show both schemes even when the surrounding interface changes theme. */
-  .theme-picker { min-width: 0; margin: 0; padding: 0 0 var(--s-5); border: 0; border-bottom: 1px solid var(--line); }
+  .theme-picker { container-type: inline-size; container-name: picker; min-width: 0; margin: 0; padding: 0 0 var(--s-5); border: 0; border-bottom: 1px solid var(--line); }
   .theme-picker legend { padding: 0; font: 650 var(--t-5)/1.3 var(--display); letter-spacing: -.01em; }
   .theme-picker > .hint { margin: var(--s-2) 0 var(--s-3); }
   .theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2); }
@@ -266,7 +266,8 @@
   .ui-size[hidden] { display: none; }
   .ui-size label { display: grid; gap: 3px; }
   .ui-size small { font-size: var(--t-2); color: var(--ink-3); }
-  @media (max-width: 920px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
+  /* Two tiles need about 260px each; under that the picker is one column, whatever the window. */
+  @container picker (max-width: 540px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
 
   /* ---- icons ---------------------------------------------------------------- */
 
@@ -784,8 +785,6 @@
     .home:has(> .home-activity:not([hidden])) > .home-dbs { grid-column: 1; }
     .home:has(> .home-activity:not([hidden])) { grid-auto-flow: row dense; }
     .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; grid-row: span 2; margin-top: 0; align-self: start; }
-    .home-activity .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
-    .home-activity .act-row.act-home .act-what { grid-column: 1 / -1; }
     .home-activity .act-row.act-home:nth-child(n + 9) { display: grid; }
   }
   .scard {
@@ -840,10 +839,10 @@
   .sc-note[data-tone="warn"] { color: var(--warn-ink); }
   .sc-foot .sc-open { padding: 4px 10px; font-size: var(--t-2); }
 
-  @media (max-width: 1100px) {
+  @container stage (max-width: 1024px) {
     .home { padding: 28px 24px 40px; }
   }
-  @media (max-width: 760px) {
+  @container stage (max-width: 720px) {
     .home { padding: var(--s-5); }
   }
 
@@ -954,15 +953,19 @@
   .srv-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
 
   /*
-    Under about 1080px there is not room for four vitals beside the name and the buttons. TPS is
-    the one that goes: it is also in the Stats tool, with its history, one click away.
+    Under about 1024px of stage there is not room for four vitals beside the name and the buttons.
+    TPS is the one that goes: it is also in the Stats tool, with its history, one click away.
   */
-  @media (max-width: 1080px) {
+  @container stage (max-width: 1024px) {
     .srv-strip { gap: var(--s-3) var(--s-4); }
     .vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); flex-basis: 290px; gap: var(--s-3); padding-left: var(--s-4); }
     .vital[data-v="tps"] { display: none; }
     /* The figure alone at this width; the meter beside it ran into the next cell. */
     .vital .meter { display: none; }
+  }
+  @container stage (max-width: 784px) {
+    /* The vitals take their own row under the name; the divider between them would be a stray line. */
+    .vitals { border-left: 0; padding-left: 0; flex-basis: 100%; }
   }
 
   @media (max-height: 700px) {
@@ -1461,7 +1464,7 @@
     .step-fields { grid-column: 2 / -1; grid-row: 2; }
     .step-acts { grid-column: 3; grid-row: 1; }
   }
-  .home-activity { margin-top: var(--s-6); }
+  .home-activity { margin-top: var(--s-6); container-type: inline-size; container-name: feed; }
   .home-activity .act-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .act-row.act-home {
     grid-template-columns: 84px minmax(90px, 160px) auto minmax(0, 1fr); width: 100%;
@@ -1471,7 +1474,7 @@
   .act-row.act-home:last-child { border-bottom: 0; }
   button.act-row.act-home:hover:not(:disabled) { background: rgba(var(--ink-rgb), .035); transform: none; }
   .act-server { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  @media (max-width: 900px) {
+  @container feed (max-width: 840px) {
     .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
     .act-row.act-home .act-what { grid-column: 1 / -1; }
   }
@@ -2262,9 +2265,11 @@
     .side-new { margin: 0 6px var(--s-2); }
     .srv-strip { padding-left: var(--s-5); }
   }
+  /* Header chrome: the wordmark goes when the window itself is narrow. Everything inside the
+     stage measures the stage or its pane instead; this and the compact rail above are the only
+     width queries left on the window. */
   @media (max-width: 840px) {
     .brand b { display: none; }
-    .vitals { border-left: 0; padding-left: 0; flex-basis: 100%; }
   }
 
   @media (prefers-reduced-motion: reduce) {
