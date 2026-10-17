@@ -2242,6 +2242,12 @@
   .con-search input { padding-left: 30px; font-size: var(--t-3); }
   .con-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--ink-3); }
   .con-count { font: var(--t-1)/1 var(--mono); color: var(--ink-3); white-space: nowrap; margin-right: 4px; }
+  /* The view's own switches, as one quiet cluster: they change how the log is shown, never the
+     server, so they do not need to be read one by one. */
+  .con-tools { display: inline-flex; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--line-soft); }
+  .con-tools .icon-btn { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-3); }
+  .con-tools .icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--ink); transform: none; }
+  .con-tools .icon-btn[aria-pressed="true"] { background: var(--lapis-wash); color: var(--ink); }
   /* The counts beside the level filters, in the level's own ink, so a glance says whether there is
      anything to filter for. */
   .seg .n { margin-left: 5px; font: 600 var(--t-1)/1 var(--mono); }
@@ -2326,16 +2332,41 @@
   .ln mark { background: var(--warn-edge); color: var(--warn-ink); border-radius: 2px; }
   .ln.warn  { border-left-color: var(--warn); background: rgba(245, 184, 74, .05); }
   .ln.error { border-left-color: var(--fault); background: rgba(255, 107, 97, .06); }
+  /* The level word carries the level's ink too; the message itself stays at full contrast. */
+  .ln.warn .pre  { color: var(--warn-ink); }
+  .ln.error .pre { color: var(--fault-ink); }
   .ln.sys   { border-left-color: var(--lapis); color: var(--ink-2); }
   .ln.sys .pre { color: var(--lapis); }
 
   .log-empty { padding: var(--s-6) var(--s-5); color: var(--ink-3); font: var(--t-3)/1.6 var(--ui); }
 
-  .jump { position: absolute; right: 18px; bottom: 16px; box-shadow: var(--shadow-lg); font-size: var(--t-3); background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
+  /* Centred over the input, where the eye is when it is typing, and it says how much it is
+     hiding: a pill in a corner was easy to miss while the log ran on underneath it. */
+  .jump {
+    position: absolute; left: 50%; bottom: var(--s-3); transform: translateX(-50%);
+    border-radius: 999px; padding: 0 var(--s-3) 0 10px;
+    box-shadow: var(--shadow-lg); font-size: var(--t-2);
+    background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  }
+  .jump:hover:not(:disabled) { transform: translateX(-50%); }
 
-  .cmd { display: flex; gap: 10px; padding: 12px var(--s-3) 12px var(--s-5); border-top: 1px solid var(--line-soft); align-items: center; }
+  /* The input is the one thing on this screen that takes typing, so it looks like a terminal
+     prompt rather than another form field: the slash sits inside it, and it is taller. */
+  .cmd { display: flex; gap: var(--s-2); padding: var(--s-3) var(--s-3) var(--s-3) var(--s-5); border-top: 1px solid var(--line-soft); align-items: center; background: var(--recess); }
+  .cmd[hidden] { display: none; }
+  .cmd-field {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2);
+    height: 40px; padding: 0 var(--s-3);
+    background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-sm);
+    cursor: text;
+  }
+  .cmd-field:focus-within { border-color: var(--lapis-edge); outline: var(--ring-width) solid var(--ring-color); outline-offset: -1px; }
   .cmd .prompt { font: 600 var(--t-4)/1 var(--mono); color: var(--lapis); }
-  .cmd input { font-family: var(--mono); font-size: var(--t-3); }
+  /* The field's frame is the label's, so the input itself draws none and takes no ring of its own. */
+  :root #cmd, :root #cmd:focus, :root #cmd:focus-visible { flex: 1; min-width: 0; height: 100%; min-height: 0; padding: 0; border: 0; outline: 0; background: transparent; box-shadow: none; font-family: var(--mono); font-size: var(--t-3); }
+  .cmd-field:has(input:disabled) { background: var(--recess); border-style: dashed; cursor: not-allowed; }
+  .cmd-field:has(input:disabled) .prompt { color: var(--ink-4); }
+  .cmd button { height: 40px; }
 
   /* ---- sheets: add a server, settings ----------------------------------- */
 
@@ -2790,10 +2821,12 @@
           </span>
           <span class="grow"></span>
           <span class="con-count" id="conCount"></span>
+          <span class="con-tools">
           <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
           <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
           <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+          </span>
           <span class="menu-wrap" id="shareWrap">
             <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
             <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
@@ -2817,14 +2850,17 @@
           </span>
         </div>
         <div class="log-wrap">
-          <pre id="log" class="nowrap" tabindex="0" role="log" aria-label="Server console"></pre>
-          <button class="jump" id="bJump" hidden>Jump to newest</button>
+          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
+          <button class="jump" id="bJump" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span id="jumpLabel">Jump to latest</span></button>
         </div>
 
-        <div class="cmd">
-          <span class="prompt" aria-hidden="true">/</span>
-          <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" aria-label="Server command">
+        <div class="cmd" id="cmdRow">
+          <label class="cmd-field">
+            <span class="prompt" aria-hidden="true">/</span>
+            <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command">
+          </label>
           <button id="bSend" class="primary">Send</button>
+          <button id="bCmdStart" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start server</button>
         </div>
       </section>
 
@@ -3302,6 +3338,11 @@ const state = {
   atBottom: true,
   history: [],
   histAt: -1,
+  // Each server's typed commands, kept while the panel is open, so switching away and back does
+  // not lose them. Not saved to disk: a command can carry a password (/login, /auth).
+  histories: new Map(),
+  draft: '',
+  unseen: 0,
   layout: null,
   appInfo: null,
   busy: false,
@@ -4333,9 +4374,14 @@ function renderServer(row) {
   $('#bManage').disabled = state.busy;
   $('#cmd').disabled = !live || db;
   $('#bSend').disabled = !live || db;
-  $('#cmd').placeholder = db
-    ? 'A database takes no console commands — use its client, or the credentials under Settings'
-    : live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
+  // A database takes no commands at all, so it gets no command row rather than a dead one.
+  $('#cmdRow').hidden = db;
+  // A stopped server's row offers the way to a live one, in place of a Send that cannot send.
+  const startable = !db && !up && !external;
+  $('#bSend').hidden = startable;
+  $('#bCmdStart').hidden = !startable;
+  $('#bCmdStart').disabled = state.busy;
+  $('#cmd').placeholder = live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
 
   // The diagnoses are Minecraft's failure shapes; a database's console has its own.
   if (db) { $('#srvDiag').textContent = ''; diagKey = ''; } else loadDiagnosis(row);
@@ -5704,9 +5750,12 @@ function renderLog() {
   if (!shown) {
     const p = document.createElement('div');
     p.className = 'log-empty';
+    const row = rowOf(state.current);
     p.textContent = state.lines.length
       ? 'Nothing matches. Clear the search or the level filter to see the rest.'
-      : 'No console output yet. Start the server and it appears here as it runs.';
+      : row && isDb(row) && row.external ? 'This database runs elsewhere, so its log is on that machine, not here.'
+        : row && isDb(row) ? 'No output yet. Start the database and its log appears here as it runs.'
+          : 'No console output yet. Start the server and it appears here as it runs.';
     log.append(p);
   }
   updateCount(shown);
@@ -5754,6 +5803,7 @@ function pushLine(text) {
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.append(makeLine(entry));
   if (atBottom) log.scrollTop = log.scrollHeight;
+  else { state.unseen++; paintJump(); }
   updateCount();
 }
 
@@ -5779,8 +5829,11 @@ function select(name) {
   state.paused = false;
   state.pausedAt = 0;
   state.atBottom = true;
-  state.history = [];
-  state.histAt = -1;
+  if (!state.histories.has(name)) state.histories.set(name, []);
+  state.history = state.histories.get(name);
+  state.histAt = state.history.length;
+  state.draft = '';
+  state.unseen = 0;
   state.search = '';
   setPauseButton(false);
   $('#conSearch').value = '';
@@ -5871,11 +5924,19 @@ $('#bPause').onclick = () => {
   updateCount();
 };
 
-$('#bWrap').onclick = () => {
-  state.wrap = !state.wrap;
-  $('#log').classList.toggle('nowrap', !state.wrap);
-  $('#bWrap').setAttribute('aria-pressed', String(state.wrap));
-};
+// Wrapped by default: unwrapped, the first line of every JVM start ran off the edge mid-flag.
+// Remembered either way, like line numbers.
+const WRAP_KEY = 'mcctl.wrap';
+function setWrap(on, { remember = true } = {}) {
+  state.wrap = on;
+  $('#log').classList.toggle('nowrap', !on);
+  $('#bWrap').setAttribute('aria-pressed', String(on));
+  if (remember) try { localStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch {}
+}
+$('#bWrap').onclick = () => setWrap(!state.wrap);
+let wrapSaved = null;
+try { wrapSaved = localStorage.getItem(WRAP_KEY); } catch {}
+setWrap(wrapSaved !== '0', { remember: false });
 
 const NUMS_KEY = 'mcctl.nums';
 function setNums(on, { remember = true } = {}) {
@@ -6039,17 +6100,26 @@ $('#miExportShare').onclick = async () => {
   }
 };
 
+/** The jump pill, with how many lines arrived below the fold since the reader scrolled up. */
+function paintJump() {
+  if (state.atBottom) state.unseen = 0;
+  $('#bJump').hidden = state.atBottom;
+  $('#jumpLabel').textContent = state.unseen
+    ? 'Jump to latest · ' + state.unseen.toLocaleString() + ' new'
+    : 'Jump to latest';
+}
+
 $('#log').addEventListener('scroll', () => {
   const log = $('#log');
   state.atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  $('#bJump').hidden = state.atBottom;
+  paintJump();
 });
 
 $('#bJump').onclick = () => {
   const log = $('#log');
   state.atBottom = true;
   log.scrollTop = log.scrollHeight;
-  $('#bJump').hidden = true;
+  paintJump();
 };
 
 // ------------------------------------------------------------ lifecycle ----
@@ -6081,6 +6151,7 @@ const act = (what) => async () => {
 };
 
 $('#bStart').onclick = act('start');
+$('#bCmdStart').onclick = act('start');
 $('#bStop').onclick = act('stop');
 $('#bRestart').onclick = act('restart');
 
@@ -11999,7 +12070,9 @@ async function send() {
   const line = box.value.trim();
   if (!state.current || !line) return;
   box.value = '';
-  state.history.push(line);
+  state.draft = '';
+  // The same command twice in a row is one entry, as in a shell.
+  if (state.history[state.history.length - 1] !== line) state.history.push(line);
   state.histAt = state.history.length;
   try {
     await post('/instances/' + encodeURIComponent(state.current) + '/command', { line: line });
@@ -12012,19 +12085,17 @@ async function send() {
 $('#bSend').onclick = send;
 $('#cmd').onkeydown = (e) => {
   if (e.key === 'Enter') { send(); return; }
-  // Shell muscle memory: a console you type into should remember what you typed.
+  // Shell muscle memory: a console you type into should remember what you typed. What was being
+  // typed when Up was first pressed is kept, and Down past the newest brings it back - the old
+  // Down blanked the field, half-typed command and all.
   if (e.key === 'ArrowUp' && state.histAt > 0) {
+    if (state.histAt === state.history.length) state.draft = e.target.value;
     state.histAt--;
     e.target.value = state.history[state.histAt];
     e.preventDefault();
-  } else if (e.key === 'ArrowDown') {
-    if (state.histAt < state.history.length - 1) {
-      state.histAt++;
-      e.target.value = state.history[state.histAt];
-    } else {
-      state.histAt = state.history.length;
-      e.target.value = '';
-    }
+  } else if (e.key === 'ArrowDown' && state.histAt < state.history.length) {
+    state.histAt++;
+    e.target.value = state.histAt === state.history.length ? state.draft : state.history[state.histAt];
     e.preventDefault();
   }
 };
