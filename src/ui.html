@@ -551,6 +551,27 @@
   .creds div { display: grid; grid-template-columns: 90px 1fr; gap: 10px; }
   .creds dt { color: var(--ink-3); }
   .creds dd { margin: 0; color: var(--ink); word-break: break-all; }
+  /* A database's own page: each fact on a line of its own, the copyable ones as copy chips, the
+     login masked until shown. */
+  .db-facts { display: grid; margin: 0; }
+  .db-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: var(--s-3); align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
+  .db-facts > div:last-child { border-bottom: 0; }
+  .db-facts dt { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .db-facts dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+  .db-facts .addr-copy { font: var(--t-3)/1.4 var(--mono); }
+  .db-facts .mono-path { font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
+  .db-mask { font: var(--t-3)/1 var(--mono); letter-spacing: .1em; color: var(--ink-3); }
+  .db-shown .creds div { align-items: center; }
+  .db-shown { flex-basis: 100%; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--sunken); border: 1px solid var(--line-soft); }
+  .db-attached { display: grid; margin: 0; padding: 0; list-style: none; }
+  .db-attached li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
+  .db-attached li:last-child { border-bottom: 0; }
+  .db-att-text { display: grid; gap: 2px; min-width: 0; }
+  .db-att-name { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
+  button.db-att-name:hover:not(:disabled) { color: var(--lapis-ink); text-decoration: underline; text-underline-offset: 3px; }
+  button.db-att-name { padding: 0; border: 0; background: none; }
+  .db-att-name .ico { width: 14px; height: 14px; color: var(--ink-3); }
+  .db-att-sub { font: var(--t-2)/1.4 var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---- stage ------------------------------------------------------------ */
 
@@ -2387,6 +2408,16 @@
   .sheet-body { padding: var(--s-6) var(--s-5) var(--s-7); display: grid; gap: var(--s-5); width: 100%; max-width: 640px; margin: 0 auto; }
   .sheet-body.wide { max-width: 840px; }
   .sheet-body h2 { margin: 0 0 4px; font: 650 var(--t-3)/1.4 var(--ui); letter-spacing: -.005em; }
+  /* The create form in two short groups, each under a heading, rather than one long run of fields. */
+  .sheet-body h2.form-group-title { margin: 0 0 calc(-1 * var(--s-2)); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line-soft); }
+  .sheet-body h2.form-group-title ~ h2.form-group-title { margin-top: var(--s-2); }
+  /* What Create will make, in one line beside the button, so nobody has to scroll up to check. */
+  .new-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s-2); padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sunken); font: var(--t-3)/1.4 var(--ui); color: var(--ink-2); }
+  .new-summary:empty { display: none; }
+  .new-summary b { color: var(--ink); font-weight: 600; }
+  .new-summary .sep { color: var(--ink-4); }
+  .hint code.slug-eg { color: var(--ink-3); }
 
   .tabs { display: flex; gap: 4px; padding: 0 var(--s-5); border-bottom: 1px solid var(--line); }
   .tabs button { background: transparent; border: 0; box-shadow: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 12px 12px 10px; color: var(--ink-2); font-size: var(--t-3); font-weight: 500; }
@@ -2645,6 +2676,7 @@
   <symbol id="i-grid" viewBox="0 0 16 16"><path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 16 16" stroke-linejoin="round"><path d="M6.6 1.5h2.8l.4 1.9 1.4.8 1.8-.6 1.4 2.4-1.4 1.3v1.4l1.4 1.3-1.4 2.4-1.8-.6-1.4.8-.4 1.9H6.6l-.4-1.9-1.4-.8-1.8.6L1.6 10l1.4-1.3V7.3L1.6 6l1.4-2.4 1.8.6 1.4-.8z"/><circle cx="8" cy="8" r="2"/></symbol>
   <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3.5v9M11 3.5v9"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></symbol>
   <symbol id="i-copy" viewBox="0 0 16 16"><path d="M5.5 5.5h8v8h-8z"/><path d="M10.5 5.5v-3h-8v8h3"/></symbol>
   <symbol id="i-wrap" viewBox="0 0 16 16"><path d="M2 4h12M2 12h3"/><path d="M2 8h9.5a2 2 0 0 1 0 4H8"/><path d="M9.5 10.5L8 12l1.5 1.5"/></symbol>
   <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 2.5v8"/><path d="M5 5.5l3-3 3 3"/><path d="M3 9v4.5h10V9"/></symbol>
@@ -2920,7 +2952,7 @@
     <!-- ============ add a server ========================================= -->
     <div class="view sheet" id="vAdd">
       <div class="sheet-head">
-        <h1>Add a server</h1>
+        <h1 id="addTitle">Add a server</h1>
         <span class="grow"></span>
         <button class="ghost" id="bAddClose">Close</button>
       </div>
@@ -2932,6 +2964,7 @@
       </div>
 
       <form class="sheet-body" id="formNew">
+        <h2 class="form-group-title">What to run</h2>
         <div class="field">
           <label for="nName">Name</label>
           <input id="nName" name="name" required autocomplete="off" placeholder="Survival (Season 3)" maxlength="48">
@@ -2951,6 +2984,7 @@
             <label for="nVersion">Minecraft version</label>
             <select id="nVersion" name="version"><option value="">Loading versions…</option></select>
             <div class="hint" id="nVersionHint">Downloads the newest stable Paper build.</div>
+            <div class="bad field-note" id="nVersionBad" role="status"></div>
             <div class="inline-warn" id="nJavaWarn" hidden></div>
           </div>
           <div class="field" style="flex:1">
@@ -2961,13 +2995,14 @@
           </div>
           <div class="field" style="flex:1">
             <label for="nPort">Port</label>
-            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off">
+            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off" min="1024" max="65535" aria-describedby="nPortBad">
             <div class="hint">Blank picks a free one</div>
+            <div class="bad field-note" id="nPortBad" aria-live="polite"></div>
           </div>
         </div>
+        <h2 class="form-group-title" id="nJoinTitle">Who can join</h2>
         <div class="field">
-          <label>Who can join</label>
-          <div class="choice" id="nJoin">
+          <div class="choice" id="nJoin" role="radiogroup" aria-labelledby="nJoinTitle">
             <label>
               <input type="radio" name="onlineMode" value="online" checked>
               <b>Require a Minecraft account</b>
@@ -2987,6 +3022,7 @@
           <div class="track"><div class="bar" id="newBar"></div></div>
           <div class="msg" id="newMsg"></div>
         </div>
+        <div class="new-summary" id="newSummary" aria-live="polite"></div>
         <div class="row">
           <button type="submit" class="primary" id="bCreate">Create server</button>
           <span class="hint" id="newHint">Accepts the Minecraft EULA on your behalf, as the operator of this machine.</span>
@@ -3040,7 +3076,7 @@
             <input id="aDir" class="mono" spellcheck="false" placeholder="C:\Minecraft\survival" autocomplete="off">
             <button type="button" id="bBrowse" hidden>Browse…</button>
           </div>
-          <div class="hint">The folder holding the server jar and server.properties.</div>
+          <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
         </div>
         <div class="row" style="align-items:flex-start">
           <div class="field" style="flex:2">
@@ -3593,7 +3629,10 @@ function recallTool(name) {
     const saved = JSON.parse(localStorage.getItem(toolKey(name)) || 'null');
     if (saved && (saved.tool === null || Object.hasOwn(TOOL_NAMES, saved.tool))) return { tool: saved.tool };
   } catch { /* nothing remembered is the same as nothing open */ }
-  return { tool: null };
+  // A database's console is its log, rarely what anyone opened it for, and an external one has
+  // none here at all. It opens on its connection details and attached servers instead.
+  const row = rowOf(name);
+  return { tool: row && isDb(row) ? 'settings' : null };
 }
 
 function rememberTool() {
@@ -4706,13 +4745,13 @@ const nestedDb = (db) => {
 };
 
 /** An address as a button that copies it, with the glyph that says so. */
-function addrButton(text) {
+function addrButton(text, what = 'address') {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'addr-copy';
   b.append(document.createTextNode(text), icon('copy'));
   b.title = 'Copy ' + text;
-  b.setAttribute('aria-label', 'Copy address ' + text);
+  b.setAttribute('aria-label', 'Copy ' + what + ' ' + text);
   b.onclick = async (ev) => {
     ev.stopPropagation();
     if (!(await copyText(text, text))) return;
@@ -12109,100 +12148,138 @@ async function renderDatabaseSettings(row) {
   paneHead(body, 'sliders', 'Database settings',
     'Where it listens, how to reach it as root, and which servers have a database on it.');
 
-  const conn = document.createElement('div');
-  conn.className = 'section set-group';
-  const head = document.createElement('div');
-  head.className = 'set-head';
-  const mark = document.createElement('span');
-  mark.className = 'mark';
-  mark.append(icon('server'));
-  const h = document.createElement('h3');
-  h.textContent = 'Connection';
-  const blurb = document.createElement('p');
-  blurb.textContent = row.external
+  const glyph = row.engineKind === 'redis' ? 'cache' : 'database';
+  const groupHead = (mark, title, text) => {
+    const head = el('div', 'set-head');
+    const m = el('span', 'mark');
+    m.append(icon(mark));
+    const h = el('h3');
+    h.textContent = title;
+    const p = el('p');
+    p.textContent = text;
+    head.append(m, h, p);
+    return head;
+  };
+  const fact = (dl, term, ...value) => {
+    const div = el('div');
+    const dt = el('dt');
+    dt.textContent = term;
+    const dd = el('dd');
+    dd.append(...value);
+    div.append(dt, dd);
+    dl.append(div);
+    return dd;
+  };
+
+  // ---- how to reach it: every value a plugin config asks for, each copyable ----------------
+  const conn = el('div', 'section set-group db-conn');
+  conn.append(groupHead(glyph, 'Connection', row.external
     ? 'Registered with its address and admin credentials; it is run and stopped where it lives. Servers are attached to it from their own Settings tab.'
     : row.engineKind === 'redis'
       ? 'Loopback only: nothing outside this machine can reach it. One password and one key space, shared by every server attached; plugins prefix their keys.'
-      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.';
-  head.append(mark, h, blurb);
-  conn.append(head);
-  const dl = document.createElement('dl');
-  dl.className = 'creds';
-  const facts = [['Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : '')], ['Host', row.host || '127.0.0.1'], ['Port', String(row.port)]];
-  if (!row.external) facts.push(['Folder', row.dir || '—']);
-  for (const r of facts) {
-    const div = document.createElement('div');
-    const dt = document.createElement('dt');
-    dt.textContent = r[0];
-    const dd = document.createElement('dd');
-    dd.textContent = r[1];
-    div.append(dt, dd);
-    dl.append(div);
+      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.'));
+  const dl = el('dl', 'db-facts');
+  fact(dl, 'Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : ''));
+  fact(dl, 'Host', addrButton(row.host || '127.0.0.1', 'host'));
+  fact(dl, 'Port', addrButton(String(row.port), 'port'));
+  if (!row.external && row.dir) {
+    const dir = el('code', 'mono-path');
+    dir.textContent = row.dir;
+    dir.title = row.dir;
+    fact(dl, 'Folder', dir);
   }
-  conn.append(dl);
-  const rootRow = document.createElement('div');
-  rootRow.className = 'row';
-  rootRow.style.marginTop = '10px';
-  const rootBtn = document.createElement('button');
-  rootBtn.textContent = row.engineKind === 'redis' ? 'Show password' : 'Show admin password';
-  rootBtn.onclick = async () => {
-    let c;
-    try {
-      c = await api('/databases/' + encodeURIComponent(row.name) + '/root');
-    } catch (e) {
-      toast(e.message, 'bad');
+
+  /*
+    The admin login, masked until asked for. Fetched each time it is shown and dropped when it is
+    hidden, as the per-server credentials are: a password that sits in the page is one a stray
+    screenshot or screen share carries. Copy fetches it without showing it.
+  */
+  const who = row.engineKind === 'redis' ? 'Password' : 'Admin login';
+  const secret = fact(dl, who);
+  secret.classList.add('db-secret');
+  const masked = el('span', 'db-mask');
+  masked.textContent = '•'.repeat(12);
+  masked.setAttribute('aria-label', 'Hidden');
+  const reveal = iconButton('eye', 'Show', 'sm');
+  reveal.setAttribute('aria-expanded', 'false');
+  const copyAll = iconButton('copy', 'Copy', 'sm ghost');
+  const shown = el('div', 'db-shown');
+  shown.hidden = true;
+  secret.append(masked, reveal, copyAll, shown);
+  const rootCreds = () => api('/databases/' + encodeURIComponent(row.name) + '/root');
+  reveal.onclick = async () => {
+    if (!shown.hidden) {
+      shown.hidden = true;
+      shown.textContent = '';
+      masked.hidden = false;
+      reveal.lastChild.textContent = 'Show';
+      reveal.setAttribute('aria-expanded', 'false');
       return;
     }
-    rootBtn.replaceWith(credsList(c, { root: true }));
-    const copy = document.createElement('button');
-    copy.textContent = 'Copy';
-    copy.onclick = () => copyText(credsText(c, { root: true }), 'the root connection details');
-    rootRow.append(copy);
+    busy(reveal, true);
+    try {
+      const c = await rootCreds();
+      // Host and port are already on the lines above; only what was hidden is shown, each copyable.
+      const creds = el('dl', 'creds');
+      for (const [term, value, what] of [['User', c.user, 'user'], ['Password', c.password, 'password'], ['URL', c.url, 'URL']]) {
+        if (!value) continue;
+        const div = el('div');
+        const dt = el('dt');
+        dt.textContent = term;
+        const dd = el('dd');
+        dd.append(addrButton(String(value), what));
+        div.append(dt, dd);
+        creds.append(div);
+      }
+      shown.append(creds);
+      shown.hidden = false;
+      masked.hidden = true;
+      busy(reveal, false);
+      reveal.lastChild.textContent = 'Hide';
+      reveal.setAttribute('aria-expanded', 'true');
+    } catch (e) {
+      busy(reveal, false);
+      toast(e.message, 'bad');
+    }
   };
-  rootRow.append(rootBtn);
-  conn.append(rootRow);
+  copyAll.onclick = async () => {
+    try {
+      copyText(credsText(await rootCreds(), { root: true }), 'the ' + (row.engineKind === 'redis' ? 'connection details' : 'admin login'));
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  conn.append(dl);
   body.append(conn);
 
-  const att = document.createElement('div');
-  att.className = 'section set-group';
-  const head2 = document.createElement('div');
-  head2.className = 'set-head';
-  const mark2 = document.createElement('span');
-  mark2.className = 'mark';
-  mark2.append(icon('plug'));
-  const h2 = document.createElement('h3');
-  h2.textContent = 'Attached servers';
-  const blurb2 = document.createElement('p');
-  blurb2.textContent = 'Each has a database and a user named after it. Attach a server from its own Settings tab.';
-  head2.append(mark2, h2, blurb2);
-  att.append(head2);
+  // ---- who uses it: each attached server, a link to it, and its own login ------------------
+  const att = el('div', 'section set-group');
+  att.append(groupHead('server', 'Attached servers',
+    'Each has a database and a user named after it. Attach a server from its own Settings tab.'));
   const names = Object.keys(row.attachments || {});
   if (!names.length) {
-    const hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = 'Nothing attached yet.';
-    att.append(hint);
+    att.append(emptyState('server', 'No server uses this database yet. Attach one from that server’s Settings.'));
   }
+  const list = el('ul', 'db-attached');
   for (const name of names) {
     const a = row.attachments[name];
-    const line = document.createElement('div');
-    line.className = 'row';
-    line.style.alignItems = 'center';
-    const text = document.createElement('div');
-    text.style.flex = '1';
-    const b = document.createElement('b');
-    b.textContent = name;
-    const sub = document.createElement('div');
-    sub.className = 'hint';
-    sub.style.margin = '0';
-    sub.textContent = a.database ? 'database ' + a.database + ' \u00b7 user ' + a.user : 'shared password \u00b7 key prefix ' + name + ':';
-    text.append(b, sub);
-    const show = document.createElement('button');
-    show.textContent = 'Show credentials';
+    const server = rowOf(name);
+    const li = el('li');
+    const text = el('div', 'db-att-text');
+    const go = el(server ? 'button' : 'b', server ? 'ghost inline db-att-name' : 'db-att-name');
+    if (server) {
+      go.type = 'button';
+      go.title = 'Open ' + (server.label || name);
+      go.onclick = () => select(name);
+    }
+    go.append(icon('server'), document.createTextNode(server ? (server.label || name) : name + ' (removed)'));
+    const sub = el('code', 'db-att-sub');
+    sub.textContent = a.database ? 'database ' + a.database + ' · user ' + a.user : 'key prefix ' + name + ':';
+    text.append(go, sub);
+    const show = iconButton('eye', 'Show credentials', 'sm');
     show.onclick = () => showCredentials(row.name, name);
-    line.append(text, show);
-    att.append(line);
+    li.append(text, show);
+    list.append(li);
   }
+  if (names.length) att.append(list);
   body.append(att);
 }
 
@@ -12278,6 +12355,8 @@ function checkMemory(input, out) {
 
 function selectTab(tab) {
   for (const b of $$('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  $('#addTitle').textContent = tab === 'db' ? 'Add a database' : 'Add a server';
+  for (const id of ['#nName', '#aName', '#dName', '#pName']) paintSlug($(id));
   $('#formNew').hidden = tab !== 'new';
   $('#formPack').hidden = tab !== 'pack';
   $('#formAdopt').hidden = tab !== 'adopt';
@@ -12410,10 +12489,21 @@ function freeSlug(base) {
 /** The instance name a name field will create. */
 function slugOf(input) { return freeSlug(slugFor(input.value.trim())); }
 
+/**
+ * The folder name beside a name field. Before anything is typed it shows what the placeholder
+ * would make, dimmed - a bare dash read as something broken.
+ */
+function paintSlug(input) {
+  const slugEl = $('#' + input.id + 'Slug');
+  if (!slugEl) return;
+  const value = input.value.trim();
+  slugEl.textContent = value ? slugOf(input) : input.placeholder ? freeSlug(slugFor(input.placeholder)) : '—';
+  slugEl.classList.toggle('slug-eg', !value);
+}
+
 function checkName(input, out) {
   const value = input.value.trim();
-  const slugEl = $('#' + input.id + 'Slug');
-  if (slugEl) slugEl.textContent = value ? slugOf(input) : '—';
+  paintSlug(input);
   let msg = '';
   if (value && state.rows.some((r) => (r.label || r.name).toLowerCase() === value.toLowerCase())) {
     msg = 'There is already a server called ' + value + '.';
@@ -12428,6 +12518,39 @@ $('#dName').oninput = () => checkName($('#dName'), $('#dNameBad'));
 $('#aName').oninput = () => checkName($('#aName'), $('#aNameBad'));
 $('#pName').oninput = () => checkName($('#pName'), $('#pNameBad'));
 $('#nMem').oninput = () => checkMemory($('#nMem'), $('#nMemBad'));
+$('#nPort').oninput = () => checkPort($('#nPort'), $('#nPortBad'));
+
+function checkPort(input, out) {
+  const value = input.value.trim();
+  const ok = !value || (/^\d+$/.test(value) && Number(value) >= 1024 && Number(value) <= 65535);
+  out.textContent = ok ? '' : 'Use a port from 1024 to 65535, or leave it blank.';
+  input.setAttribute('aria-invalid', String(!ok));
+  return ok;
+}
+
+/** What Create will make, in a line: the choices from the form above, read back. */
+function paintNewSummary() {
+  const box = $('#newSummary');
+  const sw = softwareById[$('#nLoader').value] || softwareById.paper;
+  const version = $('#nVersion').value;
+  const port = $('#nPort').value.trim();
+  const parts = [
+    [sw.label + (version ? ' ' + version : ''), version ? '' : ' (no version yet)'],
+    [$('#nMem').value.trim() || '4G', ' memory'],
+    [port ? 'port ' + port : 'a free port', ''],
+    [$('input[name="onlineMode"]:checked')?.value === 'offline' ? 'any name can join' : 'Minecraft account required', ''],
+  ];
+  box.textContent = '';
+  box.append('Creates ');
+  parts.forEach(([b, rest], i) => {
+    if (i) { const sep = el('span', 'sep'); sep.textContent = '\u00b7'; box.append(sep); }
+    const strong = el('b');
+    strong.textContent = b;
+    box.append(strong, rest);
+  });
+}
+$('#formNew').addEventListener('input', paintNewSummary);
+$('#formNew').addEventListener('change', paintNewSummary);
 $('#aMem').oninput = () => checkMemory($('#aMem'), $('#aMemBad'));
 
 $('#formDb').onsubmit = async (e) => {
@@ -12514,6 +12637,7 @@ $('#formNew').onsubmit = async (e) => {
   e.preventDefault();
   if (!checkName($('#nName'), $('#nNameBad'))) { $('#nName').focus(); return; }
   if (!checkMemory($('#nMem'), $('#nMemBad'))) { $('#nMem').focus(); return; }
+  if (!checkPort($('#nPort'), $('#nPortBad'))) { $('#nPort').focus(); return; }
 
   const jobId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now();
   const bar = $('#newBar');
@@ -12566,6 +12690,7 @@ $('#formNew').onsubmit = async (e) => {
     // loader was chosen last, so a second create without touching the loader posted a Fabric
     // version string against loader:'paper'.
     loadVersions($('#nLoader').value);
+    paintSlug($('#nName'));
     await refresh();
     select(inst.name);
     toast('Created ' + inst.name + ' on port ' + inst.port + '.', 'good');
@@ -12754,6 +12879,7 @@ $('#formPack').onsubmit = async (e) => {
 // the app shows the button - the browser keeps the text field it always had.
 if (desktop) {
   $('#bBrowse').hidden = false;
+  $('#aDirHint').textContent = 'The folder holding the server jar and server.properties.';
   $('#bBrowse').onclick = async () => {
     const dir = await desktop.pickFolder('Choose the server folder');
     if (!dir) return;
@@ -13168,6 +13294,8 @@ async function loadVersions(loader) {
   $('#nLoaderHint').textContent = sw.content === 'mods' ? 'Runs mods'
     : sw.content === 'none' ? 'No plugins or mods'
       : 'Runs plugins';
+  const note = $('#nVersionBad');
+  note.textContent = '';
   if (!versionLists[loader]) {
     sel.disabled = true;
     sel.textContent = '';
@@ -13175,14 +13303,24 @@ async function loadVersions(loader) {
     o.value = '';
     o.textContent = 'Loading versions…';
     sel.append(o);
+    paintNewSummary();
     try {
       versionLists[loader] = await api('/' + loader + '/versions');
     } catch {
+      // The reason goes under the field, whole, with a way to try again; as the select's own text
+      // it was cut off at "Could not reach the Paper dov".
       sel.textContent = '';
       const bad = document.createElement('option');
       bad.value = '';
-      bad.textContent = 'Could not reach the ' + sw.label + ' download service';
+      bad.textContent = 'Unavailable';
       sel.append(bad);
+      note.append('Could not reach the ' + sw.label + ' download service. ');
+      const retry = el('button', 'ghost inline');
+      retry.type = 'button';
+      retry.textContent = 'Try again';
+      retry.onclick = () => { if ($('#nLoader').value === loader) loadVersions(loader); };
+      note.append(retry);
+      paintNewSummary();
       // A dead end is not an empty dropdown. Creating needs the download; adding a server you
       // already have does not, and that is a real way forward rather than an instruction to
       // come back later.
@@ -13211,6 +13349,11 @@ async function loadVersions(loader) {
   annotateJavaNeeds(loader);
   sel.disabled = false;
   $('#bCreate').disabled = false;
+  $('#bJumpAdopt')?.remove();
+  if (/^Creating a server needs a connection/.test($('#newHint').textContent)) {
+    $('#newHint').textContent = 'Accepts the Minecraft EULA on your behalf, as the operator of this machine.';
+  }
+  paintNewSummary();
 }
 
 $('#nLoader').onchange = () => loadVersions($('#nLoader').value);
