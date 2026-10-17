@@ -554,7 +554,7 @@
   /* A database's own page: each fact on a line of its own, the copyable ones as copy chips, the
      login masked until shown. */
   .db-facts { display: grid; margin: 0; }
-  .db-facts > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: var(--s-3); align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
+  .db-facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--s-3); align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
   .db-facts > div:last-child { border-bottom: 0; }
   .db-facts dt { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
   .db-facts dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
@@ -563,6 +563,9 @@
   .db-mask { font: var(--t-3)/1 var(--mono); letter-spacing: .1em; color: var(--ink-3); }
   .db-shown .creds div { align-items: center; }
   .db-shown { flex-basis: 100%; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--sunken); border: 1px solid var(--line-soft); }
+  .db-reach { grid-column: 1 / -1; }
+  .db-reach:empty { display: none; }
+  .db-reach .notice { padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); border-radius: var(--r-sm); }
   .db-attached { display: grid; margin: 0; padding: 0; list-style: none; }
   .db-attached li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
   .db-attached li:last-child { border-bottom: 0; }
@@ -838,6 +841,12 @@
   .chip-mem[data-tone="fault"] b { color: var(--fault-ink); }
 
   .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
+  /* Until the first /overview answers, the cards wait: Needs attention comes from it and lands
+     above them, and painting the cards first dropped them a card's height as it arrived. The words
+     only show if the wait is long enough to notice. */
+  .home[aria-busy="true"] :is(.home-main > *, .home-activity) { visibility: hidden; }
+  .home[aria-busy="true"] .home-main::before { content: "Loading your servers…"; color: var(--ink-3); font-size: var(--t-3); animation: fade-late .2s .4s both; }
+  @keyframes fade-late { from { opacity: 0; } }
 
   /*
     Needs attention. The most important thing on the page, so a card in the warning's own tone with
@@ -1432,6 +1441,7 @@
   /* inline-block rather than flex: ::first-letter only applies to block containers, and the
      scope names arrive lowercase ("plugins", "one file") but read as labels in sentence case. */
   .snap .tag::first-letter { text-transform: uppercase; }
+  .snap .tag.unknown { background: none; border-color: transparent; color: var(--ink-3); font-weight: 400; }
   .snap .tag {
     grid-area: tag; justify-self: start;
     display: inline-block;
@@ -1821,7 +1831,9 @@
   /* ---- players -------------------------------------------------------------- */
 
   .who-bar { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin-bottom: var(--s-3); }
-  .who-bar input[type="search"] { flex: 1 1 200px; min-width: 160px; }
+  /* Names are short; a field the width of the pane reads as a search over something far bigger. */
+  .who-bar input[type="search"] { flex: 0 1 360px; min-width: 160px; }
+  .who-bar .filters { margin-left: auto; }
 
   .people { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .who {
@@ -2132,6 +2144,7 @@
   .pane-head .mark .ico { width: 17px; height: 17px; }
   .pane-head h2 { margin: 0; font: var(--type-section); color: var(--ink); letter-spacing: -.015em; }
   .pane-head p { margin: 0; font: var(--t-3)/1.45 var(--ui); color: var(--ink-3); }
+  .pane-head-wait { visibility: hidden; }
 
   /* ---- a pane with nothing in it yet ---------------------------------------- */
 
@@ -4389,7 +4402,10 @@ function renderServer(row) {
   notice.textContent = '';
   const note = STATE_NOTE[row.status];
   const noteKey = row.name + '|state|' + row.status;
-  if (note && !dismissed.has(noteKey)) {
+  paintDbReach(row);
+  // An unreachable database says so on its own page, beside the address it cannot reach, rather
+  // than in a full-width red strip that repeats the pill above it.
+  if (note && !dismissed.has(noteKey) && !(db && row.status === 'unreachable')) {
     notice.append(noticeBox({
       tone: row.status === 'stale' ? 'warn' : 'fault',
       title: note[0],
@@ -4464,6 +4480,31 @@ const dismissed = new Set();
  * and the ones the panel can do something about carry that something as a button - "Change
  * port…" opens the same dialog Manage does, rather than a sentence telling you to go and find it.
  */
+/** The unreachable notice on a database's own page, kept in step with each poll. */
+function paintDbReach(row) {
+  const box = $('#settingsBody .db-reach');
+  if (!box || $('#settingsBody').dataset.for !== row.name) return;
+  const down = row.status === 'unreachable';
+  if (box.dataset.down === String(down)) return;
+  box.dataset.down = String(down);
+  box.textContent = '';
+  if (!down) return;
+  const again = { label: 'Check again', run: async (e) => {
+    const b = e.currentTarget;
+    busy(b, true);
+    await refresh();
+    if (b.isConnected) busy(b, false);
+  } };
+  const notice = noticeBox({
+    tone: 'fault',
+    title: 'Not answering',
+    text: 'Nothing replied at ' + (row.host || '127.0.0.1') + ':' + row.port + '. Start it where it runs, then check again.',
+    actions: [again],
+  });
+  notice.setAttribute('role', 'status');
+  box.append(notice);
+}
+
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
   const box = document.createElement('div');
   box.className = 'notice ' + tone;
@@ -4609,7 +4650,7 @@ function showHome() {
   up, and how much memory the machine has. Asked for when the overview shows and then twice a
   minute at most - a backup is minutes apart at the closest - and after anything here changes it.
 */
-const overview = { data: null, asked: 0, showAll: false, attention: '', acting: {} };
+const overview = { data: null, failed: false, asked: 0, showAll: false, attention: '', acting: {} };
 
 // Activity is fetched this deep so that, once runs are folded into one line each, there is still
 // more than a screenful to show.
@@ -4627,6 +4668,9 @@ async function loadOverview(force) {
     overview.data = data;
     overview.activity = recent ? recent.entries : null;
   } catch {
+    // Without it the cards still say everything but the backup ages, so show them.
+    overview.failed = true;
+    if (state.view === 'home') renderOverview();
     return;
   }
   if (state.view === 'home') renderOverview();
@@ -4696,6 +4740,8 @@ function renderOverview() {
   }
   box.append(mem);
 
+  if (!overview.data && !overview.failed) $('#vHome').setAttribute('aria-busy', 'true');
+  else $('#vHome').removeAttribute('aria-busy');
   renderAttention();
   renderHomeCards();
   renderHomeDbs();
@@ -6293,7 +6339,9 @@ function emptyState(name, text, action) {
  * so a refresh of the same server keeps what is on screen until the new answer replaces it.
  */
 function paneLoading(body) {
-  clearPaneHead(body);
+  // An invisible stand-in the height of the title row, so the body does not drop when the real
+  // title arrives with the data.
+  paneHead(body, 'server', '\u00a0', '\u00a0').classList.add('pane-head-wait');
   const sk = document.createElement('div');
   sk.className = 'skeleton';
   sk.setAttribute('aria-busy', 'true');
@@ -6304,7 +6352,8 @@ function paneLoading(body) {
 
 /** A pane whose read failed: the error as the server worded it, and Retry. */
 function paneError(body, message, retry) {
-  clearPaneHead(body);
+  // Kept from the loading state, so the error lands where the skeleton was.
+  if (!body.parentElement.querySelector(':scope > .pane-head-wait')) clearPaneHead(body);
   const box = emptyState('alert', message, retry && { icon: 'restart', label: 'Retry', onClick: retry });
   box.classList.add('pane-error');
   box.setAttribute('role', 'alert');
@@ -8595,9 +8644,16 @@ async function renderScheduler(opts) {
   };
 
   // ---- what a schedule is, before the list of them ---------------------------
-  const intro = document.createElement('div');
-  intro.className = 'hint';
-  intro.textContent = schedulerName + '. ' + schedulerHint;
+  // The title row already says tasks run with SpawnLoft closed; which scheduler holds them and
+  // what happens at sleep or sign-out is for whoever asks.
+  const intro = document.createElement('details');
+  intro.className = 'more';
+  const introTitle = document.createElement('summary');
+  introTitle.textContent = 'How this runs';
+  const introText = document.createElement('p');
+  introText.className = 'hint';
+  introText.textContent = 'Held by ' + schedulerName + '. ' + schedulerHint;
+  intro.append(introTitle, introText);
   body.append(intro);
   const lingering = lingerNotice(data.background, again);
   if (lingering) body.append(lingering);
@@ -10159,6 +10215,8 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
   const sub = document.createElement('span');
   if (!automatic) {
     head.textContent = 'Checking the schedule…';
+    // Two lines like every answer below, so the cards under it stay put when the answer lands.
+    sub.textContent = 'Asking whether this server backs itself up.';
   } else if (!known) {
     head.textContent = 'Schedule unknown';
     sub.textContent = automatic.error;
@@ -10438,7 +10496,13 @@ function renderBackupHistory(row, data, signature) {
       items.textContent = n ? n + (n === 1 ? ' item' : ' items') : '';
       const tag = document.createElement('div');
       tag.className = 'tag';
-      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
+      // An archive with no manifest (made by hand, or by an old version) reports its scope as "?".
+      const unknownScope = !fromFiles && !onlyFile && (!snap.scope || snap.scope === '?');
+      if (unknownScope) {
+        tag.classList.add('unknown');
+        tag.title = 'This archive does not record what it covers.';
+      }
+      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : unknownScope ? 'Unknown' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
       if (onlyWhat) tag.title = 'Holds only ' + onlyWhat + '. Restoring it puts back ' + (onlyFile ? 'that file' : 'those') + ' and nothing else.';
       if (snap.databases && snap.databases.length) {
         tag.title = 'Includes a dump of ' + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ');
@@ -12171,6 +12235,9 @@ async function renderDatabaseSettings(row) {
     return dd;
   };
 
+  body.append(el('div', 'db-reach'));
+  paintDbReach(row);
+
   // ---- how to reach it: every value a plugin config asks for, each copyable ----------------
   const conn = el('div', 'section set-group db-conn');
   conn.append(groupHead(glyph, 'Connection', row.external
@@ -12198,7 +12265,7 @@ async function renderDatabaseSettings(row) {
   const secret = fact(dl, who);
   secret.classList.add('db-secret');
   const masked = el('span', 'db-mask');
-  masked.textContent = '•'.repeat(12);
+  masked.textContent = '•'.repeat(8);
   masked.setAttribute('aria-label', 'Hidden');
   const reveal = iconButton('eye', 'Show', 'sm');
   reveal.setAttribute('aria-expanded', 'false');
