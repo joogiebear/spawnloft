@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('mcctlDesktop', {
 
   getSetup: () => ipcRenderer.invoke('mcctl:getSetup'),
 
+  // the interface size as a factor (1 is 100%); setZoom returns the step it landed on
+  getZoom: () => ipcRenderer.invoke('mcctl:getZoom'),
+
+  setZoom: (factor) => ipcRenderer.invoke('mcctl:setZoom', factor),
+
   checkJava: () => ipcRenderer.invoke('mcctl:checkJava'),
 
   // https only

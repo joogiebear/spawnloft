@@ -262,6 +262,10 @@
   .theme-preview i:nth-child(2) { left: 4px; top: 12px; width: 14px; bottom: 4px; }
   .theme-preview i:nth-child(3) { left: 22px; right: 5px; top: 13px; height: 5px; background: var(--preview-accent); box-shadow: 0 10px 0 var(--preview-surface), 0 18px 0 var(--preview-surface); }
   .theme-picker #themeStatus { margin-bottom: 0; min-height: 1.5em; }
+  .ui-size { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  .ui-size[hidden] { display: none; }
+  .ui-size label { display: grid; gap: 3px; }
+  .ui-size small { font-size: var(--t-2); color: var(--ink-3); }
   @media (max-width: 920px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
 
   /* ---- icons ---------------------------------------------------------------- */
@@ -2711,6 +2715,15 @@
             </label>
           </div>
           <p id="themeStatus" class="hint" aria-live="polite"></p>
+          <!-- Desktop app only: a plain browser has its own zoom. -->
+          <div class="ui-size" id="uiSizeRow" hidden>
+            <label for="uiSize"><strong>Interface size</strong><small>Ctrl and + or -, Ctrl 0 for 100%.</small></label>
+            <select id="uiSize">
+              <option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option>
+              <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option>
+              <option value="1.75">175%</option><option value="2">200%</option>
+            </select>
+          </div>
         </fieldset>
         <div>
           <h2>Where SpawnLoft keeps things</h2>
@@ -11152,6 +11165,16 @@ async function changeTheme(event) {
 showTheme(document.documentElement.dataset.theme);
 $$('input[name="appTheme"]').forEach(input => { input.onchange = changeTheme; });
 
+// The size also changes from the keyboard, so the select is read when Preferences opens, not once.
+async function showUiSize() {
+  if (!desktop || !desktop.getZoom) return;
+  $('#uiSizeRow').hidden = false;
+  $('#uiSize').value = String(await desktop.getZoom());
+}
+$('#uiSize').onchange = async (event) => {
+  event.target.value = String(await desktop.setZoom(Number(event.target.value)));
+};
+
 async function loadSettings() {
   try {
     state.layout = await api('/settings');
@@ -11161,6 +11184,7 @@ async function loadSettings() {
 }
 
 function renderSettings() {
+  showUiSize();
   showTheme(document.documentElement.dataset.theme);
   const l = state.layout;
   const paths = $('#setPaths');

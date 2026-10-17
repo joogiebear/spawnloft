@@ -6,6 +6,7 @@ const fs = require('node:fs')
 const { pathToFileURL } = require('node:url')
 const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
+const uiZoom = require('./ui-zoom')
 const updateChannel = require('./update-channel')
 // ad-hoc packages can't take Squirrel.Mac updates; signed betas use the normal updater,
 // and missing provenance fails closed on mac
@@ -67,6 +68,31 @@ function windowStateFile() {
   return path.join(app.getPath('userData'), 'window-state.json')
 }
 
+function uiZoomFile() {
+  return path.join(app.getPath('userData'), 'ui-zoom.json')
+}
+
+// Applied to every window and remembered. Electron resets a page's zoom on navigation and the panel
+// port changes between launches, so the browser's own per-site memory would not hold it.
+let zoom = 1
+function setZoom(value) {
+  zoom = uiZoom.clamp(value)
+  uiZoom.save(uiZoomFile(), zoom)
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.setZoomFactor(zoom)
+  return zoom
+}
+function trackZoom(contents) {
+  contents.setZoomFactor(zoom)
+  contents.on('did-finish-load', () => contents.setZoomFactor(zoom))
+  // the default menu, and with it Ctrl+= and Ctrl+-, is removed below on Windows and Linux
+  contents.on('before-input-event', (event, input) => {
+    const next = uiZoom.zoomForKey(input, zoom)
+    if (next === null) return
+    event.preventDefault()
+    setZoom(next)
+  })
+}
+
 // the app was called mcctl until 0.11.x and Electron keys userData by product name, so copy the
 // saved window state across once or the first SpawnLoft start opens at the default size
 function carryOverWindowState() {
@@ -112,6 +138,8 @@ function createWindow(loadUrl, theme = 'classic') {
   // maximise before showing so it doesn't appear at the restored size and jump
   if (state.maximized) win.maximize()
   windowState.track(win, windowStateFile())
+  zoom = uiZoom.load(uiZoomFile())
+  trackZoom(win.webContents)
 
   win.loadURL(loadUrl)
   win.once('ready-to-show', () => win.show())
@@ -157,6 +185,7 @@ function createWindow(loadUrl, theme = 'classic') {
   // console windows follow the same rules as the main window
   win.webContents.on('did-create-window', (child) => {
     child.webContents.setWindowOpenHandler(external)
+    trackZoom(child.webContents)
     child.webContents.on('will-navigate', (e, url) => {
       if (!url.startsWith(loadUrl)) e.preventDefault()
     })
@@ -191,6 +220,9 @@ ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
 })
 
 // asked by the first-run wizard: Java is the one prerequisite we can't supply
+ipcMain.handle('mcctl:getZoom', async () => zoom)
+ipcMain.handle('mcctl:setZoom', async (_e, value) => setZoom(value))
+
 ipcMain.handle('mcctl:checkJava', async () => {
   const java = await loadCore('src/java.mjs')
   return { ...(await java.health()), downloadUrl: java.DOWNLOAD_URL }
