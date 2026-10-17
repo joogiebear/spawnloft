@@ -13,10 +13,25 @@ const check = (label, fn) => {
   catch (e) { console.log('  FAIL ' + label + ' -> ' + e.message); process.exitCode = 1 }
 }
 
-check('garbage and missing values mean 100%', () => {
+check('garbage values mean 100%, and no file means Auto', () => {
   assert.strictEqual(z.clamp('big'), 1)
   assert.strictEqual(z.clamp(NaN), 1)
-  assert.strictEqual(z.load(file), 1)
+  assert.strictEqual(z.normalize('big'), 1)
+  assert.strictEqual(z.normalize('auto'), 'auto')
+  assert.strictEqual(z.load(file), 'auto')
+})
+
+check('Auto picks a step from the display in device-independent pixels', () => {
+  const d = (width, height) => ({ size: { width, height }, scaleFactor: 1 })
+  assert.strictEqual(z.autoStep(d(1920, 1080)), 1)
+  assert.strictEqual(z.autoStep(d(2560, 1440)), 1)
+  assert.strictEqual(z.autoStep(d(3840, 2160)), 1.5)
+  assert.strictEqual(z.autoStep(d(3072, 1728)), 1.25)
+  assert.strictEqual(z.autoStep(d(1366, 768)), 0.9)
+  assert.strictEqual(z.autoStep(undefined), 1)
+  assert.strictEqual(z.resolve('auto', d(3840, 2160)), 1.5)
+  assert.strictEqual(z.resolve(1.25, d(3840, 2160)), 1.25)
+  assert.strictEqual(z.resolve('nonsense', d(3840, 2160)), 1)
 })
 
 check('an off-step value snaps to the nearest step and the ends hold', () => {
@@ -29,11 +44,13 @@ check('an off-step value snaps to the nearest step and the ends hold', () => {
   assert.strictEqual(z.step(1, -1), 0.9)
 })
 
-check('the size round-trips through the file', () => {
+check('the size round-trips through the file, Auto included', () => {
   z.save(file, 1.5)
   assert.strictEqual(z.load(file), 1.5)
+  z.save(file, 'auto')
+  assert.strictEqual(z.load(file), 'auto')
   fs.writeFileSync(file, 'not json')
-  assert.strictEqual(z.load(file), 1)
+  assert.strictEqual(z.load(file), 'auto')
 })
 
 check('only Ctrl/Cmd zoom keys on key-down are claimed', () => {
@@ -51,4 +68,4 @@ check('only Ctrl/Cmd zoom keys on key-down are claimed', () => {
 })
 
 fs.rmSync(tmp, { recursive: true, force: true })
-console.log('\n  ' + pass + '/4 passed')
+console.log('\n  ' + pass + '/5 passed')

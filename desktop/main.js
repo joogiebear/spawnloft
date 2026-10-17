@@ -74,18 +74,41 @@ function uiZoomFile() {
 
 // Applied to every window and remembered. Electron resets a page's zoom on navigation and the panel
 // port changes between launches, so the browser's own per-site memory would not hold it.
+// `setting` is what was chosen ('auto' or a step); `zoom` is the factor on screen right now.
+let setting = uiZoom.AUTO
 let zoom = 1
-function setZoom(value) {
-  zoom = uiZoom.clamp(value)
-  uiZoom.save(uiZoomFile(), zoom)
+// the display under the main window; before it exists, the one the saved position falls on
+function currentDisplay(bounds) {
+  const { screen } = require('electron')
+  const rect = bounds || (win && !win.isDestroyed() ? win.getBounds() : null)
+  return rect ? screen.getDisplayMatching(rect) : screen.getPrimaryDisplay()
+}
+function applyZoom(bounds) {
+  zoom = uiZoom.resolve(setting, currentDisplay(bounds))
   for (const w of BrowserWindow.getAllWindows()) w.webContents.setZoomFactor(zoom)
-  return zoom
+  return { setting, zoom }
+}
+function setZoom(value) {
+  setting = uiZoom.normalize(value)
+  uiZoom.save(uiZoomFile(), setting)
+  return applyZoom()
+}
+// Auto follows the window: dragged to another monitor, or that monitor's scaling changed.
+let lastDisplayId = null
+let watchingDisplays = false
+function followDisplay() {
+  if (setting !== uiZoom.AUTO) return
+  const d = currentDisplay()
+  if (d.id === lastDisplayId) return
+  lastDisplayId = d.id
+  applyZoom()
 }
 function trackZoom(contents) {
   contents.setZoomFactor(zoom)
   contents.on('did-finish-load', () => contents.setZoomFactor(zoom))
   // the default menu, and with it Ctrl+= and Ctrl+-, is removed below on Windows and Linux
   contents.on('before-input-event', (event, input) => {
+    // a keyboard step is a fixed choice; it steps from the size on screen, so Auto at 125% goes to 150%
     const next = uiZoom.zoomForKey(input, zoom)
     if (next === null) return
     event.preventDefault()
@@ -114,7 +137,10 @@ function displayAreas() {
 
 function createWindow(loadUrl, theme = 'classic') {
   const state = windowState.load(windowStateFile(), displayAreas())
-  zoom = uiZoom.load(uiZoomFile())
+  setting = uiZoom.load(uiZoomFile())
+  const startDisplay = currentDisplay({ x: state.x ?? 0, y: state.y ?? 0, width: state.width, height: state.height })
+  lastDisplayId = startDisplay.id
+  zoom = uiZoom.resolve(setting, startDisplay)
   win = new BrowserWindow({
     width: state.width,
     height: state.height,
@@ -142,6 +168,12 @@ function createWindow(loadUrl, theme = 'classic') {
   if (state.maximized) win.maximize()
   windowState.track(win, windowStateFile())
   trackZoom(win.webContents)
+  win.on('move', followDisplay)
+  if (!watchingDisplays) {
+    // once: on mac the window is recreated on activate
+    watchingDisplays = true
+    require('electron').screen.on('display-metrics-changed', () => { lastDisplayId = null; followDisplay() })
+  }
 
   win.loadURL(loadUrl)
   win.once('ready-to-show', () => win.show())
@@ -222,7 +254,7 @@ ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
   return res.canceled ? null : res.filePaths[0]
 })
 
-ipcMain.handle('mcctl:getZoom', async () => zoom)
+ipcMain.handle('mcctl:getZoom', async () => ({ setting, zoom }))
 ipcMain.handle('mcctl:setZoom', async (_e, value) => setZoom(value))
 
 // asked by the first-run wizard: Java is the one prerequisite we can't supply

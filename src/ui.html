@@ -2903,8 +2903,9 @@
           <p id="themeStatus" class="hint" aria-live="polite"></p>
           <!-- Desktop app only: a plain browser has its own zoom. -->
           <div class="ui-size" id="uiSizeRow" hidden>
-            <label for="uiSize"><strong>Interface size</strong><small>Ctrl and + or -, Ctrl 0 for 100%.</small></label>
+            <label for="uiSize"><strong>Interface size</strong><small>Auto fits the screen. Ctrl and + or -, Ctrl 0 for 100%.</small></label>
             <select id="uiSize">
+              <option value="auto" id="uiSizeAuto">Auto</option>
               <option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option>
               <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option>
               <option value="1.75">175%</option><option value="2">200%</option>
@@ -11694,13 +11695,19 @@ showTheme(document.documentElement.dataset.theme);
 $$('input[name="appTheme"]').forEach(input => { input.onchange = changeTheme; });
 
 // The size also changes from the keyboard, so the select is read when Preferences opens, not once.
+// Auto names the size it picked, so the entry reads "Auto (125%)" and the choice is never a mystery.
+function paintUiSize(size) {
+  $('#uiSizeAuto').textContent = 'Auto (' + Math.round(size.zoom * 100) + '%)';
+  $('#uiSize').value = String(size.setting);
+}
 async function showUiSize() {
   if (!desktop || !desktop.getZoom) return;
   $('#uiSizeRow').hidden = false;
-  $('#uiSize').value = String(await desktop.getZoom());
+  paintUiSize(await desktop.getZoom());
 }
 $('#uiSize').onchange = async (event) => {
-  event.target.value = String(await desktop.setZoom(Number(event.target.value)));
+  const v = event.target.value;
+  paintUiSize(await desktop.setZoom(v === 'auto' ? 'auto' : Number(v)));
 };
 
 async function loadSettings() {

@@ -15,7 +15,8 @@ contextBridge.exposeInMainWorld('mcctlDesktop', {
 
   getSetup: () => ipcRenderer.invoke('mcctl:getSetup'),
 
-  // the interface size as a factor (1 is 100%); setZoom returns the step it landed on
+  // { setting, zoom }: setting is 'auto' or the chosen factor (1 is 100%), zoom the factor on
+  // screen now. setZoom takes 'auto' or a factor and returns the same shape.
   getZoom: () => ipcRenderer.invoke('mcctl:getZoom'),
 
   setZoom: (factor) => ipcRenderer.invoke('mcctl:setZoom', factor),

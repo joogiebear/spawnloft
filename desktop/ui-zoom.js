@@ -7,10 +7,37 @@ const path = require('node:path')
 // press of Ctrl+0 away.
 const STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
 
+// The default: a step picked from the screen the window is on, re-picked when that changes.
+const AUTO = 'auto'
+
 function clamp(value) {
   const n = Number(value)
   if (!Number.isFinite(n)) return 1
   return STEPS.reduce((best, s) => (Math.abs(s - n) < Math.abs(best - n) ? s : best), 1)
+}
+
+// 'auto', or a step. Anything else is 100%.
+function normalize(value) {
+  return value === AUTO ? AUTO : clamp(value)
+}
+
+// Which step suits a display. `size` is in device-independent pixels, so the OS's own scaling is
+// already taken out: a 4K monitor the OS scales to 150% reports 2560 wide and gets 100% like any
+// QHD screen. What is left is the screen the OS did not scale for: a 4K panel at OS 100% reads
+// 3840 wide and gets 150%, at OS 125% it reads 3072 and gets 125%. A short laptop screen
+// (1366x768) goes to 90%, which puts a fourth vital and a wider console back in reach.
+function autoStep(display) {
+  const width = Number(display?.size?.width) || 0
+  const height = Number(display?.size?.height) || 0
+  if (width >= 3400) return 1.5
+  if (width >= 2800) return 1.25
+  if (height > 0 && height < 800) return 0.9
+  return 1
+}
+
+// The factor to apply for a setting on a display.
+function resolve(setting, display) {
+  return setting === AUTO ? autoStep(display) : clamp(setting)
 }
 
 function step(current, direction) {
@@ -18,18 +45,20 @@ function step(current, direction) {
   return STEPS[Math.min(STEPS.length - 1, Math.max(0, at + direction))]
 }
 
+// No file means the size was never chosen, and Auto is what a fresh install gets. A file from
+// before Auto existed holds a number and keeps it: a size someone picked stays picked.
 function load(file) {
   try {
-    return clamp(JSON.parse(fs.readFileSync(file, 'utf8')).zoom)
+    return normalize(JSON.parse(fs.readFileSync(file, 'utf8')).zoom)
   } catch {
-    return 1
+    return AUTO
   }
 }
 
 function save(file, zoom) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(file, JSON.stringify({ zoom: clamp(zoom) }) + '\n')
+    fs.writeFileSync(file, JSON.stringify({ zoom: normalize(zoom) }) + '\n')
   } catch {
     // an unsaved size is a smaller problem than an error on every keypress
   }
@@ -45,4 +74,4 @@ function zoomForKey(input, current) {
   return null
 }
 
-module.exports = { STEPS, clamp, step, load, save, zoomForKey }
+module.exports = { STEPS, AUTO, clamp, normalize, autoStep, resolve, step, load, save, zoomForKey }
