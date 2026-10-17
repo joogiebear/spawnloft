@@ -124,6 +124,11 @@
        least this tall; an icon-only button is this square. */
     --hit: 32px;
 
+    /* Cards: one padding, corner, border and shadow for every boxed group in the panel - an
+       Overview server, a backup control, a chart, a scheduled task. */
+    --card-pad: var(--s-5);
+    --card-radius: var(--r-lg);
+
     /* Focus. One ring for every control, keyboard or not, in the accent colour. */
     --ring-width: 2px;
     --ring-offset: 2px;
@@ -401,7 +406,7 @@
   /* A button that is only a glyph. Every one of them carries an aria-label saying what it does. */
   button.icon-btn {
     justify-content: center;
-    width: 32px; height: 32px;
+    width: var(--hit); height: var(--hit);
     padding: 0;
     background: transparent;
     border-color: transparent;
@@ -487,7 +492,7 @@
   */
   .java-chip {
     gap: 6px;
-    padding: 4px 11px;
+    padding: 0 11px;
     border-radius: 999px;
     background: var(--warn-wash);
     border-color: var(--warn-edge);
@@ -556,15 +561,22 @@
 
   /* ---- controls --------------------------------------------------------- */
 
+  /*
+    Buttons. Four kinds: primary (one per area, the thing the area is for), the default secondary,
+    ghost (a quiet verb in a row of content) and danger. Two sizes that differ in padding and type,
+    never in height: .sm is as easy to hit as the default, only tighter. Every button is at least
+    --hit tall, so a toolbar of them lines up with a field beside it.
+  */
   button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    min-height: var(--hit);
     background: rgba(var(--ink-rgb), .035);
     color: var(--ink);
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    padding: 6px 12px;
+    padding: 0 12px;
     font: 500 var(--t-3)/1.4 var(--ui);
     cursor: pointer;
     white-space: nowrap;
@@ -576,7 +588,17 @@
      winning on specificity and painting a generic border and lift over theirs. */
   button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--hover-hi); transform: translateY(-1px); }
   button:where(:active:not(:disabled)) { transform: translateY(0); }
-  button:disabled { opacity: .38; cursor: default; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.sm { padding: 0 var(--s-2); font-size: var(--t-2); gap: 5px; }
+  /* Working: the label stays so the button keeps its width and says what it is doing; a spinner
+     takes the icon's place. Set by busy(). */
+  button[aria-busy="true"] { cursor: progress; pointer-events: none; }
+  button[aria-busy="true"] > .ico { display: none; }
+  button[aria-busy="true"]::before {
+    content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid currentColor; border-right-color: transparent; opacity: .8;
+    animation: spin .7s linear infinite;
+  }
 
   button.primary {
     background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
@@ -619,7 +641,11 @@
     background-color: var(--field-focus);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
   }
-  input:disabled, select:disabled { opacity: .5; }
+  input:not([type="checkbox"]):not([type="radio"]), select { min-height: var(--hit); }
+  input:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
+  /* The native box at 13px was the smallest target in the panel. Its label is the rest of the hit
+     area wherever there is one. */
+  input[type="checkbox"]:not(.switch) { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--lapis); cursor: pointer; box-shadow: none; }
   input.mono { font-family: var(--mono); font-size: var(--t-3); }
   input::placeholder { color: var(--ink-3); }
   input[aria-invalid="true"] { border-color: var(--fault); }
@@ -692,10 +718,12 @@
     background: rgba(var(--ink-rgb), .025);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
-    padding: 3px;
-    gap: 2px;
+    /* No inner padding: the segments are --hit tall themselves, and the trough is then the height
+       of the field it usually sits beside. */
+    padding: 0;
+    gap: 0;
   }
-  .seg button, .filters button, .ranges button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 4px 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: 6px; }
+  .seg button, .filters button, .ranges button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 0 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: calc(var(--r-sm) - 1px); }
   .seg button[aria-pressed="true"], .filters button[aria-pressed="true"], .ranges button[aria-pressed="true"] {
     background: var(--segment-top);
     border-color: var(--line);
@@ -862,10 +890,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-4);
-    padding: var(--s-5);
+    padding: var(--card-pad);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--card-radius);
     box-shadow: var(--shadow-sm);
     min-width: 0;
     transition: border-color var(--ease);
@@ -883,6 +911,12 @@
   .sc-acts button { min-height: 34px; }
 
   /* An address is a button because the only thing anyone does with it is paste it somewhere. */
+  /* Buttons that sit inside a line of text keep the text's height and reach --hit through an
+     invisible pad above and below, so being easy to hit never pushes the line apart. */
+  button.inline, .srv-meta button.addr { position: relative; min-height: 0; }
+  button.inline::after, .srv-meta button.addr::after {
+    content: ''; position: absolute; inset: calc((100% - var(--hit)) / 2) 0;
+  }
   button.addr-copy {
     gap: 5px; min-height: 26px; padding: 2px 6px; margin: -2px -6px;
     font: var(--t-2)/1.4 var(--mono); color: var(--ink-2);
@@ -1213,7 +1247,7 @@
     align-items: center;
     gap: 9px;
     width: 100%;
-    height: 30px;
+    height: var(--hit);
     padding: 0 10px;
     background: transparent;
     border: 1px solid transparent;
@@ -1408,12 +1442,11 @@
   }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
-  .snap-actions .icon-btn { width: 28px; height: 28px; padding: 0; }
   .snap[data-locked] .snap-actions { opacity: 1; }
   .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
   .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
-  details.leave-out > summary { cursor: pointer; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
-  details.leave-out[open] > summary { margin-bottom: var(--s-2); }
+  details.leave-out > summary { padding-block: 8px; margin-block: -8px; cursor: pointer; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
+  details.leave-out[open] > summary { margin-bottom: 0; }
   details.leave-out textarea { width: 100%; resize: vertical; font: var(--t-2)/1.5 var(--mono); }
 
   /*
@@ -1589,7 +1622,6 @@
   .step-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
   .step-fields input:not([type="number"]) { flex: 1 1 160px; min-width: 0; }
   .step-acts { display: flex; gap: 2px; }
-  .step-acts .icon-btn { width: 26px; height: 26px; font-size: 13px; }
   /* The task form styles every label as a field's heading and every input at full width; these are
      a sentence with a box in front. */
   .task-form .steps label.check { display: flex; align-items: center; gap: 8px; font: 400 var(--t-2)/1.4 var(--ui); text-transform: none; letter-spacing: 0; color: var(--ink-2); }
@@ -1650,8 +1682,18 @@
     .act-undo, .act-undone { grid-column: 3; grid-row: 1; }
   }
 
-  .section { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
-  .section h3 { margin: 0; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+  /* The card. .card is the name for new ones; the older names keep their layouts and share this. */
+  .card, .section, .gauge, .task, .task-form {
+    padding: var(--card-pad);
+    border: 1px solid var(--line);
+    border-radius: var(--card-radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  /* Only a card that does something on its own answers the pointer. */
+  .card[data-interactive]:hover, .task:hover { border-color: var(--edge); }
+  .section { display: grid; gap: var(--s-3); }
+  .section h3 { margin: 0; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
   .where { margin: 0 0 10px; gap: 10px; }
   .mono-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1662,8 +1704,7 @@
     low trend line under it. The history is context for the number, not the other way round, so the
     chart is a strip rather than a panel of its own.
   */
-  .gauge { display: grid; gap: 10px; padding: var(--s-4) var(--s-5) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); transition: all var(--ease); }
-  .gauge:hover { border-color: var(--edge); }
+  .gauge { display: grid; gap: var(--s-3); }
   .gauge-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
   .gauge-head h3 { margin: 0; flex-basis: 100%; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .gauge-head .now { font: 650 var(--t-6)/1 var(--display); letter-spacing: -.02em; color: var(--ink); }
@@ -1749,8 +1790,7 @@
   .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; }
   /* A fixed width, empty on a jar added by hand, so the versions line up down the list. */
   .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 164px; }
-  .plug-acts button { padding: 3px 9px; font-size: var(--t-2); }
-  .plug-acts .icon-btn { width: 28px; height: 28px; padding: 0; }
+  .plug-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
   /* The same two verbs on every row; quiet until the row is pointed at or reached by keyboard. */
   .plug-acts .quiet { display: inline-flex; gap: 2px; opacity: .45; transition: opacity var(--ease); }
   .plug:hover .quiet, .plug:focus-within .quiet { opacity: 1; }
@@ -1932,7 +1972,10 @@
     color: var(--ink-3); background: rgba(var(--ink-rgb), .03); border: 1px solid var(--line);
   }
   .set-tag[data-tone="changed"] { color: var(--lapis-ink); background: var(--lapis-wash); border-color: var(--lapis-edge); }
-  details.more > summary { width: max-content; cursor: pointer; list-style: none; font: 500 var(--t-2)/1.4 var(--ui); color: var(--lapis-ink); }
+  /* An inline link: padded out to --hit and pulled back by the same amount, so it is easy to hit
+     without pushing the help text apart. */
+  details.more > summary { width: max-content; cursor: pointer; list-style: none; font: 500 var(--t-2)/1.4 var(--ui); color: var(--lapis-ink);
+    padding-block: calc((var(--hit) - 1.4em) / 2); margin-block: calc((var(--hit) - 1.4em) / -2); }
   details.more > summary::-webkit-details-marker { display: none; }
   details.more > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
   details.more > .hint { margin: 4px 0 0; }
@@ -2085,6 +2128,42 @@
     color: var(--edge);
     stroke-width: 1.25;
   }
+  .empty-pane > button { margin-top: var(--s-1); }
+
+  /* A read that failed: what went wrong, in the reader's words, and the one thing to do about it. */
+  .pane-error .empty-mark { color: var(--fault); }
+  .pane-error p { color: var(--ink-2); }
+
+  /*
+    Loading. Grey bars where the rows will be, at the rows' height, so the pane holds its shape and
+    nothing jumps when the answer arrives. The previous server's content is never left showing
+    under a new server's name while it loads.
+  */
+  .skeleton { display: grid; gap: var(--s-3); padding-top: var(--s-2); }
+  .skeleton i {
+    display: block; height: 14px; border-radius: var(--r-xs);
+    background: linear-gradient(90deg, rgba(var(--ink-rgb), .05) 0 40%, rgba(var(--ink-rgb), .09) 50%, rgba(var(--ink-rgb), .05) 60% 100%) 0 0 / 300% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton i:nth-child(1) { width: 38%; height: 18px; margin-bottom: var(--s-2); }
+  .skeleton i:nth-child(3n) { width: 72%; }
+  .skeleton i:nth-child(3n + 1):not(:first-child) { width: 86%; }
+  .skeleton i:nth-child(3n + 2) { width: 64%; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+  /*
+    Tooltips. One look for every title in the panel: the script lifts an element's title into this
+    box on hover or keyboard focus, so a tooltip reaches keyboard users too and reads the same
+    everywhere instead of being the operating system's.
+  */
+  #tip {
+    position: fixed; z-index: 60; max-width: 320px; pointer-events: none;
+    padding: 6px 10px; border-radius: var(--r-xs);
+    background: var(--raised-hi); border: 1px solid var(--edge); box-shadow: var(--shadow-md);
+    color: var(--ink); font: var(--type-meta); white-space: pre-line;
+    opacity: 0; transform: translateY(2px); transition: opacity 120ms ease-out, transform 120ms ease-out;
+  }
+  #tip[data-on] { opacity: 1; transform: none; }
 
   /* ---- scheduled tasks ---------------------------------------------------- */
 
@@ -2097,16 +2176,10 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "what state" "when when" "acts acts";
     gap: 6px 14px;
-    padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) + 2px);
-    border: 1px solid var(--line);
-    border-radius: var(--r);
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
     position: relative;
     overflow: hidden;
     transition: all var(--ease);
   }
-  .task:hover { border-color: var(--edge); }
   /*
     No spine for a healthy task. "Ready" is the normal state of every task on the screen. The one
     worth marking is a task mcctl believes in that Windows has never heard of - that one will never
@@ -2125,7 +2198,7 @@
   .task .t-when { grid-area: when; font: var(--t-2)/1.5 var(--ui); color: var(--ink-3); }
   .task .t-when code { font: var(--t-1)/1 var(--mono); color: var(--ink-2); }
   .task .t-acts { grid-area: acts; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .task .t-acts button { padding: 4px 10px; font-size: var(--t-2); }
+  .task .t-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
   .t-state {
     grid-area: state; align-self: start;
     display: inline-flex; align-items: center; gap: 5px;
@@ -2140,7 +2213,7 @@
 
   /* The form for a new or edited task. Fields appear and vanish with the kind of schedule
      chosen, so it is a grid of rows rather than a fixed set of columns. */
-  .task-form { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--edge); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .task-form { display: grid; gap: var(--s-3); border-color: var(--edge); }
   .task-form .field { display: grid; gap: 6px; }
   .task-form label { font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .task-form .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
@@ -2401,7 +2474,10 @@
   }
   .toast.bad { border-left-color: var(--fault); }
   .toast.good { border-left-color: var(--live); }
-  .toast .x { background: none; border: 0; box-shadow: none; padding: 0 2px; color: var(--ink-3); font-size: var(--t-5); line-height: 1; }
+  .toast > .ico { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--lapis); }
+  .toast.bad > .ico { color: var(--fault); }
+  .toast.good > .ico { color: var(--live); }
+  .toast .x { width: var(--hit); height: var(--hit); margin: -6px -10px -6px 0; padding: 0; background: none; border: 0; box-shadow: none; color: var(--ink-3); }
   .toast .x:hover:not(:disabled) { background: none; color: var(--ink); transform: none; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
 
@@ -3181,6 +3257,7 @@
 </dialog>
 
 <div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
 <span class="sr-only" id="live" aria-live="polite"></span>
 
 <script>
@@ -3288,9 +3365,10 @@ function toast(message, kind) {
   close.className = 'x';
   close.type = 'button';
   close.setAttribute('aria-label', 'Dismiss');
-  close.textContent = '\u00d7';
+  close.append(icon('close'));
   close.onclick = () => el.remove();
-  el.append(text, close);
+  // The tone is said by a glyph as well as the edge colour, so it does not rest on colour alone.
+  el.append(icon(kind === 'bad' ? 'alert' : kind === 'good' ? 'check' : 'bolt'), text, close);
   $('#toasts').append(el);
   $('#live').textContent = message;
   // Errors stay until dismissed. Everything else is an acknowledgement, and an acknowledgement
@@ -5964,15 +6042,131 @@ function iconButton(name, label, cls) {
  * failed to load rather than one with nothing in it yet. An icon at the size of the thing it
  * stands for turns the same sentence into a state.
  */
-function emptyState(name, text) {
+function emptyState(name, text, action) {
   const wrap = document.createElement('div');
   wrap.className = 'empty-pane';
   wrap.append(icon(name, 'empty-mark'));
   const p = document.createElement('p');
   p.textContent = text;
   wrap.append(p);
+  // The one thing that fills it, where there is one. An empty list with no way out of it is a
+  // dead end; the action belongs where the eye already is.
+  if (action) {
+    const b = iconButton(action.icon || 'plus', action.label, 'primary');
+    b.onclick = action.onClick;
+    wrap.append(b);
+  }
   return wrap;
 }
+
+/**
+ * Put a pane into its loading state: the previous server's title and rows go, and a skeleton
+ * holds the space. Called only when the pane is about to show a different server (or nothing yet),
+ * so a refresh of the same server keeps what is on screen until the new answer replaces it.
+ */
+function paneLoading(body) {
+  clearPaneHead(body);
+  const sk = document.createElement('div');
+  sk.className = 'skeleton';
+  sk.setAttribute('aria-busy', 'true');
+  sk.setAttribute('aria-label', 'Loading');
+  for (let i = 0; i < 7; i++) sk.append(document.createElement('i'));
+  body.replaceChildren(sk);
+}
+
+/** A pane whose read failed: the error as the server worded it, and Retry. */
+function paneError(body, message, retry) {
+  clearPaneHead(body);
+  const box = emptyState('alert', message, retry && { icon: 'restart', label: 'Retry', onClick: retry });
+  box.classList.add('pane-error');
+  box.setAttribute('role', 'alert');
+  const b = box.querySelector('button');
+  if (b) b.className = '';
+  body.replaceChildren(box);
+}
+
+/**
+ * Mark a button as working, or done. The label can change to say what is happening ("Updating")
+ * and goes back afterwards; the button is disabled meanwhile so a second press cannot queue a
+ * second request.
+ */
+function busy(button, on, label) {
+  if (on) {
+    if (!('idle' in button.dataset)) button.dataset.idle = button.lastChild ? button.lastChild.textContent : '';
+    if (label && button.lastChild) button.lastChild.textContent = label;
+    button.setAttribute('aria-busy', 'true');
+    button.disabled = true;
+  } else {
+    if ('idle' in button.dataset && button.lastChild) button.lastChild.textContent = button.dataset.idle;
+    delete button.dataset.idle;
+    button.removeAttribute('aria-busy');
+    button.disabled = false;
+  }
+}
+
+/*
+  Tooltips. The browser's own title tooltip only appears for a mouse, after a long wait, in the
+  operating system's style. Here an element's title moves into #tip while it is pointed at or
+  focused from the keyboard, and goes back afterwards, so every existing title becomes this tooltip
+  without each control having to ask for one. Dialogs keep the native ones: the dialog is drawn
+  above anything a page element can reach.
+*/
+(() => {
+  const tip = $('#tip');
+  let owner = null;
+  let timer = 0;
+  const hide = () => {
+    clearTimeout(timer);
+    if (owner) {
+      // Code that changed the title while it was lifted wins over the one put back.
+      if (!owner.hasAttribute('title') && owner.dataset.tip) owner.setAttribute('title', owner.dataset.tip);
+      delete owner.dataset.tip;
+      if (owner.getAttribute('aria-describedby') === 'tip') owner.removeAttribute('aria-describedby');
+      owner = null;
+    }
+    tip.removeAttribute('data-on');
+  };
+  const place = (el) => {
+    const r = el.getBoundingClientRect();
+    const t = tip.getBoundingClientRect();
+    const x = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
+    let y = r.bottom + 6;
+    if (y + t.height > innerHeight - 8) y = r.top - t.height - 6;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+  const showFor = (el, delay) => {
+    if (owner === el) return;
+    hide();
+    const text = el.getAttribute('title');
+    if (!text || el.closest('dialog')) return;
+    owner = el;
+    el.dataset.tip = text;
+    el.removeAttribute('title');
+    timer = setTimeout(() => {
+      if (owner !== el || !el.isConnected) return hide();
+      tip.textContent = el.dataset.tip;
+      if (!el.hasAttribute('aria-describedby')) el.setAttribute('aria-describedby', 'tip');
+      tip.setAttribute('data-on', '');
+      place(el);
+    }, delay);
+  };
+  document.addEventListener('pointerover', (e) => {
+    if (owner && owner.contains(e.target)) return;
+    const el = e.target.closest && e.target.closest('[title]');
+    if (el) showFor(el, 450);
+    else hide();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest && e.target.closest('[title]');
+    if (el && e.target.matches(':focus-visible')) showFor(el, 150);
+  });
+  document.addEventListener('focusout', hide);
+  document.addEventListener('pointerdown', hide, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  addEventListener('scroll', hide, true);
+  addEventListener('blur', hide);
+})();
 
 /**
  * The title block a pane opens with.
@@ -6174,6 +6368,7 @@ async function renderPerformance(opts) {
   // again even when the drawing is still good - otherwise the chart sits frozen at whatever it last
   // showed and only a server change ever clears it.
   const drawn = !force && body.dataset.for === row.name && body.childElementCount;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   if (!drawn) await paintPerformance(row.name);
 
@@ -6193,11 +6388,7 @@ async function paintPerformance(name, opts) {
     data = await api('/instances/' + encodeURIComponent(name) + '/metrics?seconds=' + perfView.seconds);
   } catch (e) {
     if (opts && opts.quiet) return;
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPerformance({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6363,17 +6554,14 @@ async function renderPlayers(opts) {
   const body = $('#playersBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/players');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPlayers({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6781,17 +6969,14 @@ async function renderPlugins(opts) {
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
   if (pluginView.for !== row.name) { pluginView.updates = cachedUpdates(row.name); pluginView.for = row.name; }
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/plugins');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPlugins({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6849,7 +7034,7 @@ async function renderPlugins(opts) {
       + '. Players join with the matching client pack, installed in their own launcher: ';
     if (desktop) {
       const open = document.createElement('button');
-      open.className = 'ghost';
+      open.className = 'ghost inline';
       open.style.cssText = 'padding:2px 8px;font-size:12px';
       open.textContent = 'Open on Modrinth';
       open.onclick = () => desktop.openExternal(link);
@@ -7171,7 +7356,7 @@ async function renderPlugins(opts) {
     listWrap.textContent = '';
     if (!data.plugins.length) {
       listWrap.append(emptyState('plug', 'No ' + data.kind + ' yet. Search ' + sources + ' above and they land in this server’s '
-        + data.kind + ' folder.'));
+        + data.kind + ' folder.', { icon: 'search', label: 'Find ' + data.kind, onClick: () => q.focus() }));
       return;
     }
     const list = document.createElement('div');
@@ -7325,17 +7510,14 @@ async function renderWorlds(opts) {
   const body = $('#worldsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/worlds');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderWorlds({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -8126,17 +8308,14 @@ async function renderScheduler(opts) {
   const body = $('#schedulerBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/schedules');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderScheduler({ force: true }));
     // Cleared, so leaving the tab and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -8183,6 +8362,8 @@ async function renderScheduler(opts) {
   const add = iconButton('plus', 'New task', 'primary');
   addWrap.append(add);
   body.append(addWrap);
+  // With no tasks the empty state carries the one primary action, so two never sit stacked.
+  add.hidden = !data.tasks.length;
 
   add.onclick = () => {
     editor.close();
@@ -8203,19 +8384,19 @@ async function renderScheduler(opts) {
       },
     });
     addWrap.append(form);
-    editor.restore = () => { form.remove(); add.hidden = false; };
+    editor.restore = () => { form.remove(); add.hidden = !data.tasks.length; };
   };
 
   // ---- the tasks ------------------------------------------------------------
   const listTitle = document.createElement('h3');
   listTitle.className = 'hist-title';
   listTitle.textContent = 'Tasks (' + data.tasks.length + ')';
-  body.append(listTitle);
 
   if (!data.tasks.length) {
     body.append(emptyState('clock', 'Nothing scheduled. A nightly backup and a daily restart are '
-      + 'the two most servers ever need.'));
+      + 'the two most servers ever need.', { icon: 'plus', label: 'New task', onClick: () => add.onclick() }));
   } else {
+    body.append(listTitle);
     const list = document.createElement('div');
     list.className = 'tasks';
     for (const task of data.tasks) list.append(taskCard(task, data, base, again, editor));
@@ -8452,6 +8633,7 @@ async function renderFiles(opts) {
   const body = $('#filesBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   const view = filesStateFor(row.name);
   if (view.editing) return renderFileEditor(row, view);
@@ -8466,11 +8648,7 @@ async function renderFiles(opts) {
     // A folder that went away (renamed outside, deleted) takes you back to the top rather than
     // leaving you in front of an error with nowhere to go.
     if (view.dir && !view.query) { view.dir = ''; view.selected.clear(); return renderFiles({ force: true }); }
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderFiles({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -9268,6 +9446,7 @@ async function renderActivity(opts) {
   const row = rowOf(state.current);
   const body = $('#activityBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   const base = '/instances/' + encodeURIComponent(row.name) + '/activity';
   const q = (before) => '?limit=60' + (activityView.by ? '&by=' + activityView.by : '') + (before ? '&before=' + encodeURIComponent(before) : '');
@@ -9276,11 +9455,7 @@ async function renderActivity(opts) {
   try {
     data = await api(base + q());
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderActivity());
     return;
   }
   if (body.dataset.for !== row.name) return;
@@ -9569,6 +9744,7 @@ async function renderBackups(opts) {
   if (!force && backupPending && backupPending.name === row.name) return;
   const request = ++backupRequest;
   backupPending = { name: row.name, request: request };
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
@@ -9583,11 +9759,7 @@ async function renderBackups(opts) {
       status.textContent = 'Backup history could not refresh: ' + e.message + '. Trying again shortly.';
       return;
     }
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderBackups({ force: true }));
     // Cleared, so leaving the tab and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -9824,7 +9996,7 @@ function renderBackupHistory(row, data, signature) {
   wherePath.className = 'hint mono-path';
   wherePath.textContent = data.dir;
   const change = document.createElement('button');
-  change.className = 'ghost';
+  change.className = 'ghost inline';
   change.type = 'button';
   change.textContent = 'Change';
   change.title = 'Where backups are kept, for every server';
@@ -9842,7 +10014,7 @@ function renderBackupHistory(row, data, signature) {
     ? 'mirrored to ' + data.mirror
     : 'No mirror: snapshots live on one drive, beside what they back up.';
   const mset = document.createElement('button');
-  mset.className = 'ghost';
+  mset.className = 'ghost inline';
   mset.type = 'button';
   mset.textContent = data.mirror ? 'Change' : 'Add a mirror';
   mset.title = 'A second location - ideally another drive - every new snapshot is copied to';
@@ -9850,7 +10022,7 @@ function renderBackupHistory(row, data, signature) {
   mirrorRow.append(mirrorPath, mset);
   if (data.mirror) {
     const moff = document.createElement('button');
-    moff.className = 'ghost';
+    moff.className = 'ghost inline';
     moff.type = 'button';
     moff.textContent = 'Off';
     moff.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
@@ -10116,23 +10288,14 @@ let settingsPaneWatch = null;
 async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
   body.classList.add('set-screen');
-  body.textContent = '';
-
-  const loading = document.createElement('div');
-  loading.className = 'hint';
-  loading.textContent = 'Reading server.properties…';
-  body.append(loading);
+  paneLoading(body);
 
   const base = '/instances/' + encodeURIComponent(row.name);
   let data;
   try {
     data = await api(base + '/props');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderServerSettings());
     // Cleared, so leaving the tool and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn form, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -11460,17 +11623,14 @@ async function renderDatabaseBackups(opts) {
   // A poll must not redraw under a dump or a restore in progress, or pile up behind a slow one.
   if (!force && (dbBackupBusy || dbBackupPending === row.name)) return;
   dbBackupPending = row.name;
+  if (body.dataset.for !== row.name) paneLoading(body);
   const base = '/databases/' + encodeURIComponent(row.name) + '/backups';
   let data;
   try {
     data = await api(base);
   } catch (e) {
     if (state.current !== row.name) return;
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderDatabaseBackups({ force: true }));
     body.dataset.for = '';
     return;
   } finally {
