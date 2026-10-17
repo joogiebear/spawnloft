@@ -1060,6 +1060,14 @@
     below need to change the body's own column count.
   */
   .pane-scroll { overflow: auto; align-content: start; container-type: inline-size; container-name: pane; }
+  /*
+    Density tiers. A pane shows more as it gets room, never bigger: the rows below add columns at two
+    pane widths, measured on the pane itself (the console column and the sidebar take width, so a
+    4K window can hold a pane no wider than a 1440p one). Wide starts at 1280px, Ultra at 2000px.
+    Each tier restates the row's whole track list instead of zeroing a track, because a zero-width
+    track still takes a column gap. A column that appears at a tier appears to the right of the
+    ones before it, so a window being resized grows at its edge.
+  */
   .pane-body {
     /* No max-width. The panes are dashboards, and each one lays its content into as many columns
        as the pane affords. */
@@ -1176,6 +1184,23 @@
     max-width: 100%; overflow: hidden; text-overflow: ellipsis;
   }
   .snap button { padding: 4px 10px; font-size: var(--t-2); }
+  .snap .why, .snap .items, .snaps-head > .h-why, .snaps-head > .h-items { display: none; font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .snap .items { font-family: var(--mono); text-align: right; }
+  /* Wide: why the snapshot was taken. Ultra: how much it holds. */
+  @container pane (min-width: 1280px) {
+    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 84px 262px; }
+    .snaps-head { grid-template-areas: "what tag why size actions"; }
+    .snap { grid-template-areas: "when tag why size actions" "what tag why size actions"; }
+    .snap .why { display: block; grid-area: why; }
+    .snaps-head > .h-why { display: block; grid-area: why; font: inherit; color: inherit; }
+  }
+  @container pane (min-width: 2000px) {
+    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 80px 84px 262px; }
+    .snaps-head { grid-template-areas: "what tag why items size actions"; }
+    .snap { grid-template-areas: "when tag why items size actions" "what tag why items size actions"; }
+    .snap .items { display: block; grid-area: items; }
+    .snaps-head > .h-items { display: block; grid-area: items; text-align: right; font: inherit; color: inherit; }
+  }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
   .snap-actions .icon-btn { width: 28px; height: 28px; padding: 0; }
@@ -1226,6 +1251,18 @@
   .fm-open:hover .ico { color: var(--lapis-ink); }
   .fm-row .fm-size { font: var(--t-2)/1 var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
   .fm-row .fm-when { font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .fm-row .fm-kind { display: none; font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fm-row .fm-when .long { display: none; }
+  /* Wide: what kind of thing each entry is. Ultra: the exact time, not the short stamp. */
+  @container pane (min-width: 1280px) {
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 132px; }
+    .fm-row .fm-kind { display: block; }
+  }
+  @container pane (min-width: 2000px) {
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 210px; }
+    .fm-row .fm-when .short { display: none; }
+    .fm-row .fm-when .long { display: inline; }
+  }
   .pane[data-drop] .fm-list { outline: 2px dashed var(--lapis-edge); outline-offset: 4px; }
   @container pane (max-width: 560px) {
     .fm-row { grid-template-columns: 20px minmax(0, 1fr) 72px; }
@@ -1297,6 +1334,15 @@
   code.act-detail { font: var(--t-2)/1.4 var(--mono); }
   .act-row[data-bad] .act-what > span:first-child { color: var(--fault-ink); }
   .act-undo { padding: 3px 9px; font-size: var(--t-2); }
+  .act-rest { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+  /* Wide: the verb and what it was done to become two aligned columns, so a day's changes read as
+     a table rather than a list of sentences. */
+  @container pane (min-width: 1280px) {
+    .act-row { grid-template-columns: 64px auto 230px minmax(0, 1fr) auto; }
+    .act-row .act-what { display: contents; }
+    .act-row .act-verb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+    .act-row .act-rest { font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+  }
   .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
   .act-more { margin-top: var(--s-3); }
   .launch-line {
@@ -1510,9 +1556,30 @@
      why they are banned - are the half a person is reading the line for. */
   .who .w-meta {
     grid-area: meta;
+    display: flex; flex-wrap: wrap; gap: 0 2px;
     font: var(--t-1)/1.55 var(--mono);
     color: var(--ink-3);
     overflow-wrap: anywhere;
+  }
+  .who .w-meta > span + span::before { content: '\00b7'; margin: 0 8px; }
+  .who .w-seen, .who .w-id { display: none; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .who .w-id { font-family: var(--mono); }
+  .who .w-id .long { display: none; }
+  /* Wide: when they were last on and who they are move out of the meta line into columns that line
+     up down the list. Ultra: the whole id. */
+  @container pane (min-width: 1280px) {
+    .who {
+      grid-template-columns: auto minmax(0, 1fr) 180px 104px auto;
+      grid-template-areas: "face name seen id acts" "face meta seen id acts";
+    }
+    .who .w-seen { display: block; grid-area: seen; }
+    .who .w-id { display: block; grid-area: id; }
+    .who .w-meta > .w-dup { display: none; }
+  }
+  @container pane (min-width: 2000px) {
+    .who { grid-template-columns: auto minmax(0, 1fr) 180px 300px auto; }
+    .who .w-id .short { display: none; }
+    .who .w-id .long { display: inline; }
   }
   .who .w-acts { grid-area: acts; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; opacity: .6; transition: opacity var(--ease); }
   .who:hover .w-acts, .who:focus-within .w-acts { opacity: 1; }
@@ -5574,14 +5641,34 @@ function playerRow(p, data, base, again) {
     name.append(pill);
   }
 
+  // The id and when they were last on are in the meta line on a regular pane and in their own
+  // columns on a wide one; the spans marked w-dup are the ones the columns replace.
+  const seenText = p.online ? 'Connected now' : p.lastSeen ? 'Last seen ' + stamp(p.lastSeen) : !p.joined ? 'Has never joined' : '';
   const meta = document.createElement('div');
   meta.className = 'w-meta';
-  const bits = [p.uuid];
-  if (p.online) bits.push('connected now');
-  else if (p.lastSeen) bits.push('last seen ' + stamp(p.lastSeen));
-  else if (!p.joined) bits.push('has never joined');
-  if (p.banned && p.banReason) bits.push('banned: ' + p.banReason);
-  meta.textContent = bits.join('  \u00b7  ');
+  const bit = (text, dup) => {
+    const span = document.createElement('span');
+    if (dup) span.className = 'w-dup';
+    span.textContent = text;
+    return span;
+  };
+  meta.append(bit(p.uuid, true));
+  if (seenText) meta.append(bit(seenText.charAt(0).toLowerCase() + seenText.slice(1), true));
+  if (p.banned && p.banReason) meta.append(bit('banned: ' + p.banReason));
+  const seen = document.createElement('div');
+  seen.className = 'w-seen';
+  seen.textContent = seenText;
+  if (p.lastSeen && !p.online) seen.title = new Date(p.lastSeen).toLocaleString();
+  const id = document.createElement('div');
+  id.className = 'w-id';
+  const idShort = document.createElement('span');
+  idShort.className = 'short';
+  idShort.textContent = p.uuid.slice(0, 8);
+  const idLong = document.createElement('span');
+  idLong.className = 'long';
+  idLong.textContent = p.uuid;
+  id.append(idShort, idLong);
+  id.title = p.uuid;
 
   const acts = document.createElement('div');
   acts.className = 'w-acts';
@@ -5597,7 +5684,7 @@ function playerRow(p, data, base, again) {
     : p.joined ? 'Remove this player\u2019s inventory, position, stats and advancements'
       : 'This player has no world data to delete';
   acts.append(opBtn, banBtn, wipe);
-  el.append(name, meta, acts);
+  el.append(name, meta, seen, id, acts);
 
   const label = p.name || p.uuid.slice(0, 8);
   const busy = (on) => { for (const b of acts.children) b.disabled = on || (b === wipe && (data.running || !p.joined)); };
@@ -7357,6 +7444,18 @@ function downloadPath(row, p) {
   a.remove();
 }
 
+/** The Kind column: a folder, a link, or the file's extension as people say it. */
+function fileKind(e) {
+  if (e.type === 'dir') return 'Folder';
+  if (e.type === 'link') return 'Link';
+  if (e.type !== 'file') return 'Other';
+  const m = /\.([a-z0-9]{1,8})$/i.exec(e.name || e.path || '');
+  if (!m) return 'File';
+  const ext = m[1].toLowerCase();
+  const known = { jar: 'Jar', yml: 'YAML', yaml: 'YAML', json: 'JSON', toml: 'TOML', properties: 'Properties', log: 'Log', gz: 'Archive', zip: 'Archive', txt: 'Text', md: 'Markdown', sh: 'Script', bat: 'Script', dat: 'Data', mca: 'Region', png: 'Image', jpg: 'Image', lock: 'Lock' };
+  return known[ext] || ext.toUpperCase();
+}
+
 async function renderFiles(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -7583,7 +7682,7 @@ async function renderFiles(opts) {
   all.setAttribute('aria-label', 'Select all');
   all.checked = entries.length > 0 && entries.every((e) => view.selected.has(e.path));
   all.onchange = () => { if (all.checked) for (const e of entries) view.selected.add(e.path); else view.selected.clear(); again(); };
-  for (const [cls, text] of [['fm-name', 'Name'], ['fm-size', 'Size'], ['fm-when', 'Modified']]) {
+  for (const [cls, text] of [['fm-name', 'Name'], ['fm-kind', 'Kind'], ['fm-size', 'Size'], ['fm-when', 'Modified']]) {
     const c = document.createElement('span');
     c.className = cls;
     c.setAttribute('role', 'columnheader');
@@ -7634,14 +7733,23 @@ async function renderFiles(opts) {
       open.append(pill);
     }
     if (e.type === 'link') open.title = 'A link that leads outside the server folder';
+    const kind = document.createElement('span');
+    kind.className = 'fm-kind';
+    kind.textContent = fileKind(e);
     const size = document.createElement('span');
     size.className = 'fm-size';
     size.textContent = fileSize(e.size);
     const when = document.createElement('span');
     when.className = 'fm-when';
-    when.textContent = stamp(e.modified);
-    when.title = new Date(e.modified).toLocaleString();
-    line.append(box, open, size, when);
+    const whenShort = document.createElement('span');
+    whenShort.className = 'short';
+    whenShort.textContent = stamp(e.modified);
+    const whenLong = document.createElement('span');
+    whenLong.className = 'long';
+    whenLong.textContent = new Date(e.modified).toLocaleString();
+    when.append(whenShort, whenLong);
+    when.title = whenLong.textContent;
+    line.append(box, open, kind, size, when);
     list.append(line);
 
     open.onclick = () => {
@@ -8117,23 +8225,29 @@ function activitySentence(e) {
   const what = document.createElement('div');
   what.className = 'act-what';
   const verb = document.createElement('span');
+  verb.className = 'act-verb';
   // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
   // the webhook; it reads as its own line rather than after a verb that says it twice.
   if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
   else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
-  what.append(verb);
+  verb.title = verb.textContent;
+  // What it was done to, and whether it failed, in one span: on a wide pane the verb and this
+  // become two columns of the row, so the span is always there to hold the column.
+  const rest = document.createElement('span');
+  rest.className = 'act-rest';
+  what.append(verb, rest);
   if (e.detail && e.action !== 'crash') {
     const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
     d.className = 'act-detail';
     d.textContent = e.detail;
-    what.append(d);
+    rest.append(d);
   }
   if (e.ok === false) {
     const pill = document.createElement('span');
     pill.className = 'pill';
     pill.dataset.tone = 'ban';
     pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
-    what.append(pill);
+    rest.append(pill);
   }
   return what;
 }
@@ -8352,6 +8466,21 @@ const FILES_SNAPSHOT = {
   'file-replace': { tag: 'before a replace', why: 'as it was before an upload replaced it' },
   'file-delete': { tag: 'deleted', why: 'as it was when it was deleted in Files' },
 };
+
+/** The Reason column: what prompted a snapshot, from its label or the schedule that took it. */
+function snapshotReason(snap) {
+  const label = snap.label || '';
+  const named = {
+    'pre-restore': 'Before a restore', 'before-edit': 'Before an AI edit', 'pre-delete': 'Before a delete',
+    'pre-rebuild': 'Before a reset', 'pre-upgrade': 'Before an upgrade', 'pre-pack-update': 'Before a pack update',
+    'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete',
+    manual: 'Manual', nightly: 'Nightly',
+  };
+  if (named[label]) return named[label];
+  if (snap.taskId) return 'Schedule';
+  if (!label) return 'Manual';
+  return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
+}
 
 function singleFileOf(snap) {
   const members = snap.members || [];
@@ -8781,8 +8910,9 @@ function renderBackupHistory(row, data, signature) {
     const head = document.createElement('div');
     head.className = 'snaps-head';
     head.setAttribute('aria-hidden', 'true');
-    for (const label of ['Snapshot', 'Contents', 'Size']) {
+    for (const [label, cls] of [['Snapshot', ''], ['Contents', ''], ['Reason', 'h-why'], ['Items', 'h-items'], ['Size', '']]) {
       const cell = document.createElement('span');
+      if (cls) cell.className = cls;
       cell.textContent = label;
       head.append(cell);
     }
@@ -8826,6 +8956,13 @@ function renderBackupHistory(row, data, signature) {
       const size = document.createElement('div');
       size.className = 'size';
       size.textContent = snap.sizeHuman;
+      const why = document.createElement('div');
+      why.className = 'why';
+      why.textContent = snapshotReason(snap);
+      const items = document.createElement('div');
+      items.className = 'items';
+      const n = (snap.members || []).length;
+      items.textContent = n ? n + (n === 1 ? ' item' : ' items') : '';
       const tag = document.createElement('div');
       tag.className = 'tag';
       tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
@@ -8860,7 +8997,7 @@ function renderBackupHistory(row, data, signature) {
         drop.title = 'Locked. Unlock it first.';
       }
       actions.append(lock, noteBtn, download, restore, drop);
-      el.append(when, size, tag, actions, what);
+      el.append(when, size, tag, why, items, actions, what);
       list.append(el);
 
       lock.onclick = async () => {
@@ -10401,7 +10538,7 @@ async function renderDatabaseBackups(opts) {
 
   const list = el('div', 'snaps');
   const head = el('div', 'snaps-head');
-  head.append(el('span', null, 'Backup'), el('span', null, 'Label'), el('span', null, 'Size'));
+  head.append(el('span', null, 'Backup'), el('span', null, 'Label'), el('span', 'h-why', 'Reason'), el('span', 'h-items', 'Databases'), el('span', null, 'Size'));
   list.append(head);
   for (const b of data.backups) {
     const line = el('div', 'snap');
@@ -10409,6 +10546,8 @@ async function renderDatabaseBackups(opts) {
       el('span', 'when', stamp(new Date(b.mtime).toISOString())),
       el('span', 'what', b.databases.length ? b.databases.join(', ') : b.name),
       el('span', 'tag', b.label || 'manual'),
+      el('span', 'why', snapshotReason(b)),
+      el('span', 'items', b.databases.length + (b.databases.length === 1 ? ' database' : ' databases')),
       el('span', 'size', b.sizeHuman),
     );
     line.querySelector('.what').title = b.name;
