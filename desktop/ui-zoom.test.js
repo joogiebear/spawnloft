@@ -42,6 +42,8 @@ check('only Ctrl/Cmd zoom keys on key-down are claimed', () => {
   assert.strictEqual(key({ key: '+' }), 1.1)
   assert.strictEqual(key({ key: '-' }), 0.9)
   assert.strictEqual(z.zoomForKey({ type: 'keyDown', control: true, key: '0' }, 1.5), 1)
+  assert.strictEqual(z.zoomForKey({ type: 'keyDown', control: true, key: 'à', code: 'Digit0' }, 1.5), 1)
+  assert.strictEqual(z.zoomForKey({ type: 'keyDown', meta: true, key: '_' }, 1), 0.9)
   assert.strictEqual(key({ key: 'c' }), null)
   assert.strictEqual(z.zoomForKey({ type: 'keyUp', control: true, key: '=' }, 1), null)
   assert.strictEqual(z.zoomForKey({ type: 'keyDown', key: '=' }, 1), null)

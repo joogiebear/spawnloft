@@ -740,9 +740,9 @@
   /* Three to a row, in the tone of what they are about; each says one thing and offers one way out. */
   .attention { display: grid; gap: var(--s-3); }
   .attention .hist-title { margin: 0; }
-  /* auto-fill, not a fixed 3 and 2: the two grids shared no rule, so on a wide screen the notices
-     stopped at two thirds of the width while the cards went edge to edge. */
-  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--s-3); }
+  /* The same column width as .home-cards, so the notices line up with the cards below them. A fixed
+     3 and 2 columns did not scale: a wide screen got notices at two thirds of the width. */
+  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-3); }
   .att {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);

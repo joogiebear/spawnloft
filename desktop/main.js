@@ -114,6 +114,7 @@ function displayAreas() {
 
 function createWindow(loadUrl, theme = 'classic') {
   const state = windowState.load(windowStateFile(), displayAreas())
+  zoom = uiZoom.load(uiZoomFile())
   win = new BrowserWindow({
     width: state.width,
     height: state.height,
@@ -133,12 +134,13 @@ function createWindow(loadUrl, theme = 'classic') {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      // the saved size from the first paint; setting it after load shows a 100% frame first
+      zoomFactor: zoom,
     },
   })
   // maximise before showing so it doesn't appear at the restored size and jump
   if (state.maximized) win.maximize()
   windowState.track(win, windowStateFile())
-  zoom = uiZoom.load(uiZoomFile())
   trackZoom(win.webContents)
 
   win.loadURL(loadUrl)
@@ -176,6 +178,7 @@ function createWindow(loadUrl, theme = 'classic') {
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
+            zoomFactor: zoom,
           },
         },
       }
@@ -219,10 +222,10 @@ ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
   return res.canceled ? null : res.filePaths[0]
 })
 
-// asked by the first-run wizard: Java is the one prerequisite we can't supply
 ipcMain.handle('mcctl:getZoom', async () => zoom)
 ipcMain.handle('mcctl:setZoom', async (_e, value) => setZoom(value))
 
+// asked by the first-run wizard: Java is the one prerequisite we can't supply
 ipcMain.handle('mcctl:checkJava', async () => {
   const java = await loadCore('src/java.mjs')
   return { ...(await java.health()), downloadUrl: java.DOWNLOAD_URL }

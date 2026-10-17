@@ -40,7 +40,8 @@ function zoomForKey(input, current) {
   if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt) return null
   if (input.key === '+' || input.key === '=') return step(current, 1)
   if (input.key === '-' || input.key === '_') return step(current, -1)
-  if (input.key === '0') return 1
+  // code as well as key: on AZERTY the unshifted 0 key reports 'à', and with NumLock off the numpad 0 reports 'Insert'
+  if (input.key === '0' || input.code === 'Digit0' || input.code === 'Numpad0') return 1
   return null
 }
 
