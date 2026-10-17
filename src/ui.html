@@ -1123,6 +1123,27 @@
     #performanceBody > .ranges, #performanceBody > .hint, #performanceBody > .facts,
     #performanceBody > .bad { grid-column: 1 / -1; }
   }
+  /*
+    Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
+    has more room than that divides into a well and a companion instead of growing. Backups keeps
+    the history as the well, with Back up now, Leave out and Automatic stacked beside it; Players
+    puts the chosen player beside the list; Settings shows the raw file beside the form; Stats lays
+    its gauges two by two with the numbers of the range under each chart. The companion is a second
+    column the lower tiers simply do not have, so nothing changes below 2000px.
+  */
+  @container pane (min-width: 2000px) {
+    #backupsBody { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); grid-auto-flow: row dense; gap: var(--s-5) var(--s-6); }
+    #backupsBody > .section { grid-column: 2; }
+    #backupsBody > [data-backup-history] { grid-column: 1; grid-row: span 3; }
+    #performanceBody { gap: var(--s-5); }
+    /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
+    #performanceBody > .facts {
+      grid-column: auto; align-self: stretch;
+      display: grid; grid-template-columns: max-content minmax(0, 1fr); align-content: start; gap: var(--s-2) var(--s-4);
+      padding: var(--s-4) var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm);
+    }
+    #performanceBody > .facts > span { display: contents; }
+  }
   /* .row wraps rather than crushing its controls when the pane is narrow. */
   .row { flex-wrap: wrap; }
 
@@ -1450,6 +1471,12 @@
   .chart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
   .chart .line { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
   .chart .area { stroke: none; opacity: .14; }
+  /* Under a chart on an Ultra pane: the range's numbers, so the line never has to be read off by eye. */
+  .gauge-nums { display: none; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); margin: 0; padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
+  .gauge-nums > div { display: grid; gap: 3px; min-width: 0; }
+  .gauge-nums dt { font: 650 var(--t-1)/1.3 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .gauge-nums dd { margin: 0; font: 600 var(--t-3)/1.3 var(--mono); color: var(--ink-2); white-space: nowrap; }
+  @container pane (min-width: 2000px) { .gauge-nums { display: grid; } }
 
   .facts { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-6); font: var(--t-2)/1.6 var(--ui); color: var(--ink-3); }
   .facts b { color: var(--ink-2); font-weight: 600; font-family: var(--mono); }
@@ -1584,6 +1611,28 @@
   .who .w-acts { grid-area: acts; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; opacity: .6; transition: opacity var(--ease); }
   .who:hover .w-acts, .who:focus-within .w-acts { opacity: 1; }
   .who .w-acts button { padding: 4px 10px; font-size: var(--t-2); }
+  /* Ultra: the chosen player sits beside the list, so their whole record is read without leaving
+     it. Below that the detail does not exist and the list is the whole width. */
+  .who-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+  .who-detail { display: none; }
+  @container pane (min-width: 2000px) {
+    .who-split:has(> .who-detail) { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); }
+    .who-detail { display: grid; position: sticky; top: var(--s-4); gap: var(--s-4); }
+    .who { cursor: pointer; }
+    .who[aria-selected="true"] { box-shadow: inset var(--spine) 0 0 var(--lapis); background-color: rgba(var(--ink-rgb), .035); }
+  }
+  .who-detail .face { border: 1px solid var(--line); border-radius: var(--r-sm); image-rendering: pixelated; shape-rendering: crispEdges; }
+  .who-detail .wd-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-2) var(--s-4); align-items: center; }
+  .who-detail .wd-head h3 { margin: 0; font: 650 var(--t-5)/1.2 var(--display); letter-spacing: -.015em; text-transform: none; color: var(--ink); overflow-wrap: anywhere; }
+  .who-detail .wd-head .unknown { font-weight: 400; font-style: italic; color: var(--ink-3); }
+  .who-detail .wd-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .who-detail dl { display: grid; gap: var(--s-2); margin: 0; }
+  .who-detail dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-faint); }
+  .who-detail dl > div:last-child { border-bottom: 0; }
+  .who-detail dt { font: 600 var(--t-2)/1.5 var(--ui); color: var(--ink-3); }
+  .who-detail dd { margin: 0; font: var(--t-2)/1.5 var(--ui); color: var(--ink); overflow-wrap: anywhere; }
+  .who-detail dd.mono { font-family: var(--mono); }
+  .who-detail .wd-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 
   /* Contextual status badges: a dot in the state's colour, a tinted body, a hairline in the same hue. */
   .pill {
@@ -1703,6 +1752,15 @@
   @container pane (min-width: 1500px) {
     .set-form > .section:has(> .set-row) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); gap: 0 var(--s-7); align-items: start; }
     .set-form > .section:has(> .set-row) > .set-head { grid-column: 1 / -1; }
+  }
+  /* Ultra: the raw server.properties beside the form instead of in its place. The script shows and
+     hides the two by pane width (see showRaw); this only gives the file its column. */
+  @container pane (min-width: 2000px) {
+    #settingsBody.set-screen { grid-template-columns: 240px minmax(0, 1fr) clamp(420px, 36%, 900px); }
+    #settingsBody.set-screen > .set-nav { grid-column: 1; grid-row: 1; }
+    #settingsBody.set-screen > .set-form { grid-column: 2; grid-row: 1; }
+    #settingsBody.set-screen > .set-raw { grid-column: 3; grid-row: 1; }
+    .set-raw textarea { min-height: clamp(440px, 60vh, 1200px); }
   }
 
   /* In a narrow window the list becomes a row above the form, and each setting's control goes
@@ -5109,6 +5167,18 @@ function emptyState(name, text) {
  * is the difference between recognising a screen and working it out. Built here rather than in the
  * markup because every pane's body is cleared and rebuilt on each render.
  */
+/**
+ * Whether the pane a body sits in is at the Ultra tier, the width from which a pane splits into a
+ * well and a companion. The same 2000px the stylesheet's container queries use, measured on the
+ * same element, so a script-side decision (load the raw file, keep the form showing) agrees with
+ * the layout.
+ */
+const ULTRA_PANE = 2000;
+function paneIsUltra(bodyEl) {
+  const scroller = bodyEl.closest('.pane-scroll');
+  return Boolean(scroller) && scroller.clientWidth >= ULTRA_PANE;
+}
+
 /** Drop whatever title is showing. Every path that empties a pane has to do this too. */
 function clearPaneHead(bodyEl) {
   bodyEl.parentElement.querySelector(':scope > .pane-head')?.remove();
@@ -5204,7 +5274,7 @@ function chart(samples, { pick, max, colour }) {
  * sits centred over it. A pane that has no data yet still looks like the pane it will become,
  * rather than a sentence where two charts are about to be.
  */
-function gauge({ title, now, aside, samples, pick, max, colour, empty }) {
+function gauge({ title, now, aside, samples, pick, max, colour, empty, fmt }) {
   const wrap = document.createElement('div');
   wrap.className = 'gauge';
   const head = document.createElement('div');
@@ -5228,6 +5298,30 @@ function gauge({ title, now, aside, samples, pick, max, colour, empty }) {
     plot.append(p);
   }
   wrap.append(head, plot);
+  // The range's numbers, shown under the chart when the pane is Ultra (the stylesheet decides).
+  if (samples.length && fmt) {
+    const values = samples.map(pick).filter((v) => v != null && Number.isFinite(v));
+    if (values.length) {
+      const nums = document.createElement('dl');
+      nums.className = 'gauge-nums';
+      const cell = (label, v) => {
+        const d = document.createElement('div');
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = fmt(v);
+        d.append(dt, dd);
+        return d;
+      };
+      nums.append(
+        cell('Now', values[values.length - 1]),
+        cell('Average', values.reduce((a, b) => a + b, 0) / values.length),
+        cell('Peak', Math.max(...values)),
+        cell('Low', Math.min(...values)),
+      );
+      wrap.append(nums);
+    }
+  }
   return wrap;
 }
 
@@ -5371,6 +5465,7 @@ async function paintPerformance(name, opts) {
     // follows the peak instead, with a floor of 10% so a quiet server is not magnified into drama.
     max: Math.max(10, peakCpu * 1.15),
     colour: 'var(--chart-cpu)',
+    fmt: (v) => v.toFixed(1) + '%',
   }));
 
   body.append(gauge({
@@ -5381,6 +5476,7 @@ async function paintPerformance(name, opts) {
     pick: (s) => s.rss,
     max: rssMax,
     colour: '#8fd3a8',
+    fmt: (v) => Math.round(v) + ' MB',
   }));
 
   // What the server says about itself, when it says it. Read over RCON by the daemon, so a server
@@ -5397,6 +5493,7 @@ async function paintPerformance(name, opts) {
       // Fixed at the game's own ceiling: a dip from 20 to 18 should look like the small thing it is.
       max: 20,
       colour: 'var(--live)',
+      fmt: (v) => v.toFixed(1),
     }));
   }
 
@@ -5435,8 +5532,8 @@ const PLAYER_FILTERS = [
   { key: 'banned', label: 'Banned', match: (p) => p.banned },
 ];
 
-/** Kept across renders so filtering and searching do not lose their place on a refresh. */
-const playerView = { filter: 'all', search: '' };
+/** Kept across renders so filtering, searching and the chosen player do not lose their place on a refresh. */
+const playerView = { filter: 'all', search: '', selected: null };
 
 /**
  * Everyone this server knows about.
@@ -5508,10 +5605,14 @@ async function renderPlayers(opts) {
   bar.append(search, filters);
   body.append(bar);
 
+  // The list, and on an Ultra pane the chosen player's record beside it. The record is built for
+  // every tier and the stylesheet shows it only when the pane has the room.
   const list = document.createElement('div');
+  list.className = 'who-split';
   body.append(list);
 
   search.oninput = () => { playerView.search = search.value; paint(); };
+  const select = (uuid) => { playerView.selected = uuid; paint(); };
 
   function paint() {
     for (const b of filters.children) {
@@ -5536,12 +5637,85 @@ async function renderPlayers(opts) {
       list.append(emptyState('search', 'Nobody here matches that.'));
       return;
     }
+    // The chosen player, or whoever is at the top when the choice is gone or was never made.
+    const chosen = shown.find((p) => p.uuid === playerView.selected) || shown[0];
     const people = document.createElement('div');
     people.className = 'people';
-    for (const p of shown) people.append(playerRow(p, data, base, again));
-    list.append(people);
+    for (const p of shown) {
+      const line = playerRow(p, data, base, again, select);
+      line.setAttribute('aria-selected', String(p === chosen));
+      people.append(line);
+    }
+    list.append(people, playerDetail(chosen, data, base, again));
   }
   paint();
+}
+
+/**
+ * One player's whole record, for the companion column an Ultra pane has beside the list: the face
+ * at a size that shows its pattern, every flag, the full id and the dates the list truncates, and
+ * the same three actions the row offers.
+ */
+function playerDetail(p, data, base, again) {
+  const box = document.createElement('div');
+  box.className = 'who-detail section';
+  const head = document.createElement('div');
+  head.className = 'wd-head';
+  head.append(playerFace(p.uuid, 72));
+  const title = document.createElement('div');
+  const h = document.createElement('h3');
+  if (p.name) {
+    h.textContent = p.name;
+  } else {
+    h.className = 'unknown';
+    h.textContent = 'name unknown';
+  }
+  const pills = document.createElement('div');
+  pills.className = 'wd-pills';
+  const pill = (text, tone) => {
+    const span = document.createElement('span');
+    span.className = 'pill';
+    if (tone) span.dataset.tone = tone;
+    span.textContent = text;
+    pills.append(span);
+  };
+  if (p.online) pill('Online', 'on');
+  if (p.op) pill('Operator', 'op');
+  if (p.banned) pill('Banned', 'ban');
+  if (p.whitelisted) pill('Whitelisted');
+  if (!pills.childElementCount) pill(p.joined ? 'Has joined' : 'Never joined');
+  title.append(h, pills);
+  head.append(title);
+
+  const facts = document.createElement('dl');
+  const fact = (label, value, mono) => {
+    if (value == null || value === '') return;
+    const d = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    if (mono) dd.className = 'mono';
+    dd.textContent = value;
+    d.append(dt, dd);
+    facts.append(d);
+  };
+  fact('UUID', p.uuid, true);
+  fact('Status', p.online ? 'Connected now' : data.running ? 'Not connected' : 'Server stopped');
+  fact('Last seen', p.online ? 'Now' : p.lastSeen ? new Date(p.lastSeen).toLocaleString() : p.joined ? 'Unknown' : 'Has never joined');
+  fact('World data', p.joined ? 'Kept in this world' : 'None yet');
+  fact('Operator', p.op ? 'Yes' + (p.opLevel != null ? ', level ' + p.opLevel : '') : 'No');
+  if (p.banned) {
+    fact('Ban reason', p.banReason || 'None given');
+    fact('Banned by', p.banSource);
+    fact('Ban expires', p.banExpires ? new Date(p.banExpires).toLocaleString() : 'Never');
+  }
+  fact('Whitelist', p.whitelisted ? 'On the list' : 'Not on the list');
+
+  // The row's own buttons, built the same way so they behave the same way.
+  const acts = playerRow(p, data, base, again).querySelector('.w-acts');
+  acts.className = 'wd-acts';
+  box.append(head, facts, acts);
+  return box;
 }
 
 /**
@@ -5594,11 +5768,13 @@ function playerFace(uuid, size) {
 }
 
 /** One person, and the three things you can do about them. */
-function playerRow(p, data, base, again) {
+function playerRow(p, data, base, again, select) {
   const el = document.createElement('div');
   el.className = 'who';
   if (p.online) el.setAttribute('data-online', '');
   el.append(playerFace(p.uuid));
+  // A click anywhere but a button chooses this player for the detail column an Ultra pane shows.
+  if (select) el.addEventListener('click', (e) => { if (!e.target.closest('button')) select(p.uuid); });
 
   const name = document.createElement('div');
   name.className = 'w-name';
@@ -9120,6 +9296,9 @@ async function renderServerSettings() {
   return settingsRender;
 }
 
+/** The one ResizeObserver the settings form keeps on its pane; replaced when the form is rebuilt. */
+let settingsPaneWatch = null;
+
 async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
   body.classList.add('set-screen');
@@ -9871,15 +10050,30 @@ async function buildServerSettings(row, body) {
     await loadRaw();
   };
 
+  /*
+    The raw file takes the form's place on a pane that has room for one of them, and sits beside
+    the form on an Ultra pane, where both stay showing and picking server.properties in the list
+    only brings the file to the front. Measured in script because [hidden] is final in this sheet.
+  */
+  let rawOn = false;
   function showRaw(on) {
-    form.hidden = on;
-    bar.hidden = on;
-    rawView.hidden = !on;
-    if (on) {
-      markNav('raw');
-      if (rawLoaded === null) loadRaw();
-    }
+    rawOn = on;
+    const beside = paneIsUltra(body);
+    form.hidden = on && !beside;
+    bar.hidden = on && !beside;
+    rawView.hidden = !on && !beside;
+    if (!rawView.hidden && rawLoaded === null) loadRaw();
+    if (on) markNav('raw');
   }
+  // The pane crossing 2000px, either way, re-decides which of the two are showing.
+  if (settingsPaneWatch) settingsPaneWatch.disconnect();
+  settingsPaneWatch = new ResizeObserver(() => {
+    if (!body.isConnected || body.dataset.for !== row.name) return settingsPaneWatch.disconnect();
+    const beside = paneIsUltra(body);
+    if (beside === (!rawView.hidden && !form.hidden)) return;
+    showRaw(rawOn);
+  });
+  settingsPaneWatch.observe(body.closest('.pane-scroll'));
 
   const sep = el('div', 'set-nav-sep');
   sep.setAttribute('role', 'separator');
@@ -9887,6 +10081,8 @@ async function buildServerSettings(row, body) {
   const rawNav = addNav('raw', 'server.properties', rawView);
   rawNav.classList.add('mono');
   rawNav.onclick = () => { showRaw(true); rawText.focus(); };
+  // On an Ultra pane the file is on screen from the start, so it is read from the start.
+  showRaw(false);
 
   // The section that was showing before a rebuild of the same server's form comes back; otherwise
   // the first section is the one on screen until another is picked. Databases is built below, so a
