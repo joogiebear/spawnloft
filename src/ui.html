@@ -927,6 +927,10 @@
   @media (max-height: 700px) {
     .dock { gap: 2px; padding: var(--s-1) 0; }
     .dock button { height: 50px; }
+    /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
+    .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
+    .srv-name h1 { font-size: var(--t-6); }
+    .srv-title { gap: 3px; }
   }
 
   /*
