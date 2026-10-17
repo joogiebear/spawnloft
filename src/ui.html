@@ -467,23 +467,25 @@
   .stab-ico { position: relative; display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--ink-3); }
   .stab-ico .ico { width: 15px; height: 15px; }
   .stab[aria-current="page"] .stab-ico, .stab:hover .stab-ico { color: var(--ink-2); }
-  .stab-ico .lamp { position: absolute; right: -3px; bottom: -2px; width: 7px; height: 7px; box-shadow: 0 0 0 2px var(--chrome); }
-  .stab[aria-current="page"] .stab-ico .lamp { box-shadow: 0 0 0 2px var(--raised); }
+  .stab-ico .lamp { --halo: var(--chrome); position: absolute; right: -3px; bottom: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--halo); }
+  .stab[aria-current="page"] .stab-ico .lamp { --halo: var(--raised); }
   .stab-ico .lamp::after { inset: -3px; }
+  /* Stopped is a hollow ring and every other state a filled dot, so stopped and running differ in
+     shape and not only in colour. A database answering at its address is as up as a running server,
+     and one that is not answering is a fault, not an idle grey that reads as "stopped". */
+  .stab[data-status="stopped"]:not([data-crashed]) .stab-ico .lamp { background: var(--halo); box-shadow: inset 0 0 0 1.5px var(--ink-3), 0 0 0 2px var(--halo); }
+  .stab[data-status="stopped"]:not([data-crashed]) .stab-ico .lamp::after { display: none; }
+  .stab[data-status="reachable"] .lamp { --lamp: var(--live); }
+  .stab[data-status="unreachable"] .lamp { --lamp: var(--fault); }
   /* The two groups, under their own headings. */
   .tabs-head { display: block; margin: var(--s-3) 10px var(--s-1); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
-  /* Add a server, at the foot of the list, drawn like a row so it reads as one more entry. */
-  .side-new {
-    display: flex; align-items: center; gap: 9px;
-    margin: 0 var(--s-2) var(--s-3);
-    height: 36px; padding: 0 10px;
-    background: transparent; border: 1px dashed var(--edge); box-shadow: none;
-    border-radius: var(--r-sm);
-    color: var(--ink-2); font: 500 var(--t-3)/1 var(--ui);
-  }
+  /* Add a server, at the foot of the list: the same button as New server on Overview, as a
+     secondary, since the one primary on any screen belongs to that screen. It is the only way to
+     add from a server's page, which is why it stays. Lit while the Add sheet is what is open. */
+  .side-new { display: flex; justify-content: center; margin: 0 var(--s-2) var(--s-3); }
   .side-new .ico { width: 14px; height: 14px; flex: none; }
-  .side-new:hover:not(:disabled) { background: var(--hover); border-color: var(--edge); color: var(--ink); transform: none; }
+  .side-new[aria-current="page"] { background: var(--lapis-wash); border-color: var(--lapis-edge); color: var(--ink); }
 
   /*
     Java, when it is missing or too old: a chip rather than a banner across the page. It is a
@@ -1138,7 +1140,7 @@
   }
 
   @media (max-height: 700px) {
-    .side .stab, .side .dock button { height: 30px; }
+    .side .stab, .side .dock button { height: var(--hit); }
     /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
     .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
     .srv-name h1 { font-size: var(--t-6); }
@@ -2574,6 +2576,7 @@
   <symbol id="i-clock" viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M8 5.5V8h2.5"/></symbol>
   <symbol id="i-server" viewBox="0 0 16 16"><path d="M2 3h12v4H2zM2 9h12v4H2z"/><path d="M4.5 5h.5M4.5 11h.5"/></symbol>
   <symbol id="i-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8"/><path d="M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></symbol>
+  <symbol id="i-cache" viewBox="0 0 16 16"><path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4.5h12M2 11.5h12"/><path d="M5 3v3M11 10v3"/></symbol>
   <symbol id="i-plug" viewBox="0 0 16 16"><path d="M5 2v3.5M11 2v3.5"/><path d="M3.5 5.5h9V9a4.5 4.5 0 0 1-9 0z"/><path d="M8 13.5V15"/></symbol>
   <symbol id="i-map" viewBox="0 0 16 16"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5z"/><path d="M6 2.5v10M10 4v10"/></symbol>
@@ -3725,7 +3728,9 @@ function buildTab(row) {
   glyph.className = 'stab-ico';
   const lamp = document.createElement('span');
   lamp.className = 'lamp';
-  glyph.append(icon(isDb(row) ? 'database' : 'server'), lamp);
+  // A key-value store is not a table store, and the two need different things from the person
+  // (no schema, no SQL dumps): the glyph says which before the name does.
+  glyph.append(icon(!isDb(row) ? 'server' : row.engineKind === 'redis' ? 'cache' : 'database'), lamp);
   const nm = document.createElement('span');
   nm.className = 'nm';
   const note = document.createElement('span');
@@ -3771,11 +3776,15 @@ function updateTab(el, row) {
  * sits under whichever row is current, and goes back to the sidebar, hidden, when none is.
  */
 function markTabs() {
-  $('#tabHome').setAttribute('aria-current', state.current ? 'false' : 'page');
+  // A sheet covers the stage, so the server behind it is not where the person is: lighting its row
+  // would say otherwise. The Add sheet lights the button that opened it instead.
+  const onSheet = SHEETS.has(state.view);
+  $('#tabHome').setAttribute('aria-current', state.current || onSheet ? 'false' : 'page');
+  $('#bNew').setAttribute('aria-current', state.view === 'add' ? 'page' : 'false');
   const dock = $('#dock');
   let current = null;
   for (const el of $$('#list .stab[data-name]')) {
-    const on = el.dataset.name === state.current;
+    const on = !onSheet && el.dataset.name === state.current;
     el.setAttribute('aria-current', on ? 'page' : 'false');
     if (on) current = el;
   }
@@ -3788,7 +3797,46 @@ function markTabs() {
     dock.hidden = true;
     if (dock.parentNode !== $('.srv-tabs')) $('.srv-tabs').append(dock);
   }
+  syncRoving();
 }
+
+/*
+  The sidebar is one Tab stop, not one per row: with a server open that was fifteen stops before
+  the stage. Up and Down walk the rows and the open server's tools in the order they are drawn,
+  Home and End jump to the ends, Right opens a server or steps into its tools, Left steps back out
+  to the server. Enter and Space are the buttons' own.
+*/
+const sideItems = () => $$('#list button').filter((b) => !b.closest('[hidden]') && b.offsetParent !== null);
+
+/** Leave the one Tab stop on the focused row, or else on the row that is open. */
+function syncRoving() {
+  const items = sideItems();
+  const anchor = items.includes(document.activeElement) ? document.activeElement
+    : items.find((b) => b.classList.contains('stab') && b.getAttribute('aria-current') === 'page') || items[0];
+  for (const b of $$('#list button')) b.tabIndex = b === anchor ? 0 : -1;
+}
+
+$('#list').addEventListener('focusin', syncRoving);
+$('#list').addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const items = sideItems();
+  const at = document.activeElement;
+  const i = items.indexOf(at);
+  if (i < 0) return;
+  const dock = $('#dock');
+  let to = null;
+  if (e.key === 'ArrowDown') to = items[Math.min(i + 1, items.length - 1)];
+  else if (e.key === 'ArrowUp') to = items[Math.max(i - 1, 0)];
+  else if (e.key === 'Home') to = items[0];
+  else if (e.key === 'End') to = items[items.length - 1];
+  else if (e.key === 'ArrowRight' && at.dataset.name) {
+    if (at.getAttribute('aria-current') === 'page' && !dock.hidden) to = dock.querySelector('button');
+    else at.click();
+  } else if (e.key === 'ArrowLeft' && dock.contains(at)) to = dock.previousElementSibling;
+  else return;
+  e.preventDefault();
+  if (to) to.focus();
+});
 
 /**
  * Reconcile the tabs against the DOM rather than rewriting them.
