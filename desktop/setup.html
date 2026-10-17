@@ -43,8 +43,9 @@
     /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
        the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
     --ink-3:    #8f98ae;
-    /* Below the reading line on purpose: console timestamps, which are looked up, not read. */
-    --ink-4:    #545d72;
+    /* The quietest text: console timestamps, line numbers, separators. Quiet, but still text, so
+       it holds 4.5:1 on every plane up to --raised-hi (#545d72 was 2.3:1 there). */
+    --ink-4:    #868fa4;
 
     --lapis:     #5b84ff;
     --lapis-dim: #2c3f8f;
@@ -90,7 +91,22 @@
     --t-6: 22px;   /* a server's name, a big number */
     --t-7: 32px;   /* the one display heading */
 
-    /* Spacing, on a four-pixel grid. */
+    /* Type roles. A role is size, weight, line height and family together, so a title is one
+       decision rather than four. Use these for new type; a raw --t-* is for the odd fact that is
+       none of them. --track-* is the letter-spacing that goes with a role. */
+    --type-display: 650 var(--t-7)/1.1 var(--display);   /* Overview's one heading */
+    --type-page:    650 var(--t-6)/1.15 var(--display);  /* a page or sheet title */
+    --type-section: 650 var(--t-5)/1.25 var(--display);  /* a pane, tool or dialog title */
+    --type-card:    600 var(--t-4)/1.35 var(--ui);       /* the name on a card or a row */
+    --type-body:    400 var(--t-3)/1.5 var(--ui);        /* running text inside panes */
+    --type-meta:    400 var(--t-2)/1.45 var(--ui);       /* hints, timestamps, secondary lines */
+    --type-label:   650 var(--t-1)/1.3 var(--ui);        /* uppercase field and section labels */
+    --type-mono:    400 var(--t-3)/1.5 var(--mono);      /* paths, addresses, the console */
+    --track-display: -.025em;
+    --track-label: .08em;
+
+    /* Spacing, on a four-pixel grid. Every gap, padding and margin should be one of these; a
+       value between two steps is a sign the layout wants the smaller one. */
     --s-1: 4px;
     --s-2: 8px;
     --s-3: 12px;
@@ -98,6 +114,15 @@
     --s-5: 20px;
     --s-6: 28px;
     --s-7: 40px;
+
+    /* The smallest thing a pointer is asked to hit. Buttons, tabs, segments and disclosures are at
+       least this tall; an icon-only button is this square. */
+    --hit: 32px;
+
+    /* Focus. One ring for every control, keyboard or not, in the accent colour. */
+    --ring-width: 2px;
+    --ring-offset: 2px;
+    --ring-color: var(--lapis);
 
     /* Depth. Every plane is solid: the frame is --chrome, a sheet or dialog is --raised, and the
        one-pixel --lift along the top says which is in front. Glass needs something behind it to
@@ -181,7 +206,7 @@
     --ink: #efeee6;
     --ink-2: #b5bcac;
     --ink-3: #9aa48f;
-    --ink-4: #5f6a58;
+    --ink-4: #8d9783;
     --idle: #9aa48f;
     --lapis: #c4f566;
     --lapis-dim: #546e2a;
@@ -243,7 +268,8 @@
     padding: 28px;
     overflow: auto;
   }
-  :focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; border-radius: 4px; }
+  /* The panel's ring, lifted over component transitions the same way; see src/ui.html. */
+  :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); transition-property: none; }
 
   .card {
     width: min(660px, 100%);
@@ -292,11 +318,12 @@
     transition: all var(--ease);
   }
   input[type="text"]:hover { border-color: var(--edge); }
-  input[type="text"]:focus {
-    outline: none;
+  :root input[type="text"]:focus {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -1px;
     border-color: var(--lapis-edge);
     background-color: var(--field-focus);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
   }
 
   button {
