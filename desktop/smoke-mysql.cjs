@@ -5,10 +5,9 @@ const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 
 // native Oracle binaries, created through the packaged GUI from an empty engine store
-module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record }) {
+module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings }) {
   const dbName = `${name}-db`
-  // a second press on an open tool closes it, so only press if Settings isn't already open
-  if (await page.locator('#tabSettings').getAttribute('aria-expanded') !== 'true') await page.locator('#tabSettings').click()
+  await openDatabaseSettings()
   const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
   await create.scrollIntoViewIfNeeded()
   assert.equal(await create.isEnabled(), true)

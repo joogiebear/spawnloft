@@ -1318,13 +1318,14 @@
   .mc-motd { color: #aaa; overflow-wrap: anywhere; }
 
   :root[data-console-only] header,
+  :root[data-console-only] .side,
   :root[data-console-only] .dock,
   :root[data-console-only] #toolPanel,
   :root[data-console-only] #conMini,
   :root[data-console-only] #bPopConsole,
   :root[data-console-only] #srvNotice,
   :root[data-console-only] #bManage { display: none !important; }
-  :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
+  :root[data-console-only] main, :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
   .steps { display: grid; gap: var(--s-2); }
   .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
   .step {
