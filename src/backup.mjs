@@ -395,19 +395,23 @@ export function listSnapshots(name) {
     .sort((a, b) => b.mtime - a.mtime)
 }
 
-// Newest snapshot time, or null. Used by the panel overview for every server at once, so it only
-// stats archives: no manifests, no folder created, async.
-export async function newestSnapshotAt(name) {
+// Newest snapshot time and how many there are. Used by the panel overview for every server at
+// once, so it only stats archives: no manifests, no folder created, async.
+export async function snapshotSummary(name) {
   const dir = path.join(BACKUPS_DIR, name)
   let files
   try {
     files = (await fs.promises.readdir(dir)).filter((f) => f.endsWith('.tar.gz'))
   } catch {
-    return null
+    return { newestAt: null, count: 0 }
   }
   const times = await Promise.all(files.map((f) => fs.promises.stat(path.join(dir, f)).then((s) => s.mtimeMs, () => 0)))
   const newest = Math.max(0, ...times)
-  return newest || null
+  return { newestAt: newest || null, count: times.filter(Boolean).length }
+}
+
+export async function newestSnapshotAt(name) {
+  return (await snapshotSummary(name)).newestAt
 }
 
 export function resolveSnapshot(name, ref) {
