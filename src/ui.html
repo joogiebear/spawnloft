@@ -514,7 +514,7 @@
   /* minmax(0, 1fr), not the default auto: an auto track is sized to its content's minimum, so
      the server header - a flex row of five buttons that do not wrap - made this column wider
      than the window and pushed "Manage" off the right edge at the app's own minimum size. */
-  .stage { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+  .stage { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); container-type: inline-size; container-name: stage; }
   .view { display: none; min-height: 0; }
   .view[data-active] { display: grid; }
 
@@ -760,13 +760,37 @@
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
   .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
-  /* On a wide window the cards grow instead of leaving empty tracks: after the base rules above so
-     it wins, and auto-fit so four servers on a 4K screen share the whole row. */
-  @media (min-width: 2000px) {
+  /*
+    The Overview's tiers, measured on the stage (the window less the sidebar). Wide: the databases
+    block appears under the cards. Ultra: the cards grow instead of leaving empty tracks (auto-fit,
+    so four servers share the whole row), and the activity feed moves beside the cards as a column
+    of its own, showing all of what was fetched rather than the first eight. After the base rules
+    above so these win.
+  */
+  /* Eight lines of history is the Overview's share below Ultra; the rest is fetched for the column. */
+  .home-activity .act-row.act-home:nth-child(n + 9) { display: none; }
+  @container stage (min-width: 1280px) {
+    .home-dbs:not([hidden]) { display: grid; }
+  }
+  @container stage (min-width: 2000px) {
     .home { padding: 40px 56px 56px; gap: var(--s-7); }
-    .home-cards, .att-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
+    .home-cards, .att-grid, .dbs-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
+    /* The well cap: one server on a 4K screen gets a 1400px card, not a 2600px one. */
+    .home-cards > .scard, .dbs-grid > .dcard, .att-grid > .att { max-width: 1400px; }
+    .home:has(> .home-activity:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(420px, 32%, 820px); column-gap: var(--s-7); }
+    .home:has(> .home-activity:not([hidden])) > .home-head,
+    .home:has(> .home-activity:not([hidden])) > .attention { grid-column: 1 / -1; }
+    .home:has(> .home-activity:not([hidden])) > .home-cards,
+    .home:has(> .home-activity:not([hidden])) > .home-dbs { grid-column: 1; }
+    .home:has(> .home-activity:not([hidden])) { grid-auto-flow: row dense; }
+    .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; grid-row: span 2; margin-top: 0; align-self: start; }
+    .home-activity .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
+    .home-activity .act-row.act-home .act-what { grid-column: 1 / -1; }
+    .home-activity .act-row.act-home:nth-child(n + 9) { display: grid; }
   }
   .scard {
+    container-type: inline-size;
+    container-name: card;
     display: grid;
     gap: var(--s-3);
     padding: var(--s-5);
@@ -789,6 +813,28 @@
   .sc-stats .big { font: 650 var(--t-5)/1 var(--display); color: var(--ink); letter-spacing: -.01em; }
   .sc-stats .big[data-tone="warn"] { color: var(--warn-ink); }
   .sc-stats .of { font: var(--t-2)/1 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+  /*
+    What a card shows when it is wide, whether because the screen is or because there are two of
+    them: the last ten minutes of TPS and memory as a line beside each number, and the databases the
+    server is attached to. Keyed on the card's own width, so the reveal is the same either way.
+  */
+  .sc-stats .spark { display: none; width: 64px; height: 18px; flex: none; overflow: visible; align-self: center; }
+  .sc-stats .spark polyline { fill: none; stroke: var(--chart-cpu); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .sc-stats [data-v="memory"] .spark polyline { stroke: #8fd3a8; }
+  .sc-dbs { display: none; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-dbs b { font-weight: 600; color: var(--ink-2); }
+  .sc-dbs:empty { display: none; }
+  @container card (min-width: 640px) {
+    .sc-stats .spark { display: block; }
+    .sc-dbs:not(:empty) { display: block; }
+  }
+
+  /* The databases, each as a card of the server cards' shape: what it is, where, and who uses it. */
+  .home-dbs { display: none; gap: var(--s-3); }
+  .home-dbs .hist-title { margin: 0; }
+  .dbs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
+  .dcard .sc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dcard .sc-stats .txt { font: 500 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sc-foot { display: flex; align-items: center; gap: var(--s-3); }
   .sc-note { flex: 1; min-width: 0; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sc-note[data-tone="warn"] { color: var(--warn-ink); }
@@ -2425,6 +2471,10 @@
         <button type="button" class="more-link" id="attMore" hidden></button>
       </section>
       <div class="home-cards" id="homeCards"></div>
+      <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
+        <h2 class="hist-title" id="homeDbTitle">Databases</h2>
+        <div class="dbs-grid" id="dbsGrid"></div>
+      </section>
       <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
         <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
         <div class="act-list" id="homeActList"></div>
@@ -4132,7 +4182,9 @@ async function loadOverview(force) {
   try {
     // The history rides along: the same "what changed" the servers' Activity tools answer, across
     // all of them, newest first.
-    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=8').catch(() => null)]);
+    // Twenty lines: eight show below Ultra, and the column an Ultra window has beside the cards
+    // shows them all.
+    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=20').catch(() => null)]);
     overview.data = data;
     overview.activity = recent ? recent.entries : null;
   } catch {
@@ -4162,7 +4214,118 @@ function renderOverview() {
 
   renderAttention();
   renderHomeCards();
+  renderHomeDbs();
   renderHomeActivity();
+  pollHomeMetrics();
+}
+
+/*
+  The lines beside TPS and memory on a wide card: the last ten minutes, asked for every ten seconds
+  while the Overview is showing, only for running servers and only when a card is wide enough to
+  draw them. A narrow card asks for nothing.
+*/
+const homeMetrics = { samples: {}, asked: 0, timer: null };
+
+async function pollHomeMetrics() {
+  if (state.view !== 'home' || document.hidden) return;
+  if (!homeMetrics.timer) {
+    homeMetrics.timer = setInterval(() => {
+      if (state.view !== 'home') { clearInterval(homeMetrics.timer); homeMetrics.timer = null; return; }
+      pollHomeMetrics();
+    }, 10000);
+  }
+  if (Date.now() - homeMetrics.asked < 9000) return;
+  homeMetrics.asked = Date.now();
+  const wide = new Set(Array.from($('#homeCards').children).filter((c) => c.clientWidth >= 640).map((c) => c.dataset.name));
+  const asks = state.rows.filter((r) => r.status === 'running' && wide.has(r.name)).map((r) =>
+    api('/instances/' + encodeURIComponent(r.name) + '/metrics?seconds=600')
+      .then((d) => { homeMetrics.samples[r.name] = (d && d.samples) || []; }, () => {}));
+  if (!asks.length) return;
+  await Promise.all(asks);
+  if (state.view === 'home') renderHomeCards();
+}
+
+/**
+ * The databases, under the servers, on a Wide stage. Each card is keyed like a server card and
+ * says what the database is, where it answers, how much memory it holds and which servers use it.
+ */
+function renderHomeDbs() {
+  const section = $('#homeDbs');
+  const grid = $('#dbsGrid');
+  const dbs = state.dbs || [];
+  section.hidden = !dbs.length;
+  const seen = new Set();
+  dbs.forEach((row, i) => {
+    seen.add(row.name);
+    let card = grid.querySelector('.dcard[data-name="' + CSS.escape(row.name) + '"]');
+    if (!card) card = buildDbCard(row.name);
+    updateDbCard(card, row);
+    if (grid.children[i] !== card) grid.insertBefore(card, grid.children[i] || null);
+  });
+  for (const card of Array.from(grid.children)) if (!seen.has(card.dataset.name)) card.remove();
+}
+
+function buildDbCard(name) {
+  const el = (tag, cls) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    return node;
+  };
+  const card = el('article', 'scard dcard');
+  card.dataset.name = name;
+  const head = el('div', 'sc-head');
+  const title = el('div', 'sc-title');
+  title.append(el('h3', 'sc-name'), el('span', 'spill'));
+  head.append(title);
+  const stats = el('dl', 'sc-stats');
+  for (const [key, label] of [['memory', 'Memory'], ['attached', 'Used by'], ['address', 'Address']]) {
+    const cell = el('div');
+    cell.dataset.v = key;
+    const dt = el('dt');
+    dt.textContent = label;
+    cell.append(dt, el('dd'));
+    stats.append(cell);
+  }
+  const foot = el('div', 'sc-foot');
+  const open = el('button', 'ghost sc-open');
+  open.type = 'button';
+  open.textContent = 'Open \u2192';
+  open.onclick = () => select(name);
+  foot.append(el('span', 'sc-note'), open);
+  card.append(head, el('div', 'sc-soft'), stats, foot);
+  return card;
+}
+
+function updateDbCard(card, row) {
+  card.dataset.status = row.status;
+  card.querySelector('.sc-name').textContent = row.label || row.name;
+  const pill = card.querySelector('.spill');
+  const said = describeState(row, null);
+  pill.textContent = said.text;
+  if (said.tone) pill.dataset.tone = said.tone;
+  else delete pill.dataset.tone;
+  card.querySelector('.sc-soft').textContent = (row.engineLabel || row.engine) + (row.version ? ' ' + row.version : '')
+    + (row.external ? ' \u00b7 runs elsewhere' : '');
+  const latest = row.status === 'running' ? row.latest : null;
+  if (latest && Number.isFinite(latest.rss)) {
+    const gb = latest.rss >= 1024;
+    setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? 'GB' : 'MB');
+  } else setStat(card, 'memory', '\u2014');
+  const names = Object.keys(row.attachments || {});
+  const text = (key, value) => {
+    const dd = card.querySelector('[data-v="' + key + '"] dd');
+    dd.textContent = '';
+    const t = document.createElement('span');
+    t.className = 'txt';
+    t.textContent = value;
+    t.title = value;
+    dd.append(t);
+  };
+  text('attached', names.length ? names.map((n) => (rowOf(n) || {}).label || n).join(', ') : 'nothing yet');
+  text('address', (row.host || '127.0.0.1') + ':' + (row.port || '?'));
+  card.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (row.label || row.name));
+  const note = card.querySelector('.sc-note');
+  note.textContent = names.length === 1 ? '1 server attached' : names.length ? names.length + ' servers attached' : 'No server attached';
 }
 
 /**
@@ -4402,7 +4565,7 @@ function buildHomeCard(name) {
   open.onclick = () => select(name);
   foot.append(el('span', 'sc-note'), open);
 
-  card.append(head, el('div', 'sc-soft'), stats, foot);
+  card.append(head, el('div', 'sc-soft'), stats, el('div', 'sc-dbs'), foot);
   return card;
 }
 
@@ -4443,7 +4606,7 @@ function cardNote(row) {
   return { text: 'Backups off' };
 }
 
-function setStat(card, key, value, of, tone) {
+function setStat(card, key, value, of, tone, spark) {
   const dd = card.querySelector('[data-v="' + key + '"] dd');
   dd.textContent = '';
   const big = document.createElement('span');
@@ -4457,6 +4620,8 @@ function setStat(card, key, value, of, tone) {
     small.textContent = of;
     dd.append(small);
   }
+  // Drawn whenever there is history; the stylesheet shows it only on a card wide enough for it.
+  if (spark && spark.values.length > 1) dd.append(sparkline(spark.values, spark.max));
 }
 
 function updateHomeCard(card, row) {
@@ -4487,13 +4652,26 @@ function updateHomeCard(card, row) {
   const latest = row.status === 'running' ? row.latest : null;
   if (latest && latest.players != null) setStat(card, 'players', String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
   else setStat(card, 'players', '—');
-  setStat(card, 'tps', latest && latest.tps != null ? latest.tps.toFixed(1) : '—');
+  const samples = latest ? homeMetrics.samples[row.name] || [] : [];
+  setStat(card, 'tps', latest && latest.tps != null ? latest.tps.toFixed(1) : '—', '', '',
+    { values: samples.filter((s) => s.tps != null).map((s) => s.tps), max: 20 });
   const ceiling = memoryCeilingMb(row.memory);
   if (latest && Number.isFinite(latest.rss)) {
     const gb = latest.rss >= 1024;
     const allotted = ceiling ? '/ ' + gbOf(ceiling) + ' GB' : 'GB';
-    setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted);
+    const rss = samples.map((s) => s.rss).filter((v) => Number.isFinite(v));
+    setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted, '',
+      { values: rss, max: Math.max(ceiling || 0, ...rss, 256) });
   } else setStat(card, 'memory', '—');
+  // The databases this server is attached to, on a wide card.
+  const dbs = (state.dbs || []).filter((d) => d.attachments && d.attachments[row.name]);
+  const dbLine = card.querySelector('.sc-dbs');
+  dbLine.textContent = '';
+  if (dbs.length) {
+    const b = document.createElement('b');
+    b.textContent = dbs.length === 1 ? 'Database ' : 'Databases ';
+    dbLine.append(b, dbs.map((d) => d.label || d.name).join(', '));
+  }
   const facts = overview.data && overview.data.servers[row.name];
   if (!facts) setStat(card, 'backup', '…');
   else if (facts.lastBackupAt == null) setStat(card, 'backup', 'Never', '', 'warn');
