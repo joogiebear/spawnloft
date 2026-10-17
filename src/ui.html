@@ -262,6 +262,10 @@
   .theme-preview i:nth-child(2) { left: 4px; top: 12px; width: 14px; bottom: 4px; }
   .theme-preview i:nth-child(3) { left: 22px; right: 5px; top: 13px; height: 5px; background: var(--preview-accent); box-shadow: 0 10px 0 var(--preview-surface), 0 18px 0 var(--preview-surface); }
   .theme-picker #themeStatus { margin-bottom: 0; min-height: 1.5em; }
+  .ui-size { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  .ui-size[hidden] { display: none; }
+  .ui-size label { display: grid; gap: 3px; }
+  .ui-size small { font-size: var(--t-2); color: var(--ink-3); }
   @media (max-width: 920px) { .theme-options { grid-template-columns: minmax(0, 1fr); } }
 
   /* ---- icons ---------------------------------------------------------------- */
@@ -736,7 +740,9 @@
   /* Three to a row, in the tone of what they are about; each says one thing and offers one way out. */
   .attention { display: grid; gap: var(--s-3); }
   .attention .hist-title { margin: 0; }
-  .att-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+  /* The same column width as .home-cards, so the notices line up with the cards below them. A fixed
+     3 and 2 columns did not scale: a wide screen got notices at two thirds of the width. */
+  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-3); }
   .att {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
@@ -764,7 +770,7 @@
   button.more-link { justify-self: start; padding: 2px 0; background: none; border: 0; box-shadow: none; color: var(--lapis-ink); font: 500 var(--t-3)/1.4 var(--ui); }
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
-  .home-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+  .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
   .scard {
     display: grid;
     gap: var(--s-3);
@@ -794,12 +800,10 @@
   .sc-foot .sc-open { padding: 4px 10px; font-size: var(--t-2); }
 
   @media (max-width: 1100px) {
-    .home { padding: 28px 32px 40px; }
-    .att-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .home { padding: 28px 24px 40px; }
   }
   @media (max-width: 760px) {
     .home { padding: var(--s-5); }
-    .att-grid, .home-cards { grid-template-columns: minmax(0, 1fr); }
   }
 
   /* ---- server view ------------------------------------------------------ */
@@ -923,6 +927,10 @@
   @media (max-height: 700px) {
     .dock { gap: 2px; padding: var(--s-1) 0; }
     .dock button { height: 50px; }
+    /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
+    .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
+    .srv-name h1 { font-size: var(--t-6); }
+    .srv-title { gap: 3px; }
   }
 
   /*
@@ -2711,6 +2719,15 @@
             </label>
           </div>
           <p id="themeStatus" class="hint" aria-live="polite"></p>
+          <!-- Desktop app only: a plain browser has its own zoom. -->
+          <div class="ui-size" id="uiSizeRow" hidden>
+            <label for="uiSize"><strong>Interface size</strong><small>Ctrl and + or -, Ctrl 0 for 100%.</small></label>
+            <select id="uiSize">
+              <option value="0.8">80%</option><option value="0.9">90%</option><option value="1">100%</option>
+              <option value="1.1">110%</option><option value="1.25">125%</option><option value="1.5">150%</option>
+              <option value="1.75">175%</option><option value="2">200%</option>
+            </select>
+          </div>
         </fieldset>
         <div>
           <h2>Where SpawnLoft keeps things</h2>
@@ -11152,6 +11169,16 @@ async function changeTheme(event) {
 showTheme(document.documentElement.dataset.theme);
 $$('input[name="appTheme"]').forEach(input => { input.onchange = changeTheme; });
 
+// The size also changes from the keyboard, so the select is read when Preferences opens, not once.
+async function showUiSize() {
+  if (!desktop || !desktop.getZoom) return;
+  $('#uiSizeRow').hidden = false;
+  $('#uiSize').value = String(await desktop.getZoom());
+}
+$('#uiSize').onchange = async (event) => {
+  event.target.value = String(await desktop.setZoom(Number(event.target.value)));
+};
+
 async function loadSettings() {
   try {
     state.layout = await api('/settings');
@@ -11161,6 +11188,7 @@ async function loadSettings() {
 }
 
 function renderSettings() {
+  showUiSize();
   showTheme(document.documentElement.dataset.theme);
   const l = state.layout;
   const paths = $('#setPaths');
