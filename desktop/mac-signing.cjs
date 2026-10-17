@@ -20,6 +20,23 @@ exports.requireCredentials = function (env = process.env) {
   }
 }
 
+// `stapler validate` checks the stapled ticket against Apple's CloudKit, and that lookup fails
+// now and then with exit 68 on a build whose ticket is fine: the same app validated minutes
+// earlier in the same job. A few spaced tries tell a passing blip from a missing ticket, and the
+// tool's own output is kept, since the exit code alone has been the whole error so far.
+exports.validateStapled = async function (app, { run, attempts = 4, pauseMs = 20000, sleep, log = console.log } = {}) {
+  const wait = sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)))
+  let last
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const result = run('xcrun', ['stapler', 'validate', app])
+    if (result.status === 0) return attempt
+    last = result
+    log(`stapler validate failed (exit ${result.status}), attempt ${attempt} of ${attempts}\n${result.stdout || ''}${result.stderr || ''}`.trimEnd())
+    if (attempt < attempts) await wait(pauseMs)
+  }
+  throw new Error(`Notarization ticket did not validate after ${attempts} attempts (exit ${last.status})`)
+}
+
 exports.verifySignatureDetails = function (details, mode, teamId) {
   if (!MODES.includes(mode)) throw new Error('Unknown Mac signing mode')
   if (mode === 'ad-hoc') {

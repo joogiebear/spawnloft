@@ -34,6 +34,25 @@ test('signed verification refuses ad-hoc, wrong team, missing runtime or timesta
   assert.throws(() => signing.verifySignatureDetails(good, 'ad-hoc'))
 })
 
+test('stapler validation retries a CloudKit blip, keeps the output, and fails closed', async () => {
+  const calls = []
+  const logs = []
+  const waits = []
+  const flaky = (statuses) => (command, args) => {
+    calls.push([command, ...args])
+    const status = statuses.shift()
+    return { status, stdout: `Processing: ${args[2]}\n`, stderr: status ? 'CloudKit query failed\n' : '' }
+  }
+  const opts = { sleep: ms => { waits.push(ms); return Promise.resolve() }, log: m => logs.push(m), pauseMs: 7 }
+  assert.equal(await signing.validateStapled('/tmp/App.app', { ...opts, run: flaky([68, 68, 0]) }), 3)
+  assert.deepEqual(calls[0], ['xcrun', 'stapler', 'validate', '/tmp/App.app'])
+  assert.deepEqual(waits, [7, 7])
+  assert.match(logs[0], /exit 68.*attempt 1 of 4/s)
+  assert.match(logs[0], /CloudKit query failed/)
+  await assert.rejects(signing.validateStapled('/tmp/App.app', { ...opts, run: flaky([65, 65, 65, 65]) }), /did not validate after 4 attempts \(exit 65\)/)
+  assert.equal(calls.length, 7)
+})
+
 test('release notes describe verified signing mode without changing Windows preview status', () => {
   const template = fs.readFileSync(new URL('../desktop/PREVIEW.md', import.meta.url), 'utf8')
   assert.equal(notes.renderPreviewNotes(template, 'ad-hoc'), template)

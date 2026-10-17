@@ -7,8 +7,9 @@ const path = require('node:path')
 const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
 const http = require('node:http')
-const { execFileSync } = require('node:child_process')
+const { execFileSync, spawnSync } = require('node:child_process')
 const { _electron: electron } = require('playwright')
+const { validateStapled } = require('./mac-signing.cjs')
 
 async function main() {
   assert.equal(process.platform, 'darwin')
@@ -110,7 +111,7 @@ async function main() {
     await app.close().catch(() => {})
     app = null
     execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', installed])
-    execFileSync('/usr/bin/xcrun', ['stapler', 'validate', installed])
+    await validateStapled(installed, { run: (command, args) => spawnSync('/usr/bin/' + command, args, { encoding: 'utf8' }) })
     execFileSync('/usr/sbin/spctl', ['--assess', '--type', 'execute', installed])
     app = await launch()
     const updated = await app.firstWindow()
