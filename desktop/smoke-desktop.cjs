@@ -75,6 +75,14 @@ async function main() {
     if (await page.locator('#toolPanel').isVisible()) await page.locator('#toolClose').click()
     await page.locator('#log').waitFor({ state: 'visible' })
   }
+  // Settings shows one section at a time; the databases are the last one, added once the form has read
+  // which databases the server is attached to.
+  async function openDatabaseSettings() {
+    await openTool('tabSettings')
+    const databases = page.locator('#settingsBody .set-nav [data-section="databases"]')
+    await databases.waitFor({ state: 'visible' })
+    if (await databases.getAttribute('aria-current') !== 'true') await databases.click()
+  }
 
   function record(message) {
     console.log(message)
@@ -382,7 +390,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     record(`PASS: packaged daemon starts, reaches ready, and receives console input over its ${isUnix ? 'Unix socket' : 'named pipe'}`)
     await page.locator('#bSetClose').click()
     await page.locator(`#list [data-name="${name}"]`).click()
-    await openTool('tabSettings')
+    await openDatabaseSettings()
     const showCredentials = page.locator('#settingsBody').getByRole('button', { name: 'Show credentials', exact: true })
     await showCredentials.waitFor({ state: 'visible' })
     assert.match(await page.locator('#settingsBody').textContent(), /configure your plugins manually/)
@@ -557,13 +565,13 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     if (isMac) await require('./smoke-scheduler.cjs')({ api, cli, close, launch, data, name, record })
     // Oracle publishes no small MySQL build for Linux arm64, so the button must be off and say why
     if (isLinux && process.arch !== 'x64') {
-      await openTool('tabSettings')
+      await openDatabaseSettings()
       const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
       await create.scrollIntoViewIfNeeded()
       assert.equal(await create.isEnabled(), false, 'Managed MySQL must not be offered where it cannot be installed')
       assert.match(await page.locator('#settingsBody').innerText(), /Managed MySQL is not available for this machine/)
       record('PASS: managed MySQL is not offered on this architecture, and the panel says why')
-    } else await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
+    } else await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings })
     await require('./smoke-redis.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
     assert.deepEqual(errors, [], `Renderer errors: ${errors.join('\n')}`)
     record('PASS: no uncaught renderer errors')

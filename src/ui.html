@@ -352,17 +352,11 @@
     The header, the server strip's tabs and the tool dock are the frame around the work, in
     --chrome, one step below the page so what is being worked on sits forward of it.
   */
-  /*
-    Everything in it starts 8px down, the tabs included, and the tabs fill the rest to the bottom
-    edge. That gives the logo, the tab names, + and the gear one centre line, while a tab can still
-    run down into the page under it - centring the rest in the full 52px left the tab names 8px
-    below everything beside them.
-  */
   header {
     display: flex;
-    align-items: stretch;
+    align-items: center;
     gap: var(--s-3);
-    padding: 8px var(--s-4) 0 var(--s-5);
+    padding: 0 var(--s-4) 0 var(--s-5);
     height: 52px;
     background: var(--chrome);
     border-bottom: 1px solid var(--line-soft);
@@ -389,71 +383,66 @@
   button.icon-btn:hover:not(:disabled) { background: var(--hover); border-color: var(--line); color: var(--ink); transform: none; }
   button.icon-btn[aria-pressed="true"], button.icon-btn[aria-expanded="true"] { background: var(--raised); border-color: var(--line); color: var(--ink); }
 
-  .srv-tabs { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: var(--s-1); margin-left: var(--s-3); }
-  .srv-tabs > .icon-btn { align-self: center; flex: none; }
-  /*
-    Sideways only, and faded at whichever edge has more beyond it, so a strip that has run out of
-    room says so rather than cutting a name in half with no sign there is anything after it.
-  */
-  .tabs-scroll {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    min-width: 0;
-    /* One pixel over the header's bottom border, so the open tab covers it rather than being
-       clipped just above it by the sideways scroll. */
-    height: calc(100% + 1px);
-    margin-bottom: -1px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-  }
-  .tabs-scroll::-webkit-scrollbar { height: 0; }
-  .tabs-scroll.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent); }
-  .tabs-scroll.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px); mask-image: linear-gradient(90deg, transparent, #000 40px); }
-  .tabs-scroll.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
+  /* ---- the sidebar ------------------------------------------------------- */
 
-  /*
-    A tab. The one that is open is drawn joined to the page under it - the page's colour, borders
-    on three sides and none along the bottom - so it reads as the top of the screen below rather
-    than as a button that happens to be lit.
-  */
+  .side {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-height: 0;
+    background: var(--chrome);
+    border-right: 1px solid var(--line-soft);
+  }
+  .srv-tabs { display: grid; align-content: start; gap: 2px; padding: var(--s-3) var(--s-2); min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+  .tabs-scroll { display: grid; gap: 2px; min-width: 0; }
+
+  /* A server's row: its lamp, its name, and the small word beside it. The open one is lit and
+     carries a spine on its left edge, the same mark a selected section in Settings carries. */
   .stab {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex: none;
-    height: 100%;
-    max-width: 240px;
-    /* The 2px below balances the border above and the pixel the tab runs over the header's edge,
-       so the name sits on the same centre line as the logo and the buttons. */
-    padding: 0 14px 2px;
+    gap: 9px;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 0 10px;
     background: transparent;
     border: 1px solid transparent;
-    border-bottom: 0;
-    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    border-radius: var(--r-sm);
     box-shadow: none;
     color: var(--ink-2);
     font: 500 var(--t-3)/1 var(--ui);
+    text-align: left;
   }
   .stab:hover:not(:disabled) { background: var(--hover); color: var(--ink); transform: none; border-color: transparent; }
   .stab[aria-current="page"] {
-    background: var(--void);
-    border-color: var(--line-soft);
+    background: var(--raised);
+    border-color: var(--line);
     color: var(--ink);
     font-weight: 600;
+    box-shadow: inset var(--spine) 0 0 var(--lapis);
   }
-  .stab[aria-current="page"]:hover { background: var(--void); border-color: var(--line-soft); }
-  .stab-home { padding: 0 12px 2px; }
-  .stab-home .ico { width: 16px; height: 16px; }
-  .stab .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .stab .note { font: var(--t-1)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .stab[aria-current="page"]:hover { background: var(--raised); border-color: var(--line); }
+  .stab-home .ico { width: 16px; height: 16px; flex: none; color: var(--ink-3); }
+  .stab-home[aria-current="page"] .ico { color: var(--lapis); }
+  .stab .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .stab .note { flex: none; font: var(--t-1)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
   .stab .note:empty { display: none; }
   .stab .note[data-tone="fault"] { font-family: var(--ui); color: var(--fault-ink); }
   .stab[data-kind="database"] .nm::after { content: 'DB'; margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: var(--lapis-wash); border: 1px solid var(--lapis-edge); color: var(--lapis-ink); font-size: 10px; font-weight: 650; letter-spacing: .04em; vertical-align: 1px; }
-  /* Between the servers and the databases, a hairline rather than a heading: a tab strip has no
-     room for a word it would have to repeat on every screen. */
-  .tabs-div { flex: none; width: 1px; height: 18px; margin: 0 6px 10px; background: var(--line); }
+  /* Between the servers and the databases, a hairline rather than a heading. */
+  .tabs-div { display: block; height: 1px; margin: var(--s-2) 10px; background: var(--line); }
+
+  /* Add a server, at the foot of the list, drawn like a row so it reads as one more entry. */
+  .side-new {
+    display: flex; align-items: center; gap: 9px;
+    margin: 0 var(--s-2) var(--s-3);
+    height: 34px; padding: 0 10px;
+    background: transparent; border: 1px dashed var(--line); box-shadow: none;
+    border-radius: var(--r-sm);
+    color: var(--ink-3); font: 500 var(--t-3)/1 var(--ui);
+  }
+  .side-new .ico { width: 14px; height: 14px; flex: none; }
+  .side-new:hover:not(:disabled) { background: var(--hover); border-color: var(--edge); color: var(--ink); transform: none; }
 
   /*
     Java, when it is missing or too old: a chip rather than a banner across the page. It is a
@@ -476,7 +465,7 @@
 
   /* ---- layout ----------------------------------------------------------- */
 
-  main { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  main { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; }
 
   /*
     The lamp.
@@ -771,6 +760,12 @@
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
   .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
+  /* On a wide window the cards grow instead of leaving empty tracks: after the base rules above so
+     it wins, and auto-fit so four servers on a 4K screen share the whole row. */
+  @media (min-width: 2000px) {
+    .home { padding: 40px 56px 56px; gap: var(--s-7); }
+    .home-cards, .att-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
+  }
   .scard {
     display: grid;
     gap: var(--s-3);
@@ -885,7 +880,9 @@
   */
   .vitals {
     margin: 0;
-    flex: 1 1 380px;
+    /* Grows to 560px and no further: on a 4K window four numbers spread across the whole strip
+       put the Start button a metre from the name. */
+    flex: 0 1 560px;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--s-4);
@@ -922,11 +919,8 @@
     .vital .meter { display: none; }
   }
 
-  /* Seven tools in a column need about 430px; at the app's 600px minimum height that is most of
-     what the header and the strip leave, so the buttons give up a little height first. */
   @media (max-height: 700px) {
-    .dock { gap: 2px; padding: var(--s-1) 0; }
-    .dock button { height: 50px; }
+    .side .stab, .side .dock button { height: 30px; }
     /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
     .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
     .srv-name h1 { font-size: var(--t-6); }
@@ -951,52 +945,35 @@
   /* ---- the work: console, tool panel, dock ---------------------------------- */
 
   /*
-    [ console ][ tool 480 ][ dock 72 ]. With no tool open the console takes the tool's width. A
-    tool popped out takes the console's place instead, and the console shrinks to one line along
-    the bottom rather than disappearing: its newest line and its error count stay in view.
+    One thing at a time: the console, or the tool that took its place. While a tool is open the
+    console is one line along the bottom rather than gone - its newest line and its error count
+    stay in view. From 2000px there is room for both, and the console keeps a column on the right.
   */
   .work {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 72px;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     min-height: 0;
     min-width: 0;
   }
-  .work[data-tool] { grid-template-columns: minmax(0, 1fr) 480px 72px; }
-  .work[data-tool][data-popped] { grid-template-columns: minmax(0, 1fr) 72px; grid-template-rows: minmax(0, 1fr) 40px; }
+  .work[data-tool] { grid-template-rows: minmax(0, 1fr) 40px; }
   .console { grid-column: 1; grid-row: 1; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
-  .work[data-popped] .console { display: none; }
+  .work[data-tool] .console { display: none; }
   .tool {
-    grid-column: 2; grid-row: 1;
+    grid-column: 1; grid-row: 1;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
     min-width: 0;
     background: var(--surface);
-    border-left: 1px solid var(--line-soft);
   }
-  .work[data-popped] .tool { grid-column: 1; border-left: 0; }
-  .dock { grid-column: -2 / -1; grid-row: 1 / -1; }
-
-  /*
-    Under 1280px a 480px panel beside the console would leave the console a few hundred pixels,
-    which is not a console. Docked there, the panel lies over it as a sheet instead - the console
-    keeps its width underneath and comes back the moment the panel closes.
-  */
-  @media (max-width: 1279px) {
-    .work[data-tool]:not([data-popped]) { grid-template-columns: minmax(0, 1fr) 72px; }
-    .work[data-tool]:not([data-popped]) .tool {
-      /* Placement released: an absolutely positioned grid item measures itself against the cell
-         it is placed in, which here would be the dock's 72px, not the whole of the work area. */
-      grid-column: auto; grid-row: auto;
-      position: absolute;
-      top: 0; bottom: 0; right: 72px;
-      width: min(480px, calc(100% - 120px));
-      z-index: 4;
-      border-left: 1px solid var(--line);
-      box-shadow: var(--shadow-lg);
-    }
+  @media (min-width: 2000px) {
+    /* The console's share grows with the window: a log line is the one thing in the panel that
+       is better for every extra pixel, so a 4K window gives it about 1400px. */
+    .work[data-tool] { grid-template-columns: minmax(0, 1fr) clamp(520px, 38%, 1400px); grid-template-rows: minmax(0, 1fr); }
+    .work[data-tool] .console { display: grid; grid-column: 2; grid-row: 1; border-left: 1px solid var(--line-soft); }
+    .work[data-tool] .con-mini { display: none; }
   }
 
   .tool-head { display: flex; align-items: center; gap: 2px; height: 52px; padding: 0 var(--s-3) 0 var(--s-5); border-bottom: 1px solid var(--line-soft); min-width: 0; }
@@ -1035,45 +1012,41 @@
   .con-mini .errs:empty { display: none; }
 
   /*
-    The dock: every tool a server has, as a column of icons with their names under them. Buttons
-    rather than tabs - each opens a panel beside the console, and pressing the open one again
-    closes it - so they announce expanded and collapsed rather than selected.
+    The open server's sections, indented under its row in the sidebar. The console is where a
+    server opens, so it is marked current like a page; the tools announce expanded and collapsed,
+    because pressing the open one again goes back to the console.
   */
   .dock {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: var(--s-2) 0;
-    background: var(--chrome);
+    display: grid;
+    gap: 1px;
+    margin: 2px 0 var(--s-2) 14px;
+    padding-left: var(--s-2);
     border-left: 1px solid var(--line-soft);
-    overflow-y: auto;
-    min-height: 0;
-    scrollbar-width: none;
   }
-  .dock::-webkit-scrollbar { width: 0; }
   .dock button {
     position: relative;
-    display: grid;
-    justify-items: center;
-    align-content: center;
-    gap: 5px;
-    flex: none;
-    width: 60px; height: 56px;
-    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 30px;
+    padding: 0 10px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--r-sm);
     box-shadow: none;
-    color: var(--ink-3);
-    font: 500 var(--t-1)/1 var(--ui);
+    color: var(--ink-2);
+    font: 500 var(--t-3)/1 var(--ui);
+    text-align: left;
+    white-space: nowrap;
   }
-  .dock button .ico { width: 18px; height: 18px; }
+  .dock button .ico { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+  .dock button .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .dock button:hover:not(:disabled) { background: var(--hover); color: var(--ink); border-color: transparent; transform: none; }
-  .dock button[aria-expanded="true"] { background: var(--raised); color: var(--ink); border-color: var(--line); }
-  .dock button[aria-expanded="true"] .ico { color: var(--lapis); }
+  .dock button[aria-expanded="true"], .dock button[aria-current="page"] { background: var(--raised); color: var(--ink); border-color: var(--line); font-weight: 600; }
+  .dock button[aria-expanded="true"] .ico, .dock button[aria-current="page"] .ico { color: var(--lapis); }
   .dock-badge {
-    position: absolute; top: 4px; right: 8px;
+    flex: none;
     min-width: 16px; height: 16px; padding: 0 4px;
     border-radius: 999px;
     background: var(--lapis);
@@ -1346,13 +1319,14 @@
   .mc-motd { color: #aaa; overflow-wrap: anywhere; }
 
   :root[data-console-only] header,
+  :root[data-console-only] .side,
   :root[data-console-only] .dock,
   :root[data-console-only] #toolPanel,
   :root[data-console-only] #conMini,
   :root[data-console-only] #bPopConsole,
   :root[data-console-only] #srvNotice,
   :root[data-console-only] #bManage { display: none !important; }
-  :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
+  :root[data-console-only] main, :root[data-console-only] .work { grid-template-columns: minmax(0, 1fr) !important; }
   .steps { display: grid; gap: var(--s-2); }
   .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 6px; }
   .step {
@@ -1588,7 +1562,7 @@
     name, a Default or Changed tag, the first sentence of its help - and the control on the right,
     280px, with only the faintest rule between rows.
   */
-  #settingsBody.set-screen { grid-template-columns: 240px minmax(0, 820px); align-items: start; gap: var(--s-5) var(--s-6); }
+  #settingsBody.set-screen { grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: var(--s-5) var(--s-6); }
   #settingsBody.set-screen > .pane-foot, #settingsBody.set-screen > .hint, #settingsBody.set-screen > .bad { grid-column: 1 / -1; }
   .set-nav { position: sticky; top: var(--s-4); display: grid; gap: 2px; align-content: start; }
   .set-nav button {
@@ -1606,7 +1580,7 @@
   .set-nav-sep { height: 1px; margin: var(--s-2) 10px; background: var(--line-soft); }
 
   .set-form { display: grid; gap: var(--s-6); min-width: 0; }
-  .set-form > .section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; gap: 0; scroll-margin-top: var(--s-4); }
+  .set-form > .section { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; gap: 0; }
   .set-form .set-head, .set-raw .set-head { display: block; padding-bottom: var(--s-2); border-bottom: 1px solid var(--line-soft); }
   .set-form .set-head .mark { display: none; }
   .set-form .set-head h3, .set-raw .set-head h3 { font: 650 18px/1.3 var(--display); letter-spacing: -.01em; }
@@ -1655,22 +1629,17 @@
   .set-raw textarea:focus { outline: none; border-color: var(--lapis-edge); background-color: var(--field-focus); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
 
   /*
-    Wide pane: sections flow into columns instead of one 820px strip with half the window empty.
-    Each column is still about 620 to 820px, so a label and its control stay together. Multi-column
-    rather than a grid so a short section does not leave a hole under it while its neighbour is tall;
-    break-inside keeps a section whole. Capped at three columns so a 4K window does not scatter them.
+    A wide pane: the open section's rows sit two or three abreast, each still a label beside its
+    control, so a 4K window shows the whole section at a glance instead of a strip down the left.
+    Only the sections made of rows; Server software and Databases lay themselves out.
   */
-  @container pane (min-width: 1240px) {
-    /* min-height and the 1fr row keep the save bar at the bottom of the pane: with columns the form is
-       short enough that, in a tall window, the bar would otherwise sit in the middle of it. */
-    #settingsBody.set-screen { grid-template-columns: 220px minmax(0, 2480px); grid-template-rows: 1fr auto; min-height: 100%; }
-    .set-form { display: block; column-width: 620px; column-gap: var(--s-7); max-width: 2480px; }
-    .set-form > .section { break-inside: avoid; margin-bottom: var(--s-6); }
-    .set-form > .section:last-child { margin-bottom: 0; }
+  @container pane (min-width: 1500px) {
+    .set-form > .section:has(> .set-row) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); gap: 0 var(--s-7); align-items: start; }
+    .set-form > .section:has(> .set-row) > .set-head { grid-column: 1 / -1; }
   }
 
-  /* Docked beside the console the form has 480px: the list becomes a row above it, and each
-     setting's control goes under its name. */
+  /* In a narrow window the list becomes a row above the form, and each setting's control goes
+     under its name. */
   @container pane (max-width: 760px) {
     #settingsBody.set-screen { grid-template-columns: minmax(0, 1fr); }
     .set-nav { position: static; display: flex; flex-wrap: wrap; gap: 4px; }
@@ -2103,17 +2072,27 @@
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
 
-  /* Narrower than the desktop app allows: a browser tab dragged small. The brand gives its width
-     to the tabs, and the dock's labels go, leaving the icons, which keep their names as tooltips. */
+  /*
+    Compact: under 1200px the sidebar folds to a rail of lamps and icons, and the names become
+    tooltips. The width goes to the console and the tools, which is where a 1024px window needs it.
+  */
+  @media (max-width: 1199px) {
+    main { grid-template-columns: 56px minmax(0, 1fr); }
+    .srv-tabs { padding: var(--s-2) 6px; }
+    .stab, .dock button, .side-new { justify-content: center; padding: 0; height: 40px; }
+    .stab .nm, .stab .note, .dock button .lbl, .side-new .nm, .tabs-div { display: none; }
+    .stab[data-kind="database"] .nm::after { display: none; }
+    .stab .lamp { width: 10px; height: 10px; }
+    .stab[aria-current="page"] { box-shadow: none; }
+    .dock { margin: 2px 0 var(--s-2); padding: 0; border-left: 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding-block: 4px; }
+    .dock button { height: 36px; }
+    .dock button .ico { width: 17px; height: 17px; }
+    .dock-badge { position: absolute; top: 3px; right: 5px; }
+    .side-new { margin: 0 6px var(--s-2); }
+    .srv-strip { padding-left: var(--s-5); }
+  }
   @media (max-width: 840px) {
     .brand b { display: none; }
-    .work { grid-template-columns: minmax(0, 1fr) 52px; }
-    .work[data-tool][data-popped] { grid-template-columns: minmax(0, 1fr) 52px; }
-    .work[data-tool]:not([data-popped]) { grid-template-columns: minmax(0, 1fr) 52px; }
-    .work[data-tool]:not([data-popped]) .tool { right: 52px; width: calc(100% - 52px); }
-    .dock button { width: 44px; height: 44px; }
-    .dock button .lbl { display: none; }
-    .srv-strip { padding-left: var(--s-5); }
     .vitals { border-left: 0; padding-left: 0; flex-basis: 100%; }
   }
 
@@ -2211,7 +2190,6 @@
   <symbol id="i-wrap" viewBox="0 0 16 16"><path d="M2 4h12M2 12h3"/><path d="M2 8h9.5a2 2 0 0 1 0 4H8"/><path d="M9.5 10.5L8 12l1.5 1.5"/></symbol>
   <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 2.5v8"/><path d="M5 5.5l3-3 3 3"/><path d="M3 9v4.5h10V9"/></symbol>
   <symbol id="i-popout" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7"/><path d="M13.5 2.5L8 8"/><path d="M11.5 9.5v4h-9v-9h4"/></symbol>
-  <symbol id="i-dockin" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z"/><path d="M9.5 3v10"/></symbol>
   <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
   <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></symbol>
   <symbol id="i-alert" viewBox="0 0 16 16" stroke-miterlimit="2"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3.5M8 11.5v1"/></symbol>
@@ -2229,22 +2207,7 @@
     </svg>
     <b>SpawnLoft</b>
   </span>
-  <!--
-    The servers, as tabs across the top rather than a list down the side: the width a list took
-    now belongs to the console, and every server's state is still in view. One strip that scrolls
-    sideways when there are too many to fit - it never wraps, because a second row of tabs moves
-    everything under it every time a server is added.
-  -->
-  <nav class="srv-tabs" aria-label="Servers">
-    <div class="tabs-scroll" id="list">
-      <button type="button" class="stab stab-home" id="tabHome" aria-label="Overview" title="Overview">
-        <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg>
-      </button>
-    </div>
-    <button type="button" class="icon-btn" id="bNew" aria-label="Add a server" title="Add a server">
-      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>
-    </button>
-  </nav>
+  <span class="grow"></span>
   <button type="button" class="java-chip" id="javaChip" hidden>
     <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-alert"/></svg><span>Java</span>
   </button>
@@ -2255,6 +2218,42 @@
 </header>
 
 <main>
+  <!--
+    The sidebar: every server, and under the open one, its sections. One list down the side rather
+    than tabs across the top and a dock down the right, so switching server and switching tool are
+    the same gesture, and the list is the only navigation there is. Under 1200px it folds to an
+    icon rail and the names become tooltips.
+  -->
+  <aside class="side" id="side">
+    <nav class="srv-tabs" aria-label="Servers">
+      <div class="tabs-scroll" id="list">
+        <button type="button" class="stab stab-home" id="tabHome" title="Overview">
+          <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg><span class="nm">Overview</span>
+        </button>
+      </div>
+      <!--
+        The open server's sections. Moved under that server's row by markTabs(), and out of the
+        list before renderList() reconciles it, so the list only ever has to think about servers.
+        Console first: it is where a server opens, and the others announce expanded or collapsed
+        because pressing the open one again goes back to the console.
+      -->
+      <nav class="dock" id="dock" aria-label="Server tools" hidden>
+        <button type="button" id="tabConsole" aria-current="page"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-terminal"/></svg><span class="lbl">Console</span></button>
+        <button type="button" id="tabPlugins" data-pane="plugins" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span class="lbl">Plugins</span><b class="dock-badge" hidden></b></button>
+        <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
+        <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
+        <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
+        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
+        <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
+        <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
+        <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
+        <button type="button" id="tabSettings" data-pane="settings" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span class="lbl">Settings</span></button>
+      </nav>
+    </nav>
+    <button type="button" class="side-new" id="bNew" title="Add a server">
+      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">Add a server</span>
+    </button>
+  </aside>
   <section class="stage">
 
     <!-- ============ nothing selected ===================================== -->
@@ -2402,7 +2401,6 @@
       <section class="tool" id="toolPanel" aria-labelledby="toolTitle" hidden>
         <div class="tool-head">
           <h2 id="toolTitle"></h2>
-          <button type="button" class="icon-btn" id="toolPop" aria-label="Pop out" title="Pop out"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" class="icon-btn" id="toolClose" aria-label="Close" title="Close"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
         </div>
         <div class="panes">
@@ -2441,17 +2439,6 @@
         <b>Console</b><span class="last" id="conMiniLast"></span><span class="errs" id="conMiniErr"></span>
       </button>
 
-      <nav class="dock" aria-label="Server tools">
-        <button type="button" id="tabPlugins" data-pane="plugins" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plug"/></svg><span class="lbl">Plugins</span><b class="dock-badge" hidden></b></button>
-        <button type="button" id="tabFiles" data-pane="files" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="lbl">Files</span></button>
-        <button type="button" id="tabWorlds" data-pane="worlds" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-map"/></svg><span class="lbl">Worlds</span></button>
-        <button type="button" id="tabBackups" data-pane="backups" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span class="lbl">Backups</span></button>
-        <button type="button" id="tabActivity" data-pane="activity" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg><span class="lbl">Activity</span></button>
-        <button type="button" id="tabPlayers" data-pane="players" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-user"/></svg><span class="lbl">Players</span></button>
-        <button type="button" id="tabPerformance" data-pane="performance" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pulse"/></svg><span class="lbl">Stats</span></button>
-        <button type="button" id="tabScheduler" data-pane="scheduler" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><span class="lbl">Schedule</span></button>
-        <button type="button" id="tabSettings" data-pane="settings" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span class="lbl">Settings</span></button>
-      </nav>
       </div>
     </div>
 
@@ -3087,34 +3074,32 @@ const VIEW_EL = { empty: '#vEmpty', home: '#vHome', server: '#vServer', add: '#v
 function show(view) {
   state.view = view;
   for (const key of Object.keys(VIEW_EL)) $(VIEW_EL[key]).toggleAttribute('data-active', key === view);
+  // The sections list belongs to the server screen; on the overview or a sheet the sidebar is servers only.
+  if ($('#dock')) markTabs();
 }
 
 // ------------------------------------------------------------------ tools ----
 
 /**
- * The tools a server has, beside the console.
+ * The tools a server has, beside the console in the sidebar.
  *
- * <p>Each opens in the panel between the console and the dock, or popped out in the console's
- * place. The console keeps streaming either way: its lines are appended to an element that may be
- * hidden, which costs nothing, and means coming back to it has the scrollback intact.
+ * <p>Each opens in the console's place - one thing at a time, and on a wide window the console keeps
+ * a column of its own. The console keeps streaming either way: its lines are appended to an element
+ * that may be hidden, which costs nothing, and means coming back to it has the scrollback intact.
  */
 const TOOL_NAMES = {
   plugins: 'Plugins', files: 'Files', worlds: 'Worlds', backups: 'Backups', activity: 'Activity', players: 'Players',
   performance: 'Stats', scheduler: 'Schedule', settings: 'Settings',
 };
-// A settings form, a dense backup grid and a file listing are cramped at 480px; the rest read fine beside the
-// console. Each opens where it fits, and a tool someone moved stays where they put it.
-const POPPED_BY_DEFAULT = new Set(['settings', 'backups', 'files']);
 // A database has no plugins, worlds, players or tasks of its own. Its Backups are SQL dumps, and
 // its Activity is its starts, stops and crashes.
 const DB_TOOLS = new Set(['performance', 'backups', 'activity', 'settings']);
-const NARROW = window.matchMedia('(max-width: 1279px)');
 
-const toolView = { tool: null, popped: false };
+const toolView = { tool: null };
 
 /*
-  The open tool and whether it is popped out, remembered per server: someone who keeps Plugins
-  open on the modded server and nothing open on the lobby should come back to both that way.
+  The open tool, remembered per server: someone who keeps Plugins open on the modded server and
+  nothing open on the lobby should come back to both that way.
   localStorage can be missing or refuse (a locked-down profile, a private window), and a panel that
   fails to remember still opens.
 */
@@ -3123,11 +3108,9 @@ function toolKey(name) { return 'mcctl.tool.' + name; }
 function recallTool(name) {
   try {
     const saved = JSON.parse(localStorage.getItem(toolKey(name)) || 'null');
-    if (saved && (saved.tool === null || Object.hasOwn(TOOL_NAMES, saved.tool))) {
-      return { tool: saved.tool, popped: Boolean(saved.popped) };
-    }
+    if (saved && (saved.tool === null || Object.hasOwn(TOOL_NAMES, saved.tool))) return { tool: saved.tool };
   } catch { /* nothing remembered is the same as nothing open */ }
-  return { tool: null, popped: false };
+  return { tool: null };
 }
 
 function rememberTool() {
@@ -3142,31 +3125,23 @@ function toolLabel(tool) {
   return tool === 'plugins' ? $('#tabPlugins .lbl').textContent : TOOL_NAMES[tool];
 }
 
-/** Open a tool beside the console, popped out in its place, or close it (tool null). */
-function setTool(tool, popped) {
+/** Open a tool in the console's place, or close it and show the console (tool null). */
+function setTool(tool) {
   if (consoleOnly) tool = null;
   if (tool && isDb(rowOf(state.current)) && !DB_TOOLS.has(tool)) tool = null;
   toolView.tool = tool || null;
-  toolView.popped = Boolean(toolView.tool && popped);
   state.pane = toolView.tool || 'console';
 
   const work = $('#work');
   work.toggleAttribute('data-tool', Boolean(toolView.tool));
-  work.toggleAttribute('data-popped', toolView.popped);
   $('#toolPanel').hidden = !toolView.tool;
-  $('#conMini').hidden = !toolView.popped;
+  $('#conMini').hidden = !toolView.tool;
+  $('#tabConsole').setAttribute('aria-current', toolView.tool ? 'false' : 'page');
   for (const b of $$('.dock [data-pane]')) b.setAttribute('aria-expanded', String(b.dataset.pane === toolView.tool));
   for (const el of $$('.tool .pane')) el.toggleAttribute('data-active', Boolean(toolView.tool) && el.id === paneId(toolView.tool));
 
   const t = toolView.tool;
-  if (t) {
-    $('#toolTitle').textContent = toolLabel(t);
-    const pop = $('#toolPop');
-    const label = toolView.popped ? 'Dock beside the console' : 'Pop out';
-    pop.setAttribute('aria-label', label);
-    pop.title = label;
-    pop.querySelector('use').setAttribute('href', toolView.popped ? '#i-dockin' : '#i-popout');
-  }
+  if (t) $('#toolTitle').textContent = toolLabel(t);
   if (t === 'settings') renderServerSettings();
   if (t === 'backups') renderBackupsTool();
   if (t === 'scheduler') renderScheduler();
@@ -3181,7 +3156,7 @@ function setTool(tool, popped) {
   // for as long as the app is open.
   if (t !== 'performance') stopPerfPolling();
 
-  if (toolView.popped) {
+  if (toolView.tool) {
     updateConMini();
   } else if (state.atBottom) {
     // Scroll position is not kept while a pre is hidden, so the console has to be put back where
@@ -3194,27 +3169,22 @@ function setTool(tool, popped) {
 
 /**
  * Show one part of the selected server - the name every finding and shortcut in the panel already
- * calls. 'console' means make the console visible: a popped-out tool goes back beside it, and a
- * docked one lying over it at a narrow width closes.
+ * calls. 'console' means the console: whatever tool had its place closes.
  */
 function showPane(pane) {
-  if (pane === 'console') {
-    if (toolView.popped) setTool(toolView.tool, false);
-    if (toolView.tool && NARROW.matches) setTool(null);
-    return;
-  }
+  if (pane === 'console') { if (toolView.tool) setTool(null); return; }
   if (toolView.tool === pane) return;
-  setTool(pane, POPPED_BY_DEFAULT.has(pane));
+  setTool(pane);
 }
 
-// Pressing the open tool's button again closes it; the console takes the width back.
+// Pressing the open tool's row again closes it; the console comes back.
 for (const b of $$('.dock [data-pane]')) {
   b.onclick = () => {
     const tool = b.dataset.pane;
-    if (toolView.tool === tool) setTool(null);
-    else setTool(tool, POPPED_BY_DEFAULT.has(tool));
+    setTool(toolView.tool === tool ? null : tool);
   };
 }
+$('#tabConsole').onclick = () => setTool(null);
 
 function closeTool() {
   const was = toolView.tool;
@@ -3224,13 +3194,12 @@ function closeTool() {
 }
 
 $('#toolClose').onclick = closeTool;
-$('#toolPop').onclick = () => setTool(toolView.tool, !toolView.popped);
-$('#conMini').onclick = () => setTool(toolView.tool, false);
-$('#conMini').title = 'Show the console beside this tool';
+$('#conMini').onclick = () => setTool(null);
+$('#conMini').title = 'Back to the console';
 
 /** The console's one line while a tool fills its space: its newest line and how many errors. */
 function updateConMini() {
-  if (!toolView.popped) return;
+  if (!toolView.tool) return;
   const last = state.lines.length ? state.lines[state.lines.length - 1].text : '';
   $('#conMiniLast').textContent = last;
   $('#conMiniErr').textContent = levelCounts.error
@@ -3361,30 +3330,29 @@ function updateTab(el, row) {
     .filter(Boolean).join(', '));
 }
 
+/**
+ * Mark the open server, and hang its sections under it. The dock is one element that moves: it
+ * sits under whichever row is current, and goes back to the sidebar, hidden, when none is.
+ */
 function markTabs() {
   $('#tabHome').setAttribute('aria-current', state.current ? 'false' : 'page');
+  const dock = $('#dock');
+  let current = null;
   for (const el of $$('#list .stab[data-name]')) {
-    el.setAttribute('aria-current', el.dataset.name === state.current ? 'page' : 'false');
+    const on = el.dataset.name === state.current;
+    el.setAttribute('aria-current', on ? 'page' : 'false');
+    if (on) current = el;
+  }
+  // Moved only when it is in the wrong place: taking a node out of the document blurs whatever
+  // inside it had focus, and this runs on every four-second refresh.
+  if (current && state.view === 'server') {
+    if (current.nextElementSibling !== dock) current.after(dock);
+    dock.hidden = false;
+  } else {
+    dock.hidden = true;
+    if (dock.parentNode !== $('.srv-tabs')) $('.srv-tabs').append(dock);
   }
 }
-
-/** Fade whichever edge of the strip has more tabs beyond it. */
-function updateTabFade() {
-  const strip = $('#list');
-  const beyond = strip.scrollWidth - strip.clientWidth - strip.scrollLeft;
-  strip.classList.toggle('fade-l', strip.scrollLeft > 2);
-  strip.classList.toggle('fade-r', beyond > 2);
-}
-$('#list').addEventListener('scroll', updateTabFade, { passive: true });
-window.addEventListener('resize', updateTabFade);
-// A mouse wheel only turns vertically. On a strip that only scrolls sideways, that is what it means.
-$('#list').addEventListener('wheel', (e) => {
-  if (!e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-  const strip = $('#list');
-  if (strip.scrollWidth <= strip.clientWidth) return;
-  strip.scrollLeft += e.deltaY;
-  e.preventDefault();
-}, { passive: false });
 
 /**
  * Reconcile the tabs against the DOM rather than rewriting them.
@@ -3396,6 +3364,9 @@ function renderList(rows, dbs) {
   dbs = dbs || [];
   const list = $('#list');
   document.body.classList.toggle('bare', rows.length === 0 && dbs.length === 0);
+  // The sections list rides under the open server's row and is not a server: the positions below
+  // are counted without it, and it stays where it is, so a focused button in it keeps its focus.
+  const tabs = () => Array.from(list.children).filter((el) => el.id !== 'dock');
 
   // Overview first, the servers, then a hairline and the databases.
   const seen = new Set();
@@ -3418,14 +3389,14 @@ function renderList(rows, dbs) {
       if (!el) el = buildTab(row);
       updateTab(el, row);
     }
-    if (list.children[i] !== el) list.insertBefore(el, list.children[i] || null);
+    const at = tabs();
+    if (at[i] !== el) list.insertBefore(el, at[i] || null);
   });
-  for (const el of Array.from(list.children)) {
+  for (const el of tabs()) {
     if (el.dataset.name && !seen.has(el.dataset.name)) el.remove();
     if (el.classList.contains('tabs-div') && !dbs.length) el.remove();
   }
   markTabs();
-  updateTabFade();
 }
 
 /** A tab was pressed. The server already open behind a sheet just comes back to the front. */
@@ -3780,10 +3751,11 @@ function buildMoreMenu() {
 
 /** Upgrading lives with the rest of the server's software, in Settings. */
 async function openUpgrade() {
-  setTool('settings', toolView.tool === 'settings' ? toolView.popped : POPPED_BY_DEFAULT.has('settings'));
+  setTool('settings');
   await renderServerSettings();
   const soft = $$('#settingsBody .set-head h3').find((h) => h.textContent === 'Server software');
-  if (soft) soft.closest('.set-group').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  const key = soft && soft.closest('.set-group').dataset.section;
+  if (key) $('#settingsBody .set-nav [data-section="' + CSS.escape(key) + '"]')?.click();
 }
 
 function renderServer(row) {
@@ -4724,10 +4696,10 @@ function select(name) {
   const chosen = rowOf(name);
   renderServer(chosen);
   const saved = recallTool(name);
-  setTool(saved.tool, saved.popped);
+  setTool(saved.tool);
   renderLog();
   renderList(state.rows, state.dbs);
-  $('#list [data-name="' + CSS.escape(name) + '"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  $('#list [data-name="' + CSS.escape(name) + '"]')?.scrollIntoView({ block: 'nearest' });
   startVitals(name);
 
   // Server-Sent Events rather than polling: the console is a stream by nature, and the browser
@@ -8040,8 +8012,7 @@ function renderFileEditor(row, view) {
   });
   paint();
   caret();
-  // As tall as the pane allows, measured rather than guessed: the pane is shorter docked beside the
-  // console than popped out, and shorter again with the window.
+  // As tall as the pane allows, measured rather than guessed: the pane's height follows the window.
   const pane = body.closest('.pane');
   const fit = () => {
     if (!box.isConnected) { ro.disconnect(); return; }
@@ -8997,14 +8968,22 @@ function renderBackupHistory(row, data, signature) {
  * and the core cannot drift about what exists or what a field will accept. The whole file is one
  * more entry in the list, for the keys the form does not cover.
  */
+let settingsRender = null;
 async function renderServerSettings() {
   const row = rowOf(state.current);
   const body = $('#settingsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (isDb(row)) { body.classList.remove('set-screen'); return renderDatabaseSettings(row); }
 
-  // Re-rendering under someone mid-edit would silently discard what they had typed.
-  if (body.dataset.for === row.name && body.childElementCount) return;
+  // Re-rendering under someone mid-edit would silently discard what they had typed. A caller that
+  // arrives while the file is still being read gets the read in progress, so awaiting this means
+  // the form is there.
+  if (body.dataset.for === row.name && body.childElementCount) return settingsRender;
+  settingsRender = buildServerSettings(row, body);
+  return settingsRender;
+}
+
+async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
   body.classList.add('set-screen');
   body.textContent = '';
@@ -9061,8 +9040,7 @@ async function renderServerSettings() {
     b.append(word, dot);
     b.onclick = () => {
       showRaw(false);
-      target.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      markNav(key);
+      showSection(key);
     };
     nav.append(b);
     navButtons.set(key, { button: b, dot, title });
@@ -9073,6 +9051,23 @@ async function renderServerSettings() {
   };
 
   const sections = new Map();
+  let shown = null;
+  /*
+    One section at a time. The list is the navigation, not a map of a long page: picking a section
+    replaces the one on screen, and the dot beside a name is how an unsaved change in a section
+    that is not showing stays visible. Edits in hidden sections are kept - the rows are hidden,
+    not rebuilt - and Save writes all of them.
+  */
+  const showSection = (key) => {
+    shown = key;
+    // Remembered on the body, so a rebuild after Save, Attach or Create brings the same section back.
+    body.dataset.section = key;
+    body.dataset.sectionFor = row.name;
+    for (const [k, sec] of sections) sec.hidden = k !== key;
+    markNav(key);
+    const scroller = body.closest('.pane-scroll');
+    if (scroller) scroller.scrollTop = 0;
+  };
   const sectionFor = (key, meta) => {
     if (sections.has(key)) return sections.get(key);
     meta = meta || (data.groups || []).find((g) => g.key === key)
@@ -9086,6 +9081,7 @@ async function renderServerSettings() {
     blurb.textContent = meta.blurb;
     head.append(h, blurb);
     sec.append(head);
+    sec.hidden = shown !== null && shown !== key;
     form.append(sec);
     sections.set(key, sec);
     addNav(key, meta.title, sec);
@@ -9755,18 +9751,12 @@ async function renderServerSettings() {
   rawNav.classList.add('mono');
   rawNav.onclick = () => { showRaw(true); rawText.focus(); };
 
-  // Which section is on screen, as the form scrolls: the list says where you are in it.
-  const scroller = body.closest('.pane-scroll');
-  const spy = () => {
-    if (!rawView.hidden || !scroller) return;
-    const top = scroller.getBoundingClientRect().top + 80;
-    let current = null;
-    for (const [key, sec] of sections) if (sec.getBoundingClientRect().top <= top) current = key;
-    markNav(current || sections.keys().next().value);
-  };
-  if (scroller) {
-    scroller.onscroll = spy;
-  }
+  // The section that was showing before a rebuild of the same server's form comes back; otherwise
+  // the first section is the one on screen until another is picked. Databases is built below, so a
+  // form that is coming back to it waits for it.
+  const keep = body.dataset.sectionFor === row.name ? body.dataset.section : null;
+  if (keep && sections.has(keep)) showSection(keep);
+  else if (sections.size && keep !== 'databases') showSection(sections.keys().next().value);
 
   // Last, after the file-backed sections: the databases this server is attached to. It is one of
   // the sections, so it goes in the list too.
@@ -9775,12 +9765,13 @@ async function renderServerSettings() {
     await renderServerDatabases(row, body, form);
     const dbSection = form.querySelector('[data-section="databases"]');
     if (dbSection && !navButtons.has('databases')) {
+      dbSection.hidden = shown !== null && shown !== 'databases';
       sections.set('databases', dbSection);
       addNav('databases', 'Databases', dbSection);
       nav.insertBefore(navButtons.get('databases').button, sep);
+      if (shown === null) showSection('databases');
     }
   }
-  spy();
 }
 
 // --------------------------------------------------------------- manage ----

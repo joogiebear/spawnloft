@@ -6,7 +6,7 @@ same version. The release is published only after Windows x64, Apple Silicon Mac
 
 ### Fixes to try
 
-- **Files (new in 1.5):** a server's folder in the panel - the Files tool in the dock. Browse,
+- **Files (new in 1.5):** a server's folder in the panel - the Files tool in the sidebar. Browse,
   open any text file in an editor that colours YAML, JSON and properties files, and save it;
   upload by dropping files onto the list, download, rename or move, zip and unzip, make files
   and folders, and find anything by name. Every edit, replaced file and delete keeps a copy
@@ -14,7 +14,7 @@ same version. The release is published only after Windows x64, Apple Silicon Mac
   the active world, its jar, the plugins it loaded - cannot be moved, replaced or deleted.
   Please edit a real plugin config beside the console and reload it, and say what you reached
   for that was not there.
-- **Activity (new in 1.5):** the Activity tool in the dock lists what was done to a server and
+- **Activity (new in 1.5):** the Activity tool in the sidebar lists what was done to a server and
   who did it - you, a schedule, an AI assistant (by its app's name) or SpawnLoft's crash guard.
   Edits, replaced files, deletes and an assistant's config changes have Undo. Please have your
   assistant change something, then find it there and undo it, and say what was missing.
