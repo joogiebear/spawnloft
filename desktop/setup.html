@@ -40,8 +40,9 @@
 
     --ink:      #e9ecf4;
     --ink-2:    #9aa4ba;
-    /* Lifted from #6d7589, which measured under 4.5:1 on --surface and is used for 12px text. */
-    --ink-3:    #8089a0;
+    /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
+       the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
+    --ink-3:    #8f98ae;
     /* Below the reading line on purpose: console timestamps, which are looked up, not read. */
     --ink-4:    #545d72;
 
@@ -52,7 +53,7 @@
     --live:  #4ade80;
     --warn:  #f0b64d;
     --fault: #f2645c;
-    --idle:  #8089a0;
+    --idle:  #8f98ae;
 
     --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     /* Headings and big numbers: the display cut of the same family, drawn for sizes above 20px. */
@@ -179,9 +180,9 @@
     --edge: #485541;
     --ink: #efeee6;
     --ink-2: #b5bcac;
-    --ink-3: #909a86;
+    --ink-3: #9aa48f;
     --ink-4: #5f6a58;
-    --idle: #909a86;
+    --idle: #9aa48f;
     --lapis: #c4f566;
     --lapis-dim: #546e2a;
     --lapis-wash: rgba(196, 245, 102, .12);

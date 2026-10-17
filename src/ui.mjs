@@ -1348,11 +1348,20 @@ async function route(req, res) {
     await Promise.all(registry.listInstances().map(async (i) => {
       const mine = tasks.filter((t) => t.instance === i.name && t.action?.type === 'backup')
       const auto = mine.find((t) => t.owner === schedule.OWNER_BACKUPS) ?? mine.find((t) => !t.owner && t.name === 'Automatic backup') ?? null
+      const kept = await backup.snapshotSummary(i.name)
       servers[i.name] = {
-        lastBackupAt: await backup.newestSnapshotAt(i.name),
+        lastBackupAt: kept.newestAt,
+        backupCount: kept.count,
         autoBackup: auto ? { enabled: auto.enabled !== false, schedule: auto.schedule, keep: auto.action.keep ?? null } : null,
       }
     }))
+    // No archive on disk is either "never backed up" or "backed up, then deleted"; the log tells
+    // which, so the page does not call a server that had eighteen backups this morning "never".
+    const bare = Object.keys(servers).filter((n) => !servers[n].backupCount)
+    if (bare.length) {
+      const trails = activity.backupTrails(bare)
+      for (const n of bare) servers[n].backupTrail = trails[n]
+    }
     return json(res, 200, {
       machine: { memoryMb: Math.round(os.totalmem() / 1048576) },
       automaticAvailable: platformCapabilities().scheduler,

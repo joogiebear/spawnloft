@@ -45,8 +45,9 @@
 
     --ink:      #e9ecf4;
     --ink-2:    #9aa4ba;
-    /* Lifted from #6d7589, which measured under 4.5:1 on --surface and is used for 12px text. */
-    --ink-3:    #8089a0;
+    /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
+       the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
+    --ink-3:    #8f98ae;
     /* Below the reading line on purpose: console timestamps, which are looked up, not read. */
     --ink-4:    #545d72;
 
@@ -57,7 +58,7 @@
     --live:  #4ade80;
     --warn:  #f0b64d;
     --fault: #f2645c;
-    --idle:  #8089a0;
+    --idle:  #8f98ae;
 
     --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     /* Headings and big numbers: the display cut of the same family, drawn for sizes above 20px. */
@@ -184,9 +185,9 @@
     --edge: #485541;
     --ink: #efeee6;
     --ink-2: #b5bcac;
-    --ink-3: #909a86;
+    --ink-3: #9aa48f;
     --ink-4: #5f6a58;
-    --idle: #909a86;
+    --idle: #9aa48f;
     --lapis: #c4f566;
     --lapis-dim: #546e2a;
     --lapis-wash: rgba(196, 245, 102, .12);
@@ -429,18 +430,25 @@
   .stab .note { flex: none; font: var(--t-1)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
   .stab .note:empty { display: none; }
   .stab .note[data-tone="fault"] { font-family: var(--ui); color: var(--fault-ink); }
-  .stab[data-kind="database"] .nm::after { content: 'DB'; margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: var(--lapis-wash); border: 1px solid var(--lapis-edge); color: var(--lapis-ink); font-size: 10px; font-weight: 650; letter-spacing: .04em; vertical-align: 1px; }
-  /* Between the servers and the databases, a hairline rather than a heading. */
-  .tabs-div { display: block; height: 1px; margin: var(--s-2) 10px; background: var(--line); }
+  /* What a row is, as its glyph - a server or a database - with its lamp on the corner, so kind
+     and state read together and the rail keeps both when the names fold away. */
+  .stab-ico { position: relative; display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--ink-3); }
+  .stab-ico .ico { width: 15px; height: 15px; }
+  .stab[aria-current="page"] .stab-ico, .stab:hover .stab-ico { color: var(--ink-2); }
+  .stab-ico .lamp { position: absolute; right: -3px; bottom: -2px; width: 7px; height: 7px; box-shadow: 0 0 0 2px var(--chrome); }
+  .stab[aria-current="page"] .stab-ico .lamp { box-shadow: 0 0 0 2px var(--raised); }
+  .stab-ico .lamp::after { inset: -3px; }
+  /* The two groups, under their own headings. */
+  .tabs-head { display: block; margin: var(--s-3) 10px var(--s-1); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
   /* Add a server, at the foot of the list, drawn like a row so it reads as one more entry. */
   .side-new {
     display: flex; align-items: center; gap: 9px;
     margin: 0 var(--s-2) var(--s-3);
-    height: 34px; padding: 0 10px;
-    background: transparent; border: 1px dashed var(--line); box-shadow: none;
+    height: 36px; padding: 0 10px;
+    background: transparent; border: 1px dashed var(--edge); box-shadow: none;
     border-radius: var(--r-sm);
-    color: var(--ink-3); font: 500 var(--t-3)/1 var(--ui);
+    color: var(--ink-2); font: 500 var(--t-3)/1 var(--ui);
   }
   .side-new .ico { width: 14px; height: 14px; flex: none; }
   .side-new:hover:not(:disabled) { background: var(--hover); border-color: var(--edge); color: var(--ink); transform: none; }
@@ -718,82 +726,112 @@
   /* ---- the overview ----------------------------------------------------- */
 
   /*
-    Every server at once. Full width now that there is no sidebar, and padded more generously than
-    a working screen: this is the one people look across rather than into.
+    Every server at once, padded more generously than a working screen: this is the one people look
+    across rather than into. One column below Wide. From Wide up it is two: the attention cards, the
+    servers and the databases in the main column, and the recent activity in a narrower column of
+    its own beside them, so a short page has no empty corner and a long feed has somewhere to go.
   */
   .home { align-content: start; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); padding: 32px 48px 48px; background: var(--void); overflow: auto; }
   .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-4); }
-  .home-title { flex: 1 1 320px; min-width: 0; display: grid; gap: 6px; }
+  .home-title { flex: 1 1 320px; min-width: 0; display: grid; gap: var(--s-3); }
   .home-title h1 { margin: 0; font: 650 var(--t-7)/1.1 var(--display); letter-spacing: -.028em; }
-  .home-sum { margin: 0; font: var(--t-3)/1.5 var(--ui); color: var(--ink-2); }
 
-  /* Three to a row, in the tone of what they are about; each says one thing and offers one way out. */
-  .attention { display: grid; gap: var(--s-3); }
+  /* The summary as chips: what is here, what runs, who is on, and the memory the servers may take,
+     the last with a bar so "4 of 94 GB" is a length and not arithmetic. */
+  .home-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: var(--s-2);
+    min-height: 30px; padding: 4px 12px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--line); box-shadow: var(--lift);
+    font: var(--t-2)/1.2 var(--ui); color: var(--ink-2); white-space: nowrap;
+  }
+  .chip b { font: 650 var(--t-3)/1 var(--display); color: var(--ink); }
+  .chip .ico { width: 13px; height: 13px; color: var(--ink-3); }
+  .chip-mem { gap: var(--s-3); }
+  .meter { position: relative; display: block; width: 96px; height: 6px; border-radius: 999px; background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+  .meter > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--lapis); }
+  .chip-mem[data-tone="warn"] .meter > i { background: var(--warn); }
+  .chip-mem[data-tone="fault"] .meter > i { background: var(--fault); }
+  .chip-mem[data-tone="warn"] b { color: var(--warn-ink); }
+  .chip-mem[data-tone="fault"] b { color: var(--fault-ink); }
+
+  .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
+
+  /*
+    Needs attention. The most important thing on the page, so a card in the warning's own tone with
+    a lit edge - the console's mark for "this is not doing what it should" - an icon, one line on
+    what to do, and the button that does it. Stacked one to a row: each is a sentence to read.
+  */
+  .attention { display: grid; gap: var(--s-3); container-type: inline-size; container-name: att; }
   .attention .hist-title { margin: 0; }
-  /* The same column width as .home-cards, so the notices line up with the cards below them. A fixed
-     3 and 2 columns did not scale: a wide screen got notices at two thirds of the width. */
-  .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-3); }
+  .att-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
   .att {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr);
-    gap: var(--s-2) var(--s-3);
-    align-items: start;
-    padding: var(--s-4);
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: var(--s-2) var(--s-4);
+    align-items: center;
+    padding: var(--s-4) var(--s-5);
     border: 1px solid var(--line);
     border-radius: var(--r);
     background: var(--surface);
   }
-  .att[data-tone="fault"] { background: var(--fault-wash); border-color: var(--fault-edge); }
-  .att[data-tone="warn"] { background: var(--warn-wash); border-color: var(--warn-edge); }
+  .att[data-tone="fault"] { background: var(--fault-wash); border-color: var(--fault-edge); box-shadow: inset var(--spine) 0 0 var(--fault); }
+  .att[data-tone="warn"] { background: var(--warn-wash); border-color: var(--warn-edge); box-shadow: inset var(--spine) 0 0 var(--warn); }
   .att[data-tone="accent"] { background: var(--lapis-wash); border-color: var(--lapis-edge); }
-  .att-tile { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--raised); border: 1px solid var(--line); color: var(--ink-2); }
-  .att-tile .ico { width: 16px; height: 16px; }
-  .att[data-tone="fault"] .att-tile { color: var(--fault-ink); border-color: var(--fault-edge); }
-  .att[data-tone="warn"] .att-tile { color: var(--warn-ink); border-color: var(--warn-edge); }
+  .att-tile { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--r-sm); background: var(--raised); border: 1px solid var(--line); color: var(--ink-2); }
+  .att-tile .ico { width: 20px; height: 20px; }
+  .att[data-tone="fault"] .att-tile { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
+  .att[data-tone="warn"] .att-tile { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
   .att[data-tone="accent"] .att-tile { color: var(--lapis-ink); border-color: var(--lapis-edge); }
-  .att-words { display: grid; gap: 3px; min-width: 0; }
-  .att-words b { font: 600 var(--t-3)/1.35 var(--ui); color: var(--ink); }
-  .att-words span { font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .att > button { grid-column: 2; justify-self: start; padding: 4px 11px; font-size: var(--t-2); }
+  .att-words { display: grid; gap: 4px; min-width: 0; }
+  .att-words b { font: 650 var(--t-4)/1.35 var(--ui); color: var(--ink); }
+  .att[data-tone="warn"] .att-words b { color: var(--warn-ink); }
+  .att[data-tone="fault"] .att-words b { color: var(--fault-ink); }
+  .att-words span { font: var(--t-3)/1.45 var(--ui); color: var(--ink-2); }
+  .att-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); }
+  .att-acts button { min-height: 34px; }
+  @container att (max-width: 640px) {
+    .att { grid-template-columns: 40px minmax(0, 1fr); align-items: start; }
+    .att-acts { grid-column: 2; justify-content: flex-start; }
+  }
 
-  /* "and 2 more": a word to click, not another button competing with the ones in the cards. */
-  button.more-link { justify-self: start; padding: 2px 0; background: none; border: 0; box-shadow: none; color: var(--lapis-ink); font: 500 var(--t-3)/1.4 var(--ui); }
+  /* "and 2 more", "View all": a word to click, not another button competing with the ones in the
+     cards - but a word with a full-size target. */
+  button.more-link { justify-self: start; min-height: 32px; padding: 4px 6px; margin-left: -6px; background: none; border: 0; box-shadow: none; color: var(--lapis-ink); font: 500 var(--t-3)/1.4 var(--ui); }
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
-  .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
-  .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
-  /*
-    The Overview's tiers, measured on the stage (the window less the sidebar). Wide: the databases
-    block appears under the cards. Ultra: the cards grow instead of leaving empty tracks (auto-fit,
-    so four servers share the whole row), and the activity feed moves beside the cards as a column
-    of its own, showing all of what was fetched rather than the first eight. After the base rules
-    above so these win.
-  */
-  /* Eight lines of history is the Overview's share below Ultra; the rest is fetched for the column. */
-  .home-activity .act-row.act-home:nth-child(n + 9) { display: none; }
+  /* Cards share one grid rule, servers and databases alike, so they are the same width. auto-fit:
+     one server gets the row rather than a third of it. The main column's own cap, below, is the
+     well cap, so the activity column sits right beside the cards rather than across a gap. */
+  .home-cards, .dbs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: var(--s-4); }
+
+  /* Two columns from Wide. Two items in one row, each its own height: the feed must not span rows,
+     because a spanning item hands its height to the rows it crosses, and a long feed then stretched
+     the server card to match it. */
   @container stage (min-width: 1280px) {
-    .home-dbs:not([hidden]) { display: grid; }
+    .home:has(> .home-activity:not([hidden])) { grid-template-columns: minmax(0, 1600px) clamp(320px, 30%, 460px); justify-content: start; column-gap: var(--s-6); }
+    .home:has(> .home-activity:not([hidden])) > .home-head { grid-column: 1 / -1; }
+    .home:has(> .home-activity:not([hidden])) > .home-main { grid-column: 1; align-self: start; }
+    .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; align-self: start; }
   }
   @container stage (min-width: 2000px) {
     .home { padding: 40px 56px 56px; gap: var(--s-7); }
     .home-main { gap: var(--s-7); }
-    .home-cards, .att-grid, .dbs-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
-    /* The well cap: one server on a 4K screen gets a 1400px card, not a 2600px one. */
-    .home-cards > .scard, .dbs-grid > .dcard, .att-grid > .att { max-width: 1400px; }
-    .home:has(> .home-activity:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(420px, 32%, 820px); column-gap: var(--s-7); }
-    .home:has(> .home-activity:not([hidden])) > .home-head,
-    .home:has(> .home-activity:not([hidden])) > .attention { grid-column: 1 / -1; }
-    /* Two items in one row, each its own height. The feed must not span rows: a spanning item hands
-       its height to the rows it crosses, and a long feed then stretched the server card to match it. */
-    .home:has(> .home-activity:not([hidden])) > .home-main { grid-column: 1; align-self: start; }
-    .home:has(> .home-activity:not([hidden])) > .home-activity { grid-column: 2; margin-top: 0; align-self: start; }
-    .home-activity .act-row.act-home:nth-child(n + 9) { display: grid; }
+    .home-cards, .dbs-grid { gap: var(--s-5); }
+    .home:has(> .home-activity:not([hidden])) { grid-template-columns: minmax(0, 2200px) clamp(400px, 26%, 600px); column-gap: var(--s-7); }
   }
+
+  /*
+    A card, server or database: the same padding, title, pill and foot either way. The icon tile
+    says which kind it is before the name is read.
+  */
   .scard {
     container-type: inline-size;
     container-name: card;
-    display: grid;
-    gap: var(--s-3);
+    /* A column, so a card that a taller neighbour stretches keeps its foot at the bottom. */
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
     padding: var(--s-5);
     background: var(--surface);
     border: 1px solid var(--line);
@@ -803,49 +841,114 @@
     transition: border-color var(--ease);
   }
   .scard:hover { border-color: var(--edge); }
-  .sc-head { display: flex; align-items: flex-start; gap: var(--s-3); }
-  .sc-title { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-  .sc-name { margin: 0; min-width: 0; font: 650 21px/1.2 var(--display); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sc-soft { margin-top: -6px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
-  .sc-stats { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
+  .sc-head { display: flex; align-items: center; gap: var(--s-3); }
+  .sc-kind { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: var(--r-sm); background: var(--raised); border: 1px solid var(--line); color: var(--ink-2); }
+  .sc-kind .ico { width: 20px; height: 20px; }
+  [data-status="running"] > .sc-head .sc-kind { color: var(--live-ink); border-color: var(--live-edge); }
+  .sc-title { flex: 1; min-width: 0; display: grid; gap: 4px; }
+  .sc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+  .sc-name { margin: 0; min-width: 0; max-width: 100%; font: 650 var(--t-6)/1.2 var(--display); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-soft { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .sc-acts { display: flex; gap: var(--s-2); flex: none; align-self: flex-start; }
+  .sc-acts button { min-height: 34px; }
+
+  /* An address is a button because the only thing anyone does with it is paste it somewhere. */
+  button.addr-copy {
+    gap: 5px; min-height: 26px; padding: 2px 6px; margin: -2px -6px;
+    font: var(--t-2)/1.4 var(--mono); color: var(--ink-2);
+    background: transparent; border: 1px solid transparent; box-shadow: none; border-radius: var(--r-xs);
+  }
+  button.addr-copy .ico { width: 12px; height: 12px; color: var(--ink-3); }
+  button.addr-copy:hover:not(:disabled) { background: var(--hover); border-color: var(--line); color: var(--ink); transform: none; }
+  button.addr-copy:hover .ico { color: var(--ink); }
+
+  /* Busy: the button keeps its place and says what it is doing, with a ring turning in front. */
+  button[aria-busy="true"] { cursor: progress; }
+  button[aria-busy="true"]:disabled { opacity: .8; }
+  button[aria-busy="true"]::before {
+    content: ""; width: 12px; height: 12px; flex: none; border-radius: 50%;
+    border: 2px solid currentColor; border-right-color: transparent;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(1turn); } }
+
+  .sc-stats { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
   .sc-stats > div { display: grid; gap: 5px; min-width: 0; }
   .sc-stats dt { font: 650 var(--t-1)/1.3 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); white-space: nowrap; }
   .sc-stats dd { margin: 0; display: flex; align-items: baseline; gap: 5px; min-width: 0; white-space: nowrap; }
   .sc-stats .big { font: 650 var(--t-5)/1 var(--display); color: var(--ink); letter-spacing: -.01em; }
   .sc-stats .big[data-tone="warn"] { color: var(--warn-ink); }
   .sc-stats .of { font: var(--t-2)/1 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+  .sc-stats .txt { font: 500 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Live figures only mean something while it runs; stopped, the card says so once instead of
+     showing three dashes. */
+  .sc-idle { display: flex; align-items: center; gap: var(--s-2); margin: 0; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); font: var(--t-3)/1.4 var(--ui); color: var(--ink-3); }
+  .sc-idle .ico { width: 14px; height: 14px; flex: none; }
+  .sc-idle[data-tone="fault"] { color: var(--fault-ink); }
+
   /*
-    What a card shows when it is wide, whether because the screen is or because there are two of
-    them: the last ten minutes of TPS and memory as a line beside each number, and the databases the
-    server is attached to. Keyed on the card's own width, so the reveal is the same either way.
+    The line beside TPS and memory on a wide card: the last ten minutes, keyed on the card's own
+    width, so the reveal is the same whether the screen is wide or there are two cards.
   */
   .sc-stats .spark { display: none; width: 64px; height: 18px; flex: none; overflow: visible; align-self: center; }
   .sc-stats .spark polyline { fill: none; stroke: var(--chart-cpu); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
   .sc-stats [data-v="memory"] .spark polyline { stroke: #8fd3a8; }
-  .sc-dbs { display: none; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sc-dbs b { font-weight: 600; color: var(--ink-2); }
-  .sc-dbs:empty { display: none; }
   @container card (min-width: 640px) {
     .sc-stats .spark { display: block; }
-    .sc-dbs:not(:empty) { display: block; }
   }
 
-  /* The databases, each as a card of the server cards' shape: what it is, where, and who uses it. */
-  .home-dbs { display: none; gap: var(--s-3); }
+  /* A database only this server uses, nested in its card: it belongs to the server, so it is shown
+     as part of it rather than as a stranger in a grid further down. */
+  .sc-links { display: grid; gap: var(--s-2); }
+  .sc-links:empty { display: none; }
+  .sc-link {
+    display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-1) var(--s-3);
+    padding: var(--s-2) var(--s-2) var(--s-2) var(--s-3);
+    background: var(--recess); border: 1px solid var(--line-soft); border-radius: var(--r);
+  }
+  .sc-link .sc-kind { width: 32px; height: 32px; }
+  .sc-link .sc-kind .ico { width: 16px; height: 16px; }
+  .sc-link-words { display: grid; gap: 2px; min-width: 0; }
+  .sc-link-words b { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-link-words b small { margin-left: 6px; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .sc-link .spill { padding: 4px 9px; }
+  @container card (max-width: 480px) {
+    .sc-link { grid-template-columns: 32px minmax(0, 1fr) auto; }
+    .sc-link .spill { grid-column: 2; grid-row: 2; justify-self: start; }
+  }
+  /* Databases it shares with other servers: named on the card, drawn in the Databases block. */
+  .sc-dbs { font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-dbs b { font-weight: 600; color: var(--ink-2); }
+  .sc-dbs:empty { display: none; }
+
+  /* Which servers use a database, each one a way to that server. */
+  .used-by { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+  button.srv-chip {
+    gap: 6px; min-height: 28px; padding: 3px 10px; border-radius: 999px;
+    font: 500 var(--t-2)/1.2 var(--ui); color: var(--ink); background: var(--raised); border-color: var(--line); box-shadow: none;
+  }
+  button.srv-chip .ico { width: 12px; height: 12px; color: var(--ink-3); }
+  button.srv-chip:hover:not(:disabled) { border-color: var(--edge); background: var(--raised-hi); transform: none; }
+
+  /* The databases nobody, or more than one server, owns: cards of the server cards' shape. */
+  .home-dbs { display: grid; gap: var(--s-3); }
   .home-dbs .hist-title { margin: 0; }
-  .dbs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
-  .dcard .sc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dcard .sc-stats .txt { font: 500 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sc-foot { display: flex; align-items: center; gap: var(--s-3); }
-  .sc-note { flex: 1; min-width: 0; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sc-note[data-tone="warn"] { color: var(--warn-ink); }
-  .sc-foot .sc-open { padding: 4px 10px; font-size: var(--t-2); }
+
+  .sc-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); margin-top: auto; padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
+  .sc-note { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--s-2); font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
+  .sc-note .ico { width: 14px; height: 14px; flex: none; color: var(--ink-3); }
+  .sc-note b { font-weight: 600; color: var(--ink); }
+  .sc-note[data-tone="warn"], .sc-note[data-tone="warn"] b, .sc-note[data-tone="warn"] .ico { color: var(--warn-ink); }
+  .sc-note button.more-link { margin-left: 0; padding: 2px 4px; min-height: 28px; font-size: var(--t-2); }
+  /* "Open": the card's way in, with a target the size of a button rather than of its word. */
+  .sc-foot .sc-open { min-height: 36px; padding: 6px 14px; font-size: var(--t-3); color: var(--ink); border-color: var(--line); }
 
   @container stage (max-width: 1024px) {
     .home { padding: 28px 24px 40px; }
   }
   @container stage (max-width: 720px) {
     .home { padding: var(--s-5); }
+    .sc-acts .sc-restart { display: none; }
   }
 
   /* ---- server view ------------------------------------------------------ */
@@ -1466,19 +1569,49 @@
     .step-fields { grid-column: 2 / -1; grid-row: 2; }
     .step-acts { grid-column: 3; grid-row: 1; }
   }
-  .home-activity { margin-top: var(--s-6); container-type: inline-size; container-name: feed; }
-  .home-activity .act-list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
-  .act-row.act-home {
-    grid-template-columns: 84px minmax(90px, 160px) auto minmax(0, 1fr); width: 100%;
-    border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none;
-    background: transparent; padding: 6px var(--s-4); text-align: left; font: inherit; color: inherit;
+  /*
+    The Overview's recent activity. A line says what happened and when, on one line, with the
+    server and who did it under it only when there is more than one of either to tell apart. A run
+    of the same thing done back to back - eighteen backups deleted in a minute - is one line that
+    opens to show each of them.
+  */
+  .home-activity { display: grid; gap: var(--s-3); align-content: start; min-width: 0; container-type: inline-size; container-name: feed; }
+  .home-activity .hist-title { margin: 0; }
+  .feed { display: grid; margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .feed > li { border-bottom: 1px solid var(--line-soft); }
+  .feed > li:last-child { border-bottom: 0; }
+  /* .feed in front: `button:has(> .ico)` makes every button holding an icon a flex row, and a bare
+     class loses to it. */
+  .feed .feed-row {
+    display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; column-gap: var(--s-2); row-gap: 3px;
+    width: 100%; min-height: 44px; padding: 8px var(--s-4) 8px var(--s-3);
+    background: transparent; border: 0; border-radius: 0; box-shadow: none;
+    text-align: left; font: var(--t-3)/1.4 var(--ui); color: var(--ink); white-space: normal; cursor: pointer;
   }
-  .act-row.act-home:last-child { border-bottom: 0; }
-  button.act-row.act-home:hover:not(:disabled) { background: rgba(var(--ink-rgb), .035); transform: none; }
-  .act-server { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  @container feed (max-width: 840px) {
-    .act-row.act-home { grid-template-columns: 72px minmax(0, 1fr) auto; row-gap: 4px; }
-    .act-row.act-home .act-what { grid-column: 1 / -1; }
+  button.feed-row:hover:not(:disabled), summary.feed-row:hover { background: rgba(var(--ink-rgb), .035); transform: none; }
+  div.feed-row { cursor: default; }
+  .feed-row .ico { width: 14px; height: 14px; color: var(--ink-3); }
+  .feed-what { grid-column: 2; grid-row: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; }
+  .feed-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-text code { font: var(--t-2)/1.4 var(--mono); color: var(--ink-2); }
+  .feed-text .dim { color: var(--ink-2); }
+  .feed-row .act-when { grid-column: 3; grid-row: 1; justify-self: end; }
+  .feed-meta { grid-column: 2 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s-2); min-width: 0; }
+  .feed-meta:empty { display: none; }
+  .feed-meta .act-server { font: 600 var(--t-2)/1.3 var(--ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-row[data-bad] .feed-text { color: var(--fault-ink); }
+  /* A run: the caret turns when it opens, and the lines inside sit under its words. */
+  .feed details > summary { list-style: none; }
+  .feed details > summary::-webkit-details-marker { display: none; }
+  .feed details > summary .ico { transition: transform var(--ease); transform: rotate(-90deg); }
+  .feed details[open] > summary .ico { transform: none; }
+  .feed-sub { display: grid; margin: 0; padding: 0 0 var(--s-2); list-style: none; background: var(--recess); border-top: 1px solid var(--line-faint); }
+  .feed-sub .feed-row { min-height: 36px; padding-block: 5px; }
+  .feed-sub .feed-text { font: var(--t-2)/1.4 var(--mono); color: var(--ink-2); }
+  @container feed (min-width: 760px) {
+    .feed .feed-row { grid-template-columns: 16px minmax(0, 1fr) auto auto; }
+    .feed-meta { grid-column: 3; grid-row: 1; flex-wrap: nowrap; justify-content: flex-end; max-width: 320px; }
+    .feed-row .act-when { grid-column: 4; min-width: 64px; text-align: right; }
   }
   @container pane (max-width: 560px) {
     .act-row { grid-template-columns: 56px minmax(0, 1fr) auto; row-gap: 4px; padding: 6px var(--s-2); }
@@ -2256,9 +2389,11 @@
     main { grid-template-columns: 56px minmax(0, 1fr); }
     .srv-tabs { padding: var(--s-2) 6px; }
     .stab, .dock button, .side-new { justify-content: center; padding: 0; height: 40px; }
-    .stab .nm, .stab .note, .dock button .lbl, .side-new .nm, .tabs-div { display: none; }
-    .stab[data-kind="database"] .nm::after { display: none; }
-    .stab .lamp { width: 10px; height: 10px; }
+    .stab .nm, .stab .note, .dock button .lbl, .side-new .nm { display: none; }
+    /* The headings fold to the hairline between the groups. */
+    .tabs-head { height: 1px; margin: var(--s-2) 6px; overflow: hidden; color: transparent; background: var(--line); }
+    .stab-ico { width: 20px; height: 20px; }
+    .stab-ico .ico { width: 17px; height: 17px; }
     .stab[aria-current="page"] { box-shadow: none; }
     .dock { margin: 2px 0 var(--s-2); padding: 0; border-left: 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); padding-block: 4px; }
     .dock button { height: 36px; }
@@ -2333,6 +2468,7 @@
   <symbol id="i-pulse" viewBox="0 0 16 16"><path d="M1.5 9h3l2-5 2.5 9 2-4h3.5"/></symbol>
   <symbol id="i-clock" viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M8 5.5V8h2.5"/></symbol>
   <symbol id="i-server" viewBox="0 0 16 16"><path d="M2 3h12v4H2zM2 9h12v4H2z"/><path d="M4.5 5h.5M4.5 11h.5"/></symbol>
+  <symbol id="i-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8"/><path d="M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4.5h12M2 11.5h12"/><path d="M5 3v3M11 10v3"/></symbol>
   <symbol id="i-plug" viewBox="0 0 16 16"><path d="M5 2v3.5M11 2v3.5"/><path d="M3.5 5.5h9V9a4.5 4.5 0 0 1-9 0z"/><path d="M8 13.5V15"/></symbol>
   <symbol id="i-map" viewBox="0 0 16 16"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5z"/><path d="M6 2.5v10M10 4v10"/></symbol>
@@ -2428,8 +2564,8 @@
         <button type="button" id="tabSettings" data-pane="settings" aria-expanded="false" aria-controls="toolPanel"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sliders"/></svg><span class="lbl">Settings</span></button>
       </nav>
     </nav>
-    <button type="button" class="side-new" id="bNew" title="Add a server">
-      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">Add a server</span>
+    <button type="button" class="side-new" id="bNew" title="New server">
+      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">New server</span>
     </button>
   </aside>
   <section class="stage">
@@ -2468,18 +2604,21 @@
       <div class="home-head">
         <div class="home-title">
           <h1>Your servers</h1>
-          <p class="home-sum" id="homeSummary"></p>
+          <ul class="home-chips" id="homeSummary" aria-label="Summary"></ul>
         </div>
         <button class="primary" id="homeNew"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>New server</button>
       </div>
-      <section class="attention" id="homeAttention" aria-labelledby="attTitle" hidden>
-        <h2 class="hist-title" id="attTitle">Needs attention</h2>
-        <div class="att-grid" id="attGrid"></div>
-        <button type="button" class="more-link" id="attMore" hidden></button>
-      </section>
-      <!-- the cards and the databases share a column, so a feed beside them sizes nothing of theirs -->
+      <!-- attention, cards and databases share a column, so a feed beside them sizes nothing of theirs -->
       <div class="home-main">
-        <div class="home-cards" id="homeCards"></div>
+        <section class="attention" id="homeAttention" aria-labelledby="attTitle" hidden>
+          <h2 class="hist-title" id="attTitle">Needs attention</h2>
+          <div class="att-grid" id="attGrid"></div>
+          <button type="button" class="more-link" id="attMore" hidden></button>
+        </section>
+        <section class="home-servers" aria-labelledby="homeSrvTitle">
+          <h2 class="sr-only" id="homeSrvTitle">Servers</h2>
+          <div class="home-cards" id="homeCards"></div>
+        </section>
         <section class="home-dbs" id="homeDbs" aria-labelledby="homeDbTitle" hidden>
           <h2 class="hist-title" id="homeDbTitle">Databases</h2>
           <div class="dbs-grid" id="dbsGrid"></div>
@@ -2487,7 +2626,8 @@
       </div>
       <section class="home-activity" id="homeActivity" aria-labelledby="homeActTitle" hidden>
         <h2 class="hist-title" id="homeActTitle">Recent activity</h2>
-        <div class="act-list" id="homeActList"></div>
+        <ol class="feed" id="homeActList"></ol>
+        <button type="button" class="more-link" id="homeActMore" hidden></button>
       </section>
     </div>
 
@@ -3474,13 +3614,16 @@ function buildTab(row) {
   el.className = 'stab';
   el.dataset.name = row.name;
   if (isDb(row)) el.dataset.kind = 'database';
+  const glyph = document.createElement('span');
+  glyph.className = 'stab-ico';
   const lamp = document.createElement('span');
   lamp.className = 'lamp';
+  glyph.append(icon(isDb(row) ? 'database' : 'server'), lamp);
   const nm = document.createElement('span');
   nm.className = 'nm';
   const note = document.createElement('span');
   note.className = 'note';
-  el.append(lamp, nm, note);
+  el.append(glyph, nm, note);
   el.onclick = () => openServer(el.dataset.name);
   return el;
 }
@@ -3554,20 +3697,22 @@ function renderList(rows, dbs) {
   // are counted without it, and it stays where it is, so a focused button in it keeps its focus.
   const tabs = () => Array.from(list.children).filter((el) => el.id !== 'dock');
 
-  // Overview first, the servers, then a hairline and the databases.
+  // Overview first, then the servers and the databases, each under its own heading.
   const seen = new Set();
-  const order = [{ home: true }, ...rows];
-  if (dbs.length) order.push({ divider: true }, ...dbs);
+  const order = [{ home: true }];
+  if (rows.length) order.push({ heading: 'Servers' }, ...rows);
+  if (dbs.length) order.push({ heading: 'Databases' }, ...dbs);
   order.forEach((row, i) => {
     let el;
     if (row.home) {
       el = $('#tabHome');
-    } else if (row.divider) {
-      el = list.querySelector('.tabs-div');
+    } else if (row.heading) {
+      el = list.querySelector('.tabs-head[data-group="' + row.heading + '"]');
       if (!el) {
         el = document.createElement('span');
-        el.className = 'tabs-div';
-        el.setAttribute('aria-hidden', 'true');
+        el.className = 'tabs-head';
+        el.dataset.group = row.heading;
+        el.textContent = row.heading;
       }
     } else {
       seen.add(row.name);
@@ -3580,7 +3725,7 @@ function renderList(rows, dbs) {
   });
   for (const el of tabs()) {
     if (el.dataset.name && !seen.has(el.dataset.name)) el.remove();
-    if (el.classList.contains('tabs-div') && !dbs.length) el.remove();
+    if (el.classList.contains('tabs-head') && !order.some((o) => o.heading === el.dataset.group)) el.remove();
   }
   markTabs();
 }
@@ -4187,15 +4332,19 @@ function showHome() {
 */
 const overview = { data: null, asked: 0, showAll: false, attention: '', acting: {} };
 
+// Activity is fetched this deep so that, once runs are folded into one line each, there is still
+// more than a screenful to show.
+const FEED_FETCH = 60;
+const FEED_SHOWN = 8;
+
 async function loadOverview(force) {
   if (!force && Date.now() - overview.asked < 30000) return;
   overview.asked = Date.now();
   try {
     // The history rides along: the same "what changed" the servers' Activity tools answer, across
     // all of them, newest first.
-    // Twenty lines: eight show below Ultra, and the column an Ultra window has beside the cards
-    // shows them all.
-    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=20').catch(() => null)]);
+    // Deep enough that, with runs folded, there is more than the eight lines the feed shows.
+    const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=' + FEED_FETCH).catch(() => null)]);
     overview.data = data;
     overview.activity = recent ? recent.entries : null;
   } catch {
@@ -4208,20 +4357,65 @@ const gbOf = (mb) => Math.round((mb / 1024) * 10) / 10;
 
 function renderOverview() {
   const rows = state.rows;
+  const dbs = state.dbs || [];
   const running = rows.filter((r) => r.status === 'running');
   const reservedMb = rows.reduce((n, r) => n + (memoryCeilingMb(r.memory) || 0), 0);
   const machineMb = overview.data && overview.data.machine && overview.data.machine.memoryMb;
   const counted = running.filter((r) => r.latest && r.latest.players != null);
-  const parts = [rows.length + ' on this machine', running.length + ' running'];
+  const chips = [
+    { n: rows.length, text: rows.length === 1 ? 'server' : 'servers', icon: 'server' },
+    { n: running.length, text: 'running', lamp: running.length ? 'running' : 'stopped' },
+  ];
   // Only a figure the servers actually gave; "0 players online" from servers that were not asked
   // would be a claim about nobody.
   if (counted.length) {
     const n = counted.reduce((sum, r) => sum + r.latest.players, 0);
-    parts.push(n + (n === 1 ? ' player' : ' players') + ' online');
+    chips.push({ n, text: n === 1 ? 'player online' : 'players online', icon: 'user' });
   }
-  parts.push(gbOf(reservedMb) + (machineMb ? ' of ' + Math.round(machineMb / 1024) : '') + ' GB memory reserved');
-  $('#homeSummary').textContent = parts.join(' · ');
-  $('#homeSummary').title = 'Reserved is what the servers are allowed to use, added up, whether or not they are running.';
+  if (dbs.length) chips.push({ n: dbs.length, text: dbs.length === 1 ? 'database' : 'databases', icon: 'database' });
+  const box = $('#homeSummary');
+  box.textContent = '';
+  for (const c of chips) {
+    const li = document.createElement('li');
+    li.className = 'chip';
+    if (c.lamp) {
+      li.dataset.status = c.lamp;
+      const lamp = document.createElement('span');
+      lamp.className = 'lamp';
+      li.append(lamp);
+    } else li.append(icon(c.icon));
+    const b = document.createElement('b');
+    b.textContent = String(c.n);
+    li.append(b, ' ' + c.text);
+    box.append(li);
+  }
+  // Memory: what the servers are allowed to take, against what the machine has, as a bar.
+  const mem = document.createElement('li');
+  mem.className = 'chip chip-mem';
+  mem.title = 'Reserved is what the servers are allowed to use, added up, whether or not they are running.';
+  const words = document.createElement('span');
+  const b = document.createElement('b');
+  b.textContent = String(gbOf(reservedMb));
+  words.append(b, machineMb ? ' of ' + Math.round(machineMb / 1024) + ' GB reserved' : ' GB reserved');
+  mem.append(icon('pulse'), words);
+  if (machineMb) {
+    const share = reservedMb / machineMb;
+    if (share > 1) mem.dataset.tone = 'fault';
+    else if (share > 0.8) mem.dataset.tone = 'warn';
+    const meter = document.createElement('span');
+    meter.className = 'meter';
+    meter.setAttribute('role', 'meter');
+    meter.setAttribute('aria-label', 'Memory reserved');
+    meter.setAttribute('aria-valuemin', '0');
+    meter.setAttribute('aria-valuemax', String(Math.round(machineMb / 1024)));
+    meter.setAttribute('aria-valuenow', String(Math.min(gbOf(reservedMb), Math.round(machineMb / 1024))));
+    meter.setAttribute('aria-valuetext', Math.round(share * 100) + '% of this machine' + (share > 1 ? ', more than it has' : ''));
+    const fill = document.createElement('i');
+    fill.style.width = Math.min(100, Math.max(share > 0 ? 2 : 0, share * 100)).toFixed(1) + '%';
+    meter.append(fill);
+    mem.append(meter);
+  }
+  box.append(mem);
 
   renderAttention();
   renderHomeCards();
@@ -4257,13 +4451,52 @@ async function pollHomeMetrics() {
 }
 
 /**
- * The databases, under the servers, on a Wide stage. Each card is keyed like a server card and
+ * Which databases belong inside a server's card: one attached to that server and no other. The
+ * rest - shared, or not attached yet - are cards of their own in the Databases block.
+ */
+function ownedDbs(serverName) {
+  return (state.dbs || []).filter((d) => {
+    const users = Object.keys(d.attachments || {});
+    return users.length === 1 && users[0] === serverName && rowOf(serverName);
+  });
+}
+const nestedDb = (db) => {
+  const users = Object.keys(db.attachments || {});
+  return users.length === 1 && Boolean(state.rows.find((r) => r.name === users[0]));
+};
+
+/** An address as a button that copies it, with the glyph that says so. */
+function addrButton(text) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'addr-copy';
+  b.append(document.createTextNode(text), icon('copy'));
+  b.title = 'Copy ' + text;
+  b.setAttribute('aria-label', 'Copy address ' + text);
+  b.onclick = (ev) => { ev.stopPropagation(); copyText(text, text); };
+  return b;
+}
+
+const dbAddress = (row) => (row.host || '127.0.0.1') + ':' + (row.port || '?');
+const dbEngine = (row) => (row.engineLabel || row.engine) + (row.version ? ' ' + row.version : '');
+
+function setPill(pill, row, acting) {
+  const said = describeState(row, acting);
+  pill.textContent = said.text;
+  if (said.tone) pill.dataset.tone = said.tone;
+  else delete pill.dataset.tone;
+  if (said.since) pill.dataset.since = String(said.since);
+  else delete pill.dataset.since;
+}
+
+/**
+ * The databases nobody owns alone, under the servers. Each card is keyed like a server card and
  * says what the database is, where it answers, how much memory it holds and which servers use it.
  */
 function renderHomeDbs() {
   const section = $('#homeDbs');
   const grid = $('#dbsGrid');
-  const dbs = state.dbs || [];
+  const dbs = (state.dbs || []).filter((d) => !nestedDb(d));
   section.hidden = !dbs.length;
   const seen = new Set();
   dbs.forEach((row, i) => {
@@ -4276,20 +4509,31 @@ function renderHomeDbs() {
   for (const card of Array.from(grid.children)) if (!seen.has(card.dataset.name)) card.remove();
 }
 
+const el = (tag, cls) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  return node;
+};
+
+/** The head every card has: the kind's glyph, the name and its state, and a line under them. */
+function cardHead(kind) {
+  const head = el('div', 'sc-head');
+  const glyph = el('span', 'sc-kind');
+  glyph.append(icon(kind));
+  const title = el('div', 'sc-title');
+  const line = el('div', 'sc-line');
+  line.append(el('h3', 'sc-name'), el('span', 'spill'));
+  title.append(line, el('div', 'sc-soft'));
+  head.append(glyph, title);
+  return head;
+}
+
 function buildDbCard(name) {
-  const el = (tag, cls) => {
-    const node = document.createElement(tag);
-    if (cls) node.className = cls;
-    return node;
-  };
   const card = el('article', 'scard dcard');
   card.dataset.name = name;
-  const head = el('div', 'sc-head');
-  const title = el('div', 'sc-title');
-  title.append(el('h3', 'sc-name'), el('span', 'spill'));
-  head.append(title);
+  const head = cardHead('database');
   const stats = el('dl', 'sc-stats');
-  for (const [key, label] of [['memory', 'Memory'], ['attached', 'Used by'], ['address', 'Address']]) {
+  for (const [key, label] of [['memory', 'Memory'], ['attached', 'Used by']]) {
     const cell = el('div');
     cell.dataset.v = key;
     const dt = el('dt');
@@ -4297,78 +4541,297 @@ function buildDbCard(name) {
     cell.append(dt, el('dd'));
     stats.append(cell);
   }
+  stats.lastChild.style.gridColumn = 'span 2';
   const foot = el('div', 'sc-foot');
-  const open = el('button', 'ghost sc-open');
+  const open = el('button', 'sc-open');
   open.type = 'button';
-  open.textContent = 'Open \u2192';
+  open.textContent = 'Open →';
   open.onclick = () => select(name);
   foot.append(el('span', 'sc-note'), open);
-  card.append(head, el('div', 'sc-soft'), stats, foot);
+  card.append(head, stats, foot);
   return card;
 }
 
 function updateDbCard(card, row) {
   card.dataset.status = row.status;
   card.querySelector('.sc-name').textContent = row.label || row.name;
-  const pill = card.querySelector('.spill');
-  const said = describeState(row, null);
-  pill.textContent = said.text;
-  if (said.tone) pill.dataset.tone = said.tone;
-  else delete pill.dataset.tone;
-  card.querySelector('.sc-soft').textContent = (row.engineLabel || row.engine) + (row.version ? ' ' + row.version : '')
-    + (row.external ? ' \u00b7 runs elsewhere' : '');
+  setPill(card.querySelector('.spill'), row, null);
+  const soft = card.querySelector('.sc-soft');
+  const what = dbEngine(row) + (row.external ? ' · runs elsewhere' : '') + ' · ';
+  // Rebuilt only when it changes, so a focused button keeps its focus across polls.
+  if (soft.dataset.said !== what + dbAddress(row)) {
+    soft.dataset.said = what + dbAddress(row);
+    soft.textContent = '';
+    soft.append(what, addrButton(dbAddress(row)));
+  }
   const latest = row.status === 'running' ? row.latest : null;
   if (latest && Number.isFinite(latest.rss)) {
     const gb = latest.rss >= 1024;
     setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? 'GB' : 'MB');
-  } else setStat(card, 'memory', '\u2014');
-  const names = Object.keys(row.attachments || {});
-  const text = (key, value) => {
-    const dd = card.querySelector('[data-v="' + key + '"] dd');
+  } else {
+    const dd = card.querySelector('[data-v="memory"] dd');
     dd.textContent = '';
-    const t = document.createElement('span');
-    t.className = 'txt';
-    t.textContent = value;
-    t.title = value;
+    const t = el('span', 'txt');
+    t.textContent = row.status === 'running' ? 'Not measured' : 'Not running';
+    t.style.color = 'var(--ink-3)';
     dd.append(t);
-  };
-  text('attached', names.length ? names.map((n) => (rowOf(n) || {}).label || n).join(', ') : 'nothing yet');
-  text('address', (row.host || '127.0.0.1') + ':' + (row.port || '?'));
+  }
+  const names = Object.keys(row.attachments || {});
+  const used = card.querySelector('[data-v="attached"] dd');
+  const usedKey = names.map((n) => n + '=' + ((rowOf(n) || {}).label || '') + (rowOf(n) ? '' : '!')).join(',');
+  if (used.dataset.said === usedKey) {
+    // unchanged; the chips keep their focus
+  } else if (names.length) {
+    used.dataset.said = usedKey;
+    used.textContent = '';
+    const chips = el('div', 'used-by');
+    for (const n of names) {
+      const srv = rowOf(n);
+      const chip = el('button', 'srv-chip');
+      chip.type = 'button';
+      chip.append(icon('server'), (srv && srv.label) || n);
+      chip.title = srv ? 'Open ' + (srv.label || n) : n + ' is no longer on this machine';
+      chip.disabled = !srv;
+      chip.onclick = () => select(n);
+      chips.append(chip);
+    }
+    used.append(chips);
+  } else {
+    used.dataset.said = usedKey;
+    used.textContent = '';
+    const t = el('span', 'txt');
+    t.textContent = 'Nothing yet';
+    used.append(t);
+  }
   card.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (row.label || row.name));
   const note = card.querySelector('.sc-note');
-  note.textContent = names.length === 1 ? '1 server attached' : names.length ? names.length + ' servers attached' : 'No server attached';
+  note.textContent = names.length > 1 ? 'Shared by ' + names.length + ' servers' : names.length ? '1 server attached' : 'No server attached';
+}
+
+/** A database this server owns, drawn inside its card. */
+function buildDbLink(db) {
+  const link = el('div', 'sc-link');
+  link.dataset.name = db.name;
+  const glyph = el('span', 'sc-kind');
+  glyph.append(icon('database'));
+  const words = el('div', 'sc-link-words');
+  words.append(el('b'), el('span', 'sc-soft'));
+  const open = el('button', 'sc-open');
+  open.type = 'button';
+  open.textContent = 'Open →';
+  open.onclick = () => select(db.name);
+  link.append(glyph, words, el('span', 'spill'), open);
+  return link;
+}
+
+function updateDbLink(link, db) {
+  link.dataset.status = db.status;
+  const b = link.querySelector('b');
+  b.textContent = db.label || db.name;
+  const tag = document.createElement('small');
+  tag.textContent = 'Database';
+  b.append(tag);
+  const soft = link.querySelector('.sc-soft');
+  if (soft.dataset.said !== dbEngine(db) + dbAddress(db)) {
+    soft.dataset.said = dbEngine(db) + dbAddress(db);
+    soft.textContent = '';
+    soft.append(dbEngine(db) + ' · ', addrButton(dbAddress(db)));
+  }
+  setPill(link.querySelector('.spill'), db, null);
+  link.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (db.label || db.name));
+}
+
+// ---- recent activity ------------------------------------------------------------
+
+// Two of the same thing more than this far apart are two events, not one run.
+const FEED_RUN_GAP_MS = 30 * 60 * 1000;
+
+function actorKey(by) {
+  return (by && by.kind ? by.kind : 'spawnloft') + '|' + (by && by.name ? by.name : '');
 }
 
 /**
- * The last few things done anywhere, and by whom. A line opens that server's Activity, where the
- * rest of its history and any Undo are; a server since deleted has nowhere to open, and says so.
+ * Consecutive entries of the same thing - one server, one action, one actor, one outcome, each
+ * within half an hour of the last - become one run. Entries are newest first and so are runs.
+ */
+function groupActivity(entries) {
+  const runs = [];
+  for (const e of entries) {
+    const key = e.server + '\n' + e.action + '\n' + actorKey(e.by) + '\n' + (e.ok === false ? 'bad' : 'ok');
+    const last = runs[runs.length - 1];
+    const prev = last && last.entries[last.entries.length - 1];
+    if (last && last.key === key && Math.abs(Date.parse(prev.at) - Date.parse(e.at)) <= FEED_RUN_GAP_MS) last.entries.push(e);
+    else runs.push({ key, entries: [e] });
+  }
+  return runs;
+}
+
+// What a run of n says. Anything without a phrase here says its verb and a count.
+const ACTIVITY_MANY = {
+  backup: 'Made {n} backups', 'backup-delete': 'Deleted {n} backups', 'backup-prune': 'Cleared old backups {n} times',
+  'backup-lock': 'Locked {n} backups', 'backup-unlock': 'Unlocked {n} backups', restore: 'Restored {n} backups',
+  start: 'Started {n} times', stop: 'Stopped {n} times', kill: 'Forced to stop {n} times', crash: 'Crashed {n} times',
+  command: 'Ran {n} commands', 'file-edit': 'Edited {n} files', 'file-create': 'Created {n} files', 'file-upload': 'Uploaded {n} files',
+  'file-delete': 'Deleted {n} files', 'file-move': 'Moved {n} files', 'config-edit': 'Changed {n} config files',
+  'plugin-install': 'Installed {n} plugins', 'plugin-update': 'Updated {n} plugins', 'plugin-remove': 'Removed {n} plugins',
+  'plugin-enable': 'Turned on {n} plugins', 'plugin-disable': 'Turned off {n} plugins', settings: 'Changed settings {n} times',
+  'player-op': 'Made {n} operators', 'player-ban': 'Banned {n} players', 'player-unban': 'Unbanned {n} players',
+  'schedule-add': 'Scheduled {n} tasks', 'schedule-remove': 'Removed {n} schedules', 'schedule-run': 'Ran schedules {n} times',
+};
+
+/** A run as words: the one entry's own sentence, or what n of them come to. */
+function runText(run) {
+  const n = run.entries.length;
+  const e = run.entries[0];
+  if (n === 1) {
+    if (e.action === 'crash' && e.detail) return { verb: e.detail.charAt(0).toUpperCase() + e.detail.slice(1), detail: '' };
+    return { verb: (ACTIVITY_TEXT[e.action] || e.action).replace(/:$/, ''), detail: e.detail || '' };
+  }
+  const many = ACTIVITY_MANY[e.action];
+  return { verb: many ? many.replace('{n}', n) : (ACTIVITY_TEXT[e.action] || e.action).replace(/:$/, '') + ' ×' + n, detail: '' };
+}
+
+const feed = { all: false };
+
+/**
+ * The last few things done anywhere, newest first, a run of the same thing as one line. A line
+ * opens that server's Activity, where the rest of its history and any Undo are; a server since
+ * deleted has nowhere to open, and says so.
  */
 function renderHomeActivity() {
   const entries = overview.activity || [];
   const box = $('#homeActList');
   $('#homeActivity').hidden = !entries.length;
-  box.textContent = '';
-  for (const e of entries) {
-    const row = rowOf(e.server);
-    const line = document.createElement(row ? 'button' : 'div');
-    line.className = 'act-row act-home';
+  const servers = new Set(entries.map((e) => e.server));
+  const actors = new Set(entries.map((e) => actorKey(e.by)));
+  // The server and the actor are said only where there is more than one to tell apart: one server
+  // and one person is eighteen repeats of "RoyalSkyblock" and "You" saying nothing.
+  const showServer = servers.size > 1;
+  const showWho = actors.size > 1;
+  const runs = groupActivity(entries);
+  const shown = feed.all ? runs : runs.slice(0, FEED_SHOWN);
+  // Rebuilt only when what it says changes: an open run stays open across polls.
+  // Times are refreshed in place rather than keyed on, so a line under someone's focus survives the
+  // minute ticking over.
+  const key = shown.map((r) => r.entries.map((e) => e.at).join(',')).join('|') + '|' + showServer + showWho;
+  for (const t of box.querySelectorAll('time.act-when')) t.textContent = ago(t.dateTime) || stamp(t.dateTime);
+  if (key !== feed.key) {
+    feed.key = key;
+    const open = new Set(Array.from(box.querySelectorAll('details[open]')).map((d) => d.dataset.key));
+    box.textContent = '';
+    for (const run of shown) box.append(feedItem(run, { showServer, showWho, open }));
+  }
+  const more = $('#homeActMore');
+  const only = servers.size === 1 ? rowOf([...servers][0]) : null;
+  if (only && !feed.all && runs.length > FEED_SHOWN) {
+    more.hidden = false;
+    more.textContent = 'View all in ' + (only.label || only.name) + '\u2019s Activity';
+    more.onclick = () => openServerTool(only.name, 'activity');
+  } else {
+    more.hidden = runs.length <= FEED_SHOWN;
+    more.textContent = feed.all ? 'Show fewer' : 'View all ' + runs.length;
+    more.onclick = () => { feed.all = !feed.all; renderHomeActivity(); };
+  }
+}
+
+function feedTime(iso) {
+  const when = el('time', 'act-when');
+  when.dateTime = iso;
+  when.textContent = ago(iso) || stamp(iso);
+  when.title = new Date(iso).toLocaleString();
+  return when;
+}
+
+function feedItem(run, { showServer, showWho, open }) {
+  const li = el('li');
+  const e = run.entries[0];
+  const row = rowOf(e.server);
+  const said = runText(run);
+  const where = row ? (row.label || row.name) : e.server + ' (deleted)';
+
+  const what = el('span', 'feed-what');
+  const text = el('span', 'feed-text');
+  text.append(said.verb);
+  if (said.detail) {
+    const d = el(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span', 'dim');
+    d.textContent = ' ' + said.detail;
+    text.append(d);
+  }
+  // The whole sentence, for the line it was cut short to fit.
+  text.title = said.verb + (said.detail ? ' ' + said.detail : '');
+  what.append(text);
+  if (e.ok === false) {
+    const pill = el('span', 'pill');
+    pill.dataset.tone = 'ban';
+    pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
+    what.append(pill);
+  }
+  const meta = el('span', 'feed-meta');
+  if (showServer) {
+    const s = el('b', 'act-server');
+    s.textContent = where;
+    meta.append(s);
+  }
+  if (showWho) meta.append(activityChip(e.by));
+
+  if (run.entries.length === 1) {
+    const line = el(row ? 'button' : 'div', 'feed-row');
     if (row) {
       line.type = 'button';
-      line.title = 'Open ' + (row.label || row.name) + '\u2019s activity';
+      line.title = 'Open ' + where + '\u2019s activity';
       line.onclick = () => openServerTool(row.name, 'activity');
     }
     if (e.ok === false) line.setAttribute('data-bad', '');
-    const when = document.createElement('time');
-    when.className = 'act-when';
-    when.dateTime = e.at;
-    when.textContent = ago(e.at) || stamp(e.at);
-    when.title = new Date(e.at).toLocaleString();
-    const where = document.createElement('b');
-    where.className = 'act-server';
-    where.textContent = row ? (row.label || row.name) : e.server + ' (deleted)';
-    line.append(when, where, activityChip(e.by), activitySentence(e));
-    box.append(line);
+    line.append(icon(activityIcon(e.action)), what, meta, feedTime(e.at));
+    li.append(line);
+    return li;
   }
+
+  // A run: one line that opens to the entries in it.
+  const details = el('details');
+  details.dataset.key = run.key + '|' + run.entries[run.entries.length - 1].at;
+  details.open = open.has(details.dataset.key);
+  const summary = el('summary', 'feed-row');
+  if (e.ok === false) summary.setAttribute('data-bad', '');
+  const last = run.entries[run.entries.length - 1];
+  const span = ago(last.at) !== ago(e.at) ? ago(last.at) + ' to ' + ago(e.at) : ago(e.at);
+  summary.title = text.title + ' \u00b7 ' + span;
+  summary.append(icon('caret'), what, meta, feedTime(e.at));
+  const sub = el('ol', 'feed-sub');
+  for (const one of run.entries) {
+    const item = el('li');
+    const line = el(row ? 'button' : 'div', 'feed-row');
+    if (row) {
+      line.type = 'button';
+      line.title = 'Open ' + where + '\u2019s activity';
+      line.onclick = () => openServerTool(row.name, 'activity');
+    }
+    const t = el('span', 'feed-text');
+    t.textContent = one.detail || (ACTIVITY_TEXT[one.action] || one.action);
+    t.title = t.textContent;
+    const w = el('span', 'feed-what');
+    w.append(t);
+    line.append(el('span'), w, el('span', 'feed-meta'), feedTime(one.at));
+    item.append(line);
+    sub.append(item);
+  }
+  details.append(summary, sub);
+  li.append(details);
+  return li;
+}
+
+/** The glyph a line of history leads with: what kind of thing was done. */
+function activityIcon(action) {
+  if (/^backup|^restore/.test(action)) return 'archive';
+  if (/^schedule/.test(action)) return 'clock';
+  if (/^plugin/.test(action)) return 'plug';
+  if (/^(file|folder|config|undo)/.test(action)) return 'file';
+  if (/^world/.test(action)) return 'map';
+  if (/^player/.test(action)) return 'user';
+  if (action === 'command') return 'terminal';
+  if (action === 'crash' || action === 'kill') return 'alert';
+  if (action === 'start' || action === 'stop') return 'pulse';
+  return 'history';
 }
 
 // ---- needs attention ----------------------------------------------------------
@@ -4392,6 +4855,44 @@ function javaShort(row) {
 }
 
 /**
+ * Where a server stands on backups, said once for the card and the attention list alike. "Never"
+ * only when the log agrees: a server whose backups were all deleted has none on disk, but it has
+ * been backed up, and calling that "never" made the page contradict its own activity feed.
+ */
+function backupState(row) {
+  const facts = overview.data && overview.data.servers[row.name];
+  if (!facts) return null;
+  const trail = facts.backupTrail || null;
+  const none = facts.lastBackupAt == null;
+  return {
+    auto: facts.autoBackup && facts.autoBackup.enabled ? facts.autoBackup : null,
+    lastAt: facts.lastBackupAt,
+    none,
+    gone: none && Boolean(trail && (trail.lastMadeAt || trail.deleted)),
+    trail,
+  };
+}
+
+/** What became of the backups a server no longer has, from its activity. */
+function goneSentence(trail) {
+  const when = (ms) => ago(new Date(ms).toISOString()) || 'earlier';
+  const deleted = trail.deleted
+    ? (trail.deleted === 1 ? '1 backup was' : trail.deleted + ' backups were') + ' deleted'
+    : '';
+  const off = trail.scheduleOffAt ? 'the backup schedule was removed' : '';
+  if (deleted && off) {
+    const a = when(trail.lastDeletedAt);
+    const b = when(trail.scheduleOffAt);
+    if (a === b) return 'Its ' + (trail.deleted === 1 ? 'backup was' : trail.deleted + ' backups were') + ' deleted and ' + off.replace('the ', 'its ') + ' ' + a + '.';
+    return capital(deleted) + ' ' + a + ', and ' + off + ' ' + b + '.';
+  }
+  if (deleted) return capital(deleted) + ' ' + when(trail.lastDeletedAt) + '.';
+  if (off) return capital(off) + ' ' + when(trail.scheduleOffAt) + ', and no backup is left on disk.';
+  return 'The last backup, made ' + when(trail.lastMadeAt) + ', is no longer on disk.';
+}
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
  * The few things that want someone to do something, each with the one thing to do. Nothing here
  * is shown for its own sake: a card is a crash, updates somebody asked about, a server with no
  * backups going unprotected, or a Java that will stop servers starting.
@@ -4409,7 +4910,7 @@ function attentionItems() {
         text: r.stoppedAt
           ? 'It stopped on its own ' + (sameDay(r.stoppedAt) ? 'at ' + clockOf(r.stoppedAt) : ago(new Date(r.stoppedAt).toISOString())) + '.'
           : 'It stopped without being asked to.',
-        action: 'See why', run: () => openServerConsole(r.name),
+        actions: [{ label: 'See why', run: () => openServerConsole(r.name), primary: true }],
       });
     } else if (r.status === 'running' && r.restarts > 0 && r.startedAt && sameDay(r.startedAt)) {
       // Each comeback is a fresh launch, so the start time is when the latest one happened.
@@ -4419,7 +4920,7 @@ function attentionItems() {
         text: r.restarts === 1
           ? 'Crash guard brought it back at ' + clockOf(r.startedAt) + '.'
           : 'Crash guard has brought it back ' + r.restarts + ' times, the last at ' + clockOf(r.startedAt) + '.',
-        action: 'See why', run: () => openServerConsole(r.name),
+        actions: [{ label: 'See why', run: () => openServerConsole(r.name), primary: true }],
       });
     }
   }
@@ -4434,25 +4935,26 @@ function attentionItems() {
       key: 'updates|' + r.name + '|' + n, tone: 'accent', icon: 'plug',
       title: n + (n === 1 ? ' update' : ' updates') + ' for ' + nameOf(r),
       text: names.join(', '),
-      action: 'Review', run: () => openServerTool(r.name, 'plugins'),
+      actions: [{ label: 'Review', run: () => openServerTool(r.name, 'plugins') }],
     });
   }
 
   if (data) {
     for (const r of state.rows) {
-      const facts = data.servers[r.name];
-      if (!facts || (facts.autoBackup && facts.autoBackup.enabled)) continue;
-      const never = facts.lastBackupAt == null;
-      const days = never ? 0 : Math.floor((Date.now() - facts.lastBackupAt) / DAY_MS);
-      if (!never && !(r.status === 'running' && days >= 7)) continue;
+      const b = backupState(r);
+      if (!b || b.auto) continue;
+      const days = b.none ? 0 : Math.floor((Date.now() - b.lastAt) / DAY_MS);
+      if (!b.none && !(r.status === 'running' && days >= 7)) continue;
+      const offer = data.automaticAvailable
+        ? 'Turn on nightly backups at 03:00, keeping the last 7.'
+        : 'Automatic backups are not available here; take one from Backups.';
       items.push({
-        key: 'backup|' + r.name + '|' + (never ? 'never' : days), tone: 'warn', icon: 'archive',
-        title: never ? nameOf(r) + ' has never been backed up' : 'No backup of ' + nameOf(r) + ' in ' + days + ' days',
-        text: data.automaticAvailable
-          ? 'Nightly backups at 03:00, keeping the last 7.'
-          : 'Automatic backups are not available here; take one from Backups.',
-        action: data.automaticAvailable ? 'Turn on' : 'Open Backups',
-        run: data.automaticAvailable ? () => turnOnBackups(r) : () => openServerTool(r.name, 'backups'),
+        key: 'backup|' + r.name + '|' + (b.gone ? 'gone' : b.none ? 'never' : days), tone: 'warn', icon: 'archive',
+        title: b.gone ? nameOf(r) + ' has no backups' : b.none ? nameOf(r) + ' has never been backed up' : 'No backup of ' + nameOf(r) + ' in ' + days + ' days',
+        text: b.gone ? goneSentence(b.trail) + ' ' + offer : offer,
+        actions: data.automaticAvailable
+          ? [{ label: 'Turn on backups', run: () => turnOnBackups(r), primary: true }, { label: 'Open Backups', run: () => openServerTool(r.name, 'backups') }]
+          : [{ label: 'Open Backups', run: () => openServerTool(r.name, 'backups'), primary: true }],
       });
     }
   }
@@ -4466,7 +4968,7 @@ function attentionItems() {
       title: 'Java ' + need + ' needed',
       text: (names.length > 2 ? names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more' : names.join(' and '))
         + (names.length === 1 ? ' won’t start until it is installed.' : ' won’t start until it is installed.'),
-      action: 'Get Java', run: () => openOutside(state.health.javaDownload),
+      actions: [{ label: 'Get Java', run: () => openOutside(state.health.javaDownload), primary: true }],
     });
   }
   return items;
@@ -4481,9 +4983,14 @@ function renderAttention() {
   const items = attentionItems();
   const box = $('#homeAttention');
   const shown = overview.showAll ? items : items.slice(0, 3);
-  const key = items.map((i) => i.key + '|' + i.title + '|' + i.text).join('\n') + '|' + overview.showAll;
+  // The text is left out of the key: it carries "6h ago", and a card rebuilt each time that ticks
+  // over loses the focus of the button someone was about to press. It is refreshed in place.
+  const key = items.map((i) => i.key + '|' + i.title).join('\n') + '|' + overview.showAll;
   box.hidden = !items.length;
-  if (key === overview.attention) return;
+  if (key === overview.attention) {
+    $$('#attGrid .att-words span').forEach((span, i) => { if (shown[i] && span.textContent !== shown[i].text) span.textContent = shown[i].text; });
+    return;
+  }
   overview.attention = key;
 
   const grid = $('#attGrid');
@@ -4495,6 +5002,9 @@ function renderAttention() {
     const tile = document.createElement('span');
     tile.className = 'att-tile';
     tile.append(icon(item.icon));
+    // Said in words as well as in colour: the tile's glyph is decoration to a screen reader.
+    card.setAttribute('role', 'group');
+    card.setAttribute('aria-label', (item.tone === 'fault' ? 'Problem: ' : item.tone === 'warn' ? 'Warning: ' : '') + item.title);
     const words = document.createElement('div');
     words.className = 'att-words';
     const b = document.createElement('b');
@@ -4502,11 +5012,17 @@ function renderAttention() {
     const p = document.createElement('span');
     p.textContent = item.text;
     words.append(b, p);
-    const act = document.createElement('button');
-    act.type = 'button';
-    act.textContent = item.action;
-    act.onclick = item.run;
-    card.append(tile, words, act);
+    const acts = document.createElement('div');
+    acts.className = 'att-acts';
+    for (const a of item.actions) {
+      const act = document.createElement('button');
+      act.type = 'button';
+      act.textContent = a.label;
+      if (a.primary) act.className = 'primary';
+      act.onclick = a.run;
+      acts.append(act);
+    }
+    card.append(tile, words, acts);
     grid.append(card);
   }
   const more = $('#attMore');
@@ -4543,24 +5059,23 @@ async function turnOnBackups(row) {
 // ---- the server cards ----------------------------------------------------------
 
 function buildHomeCard(name) {
-  const el = (tag, cls) => {
-    const node = document.createElement(tag);
-    if (cls) node.className = cls;
-    return node;
-  };
   const card = el('article', 'scard');
   card.dataset.name = name;
 
-  const head = el('div', 'sc-head');
-  const title = el('div', 'sc-title');
-  title.append(el('h3', 'sc-name'), el('span', 'spill'));
+  const head = cardHead('server');
+  // The verbs: the one that changes its state, and Restart beside Stop while it runs.
+  const acts = el('div', 'sc-acts');
+  const restart = el('button', 'sc-restart');
+  restart.type = 'button';
+  restart.onclick = () => cardAct(name, 'restart');
   const act = el('button', 'sc-act');
   act.type = 'button';
   act.onclick = () => cardAct(name);
-  head.append(title, act);
+  acts.append(restart, act);
+  head.append(acts);
 
   const stats = el('dl', 'sc-stats');
-  for (const [key, label] of [['players', 'Players'], ['tps', 'TPS'], ['memory', 'Memory'], ['backup', 'Last backup']]) {
+  for (const [key, label] of [['players', 'Players'], ['tps', 'TPS'], ['memory', 'Memory']]) {
     const cell = el('div');
     cell.dataset.v = key;
     const dt = el('dt');
@@ -4568,28 +5083,29 @@ function buildHomeCard(name) {
     cell.append(dt, el('dd'));
     stats.append(cell);
   }
+  const idle = el('p', 'sc-idle');
 
   const foot = el('div', 'sc-foot');
-  const open = el('button', 'ghost sc-open');
+  const open = el('button', 'sc-open');
   open.type = 'button';
   open.textContent = 'Open →';
   open.onclick = () => select(name);
-  foot.append(el('span', 'sc-note'), open);
+  foot.append(el('div', 'sc-note'), open);
 
-  card.append(head, el('div', 'sc-soft'), stats, el('div', 'sc-dbs'), foot);
+  card.append(head, stats, idle, el('div', 'sc-links'), el('div', 'sc-dbs'), foot);
   return card;
 }
 
-/** What the card's one button does: stop a running server, start a stopped one. */
+/** What the card's main button does: stop a running server, start a stopped one. */
 function cardVerb(row) {
   if (row.status === 'running' || row.status === 'stopping') return { what: 'stop', label: 'Stop', primary: false };
   return { what: 'start', label: crashedNow(row) ? 'Restart' : 'Start', primary: true };
 }
 
-async function cardAct(name) {
+async function cardAct(name, what) {
   const row = rowOf(name);
   if (!row || overview.acting[name]) return;
-  const verb = cardVerb(row);
+  const verb = what ? { what } : cardVerb(row);
   overview.acting[name] = verb.what;
   renderHomeCards();
   const note = toast(ACTION_ING[verb.what] + ' ' + name + '…');
@@ -4606,15 +5122,27 @@ async function cardAct(name) {
   }
 }
 
-/** The line at the foot of a card: the one thing about how it is looked after worth knowing. */
+/**
+ * The line at the foot of a card: how it is looked after. A server with no backup on disk says
+ * so in the warning's colour and offers the way to set them up; "Never" only when it truly never
+ * was.
+ */
 function cardNote(row) {
-  if (javaShort(row)) return { text: 'Needs Java ' + row.javaNeeds + ' to start', tone: 'warn' };
-  const facts = overview.data && overview.data.servers[row.name];
-  if (!facts) return { text: '' };
-  const auto = facts.autoBackup;
-  if (auto && auto.enabled) return { text: 'Backs up ' + describeSchedule(auto.schedule) };
-  if (row.origin && row.origin.clonedFrom) return { text: 'Test copy, backups off' };
-  return { text: 'Backups off' };
+  const b = backupState(row);
+  if (!b) return { text: 'Checking backups…' };
+  const schedule = b.auto ? 'backs up ' + describeSchedule(b.auto.schedule) : '';
+  if (!b.none) {
+    const old = !b.auto && Date.now() - b.lastAt >= 7 * DAY_MS;
+    return {
+      icon: 'archive', tone: old ? 'warn' : '',
+      lead: 'Last backup', strong: ago(new Date(b.lastAt).toISOString()) || 'just now',
+      text: schedule ? capital(schedule) : 'No schedule',
+      link: b.auto ? null : 'Set up backups',
+    };
+  }
+  if (b.auto) return { icon: 'archive', lead: 'No backup yet', text: 'First one ' + describeSchedule(b.auto.schedule) };
+  if (row.origin && row.origin.clonedFrom && !b.gone) return { icon: 'archive', text: 'Test copy, backups off' };
+  return { icon: 'alert', tone: 'warn', strong: b.gone ? 'No backups kept' : 'Never backed up', text: 'Backups off', link: 'Set up backups' };
 }
 
 function setStat(card, key, value, of, tone, spark) {
@@ -4635,65 +5163,133 @@ function setStat(card, key, value, of, tone, spark) {
   if (spark && spark.values.length > 1) dd.append(sparkline(spark.values, spark.max));
 }
 
+/** A button's word, and whether it is the one doing something right now. */
+function setVerb(button, label, busy, disabled, name) {
+  button.textContent = busy ? ACTION_ING[busy] + '…' : label;
+  button.setAttribute('aria-busy', busy ? 'true' : 'false');
+  button.disabled = disabled;
+  button.setAttribute('aria-label', (busy ? ACTION_ING[busy] : label) + ' ' + name);
+}
+
 function updateHomeCard(card, row) {
+  const name = row.label || row.name;
+  const acting = overview.acting[row.name];
   card.dataset.status = row.status;
   card.toggleAttribute('data-crashed', crashedNow(row));
-  card.querySelector('.sc-name').textContent = row.label || row.name;
-
-  const pill = card.querySelector('.spill');
-  const said = describeState(row, overview.acting[row.name]);
-  pill.textContent = said.text;
-  if (said.tone) pill.dataset.tone = said.tone;
-  else delete pill.dataset.tone;
-  if (said.since) pill.dataset.since = String(said.since);
-  else delete pill.dataset.since;
+  card.querySelector('.sc-name').textContent = name;
+  setPill(card.querySelector('.spill'), row, acting);
 
   const sw = softwareById[row.loader ?? 'paper'];
-  card.querySelector('.sc-soft').textContent = (sw ? sw.label : (row.loader || 'Paper'))
-    + (row.mcVersion ? ' ' + row.mcVersion : '') + ' · localhost:' + (row.port || '?');
+  const soft = card.querySelector('.sc-soft');
+  const addr = 'localhost:' + (row.port || '?');
+  const what = (sw ? sw.label : (row.loader || 'Paper')) + (row.mcVersion ? ' ' + row.mcVersion : '');
+  // Rebuilt only when it changes, so the address button keeps its focus across polls.
+  if (soft.dataset.said !== what + '|' + addr) {
+    soft.dataset.said = what + '|' + addr;
+    soft.textContent = '';
+    soft.append(what + ' · ', addrButton(addr));
+  }
 
   const verb = cardVerb(row);
+  const blocked = Boolean(acting) || row.status === 'stopping' || Boolean(state.busy && state.current === row.name);
   const act = card.querySelector('.sc-act');
-  act.textContent = verb.label;
   act.className = 'sc-act' + (verb.primary ? ' primary' : '');
-  act.disabled = Boolean(overview.acting[row.name]) || row.status === 'stopping' || Boolean(state.busy && state.current === row.name);
-  act.setAttribute('aria-label', verb.label + ' ' + (row.label || row.name));
-  card.querySelector('.sc-open').setAttribute('aria-label', 'Open ' + (row.label || row.name));
+  const busy = acting && acting !== 'restart' ? acting : row.status === 'stopping' ? 'stop' : null;
+  setVerb(act, verb.label, busy, blocked, name);
+  const restart = card.querySelector('.sc-restart');
+  restart.hidden = !(row.status === 'running' || acting === 'restart');
+  setVerb(restart, 'Restart', acting === 'restart' ? 'restart' : null, blocked, name);
+  card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
-  const latest = row.status === 'running' ? row.latest : null;
-  if (latest && latest.players != null) setStat(card, 'players', String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
-  else setStat(card, 'players', '—');
-  const samples = latest ? homeMetrics.samples[row.name] || [] : [];
-  setStat(card, 'tps', latest && latest.tps != null ? latest.tps.toFixed(1) : '—', '', '',
-    { values: samples.filter((s) => s.tps != null).map((s) => s.tps), max: 20 });
-  const ceiling = memoryCeilingMb(row.memory);
-  if (latest && Number.isFinite(latest.rss)) {
-    const gb = latest.rss >= 1024;
-    const allotted = ceiling ? '/ ' + gbOf(ceiling) + ' GB' : 'GB';
-    const rss = samples.map((s) => s.rss).filter((v) => Number.isFinite(v));
-    setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted, '',
-      { values: rss, max: Math.max(ceiling || 0, ...rss, 256) });
-  } else setStat(card, 'memory', '—');
-  // The databases this server is attached to, on a wide card.
-  const dbs = (state.dbs || []).filter((d) => d.attachments && d.attachments[row.name]);
+  // Live figures while it runs; one line saying why there are none while it does not.
+  const live = row.status === 'running';
+  const stats = card.querySelector('.sc-stats');
+  const idle = card.querySelector('.sc-idle');
+  stats.hidden = !live;
+  idle.hidden = live;
+  if (!live) {
+    idle.textContent = '';
+    delete idle.dataset.tone;
+    if (javaShort(row)) {
+      idle.dataset.tone = 'fault';
+      idle.append(icon('alert'), 'Needs Java ' + row.javaNeeds + ' to start');
+    } else if (crashedNow(row)) {
+      idle.dataset.tone = 'fault';
+      idle.append(icon('alert'), 'Crashed — open the console to see why, or start it again');
+    } else if (acting === 'start' || acting === 'restart') {
+      idle.append(icon('pulse'), 'Starting — live stats appear once it is up');
+    } else {
+      idle.append(icon('pulse'), 'Server is stopped — start it to see live stats');
+    }
+  } else {
+    const latest = row.latest;
+    if (latest && latest.players != null) setStat(card, 'players', String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
+    else setStat(card, 'players', '…', 'starting');
+    const samples = (latest && homeMetrics.samples[row.name]) || [];
+    setStat(card, 'tps', latest && latest.tps != null ? latest.tps.toFixed(1) : '…', '', '',
+      { values: samples.filter((s) => s.tps != null).map((s) => s.tps), max: 20 });
+    const ceiling = memoryCeilingMb(row.memory);
+    if (latest && Number.isFinite(latest.rss)) {
+      const gb = latest.rss >= 1024;
+      const allotted = ceiling ? '/ ' + gbOf(ceiling) + ' GB' : 'GB';
+      const rss = samples.map((s) => s.rss).filter((v) => Number.isFinite(v));
+      setStat(card, 'memory', gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted, '',
+        { values: rss, max: Math.max(ceiling || 0, ...rss, 256) });
+    } else setStat(card, 'memory', '…');
+  }
+
+  // The databases only this server uses, inside its card; the ones it shares, named.
+  const links = card.querySelector('.sc-links');
+  const owned = ownedDbs(row.name);
+  const keep = new Set(owned.map((d) => d.name));
+  for (const l of Array.from(links.children)) if (!keep.has(l.dataset.name)) l.remove();
+  owned.forEach((db, i) => {
+    let link = links.querySelector('.sc-link[data-name="' + CSS.escape(db.name) + '"]');
+    if (!link) link = buildDbLink(db);
+    updateDbLink(link, db);
+    if (links.children[i] !== link) links.insertBefore(link, links.children[i] || null);
+  });
+  const shared = (state.dbs || []).filter((d) => d.attachments && d.attachments[row.name] && !keep.has(d.name));
   const dbLine = card.querySelector('.sc-dbs');
   dbLine.textContent = '';
-  if (dbs.length) {
+  if (shared.length) {
     const b = document.createElement('b');
-    b.textContent = dbs.length === 1 ? 'Database ' : 'Databases ';
-    dbLine.append(b, dbs.map((d) => d.label || d.name).join(', '));
-  }
-  const facts = overview.data && overview.data.servers[row.name];
-  if (!facts) setStat(card, 'backup', '…');
-  else if (facts.lastBackupAt == null) setStat(card, 'backup', 'Never', '', 'warn');
-  else {
-    const when = shortAgo(facts.lastBackupAt);
-    setStat(card, 'backup', when, when === 'now' ? '' : 'ago');
+    b.textContent = shared.length === 1 ? 'Shared database ' : 'Shared databases ';
+    dbLine.append(b, shared.map((d) => d.label || d.name).join(', '));
   }
 
   const note = cardNote(row);
   const noteEl = card.querySelector('.sc-note');
-  noteEl.textContent = note.text;
+  // Keyed without the time, which is refreshed in place: a rebuild would take the focus off "Set up
+  // backups" each time a minute ticks over.
+  const said = JSON.stringify({ ...note, strong: note.lead === 'Last backup' ? '' : note.strong });
+  if (noteEl.dataset.said === said && note.strong) {
+    const b = noteEl.querySelector('b');
+    if (b && b.textContent !== note.strong) b.textContent = note.strong;
+  }
+  if (noteEl.dataset.said !== said) {
+    noteEl.dataset.said = said;
+    noteEl.textContent = '';
+    if (note.icon) noteEl.append(icon(note.icon));
+    const words = document.createElement('span');
+    if (note.lead) words.append(note.lead + (note.strong ? ' ' : ''));
+    if (note.strong) {
+      const b = document.createElement('b');
+      b.textContent = note.strong;
+      words.append(b);
+    }
+    if (note.text) words.append((note.lead || note.strong ? ' · ' : '') + note.text);
+    noteEl.append(words);
+    if (note.link) {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'more-link';
+      link.textContent = note.link;
+      link.setAttribute('aria-label', note.link + ' for ' + name);
+      link.onclick = () => openServerTool(row.name, 'backups');
+      noteEl.append(link);
+    }
+  }
   if (note.tone) noteEl.dataset.tone = note.tone;
   else delete noteEl.dataset.tone;
 }

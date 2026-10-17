@@ -114,6 +114,40 @@ export function readActivity({ server = null, since = null, before = null, by = 
   return { entries: matched.slice(0, limit), more: matched.length > limit }
 }
 
+// What the log says about each server's backups, for a server with none on disk: whether one was
+// ever made, and what removed them. One read of the log for every server at once.
+// `deleted` counts the backups deleted or pruned since the newest one was made; `scheduleOffAt`
+// is when its automatic backup was last removed or paused.
+export function backupTrails(names) {
+  const want = new Set(names)
+  const out = {}
+  for (const name of want) out[name] = { lastMadeAt: null, deleted: 0, lastDeletedAt: null, scheduleOffAt: null }
+  const all = [...readLines(PREVIOUS()), ...readLines(FILE())]
+  const done = new Set()
+  for (let i = all.length - 1; i >= 0 && done.size < want.size; i--) {
+    const e = all[i]
+    const t = out[e.server]
+    if (!t || done.has(e.server) || e.ok === false) continue
+    const at = Date.parse(e.at)
+    if (e.action === 'backup') {
+      t.lastMadeAt = at
+      done.add(e.server)
+    } else if (e.action === 'create' || e.action === 'adopt' || e.action === 'delete') {
+      // Before this the name belonged to another server, whose backups are not this one's.
+      done.add(e.server)
+    } else if (e.action === 'backup-delete') {
+      t.deleted++
+      t.lastDeletedAt ??= at
+    } else if (e.action === 'backup-prune') {
+      t.deleted += Number.parseInt(e.detail, 10) || 1
+      t.lastDeletedAt ??= at
+    } else if ((e.action === 'schedule-remove' || e.action === 'schedule-disable') && e.detail === 'Automatic backup') {
+      t.scheduleOffAt ??= at
+    }
+  }
+  return out
+}
+
 export function renameServer(from, to) {
   for (const file of [PREVIOUS(), FILE()]) {
     let text

@@ -191,3 +191,23 @@ test('the panel and the setup wizard share one token block, values included', ()
 test('the website palette stays consistent between the panel and setup wizard', () => {
   assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../desktop/setup.html', true))
 })
+
+test('the overview feed folds a run of the same thing into one line, and only a run', () => {
+  const { groupActivity } = lifted(['FEED_RUN_GAP_MS', 'actorKey', 'groupActivity'])
+  const you = { kind: 'panel' }
+  const at = (min) => new Date(Date.UTC(2026, 9, 17, 12, 0) - min * 60000).toISOString()
+  const del = (min, by = you) => ({ at: at(min), server: 'RoyalSkyblock', action: 'backup-delete', by, detail: `b${min}.tar.gz` })
+  const runs = groupActivity([
+    del(0), del(1), del(2),
+    // the same action by someone else is not the same run
+    del(3, { kind: 'assistant', name: 'Claude' }),
+    { at: at(4), server: 'RoyalSkyblock', action: 'schedule-remove', by: you, detail: 'Automatic backup' },
+    del(5), del(6),
+    // more than half an hour after the one before it: a new run
+    del(60),
+    { at: at(61), server: 'Lobby', action: 'backup-delete', by: you, detail: 'x.tar.gz' },
+  ])
+  assert.deepEqual(runs.map((r) => r.entries.length), [3, 1, 1, 2, 1, 1])
+  assert.equal(runs[0].entries[0].detail, 'b0.tar.gz', 'newest first, inside a run too')
+  assert.notEqual(runs[3].key, runs[5].key, 'another server is another run')
+})

@@ -8,7 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-overview-'))
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
-const { newestSnapshotAt } = await import('../src/backup.mjs')
+const { newestSnapshotAt, snapshotSummary } = await import('../src/backup.mjs')
 const { BACKUPS_DIR } = await import('../src/paths.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
@@ -27,6 +27,8 @@ test('the newest backup is the newest archive, and a server with none has none',
   at('newest_standard_2026-09-22.tar.gz.pending', 1_799_000_000)
 
   assert.equal(await newestSnapshotAt('survival'), 1_790_000_000 * 1000)
+  assert.deepEqual(await snapshotSummary('survival'), { newestAt: 1_790_000_000 * 1000, count: 2 })
+  assert.deepEqual(await snapshotSummary('never-backed-up'), { newestAt: null, count: 0 })
   assert.equal(await newestSnapshotAt('never-backed-up'), null)
   assert.equal(fs.existsSync(path.join(BACKUPS_DIR, 'never-backed-up')), false, 'Asking makes no folder')
 })
