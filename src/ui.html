@@ -1340,7 +1340,7 @@
   /*
     Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
     has more room than that divides into a well and a companion instead of growing. Backups keeps
-    the history as the well, with Back up now, Leave out and Automatic stacked beside it; Players
+    the history as the well, with Back up now and Automatic stacked beside it and the status line across both; Players
     puts the chosen player beside the list; Settings shows the raw file beside the form; Stats lays
     its gauges two by two with the numbers of the range under each chart. The companion is a second
     column the lower tiers simply do not have, so nothing changes below 2000px.
@@ -1349,6 +1349,7 @@
     #backupsBody { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); grid-auto-flow: row dense; gap: var(--s-5) var(--s-6); }
     #backupsBody > .section { grid-column: 2; }
     #backupsBody > [data-backup-history] { grid-column: 1; grid-row: span 3; }
+    #backupsBody > .bk-status { grid-column: 1 / -1; }
     #performanceBody { gap: var(--s-5); }
     /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
     #performanceBody > .facts {
@@ -1477,14 +1478,15 @@
   .fm-open {
     display: flex; align-items: center; gap: var(--s-2); min-width: 0; justify-self: start; max-width: 100%;
     padding: 4px 0; background: none; border: 0; box-shadow: none; color: var(--ink);
-    font: var(--t-3)/1.3 var(--ui); text-align: left; cursor: pointer;
+    font: var(--t-2)/1.3 var(--mono); text-align: left; cursor: pointer;
   }
   .fm-open > span:not(.pill) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fm-open .ico { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
   .fm-open:hover:not(:disabled) { background: none; transform: none; color: var(--lapis-ink); }
   .fm-open:hover .ico { color: var(--lapis-ink); }
   .fm-row .fm-size { font: var(--t-2)/1 var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
-  .fm-row .fm-when { font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .fm-row .fm-when { font: var(--t-2)/1 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; text-align: right; }
+  .fm-head .fm-when { text-align: right; }
   .fm-row .fm-kind { display: none; font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fm-row .fm-when .long { display: none; }
   /* Wide: what kind of thing each entry is. Ultra: the exact time, not the short stamp. */
@@ -1741,6 +1743,23 @@
   */
   .plug-add { display: grid; gap: var(--s-3); }
 
+  /* Backups' first line: the schedule's state, the last backup's age, and the one action. */
+  .bk-status {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface);
+  }
+  .bk-status > .ico { width: 18px; height: 18px; flex: none; color: var(--ink-3); }
+  .bk-status[data-tone="live"] > .ico { color: var(--live); }
+  .bk-status[data-tone="warn"] { border-color: var(--warn-edge); background: var(--warn-wash); }
+  .bk-status[data-tone="warn"] > .ico { color: var(--warn); }
+  .bk-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+  .bk-text b { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
+  .bk-text span { font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .bk-text span:empty { display: none; }
+  .bk-last { font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
+  .bk-status[data-tone="warn"] .bk-last { color: var(--warn-ink); font-weight: 600; }
+
   .callout {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
     padding: var(--s-3) var(--s-4);
@@ -1761,7 +1780,7 @@
   .plist { display: grid; }
   .plug {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) auto auto;
+    grid-template-columns: 32px minmax(0, 1fr) 12ch 9ch auto;
     align-items: center;
     gap: var(--s-3);
     padding: 9px var(--s-1);
@@ -1783,13 +1802,16 @@
   .plug-main { min-width: 0; display: grid; gap: 2px; }
   .plug-name { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plug-src { font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; }
-  /* A fixed width, empty on a jar added by hand, so the versions line up down the list. */
-  .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 164px; }
+  .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .plug-src code { font: var(--t-1)/1.3 var(--mono); color: var(--ink-3); }
+  .plug-state { display: inline-flex; align-items: center; gap: 6px; font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
+  .plug-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--live); }
+  .plug-state[data-on="false"] { color: var(--ink-3); }
+  .plug-state[data-on="false"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+  .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 132px; }
   .plug-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
-  /* The same two verbs on every row; quiet until the row is pointed at or reached by keyboard. */
-  .plug-acts .quiet { display: inline-flex; gap: 2px; opacity: .45; transition: opacity var(--ease); }
-  .plug:hover .quiet, .plug:focus-within .quiet { opacity: 1; }
+  /* The same two verbs on every row, always shown: hidden until hover, they read as missing. */
+  .plug-acts .row-acts { display: inline-flex; gap: 2px; }
   .plug[data-off] .plug-name, .plug[data-off] .plug-tile { opacity: .55; }
 
   /* ---- players -------------------------------------------------------------- */
@@ -5295,7 +5317,7 @@ async function turnOnBackups(row) {
   } catch (e) {
     toast(e.message, 'bad');
   }
-  await loadOverview(true);
+  if (state.view === 'home') await loadOverview(true);
 }
 
 // ---- the server cards ----------------------------------------------------------
@@ -7391,8 +7413,9 @@ async function renderPlugins(opts) {
 
   // ---- what is installed -------------------------------------------------------
   // Everything in the folder, not only what SpawnLoft installed: a jar dropped in by hand is
-  // listed and labelled as left alone, rather than being a number in a footnote. Only the ones
-  // SpawnLoft put there get updates, a toggle and a delete - the rest are the person's own.
+  // listed rather than being a number in a footnote. Every row can be turned off and removed -
+  // a broken jar added by hand is exactly the one someone needs to switch off - but only the ones
+  // SpawnLoft put there get updates, since it knows where to fetch them from.
   const listHead = document.createElement('div');
   listHead.className = 'plug-head';
   const listTitle = document.createElement('h3');
@@ -7556,21 +7579,34 @@ async function renderPlugins(opts) {
     nm.textContent = p.name;
     const src = document.createElement('div');
     src.className = 'plug-src';
-    const from = !p.managed ? 'Added by hand · left alone'
+    const from = !p.managed ? 'Added by hand'
       : p.source === 'hangar' ? 'Hangar' : p.source === 'modpack' ? 'Modpack' : 'Modrinth';
-    src.textContent = from + (p.enabled ? '' : ' · Disabled');
+    src.append(document.createTextNode(from));
+    // The jar's own name, in mono, wherever the name above is not already it - so
+    // "EssentialsX-2.20.1" is not read as a plugin called that.
+    if (p.name !== p.file.replace(/\.jar(\.disabled)?$/, '')) {
+      const file = document.createElement('code');
+      file.textContent = p.file;
+      src.append(document.createTextNode(' · '), file);
+    }
     main.append(nm, src);
 
     const ver = document.createElement('span');
     ver.className = 'plug-ver';
-    ver.textContent = p.version || '';
+    ver.textContent = p.version || '—';
+    if (!p.version) ver.title = 'The jar does not say which version it is';
+
+    // On or off as a word with a dot, not only a dimmed row.
+    const on = document.createElement('span');
+    on.className = 'plug-state';
+    on.dataset.on = String(p.enabled);
+    on.textContent = p.enabled ? 'Enabled' : 'Disabled';
 
     const acts = document.createElement('div');
     acts.className = 'plug-acts';
-    el.append(tile, main, ver, acts);
-    if (!p.managed) return el;
+    el.append(tile, main, ver, on, acts);
 
-    const update = pluginView.updates && pluginView.updates[p.file];
+    const update = p.managed && pluginView.updates && pluginView.updates[p.file];
     const upBtn = update ? document.createElement('button') : null;
     if (upBtn) {
       upBtn.type = 'button';
@@ -7580,7 +7616,7 @@ async function renderPlugins(opts) {
       acts.append(upBtn);
     }
     const quiet = document.createElement('span');
-    quiet.className = 'quiet';
+    quiet.className = 'row-acts';
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'ghost';
@@ -7633,7 +7669,10 @@ async function renderPlugins(opts) {
       const ok = await ask({
         title: 'Delete ' + p.name + '?',
         text: p.file + ' is removed from the ' + data.kind + ' folder. Its config folder stays, so '
-          + 'installing it again picks up where it left off.',
+          + 'installing it again picks up where it left off.'
+          // Nothing to fetch it back from: SpawnLoft did not install it.
+          + (p.managed ? '' : ' It was added by hand, so SpawnLoft cannot download it again; '
+            + 'keep a copy if you might want it back, or Disable it instead.'),
         confirmLabel: 'Delete ' + singular,
         danger: true,
       });
@@ -8826,8 +8865,8 @@ async function renderFiles(opts) {
   if (running) {
     const how = document.createElement('div');
     how.className = 'hint';
-    how.textContent = 'The server is running. What it holds open - the active world, its jar, the plugins it loaded - '
-      + 'can be read and edited but not moved, replaced or deleted until it stops. A changed config applies when the plugin reloads or the server restarts.';
+    how.textContent = 'The server is running: files it holds open are marked In use and cannot be moved, replaced or deleted until it stops.';
+    how.title = 'The active world, its jar and the plugins it loaded. They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.';
     body.append(how);
   }
 
@@ -8873,11 +8912,12 @@ async function renderFiles(opts) {
   };
   search.onsearch = () => { if (!search.value && view.query) { view.query = ''; again(); } };
 
-  const newFile = iconButton('file', 'New file');
-  const newFolder = iconButton('folder', 'New folder');
-  const upload = iconButton('upload', 'Upload files');
+  // Upload is what this toolbar is for most; the rest are there when wanted, at a lower voice.
+  const newFile = iconButton('file', 'New file', 'ghost');
+  const newFolder = iconButton('folder', 'New folder', 'ghost');
+  const upload = iconButton('upload', 'Upload files', 'primary');
   const uploadDir = iconButton('folder', 'Upload a folder');
-  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER);
+  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER, 'ghost');
   const picker = document.createElement('input');
   picker.type = 'file';
   picker.multiple = true;
@@ -9051,6 +9091,8 @@ async function renderFiles(opts) {
     open.append(icon(e.type === 'dir' ? 'folder' : 'file'));
     const nm = document.createElement('span');
     nm.textContent = view.query ? e.path : e.name;
+    // The row truncates a long name; the whole path is a pointer away.
+    open.title = e.path;
     open.append(nm);
     if (e.inUse) {
       const pill = document.createElement('span');
@@ -9066,7 +9108,9 @@ async function renderFiles(opts) {
     kind.textContent = fileKind(e);
     const size = document.createElement('span');
     size.className = 'fm-size';
-    size.textContent = fileSize(e.size);
+    // A folder's size would mean walking it on every listing; a dash says "not counted", where a
+    // blank cell read as a missing value.
+    size.textContent = e.type === 'dir' ? '—' : fileSize(e.size);
     const when = document.createElement('span');
     when.className = 'fm-when';
     const whenShort = document.createElement('span');
@@ -9951,6 +9995,14 @@ async function renderBackups(opts) {
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
 
+  // ---- where this server stands ---------------------------------------------
+  // Whether anything is backing it up, and when it last was, before any control: Overview flagged
+  // a server that had never been backed up, and its own Backups tool did not say so.
+  const standing = document.createElement('div');
+  standing.className = 'bk-status';
+  standing.setAttribute('role', 'status');
+  body.append(standing);
+
   // ---- take one now ---------------------------------------------------------
   const now = document.createElement('div');
   now.className = 'section';
@@ -9959,21 +10011,22 @@ async function renderBackups(opts) {
   const nowRow = document.createElement('div');
   nowRow.className = 'row';
   const scope = document.createElement('select');
+  scope.setAttribute('aria-label', 'What to back up');
   for (const sc of data.scopes) {
     const o = document.createElement('option');
     o.value = sc;
-    o.textContent = sc;
+    o.textContent = scopeLabel(sc);
     o.selected = sc === 'standard';
     scope.append(o);
   }
-  scope.style.maxWidth = '150px';
+  scope.style.maxWidth = '170px';
   const go = iconButton('archive', 'Back up now', 'primary');
   nowRow.append(scope, go);
   const nowNote = document.createElement('div');
   nowNote.className = 'hint';
   nowNote.textContent = data.running
-    ? 'standard covers plugins, worlds and config. Safe while running - the one file the server holds locked is left out.'
-    : 'standard covers plugins, worlds and config. full is everything except caches and logs.';
+    ? 'Standard covers plugins, worlds and config. Safe while running - the one file the server holds locked is left out.'
+    : 'Standard covers plugins, worlds and config. Full is everything except caches and logs.';
   now.append(nowTitle, nowRow, nowNote);
   body.append(now);
 
@@ -9981,7 +10034,7 @@ async function renderBackups(opts) {
   // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
   // edit takes, which exists to hold exactly that file.
   const skip = document.createElement('details');
-  skip.className = 'section leave-out';
+  skip.className = 'leave-out';
   if (data.exclude && data.exclude.length) skip.open = true;
   const skipTitle = document.createElement('summary');
   skipTitle.textContent = 'Leave out of backups' + (data.exclude && data.exclude.length ? ' (' + data.exclude.length + ')' : '');
@@ -10002,7 +10055,8 @@ async function renderBackups(opts) {
   skipHint.textContent = 'One per line, from the server folder; * matches anything. Big things that rebuild themselves are the usual candidates. A restore cannot bring back what was left out.';
   skipRow.append(skipSave, skipHint);
   skip.append(skipTitle, skipText, skipRow);
-  body.append(skip);
+  // Part of what Back up now takes, so it lives in that card rather than as a card of its own.
+  now.append(skip);
   skipSave.onclick = async () => {
     skipSave.disabled = true;
     try {
@@ -10039,6 +10093,7 @@ async function renderBackups(opts) {
   const auto = autoBackupSection(base, null);
   body.append(auto);
   body.append(renderBackupHistory(row, data, signature));
+  paintBackupStanding(standing, row, data, null, go);
   let automatic;
   try {
     automatic = await api(base + '/auto');
@@ -10049,6 +10104,72 @@ async function renderBackups(opts) {
   // few seconds, and would otherwise stop a slow schedule answer from ever being shown.
   if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
   auto.replaceWith(autoBackupSection(base, automatic));
+  paintBackupStanding(standing, row, data, automatic, go);
+}
+
+const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only', config: 'Config only', plugins: 'Plugins only' };
+const scopeLabel = (sc) => SCOPE_LABELS[sc] || sc.charAt(0).toUpperCase() + sc.slice(1);
+
+/** A backup in the sense of "the server is backed up": not the one-file copy an edit takes. */
+const isWholeBackup = (snap) => !singleFileOf(snap) && snap.scope !== 'files';
+
+/**
+ * The line at the top of Backups: is anything backing this server up, when it last was, and the
+ * one thing to do about it when the answer is nothing. `automatic` is null while the scheduler is
+ * still being asked.
+ */
+function paintBackupStanding(box, row, data, automatic, backUpNow) {
+  box.textContent = '';
+  const latest = data.snapshots.filter(isWholeBackup)
+    .reduce((at, snap) => Math.max(at, new Date(snap.mtime).getTime() || 0), 0);
+  const week = 7 * 24 * 3600 * 1000;
+  const stale = !latest || Date.now() - latest > week;
+  const known = automatic && !automatic.error;
+  const on = known && automatic.auto;
+  box.dataset.tone = stale ? 'warn' : on ? 'live' : '';
+
+  box.append(icon(stale ? 'alert' : on ? 'check' : 'archive'));
+  const text = document.createElement('div');
+  text.className = 'bk-text';
+  const head = document.createElement('b');
+  const sub = document.createElement('span');
+  if (!automatic) {
+    head.textContent = 'Checking the schedule…';
+  } else if (!known) {
+    head.textContent = 'Schedule unknown';
+    sub.textContent = automatic.error;
+  } else if (on) {
+    const every = AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, automatic.auto.schedule));
+    const next = whenNext(automatic.auto.nextRun);
+    head.textContent = 'Automatic backups on';
+    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 7)
+      + (next ? ' · next ' + next : '');
+  } else {
+    head.textContent = 'Automatic backups off';
+    sub.textContent = automatic.automaticAvailable === false
+      ? automatic.automaticUnavailableReason
+      : 'Nothing backs this server up unless you do it by hand.';
+  }
+  text.append(head, sub);
+  const last = document.createElement('span');
+  last.className = 'bk-last';
+  last.textContent = !latest ? 'Never backed up'
+    : (stale ? 'No backup in 7 days · last ' : 'Last backup ') + ago(new Date(latest).toISOString());
+  box.append(text, last);
+
+  // Off, and able to be on: turning it on is the one thing this screen should ask for, so it
+  // takes the primary and Back up now steps down to a plain button beside it.
+  const offer = known && !on && automatic.automaticAvailable !== false;
+  backUpNow.classList.toggle('primary', !offer);
+  if (offer) {
+    const turnOn = iconButton('clock', 'Turn on nightly backups', 'primary');
+    turnOn.onclick = async () => {
+      busy(turnOn, true);
+      await turnOnBackups(row);
+      await renderBackups({ force: true });
+    };
+    box.append(turnOn);
+  }
 }
 
 /**
@@ -10072,7 +10193,13 @@ function autoBackupSection(base, data) {
   const onOffLabel = document.createElement('label');
   onOffLabel.className = 'row';
   onOffLabel.style.cursor = 'pointer';
-  onOffLabel.append(onOff, document.createTextNode('On'));
+  // The word beside the switch is the switch's state, not the name of the "on" position: "On" next
+  // to a switch that was off read as a server being backed up when it was not.
+  const onOffWord = document.createElement('span');
+  const sayState = () => { onOffWord.textContent = onOff.checked ? 'On' : 'Off'; };
+  onOff.addEventListener('change', sayState);
+  sayState();
+  onOffLabel.append(onOff, onOffWord);
 
   const every = document.createElement('select');
   for (const opt of AUTO_INTERVALS) {
@@ -10367,8 +10494,8 @@ function renderBackupHistory(row, data, signature) {
           : '';
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
-          text: 'This puts back ' + covers + ' as they were on '
-            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
+          text: 'This puts back ' + covers + ' from ' + (snap.note ? '“' + snap.note + '” (' + snap.name + ')' : snap.name)
+            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
           choices: [
             { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. Not undoable; take a backup first if you are unsure.' },
             { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of what was there is kept in this list, so this can be undone.' },
