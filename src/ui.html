@@ -721,9 +721,12 @@
     a working screen: this is the one people look across rather than into.
   */
   .home { align-content: start; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); padding: 32px 48px 48px; background: var(--void); overflow: auto; }
-  /* Every block on it stops at the same width, so the attention cards and the server cards line
-     up on the right, and a 4K window gets more columns rather than wider cards. */
-  .home > * { max-width: 1800px; }
+  /* On a wide window the cards grow before they multiply: four 460px cards across a 4K screen
+     read as a row of tiles, and a 2560px one fits three roomy columns either way. */
+  @media (min-width: 2000px) {
+    .home { padding: 40px 56px 56px; gap: var(--s-7); }
+    .home-cards, .att-grid { grid-template-columns: repeat(auto-fill, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
+  }
   .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-4); }
   .home-title { flex: 1 1 320px; min-width: 0; display: grid; gap: 6px; }
   .home-title h1 { margin: 0; font: 650 var(--t-7)/1.1 var(--display); letter-spacing: -.028em; }
@@ -966,12 +969,11 @@
     background: var(--surface);
   }
   @media (min-width: 2000px) {
-    .work[data-tool] { grid-template-columns: minmax(0, 1fr) 520px; grid-template-rows: minmax(0, 1fr); }
+    /* The console's share grows with the window: a log line is the one thing in the panel that
+       is better for every extra pixel, so a 4K window gives it about 1400px. */
+    .work[data-tool] { grid-template-columns: minmax(0, 1fr) clamp(520px, 38%, 1400px); grid-template-rows: minmax(0, 1fr); }
     .work[data-tool] .console { display: grid; grid-column: 2; grid-row: 1; border-left: 1px solid var(--line-soft); }
     .work[data-tool] .con-mini { display: none; }
-  }
-  @media (min-width: 3200px) {
-    .work[data-tool] { grid-template-columns: minmax(0, 1fr) 680px; }
   }
 
   .tool-head { display: flex; align-items: center; gap: 2px; height: 52px; padding: 0 var(--s-3) 0 var(--s-5); border-bottom: 1px solid var(--line-soft); min-width: 0; }
@@ -986,8 +988,7 @@
   .tool .pane-head { position: static; display: block; padding: var(--s-4) var(--s-5) 0; border-bottom: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .tool .pane-head .mark, .tool .pane-head h2 { display: none; }
   .tool .pane-head p { font-size: var(--t-2); }
-  /* Capped: a file list stretched across a 4K window puts a name 1800px from its date. */
-  .tool .pane-body { padding: var(--s-4) var(--s-5) var(--s-5); max-width: 1680px; }
+  .tool .pane-body { padding: var(--s-4) var(--s-5) var(--s-5); }
   .tool .pane-foot { margin: var(--s-2) calc(-1 * var(--s-5)) calc(-1 * var(--s-5)); padding: var(--s-3) var(--s-5); }
 
   .con-mini {
@@ -1561,7 +1562,7 @@
     name, a Default or Changed tag, the first sentence of its help - and the control on the right,
     280px, with only the faintest rule between rows.
   */
-  #settingsBody.set-screen { grid-template-columns: 240px minmax(0, 880px); align-items: start; gap: var(--s-5) var(--s-6); }
+  #settingsBody.set-screen { grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: var(--s-5) var(--s-6); }
   #settingsBody.set-screen > .pane-foot, #settingsBody.set-screen > .hint, #settingsBody.set-screen > .bad { grid-column: 1 / -1; }
   .set-nav { position: sticky; top: var(--s-4); display: grid; gap: 2px; align-content: start; }
   .set-nav button {
@@ -1626,6 +1627,16 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
   }
   .set-raw textarea:focus { outline: none; border-color: var(--lapis-edge); background-color: var(--field-focus); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
+
+  /*
+    A wide pane: the open section's rows sit two or three abreast, each still a label beside its
+    control, so a 4K window shows the whole section at a glance instead of a strip down the left.
+    Only the sections made of rows; Server software and Databases lay themselves out.
+  */
+  @container pane (min-width: 1500px) {
+    .set-form > .section:has(> .set-row) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 600px), 1fr)); gap: 0 var(--s-7); align-items: start; }
+    .set-form > .section:has(> .set-row) > .set-head { grid-column: 1 / -1; }
+  }
 
   /* In a narrow window the list becomes a row above the form, and each setting's control goes
      under its name. */
