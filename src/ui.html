@@ -721,12 +721,6 @@
     a working screen: this is the one people look across rather than into.
   */
   .home { align-content: start; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); padding: 32px 48px 48px; background: var(--void); overflow: auto; }
-  /* On a wide window the cards grow before they multiply: four 460px cards across a 4K screen
-     read as a row of tiles, and a 2560px one fits three roomy columns either way. */
-  @media (min-width: 2000px) {
-    .home { padding: 40px 56px 56px; gap: var(--s-7); }
-    .home-cards, .att-grid { grid-template-columns: repeat(auto-fill, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
-  }
   .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-4); }
   .home-title { flex: 1 1 320px; min-width: 0; display: grid; gap: 6px; }
   .home-title h1 { margin: 0; font: 650 var(--t-7)/1.1 var(--display); letter-spacing: -.028em; }
@@ -766,6 +760,12 @@
   button.more-link:hover:not(:disabled) { background: none; border: 0; transform: none; text-decoration: underline; text-underline-offset: 3px; }
 
   .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: var(--s-4); }
+  /* On a wide window the cards grow instead of leaving empty tracks: after the base rules above so
+     it wins, and auto-fit so four servers on a 4K screen share the whole row. */
+  @media (min-width: 2000px) {
+    .home { padding: 40px 56px 56px; gap: var(--s-7); }
+    .home-cards, .att-grid { grid-template-columns: repeat(auto-fit, minmax(min(580px, 100%), 1fr)); gap: var(--s-5); }
+  }
   .scard {
     display: grid;
     gap: var(--s-3);
