@@ -153,7 +153,21 @@ export function writeJson(file, data, { mode } = {}) {
   const text = `${JSON.stringify(data, null, 2)}\n`
   if (mode === undefined) fs.writeFileSync(tmp, text)
   else writeFileWithMode(tmp, text, mode)
-  fs.renameSync(tmp, file)
+  renameOver(tmp, file)
+}
+
+// Windows: a just-written file is often held by a virus scanner or sync client, so renaming over
+// it fails with EPERM/EBUSY/EACCES. Retry with short waits (about 350 ms in total).
+export function renameOver(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(from, to)
+      return
+    } catch (err) {
+      if (attempt >= 3 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * 2 ** attempt)
+    }
+  }
 }
 
 // Cross-process lock via an exclusively created file (CLI, panel and daemon all use it). The
