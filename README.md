@@ -734,6 +734,7 @@ mcctl db creds sql survival        # shows them again
 mcctl db detach sql survival       # takes the user away; --drop deletes the data too
 mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
 mcctl db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
+mcctl db address xampp --port 3307  # it moved: point SpawnLoft at the new address (also under its Settings in the panel)
 ```
 
 MySQL comes from Oracle's CDN as a pinned native archive, hash-checked and unpacked with the

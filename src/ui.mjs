@@ -1315,6 +1315,16 @@ async function route(req, res) {
     if (seg[3] === 'delete') {
       return json(res, 200, services.removeDatabase(db, { purge: body.purge === true }))
     }
+    if (seg[3] === 'address') {
+      const updated = await services.updateExternal(db, {
+        host: body.host != null ? String(body.host) : null,
+        port: body.port != null && body.port !== '' ? Number(body.port) : null,
+        user: body.user != null ? String(body.user) : null,
+        // Left out, or blank, keeps the password it has: the form never holds the old one.
+        password: body.password ? String(body.password) : null,
+      })
+      return json(res, 200, safeDatabase(updated))
+    }
     return json(res, 404, { error: 'not found' })
   }
   if (seg[1] === 'databases' && seg[2]) return json(res, 404, { error: 'no such database' })

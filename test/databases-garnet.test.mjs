@@ -110,6 +110,24 @@ test('an external database is registered only if it answers, and attaches like o
     assert.equal(row.external, true)
     assert.equal(row.root, undefined)
     assert.equal(rows.find((r) => r.name === RD).status, 'running')
+
+    // Moved: the new address is saved even though nothing answers there, and says so.
+    const address = (name, body) => fetch(`${url}api/databases/${name}/address`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const moved = await (await address(EXT, { host: '127.0.0.1', port: 1 })).json()
+    assert.equal(moved.status, 'unreachable')
+    assert.equal(moved.port, 1)
+    assert.equal(moved.root, undefined, 'the admin login is not sent back')
+    assert.equal(services.credentials(EXT, SRV).port, 1, 'attached servers read the new address')
+    assert.equal(services.getDatabase(EXT).root.password, live.root.password, 'a blank password keeps the saved one')
+    const back = await (await address(EXT, { port: live.port })).json()
+    assert.equal(back.status, 'reachable')
+    assert.equal(back.host, '127.0.0.1', 'a field left out keeps its value')
+    const bad = await address(EXT, { port: 70000 })
+    assert.equal(bad.status, 400)
+    assert.match((await bad.json()).error, /not a port/)
+    const managed = await address(RD, { port: 1 })
+    assert.equal(managed.status, 400)
+    assert.equal(services.getDatabase(RD).port, live.port, 'a database run here keeps its port')
   } finally {
     server.close()
   }

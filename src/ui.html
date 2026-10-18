@@ -564,6 +564,13 @@
   .db-shown .creds div { align-items: center; }
   .db-shown { flex-basis: 100%; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--sunken); border: 1px solid var(--line-soft); }
   .db-reach { grid-column: 1 / -1; }
+  .db-edit-wrap { margin-top: var(--s-3); }
+  .db-edit { display: grid; gap: var(--s-3); }
+  .db-edit[hidden] { display: none; }
+  .db-edit-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: var(--s-3); row-gap: 4px; align-items: center; }
+  .db-edit-field .hint { grid-column: 2; }
+  .db-edit-label { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .db-edit-acts { display: flex; gap: var(--s-2); justify-content: flex-end; }
   .db-reach:empty { display: none; }
   .db-reach .notice { padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); border-radius: var(--r-sm); }
   .db-attached { display: grid; margin: 0; padding: 0; list-style: none; }
@@ -4480,6 +4487,82 @@ const dismissed = new Set();
  * and the ones the panel can do something about carry that something as a button - "Change
  * port…" opens the same dialog Manage does, rather than a sentence telling you to go and find it.
  */
+/**
+ * Where a database that runs elsewhere is found, edited in place on its own page: the facts give
+ * way to a form, and Cancel puts them back. The password field starts empty and empty keeps the
+ * one saved, so the form never has to hold it.
+ */
+function dbAddressEditor(row, facts) {
+  const wrap = el('div', 'db-edit-wrap');
+  const open = iconButton('pencil', 'Edit address', 'sm');
+  const form = el('form', 'db-edit');
+  form.hidden = true;
+  const field = (label, input, hint) => {
+    const f = el('label', 'db-edit-field');
+    const t = el('span', 'db-edit-label');
+    t.textContent = label;
+    f.append(t, input);
+    if (hint) {
+      const h = el('span', 'hint');
+      h.textContent = hint;
+      f.append(h);
+    }
+    form.append(f);
+    return input;
+  };
+  const input = (value, attrs = {}) => {
+    const i = el('input', 'mono');
+    i.value = value;
+    Object.assign(i, { spellcheck: false, autocomplete: 'off' }, attrs);
+    return i;
+  };
+  const host = field('Host', input(row.host || '127.0.0.1', { required: true }));
+  const port = field('Port', input(String(row.port), { type: 'number', min: 1, max: 65535, required: true }));
+  const redis = row.engineKind === 'redis';
+  const user = redis ? null : field('Admin user', input(''), 'Empty keeps the one saved.');
+  const pass = field('Password', input('', { type: 'password', autocomplete: 'new-password' }), 'Empty keeps the one saved.');
+  const acts = el('div', 'db-edit-acts');
+  const save = el('button', 'primary');
+  save.type = 'submit';
+  save.textContent = 'Save';
+  const cancel = el('button', 'ghost');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  acts.append(save, cancel);
+  form.append(acts);
+  wrap.append(open, form);
+
+  const show = (editing) => {
+    form.hidden = !editing;
+    facts.hidden = editing;
+    open.hidden = editing;
+    if (editing) host.focus();
+    else open.focus();
+  };
+  open.onclick = () => show(true);
+  cancel.onclick = () => show(false);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    busy(save, true);
+    try {
+      const out = await post('/databases/' + encodeURIComponent(row.name) + '/address', {
+        host: host.value.trim(), port: port.value, user: user ? user.value.trim() : undefined, password: pass.value || undefined,
+      });
+      toast(out.status === 'reachable'
+        ? 'Saved. ' + (row.label || row.name) + ' answers at ' + out.host + ':' + out.port + '.'
+        : 'Saved, but nothing answers at ' + out.host + ':' + out.port + ' yet.', out.status === 'reachable' ? 'good' : 'bad');
+      $('#settingsBody').dataset.for = '';
+      await refresh();
+      const now = rowOf(row.name);
+      if (now && state.current === row.name) renderDatabaseSettings(now);
+    } catch (err) {
+      busy(save, false);
+      toast(err.message, 'bad');
+    }
+  };
+  return wrap;
+}
+
 /** The unreachable notice on a database's own page, kept in step with each poll. */
 function paintDbReach(row) {
   const box = $('#settingsBody .db-reach');
@@ -4495,11 +4578,12 @@ function paintDbReach(row) {
     await refresh();
     if (b.isConnected) busy(b, false);
   } };
+  const edit = { label: 'Edit address', run: () => $('#settingsBody .db-edit-wrap > button')?.click() };
   const notice = noticeBox({
     tone: 'fault',
     title: 'Not answering',
-    text: 'Nothing replied at ' + (row.host || '127.0.0.1') + ':' + row.port + '. Start it where it runs, then check again.',
-    actions: [again],
+    text: 'Nothing replied at ' + (row.host || '127.0.0.1') + ':' + row.port + '. Start it where it runs, or correct the address, then check again.',
+    actions: row.external ? [again, edit] : [again],
   });
   notice.setAttribute('role', 'status');
   box.append(notice);
@@ -12315,6 +12399,7 @@ async function renderDatabaseSettings(row) {
     } catch (e) { toast(e.message, 'bad'); }
   };
   conn.append(dl);
+  if (row.external) conn.append(dbAddressEditor(row, dl));
   body.append(conn);
 
   // ---- who uses it: each attached server, a link to it, and its own login ------------------
