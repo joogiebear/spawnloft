@@ -840,6 +840,8 @@
   .chip-mem[data-tone="warn"] b { color: var(--warn-ink); }
   .chip-mem[data-tone="fault"] b { color: var(--fault-ink); }
 
+  .home-fail { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin: 0; padding: var(--s-2) var(--s-3); border: 1px solid var(--warn-edge); border-radius: var(--r-sm); background: var(--warn-wash); font-size: var(--t-3); color: var(--ink-2); }
+  .home-fail[hidden] { display: none; }
   .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
   /* Until the first /overview answers, the cards wait: Needs attention comes from it and lands
      above them, and painting the cards first dropped them a card's height as it arrived. The words
@@ -1659,6 +1661,7 @@
   .feed { display: grid; margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .feed > li { border-bottom: 1px solid var(--line-soft); }
   .feed > li:last-child { border-bottom: 0; }
+  .feed > .feed-day { padding: var(--s-2) var(--s-3) 6px; background: var(--sunken); font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
   /* .feed in front: `button:has(> .ico)` makes every button holding an icon a flex row, and a bare
      class loses to it. */
   .feed .feed-row {
@@ -2801,6 +2804,10 @@
       </div>
       <!-- attention, cards and databases share a column, so a feed beside them sizes nothing of theirs -->
       <div class="home-main">
+        <p class="home-fail" id="homeFail" role="status" hidden>
+          <span>Backup ages and this machine's memory could not be read.</span>
+          <button type="button" class="ghost sm" id="homeFailRetry">Try again</button>
+        </p>
         <section class="attention" id="homeAttention" aria-labelledby="attTitle" hidden>
           <h2 class="hist-title" id="attTitle">Needs attention</h2>
           <div class="att-grid" id="attGrid"></div>
@@ -4684,6 +4691,7 @@ async function loadOverview(force) {
     const [data, recent] = await Promise.all([api('/overview'), api('/activity?limit=' + FEED_FETCH).catch(() => null)]);
     overview.data = data;
     overview.activity = recent ? recent.entries : null;
+    overview.failed = false;
   } catch {
     // Without it the cards still say everything but the backup ages, so show them.
     overview.failed = true;
@@ -4757,6 +4765,8 @@ function renderOverview() {
   }
   box.append(mem);
 
+  // Said only when there is nothing older to show; a refresh that fails keeps the last answer.
+  $('#homeFail').hidden = !(overview.failed && !overview.data);
   if (!overview.data && !overview.failed) $('#vHome').setAttribute('aria-busy', 'true');
   else $('#vHome').removeAttribute('aria-busy');
   renderAttention();
@@ -5079,13 +5089,24 @@ function renderHomeActivity() {
   // Rebuilt only when what it says changes: an open run stays open across polls.
   // Times are refreshed in place rather than keyed on, so a line under someone's focus survives the
   // minute ticking over.
-  const key = shown.map((r) => r.entries.map((e) => e.at).join(',')).join('|') + '|' + showServer + showWho;
+  // A day label only where the lines cross a day: eight lines of "Today" would say it eight times
+  // over nothing. Keyed on the labels too, so the feed re-splits when midnight passes.
+  const days = shown.map((r) => activityDay(r.entries[0].at));
+  const split = new Set(days).size > 1;
+  const key = shown.map((r) => r.entries.map((e) => e.at).join(',')).join('|') + '|' + showServer + showWho + '|' + (split ? days.join(',') : '');
   for (const t of box.querySelectorAll('time.act-when')) t.textContent = ago(t.dateTime) || stamp(t.dateTime);
   if (key !== feed.key) {
     feed.key = key;
     const open = new Set(Array.from(box.querySelectorAll('details[open]')).map((d) => d.dataset.key));
     box.textContent = '';
-    for (const run of shown) box.append(feedItem(run, { showServer, showWho, open }));
+    shown.forEach((run, i) => {
+      if (split && days[i] !== days[i - 1]) {
+        const day = el('li', 'feed-day');
+        day.textContent = days[i];
+        box.append(day);
+      }
+      box.append(feedItem(run, { showServer, showWho, open }));
+    });
   }
   const more = $('#homeActMore');
   const only = servers.size === 1 ? rowOf([...servers][0]) : null;
@@ -5403,6 +5424,11 @@ function renderAttention() {
   more.hidden = rest <= 0;
   more.textContent = overview.showAll ? 'Show fewer' : 'and ' + rest + ' more';
 }
+$('#homeFailRetry').onclick = async (e) => {
+  busy(e.currentTarget, true);
+  await loadOverview(true);
+  busy($('#homeFailRetry'), false);
+};
 $('#attMore').onclick = () => { overview.showAll = !overview.showAll; renderAttention(); };
 
 /** "See why": that server, its console on screen. */
@@ -5502,7 +5528,7 @@ async function cardAct(name, what) {
  */
 function cardNote(row) {
   const b = backupState(row);
-  if (!b) return { text: 'Checking backups…' };
+  if (!b) return { text: overview.failed ? 'Backups unknown' : 'Checking backups…' };
   const schedule = b.auto ? 'backs up ' + describeSchedule(b.auto.schedule) : '';
   if (!b.none) {
     const old = !b.auto && Date.now() - b.lastAt >= 7 * DAY_MS;
