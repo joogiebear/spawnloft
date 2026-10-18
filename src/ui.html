@@ -1479,6 +1479,7 @@
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
   .snap[data-locked] .snap-actions { opacity: 1; }
+  .snap-actions .icon-btn[data-tone="danger"]:hover:not(:disabled) { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
   .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
   .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
   details.leave-out > summary { padding-block: 8px; margin-block: -8px; cursor: pointer; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
@@ -4331,11 +4332,27 @@ function moreItems(row) {
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
-    { label: 'Rename, memory and port…', hint: why || 'Takes effect the next time it starts.', run: () => editServer(row), disabled: up },
+    // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
+    row.status === 'running'
+      ? { label: 'Stop and edit…', hint: 'Name, memory and port. Stops the server first.', run: () => stopThenEdit(row) }
+      : { label: 'Rename, memory and port…', hint: why || 'Takes effect the next time it starts.', run: () => editServer(row), disabled: up },
     'sep',
     { label: 'Reset the world…', hint: why || 'Deletes worlds and generated state. A snapshot is taken first.', run: () => rebuildServer(row), disabled: up, danger: true },
     { label: 'Delete this server…', hint: why || 'Removes it from SpawnLoft, and optionally its files.', run: () => deleteServer(row), disabled: up, danger: true },
   ];
+}
+
+async function stopThenEdit(row) {
+  const online = row.latest && row.latest.players;
+  const ok = await ask({
+    title: 'Stop ' + (row.label || row.name) + ' to edit it?',
+    text: online ? (online === 1 ? 'One player is online and will be disconnected.' : online + ' players are online and will be disconnected.') : 'Nobody is online.',
+    confirmLabel: 'Stop and edit',
+  });
+  if (!ok || state.current !== row.name) return;
+  await act('stop')();
+  const now = rowOf(row.name);
+  if (now && now.status !== 'running' && now.status !== 'stopping') editServer(now);
 }
 
 function buildMoreMenu() {
@@ -10429,7 +10446,9 @@ function autoBackupSection(base, data) {
 
   const settled = data && !data.error;
   if (!settled) {
-    autoState.textContent = data ? 'Could not read the schedule: ' + data.error : 'Checking the schedule…';
+    // While asking, the card keeps the "off" wording, the commonest answer, so it does not change
+    // height when the answer lands; the line at the top of the tab says it is still checking.
+    autoState.textContent = data ? 'Could not read the schedule: ' + data.error : schedulerHint;
     for (const control of [onOff, every, keep, apply]) control.disabled = true;
   }
   return auto;
@@ -10598,7 +10617,6 @@ function renderBackupHistory(row, data, signature) {
       restore.title = data.running
         ? 'Stop the server first'
         : 'Extract this snapshot back over the server files';
-      const drop = iconButton('trash', 'Delete', 'danger');
       const glyph = (name, label) => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -10612,6 +10630,10 @@ function renderBackupHistory(row, data, signature) {
       lock.setAttribute('aria-pressed', String(Boolean(snap.locked)));
       const noteBtn = glyph('pencil', snap.note ? 'Change its note' : 'Add a note');
       const download = glyph('download', 'Download');
+      // One labelled verb per row, Restore; the rest are glyphs, Delete included, so five buttons
+      // do not out-shout the snapshot they belong to. Delete still asks before it does anything.
+      const drop = glyph('trash', 'Delete');
+      drop.dataset.tone = 'danger';
       if (snap.locked) {
         el.setAttribute('data-locked', '');
         drop.disabled = true;
