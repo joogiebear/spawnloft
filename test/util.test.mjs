@@ -60,6 +60,30 @@ test('writeJson round-trips and leaves no .tmp behind', () => {
   assert.ok(!fs.existsSync(`${file}.tmp`), 'the temp file should have been renamed away')
 })
 
+test('writeJson waits out a file briefly held by a scanner instead of failing the write', (t) => {
+  const file = path.join(scratch(), 'state.json')
+  writeJson(file, { n: 0 })
+  const rename = fs.renameSync
+  let refusals = 2
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (refusals-- > 0) throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+    return rename(from, to)
+  })
+  writeJson(file, { n: 1 })
+  assert.deepEqual(readJson(file), { n: 1 })
+})
+
+test('writeJson still fails on a file that stays held, and on errors that are not a lock', (t) => {
+  const file = path.join(scratch(), 'state.json')
+  let code = 'EBUSY'
+  t.mock.method(fs, 'renameSync', () => { throw Object.assign(new Error(code), { code }) })
+  assert.throws(() => writeJson(file, { n: 1 }), { code: 'EBUSY' })
+  assert.equal(fs.renameSync.mock.callCount(), 4, 'three retries after the first refusal')
+  code = 'ENOENT'
+  assert.throws(() => writeJson(file, { n: 1 }), { code: 'ENOENT' })
+  assert.equal(fs.renameSync.mock.callCount(), 5, 'no retry for an error that is not a lock')
+})
+
 test('withLock serializes two read-modify-writes that would otherwise clobber each other', () => {
   const file = path.join(scratch(), 'counter.json')
   writeJson(file, { n: 0 })

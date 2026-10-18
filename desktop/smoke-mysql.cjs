@@ -17,10 +17,20 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
   await create.click()
   // even initialization must yield to the panel so progress, console and other servers keep working
   const deadline = Date.now() + 600000
-  let created = false, polls = 0
+  let created = false, polls = 0, answeredAt = Date.now()
   while (Date.now() < deadline) {
-    const response = await fetch(new URL('/api/databases', page.url()), { signal: AbortSignal.timeout(4000) })
-    const rows = await response.json()
+    // One slow answer while MySQL initializes is a busy Windows runner, not a stuck panel: what
+    // fails the test is the panel going quiet, so it is judged over a window, not a single poll.
+    let rows
+    try {
+      const response = await fetch(new URL('/api/databases', page.url()), { signal: AbortSignal.timeout(4000) })
+      rows = await response.json()
+    } catch (err) {
+      if (err.name !== 'TimeoutError') throw err
+      if (Date.now() - answeredAt > 30000) throw Error('Panel stopped answering for 30 seconds during database setup')
+      continue
+    }
+    answeredAt = Date.now()
     polls++
     if (rows.some(row => row.name === dbName && row.status === 'running' && row.attachments[name])) { created = true; break }
     const hint = await create.locator('..').textContent().catch(() => '')
