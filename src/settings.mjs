@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { UserError, PRIVATE_FILE_MODE } from './util.mjs'
+import { UserError, PRIVATE_FILE_MODE, renameOver } from './util.mjs'
 
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -113,20 +113,6 @@ function linkTarget(file) {
     return fs.lstatSync(file).isSymbolicLink() ? fs.realpathSync(file) : file
   } catch {
     return file
-  }
-}
-
-// Windows: a just-written file is often held by a virus scanner or sync client, so renaming over
-// it fails with EPERM/EBUSY/EACCES. Retry with short waits (about 350 ms in total).
-function renameOver(from, to) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      fs.renameSync(from, to)
-      return
-    } catch (err) {
-      if (attempt >= 3 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * 2 ** attempt)
-    }
   }
 }
 
