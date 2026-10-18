@@ -1687,6 +1687,21 @@ async function cmdDb(positional, flags) {
     return
   }
 
+  if (sub === 'address') {
+    const dbName = positional[1]
+    if (!dbName || !['host', 'port', 'user', 'password'].some((k) => flags[k] != null)) {
+      fail('usage: mcctl db address <database> [--host h] [--port n] [--user u] [--password p]')
+    }
+    const db = await services.updateExternal(dbName, {
+      host: flags.host != null ? String(flags.host) : null,
+      port: flags.port != null ? Number(flags.port) : null,
+      user: flags.user != null ? String(flags.user) : null,
+      password: flags.password != null ? String(flags.password) : null,
+    })
+    out(`"${db.name}" now points at ${db.host}:${db.port}${db.status === 'reachable' ? ', answering.' : ' - nothing answers there yet.'}`)
+    return
+  }
+
   if (sub === 'root') {
     const dbName = positional[1]
     if (!dbName) fail('usage: mcctl db root <database>')
@@ -1901,6 +1916,7 @@ DATABASES
   mcctl db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
   mcctl db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]
   mcctl db connect <name> --host h --port n --user u --password p   Register a database you already run
+  mcctl db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address
   mcctl db create <server>           A database of the server's own on the port after its game port, started and attached
   mcctl db attach <db> <server>      Give a server its own database and user; prints the credentials
   mcctl db detach <db> <server>      Take the user away [--drop deletes the data too]

@@ -298,6 +298,34 @@ export async function registerExternal(name, { engine = defaultEngine(), host = 
   return { name, ...inst }
 }
 
+// Points a registered external database at a new address, or new admin credentials. Saved even
+// when nothing answers there yet - the usual reason to edit is that it moved and is not running
+// at the new place - and the answer is reported, not enforced. Attached servers' records are left
+// alone: the same databases and users are expected at the new address.
+export async function updateExternal(name, { host, port, user, password } = {}) {
+  const db = getDatabase(name)
+  if (!db.external) fail(`"${name}" is run by SpawnLoft; its address is not edited by hand`)
+  const patch = {}
+  if (host != null) {
+    const clean = String(host).trim()
+    if (!clean || /\s/.test(clean)) fail(`"${host}" is not a host name or address`)
+    patch.host = clean
+  }
+  if (port != null && port !== '') {
+    const chosen = Number(port)
+    if (!Number.isInteger(chosen) || chosen < 1 || chosen > 65535) fail(`${port} is not a port number`)
+    patch.port = chosen
+  }
+  if (user != null || password != null) {
+    patch.root = {
+      user: user != null && String(user).trim() ? String(user).trim() : db.root?.user ?? 'root',
+      password: password != null ? String(password) : db.root?.password ?? '',
+    }
+  }
+  const next = updateInstance(name, patch)
+  return { ...next, status: await externalStatus(next) }
+}
+
 export async function externalStatus(db) {
   try {
     await engineOf(db).probe(db)
