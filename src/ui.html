@@ -48,8 +48,9 @@
     /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
        the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
     --ink-3:    #8f98ae;
-    /* Below the reading line on purpose: console timestamps, which are looked up, not read. */
-    --ink-4:    #545d72;
+    /* The quietest text: console timestamps, line numbers, separators. Quiet, but still text, so
+       it holds 4.5:1 on every plane up to --raised-hi (#545d72 was 2.3:1 there). */
+    --ink-4:    #868fa4;
 
     --lapis:     #5b84ff;
     --lapis-dim: #2c3f8f;
@@ -95,7 +96,22 @@
     --t-6: 22px;   /* a server's name, a big number */
     --t-7: 32px;   /* the one display heading */
 
-    /* Spacing, on a four-pixel grid. */
+    /* Type roles. A role is size, weight, line height and family together, so a title is one
+       decision rather than four. Use these for new type; a raw --t-* is for the odd fact that is
+       none of them. --track-* is the letter-spacing that goes with a role. */
+    --type-display: 650 var(--t-7)/1.1 var(--display);   /* Overview's one heading */
+    --type-page:    650 var(--t-6)/1.15 var(--display);  /* a page or sheet title */
+    --type-section: 650 var(--t-5)/1.25 var(--display);  /* a pane, tool or dialog title */
+    --type-card:    600 var(--t-4)/1.35 var(--ui);       /* the name on a card or a row */
+    --type-body:    400 var(--t-3)/1.5 var(--ui);        /* running text inside panes */
+    --type-meta:    400 var(--t-2)/1.45 var(--ui);       /* hints, timestamps, secondary lines */
+    --type-label:   650 var(--t-1)/1.3 var(--ui);        /* uppercase field and section labels */
+    --type-mono:    400 var(--t-3)/1.5 var(--mono);      /* paths, addresses, the console */
+    --track-display: -.025em;
+    --track-label: .08em;
+
+    /* Spacing, on a four-pixel grid. Every gap, padding and margin should be one of these; a
+       value between two steps is a sign the layout wants the smaller one. */
     --s-1: 4px;
     --s-2: 8px;
     --s-3: 12px;
@@ -103,6 +119,20 @@
     --s-5: 20px;
     --s-6: 28px;
     --s-7: 40px;
+
+    /* The smallest thing a pointer is asked to hit. Buttons, tabs, segments and disclosures are at
+       least this tall; an icon-only button is this square. */
+    --hit: 32px;
+
+    /* Cards: one padding, corner, border and shadow for every boxed group in the panel - an
+       Overview server, a backup control, a chart, a scheduled task. */
+    --card-pad: var(--s-5);
+    --card-radius: var(--r-lg);
+
+    /* Focus. One ring for every control, keyboard or not, in the accent colour. */
+    --ring-width: 2px;
+    --ring-offset: 2px;
+    --ring-color: var(--lapis);
 
     /* Depth. Every plane is solid: the frame is --chrome, a sheet or dialog is --raised, and the
        one-pixel --lift along the top says which is in front. Glass needs something behind it to
@@ -186,7 +216,7 @@
     --ink: #efeee6;
     --ink-2: #b5bcac;
     --ink-3: #9aa48f;
-    --ink-4: #5f6a58;
+    --ink-4: #8d9783;
     --idle: #9aa48f;
     --lapis: #c4f566;
     --lapis-dim: #546e2a;
@@ -250,7 +280,7 @@
   .theme-option:hover { border-color: var(--edge); background: var(--raised); }
   .theme-option:has(input:checked) { border-color: var(--lapis-edge); background: var(--lapis-wash); }
   .theme-option input { appearance: auto; width: 16px; height: 16px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; accent-color: var(--lapis); cursor: pointer; }
-  .theme-option input:focus-visible { outline: 2px solid var(--lapis); outline-offset: 3px; box-shadow: none; }
+  .theme-option input:focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: 3px; box-shadow: none; }
   .theme-option input:disabled { cursor: wait; }
   .theme-option strong, .theme-option small { display: block; }
   .theme-option strong { font-size: var(--t-3); font-weight: 600; }
@@ -345,8 +375,10 @@
   .banner .grow { flex: 1; }
 
   /* Focus is visible on everything, not just buttons. A control panel is operated in a hurry, and
-     losing the caret is losing your place. */
-  :focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; border-radius: 4px; }
+     losing the caret is losing your place. :root lifts it over a component's own `transition: all`,
+     which otherwise faded the ring in over 200ms and showed nothing on a quick Tab. The ring follows
+     the control's own corners, so this sets no radius. */
+  :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); transition-property: none; }
 
   /* ---- the frame: header, server tabs --------------------------------------- */
 
@@ -374,7 +406,7 @@
   /* A button that is only a glyph. Every one of them carries an aria-label saying what it does. */
   button.icon-btn {
     justify-content: center;
-    width: 32px; height: 32px;
+    width: var(--hit); height: var(--hit);
     padding: 0;
     background: transparent;
     border-color: transparent;
@@ -435,23 +467,25 @@
   .stab-ico { position: relative; display: grid; place-items: center; width: 18px; height: 18px; flex: none; color: var(--ink-3); }
   .stab-ico .ico { width: 15px; height: 15px; }
   .stab[aria-current="page"] .stab-ico, .stab:hover .stab-ico { color: var(--ink-2); }
-  .stab-ico .lamp { position: absolute; right: -3px; bottom: -2px; width: 7px; height: 7px; box-shadow: 0 0 0 2px var(--chrome); }
-  .stab[aria-current="page"] .stab-ico .lamp { box-shadow: 0 0 0 2px var(--raised); }
+  .stab-ico .lamp { --halo: var(--chrome); position: absolute; right: -3px; bottom: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--halo); }
+  .stab[aria-current="page"] .stab-ico .lamp { --halo: var(--raised); }
   .stab-ico .lamp::after { inset: -3px; }
+  /* Stopped is a hollow ring and every other state a filled dot, so stopped and running differ in
+     shape and not only in colour. A database answering at its address is as up as a running server,
+     and one that is not answering is a fault, not an idle grey that reads as "stopped". */
+  .stab[data-status="stopped"]:not([data-crashed]) .stab-ico .lamp { background: var(--halo); box-shadow: inset 0 0 0 1.5px var(--ink-3), 0 0 0 2px var(--halo); }
+  .stab[data-status="stopped"]:not([data-crashed]) .stab-ico .lamp::after { display: none; }
+  .stab[data-status="reachable"] .lamp { --lamp: var(--live); }
+  .stab[data-status="unreachable"] .lamp { --lamp: var(--fault); }
   /* The two groups, under their own headings. */
   .tabs-head { display: block; margin: var(--s-3) 10px var(--s-1); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
 
-  /* Add a server, at the foot of the list, drawn like a row so it reads as one more entry. */
-  .side-new {
-    display: flex; align-items: center; gap: 9px;
-    margin: 0 var(--s-2) var(--s-3);
-    height: 36px; padding: 0 10px;
-    background: transparent; border: 1px dashed var(--edge); box-shadow: none;
-    border-radius: var(--r-sm);
-    color: var(--ink-2); font: 500 var(--t-3)/1 var(--ui);
-  }
+  /* Add a server, at the foot of the list: the same button as New server on Overview, as a
+     secondary, since the one primary on any screen belongs to that screen. It is the only way to
+     add from a server's page, which is why it stays. Lit while the Add sheet is what is open. */
+  .side-new { display: flex; justify-content: center; margin: 0 var(--s-2) var(--s-3); }
   .side-new .ico { width: 14px; height: 14px; flex: none; }
-  .side-new:hover:not(:disabled) { background: var(--hover); border-color: var(--edge); color: var(--ink); transform: none; }
+  .side-new[aria-current="page"] { background: var(--lapis-wash); border-color: var(--lapis-edge); color: var(--ink); }
 
   /*
     Java, when it is missing or too old: a chip rather than a banner across the page. It is a
@@ -460,7 +494,7 @@
   */
   .java-chip {
     gap: 6px;
-    padding: 4px 11px;
+    padding: 0 11px;
     border-radius: 999px;
     background: var(--warn-wash);
     border-color: var(--warn-edge);
@@ -517,6 +551,30 @@
   .creds div { display: grid; grid-template-columns: 90px 1fr; gap: 10px; }
   .creds dt { color: var(--ink-3); }
   .creds dd { margin: 0; color: var(--ink); word-break: break-all; }
+  /* A database's own page: each fact on a line of its own, the copyable ones as copy chips, the
+     login masked until shown. */
+  .db-facts { display: grid; margin: 0; }
+  .db-facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--s-3); align-items: center; min-height: 44px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
+  .db-facts > div:last-child { border-bottom: 0; }
+  .db-facts dt { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .db-facts dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
+  .db-facts .addr-copy { font: var(--t-3)/1.4 var(--mono); }
+  .db-facts .mono-path { font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
+  .db-mask { font: var(--t-3)/1 var(--mono); letter-spacing: .1em; color: var(--ink-3); }
+  .db-shown .creds div { align-items: center; }
+  .db-shown { flex-basis: 100%; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--sunken); border: 1px solid var(--line-soft); }
+  .db-reach { grid-column: 1 / -1; }
+  .db-reach:empty { display: none; }
+  .db-reach .notice { padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); border-radius: var(--r-sm); }
+  .db-attached { display: grid; margin: 0; padding: 0; list-style: none; }
+  .db-attached li { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line-faint); }
+  .db-attached li:last-child { border-bottom: 0; }
+  .db-att-text { display: grid; gap: 2px; min-width: 0; }
+  .db-att-name { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
+  button.db-att-name:hover:not(:disabled) { color: var(--lapis-ink); text-decoration: underline; text-underline-offset: 3px; }
+  button.db-att-name { padding: 0; border: 0; background: none; }
+  .db-att-name .ico { width: 14px; height: 14px; color: var(--ink-3); }
+  .db-att-sub { font: var(--t-2)/1.4 var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---- stage ------------------------------------------------------------ */
 
@@ -529,15 +587,22 @@
 
   /* ---- controls --------------------------------------------------------- */
 
+  /*
+    Buttons. Four kinds: primary (one per area, the thing the area is for), the default secondary,
+    ghost (a quiet verb in a row of content) and danger. Two sizes that differ in padding and type,
+    never in height: .sm is as easy to hit as the default, only tighter. Every button is at least
+    --hit tall, so a toolbar of them lines up with a field beside it.
+  */
   button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    min-height: var(--hit);
     background: rgba(var(--ink-rgb), .035);
     color: var(--ink);
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    padding: 6px 12px;
+    padding: 0 12px;
     font: 500 var(--t-3)/1.4 var(--ui);
     cursor: pointer;
     white-space: nowrap;
@@ -549,7 +614,17 @@
      winning on specificity and painting a generic border and lift over theirs. */
   button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--hover-hi); transform: translateY(-1px); }
   button:where(:active:not(:disabled)) { transform: translateY(0); }
-  button:disabled { opacity: .38; cursor: default; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.sm { padding: 0 var(--s-2); font-size: var(--t-2); gap: 5px; }
+  /* Working: the label stays so the button keeps its width and says what it is doing; a spinner
+     takes the icon's place. Set by busy(). */
+  button[aria-busy="true"] { cursor: progress; pointer-events: none; }
+  button[aria-busy="true"] > .ico { display: none; }
+  button[aria-busy="true"]::before {
+    content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid currentColor; border-right-color: transparent; opacity: .8;
+    animation: spin .7s linear infinite;
+  }
 
   button.primary {
     background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
@@ -583,16 +658,24 @@
   input:hover:not(:disabled):not(:focus), select:hover:not(:disabled):not(:focus) {
     border-color: var(--edge);
   }
-  input:focus, select:focus {
-    outline: none;
+  /* A field takes the same ring as a button, drawn over its border rather than outside it, so a
+     row of fields does not jostle when one is focused. */
+  :root input:not([type="checkbox"]):not([type="radio"]):focus, :root select:focus {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -1px;
     border-color: var(--lapis-edge);
     background-color: var(--field-focus);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
   }
-  input:disabled, select:disabled { opacity: .5; }
+  input:not([type="checkbox"]):not([type="radio"]), select { min-height: var(--hit); }
+  input:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
+  /* The native box at 13px was the smallest target in the panel. Its label is the rest of the hit
+     area wherever there is one. */
+  input[type="checkbox"]:not(.switch) { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--lapis); cursor: pointer; box-shadow: none; }
   input.mono { font-family: var(--mono); font-size: var(--t-3); }
   input::placeholder { color: var(--ink-3); }
   input[aria-invalid="true"] { border-color: var(--fault); }
+  :root input[aria-invalid="true"]:focus { border-color: var(--fault); }
 
   /*
     Selects lose the operating system's grey arrow and gain the interface's own chevron - drawn as
@@ -645,7 +728,7 @@
   .field > label button.fill { all: unset; font: 600 var(--t-1)/1 var(--mono); text-transform: none; letter-spacing: 0; color: var(--ink); cursor: pointer;
     text-decoration: underline dotted; text-underline-offset: 3px; border-radius: 3px; padding: 0 2px; margin: 0 -2px; transition: all var(--ease); }
   .field > label button.fill:hover { background: var(--hover-hi); }
-  .field > label button.fill:focus-visible { outline: 2px solid var(--lapis); outline-offset: 1px; }
+  .field > label button.fill:focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: 1px; }
   .hint { font-size: var(--t-2); color: var(--ink-3); line-height: 1.5; }
   .bad { font-size: var(--t-2); color: var(--fault); }
   .row { display: flex; gap: 8px; align-items: center; }
@@ -662,10 +745,12 @@
     background: rgba(var(--ink-rgb), .025);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
-    padding: 3px;
-    gap: 2px;
+    /* No inner padding: the segments are --hit tall themselves, and the trough is then the height
+       of the field it usually sits beside. */
+    padding: 0;
+    gap: 0;
   }
-  .seg button, .filters button, .ranges button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 4px 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: 6px; }
+  .seg button, .filters button, .ranges button { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 0 11px; font-size: var(--t-2); font-weight: 500; color: var(--ink-2); border-radius: calc(var(--r-sm) - 1px); }
   .seg button[aria-pressed="true"], .filters button[aria-pressed="true"], .ranges button[aria-pressed="true"] {
     background: var(--segment-top);
     border-color: var(--line);
@@ -734,7 +819,7 @@
   .home { align-content: start; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); padding: 32px 48px 48px; background: var(--void); overflow: auto; }
   .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-4); }
   .home-title { flex: 1 1 320px; min-width: 0; display: grid; gap: var(--s-3); }
-  .home-title h1 { margin: 0; font: 650 var(--t-7)/1.1 var(--display); letter-spacing: -.028em; }
+  .home-title h1 { margin: 0; font: var(--type-display); letter-spacing: -.028em; }
 
   /* The summary as chips: what is here, what runs, who is on, and the memory the servers may take,
      the last with a bar so "4 of 94 GB" is a length and not arithmetic. */
@@ -756,6 +841,12 @@
   .chip-mem[data-tone="fault"] b { color: var(--fault-ink); }
 
   .home-main { display: grid; align-content: start; gap: var(--s-6); min-width: 0; }
+  /* Until the first /overview answers, the cards wait: Needs attention comes from it and lands
+     above them, and painting the cards first dropped them a card's height as it arrived. The words
+     only show if the wait is long enough to notice. */
+  .home[aria-busy="true"] :is(.home-main > *, .home-activity) { visibility: hidden; }
+  .home[aria-busy="true"] .home-main::before { content: "Loading your servers…"; color: var(--ink-3); font-size: var(--t-3); animation: fade-late .2s .4s both; }
+  @keyframes fade-late { from { opacity: 0; } }
 
   /*
     Needs attention. The most important thing on the page, so a card in the warning's own tone with
@@ -832,10 +923,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-4);
-    padding: var(--s-5);
+    padding: var(--card-pad);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--r-lg);
+    border-radius: var(--card-radius);
     box-shadow: var(--shadow-sm);
     min-width: 0;
     transition: border-color var(--ease);
@@ -853,6 +944,13 @@
   .sc-acts button { min-height: 34px; }
 
   /* An address is a button because the only thing anyone does with it is paste it somewhere. */
+  /* Buttons that sit inside a line of text keep the text's height and reach --hit through an
+     invisible pad above and below, so being easy to hit never pushes the line apart. */
+  button.inline, .srv-meta button.addr-copy { position: relative; min-height: 0; }
+  .srv-meta button.addr-copy { padding: 0 6px; margin: 0 -6px; }
+  button.inline::after, .srv-meta button.addr-copy::after {
+    content: ''; position: absolute; inset: calc((100% - var(--hit)) / 2) 0;
+  }
   button.addr-copy {
     gap: 5px; min-height: 26px; padding: 2px 6px; margin: -2px -6px;
     font: var(--t-2)/1.4 var(--mono); color: var(--ink-2);
@@ -861,6 +959,7 @@
   button.addr-copy .ico { width: 12px; height: 12px; color: var(--ink-3); }
   button.addr-copy:hover:not(:disabled) { background: var(--hover); border-color: var(--line); color: var(--ink); transform: none; }
   button.addr-copy:hover .ico { color: var(--ink); }
+  button.addr-copy[data-copied] .ico { color: var(--live); }
 
   /* Busy: the button keeps its place and says what it is doing, with a ring turning in front. */
   button[aria-busy="true"] { cursor: progress; }
@@ -984,18 +1083,6 @@
   .srv-id { font: var(--t-2)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
   .srv-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
   .srv-meta .dot { color: var(--ink-4); }
-  /* The address is a button because the only thing anyone does with it is paste it somewhere. */
-  .srv-meta button.addr {
-    font: var(--t-2)/1.4 var(--mono);
-    color: var(--ink-2);
-    padding: 0 5px;
-    margin: 0 -5px;
-    background: transparent;
-    border: 1px solid transparent;
-    box-shadow: none;
-    border-radius: var(--r-xs);
-  }
-  .srv-meta button.addr:hover:not(:disabled) { background: var(--hover); border-color: var(--line); color: var(--ink); transform: none; }
 
   /* The state, as a pill in the state's own tones. Neutral when there is nothing to say. */
   .spill {
@@ -1031,8 +1118,11 @@
   .vitals {
     margin: 0;
     /* Grows to 560px and no further: on a 4K window four numbers spread across the whole strip
-       put the Start button a metre from the name. */
-    flex: 0 1 560px;
+       put the Start button a metre from the name. Starts from 280px rather than 560px, so the
+       buttons only drop to a second line when the numbers would really be squeezed, not at
+       1280px with room to spare. */
+    flex: 1 1 280px;
+    max-width: 560px;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--s-4);
@@ -1049,9 +1139,12 @@
   .vital .txt { font: var(--t-3)/1.3 var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .vital .spark { width: 64px; height: 18px; flex: none; overflow: visible; }
   .vital .spark polyline { fill: none; stroke: var(--chart-cpu); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-  .vital .meter { width: 64px; height: 6px; flex: none; border-radius: 999px; background: var(--sunken); border: 1px solid var(--line); overflow: hidden; }
+  /* Under the figure and as wide as its cell: beside it, a fixed 64px bar ran into the next vital. */
+  .vital .meter { display: block; width: 100%; max-width: 120px; height: 4px; border-radius: 999px; background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
   .vital .meter i { display: block; height: 100%; background: var(--lapis); border-radius: 999px; }
   .vital .meter[data-tone="warn"] i { background: var(--warn); }
+  .vital .meter[data-tone="fault"] i { background: var(--fault); }
+  .vitals-off { grid-column: 1 / -2; align-self: center; margin: 0; font: var(--t-3)/1.4 var(--ui); color: var(--ink-3); }
   .vital .ok { color: var(--live); width: 14px; height: 14px; }
 
   /* Start and Stop are the verbs; the rest are behind the menu. One primary button at a time. */
@@ -1065,8 +1158,6 @@
     .srv-strip { gap: var(--s-3) var(--s-4); }
     .vitals { grid-template-columns: repeat(3, minmax(0, 1fr)); flex-basis: 290px; gap: var(--s-3); padding-left: var(--s-4); }
     .vital[data-v="tps"] { display: none; }
-    /* The figure alone at this width; the meter beside it ran into the next cell. */
-    .vital .meter { display: none; }
   }
   @container stage (max-width: 784px) {
     /* The vitals take their own row under the name; the divider between them would be a stray line. */
@@ -1074,7 +1165,7 @@
   }
 
   @media (max-height: 700px) {
-    .side .stab, .side .dock button { height: 30px; }
+    .side .stab, .side .dock button { height: var(--hit); }
     /* The strip is the tallest fixed block; on a short window it is what the tool panes pay for. */
     .srv-strip { padding-top: var(--s-3); padding-bottom: var(--s-3); gap: var(--s-2) var(--s-5); }
     .srv-name h1 { font-size: var(--t-6); }
@@ -1183,7 +1274,7 @@
     align-items: center;
     gap: 9px;
     width: 100%;
-    height: 30px;
+    height: var(--hit);
     padding: 0 10px;
     background: transparent;
     border: 1px solid transparent;
@@ -1280,7 +1371,7 @@
   /*
     Ultra: split before stretch. A row stops reading as one line past about 1400px, so a pane that
     has more room than that divides into a well and a companion instead of growing. Backups keeps
-    the history as the well, with Back up now, Leave out and Automatic stacked beside it; Players
+    the history as the well, with Back up now and Automatic stacked beside it and the status line across both; Players
     puts the chosen player beside the list; Settings shows the raw file beside the form; Stats lays
     its gauges two by two with the numbers of the range under each chart. The companion is a second
     column the lower tiers simply do not have, so nothing changes below 2000px.
@@ -1289,6 +1380,7 @@
     #backupsBody { grid-template-columns: minmax(0, 1fr) clamp(420px, 36%, 900px); grid-auto-flow: row dense; gap: var(--s-5) var(--s-6); }
     #backupsBody > .section { grid-column: 2; }
     #backupsBody > [data-backup-history] { grid-column: 1; grid-row: span 3; }
+    #backupsBody > .bk-status { grid-column: 1 / -1; }
     #performanceBody { gap: var(--s-5); }
     /* The fourth cell of the two-by-two: uptime, start and sample count as a small table. */
     #performanceBody > .facts {
@@ -1349,6 +1441,7 @@
   /* inline-block rather than flex: ::first-letter only applies to block containers, and the
      scope names arrive lowercase ("plugins", "one file") but read as labels in sentence case. */
   .snap .tag::first-letter { text-transform: uppercase; }
+  .snap .tag.unknown { background: none; border-color: transparent; color: var(--ink-3); font-weight: 400; }
   .snap .tag {
     grid-area: tag; justify-self: start;
     display: inline-block;
@@ -1378,12 +1471,11 @@
   }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
-  .snap-actions .icon-btn { width: 28px; height: 28px; padding: 0; }
   .snap[data-locked] .snap-actions { opacity: 1; }
   .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
   .snap-note { font: 600 var(--t-2)/1.4 var(--ui); color: var(--ink); white-space: normal; }
-  details.leave-out > summary { cursor: pointer; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
-  details.leave-out[open] > summary { margin-bottom: var(--s-2); }
+  details.leave-out > summary { padding-block: 8px; margin-block: -8px; cursor: pointer; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
+  details.leave-out[open] > summary { margin-bottom: 0; }
   details.leave-out textarea { width: 100%; resize: vertical; font: var(--t-2)/1.5 var(--mono); }
 
   /*
@@ -1418,14 +1510,15 @@
   .fm-open {
     display: flex; align-items: center; gap: var(--s-2); min-width: 0; justify-self: start; max-width: 100%;
     padding: 4px 0; background: none; border: 0; box-shadow: none; color: var(--ink);
-    font: var(--t-3)/1.3 var(--ui); text-align: left; cursor: pointer;
+    font: var(--t-2)/1.3 var(--mono); text-align: left; cursor: pointer;
   }
   .fm-open > span:not(.pill) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fm-open .ico { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
   .fm-open:hover:not(:disabled) { background: none; transform: none; color: var(--lapis-ink); }
   .fm-open:hover .ico { color: var(--lapis-ink); }
   .fm-row .fm-size { font: var(--t-2)/1 var(--mono); color: var(--ink-2); text-align: right; white-space: nowrap; }
-  .fm-row .fm-when { font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; }
+  .fm-row .fm-when { font: var(--t-2)/1 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; text-align: right; }
+  .fm-head .fm-when { text-align: right; }
   .fm-row .fm-kind { display: none; font: var(--t-2)/1 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fm-row .fm-when .long { display: none; }
   /* Wide: what kind of thing each entry is. Ultra: the exact time, not the short stamp. */
@@ -1453,7 +1546,7 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
     font: var(--t-3)/1.6 var(--mono); overflow: hidden;
   }
-  .fm-editor:focus-within { border-color: var(--lapis-edge); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
+  .fm-editor:focus-within { border-color: var(--lapis-edge); outline: var(--ring-width) solid var(--ring-color); outline-offset: -1px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3); }
   .fm-gutter {
     padding: var(--s-3) var(--s-2) var(--s-3) var(--s-3); min-width: 3.5em;
     text-align: right; white-space: pre; color: var(--ink-4); user-select: none; overflow: hidden;
@@ -1483,19 +1576,13 @@
   .fm-dirty[hidden] { display: none; }
   .fm-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-2) var(--s-4); margin-top: var(--s-2); }
 
-  /* Activity: a day at a time, one line per thing done - when, who, what - with Undo at the end of
-     the lines that have one. Who is a chip in a colour per kind, since it is the column people scan. */
+  /* Activity: a day at a time under a heading, each day the Overview's feed - icon, what, who,
+     when by the clock - with Undo in a last column where any line has one. Who is a chip in a
+     colour per kind, since it is the column people scan. */
   .act-filter { display: inline-flex; flex-wrap: wrap; gap: 2px; margin-bottom: var(--s-3); }
-  .act-list { display: grid; }
-  .act-day { margin: var(--s-4) 0 var(--s-2); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+  .act-list { display: grid; gap: var(--s-2); container-type: inline-size; container-name: feed; }
+  .act-day { margin: var(--s-3) 0 0; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
   .act-day:first-child { margin-top: 0; }
-  .act-row {
-    display: grid; grid-template-columns: 64px auto minmax(0, 1fr) auto; column-gap: var(--s-3);
-    align-items: center; min-height: 36px; padding: 4px var(--s-2);
-    border-bottom: 1px solid var(--line-soft); transition: background var(--ease);
-  }
-  .act-row:hover { background: rgba(var(--ink-rgb), .035); }
-  .act-when { font: var(--t-2)/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
   .act-who {
     justify-self: start; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     padding: 3px 8px; border-radius: 999px; border: 1px solid var(--edge);
@@ -1504,22 +1591,14 @@
   .act-who[data-tone="you"] { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
   .act-who[data-tone="ai"] { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
   .act-who[data-tone="sched"] { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
-  .act-what { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
-  .act-detail { overflow-wrap: anywhere; color: var(--ink-2); }
-  code.act-detail { font: var(--t-2)/1.4 var(--mono); }
-  .act-row[data-bad] .act-what > span:first-child { color: var(--fault-ink); }
-  .act-undo { padding: 3px 9px; font-size: var(--t-2); }
-  .act-rest { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
-  /* Wide: the verb and what it was done to become two aligned columns, so a day's changes read as
-     a table rather than a list of sentences. */
-  @container pane (min-width: 1280px) {
-    .act-row { grid-template-columns: 64px auto 230px minmax(0, 1fr) auto; }
-    .act-row .act-what { display: contents; }
-    .act-row .act-verb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
-    .act-row .act-rest { font: var(--t-3)/1.4 var(--ui); color: var(--ink); }
-  }
+  .act-feed .act-when { font-variant-numeric: tabular-nums; }
+  .act-list[data-undo] .act-feed .feed-row { grid-template-columns: 16px minmax(0, 1fr) auto 76px; }
+  .act-list[data-undo] .act-feed .feed-row > :last-child { grid-column: 4; grid-row: 1 / span 2; justify-self: end; }
+  .act-list[data-undo] .act-feed .feed-meta { grid-column: 2 / 4; }
   .act-undone { font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
-  .act-more { margin-top: var(--s-3); }
+  .act-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-2) var(--s-3); margin-top: var(--s-3); }
+  .act-foot .hint { margin: 0; font-variant-numeric: tabular-nums; }
+  .act-foot:has(> .act-more[hidden]) { justify-content: flex-start; }
   .launch-line {
     display: block; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm);
     background: var(--sunken); border: 1px solid var(--line-soft);
@@ -1559,7 +1638,6 @@
   .step-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--t-2); color: var(--ink-2); min-width: 0; }
   .step-fields input:not([type="number"]) { flex: 1 1 160px; min-width: 0; }
   .step-acts { display: flex; gap: 2px; }
-  .step-acts .icon-btn { width: 26px; height: 26px; font-size: 13px; }
   /* The task form styles every label as a field's heading and every input at full width; these are
      a sentence with a box in front. */
   .task-form .steps label.check { display: flex; align-items: center; gap: 8px; font: 400 var(--t-2)/1.4 var(--ui); text-transform: none; letter-spacing: 0; color: var(--ink-2); }
@@ -1611,17 +1689,23 @@
   @container feed (min-width: 760px) {
     .feed .feed-row { grid-template-columns: 16px minmax(0, 1fr) auto auto; }
     .feed-meta { grid-column: 3; grid-row: 1; flex-wrap: nowrap; justify-content: flex-end; max-width: 320px; }
-    .feed-row .act-when { grid-column: 4; min-width: 64px; text-align: right; }
-  }
-  @container pane (max-width: 560px) {
-    .act-row { grid-template-columns: 56px minmax(0, 1fr) auto; row-gap: 4px; padding: 6px var(--s-2); }
-    .act-who { grid-column: 2; grid-row: 1; }
-    .act-what { grid-column: 1 / -1; grid-row: 2; }
-    .act-undo, .act-undone { grid-column: 3; grid-row: 1; }
+    .feed-row .act-when { grid-column: 4; min-width: 64px; text-align: right; }    .act-list[data-undo] .act-feed .feed-row { grid-template-columns: 16px minmax(0, 1fr) auto auto 76px; }
+    .act-list[data-undo] .act-feed .feed-row > :last-child { grid-column: 5; grid-row: 1; }
+    .act-list[data-undo] .act-feed .feed-meta { grid-column: 3; }
   }
 
-  .section { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
-  .section h3 { margin: 0; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+  /* The card. .card is the name for new ones; the older names keep their layouts and share this. */
+  .card, .section, .gauge, .task, .task-form {
+    padding: var(--card-pad);
+    border: 1px solid var(--line);
+    border-radius: var(--card-radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  /* Only a card that does something on its own answers the pointer. */
+  .card[data-interactive]:hover, .task:hover { border-color: var(--edge); }
+  .section { display: grid; gap: var(--s-3); }
+  .section h3 { margin: 0; font: var(--type-label); text-transform: uppercase; letter-spacing: var(--track-label); color: var(--ink-3); }
   .where { margin: 0 0 10px; gap: 10px; }
   .mono-path { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1632,8 +1716,7 @@
     low trend line under it. The history is context for the number, not the other way round, so the
     chart is a strip rather than a panel of its own.
   */
-  .gauge { display: grid; gap: 10px; padding: var(--s-4) var(--s-5) var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); transition: all var(--ease); }
-  .gauge:hover { border-color: var(--edge); }
+  .gauge { display: grid; gap: var(--s-3); }
   .gauge-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
   .gauge-head h3 { margin: 0; flex-basis: 100%; font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .gauge-head .now { font: 650 var(--t-6)/1 var(--display); letter-spacing: -.02em; color: var(--ink); }
@@ -1674,6 +1757,23 @@
   */
   .plug-add { display: grid; gap: var(--s-3); }
 
+  /* Backups' first line: the schedule's state, the last backup's age, and the one action. */
+  .bk-status {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--surface);
+  }
+  .bk-status > .ico { width: 18px; height: 18px; flex: none; color: var(--ink-3); }
+  .bk-status[data-tone="live"] > .ico { color: var(--live); }
+  .bk-status[data-tone="warn"] { border-color: var(--warn-edge); background: var(--warn-wash); }
+  .bk-status[data-tone="warn"] > .ico { color: var(--warn); }
+  .bk-text { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+  .bk-text b { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
+  .bk-text span { font: var(--t-2)/1.4 var(--ui); color: var(--ink-3); }
+  .bk-text span:empty { display: none; }
+  .bk-last { font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
+  .bk-status[data-tone="warn"] .bk-last { color: var(--warn-ink); font-weight: 600; }
+
   .callout {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3);
     padding: var(--s-3) var(--s-4);
@@ -1694,7 +1794,7 @@
   .plist { display: grid; }
   .plug {
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) auto auto;
+    grid-template-columns: 32px minmax(0, 1fr) 12ch 9ch auto;
     align-items: center;
     gap: var(--s-3);
     padding: 9px var(--s-1);
@@ -1716,20 +1816,24 @@
   .plug-main { min-width: 0; display: grid; gap: 2px; }
   .plug-name { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plug-src { font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; }
-  /* A fixed width, empty on a jar added by hand, so the versions line up down the list. */
-  .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 164px; }
-  .plug-acts button { padding: 3px 9px; font-size: var(--t-2); }
-  .plug-acts .icon-btn { width: 28px; height: 28px; padding: 0; }
-  /* The same two verbs on every row; quiet until the row is pointed at or reached by keyboard. */
-  .plug-acts .quiet { display: inline-flex; gap: 2px; opacity: .45; transition: opacity var(--ease); }
-  .plug:hover .quiet, .plug:focus-within .quiet { opacity: 1; }
+  .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .plug-src code { font: var(--t-1)/1.3 var(--mono); color: var(--ink-3); }
+  .plug-state { display: inline-flex; align-items: center; gap: 6px; font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
+  .plug-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--live); }
+  .plug-state[data-on="false"] { color: var(--ink-3); }
+  .plug-state[data-on="false"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+  .plug-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 132px; }
+  .plug-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
+  /* The same two verbs on every row, always shown: hidden until hover, they read as missing. */
+  .plug-acts .row-acts { display: inline-flex; gap: 2px; }
   .plug[data-off] .plug-name, .plug[data-off] .plug-tile { opacity: .55; }
 
   /* ---- players -------------------------------------------------------------- */
 
   .who-bar { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin-bottom: var(--s-3); }
-  .who-bar input[type="search"] { flex: 1 1 200px; min-width: 160px; }
+  /* Names are short; a field the width of the pane reads as a search over something far bigger. */
+  .who-bar input[type="search"] { flex: 0 1 360px; min-width: 160px; }
+  .who-bar .filters { margin-left: auto; }
 
   .people { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .who {
@@ -1902,7 +2006,10 @@
     color: var(--ink-3); background: rgba(var(--ink-rgb), .03); border: 1px solid var(--line);
   }
   .set-tag[data-tone="changed"] { color: var(--lapis-ink); background: var(--lapis-wash); border-color: var(--lapis-edge); }
-  details.more > summary { width: max-content; cursor: pointer; list-style: none; font: 500 var(--t-2)/1.4 var(--ui); color: var(--lapis-ink); }
+  /* An inline link: padded out to --hit and pulled back by the same amount, so it is easy to hit
+     without pushing the help text apart. */
+  details.more > summary { width: max-content; cursor: pointer; list-style: none; font: 500 var(--t-2)/1.4 var(--ui); color: var(--lapis-ink);
+    padding-block: calc((var(--hit) - 1.4em) / 2); margin-block: calc((var(--hit) - 1.4em) / -2); }
   details.more > summary::-webkit-details-marker { display: none; }
   details.more > summary:hover { text-decoration: underline; text-underline-offset: 3px; }
   details.more > .hint { margin: 4px 0 0; }
@@ -1912,7 +2019,11 @@
   .set-row[data-changed] .set-control input:not(.switch), .set-row[data-changed] .set-control select { border-color: var(--lapis-edge); }
   .set-row[data-changed] .set-control .switch { border-color: var(--lapis-edge); }
 
-  .set-bar { gap: var(--s-2) var(--s-3); }
+  .set-bar { gap: var(--s-2) var(--s-3); animation: bar-in 180ms ease-out; }
+  .set-bar[hidden] { display: none; }
+  @keyframes bar-in { from { transform: translateY(100%); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .set-bar { animation: none; } }
+  .field-note:empty { display: none; }
   .set-bar .bar-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--lapis); }
   .set-bar .bar-count { font: 600 var(--t-3)/1.3 var(--ui); color: var(--ink); }
   .set-bar .hint { margin: 0; }
@@ -1926,7 +2037,7 @@
     font: var(--t-3)/1.6 var(--mono);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
   }
-  .set-raw textarea:focus { outline: none; border-color: var(--lapis-edge); background-color: var(--field-focus); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash); }
+  .set-raw textarea:focus { outline: var(--ring-width) solid var(--ring-color); outline-offset: -1px; border-color: var(--lapis-edge); background-color: var(--field-focus); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3); }
 
   /*
     A wide pane: the open section's rows sit two or three abreast, each still a label beside its
@@ -1993,11 +2104,10 @@
   input.switch:checked::after { transform: translateX(14px); background: var(--control-mark); }
   input.switch:disabled { opacity: .45; cursor: default; }
   /*
-    Stated explicitly because this control loses the ring twice over: `input:focus { outline: none }`
-    outranks the global :focus-visible rule, and the switch's own `border` shorthand outranks the
-    border colour that was standing in for it.
+    Stated explicitly: the switch is an input, and the field rule draws its ring inside the border,
+    which on a 20px switch is a ring around nothing.
   */
-  input.switch:focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
+  :root input.switch:focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); }
 
   /* ---- what a section is, said once at the top of it ------------------------ */
 
@@ -2032,8 +2142,9 @@
     box-shadow: var(--lift-strong);
   }
   .pane-head .mark .ico { width: 17px; height: 17px; }
-  .pane-head h2 { margin: 0; font: 650 var(--t-5)/1.25 var(--display); color: var(--ink); letter-spacing: -.015em; }
+  .pane-head h2 { margin: 0; font: var(--type-section); color: var(--ink); letter-spacing: -.015em; }
   .pane-head p { margin: 0; font: var(--t-3)/1.45 var(--ui); color: var(--ink-3); }
+  .pane-head-wait { visibility: hidden; }
 
   /* ---- a pane with nothing in it yet ---------------------------------------- */
 
@@ -2056,6 +2167,42 @@
     color: var(--edge);
     stroke-width: 1.25;
   }
+  .empty-pane > button { margin-top: var(--s-1); }
+
+  /* A read that failed: what went wrong, in the reader's words, and the one thing to do about it. */
+  .pane-error .empty-mark { color: var(--fault); }
+  .pane-error p { color: var(--ink-2); }
+
+  /*
+    Loading. Grey bars where the rows will be, at the rows' height, so the pane holds its shape and
+    nothing jumps when the answer arrives. The previous server's content is never left showing
+    under a new server's name while it loads.
+  */
+  .skeleton { display: grid; gap: var(--s-3); padding-top: var(--s-2); }
+  .skeleton i {
+    display: block; height: 14px; border-radius: var(--r-xs);
+    background: linear-gradient(90deg, rgba(var(--ink-rgb), .05) 0 40%, rgba(var(--ink-rgb), .09) 50%, rgba(var(--ink-rgb), .05) 60% 100%) 0 0 / 300% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton i:nth-child(1) { width: 38%; height: 18px; margin-bottom: var(--s-2); }
+  .skeleton i:nth-child(3n) { width: 72%; }
+  .skeleton i:nth-child(3n + 1):not(:first-child) { width: 86%; }
+  .skeleton i:nth-child(3n + 2) { width: 64%; }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+  /*
+    Tooltips. One look for every title in the panel: the script lifts an element's title into this
+    box on hover or keyboard focus, so a tooltip reaches keyboard users too and reads the same
+    everywhere instead of being the operating system's.
+  */
+  #tip {
+    position: fixed; z-index: 60; max-width: 320px; pointer-events: none;
+    padding: 6px 10px; border-radius: var(--r-xs);
+    background: var(--raised-hi); border: 1px solid var(--edge); box-shadow: var(--shadow-md);
+    color: var(--ink); font: var(--type-meta); white-space: pre-line;
+    opacity: 0; transform: translateY(2px); transition: opacity 120ms ease-out, transform 120ms ease-out;
+  }
+  #tip[data-on] { opacity: 1; transform: none; }
 
   /* ---- scheduled tasks ---------------------------------------------------- */
 
@@ -2068,16 +2215,10 @@
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "what state" "when when" "acts acts";
     gap: 6px 14px;
-    padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) + 2px);
-    border: 1px solid var(--line);
-    border-radius: var(--r);
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
     position: relative;
     overflow: hidden;
     transition: all var(--ease);
   }
-  .task:hover { border-color: var(--edge); }
   /*
     No spine for a healthy task. "Ready" is the normal state of every task on the screen. The one
     worth marking is a task mcctl believes in that Windows has never heard of - that one will never
@@ -2096,7 +2237,7 @@
   .task .t-when { grid-area: when; font: var(--t-2)/1.5 var(--ui); color: var(--ink-3); }
   .task .t-when code { font: var(--t-1)/1 var(--mono); color: var(--ink-2); }
   .task .t-acts { grid-area: acts; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .task .t-acts button { padding: 4px 10px; font-size: var(--t-2); }
+  .task .t-acts button { padding: 0 var(--s-2); font-size: var(--t-2); }
   .t-state {
     grid-area: state; align-self: start;
     display: inline-flex; align-items: center; gap: 5px;
@@ -2111,7 +2252,7 @@
 
   /* The form for a new or edited task. Fields appear and vanish with the kind of schedule
      chosen, so it is a grid of rows rather than a fixed set of columns. */
-  .task-form { display: grid; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--edge); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
+  .task-form { display: grid; gap: var(--s-3); border-color: var(--edge); }
   .task-form .field { display: grid; gap: 6px; }
   .task-form label { font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .task-form .when-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
@@ -2144,6 +2285,12 @@
   .con-search input { padding-left: 30px; font-size: var(--t-3); }
   .con-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--ink-3); }
   .con-count { font: var(--t-1)/1 var(--mono); color: var(--ink-3); white-space: nowrap; margin-right: 4px; }
+  /* The view's own switches, as one quiet cluster: they change how the log is shown, never the
+     server, so they do not need to be read one by one. */
+  .con-tools { display: inline-flex; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--line-soft); }
+  .con-tools .icon-btn { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-3); }
+  .con-tools .icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--ink); transform: none; }
+  .con-tools .icon-btn[aria-pressed="true"] { background: var(--lapis-wash); color: var(--ink); }
   /* The counts beside the level filters, in the level's own ink, so a glance says whether there is
      anything to filter for. */
   .seg .n { margin-left: 5px; font: 600 var(--t-1)/1 var(--mono); }
@@ -2188,6 +2335,9 @@
     white-space: normal;
   }
   .menu button b { font-weight: 600; }
+  /* The two that destroy something, apart from the rest and in the fault colour, so they are not
+     picked by a hand reaching for Rename. */
+  .menu button[data-tone="danger"]:not(:disabled) b { color: var(--fault-ink); }
   .menu button span { font-size: var(--t-2); color: var(--ink-3); transition: color var(--ease); }
   .menu button:hover, .menu button:focus-visible { background: var(--hover-hi); border-color: var(--line); transform: none; }
   .menu button:hover span, .menu button:focus-visible span { color: var(--ink-2); }
@@ -2225,27 +2375,62 @@
   .ln mark { background: var(--warn-edge); color: var(--warn-ink); border-radius: 2px; }
   .ln.warn  { border-left-color: var(--warn); background: rgba(245, 184, 74, .05); }
   .ln.error { border-left-color: var(--fault); background: rgba(255, 107, 97, .06); }
+  /* The level word carries the level's ink too; the message itself stays at full contrast. */
+  .ln.warn .pre  { color: var(--warn-ink); }
+  .ln.error .pre { color: var(--fault-ink); }
   .ln.sys   { border-left-color: var(--lapis); color: var(--ink-2); }
   .ln.sys .pre { color: var(--lapis); }
 
   .log-empty { padding: var(--s-6) var(--s-5); color: var(--ink-3); font: var(--t-3)/1.6 var(--ui); }
 
-  .jump { position: absolute; right: 18px; bottom: 16px; box-shadow: var(--shadow-lg); font-size: var(--t-3); background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
+  /* Centred over the input, where the eye is when it is typing, and it says how much it is
+     hiding: a pill in a corner was easy to miss while the log ran on underneath it. */
+  .jump {
+    position: absolute; left: 50%; bottom: var(--s-3); transform: translateX(-50%);
+    border-radius: 999px; padding: 0 var(--s-3) 0 10px;
+    box-shadow: var(--shadow-lg); font-size: var(--t-2);
+    background: var(--glass-strong); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  }
+  .jump:hover:not(:disabled) { transform: translateX(-50%); }
 
-  .cmd { display: flex; gap: 10px; padding: 12px var(--s-3) 12px var(--s-5); border-top: 1px solid var(--line-soft); align-items: center; }
+  /* The input is the one thing on this screen that takes typing, so it looks like a terminal
+     prompt rather than another form field: the slash sits inside it, and it is taller. */
+  .cmd { display: flex; gap: var(--s-2); padding: var(--s-3) var(--s-3) var(--s-3) var(--s-5); border-top: 1px solid var(--line-soft); align-items: center; background: var(--recess); }
+  .cmd[hidden] { display: none; }
+  .cmd-field {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-2);
+    height: 40px; padding: 0 var(--s-3);
+    background: var(--sunken); border: 1px solid var(--edge); border-radius: var(--r-sm);
+    cursor: text;
+  }
+  .cmd-field:focus-within { border-color: var(--lapis-edge); outline: var(--ring-width) solid var(--ring-color); outline-offset: -1px; }
   .cmd .prompt { font: 600 var(--t-4)/1 var(--mono); color: var(--lapis); }
-  .cmd input { font-family: var(--mono); font-size: var(--t-3); }
+  /* The field's frame is the label's, so the input itself draws none and takes no ring of its own. */
+  :root #cmd, :root #cmd:focus, :root #cmd:focus-visible { flex: 1; min-width: 0; height: 100%; min-height: 0; padding: 0; border: 0; outline: 0; background: transparent; box-shadow: none; font-family: var(--mono); font-size: var(--t-3); }
+  .cmd-field:has(input:disabled) { background: var(--recess); border-style: dashed; cursor: not-allowed; }
+  .cmd-field:has(input:disabled) .prompt { color: var(--ink-4); }
+  .cmd button { height: 40px; }
 
   /* ---- sheets: add a server, settings ----------------------------------- */
 
   .sheet { align-content: start; background: var(--void); overflow: auto; }
   .sheet-head { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-5) var(--s-6); border-bottom: 1px solid var(--line-soft); }
-  .sheet-head h1 { margin: 0; font: 650 var(--t-6)/1.15 var(--display); letter-spacing: -.025em; }
+  .sheet-head h1 { margin: 0; font: var(--type-page); letter-spacing: var(--track-display); }
   /* Centred in the stage. A form pinned to the left of a wide panel reads as unfinished; a centred
      column reads as the one thing this screen is about. */
   .sheet-body { padding: var(--s-6) var(--s-5) var(--s-7); display: grid; gap: var(--s-5); width: 100%; max-width: 640px; margin: 0 auto; }
   .sheet-body.wide { max-width: 840px; }
   .sheet-body h2 { margin: 0 0 4px; font: 650 var(--t-3)/1.4 var(--ui); letter-spacing: -.005em; }
+  /* The create form in two short groups, each under a heading, rather than one long run of fields. */
+  .sheet-body h2.form-group-title { margin: 0 0 calc(-1 * var(--s-2)); padding-bottom: var(--s-2); border-bottom: 1px solid var(--line-soft); }
+  .sheet-body h2.form-group-title ~ h2.form-group-title { margin-top: var(--s-2); }
+  /* What Create will make, in one line beside the button, so nobody has to scroll up to check. */
+  .new-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s-2); padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sunken); font: var(--t-3)/1.4 var(--ui); color: var(--ink-2); }
+  .new-summary:empty { display: none; }
+  .new-summary b { color: var(--ink); font-weight: 600; }
+  .new-summary .sep { color: var(--ink-4); }
+  .hint code.slug-eg { color: var(--ink-3); }
 
   .tabs { display: flex; gap: 4px; padding: 0 var(--s-5); border-bottom: 1px solid var(--line); }
   .tabs button { background: transparent; border: 0; box-shadow: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 12px 12px 10px; color: var(--ink-2); font-size: var(--t-3); font-weight: 500; }
@@ -2372,7 +2557,10 @@
   }
   .toast.bad { border-left-color: var(--fault); }
   .toast.good { border-left-color: var(--live); }
-  .toast .x { background: none; border: 0; box-shadow: none; padding: 0 2px; color: var(--ink-3); font-size: var(--t-5); line-height: 1; }
+  .toast > .ico { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--lapis); }
+  .toast.bad > .ico { color: var(--fault); }
+  .toast.good > .ico { color: var(--live); }
+  .toast .x { width: var(--hit); height: var(--hit); margin: -6px -10px -6px 0; padding: 0; background: none; border: 0; box-shadow: none; color: var(--ink-3); }
   .toast .x:hover:not(:disabled) { background: none; color: var(--ink); transform: none; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
 
@@ -2469,6 +2657,7 @@
   <symbol id="i-clock" viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M8 5.5V8h2.5"/></symbol>
   <symbol id="i-server" viewBox="0 0 16 16"><path d="M2 3h12v4H2zM2 9h12v4H2z"/><path d="M4.5 5h.5M4.5 11h.5"/></symbol>
   <symbol id="i-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.8" rx="5" ry="1.8"/><path d="M3 3.8v8.4c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V3.8"/><path d="M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/></symbol>
+  <symbol id="i-cache" viewBox="0 0 16 16"><path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 16 16"><path d="M2 4.5h12M2 11.5h12"/><path d="M5 3v3M11 10v3"/></symbol>
   <symbol id="i-plug" viewBox="0 0 16 16"><path d="M5 2v3.5M11 2v3.5"/><path d="M3.5 5.5h9V9a4.5 4.5 0 0 1-9 0z"/><path d="M8 13.5V15"/></symbol>
   <symbol id="i-map" viewBox="0 0 16 16"><path d="M2 4l4-1.5 4 1.5 4-1.5v9.5l-4 1.5-4-1.5-4 1.5z"/><path d="M6 2.5v10M10 4v10"/></symbol>
@@ -2500,6 +2689,7 @@
   <symbol id="i-grid" viewBox="0 0 16 16"><path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9h4.5v4.5H2.5zM9 9h4.5v4.5H9z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 16 16" stroke-linejoin="round"><path d="M6.6 1.5h2.8l.4 1.9 1.4.8 1.8-.6 1.4 2.4-1.4 1.3v1.4l1.4 1.3-1.4 2.4-1.8-.6-1.4.8-.4 1.9H6.6l-.4-1.9-1.4-.8-1.8.6L1.6 10l1.4-1.3V7.3L1.6 6l1.4-2.4 1.8.6 1.4-.8z"/><circle cx="8" cy="8" r="2"/></symbol>
   <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3.5v9M11 3.5v9"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></symbol>
   <symbol id="i-copy" viewBox="0 0 16 16"><path d="M5.5 5.5h8v8h-8z"/><path d="M10.5 5.5v-3h-8v8h3"/></symbol>
   <symbol id="i-wrap" viewBox="0 0 16 16"><path d="M2 4h12M2 12h3"/><path d="M2 8h9.5a2 2 0 0 1 0 4H8"/><path d="M9.5 10.5L8 12l1.5 1.5"/></symbol>
   <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 2.5v8"/><path d="M5 5.5l3-3 3 3"/><path d="M3 9v4.5h10V9"/></symbol>
@@ -2651,7 +2841,7 @@
         <dl class="vitals" id="srvVitals"></dl>
         <div class="srv-actions">
           <button id="bRestart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-restart"/></svg>Restart</button>
-          <button id="bStop" class="danger"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stop"/></svg>Stop</button>
+          <button id="bStop"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stop"/></svg>Stop</button>
           <button class="primary" id="bStart"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start</button>
           <span class="menu-wrap" id="moreWrap">
             <button type="button" id="bManage" class="icon-btn" aria-label="More actions" title="More actions"
@@ -2685,10 +2875,12 @@
           </span>
           <span class="grow"></span>
           <span class="con-count" id="conCount"></span>
+          <span class="con-tools">
           <button type="button" id="bPause" class="icon-btn" aria-pressed="false" aria-label="Pause" title="Pause"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pause"/></svg></button>
           <button type="button" id="bWrap" class="icon-btn" aria-pressed="false" aria-label="Wrap long lines" title="Wrap long lines"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-wrap"/></svg></button>
           <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
+          </span>
           <span class="menu-wrap" id="shareWrap">
             <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
             <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
@@ -2712,14 +2904,17 @@
           </span>
         </div>
         <div class="log-wrap">
-          <pre id="log" class="nowrap" tabindex="0" role="log" aria-label="Server console"></pre>
-          <button class="jump" id="bJump" hidden>Jump to newest</button>
+          <pre id="log" tabindex="0" role="log" aria-label="Server console"></pre>
+          <button class="jump" id="bJump" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span id="jumpLabel">Jump to latest</span></button>
         </div>
 
-        <div class="cmd">
-          <span class="prompt" aria-hidden="true">/</span>
-          <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" aria-label="Server command">
+        <div class="cmd" id="cmdRow">
+          <label class="cmd-field">
+            <span class="prompt" aria-hidden="true">/</span>
+            <input id="cmd" placeholder="Type a command — ↑ recalls" autocomplete="off" spellcheck="false" aria-label="Server command">
+          </label>
           <button id="bSend" class="primary">Send</button>
+          <button id="bCmdStart" hidden><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg>Start server</button>
         </div>
       </section>
 
@@ -2770,7 +2965,7 @@
     <!-- ============ add a server ========================================= -->
     <div class="view sheet" id="vAdd">
       <div class="sheet-head">
-        <h1>Add a server</h1>
+        <h1 id="addTitle">Add a server</h1>
         <span class="grow"></span>
         <button class="ghost" id="bAddClose">Close</button>
       </div>
@@ -2782,6 +2977,7 @@
       </div>
 
       <form class="sheet-body" id="formNew">
+        <h2 class="form-group-title">What to run</h2>
         <div class="field">
           <label for="nName">Name</label>
           <input id="nName" name="name" required autocomplete="off" placeholder="Survival (Season 3)" maxlength="48">
@@ -2801,6 +2997,7 @@
             <label for="nVersion">Minecraft version</label>
             <select id="nVersion" name="version"><option value="">Loading versions…</option></select>
             <div class="hint" id="nVersionHint">Downloads the newest stable Paper build.</div>
+            <div class="bad field-note" id="nVersionBad" role="status"></div>
             <div class="inline-warn" id="nJavaWarn" hidden></div>
           </div>
           <div class="field" style="flex:1">
@@ -2811,13 +3008,14 @@
           </div>
           <div class="field" style="flex:1">
             <label for="nPort">Port</label>
-            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off">
+            <input id="nPort" name="port" type="number" placeholder="auto" class="mono" autocomplete="off" min="1024" max="65535" aria-describedby="nPortBad">
             <div class="hint">Blank picks a free one</div>
+            <div class="bad field-note" id="nPortBad" aria-live="polite"></div>
           </div>
         </div>
+        <h2 class="form-group-title" id="nJoinTitle">Who can join</h2>
         <div class="field">
-          <label>Who can join</label>
-          <div class="choice" id="nJoin">
+          <div class="choice" id="nJoin" role="radiogroup" aria-labelledby="nJoinTitle">
             <label>
               <input type="radio" name="onlineMode" value="online" checked>
               <b>Require a Minecraft account</b>
@@ -2837,6 +3035,7 @@
           <div class="track"><div class="bar" id="newBar"></div></div>
           <div class="msg" id="newMsg"></div>
         </div>
+        <div class="new-summary" id="newSummary" aria-live="polite"></div>
         <div class="row">
           <button type="submit" class="primary" id="bCreate">Create server</button>
           <span class="hint" id="newHint">Accepts the Minecraft EULA on your behalf, as the operator of this machine.</span>
@@ -2890,7 +3089,7 @@
             <input id="aDir" class="mono" spellcheck="false" placeholder="C:\Minecraft\survival" autocomplete="off">
             <button type="button" id="bBrowse" hidden>Browse…</button>
           </div>
-          <div class="hint">The folder holding the server jar and server.properties.</div>
+          <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
         </div>
         <div class="row" style="align-items:flex-start">
           <div class="field" style="flex:2">
@@ -3152,6 +3351,7 @@
 </dialog>
 
 <div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
 <span class="sr-only" id="live" aria-live="polite"></span>
 
 <script>
@@ -3196,6 +3396,11 @@ const state = {
   atBottom: true,
   history: [],
   histAt: -1,
+  // Each server's typed commands, kept while the panel is open, so switching away and back does
+  // not lose them. Not saved to disk: a command can carry a password (/login, /auth).
+  histories: new Map(),
+  draft: '',
+  unseen: 0,
   layout: null,
   appInfo: null,
   busy: false,
@@ -3259,9 +3464,10 @@ function toast(message, kind) {
   close.className = 'x';
   close.type = 'button';
   close.setAttribute('aria-label', 'Dismiss');
-  close.textContent = '\u00d7';
+  close.append(icon('close'));
   close.onclick = () => el.remove();
-  el.append(text, close);
+  // The tone is said by a glyph as well as the edge colour, so it does not rest on colour alone.
+  el.append(icon(kind === 'bad' ? 'alert' : kind === 'good' ? 'check' : 'bolt'), text, close);
   $('#toasts').append(el);
   $('#live').textContent = message;
   // Errors stay until dismissed. Everything else is an acknowledgement, and an acknowledgement
@@ -3436,7 +3642,10 @@ function recallTool(name) {
     const saved = JSON.parse(localStorage.getItem(toolKey(name)) || 'null');
     if (saved && (saved.tool === null || Object.hasOwn(TOOL_NAMES, saved.tool))) return { tool: saved.tool };
   } catch { /* nothing remembered is the same as nothing open */ }
-  return { tool: null };
+  // A database's console is its log, rarely what anyone opened it for, and an external one has
+  // none here at all. It opens on its connection details and attached servers instead.
+  const row = rowOf(name);
+  return { tool: row && isDb(row) ? 'settings' : null };
 }
 
 function rememberTool() {
@@ -3618,7 +3827,9 @@ function buildTab(row) {
   glyph.className = 'stab-ico';
   const lamp = document.createElement('span');
   lamp.className = 'lamp';
-  glyph.append(icon(isDb(row) ? 'database' : 'server'), lamp);
+  // A key-value store is not a table store, and the two need different things from the person
+  // (no schema, no SQL dumps): the glyph says which before the name does.
+  glyph.append(icon(!isDb(row) ? 'server' : row.engineKind === 'redis' ? 'cache' : 'database'), lamp);
   const nm = document.createElement('span');
   nm.className = 'nm';
   const note = document.createElement('span');
@@ -3664,11 +3875,15 @@ function updateTab(el, row) {
  * sits under whichever row is current, and goes back to the sidebar, hidden, when none is.
  */
 function markTabs() {
-  $('#tabHome').setAttribute('aria-current', state.current ? 'false' : 'page');
+  // A sheet covers the stage, so the server behind it is not where the person is: lighting its row
+  // would say otherwise. The Add sheet lights the button that opened it instead.
+  const onSheet = SHEETS.has(state.view);
+  $('#tabHome').setAttribute('aria-current', state.current || onSheet ? 'false' : 'page');
+  $('#bNew').setAttribute('aria-current', state.view === 'add' ? 'page' : 'false');
   const dock = $('#dock');
   let current = null;
   for (const el of $$('#list .stab[data-name]')) {
-    const on = el.dataset.name === state.current;
+    const on = !onSheet && el.dataset.name === state.current;
     el.setAttribute('aria-current', on ? 'page' : 'false');
     if (on) current = el;
   }
@@ -3681,7 +3896,46 @@ function markTabs() {
     dock.hidden = true;
     if (dock.parentNode !== $('.srv-tabs')) $('.srv-tabs').append(dock);
   }
+  syncRoving();
 }
+
+/*
+  The sidebar is one Tab stop, not one per row: with a server open that was fifteen stops before
+  the stage. Up and Down walk the rows and the open server's tools in the order they are drawn,
+  Home and End jump to the ends, Right opens a server or steps into its tools, Left steps back out
+  to the server. Enter and Space are the buttons' own.
+*/
+const sideItems = () => $$('#list button').filter((b) => !b.closest('[hidden]') && b.offsetParent !== null);
+
+/** Leave the one Tab stop on the focused row, or else on the row that is open. */
+function syncRoving() {
+  const items = sideItems();
+  const anchor = items.includes(document.activeElement) ? document.activeElement
+    : items.find((b) => b.classList.contains('stab') && b.getAttribute('aria-current') === 'page') || items[0];
+  for (const b of $$('#list button')) b.tabIndex = b === anchor ? 0 : -1;
+}
+
+$('#list').addEventListener('focusin', syncRoving);
+$('#list').addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const items = sideItems();
+  const at = document.activeElement;
+  const i = items.indexOf(at);
+  if (i < 0) return;
+  const dock = $('#dock');
+  let to = null;
+  if (e.key === 'ArrowDown') to = items[Math.min(i + 1, items.length - 1)];
+  else if (e.key === 'ArrowUp') to = items[Math.max(i - 1, 0)];
+  else if (e.key === 'Home') to = items[0];
+  else if (e.key === 'End') to = items[items.length - 1];
+  else if (e.key === 'ArrowRight' && at.dataset.name) {
+    if (at.getAttribute('aria-current') === 'page' && !dock.hidden) to = dock.querySelector('button');
+    else at.click();
+  } else if (e.key === 'ArrowLeft' && dock.contains(at)) to = dock.previousElementSibling;
+  else return;
+  e.preventDefault();
+  if (to) to.focus();
+});
 
 /**
  * Reconcile the tabs against the DOM rather than rewriting them.
@@ -3808,15 +4062,7 @@ function renderMeta(row) {
   meta.textContent = '';
   const parts = [];
   const text = (s) => document.createTextNode(s);
-  const addr = (s) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'addr';
-    b.textContent = s;
-    b.title = 'Copy ' + s;
-    b.onclick = () => copyText(s, s);
-    return b;
-  };
+  const addr = addrButton;
   if (isDb(row)) {
     parts.push(text((row.engineLabel || row.engine) + (row.version ? ' ' + row.version : '') + (row.external ? ', runs elsewhere' : '')));
     parts.push(addr((row.host || '127.0.0.1') + ':' + (row.port || '?')));
@@ -3983,18 +4229,48 @@ function renderVitals(row) {
     return;
   }
   delete dl.dataset.count;
+  dl.toggleAttribute('data-off', !live);
+
+  const backup = vitalCell('backup', 'Last backup');
+  if (vitalsView.name !== row.name || vitalsView.backupAt === undefined) bigNumber(backup.dd, '…');
+  else if (vitalsView.backupAt === null) bigNumber(backup.dd, 'Never');
+  else {
+    bigNumber(backup.dd, shortAgo(vitalsView.backupAt), shortAgo(vitalsView.backupAt) === 'now' ? '' : 'ago');
+    backup.wrap.title = stamp(new Date(vitalsView.backupAt).toISOString());
+  }
+
+  // Not running: three dashes said nothing about why they were dashes. One line says it, in the
+  // space the live numbers take, and Last backup stays, since it is true either way.
+  if (!live) {
+    const off = document.createElement('p');
+    off.className = 'vitals-off';
+    off.textContent = state.acting === 'start' || state.acting === 'restart'
+      ? 'Starting. Players, TPS and memory appear once it answers.'
+      : crashedNow(row) ? 'Crashed. The console shows the last lines before it stopped.'
+        : 'Not running. Start it to see players, TPS and memory.';
+    dl.append(off, backup.wrap);
+    return;
+  }
 
   const players = vitalCell('players', 'Players',
-    live && latest == null ? 'Waiting for the server to answer over RCON' : '');
-  if (latest && latest.players != null) bigNumber(players.dd, String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
-  else bigNumber(players.dd, '—');
+    latest == null ? 'Waiting for the server to answer over RCON' : '');
+  if (latest && latest.players != null) {
+    bigNumber(players.dd, String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
+    players.wrap.append(bar(latest.maxPlayers ? latest.players / latest.maxPlayers : 0));
+  } else {
+    bigNumber(players.dd, '—');
+    players.wrap.append(bar(null));
+  }
 
   const tps = vitalCell('tps', 'TPS', 'Ticks per second over the last minute; 20 is full speed');
   if (latest && latest.tps != null) {
     bigNumber(tps.dd, latest.tps.toFixed(1));
-    const history = vitalsView.name === row.name ? vitalsView.samples.filter((s) => s.tps != null).map((s) => s.tps) : [];
-    tps.dd.append(sparkline(history, 20));
-  } else bigNumber(tps.dd, '—');
+    // Under 18 a player starts to feel it; under 15 everyone does.
+    tps.wrap.append(bar(latest.tps / 20, latest.tps < 15 ? 'fault' : latest.tps < 18 ? 'warn' : ''));
+  } else {
+    bigNumber(tps.dd, '—');
+    tps.wrap.append(bar(null));
+  }
 
   const ceiling = memoryCeilingMb(row.memory);
   const memory = vitalCell('memory', 'Memory',
@@ -4005,27 +4281,29 @@ function renderVitals(row) {
     const gb = latest.rss >= 1024;
     const allotted = ceiling ? '/ ' + +(ceiling / 1024).toFixed(1) + ' GB' : 'GB';
     bigNumber(memory.dd, gb ? (latest.rss / 1024).toFixed(1) : String(latest.rss), gb ? allotted : 'MB ' + allotted);
-    if (ceiling) {
-      const meter = document.createElement('span');
-      meter.className = 'meter';
-      const share = Math.min(1, latest.rss / ceiling);
-      if (share > 0.9) meter.dataset.tone = 'warn';
-      const fill = document.createElement('i');
-      fill.style.width = (share * 100).toFixed(1) + '%';
-      meter.append(fill);
-      memory.dd.append(meter);
-    }
-  } else bigNumber(memory.dd, '—');
-
-  const backup = vitalCell('backup', 'Last backup');
-  if (vitalsView.name !== row.name || vitalsView.backupAt === undefined) bigNumber(backup.dd, '…');
-  else if (vitalsView.backupAt === null) bigNumber(backup.dd, 'Never');
-  else {
-    bigNumber(backup.dd, shortAgo(vitalsView.backupAt), shortAgo(vitalsView.backupAt) === 'now' ? '' : 'ago');
-    backup.wrap.title = stamp(new Date(vitalsView.backupAt).toISOString());
+    const share = ceiling ? latest.rss / ceiling : null;
+    memory.wrap.append(bar(share, share > 0.9 ? 'warn' : ''));
+  } else {
+    bigNumber(memory.dd, '—');
+    memory.wrap.append(bar(null));
   }
 
   dl.append(players.wrap, tps.wrap, memory.wrap, backup.wrap);
+}
+
+/**
+ * A live bar under a vital's figure, the full width of its cell. Drawn even before there is a
+ * number, empty, so the strip does not grow a row when the first answer arrives.
+ */
+function bar(share, tone) {
+  const meter = document.createElement('span');
+  meter.className = 'meter';
+  meter.setAttribute('aria-hidden', 'true');
+  if (tone) meter.dataset.tone = tone;
+  const fill = document.createElement('i');
+  fill.style.width = share == null ? '0' : (Math.max(0, Math.min(1, share)) * 100).toFixed(1) + '%';
+  meter.append(fill);
+  return meter;
 }
 
 // -------------------------------------------------------------- the menu ---
@@ -4047,8 +4325,9 @@ function moreItems(row) {
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     { label: 'Rename, memory and port…', hint: why || 'Takes effect the next time it starts.', run: () => editServer(row), disabled: up },
-    { label: 'Reset the world…', hint: why || 'Deletes worlds and generated state. A snapshot is taken first.', run: () => rebuildServer(row), disabled: up },
-    { label: 'Delete this server…', hint: why || 'Removes it from SpawnLoft, and optionally its files.', run: () => deleteServer(row), disabled: up },
+    'sep',
+    { label: 'Reset the world…', hint: why || 'Deletes worlds and generated state. A snapshot is taken first.', run: () => rebuildServer(row), disabled: up, danger: true },
+    { label: 'Delete this server…', hint: why || 'Removes it from SpawnLoft, and optionally its files.', run: () => deleteServer(row), disabled: up, danger: true },
   ];
 }
 
@@ -4070,6 +4349,7 @@ function buildMoreMenu() {
     b.setAttribute('role', 'menuitem');
     b.tabIndex = -1;
     b.disabled = Boolean(item.disabled);
+    if (item.danger) b.dataset.tone = 'danger';
     const title = document.createElement('b');
     title.textContent = item.label;
     const hint = document.createElement('span');
@@ -4122,7 +4402,10 @@ function renderServer(row) {
   notice.textContent = '';
   const note = STATE_NOTE[row.status];
   const noteKey = row.name + '|state|' + row.status;
-  if (note && !dismissed.has(noteKey)) {
+  paintDbReach(row);
+  // An unreachable database says so on its own page, beside the address it cannot reach, rather
+  // than in a full-width red strip that repeats the pill above it.
+  if (note && !dismissed.has(noteKey) && !(db && row.status === 'unreachable')) {
     notice.append(noticeBox({
       tone: row.status === 'stale' ? 'warn' : 'fault',
       title: note[0],
@@ -4138,19 +4421,31 @@ function renderServer(row) {
   const live = row.status === 'running';
   const up = live || row.status === 'stopping';
   const external = Boolean(row.external);
-  $('#bStart').hidden = up;
-  $('#bStop').hidden = !up;
-  $('#bRestart').hidden = !up;
+  // A database that runs elsewhere is started and stopped there, so there is no verb to offer
+  // rather than a Start button that is always greyed out.
+  $('#bStart').hidden = up || external;
+  $('#bStop').hidden = !up || external;
+  $('#bRestart').hidden = !up || external;
   $('#bStart').disabled = state.busy || external;
   $('#bStop').disabled = state.busy || !live || external;
   $('#bRestart').disabled = state.busy || !live || external;
   $('#bStart').title = external ? 'This database runs elsewhere; it is not started from here' : '';
+  // The pressed verb spins until the core answers; the others are already disabled by busy.
+  for (const [id, verb] of [['#bStart', 'start'], ['#bStop', 'stop'], ['#bRestart', 'restart']]) {
+    if (state.acting === verb) $(id).setAttribute('aria-busy', 'true');
+    else $(id).removeAttribute('aria-busy');
+  }
   $('#bManage').disabled = state.busy;
   $('#cmd').disabled = !live || db;
   $('#bSend').disabled = !live || db;
-  $('#cmd').placeholder = db
-    ? 'A database takes no console commands — use its client, or the credentials under Settings'
-    : live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
+  // A database takes no commands at all, so it gets no command row rather than a dead one.
+  $('#cmdRow').hidden = db;
+  // A stopped server's row offers the way to a live one, in place of a Send that cannot send.
+  const startable = !db && !up && !external;
+  $('#bSend').hidden = startable;
+  $('#bCmdStart').hidden = !startable;
+  $('#bCmdStart').disabled = state.busy;
+  $('#cmd').placeholder = live ? 'Type a command — ↑ recalls' : 'Start the server to send commands';
 
   // The diagnoses are Minecraft's failure shapes; a database's console has its own.
   if (db) { $('#srvDiag').textContent = ''; diagKey = ''; } else loadDiagnosis(row);
@@ -4185,6 +4480,31 @@ const dismissed = new Set();
  * and the ones the panel can do something about carry that something as a button - "Change
  * port…" opens the same dialog Manage does, rather than a sentence telling you to go and find it.
  */
+/** The unreachable notice on a database's own page, kept in step with each poll. */
+function paintDbReach(row) {
+  const box = $('#settingsBody .db-reach');
+  if (!box || $('#settingsBody').dataset.for !== row.name) return;
+  const down = row.status === 'unreachable';
+  if (box.dataset.down === String(down)) return;
+  box.dataset.down = String(down);
+  box.textContent = '';
+  if (!down) return;
+  const again = { label: 'Check again', run: async (e) => {
+    const b = e.currentTarget;
+    busy(b, true);
+    await refresh();
+    if (b.isConnected) busy(b, false);
+  } };
+  const notice = noticeBox({
+    tone: 'fault',
+    title: 'Not answering',
+    text: 'Nothing replied at ' + (row.host || '127.0.0.1') + ':' + row.port + '. Start it where it runs, then check again.',
+    actions: [again],
+  });
+  notice.setAttribute('role', 'status');
+  box.append(notice);
+}
+
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
   const box = document.createElement('div');
   box.className = 'notice ' + tone;
@@ -4330,7 +4650,7 @@ function showHome() {
   up, and how much memory the machine has. Asked for when the overview shows and then twice a
   minute at most - a backup is minutes apart at the closest - and after anything here changes it.
 */
-const overview = { data: null, asked: 0, showAll: false, attention: '', acting: {} };
+const overview = { data: null, failed: false, asked: 0, showAll: false, attention: '', acting: {} };
 
 // Activity is fetched this deep so that, once runs are folded into one line each, there is still
 // more than a screenful to show.
@@ -4348,6 +4668,9 @@ async function loadOverview(force) {
     overview.data = data;
     overview.activity = recent ? recent.entries : null;
   } catch {
+    // Without it the cards still say everything but the backup ages, so show them.
+    overview.failed = true;
+    if (state.view === 'home') renderOverview();
     return;
   }
   if (state.view === 'home') renderOverview();
@@ -4417,6 +4740,8 @@ function renderOverview() {
   }
   box.append(mem);
 
+  if (!overview.data && !overview.failed) $('#vHome').setAttribute('aria-busy', 'true');
+  else $('#vHome').removeAttribute('aria-busy');
   renderAttention();
   renderHomeCards();
   renderHomeDbs();
@@ -4466,14 +4791,25 @@ const nestedDb = (db) => {
 };
 
 /** An address as a button that copies it, with the glyph that says so. */
-function addrButton(text) {
+function addrButton(text, what = 'address') {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'addr-copy';
   b.append(document.createTextNode(text), icon('copy'));
   b.title = 'Copy ' + text;
-  b.setAttribute('aria-label', 'Copy address ' + text);
-  b.onclick = (ev) => { ev.stopPropagation(); copyText(text, text); };
+  b.setAttribute('aria-label', 'Copy ' + what + ' ' + text);
+  b.onclick = async (ev) => {
+    ev.stopPropagation();
+    if (!(await copyText(text, text))) return;
+    // The glyph turns to a tick where the eye already is; the toast is in a corner.
+    b.dataset.copied = '';
+    b.querySelector('use').setAttribute('href', '#i-check');
+    clearTimeout(b.copiedTimer);
+    b.copiedTimer = setTimeout(() => {
+      delete b.dataset.copied;
+      b.querySelector('use').setAttribute('href', '#i-copy');
+    }, 1500);
+  };
   return b;
 }
 
@@ -4679,12 +5015,25 @@ const ACTIVITY_MANY = {
   'schedule-add': 'Scheduled {n} tasks', 'schedule-remove': 'Removed {n} schedules', 'schedule-run': 'Ran schedules {n} times',
 };
 
+// What a verb says when the entry did not record what it was done to: "Installed" alone reads as
+// a sentence cut off.
+const ACTIVITY_BARE = {
+  'plugin-install': 'Installed a plugin', 'plugin-update': 'Updated a plugin', 'plugin-remove': 'Removed a plugin',
+  'plugin-enable': 'Turned on a plugin', 'plugin-disable': 'Turned off a plugin',
+  'file-edit': 'Edited a file', 'file-create': 'Created a file', 'file-upload': 'Uploaded a file', 'file-replace': 'Replaced a file',
+  'file-move': 'Moved a file', 'file-delete': 'Deleted a file', 'file-zip': 'Zipped files', 'file-unzip': 'Unzipped a file',
+  'config-edit': 'Changed a config file', 'config-create': 'Created a config file', undo: 'Put back a change',
+  command: 'Ran a command', settings: 'Changed settings', 'player-ban': 'Banned a player', 'player-unban': 'Unbanned a player',
+  'schedule-add': 'Scheduled a task', rename: 'Renamed this server',
+};
+
 /** A run as words: the one entry's own sentence, or what n of them come to. */
 function runText(run) {
   const n = run.entries.length;
   const e = run.entries[0];
   if (n === 1) {
     if (e.action === 'crash' && e.detail) return { verb: e.detail.charAt(0).toUpperCase() + e.detail.slice(1), detail: '' };
+    if (!e.detail && ACTIVITY_BARE[e.action]) return { verb: ACTIVITY_BARE[e.action], detail: '' };
     return { verb: (ACTIVITY_TEXT[e.action] || e.action).replace(/:$/, ''), detail: e.detail || '' };
   }
   const many = ACTIVITY_MANY[e.action];
@@ -4742,12 +5091,18 @@ function feedTime(iso) {
   return when;
 }
 
-function feedItem(run, { showServer, showWho, open }) {
+/**
+ * One line of history, or a run that opens to its lines. The Overview's lines open the server's
+ * Activity; the Activity tool's own are plain (`linked: false`), tell the time by the clock under a
+ * day heading, and carry Undo in a last column (`tail`).
+ */
+function feedItem(run, { showServer, showWho, open, linked = true, when = feedTime, tail = null }) {
   const li = el('li');
   const e = run.entries[0];
-  const row = rowOf(e.server);
+  const row = linked ? rowOf(e.server) : null;
+  const tailOf = (entry) => (tail ? [tail(entry) || el('span')] : []);
   const said = runText(run);
-  const where = row ? (row.label || row.name) : e.server + ' (deleted)';
+  const where = rowOf(e.server) ? (rowOf(e.server).label || rowOf(e.server).name) : e.server + ' (deleted)';
 
   const what = el('span', 'feed-what');
   const text = el('span', 'feed-text');
@@ -4782,7 +5137,7 @@ function feedItem(run, { showServer, showWho, open }) {
       line.onclick = () => openServerTool(row.name, 'activity');
     }
     if (e.ok === false) line.setAttribute('data-bad', '');
-    line.append(icon(activityIcon(e.action)), what, meta, feedTime(e.at));
+    line.append(icon(activityIcon(e.action)), what, meta, when(e.at), ...tailOf(e));
     li.append(line);
     return li;
   }
@@ -4796,7 +5151,7 @@ function feedItem(run, { showServer, showWho, open }) {
   const last = run.entries[run.entries.length - 1];
   const span = ago(last.at) !== ago(e.at) ? ago(last.at) + ' to ' + ago(e.at) : ago(e.at);
   summary.title = text.title + ' \u00b7 ' + span;
-  summary.append(icon('caret'), what, meta, feedTime(e.at));
+  summary.append(icon('caret'), what, meta, when(e.at), ...(tail ? [el('span')] : []));
   const sub = el('ol', 'feed-sub');
   for (const one of run.entries) {
     const item = el('li');
@@ -4807,11 +5162,12 @@ function feedItem(run, { showServer, showWho, open }) {
       line.onclick = () => openServerTool(row.name, 'activity');
     }
     const t = el('span', 'feed-text');
-    t.textContent = one.detail || (ACTIVITY_TEXT[one.action] || one.action);
+    t.textContent = one.detail || ACTIVITY_BARE[one.action] || (ACTIVITY_TEXT[one.action] || one.action);
     t.title = t.textContent;
     const w = el('span', 'feed-what');
     w.append(t);
-    line.append(el('span'), w, el('span', 'feed-meta'), feedTime(one.at));
+    if (one.ok === false) line.setAttribute('data-bad', '');
+    line.append(el('span'), w, el('span', 'feed-meta'), when(one.at), ...tailOf(one));
     item.append(line);
     sub.append(item);
   }
@@ -5053,7 +5409,7 @@ async function turnOnBackups(row) {
   } catch (e) {
     toast(e.message, 'bad');
   }
-  await loadOverview(true);
+  if (state.view === 'home') await loadOverview(true);
 }
 
 // ---- the server cards ----------------------------------------------------------
@@ -5508,9 +5864,12 @@ function renderLog() {
   if (!shown) {
     const p = document.createElement('div');
     p.className = 'log-empty';
+    const row = rowOf(state.current);
     p.textContent = state.lines.length
       ? 'Nothing matches. Clear the search or the level filter to see the rest.'
-      : 'No console output yet. Start the server and it appears here as it runs.';
+      : row && isDb(row) && row.external ? 'This database runs elsewhere, so its log is on that machine, not here.'
+        : row && isDb(row) ? 'No output yet. Start the database and its log appears here as it runs.'
+          : 'No console output yet. Start the server and it appears here as it runs.';
     log.append(p);
   }
   updateCount(shown);
@@ -5558,6 +5917,7 @@ function pushLine(text) {
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   log.append(makeLine(entry));
   if (atBottom) log.scrollTop = log.scrollHeight;
+  else { state.unseen++; paintJump(); }
   updateCount();
 }
 
@@ -5583,8 +5943,11 @@ function select(name) {
   state.paused = false;
   state.pausedAt = 0;
   state.atBottom = true;
-  state.history = [];
-  state.histAt = -1;
+  if (!state.histories.has(name)) state.histories.set(name, []);
+  state.history = state.histories.get(name);
+  state.histAt = state.history.length;
+  state.draft = '';
+  state.unseen = 0;
   state.search = '';
   setPauseButton(false);
   $('#conSearch').value = '';
@@ -5675,11 +6038,19 @@ $('#bPause').onclick = () => {
   updateCount();
 };
 
-$('#bWrap').onclick = () => {
-  state.wrap = !state.wrap;
-  $('#log').classList.toggle('nowrap', !state.wrap);
-  $('#bWrap').setAttribute('aria-pressed', String(state.wrap));
-};
+// Wrapped by default: unwrapped, the first line of every JVM start ran off the edge mid-flag.
+// Remembered either way, like line numbers.
+const WRAP_KEY = 'mcctl.wrap';
+function setWrap(on, { remember = true } = {}) {
+  state.wrap = on;
+  $('#log').classList.toggle('nowrap', !on);
+  $('#bWrap').setAttribute('aria-pressed', String(on));
+  if (remember) try { localStorage.setItem(WRAP_KEY, on ? '1' : '0'); } catch {}
+}
+$('#bWrap').onclick = () => setWrap(!state.wrap);
+let wrapSaved = null;
+try { wrapSaved = localStorage.getItem(WRAP_KEY); } catch {}
+setWrap(wrapSaved !== '0', { remember: false });
 
 const NUMS_KEY = 'mcctl.nums';
 function setNums(on, { remember = true } = {}) {
@@ -5843,17 +6214,26 @@ $('#miExportShare').onclick = async () => {
   }
 };
 
+/** The jump pill, with how many lines arrived below the fold since the reader scrolled up. */
+function paintJump() {
+  if (state.atBottom) state.unseen = 0;
+  $('#bJump').hidden = state.atBottom;
+  $('#jumpLabel').textContent = state.unseen
+    ? 'Jump to latest · ' + state.unseen.toLocaleString() + ' new'
+    : 'Jump to latest';
+}
+
 $('#log').addEventListener('scroll', () => {
   const log = $('#log');
   state.atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  $('#bJump').hidden = state.atBottom;
+  paintJump();
 });
 
 $('#bJump').onclick = () => {
   const log = $('#log');
   state.atBottom = true;
   log.scrollTop = log.scrollHeight;
-  $('#bJump').hidden = true;
+  paintJump();
 };
 
 // ------------------------------------------------------------ lifecycle ----
@@ -5885,6 +6265,7 @@ const act = (what) => async () => {
 };
 
 $('#bStart').onclick = act('start');
+$('#bCmdStart').onclick = act('start');
 $('#bStop').onclick = act('stop');
 $('#bRestart').onclick = act('restart');
 
@@ -5935,15 +6316,134 @@ function iconButton(name, label, cls) {
  * failed to load rather than one with nothing in it yet. An icon at the size of the thing it
  * stands for turns the same sentence into a state.
  */
-function emptyState(name, text) {
+function emptyState(name, text, action) {
   const wrap = document.createElement('div');
   wrap.className = 'empty-pane';
   wrap.append(icon(name, 'empty-mark'));
   const p = document.createElement('p');
   p.textContent = text;
   wrap.append(p);
+  // The one thing that fills it, where there is one. An empty list with no way out of it is a
+  // dead end; the action belongs where the eye already is.
+  if (action) {
+    const b = iconButton(action.icon || 'plus', action.label, 'primary');
+    b.onclick = action.onClick;
+    wrap.append(b);
+  }
   return wrap;
 }
+
+/**
+ * Put a pane into its loading state: the previous server's title and rows go, and a skeleton
+ * holds the space. Called only when the pane is about to show a different server (or nothing yet),
+ * so a refresh of the same server keeps what is on screen until the new answer replaces it.
+ */
+function paneLoading(body) {
+  // An invisible stand-in the height of the title row, so the body does not drop when the real
+  // title arrives with the data.
+  paneHead(body, 'server', '\u00a0', '\u00a0').classList.add('pane-head-wait');
+  const sk = document.createElement('div');
+  sk.className = 'skeleton';
+  sk.setAttribute('aria-busy', 'true');
+  sk.setAttribute('aria-label', 'Loading');
+  for (let i = 0; i < 7; i++) sk.append(document.createElement('i'));
+  body.replaceChildren(sk);
+}
+
+/** A pane whose read failed: the error as the server worded it, and Retry. */
+function paneError(body, message, retry) {
+  // Kept from the loading state, so the error lands where the skeleton was.
+  if (!body.parentElement.querySelector(':scope > .pane-head-wait')) clearPaneHead(body);
+  const box = emptyState('alert', message, retry && { icon: 'restart', label: 'Retry', onClick: retry });
+  box.classList.add('pane-error');
+  box.setAttribute('role', 'alert');
+  const b = box.querySelector('button');
+  if (b) b.className = '';
+  body.replaceChildren(box);
+}
+
+/**
+ * Mark a button as working, or done. The label can change to say what is happening ("Updating")
+ * and goes back afterwards; the button is disabled meanwhile so a second press cannot queue a
+ * second request.
+ */
+function busy(button, on, label) {
+  if (on) {
+    if (!('idle' in button.dataset)) button.dataset.idle = button.lastChild ? button.lastChild.textContent : '';
+    if (label && button.lastChild) button.lastChild.textContent = label;
+    button.setAttribute('aria-busy', 'true');
+    button.disabled = true;
+  } else {
+    if ('idle' in button.dataset && button.lastChild) button.lastChild.textContent = button.dataset.idle;
+    delete button.dataset.idle;
+    button.removeAttribute('aria-busy');
+    button.disabled = false;
+  }
+}
+
+/*
+  Tooltips. The browser's own title tooltip only appears for a mouse, after a long wait, in the
+  operating system's style. Here an element's title moves into #tip while it is pointed at or
+  focused from the keyboard, and goes back afterwards, so every existing title becomes this tooltip
+  without each control having to ask for one. Dialogs keep the native ones: the dialog is drawn
+  above anything a page element can reach.
+*/
+(() => {
+  const tip = $('#tip');
+  let owner = null;
+  let timer = 0;
+  const hide = () => {
+    clearTimeout(timer);
+    if (owner) {
+      // Code that changed the title while it was lifted wins over the one put back.
+      if (!owner.hasAttribute('title') && owner.dataset.tip) owner.setAttribute('title', owner.dataset.tip);
+      delete owner.dataset.tip;
+      if (owner.getAttribute('aria-describedby') === 'tip') owner.removeAttribute('aria-describedby');
+      owner = null;
+    }
+    tip.removeAttribute('data-on');
+  };
+  const place = (el) => {
+    const r = el.getBoundingClientRect();
+    const t = tip.getBoundingClientRect();
+    const x = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
+    let y = r.bottom + 6;
+    if (y + t.height > innerHeight - 8) y = r.top - t.height - 6;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+  const showFor = (el, delay) => {
+    if (owner === el) return;
+    hide();
+    const text = el.getAttribute('title');
+    if (!text || el.closest('dialog')) return;
+    owner = el;
+    el.dataset.tip = text;
+    el.removeAttribute('title');
+    timer = setTimeout(() => {
+      if (owner !== el || !el.isConnected) return hide();
+      tip.textContent = el.dataset.tip;
+      if (!el.hasAttribute('aria-describedby')) el.setAttribute('aria-describedby', 'tip');
+      tip.setAttribute('data-on', '');
+      place(el);
+    }, delay);
+  };
+  document.addEventListener('pointerover', (e) => {
+    if (owner && owner.contains(e.target)) return;
+    const el = e.target.closest && e.target.closest('[title]');
+    if (el) showFor(el, 450);
+    else hide();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest && e.target.closest('[title]');
+    if (el && e.target.matches(':focus-visible')) showFor(el, 150);
+  });
+  document.addEventListener('focusout', hide);
+  document.addEventListener('pointerdown', hide, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  addEventListener('scroll', hide, true);
+  addEventListener('blur', hide);
+})();
 
 /**
  * The title block a pane opens with.
@@ -6145,6 +6645,7 @@ async function renderPerformance(opts) {
   // again even when the drawing is still good - otherwise the chart sits frozen at whatever it last
   // showed and only a server change ever clears it.
   const drawn = !force && body.dataset.for === row.name && body.childElementCount;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   if (!drawn) await paintPerformance(row.name);
 
@@ -6164,11 +6665,7 @@ async function paintPerformance(name, opts) {
     data = await api('/instances/' + encodeURIComponent(name) + '/metrics?seconds=' + perfView.seconds);
   } catch (e) {
     if (opts && opts.quiet) return;
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPerformance({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6334,17 +6831,14 @@ async function renderPlayers(opts) {
   const body = $('#playersBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/players');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPlayers({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6752,17 +7246,14 @@ async function renderPlugins(opts) {
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
   if (pluginView.for !== row.name) { pluginView.updates = cachedUpdates(row.name); pluginView.for = row.name; }
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/plugins');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderPlugins({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -6820,7 +7311,7 @@ async function renderPlugins(opts) {
       + '. Players join with the matching client pack, installed in their own launcher: ';
     if (desktop) {
       const open = document.createElement('button');
-      open.className = 'ghost';
+      open.className = 'ghost inline';
       open.style.cssText = 'padding:2px 8px;font-size:12px';
       open.textContent = 'Open on Modrinth';
       open.onclick = () => desktop.openExternal(link);
@@ -7017,8 +7508,9 @@ async function renderPlugins(opts) {
 
   // ---- what is installed -------------------------------------------------------
   // Everything in the folder, not only what SpawnLoft installed: a jar dropped in by hand is
-  // listed and labelled as left alone, rather than being a number in a footnote. Only the ones
-  // SpawnLoft put there get updates, a toggle and a delete - the rest are the person's own.
+  // listed rather than being a number in a footnote. Every row can be turned off and removed -
+  // a broken jar added by hand is exactly the one someone needs to switch off - but only the ones
+  // SpawnLoft put there get updates, since it knows where to fetch them from.
   const listHead = document.createElement('div');
   listHead.className = 'plug-head';
   const listTitle = document.createElement('h3');
@@ -7142,7 +7634,7 @@ async function renderPlugins(opts) {
     listWrap.textContent = '';
     if (!data.plugins.length) {
       listWrap.append(emptyState('plug', 'No ' + data.kind + ' yet. Search ' + sources + ' above and they land in this server’s '
-        + data.kind + ' folder.'));
+        + data.kind + ' folder.', { icon: 'search', label: 'Find ' + data.kind, onClick: () => q.focus() }));
       return;
     }
     const list = document.createElement('div');
@@ -7182,21 +7674,34 @@ async function renderPlugins(opts) {
     nm.textContent = p.name;
     const src = document.createElement('div');
     src.className = 'plug-src';
-    const from = !p.managed ? 'Added by hand · left alone'
+    const from = !p.managed ? 'Added by hand'
       : p.source === 'hangar' ? 'Hangar' : p.source === 'modpack' ? 'Modpack' : 'Modrinth';
-    src.textContent = from + (p.enabled ? '' : ' · Disabled');
+    src.append(document.createTextNode(from));
+    // The jar's own name, in mono, wherever the name above is not already it - so
+    // "EssentialsX-2.20.1" is not read as a plugin called that.
+    if (p.name !== p.file.replace(/\.jar(\.disabled)?$/, '')) {
+      const file = document.createElement('code');
+      file.textContent = p.file;
+      src.append(document.createTextNode(' · '), file);
+    }
     main.append(nm, src);
 
     const ver = document.createElement('span');
     ver.className = 'plug-ver';
-    ver.textContent = p.version || '';
+    ver.textContent = p.version || '—';
+    if (!p.version) ver.title = 'The jar does not say which version it is';
+
+    // On or off as a word with a dot, not only a dimmed row.
+    const on = document.createElement('span');
+    on.className = 'plug-state';
+    on.dataset.on = String(p.enabled);
+    on.textContent = p.enabled ? 'Enabled' : 'Disabled';
 
     const acts = document.createElement('div');
     acts.className = 'plug-acts';
-    el.append(tile, main, ver, acts);
-    if (!p.managed) return el;
+    el.append(tile, main, ver, on, acts);
 
-    const update = pluginView.updates && pluginView.updates[p.file];
+    const update = p.managed && pluginView.updates && pluginView.updates[p.file];
     const upBtn = update ? document.createElement('button') : null;
     if (upBtn) {
       upBtn.type = 'button';
@@ -7206,7 +7711,7 @@ async function renderPlugins(opts) {
       acts.append(upBtn);
     }
     const quiet = document.createElement('span');
-    quiet.className = 'quiet';
+    quiet.className = 'row-acts';
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'ghost';
@@ -7259,7 +7764,10 @@ async function renderPlugins(opts) {
       const ok = await ask({
         title: 'Delete ' + p.name + '?',
         text: p.file + ' is removed from the ' + data.kind + ' folder. Its config folder stays, so '
-          + 'installing it again picks up where it left off.',
+          + 'installing it again picks up where it left off.'
+          // Nothing to fetch it back from: SpawnLoft did not install it.
+          + (p.managed ? '' : ' It was added by hand, so SpawnLoft cannot download it again; '
+            + 'keep a copy if you might want it back, or Disable it instead.'),
         confirmLabel: 'Delete ' + singular,
         danger: true,
       });
@@ -7296,17 +7804,14 @@ async function renderWorlds(opts) {
   const body = $('#worldsBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/worlds');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderWorlds({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -8097,17 +8602,14 @@ async function renderScheduler(opts) {
   const body = $('#schedulerBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/schedules');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderScheduler({ force: true }));
     // Cleared, so leaving the tab and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -8142,9 +8644,16 @@ async function renderScheduler(opts) {
   };
 
   // ---- what a schedule is, before the list of them ---------------------------
-  const intro = document.createElement('div');
-  intro.className = 'hint';
-  intro.textContent = schedulerName + '. ' + schedulerHint;
+  // The title row already says tasks run with SpawnLoft closed; which scheduler holds them and
+  // what happens at sleep or sign-out is for whoever asks.
+  const intro = document.createElement('details');
+  intro.className = 'more';
+  const introTitle = document.createElement('summary');
+  introTitle.textContent = 'How this runs';
+  const introText = document.createElement('p');
+  introText.className = 'hint';
+  introText.textContent = 'Held by ' + schedulerName + '. ' + schedulerHint;
+  intro.append(introTitle, introText);
   body.append(intro);
   const lingering = lingerNotice(data.background, again);
   if (lingering) body.append(lingering);
@@ -8154,6 +8663,8 @@ async function renderScheduler(opts) {
   const add = iconButton('plus', 'New task', 'primary');
   addWrap.append(add);
   body.append(addWrap);
+  // With no tasks the empty state carries the one primary action, so two never sit stacked.
+  add.hidden = !data.tasks.length;
 
   add.onclick = () => {
     editor.close();
@@ -8174,19 +8685,19 @@ async function renderScheduler(opts) {
       },
     });
     addWrap.append(form);
-    editor.restore = () => { form.remove(); add.hidden = false; };
+    editor.restore = () => { form.remove(); add.hidden = !data.tasks.length; };
   };
 
   // ---- the tasks ------------------------------------------------------------
   const listTitle = document.createElement('h3');
   listTitle.className = 'hist-title';
   listTitle.textContent = 'Tasks (' + data.tasks.length + ')';
-  body.append(listTitle);
 
   if (!data.tasks.length) {
     body.append(emptyState('clock', 'Nothing scheduled. A nightly backup and a daily restart are '
-      + 'the two most servers ever need.'));
+      + 'the two most servers ever need.', { icon: 'plus', label: 'New task', onClick: () => add.onclick() }));
   } else {
+    body.append(listTitle);
     const list = document.createElement('div');
     list.className = 'tasks';
     for (const task of data.tasks) list.append(taskCard(task, data, base, again, editor));
@@ -8423,6 +8934,7 @@ async function renderFiles(opts) {
   const body = $('#filesBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   const view = filesStateFor(row.name);
   if (view.editing) return renderFileEditor(row, view);
@@ -8437,11 +8949,7 @@ async function renderFiles(opts) {
     // A folder that went away (renamed outside, deleted) takes you back to the top rather than
     // leaving you in front of an error with nowhere to go.
     if (view.dir && !view.query) { view.dir = ''; view.selected.clear(); return renderFiles({ force: true }); }
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderFiles({ force: true }));
     body.dataset.for = '';
     return;
   }
@@ -8459,8 +8967,8 @@ async function renderFiles(opts) {
   if (running) {
     const how = document.createElement('div');
     how.className = 'hint';
-    how.textContent = 'The server is running. What it holds open - the active world, its jar, the plugins it loaded - '
-      + 'can be read and edited but not moved, replaced or deleted until it stops. A changed config applies when the plugin reloads or the server restarts.';
+    how.textContent = 'The server is running: files it holds open are marked In use and cannot be moved, replaced or deleted until it stops.';
+    how.title = 'The active world, its jar and the plugins it loaded. They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.';
     body.append(how);
   }
 
@@ -8506,11 +9014,12 @@ async function renderFiles(opts) {
   };
   search.onsearch = () => { if (!search.value && view.query) { view.query = ''; again(); } };
 
-  const newFile = iconButton('file', 'New file');
-  const newFolder = iconButton('folder', 'New folder');
-  const upload = iconButton('upload', 'Upload files');
+  // Upload is what this toolbar is for most; the rest are there when wanted, at a lower voice.
+  const newFile = iconButton('file', 'New file', 'ghost');
+  const newFolder = iconButton('folder', 'New folder', 'ghost');
+  const upload = iconButton('upload', 'Upload files', 'primary');
   const uploadDir = iconButton('folder', 'Upload a folder');
-  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER);
+  const reveal = iconButton('external', 'Open in ' + FILE_MANAGER, 'ghost');
   const picker = document.createElement('input');
   picker.type = 'file';
   picker.multiple = true;
@@ -8684,6 +9193,8 @@ async function renderFiles(opts) {
     open.append(icon(e.type === 'dir' ? 'folder' : 'file'));
     const nm = document.createElement('span');
     nm.textContent = view.query ? e.path : e.name;
+    // The row truncates a long name; the whole path is a pointer away.
+    open.title = e.path;
     open.append(nm);
     if (e.inUse) {
       const pill = document.createElement('span');
@@ -8699,7 +9210,9 @@ async function renderFiles(opts) {
     kind.textContent = fileKind(e);
     const size = document.createElement('span');
     size.className = 'fm-size';
-    size.textContent = fileSize(e.size);
+    // A folder's size would mean walking it on every listing; a dash says "not counted", where a
+    // blank cell read as a missing value.
+    size.textContent = e.type === 'dir' ? '—' : fileSize(e.size);
     const when = document.createElement('span');
     when.className = 'fm-when';
     const whenShort = document.createElement('span');
@@ -9169,7 +9682,9 @@ const ACTIVITY_TEXT = {
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
 // decides where a button is drawn.
 const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit']);
-const ACTIVITY_FILTERS = [['', 'Everything'], ['you', 'You'], ['assistant', 'AI assistants'], ['schedule', 'Schedules'], ['spawnloft', 'SpawnLoft']];
+// SpawnLoft's own entries - the crash guard, its restarts - are under All: nobody goes looking for
+// them on their own, and a fifth button made the row of filters the loudest thing on the screen.
+const ACTIVITY_FILTERS = [['', 'All'], ['you', 'You'], ['schedule', 'Schedule'], ['assistant', 'Assistant']];
 const activityView = { by: '' };
 
 function activityActor(by) {
@@ -9179,38 +9694,6 @@ function activityActor(by) {
   if (k === 'assistant') return { text: by.name || 'AI assistant', tone: 'ai', title: 'An AI assistant, through SpawnLoft’s MCP tools' };
   if (k === 'schedule') return { text: by.name ? 'Schedule: ' + by.name : 'A schedule', tone: 'sched' };
   return { text: 'SpawnLoft', tone: 'sl', title: 'SpawnLoft itself - crash guard, or something it did on its own' };
-}
-
-/** What happened, as a sentence: the verb, then what it was done to, then whether it failed. */
-function activitySentence(e) {
-  const what = document.createElement('div');
-  what.className = 'act-what';
-  const verb = document.createElement('span');
-  verb.className = 'act-verb';
-  // A crash's detail is already a sentence about the crash ("crashed (exit 1)..."), written for
-  // the webhook; it reads as its own line rather than after a verb that says it twice.
-  if (e.action === 'crash' && e.detail) verb.textContent = e.detail.charAt(0).toUpperCase() + e.detail.slice(1);
-  else verb.textContent = (ACTIVITY_TEXT[e.action] || e.action) + (e.detail ? ' ' : '');
-  verb.title = verb.textContent;
-  // What it was done to, and whether it failed, in one span: on a wide pane the verb and this
-  // become two columns of the row, so the span is always there to hold the column.
-  const rest = document.createElement('span');
-  rest.className = 'act-rest';
-  what.append(verb, rest);
-  if (e.detail && e.action !== 'crash') {
-    const d = document.createElement(/^(file|folder|config|undo|command)/.test(e.action) ? 'code' : 'span');
-    d.className = 'act-detail';
-    d.textContent = e.detail;
-    rest.append(d);
-  }
-  if (e.ok === false) {
-    const pill = document.createElement('span');
-    pill.className = 'pill';
-    pill.dataset.tone = 'ban';
-    pill.textContent = e.action === 'crash' ? 'Crash' : 'Failed';
-    rest.append(pill);
-  }
-  return what;
 }
 
 /** Who did it, as the chip both screens show. */
@@ -9239,6 +9722,7 @@ async function renderActivity(opts) {
   const row = rowOf(state.current);
   const body = $('#activityBody');
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
   const base = '/instances/' + encodeURIComponent(row.name) + '/activity';
   const q = (before) => '?limit=60' + (activityView.by ? '&by=' + activityView.by : '') + (before ? '&before=' + encodeURIComponent(before) : '');
@@ -9247,11 +9731,7 @@ async function renderActivity(opts) {
   try {
     data = await api(base + q());
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderActivity());
     return;
   }
   if (body.dataset.for !== row.name) return;
@@ -9280,97 +9760,105 @@ async function renderActivity(opts) {
     return;
   }
 
-  const list = document.createElement('div');
-  list.className = 'act-list';
+  const list = el('div', 'act-list');
   body.append(list);
+  const all = [...data.entries];
+  let more = data.more;
+
+  const clock = (iso) => {
+    const t = el('time', 'act-when');
+    t.dateTime = iso;
+    t.textContent = new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    t.title = new Date(iso).toLocaleString();
+    return t;
+  };
+
   // An undo names the copy it put back; the change that copy undid says so rather than offering
   // the same undo twice.
-  const undone = new Set();
-  let lastDay = null;
-
-  const draw = (entries) => {
-    for (const e of entries) if (e.action === 'undo' && e.snapshot) undone.add(e.snapshot);
-    for (const e of entries) {
-      const day = activityDay(e.at);
-      if (day !== lastDay) {
-        lastDay = day;
-        const h = document.createElement('h3');
-        h.className = 'act-day';
-        h.textContent = day;
-        list.append(h);
-      }
-      list.append(activityRow(e));
+  let undone = new Set();
+  const undoOf = (e) => {
+    if (!ACTIVITY_UNDOABLE.has(e.action) || !e.snapshot) return null;
+    if (undone.has(e.snapshot)) {
+      const note = el('span', 'act-undone');
+      note.textContent = 'Undone';
+      return note;
     }
-  };
-
-  const activityRow = (e) => {
-    const line = document.createElement('div');
-    line.className = 'act-row';
-    if (e.ok === false) line.setAttribute('data-bad', '');
-    const when = document.createElement('time');
-    when.className = 'act-when';
-    when.dateTime = e.at;
-    when.textContent = new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-    when.title = new Date(e.at).toLocaleString();
-    line.append(when, activityChip(e.by), activitySentence(e));
-
-    if (ACTIVITY_UNDOABLE.has(e.action) && e.snapshot) {
-      if (undone.has(e.snapshot)) {
-        const note = document.createElement('span');
-        note.className = 'act-undone';
-        note.textContent = 'Undone';
-        line.append(note);
-      } else {
-        const undo = iconButton('restore', 'Undo', 'ghost');
-        undo.className = 'ghost act-undo';
-        undo.title = 'Put back what this changed, as it was just before';
-        line.append(undo);
-        undo.onclick = async () => {
-          const ok = await ask({
-            title: 'Undo this change?',
-            text: 'Puts back ' + (e.detail || 'what it changed') + ' as it was just before. '
-              + 'Anything changed there since is replaced. The undo is recorded here too.',
-            confirmLabel: 'Undo',
-          });
-          if (!ok) return;
-          undo.disabled = true;
-          try {
-            await post(base + '/undo', { snapshot: e.snapshot });
-            toast('Put back ' + (e.detail || 'the change') + '.', 'good');
-            // What the Files tool has on screen may be the file that just changed.
-            const fsView = filesByServer.get(row.name);
-            if (fsView && !fsView.editing) $('#filesBody').dataset.for = '';
-            renderActivity();
-          } catch (err) {
-            toast(err.message, 'bad');
-            undo.disabled = false;
-          }
-        };
-      }
-    }
-    return line;
-  };
-
-  draw(data.entries);
-
-  if (data.more) {
-    const more = document.createElement('button');
-    more.type = 'button';
-    more.className = 'ghost act-more';
-    more.textContent = 'Show older';
-    body.append(more);
-    let oldest = data.entries[data.entries.length - 1].at;
-    more.onclick = async () => {
-      more.disabled = true;
+    const undo = iconButton('restore', 'Undo', 'ghost sm');
+    undo.classList.add('act-undo');
+    undo.title = 'Put back what this changed, as it was just before';
+    undo.onclick = async (ev) => {
+      ev.stopPropagation();
+      const ok = await ask({
+        title: 'Undo this change?',
+        text: 'Puts back ' + (e.detail || 'what it changed') + ' as it was just before. '
+          + 'Anything changed there since is replaced. The undo is recorded here too.',
+        confirmLabel: 'Undo',
+      });
+      if (!ok) return;
+      busy(undo, true);
       try {
-        const next = await api(base + q(oldest));
-        draw(next.entries);
-        if (next.entries.length) oldest = next.entries[next.entries.length - 1].at;
-        more.hidden = !next.more;
-      } catch (err) { toast(err.message, 'bad'); }
-      more.disabled = false;
+        await post(base + '/undo', { snapshot: e.snapshot });
+        toast('Put back ' + (e.detail || 'the change') + '.', 'good');
+        // What the Files tool has on screen may be the file that just changed.
+        const fsView = filesByServer.get(row.name);
+        if (fsView && !fsView.editing) $('#filesBody').dataset.for = '';
+        renderActivity();
+      } catch (err) {
+        toast(err.message, 'bad');
+        busy(undo, false);
+      }
     };
-  }
+    return undo;
+  };
+
+  /*
+    A day at a time, each day's entries grouped the way the Overview groups them - a run of the
+    same thing back to back is one line that opens - so the two screens read alike. Redrawn whole
+    when older entries arrive, keeping open runs open.
+  */
+  const paint = () => {
+    undone = new Set(all.filter((e) => e.action === 'undo' && e.snapshot).map((e) => e.snapshot));
+    const open = new Set(Array.from(list.querySelectorAll('details[open]')).map((d) => d.dataset.key));
+    list.textContent = '';
+    list.toggleAttribute('data-undo', all.some((e) => ACTIVITY_UNDOABLE.has(e.action) && e.snapshot));
+    const days = [];
+    for (const e of all) {
+      const day = activityDay(e.at);
+      if (!days.length || days[days.length - 1].day !== day) days.push({ day, entries: [] });
+      days[days.length - 1].entries.push(e);
+    }
+    for (const d of days) {
+      const h = el('h3', 'act-day');
+      h.textContent = d.day;
+      const ol = el('ol', 'feed act-feed');
+      for (const run of groupActivity(d.entries)) {
+        ol.append(feedItem(run, { showServer: false, showWho: true, open, linked: false, when: clock, tail: undoOf }));
+      }
+      list.append(h, ol);
+    }
+    count.textContent = more ? 'Showing the latest ' + all.length : all.length + (all.length === 1 ? ' entry' : ' entries');
+    loadMore.hidden = !more;
+  };
+
+  const foot = el('div', 'act-foot');
+  const count = el('span', 'hint');
+  const loadMore = el('button', 'act-more');
+  loadMore.textContent = 'Load more';
+  loadMore.type = 'button';
+  foot.append(count, loadMore);
+  body.append(foot);
+  loadMore.onclick = async () => {
+    busy(loadMore, true, 'Loading…');
+    try {
+      const next = await api(base + q(all[all.length - 1].at));
+      if (body.dataset.for !== row.name) return;
+      all.push(...next.entries);
+      more = next.more && next.entries.length > 0;
+      paint();
+    } catch (err) { toast(err.message, 'bad'); }
+    busy(loadMore, false);
+  };
+  paint();
 }
 
 // ---------------------------------------------------------------- backups ---
@@ -9540,6 +10028,7 @@ async function renderBackups(opts) {
   if (!force && backupPending && backupPending.name === row.name) return;
   const request = ++backupRequest;
   backupPending = { name: row.name, request: request };
+  if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
   let data;
@@ -9554,11 +10043,7 @@ async function renderBackups(opts) {
       status.textContent = 'Backup history could not refresh: ' + e.message + '. Trying again shortly.';
       return;
     }
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderBackups({ force: true }));
     // Cleared, so leaving the tab and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn pane, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -9590,6 +10075,14 @@ async function renderBackups(opts) {
 
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
 
+  // ---- where this server stands ---------------------------------------------
+  // Whether anything is backing it up, and when it last was, before any control: Overview flagged
+  // a server that had never been backed up, and its own Backups tool did not say so.
+  const standing = document.createElement('div');
+  standing.className = 'bk-status';
+  standing.setAttribute('role', 'status');
+  body.append(standing);
+
   // ---- take one now ---------------------------------------------------------
   const now = document.createElement('div');
   now.className = 'section';
@@ -9598,21 +10091,22 @@ async function renderBackups(opts) {
   const nowRow = document.createElement('div');
   nowRow.className = 'row';
   const scope = document.createElement('select');
+  scope.setAttribute('aria-label', 'What to back up');
   for (const sc of data.scopes) {
     const o = document.createElement('option');
     o.value = sc;
-    o.textContent = sc;
+    o.textContent = scopeLabel(sc);
     o.selected = sc === 'standard';
     scope.append(o);
   }
-  scope.style.maxWidth = '150px';
+  scope.style.maxWidth = '170px';
   const go = iconButton('archive', 'Back up now', 'primary');
   nowRow.append(scope, go);
   const nowNote = document.createElement('div');
   nowNote.className = 'hint';
   nowNote.textContent = data.running
-    ? 'standard covers plugins, worlds and config. Safe while running - the one file the server holds locked is left out.'
-    : 'standard covers plugins, worlds and config. full is everything except caches and logs.';
+    ? 'Standard covers plugins, worlds and config. Safe while running - the one file the server holds locked is left out.'
+    : 'Standard covers plugins, worlds and config. Full is everything except caches and logs.';
   now.append(nowTitle, nowRow, nowNote);
   body.append(now);
 
@@ -9620,7 +10114,7 @@ async function renderBackups(opts) {
   // to every backup - by hand, on a schedule, before an upgrade - and never to the copy a file
   // edit takes, which exists to hold exactly that file.
   const skip = document.createElement('details');
-  skip.className = 'section leave-out';
+  skip.className = 'leave-out';
   if (data.exclude && data.exclude.length) skip.open = true;
   const skipTitle = document.createElement('summary');
   skipTitle.textContent = 'Leave out of backups' + (data.exclude && data.exclude.length ? ' (' + data.exclude.length + ')' : '');
@@ -9641,7 +10135,8 @@ async function renderBackups(opts) {
   skipHint.textContent = 'One per line, from the server folder; * matches anything. Big things that rebuild themselves are the usual candidates. A restore cannot bring back what was left out.';
   skipRow.append(skipSave, skipHint);
   skip.append(skipTitle, skipText, skipRow);
-  body.append(skip);
+  // Part of what Back up now takes, so it lives in that card rather than as a card of its own.
+  now.append(skip);
   skipSave.onclick = async () => {
     skipSave.disabled = true;
     try {
@@ -9678,6 +10173,7 @@ async function renderBackups(opts) {
   const auto = autoBackupSection(base, null);
   body.append(auto);
   body.append(renderBackupHistory(row, data, signature));
+  paintBackupStanding(standing, row, data, null, go);
   let automatic;
   try {
     automatic = await api(base + '/auto');
@@ -9688,6 +10184,74 @@ async function renderBackups(opts) {
   // few seconds, and would otherwise stop a slow schedule answer from ever being shown.
   if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
   auto.replaceWith(autoBackupSection(base, automatic));
+  paintBackupStanding(standing, row, data, automatic, go);
+}
+
+const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only', config: 'Config only', plugins: 'Plugins only' };
+const scopeLabel = (sc) => SCOPE_LABELS[sc] || sc.charAt(0).toUpperCase() + sc.slice(1);
+
+/** A backup in the sense of "the server is backed up": not the one-file copy an edit takes. */
+const isWholeBackup = (snap) => !singleFileOf(snap) && snap.scope !== 'files';
+
+/**
+ * The line at the top of Backups: is anything backing this server up, when it last was, and the
+ * one thing to do about it when the answer is nothing. `automatic` is null while the scheduler is
+ * still being asked.
+ */
+function paintBackupStanding(box, row, data, automatic, backUpNow) {
+  box.textContent = '';
+  const latest = data.snapshots.filter(isWholeBackup)
+    .reduce((at, snap) => Math.max(at, new Date(snap.mtime).getTime() || 0), 0);
+  const week = 7 * 24 * 3600 * 1000;
+  const stale = !latest || Date.now() - latest > week;
+  const known = automatic && !automatic.error;
+  const on = known && automatic.auto;
+  box.dataset.tone = stale ? 'warn' : on ? 'live' : '';
+
+  box.append(icon(stale ? 'alert' : on ? 'check' : 'archive'));
+  const text = document.createElement('div');
+  text.className = 'bk-text';
+  const head = document.createElement('b');
+  const sub = document.createElement('span');
+  if (!automatic) {
+    head.textContent = 'Checking the schedule…';
+    // Two lines like every answer below, so the cards under it stay put when the answer lands.
+    sub.textContent = 'Asking whether this server backs itself up.';
+  } else if (!known) {
+    head.textContent = 'Schedule unknown';
+    sub.textContent = automatic.error;
+  } else if (on) {
+    const every = AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, automatic.auto.schedule));
+    const next = whenNext(automatic.auto.nextRun);
+    head.textContent = 'Automatic backups on';
+    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 7)
+      + (next ? ' · next ' + next : '');
+  } else {
+    head.textContent = 'Automatic backups off';
+    sub.textContent = automatic.automaticAvailable === false
+      ? automatic.automaticUnavailableReason
+      : 'Nothing backs this server up unless you do it by hand.';
+  }
+  text.append(head, sub);
+  const last = document.createElement('span');
+  last.className = 'bk-last';
+  last.textContent = !latest ? 'Never backed up'
+    : (stale ? 'No backup in 7 days · last ' : 'Last backup ') + ago(new Date(latest).toISOString());
+  box.append(text, last);
+
+  // Off, and able to be on: turning it on is the one thing this screen should ask for, so it
+  // takes the primary and Back up now steps down to a plain button beside it.
+  const offer = known && !on && automatic.automaticAvailable !== false;
+  backUpNow.classList.toggle('primary', !offer);
+  if (offer) {
+    const turnOn = iconButton('clock', 'Turn on nightly backups', 'primary');
+    turnOn.onclick = async () => {
+      busy(turnOn, true);
+      await turnOnBackups(row);
+      await renderBackups({ force: true });
+    };
+    box.append(turnOn);
+  }
 }
 
 /**
@@ -9711,7 +10275,13 @@ function autoBackupSection(base, data) {
   const onOffLabel = document.createElement('label');
   onOffLabel.className = 'row';
   onOffLabel.style.cursor = 'pointer';
-  onOffLabel.append(onOff, document.createTextNode('On'));
+  // The word beside the switch is the switch's state, not the name of the "on" position: "On" next
+  // to a switch that was off read as a server being backed up when it was not.
+  const onOffWord = document.createElement('span');
+  const sayState = () => { onOffWord.textContent = onOff.checked ? 'On' : 'Off'; };
+  onOff.addEventListener('change', sayState);
+  sayState();
+  onOffLabel.append(onOff, onOffWord);
 
   const every = document.createElement('select');
   for (const opt of AUTO_INTERVALS) {
@@ -9795,7 +10365,7 @@ function renderBackupHistory(row, data, signature) {
   wherePath.className = 'hint mono-path';
   wherePath.textContent = data.dir;
   const change = document.createElement('button');
-  change.className = 'ghost';
+  change.className = 'ghost inline';
   change.type = 'button';
   change.textContent = 'Change';
   change.title = 'Where backups are kept, for every server';
@@ -9813,7 +10383,7 @@ function renderBackupHistory(row, data, signature) {
     ? 'mirrored to ' + data.mirror
     : 'No mirror: snapshots live on one drive, beside what they back up.';
   const mset = document.createElement('button');
-  mset.className = 'ghost';
+  mset.className = 'ghost inline';
   mset.type = 'button';
   mset.textContent = data.mirror ? 'Change' : 'Add a mirror';
   mset.title = 'A second location - ideally another drive - every new snapshot is copied to';
@@ -9821,7 +10391,7 @@ function renderBackupHistory(row, data, signature) {
   mirrorRow.append(mirrorPath, mset);
   if (data.mirror) {
     const moff = document.createElement('button');
-    moff.className = 'ghost';
+    moff.className = 'ghost inline';
     moff.type = 'button';
     moff.textContent = 'Off';
     moff.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
@@ -9926,7 +10496,13 @@ function renderBackupHistory(row, data, signature) {
       items.textContent = n ? n + (n === 1 ? ' item' : ' items') : '';
       const tag = document.createElement('div');
       tag.className = 'tag';
-      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
+      // An archive with no manifest (made by hand, or by an old version) reports its scope as "?".
+      const unknownScope = !fromFiles && !onlyFile && (!snap.scope || snap.scope === '?');
+      if (unknownScope) {
+        tag.classList.add('unknown');
+        tag.title = 'This archive does not record what it covers.';
+      }
+      tag.textContent = (fromFiles ? fromFiles.tag : onlyFile ? 'one file' : unknownScope ? 'Unknown' : snap.scope) + (snap.databases && snap.databases.length ? ' + ' + snap.databases.length + ' db' : '');
       if (onlyWhat) tag.title = 'Holds only ' + onlyWhat + '. Restoring it puts back ' + (onlyFile ? 'that file' : 'those') + ' and nothing else.';
       if (snap.databases && snap.databases.length) {
         tag.title = 'Includes a dump of ' + snap.databases.map((d) => d.database + ' on ' + d.service).join(', ');
@@ -10006,8 +10582,8 @@ function renderBackupHistory(row, data, signature) {
           : '';
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
-          text: 'This puts back ' + covers + ' as they were on '
-            + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
+          text: 'This puts back ' + covers + ' from ' + (snap.note ? '“' + snap.note + '” (' + snap.name + ')' : snap.name)
+            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
           choices: [
             { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. Not undoable; take a backup first if you are unsure.' },
             { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of what was there is kept in this list, so this can be undone.' },
@@ -10087,23 +10663,14 @@ let settingsPaneWatch = null;
 async function buildServerSettings(row, body) {
   body.dataset.for = row.name;
   body.classList.add('set-screen');
-  body.textContent = '';
-
-  const loading = document.createElement('div');
-  loading.className = 'hint';
-  loading.textContent = 'Reading server.properties…';
-  body.append(loading);
+  paneLoading(body);
 
   const base = '/instances/' + encodeURIComponent(row.name);
   let data;
   try {
     data = await api(base + '/props');
   } catch (e) {
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderServerSettings());
     // Cleared, so leaving the tool and coming back tries again. Leaving it set cached the failure
     // as if it were the drawn form, and the error stayed until the server was reselected.
     body.dataset.for = '';
@@ -10260,19 +10827,31 @@ async function buildServerSettings(row, body) {
     input.id = 'p_' + f.key;
     const c = { input, original: f.value == null ? '' : String(f.value), set: Boolean(f.set) };
     controls.set(f.key, c);
+    // A number field's own min and max only stop the spinner; typed, 5000 players went through to
+    // Save. The range is said under the field as it is typed, and Save waits for it.
+    let control = input;
+    let invalid;
+    if (f.type === 'int') {
+      const bad = fieldNote(input);
+      control = el('div', 'set-stack');
+      control.append(input, bad);
+      invalid = () => !checkRange(input, bad, f.min, f.max);
+      input.addEventListener('input', invalid);
+    }
     const { left } = addRow(sectionFor(f.group || 'other'), {
       id: input.id,
       label: f.label,
       help: f.note,
-      control: input,
+      control,
       entry: {
         kind: 'prop',
         key: f.key,
         changed: () => input.value.trim() !== c.original,
+        invalid,
         // Minecraft's own default: a key the file does not have yet, which the server writes on
         // its first start. Shown as a tag rather than a sentence under every field.
         isDefault: () => !c.set,
-        reset: () => { input.value = c.original; input.dispatchEvent(new Event('change')); },
+        reset: () => { input.value = c.original; input.dispatchEvent(new Event('change')); if (invalid) invalid(); },
       },
     });
 
@@ -10343,17 +10922,31 @@ async function buildServerSettings(row, body) {
   whInput.spellcheck = false;
   whInput.placeholder = 'https://discord.com/api/webhooks/…';
   whInput.value = mine.webhook;
+  // The same test the server applies, said before Save rather than as a toast after it.
+  const whBad = fieldNote(whInput);
+  const whWrap = el('div', 'set-stack');
+  whWrap.append(whInput, whBad);
+  const whCheck = () => {
+    const v = whInput.value.trim();
+    let ok = !v;
+    try { ok = ok || /^https?:$/.test(new URL(v).protocol); } catch {}
+    whBad.textContent = ok ? '' : 'Paste the whole link Discord gives you, starting with https://';
+    whInput.setAttribute('aria-invalid', String(!ok));
+    return ok;
+  };
+  whInput.addEventListener('input', whCheck);
   addRow(crash, {
     id: whInput.id,
     label: 'Discord webhook',
     help: 'Gets a message when the server crashes, recovers, gives up, or a scheduled task fails. '
       + 'Leave it empty for none; Discord makes one under Server, Integrations, Webhooks.',
-    control: whInput,
+    control: whWrap,
     entry: {
       kind: 'own', key: 'webhook',
       changed: () => whInput.value.trim() !== mine.webhook,
       value: () => whInput.value.trim(),
-      reset: () => { whInput.value = mine.webhook; },
+      invalid: () => !whCheck(),
+      reset: () => { whInput.value = mine.webhook; whCheck(); },
     },
   });
 
@@ -10440,7 +11033,8 @@ async function buildServerSettings(row, body) {
   memInput.id = 's_memory';
   memInput.autocomplete = 'off';
   memInput.value = mine.memory;
-  const memBad = el('div', 'bad');
+  const memBad = fieldNote(memInput);
+  memInput.addEventListener('input', () => checkMemory(memInput, memBad));
   const memWrap = el('div', 'set-stack');
   memWrap.append(memInput, memBad);
   addRow(jv, {
@@ -10633,7 +11227,8 @@ async function buildServerSettings(row, body) {
   barDot.setAttribute('aria-hidden', 'true');
   const barCount = el('b', 'bar-count');
   const barWhen = el('span', 'hint');
-  barWhen.textContent = 'Take effect when ' + (row.label || row.name) + ' next starts.';
+  const applyWhen = 'Take effect when ' + (row.label || row.name) + ' next starts.';
+  bar.hidden = true;
   const discard = el('button', 'ghost');
   discard.type = 'button';
   discard.textContent = 'Discard';
@@ -10692,8 +11287,11 @@ async function buildServerSettings(row, body) {
     const n = pending().count;
     const invalid = entries.some((e) => e.invalid && e.changed() && e.invalid());
     const running = (rowOf(row.name) || row).status === 'running';
-    barDot.hidden = !n;
-    barCount.textContent = n ? n + (n === 1 ? ' unsaved change' : ' unsaved changes') : 'No unsaved changes';
+    // The bar is there only while there is something to save: with nothing changed it was three
+    // disabled buttons and a sentence saying so, on every visit.
+    bar.hidden = !n && !saving;
+    barCount.textContent = n + (n === 1 ? ' unsaved change' : ' unsaved changes');
+    barWhen.textContent = invalid ? 'Fix the field marked in red to save.' : applyWhen;
     discard.disabled = saving || !n;
     save.disabled = saving || !n || invalid;
     saveRestart.disabled = saving || !n || invalid;
@@ -11161,8 +11759,10 @@ async function copyText(text, what) {
   try {
     await navigator.clipboard.writeText(text);
     toast('Copied ' + what + '.', 'good');
+    return true;
   } catch {
     toast('The clipboard refused; select and copy by hand.', 'bad');
+    return false;
   }
 }
 
@@ -11431,17 +12031,14 @@ async function renderDatabaseBackups(opts) {
   // A poll must not redraw under a dump or a restore in progress, or pile up behind a slow one.
   if (!force && (dbBackupBusy || dbBackupPending === row.name)) return;
   dbBackupPending = row.name;
+  if (body.dataset.for !== row.name) paneLoading(body);
   const base = '/databases/' + encodeURIComponent(row.name) + '/backups';
   let data;
   try {
     data = await api(base);
   } catch (e) {
     if (state.current !== row.name) return;
-    body.textContent = '';
-    const bad = document.createElement('div');
-    bad.className = 'bad';
-    bad.textContent = e.message;
-    body.append(bad);
+    paneError(body, e.message, () => renderDatabaseBackups({ force: true }));
     body.dataset.for = '';
     return;
   } finally {
@@ -11615,100 +12212,141 @@ async function renderDatabaseSettings(row) {
   paneHead(body, 'sliders', 'Database settings',
     'Where it listens, how to reach it as root, and which servers have a database on it.');
 
-  const conn = document.createElement('div');
-  conn.className = 'section set-group';
-  const head = document.createElement('div');
-  head.className = 'set-head';
-  const mark = document.createElement('span');
-  mark.className = 'mark';
-  mark.append(icon('server'));
-  const h = document.createElement('h3');
-  h.textContent = 'Connection';
-  const blurb = document.createElement('p');
-  blurb.textContent = row.external
+  const glyph = row.engineKind === 'redis' ? 'cache' : 'database';
+  const groupHead = (mark, title, text) => {
+    const head = el('div', 'set-head');
+    const m = el('span', 'mark');
+    m.append(icon(mark));
+    const h = el('h3');
+    h.textContent = title;
+    const p = el('p');
+    p.textContent = text;
+    head.append(m, h, p);
+    return head;
+  };
+  const fact = (dl, term, ...value) => {
+    const div = el('div');
+    const dt = el('dt');
+    dt.textContent = term;
+    const dd = el('dd');
+    dd.append(...value);
+    div.append(dt, dd);
+    dl.append(div);
+    return dd;
+  };
+
+  body.append(el('div', 'db-reach'));
+  paintDbReach(row);
+
+  // ---- how to reach it: every value a plugin config asks for, each copyable ----------------
+  const conn = el('div', 'section set-group db-conn');
+  conn.append(groupHead(glyph, 'Connection', row.external
     ? 'Registered with its address and admin credentials; it is run and stopped where it lives. Servers are attached to it from their own Settings tab.'
     : row.engineKind === 'redis'
       ? 'Loopback only: nothing outside this machine can reach it. One password and one key space, shared by every server attached; plugins prefix their keys.'
-      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.';
-  head.append(mark, h, blurb);
-  conn.append(head);
-  const dl = document.createElement('dl');
-  dl.className = 'creds';
-  const facts = [['Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : '')], ['Host', row.host || '127.0.0.1'], ['Port', String(row.port)]];
-  if (!row.external) facts.push(['Folder', row.dir || '—']);
-  for (const r of facts) {
-    const div = document.createElement('div');
-    const dt = document.createElement('dt');
-    dt.textContent = r[0];
-    const dd = document.createElement('dd');
-    dd.textContent = r[1];
-    div.append(dt, dd);
-    dl.append(div);
+      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.'));
+  const dl = el('dl', 'db-facts');
+  fact(dl, 'Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : ''));
+  fact(dl, 'Host', addrButton(row.host || '127.0.0.1', 'host'));
+  fact(dl, 'Port', addrButton(String(row.port), 'port'));
+  if (!row.external && row.dir) {
+    const dir = el('code', 'mono-path');
+    dir.textContent = row.dir;
+    dir.title = row.dir;
+    fact(dl, 'Folder', dir);
   }
-  conn.append(dl);
-  const rootRow = document.createElement('div');
-  rootRow.className = 'row';
-  rootRow.style.marginTop = '10px';
-  const rootBtn = document.createElement('button');
-  rootBtn.textContent = row.engineKind === 'redis' ? 'Show password' : 'Show admin password';
-  rootBtn.onclick = async () => {
-    let c;
-    try {
-      c = await api('/databases/' + encodeURIComponent(row.name) + '/root');
-    } catch (e) {
-      toast(e.message, 'bad');
+
+  /*
+    The admin login, masked until asked for. Fetched each time it is shown and dropped when it is
+    hidden, as the per-server credentials are: a password that sits in the page is one a stray
+    screenshot or screen share carries. Copy fetches it without showing it.
+  */
+  const who = row.engineKind === 'redis' ? 'Password' : 'Admin login';
+  const secret = fact(dl, who);
+  secret.classList.add('db-secret');
+  const masked = el('span', 'db-mask');
+  masked.textContent = '•'.repeat(8);
+  masked.setAttribute('aria-label', 'Hidden');
+  const reveal = iconButton('eye', 'Show', 'sm');
+  reveal.setAttribute('aria-expanded', 'false');
+  const copyAll = iconButton('copy', 'Copy', 'sm ghost');
+  const shown = el('div', 'db-shown');
+  shown.hidden = true;
+  secret.append(masked, reveal, copyAll, shown);
+  const rootCreds = () => api('/databases/' + encodeURIComponent(row.name) + '/root');
+  reveal.onclick = async () => {
+    if (!shown.hidden) {
+      shown.hidden = true;
+      shown.textContent = '';
+      masked.hidden = false;
+      reveal.lastChild.textContent = 'Show';
+      reveal.setAttribute('aria-expanded', 'false');
       return;
     }
-    rootBtn.replaceWith(credsList(c, { root: true }));
-    const copy = document.createElement('button');
-    copy.textContent = 'Copy';
-    copy.onclick = () => copyText(credsText(c, { root: true }), 'the root connection details');
-    rootRow.append(copy);
+    busy(reveal, true);
+    try {
+      const c = await rootCreds();
+      // Host and port are already on the lines above; only what was hidden is shown, each copyable.
+      const creds = el('dl', 'creds');
+      for (const [term, value, what] of [['User', c.user, 'user'], ['Password', c.password, 'password'], ['URL', c.url, 'URL']]) {
+        if (!value) continue;
+        const div = el('div');
+        const dt = el('dt');
+        dt.textContent = term;
+        const dd = el('dd');
+        dd.append(addrButton(String(value), what));
+        div.append(dt, dd);
+        creds.append(div);
+      }
+      shown.append(creds);
+      shown.hidden = false;
+      masked.hidden = true;
+      busy(reveal, false);
+      reveal.lastChild.textContent = 'Hide';
+      reveal.setAttribute('aria-expanded', 'true');
+    } catch (e) {
+      busy(reveal, false);
+      toast(e.message, 'bad');
+    }
   };
-  rootRow.append(rootBtn);
-  conn.append(rootRow);
+  copyAll.onclick = async () => {
+    try {
+      copyText(credsText(await rootCreds(), { root: true }), 'the ' + (row.engineKind === 'redis' ? 'connection details' : 'admin login'));
+    } catch (e) { toast(e.message, 'bad'); }
+  };
+  conn.append(dl);
   body.append(conn);
 
-  const att = document.createElement('div');
-  att.className = 'section set-group';
-  const head2 = document.createElement('div');
-  head2.className = 'set-head';
-  const mark2 = document.createElement('span');
-  mark2.className = 'mark';
-  mark2.append(icon('plug'));
-  const h2 = document.createElement('h3');
-  h2.textContent = 'Attached servers';
-  const blurb2 = document.createElement('p');
-  blurb2.textContent = 'Each has a database and a user named after it. Attach a server from its own Settings tab.';
-  head2.append(mark2, h2, blurb2);
-  att.append(head2);
+  // ---- who uses it: each attached server, a link to it, and its own login ------------------
+  const att = el('div', 'section set-group');
+  att.append(groupHead('server', 'Attached servers',
+    'Each has a database and a user named after it. Attach a server from its own Settings tab.'));
   const names = Object.keys(row.attachments || {});
   if (!names.length) {
-    const hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = 'Nothing attached yet.';
-    att.append(hint);
+    att.append(emptyState('server', 'No server uses this database yet. Attach one from that server’s Settings.'));
   }
+  const list = el('ul', 'db-attached');
   for (const name of names) {
     const a = row.attachments[name];
-    const line = document.createElement('div');
-    line.className = 'row';
-    line.style.alignItems = 'center';
-    const text = document.createElement('div');
-    text.style.flex = '1';
-    const b = document.createElement('b');
-    b.textContent = name;
-    const sub = document.createElement('div');
-    sub.className = 'hint';
-    sub.style.margin = '0';
-    sub.textContent = a.database ? 'database ' + a.database + ' \u00b7 user ' + a.user : 'shared password \u00b7 key prefix ' + name + ':';
-    text.append(b, sub);
-    const show = document.createElement('button');
-    show.textContent = 'Show credentials';
+    const server = rowOf(name);
+    const li = el('li');
+    const text = el('div', 'db-att-text');
+    const go = el(server ? 'button' : 'b', server ? 'ghost inline db-att-name' : 'db-att-name');
+    if (server) {
+      go.type = 'button';
+      go.title = 'Open ' + (server.label || name);
+      go.onclick = () => select(name);
+    }
+    go.append(icon('server'), document.createTextNode(server ? (server.label || name) : name + ' (removed)'));
+    const sub = el('code', 'db-att-sub');
+    sub.textContent = a.database ? 'database ' + a.database + ' · user ' + a.user : 'key prefix ' + name + ':';
+    text.append(go, sub);
+    const show = iconButton('eye', 'Show credentials', 'sm');
     show.onclick = () => showCredentials(row.name, name);
-    line.append(text, show);
-    att.append(line);
+    li.append(text, show);
+    list.append(li);
   }
+  if (names.length) att.append(list);
   body.append(att);
 }
 
@@ -11719,7 +12357,9 @@ async function send() {
   const line = box.value.trim();
   if (!state.current || !line) return;
   box.value = '';
-  state.history.push(line);
+  state.draft = '';
+  // The same command twice in a row is one entry, as in a shell.
+  if (state.history[state.history.length - 1] !== line) state.history.push(line);
   state.histAt = state.history.length;
   try {
     await post('/instances/' + encodeURIComponent(state.current) + '/command', { line: line });
@@ -11732,19 +12372,17 @@ async function send() {
 $('#bSend').onclick = send;
 $('#cmd').onkeydown = (e) => {
   if (e.key === 'Enter') { send(); return; }
-  // Shell muscle memory: a console you type into should remember what you typed.
+  // Shell muscle memory: a console you type into should remember what you typed. What was being
+  // typed when Up was first pressed is kept, and Down past the newest brings it back - the old
+  // Down blanked the field, half-typed command and all.
   if (e.key === 'ArrowUp' && state.histAt > 0) {
+    if (state.histAt === state.history.length) state.draft = e.target.value;
     state.histAt--;
     e.target.value = state.history[state.histAt];
     e.preventDefault();
-  } else if (e.key === 'ArrowDown') {
-    if (state.histAt < state.history.length - 1) {
-      state.histAt++;
-      e.target.value = state.history[state.histAt];
-    } else {
-      state.histAt = state.history.length;
-      e.target.value = '';
-    }
+  } else if (e.key === 'ArrowDown' && state.histAt < state.history.length) {
+    state.histAt++;
+    e.target.value = state.histAt === state.history.length ? state.draft : state.history[state.histAt];
     e.preventDefault();
   }
 };
@@ -11757,6 +12395,23 @@ const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
 // to sail through create and only surface as a server that would not start.
 const MEM_RE = /^\d+(?:\.\d+)?\s*[GgMm]$/;
 
+/** The line under a field that says what is wrong with it, read out with the field. */
+function fieldNote(input) {
+  const note = el('div', 'bad field-note');
+  note.id = input.id + '_note';
+  note.setAttribute('aria-live', 'polite');
+  input.setAttribute('aria-describedby', note.id);
+  return note;
+}
+
+function checkRange(input, out, min, max) {
+  const value = input.value.trim();
+  const ok = /^-?\d+$/.test(value) && Number(value) >= min && Number(value) <= max;
+  out.textContent = ok ? '' : 'Use a whole number from ' + min + ' to ' + max + '.';
+  input.setAttribute('aria-invalid', String(!ok));
+  return ok;
+}
+
 function checkMemory(input, out) {
   const value = input.value.trim();
   const bad = value && !MEM_RE.test(value);
@@ -11767,6 +12422,8 @@ function checkMemory(input, out) {
 
 function selectTab(tab) {
   for (const b of $$('.tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  $('#addTitle').textContent = tab === 'db' ? 'Add a database' : 'Add a server';
+  for (const id of ['#nName', '#aName', '#dName', '#pName']) paintSlug($(id));
   $('#formNew').hidden = tab !== 'new';
   $('#formPack').hidden = tab !== 'pack';
   $('#formAdopt').hidden = tab !== 'adopt';
@@ -11899,10 +12556,21 @@ function freeSlug(base) {
 /** The instance name a name field will create. */
 function slugOf(input) { return freeSlug(slugFor(input.value.trim())); }
 
+/**
+ * The folder name beside a name field. Before anything is typed it shows what the placeholder
+ * would make, dimmed - a bare dash read as something broken.
+ */
+function paintSlug(input) {
+  const slugEl = $('#' + input.id + 'Slug');
+  if (!slugEl) return;
+  const value = input.value.trim();
+  slugEl.textContent = value ? slugOf(input) : input.placeholder ? freeSlug(slugFor(input.placeholder)) : '—';
+  slugEl.classList.toggle('slug-eg', !value);
+}
+
 function checkName(input, out) {
   const value = input.value.trim();
-  const slugEl = $('#' + input.id + 'Slug');
-  if (slugEl) slugEl.textContent = value ? slugOf(input) : '—';
+  paintSlug(input);
   let msg = '';
   if (value && state.rows.some((r) => (r.label || r.name).toLowerCase() === value.toLowerCase())) {
     msg = 'There is already a server called ' + value + '.';
@@ -11917,6 +12585,39 @@ $('#dName').oninput = () => checkName($('#dName'), $('#dNameBad'));
 $('#aName').oninput = () => checkName($('#aName'), $('#aNameBad'));
 $('#pName').oninput = () => checkName($('#pName'), $('#pNameBad'));
 $('#nMem').oninput = () => checkMemory($('#nMem'), $('#nMemBad'));
+$('#nPort').oninput = () => checkPort($('#nPort'), $('#nPortBad'));
+
+function checkPort(input, out) {
+  const value = input.value.trim();
+  const ok = !value || (/^\d+$/.test(value) && Number(value) >= 1024 && Number(value) <= 65535);
+  out.textContent = ok ? '' : 'Use a port from 1024 to 65535, or leave it blank.';
+  input.setAttribute('aria-invalid', String(!ok));
+  return ok;
+}
+
+/** What Create will make, in a line: the choices from the form above, read back. */
+function paintNewSummary() {
+  const box = $('#newSummary');
+  const sw = softwareById[$('#nLoader').value] || softwareById.paper;
+  const version = $('#nVersion').value;
+  const port = $('#nPort').value.trim();
+  const parts = [
+    [sw.label + (version ? ' ' + version : ''), version ? '' : ' (no version yet)'],
+    [$('#nMem').value.trim() || '4G', ' memory'],
+    [port ? 'port ' + port : 'a free port', ''],
+    [$('input[name="onlineMode"]:checked')?.value === 'offline' ? 'any name can join' : 'Minecraft account required', ''],
+  ];
+  box.textContent = '';
+  box.append('Creates ');
+  parts.forEach(([b, rest], i) => {
+    if (i) { const sep = el('span', 'sep'); sep.textContent = '\u00b7'; box.append(sep); }
+    const strong = el('b');
+    strong.textContent = b;
+    box.append(strong, rest);
+  });
+}
+$('#formNew').addEventListener('input', paintNewSummary);
+$('#formNew').addEventListener('change', paintNewSummary);
 $('#aMem').oninput = () => checkMemory($('#aMem'), $('#aMemBad'));
 
 $('#formDb').onsubmit = async (e) => {
@@ -12003,6 +12704,7 @@ $('#formNew').onsubmit = async (e) => {
   e.preventDefault();
   if (!checkName($('#nName'), $('#nNameBad'))) { $('#nName').focus(); return; }
   if (!checkMemory($('#nMem'), $('#nMemBad'))) { $('#nMem').focus(); return; }
+  if (!checkPort($('#nPort'), $('#nPortBad'))) { $('#nPort').focus(); return; }
 
   const jobId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'job-' + Date.now();
   const bar = $('#newBar');
@@ -12055,6 +12757,7 @@ $('#formNew').onsubmit = async (e) => {
     // loader was chosen last, so a second create without touching the loader posted a Fabric
     // version string against loader:'paper'.
     loadVersions($('#nLoader').value);
+    paintSlug($('#nName'));
     await refresh();
     select(inst.name);
     toast('Created ' + inst.name + ' on port ' + inst.port + '.', 'good');
@@ -12243,6 +12946,7 @@ $('#formPack').onsubmit = async (e) => {
 // the app shows the button - the browser keeps the text field it always had.
 if (desktop) {
   $('#bBrowse').hidden = false;
+  $('#aDirHint').textContent = 'The folder holding the server jar and server.properties.';
   $('#bBrowse').onclick = async () => {
     const dir = await desktop.pickFolder('Choose the server folder');
     if (!dir) return;
@@ -12657,6 +13361,8 @@ async function loadVersions(loader) {
   $('#nLoaderHint').textContent = sw.content === 'mods' ? 'Runs mods'
     : sw.content === 'none' ? 'No plugins or mods'
       : 'Runs plugins';
+  const note = $('#nVersionBad');
+  note.textContent = '';
   if (!versionLists[loader]) {
     sel.disabled = true;
     sel.textContent = '';
@@ -12664,14 +13370,24 @@ async function loadVersions(loader) {
     o.value = '';
     o.textContent = 'Loading versions…';
     sel.append(o);
+    paintNewSummary();
     try {
       versionLists[loader] = await api('/' + loader + '/versions');
     } catch {
+      // The reason goes under the field, whole, with a way to try again; as the select's own text
+      // it was cut off at "Could not reach the Paper dov".
       sel.textContent = '';
       const bad = document.createElement('option');
       bad.value = '';
-      bad.textContent = 'Could not reach the ' + sw.label + ' download service';
+      bad.textContent = 'Unavailable';
       sel.append(bad);
+      note.append('Could not reach the ' + sw.label + ' download service. ');
+      const retry = el('button', 'ghost inline');
+      retry.type = 'button';
+      retry.textContent = 'Try again';
+      retry.onclick = () => { if ($('#nLoader').value === loader) loadVersions(loader); };
+      note.append(retry);
+      paintNewSummary();
       // A dead end is not an empty dropdown. Creating needs the download; adding a server you
       // already have does not, and that is a real way forward rather than an instruction to
       // come back later.
@@ -12700,6 +13416,11 @@ async function loadVersions(loader) {
   annotateJavaNeeds(loader);
   sel.disabled = false;
   $('#bCreate').disabled = false;
+  $('#bJumpAdopt')?.remove();
+  if (/^Creating a server needs a connection/.test($('#newHint').textContent)) {
+    $('#newHint').textContent = 'Accepts the Minecraft EULA on your behalf, as the operator of this machine.';
+  }
+  paintNewSummary();
 }
 
 $('#nLoader').onchange = () => loadVersions($('#nLoader').value);
