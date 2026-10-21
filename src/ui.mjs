@@ -9,7 +9,7 @@ import * as supervisor from './supervisor.mjs'
 import * as registry from './registry.mjs'
 import * as create from './create.mjs'
 import * as manage from './manage.mjs'
-import { LAYOUT } from './paths.mjs'
+import { LAYOUT, BACKUPS_DIR } from './paths.mjs'
 import * as java from './java.mjs'
 import * as backup from './backup.mjs'
 import * as schedule from './schedule.mjs'
@@ -35,9 +35,11 @@ import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
+import { buildBundle, writeBundle } from './diag-bundle.mjs'
+import { scrubber } from './mcp-tools.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
-import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
+import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside } from './util.mjs'
 import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -700,6 +702,41 @@ async function handleConsole(req, res, name, seg) {
   if (verb === 'export') return json(res, 200, mclogs.exportConsole(inst))
   if (verb === 'share') return json(res, 200, await mclogs.shareConsole(inst))
   return json(res, 404, { error: 'not found' })
+}
+
+async function handleDiag(req, res, name, seg, url) {
+  registry.getInstance(name)
+  const outDir = path.join(BACKUPS_DIR, name, 'exports')
+
+  const verb = seg[4] ?? null
+  if (req.method === 'POST' && !verb) {
+    const bundle = await buildBundle({ server: name, scrub: scrubber() })
+    const result = await writeBundle(bundle, { outDir })
+    return json(res, 200, { file: result.file, size: result.size, sizeHuman: result.sizeHuman, findings: bundle.findings })
+  }
+  if (req.method !== 'GET' || verb !== 'download') return json(res, 404, { error: 'not found' })
+
+  const rel = safeRelativePath(url.searchParams.get('file'))
+  if (rel === null) return json(res, 400, { error: 'file must be a basename' })
+  if (rel.includes('/')) return json(res, 400, { error: 'file must be a basename' })
+  if (!rel.endsWith('.zip')) return json(res, 400, { error: 'file must end in .zip' })
+  if (!isInside(outDir, path.resolve(outDir, rel))) return json(res, 400, { error: 'file is not inside the exports folder' })
+
+  const file = path.resolve(outDir, rel)
+  let size
+  try {
+    size = (await fs.promises.stat(file)).size
+  } catch {
+    return json(res, 404, { error: 'not found' })
+  }
+
+  res.writeHead(200, {
+    'content-type': 'application/zip',
+    'content-length': size,
+    'content-disposition': 'attachment; filename="' + rel + '"',
+    'cache-control': 'no-store',
+  })
+  fs.createReadStream(file).pipe(res)
 }
 
 // Thin layer; the running-server gates live in worlds.mjs.
@@ -1520,6 +1557,7 @@ async function route(req, res) {
   if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
   if (seg[3] === 'icon') return handleIcon(req, res, name, seg)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
+  if (seg[3] === 'diag') return handleDiag(req, res, name, seg, url)
 
   if (seg[3] === 'diagnose' && req.method === 'GET') {
     const inst = registry.getInstance(name)

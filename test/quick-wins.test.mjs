@@ -73,3 +73,27 @@ test('the server icon must be a 64 by 64 PNG, and can be taken away again', asyn
   assert.equal((await api('instances/quick/icon/remove', {})).status, 200)
   assert.ok(!fs.existsSync(path.join(dir, 'server-icon.png')))
 })
+
+test('diagnostics: POST writes the zip, GET streams it with attachment', async () => {
+  const res = await api('instances/quick/diag', {})
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.file.endsWith('.zip'))
+  assert.ok(fs.existsSync(body.file))
+  assert.ok(body.sizeHuman)
+  assert.ok(Array.isArray(body.findings.server))
+  assert.ok(Array.isArray(body.findings.client))
+
+  const basename = body.file.split(/[\\/]/).pop()
+  const dl = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent(basename))
+  assert.equal(dl.status, 200)
+  assert.match(dl.headers.get('content-disposition'), /^attachment/)
+})
+
+test('diagnostics download refuses path traversal', async () => {
+  const r1 = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent('../instances.json'))
+  assert.equal(r1.status, 400)
+
+  const r2 = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent('..\\instances.json'))
+  assert.equal(r2.status, 400)
+})

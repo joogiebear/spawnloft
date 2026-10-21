@@ -2896,6 +2896,7 @@
           <button type="button" id="bPopConsole" class="icon-btn" aria-label="Open in its own window" title="Open in its own window"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-popout"/></svg></button>
           <button type="button" id="bCopy" class="icon-btn" aria-label="Copy the lines shown" title="Copy the lines shown"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></button>
           </span>
+          <button type="button" id="bDiagZip"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg>Diagnostics</button>
           <span class="menu-wrap" id="shareWrap">
             <button type="button" id="bExport" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-share"/></svg>Share log<svg class="ico caret" aria-hidden="true" focusable="false"><use href="#i-caret"/></svg></button>
             <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
@@ -6308,6 +6309,32 @@ $('#miExportFile').onclick = async () => {
   } catch (err) {
     note.remove();
     toast(err.message, 'bad');
+  }
+};
+
+$('#bDiagZip').onclick = async () => {
+  if (!state.current) { toast('Select a server first.', 'bad'); return; }
+  const btn = $('#bDiagZip');
+  btn.disabled = true;
+  const note = toast('Writing the diagnostics zip…');
+  try {
+    const out = await post('/instances/' + encodeURIComponent(state.current) + '/diag');
+    note.remove();
+    const basename = out.file.split(/[\\/]/).pop();
+    const el = toast('Diagnostics zip written (' + out.sizeHuman + '). ', 'good');
+    const a = document.createElement('a');
+    a.href = '/api/instances/' + encodeURIComponent(state.current) + '/diag/download?file=' + encodeURIComponent(basename);
+    a.textContent = 'Download';
+    a.download = '';
+    el.querySelector('div').append(a);
+    // The toast goes away on its own after a few seconds, so the download starts without
+    // waiting for the link to be clicked; the link is there for a second copy.
+    a.click();
+  } catch (err) {
+    note.remove();
+    toast(err.message, 'bad');
+  } finally {
+    btn.disabled = false;
   }
 };
 
