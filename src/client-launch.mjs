@@ -117,27 +117,24 @@ export async function spawnClient(command, { name, state }) {
     env = command.env
   }
 
-  const logStream = fs.createWriteStream(clientLog(name), { flags: 'a' })
+  // The launcher may be a short-lived CLI command, so the game runs in its own session with its
+  // output on a file descriptor rather than a pipe to us; windowsHide keeps java.exe's console
+  // window from appearing (the game's own window is unaffected).
+  const fd = fs.openSync(clientLog(name), 'a')
+  let child
+  try {
+    child = spawn(cmd, args, {
+      cwd: command.cwd,
+      stdio: ['ignore', fd, fd],
+      windowsHide: true,
+      detached: true,
+      env,
+    })
+  } finally {
+    // spawn() has already duplicated the descriptor into the child.
+    fs.closeSync(fd)
+  }
 
-  const child = spawn(cmd, args, {
-    cwd: command.cwd,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: false,
-    detached: false,
-    env,
-  })
-
-  child.stdout.pipe(logStream, { end: false })
-  child.stderr.pipe(logStream, { end: false })
-  // A log that can no longer be written (disk full, folder gone) must not take the game down
-  // with it: the capture stops and the client keeps running.
-  logStream.on('error', (err) => {
-    child.stdout.unpipe(logStream)
-    child.stderr.unpipe(logStream)
-    process.stderr.write(`client log for ${name} stopped: ${err.message}\n`)
-  })
-
-  child.on('close', () => logStream.end())
   // A stopped client's exit event can arrive after the next launch wrote its own state; leave that one alone.
   child.on('exit', () => {
     if (readJson(clientStateFile(name), null)?.pid === child.pid) fs.rmSync(clientStateFile(name), { force: true })
@@ -153,6 +150,7 @@ export async function spawnClient(command, { name, state }) {
         javaPid: child.pid,
         harness: state.harness ?? null,
       })
+      child.unref()
       resolve({ pid: child.pid, child })
     })
     child.on('error', (err) => reject(new UserError('could not start ' + command.bin + ': ' + err.message)))
