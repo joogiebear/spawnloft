@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { parseMemoryGb } from './registry.mjs'
@@ -186,8 +187,9 @@ export async function launch(name, { playerName = null, server = null, onProgres
   }
 
   const account = offlineAccount(playerName ?? defaultPlayerName(name))
-  const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java })
-  const { pid } = await spawnClient(command, { name, state: { mode: 'offline', account, harness: null } })
+  const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
+  const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, harnessToken })
+  const { pid } = await spawnClient(command, { name, state: { mode: 'offline', account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name } }
 }
