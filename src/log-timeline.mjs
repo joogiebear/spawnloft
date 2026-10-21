@@ -15,7 +15,8 @@ function normalizeLevel(level) {
   return upper === 'SEVERE' ? 'ERROR' : upper
 }
 
-export function parseLine(line) {
+export function parseLine(raw) {
+  const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
   let m = FABRIC_MOD_RE.exec(line)
   if (m) {
     return { time: m[1], iso: null, level: normalizeLevel(m[3]), thread: m[2], text: m[5] }
@@ -44,79 +45,81 @@ function hmsToMs(hms) {
   return h * 3600000 + mi * 60000 + s * 1000
 }
 
-function combineDateTime(dateObj, hms) {
-  const [h, mi, s] = hms.split(':').map(Number)
-  dateObj.setHours(h, mi, s, 0)
-  return dateObj.toISOString()
+function msOfDay(d) {
+  return d.getHours() * 3600000 + d.getMinutes() * 60000 + d.getSeconds() * 1000
 }
 
-export function parseLog(lines, { source, anchor = null, mtime = null }) {
-  let baseDate
-  if (anchor !== null) {
-    baseDate = new Date(typeof anchor === 'number' ? anchor : anchor)
-  } else if (mtime !== null) {
-    baseDate = new Date(mtime)
-  } else {
-    baseDate = new Date()
-  }
+function dateAt(base, dayOffset, hms) {
+  const d = new Date(base)
+  d.setDate(d.getDate() + dayOffset)
+  const [h, mi, s] = hms.split(':').map(Number)
+  d.setHours(h, mi, s, 0)
+  return d.toISOString()
+}
 
-  const currentDate = new Date(baseDate)
+function isoOf(text) {
+  const d = new Date(text)
+  return Number.isNaN(d.getTime()) ? text : d.toISOString()
+}
+
+// Lines carry a time of day only, so each gets a day offset from the first (a line more than an hour
+// earlier than the one before it crossed midnight) and the offsets are pinned to a calendar date by
+// `mtime` when given (the last line was written at the file's mtime, which is right even when `lines`
+// is a tail of a log days long), else by `anchor` (the first line is after the process started), else
+// by now.
+export function parseLog(lines, { source, anchor = null, mtime = null }) {
   const entries = []
+  let dayOffset = 0
   let prevTimeMs = null
 
-  for (const line of lines) {
+  for (const raw of lines) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
     const parsed = parseLine(line)
 
     if (parsed.time === null && parsed.iso === null) {
       if (entries.length > 0) {
-        entries[entries.length - 1].text += '\n' + line
+        entries[entries.length - 1].text += '\n' + parsed.text
+        entries[entries.length - 1].raw += '\n' + line
       } else {
-        entries.push({
-          at: currentDate.toISOString(),
-          source,
-          level: null,
-          thread: null,
-          text: line,
-          raw: line,
-        })
+        entries.push({ at: null, day: null, source, level: null, thread: null, text: parsed.text, raw: line })
       }
       continue
     }
 
     if (parsed.iso !== null) {
-      entries.push({
-        at: parsed.iso,
-        source,
-        level: null,
-        thread: null,
-        text: parsed.text,
-        raw: line,
-      })
+      entries.push({ at: isoOf(parsed.iso), day: null, source, level: null, thread: null, text: parsed.text, raw: line })
       continue
     }
 
     const timeMs = hmsToMs(parsed.time)
-    if (prevTimeMs !== null && prevTimeMs - timeMs > 3600000) {
-      currentDate.setDate(currentDate.getDate() + 1)
-    }
+    if (prevTimeMs !== null && prevTimeMs - timeMs > 3600000) dayOffset += 1
     prevTimeMs = timeMs
-
-    const at = combineDateTime(currentDate, parsed.time)
-    entries.push({
-      at,
-      source,
-      level: parsed.level,
-      thread: parsed.thread,
-      text: parsed.text,
-      raw: line,
-    })
+    entries.push({ at: null, day: dayOffset, time: parsed.time, source, level: parsed.level, thread: parsed.thread, text: parsed.text, raw: line })
   }
 
-  return entries
+  const timed = entries.filter((e) => e.day !== null)
+  let base
+  if (mtime !== null && timed.length) {
+    base = new Date(mtime)
+    const last = timed[timed.length - 1]
+    if (hmsToMs(last.time) > msOfDay(base) + 1000) base.setDate(base.getDate() - 1)
+    base.setDate(base.getDate() - last.day)
+  } else if (anchor !== null) {
+    base = new Date(anchor)
+    if (timed.length && hmsToMs(timed[0].time) + 1000 < msOfDay(base)) base.setDate(base.getDate() + 1)
+  } else {
+    base = new Date(mtime ?? Date.now())
+  }
+
+  return entries.map(({ day, time, ...e }) => ({
+    ...e,
+    at: e.at ?? (day === null ? base.toISOString() : dateAt(base, day, time)),
+  }))
 }
 
 export function mergeTimelines(...lists) {
-  return lists.flat().sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  const ms = (e) => Date.parse(e.at) || 0
+  return lists.flat().sort((a, b) => ms(a) - ms(b))
 }
 
 function localTime(iso) {

@@ -44,7 +44,7 @@ import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
 import { jsonLine, checkFlags, instanceName, keepCount, UsageError } from './src/cli-output.mjs'
 import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 import * as bots from './src/bots.mjs'
-import { buildBundle, writeBundle, summarise, TAIL_LINES } from './src/diag-bundle.mjs'
+import { buildBundle, writeBundle, summarise, summarySection, TAIL_LINES } from './src/diag-bundle.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -210,8 +210,7 @@ async function cmdDiag(positional, flags) {
   const bundle = await buildBundle({ server: name, lines, scrub: scrubber() })
   const { file } = await writeBundle(bundle, { outDir })
   if (cliContext.json) {
-    const { timeline, ...data } = bundle
-    process.stdout.write(jsonLine('diag', { ...data, file }))
+    process.stdout.write(jsonLine('diag', { ...summarySection(bundle), file }))
     return
   }
   out(summarise(bundle))

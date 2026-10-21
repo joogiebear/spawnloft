@@ -87,21 +87,46 @@ test('midnight rollover moves the second line to the next day', () => {
   assert.equal(d1.getDate(), nextDay.getDate())
 })
 
-test('an anchor of 2026-10-20T22:00:00Z dates lines accordingly', () => {
+test('lines are dated on the anchor day when they come after the start', () => {
+  const anchor = new Date(2026, 9, 20, 10, 0, 0)
   const lines = ['[12:00:00 INFO]: Started', '[12:00:01 INFO]: Ticking']
-  const entries = parseLog(lines, { source: 'server', anchor: '2026-10-20T22:00:00Z' })
-  const anchor = new Date('2026-10-20T22:00:00Z')
+  const entries = parseLog(lines, { source: 'server', anchor: anchor.getTime() })
   const d0 = new Date(entries[0].at)
-  const d1 = new Date(entries[1].at)
-  assert.equal(d0.getFullYear(), anchor.getFullYear())
-  assert.equal(d0.getMonth(), anchor.getMonth())
   assert.equal(d0.getDate(), anchor.getDate())
   assert.equal(d0.getHours(), 12)
-  assert.equal(d0.getMinutes(), 0)
-  assert.equal(d0.getSeconds(), 0)
-  assert.equal(d1.getHours(), 12)
-  assert.equal(d1.getMinutes(), 0)
-  assert.equal(d1.getSeconds(), 1)
+  assert.equal(new Date(entries[1].at).getSeconds(), 1)
+})
+
+test('a first line earlier than the start time belongs to the next day', () => {
+  const anchor = new Date(2026, 9, 20, 23, 0, 0)
+  const entries = parseLog(['[01:00:00 INFO]: Late start'], { source: 'server', anchor: anchor.getTime() })
+  const d0 = new Date(entries[0].at)
+  assert.equal(d0.getDate(), 21)
+  assert.equal(d0.getHours(), 1)
+})
+
+test('with an mtime the tail is dated backwards from the last line, across days', () => {
+  const mtime = new Date(2026, 9, 23, 8, 30, 0)
+  const lines = ['[23:00:00 INFO]: Day one', '[00:30:00 INFO]: Day two', '[08:29:59 INFO]: Written at mtime']
+  const entries = parseLog(lines, { source: 'server', anchor: new Date(2026, 9, 1).getTime(), mtime: mtime.getTime() })
+  const dates = entries.map((e) => new Date(e.at).getDate())
+  assert.deepEqual(dates, [22, 23, 23])
+  const late = parseLog(['[09:00:00 INFO]: Later than the mtime clock'], { source: 'server', mtime: mtime.getTime() })
+  assert.equal(new Date(late[0].at).getDate(), 22)
+})
+
+test('CRLF lines parse like LF lines and keep no carriage return', () => {
+  const lines = ['[12:00:00 INFO]: Hello\r', '[2026-10-20T12:00:01.000Z] daemon\r', '  at Foo.bar\r']
+  const entries = parseLog(lines, { source: 'daemon', anchor: '2026-10-20T00:00:00Z' })
+  assert.equal(entries.length, 2)
+  assert.equal(entries[0].text, 'Hello')
+  assert.equal(entries[1].text, 'daemon\n  at Foo.bar')
+  assert.ok(!JSON.stringify(entries).includes('\\r'))
+})
+
+test('a daemon time with an offset is normalised to UTC ISO', () => {
+  const [e] = parseLog(['[2026-10-20 14:00:00+02:00] hi'], { source: 'daemon' })
+  assert.equal(e.at, '2026-10-20T12:00:00.000Z')
 })
 
 test('mergeTimelines orders server before client when times are equal', () => {

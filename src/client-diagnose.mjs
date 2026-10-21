@@ -12,7 +12,8 @@ export const CLIENT_SHAPES = [
   },
   {
     id: 'opengl',
-    test: /Failed to create window|GLFW error|OpenGL (version|context)|No OpenGL context/i,
+    // not /i: Sodium and the driver print "OpenGL Version: 4.6" on every healthy start
+    test: /Failed to create window|GLFW error|Could not create (?:the )?OpenGL context|OpenGL (?:version|context) .*not supported|No OpenGL context/,
     title: 'The graphics subsystem could not start',
     advice: () => 'The graphics driver could not create a window or an OpenGL context. Update the GPU '
       + 'driver; a headless machine with no display cannot run the client, and bots ("spawnloft bot") are the way to test there.',

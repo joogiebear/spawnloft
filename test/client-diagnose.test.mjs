@@ -88,3 +88,8 @@ test('each shape reports once, at most three come back, cause before consequence
 test('an unremarkable log yields nothing rather than a guess', () => {
   assert.deepEqual(clientDiagnose(['[12:00:00 INFO]: Connected to server', 'Loading assets...']), [])
 })
+
+test('a healthy OpenGL version line is not a graphics failure', () => {
+  const findings = clientDiagnose(['[12:00:00] [Render thread/INFO]: (sodium) OpenGL Version: 4.6.0 NVIDIA 560.35'], {})
+  assert.ok(!findings.some(f => f.id === 'opengl'))
+})

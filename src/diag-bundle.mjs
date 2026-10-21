@@ -16,12 +16,28 @@ import { createZip, zipEntries } from './zip.mjs'
 
 export const TAIL_LINES = 5000
 
-function readLines(file, count) {
-  if (!fs.existsSync(file)) return []
-  const text = fs.readFileSync(file, 'utf8')
-  const all = text.split('\n')
-  if (all.length > 0 && all[all.length - 1] === '') all.pop()
-  return all.slice(-count)
+// The daemon log is appended to forever, so only its tail is read, and asynchronously: this runs
+// on the panel's request path.
+async function readLines(file, count) {
+  let fh
+  try {
+    fh = await fs.promises.open(file, 'r')
+  } catch (err) {
+    if (err.code === 'ENOENT') return []
+    throw err
+  }
+  try {
+    const { size } = await fh.stat()
+    const readBytes = Math.min(size, Math.max(64 * 1024, count * 512))
+    const buf = Buffer.alloc(readBytes)
+    await fh.read(buf, 0, readBytes, size - readBytes)
+    const lines = buf.toString('utf8').split(/\r?\n/)
+    if (size > readBytes && lines.length) lines.shift()
+    while (lines.length && lines[lines.length - 1] === '') lines.pop()
+    return lines.slice(-count)
+  } finally {
+    await fh.close()
+  }
 }
 
 export async function collectServer(name, { lines = TAIL_LINES } = {}) {
@@ -42,15 +58,16 @@ export async function collectServer(name, { lines = TAIL_LINES } = {}) {
     status = 'never started'
   } else {
     consoleLines = tailLog(name, lines)
-    daemonLines = readLines(daemonLog(name), lines)
+    daemonLines = await readLines(daemonLog(name), lines)
 
     let anchor = null
     try {
-      const state = JSON.parse(fs.readFileSync(stateFile(name), 'utf8'))
+      const state = JSON.parse(await fs.promises.readFile(stateFile(name), 'utf8'))
       anchor = state.startedAt ?? null
-    } catch { /* no state file; parseLog falls back to the file mtime */ }
+    } catch { /* no state file: the mtime dates the lines */ }
+    const mtime = (await fs.promises.stat(consoleFile)).mtimeMs
 
-    const serverEntries = parseLog(consoleLines, { source: 'server', anchor })
+    const serverEntries = parseLog(consoleLines, { source: 'server', anchor, mtime })
     const daemonEntries = parseLog(daemonLines, { source: 'daemon' })
     timeline = mergeTimelines(serverEntries, daemonEntries)
   }
@@ -140,38 +157,44 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
     finding.title = clean(finding.title)
     finding.advice = clean(finding.advice)
   }
-  timeline = timeline.map(e => ({ ...e, text: clean(e.text) }))
+  timeline = timeline.map(e => ({ ...e, text: clean(e.text), raw: clean(e.raw), thread: clean(e.thread) }))
   if (facts.server?.java) facts.server.java.path = clean(facts.server.java.path)
 
   return { facts, timeline, findings, files }
 }
 
+// The bundle without the timeline and without the files' text: the logs are in the zip as
+// themselves, so summary.json (and `diag --json`) names them with their size instead.
+export function summarySection(bundle) {
+  const { timeline, files, ...rest } = bundle
+  return { ...rest, files: files.map(f => ({ name: f.name, bytes: Buffer.byteLength(f.text) })) }
+}
+
 export async function writeBundle(bundle, { outDir }) {
   const serverName = bundle.facts.server?.name ?? 'server'
-  fs.mkdirSync(outDir, { recursive: true })
+  await fs.promises.mkdir(outDir, { recursive: true })
   const file = path.join(outDir, `${serverName}_diag_${stamp()}.zip`)
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-diag-'))
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sl-diag-'))
   try {
     const members = []
 
-    const { timeline, ...summary } = bundle
-    fs.writeFileSync(path.join(tmpDir, 'summary.json'), JSON.stringify(summary, null, 2))
+    await fs.promises.writeFile(path.join(tmpDir, 'summary.json'), JSON.stringify(summarySection(bundle), null, 2))
     members.push('summary.json')
 
-    fs.writeFileSync(path.join(tmpDir, 'timeline.txt'), formatTimeline(bundle.timeline))
+    await fs.promises.writeFile(path.join(tmpDir, 'timeline.txt'), formatTimeline(bundle.timeline))
     members.push('timeline.txt')
 
     for (const f of bundle.files) {
       const filePath = path.join(tmpDir, f.name)
-      fs.mkdirSync(path.dirname(filePath), { recursive: true })
-      fs.writeFileSync(filePath, f.text)
+      await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
+      await fs.promises.writeFile(filePath, f.text)
       members.push(f.name)
     }
 
     await createZip(file, tmpDir, members)
   } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true })
+    await fs.promises.rm(tmpDir, { recursive: true, force: true })
   }
 
   const fd = fs.openSync(file, 'r')
@@ -200,7 +223,9 @@ export function summarise(bundle) {
   if (bundle.facts.server) {
     for (const [k, v] of Object.entries(bundle.facts.server)) {
       if (v === null) continue
-      const val = Array.isArray(v) ? v.join(', ') : String(v)
+      const val = Array.isArray(v) ? v.join(', ')
+        : k === 'java' ? `${v.version} (major ${v.major}) at ${v.path}`
+        : String(v)
       parts.push(`server ${k}: ${val}`)
     }
   }
