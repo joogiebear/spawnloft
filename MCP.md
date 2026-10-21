@@ -153,7 +153,7 @@ Add them after `mcp` in `args`.
 | `list_servers` | Every server and database, with status and ports. |
 | `server_status` | One server: running or not, ports, memory, uptime. |
 | `get_logs` | The last console lines, up to 500. Filter by `level` (`error`, or `warn`, which includes errors) and by a `grep` pattern. |
-| `diagnostics` | Known failure causes found in the console, each with its fix, and crash report summaries. |
+| `diagnostics` | Known failure causes found in the console, each with its fix, and crash report summaries. With `bundle: true`, also writes a zip (console, daemon log, crash reports, findings, secrets removed) to the server's exports folder and returns its path, size and findings. |
 | `players` | Who is online, and every player the server knows about. |
 | `performance` | CPU and memory over a window, plus TPS and MSPT from the server when it is running. |
 | `list_snapshots` | A server's backups, newest first. |

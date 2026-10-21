@@ -15,7 +15,8 @@ import { runDoctor } from './doctor.mjs'
 import { mcpNotice } from './private-copy.mjs'
 import { readState, activeBlock } from './control.mjs'
 import { fail, humanBytes, humanDuration } from './util.mjs'
-import { DATA_ROOT } from './paths.mjs'
+import { DATA_ROOT, BACKUPS_DIR } from './paths.mjs'
+import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
 import * as activity from './activity.mjs'
@@ -120,9 +121,9 @@ const readTools = [
   },
   {
     name: 'diagnostics', title: 'Why did it fail?', annotations: READ,
-    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries.',
-    inputSchema: object({ name }, ['name']),
-    run({ name: n }) {
+    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries. With bundle: true, also writes a zip for attaching to a bug report.',
+    inputSchema: object({ name, bundle: { type: 'boolean', description: 'Write a zip with the console, daemon log, crash reports and findings for attaching to a bug report' } }, ['name']),
+    async run({ name: n, bundle: doBundle }) {
       const d = query('diagnostics', [n], {})
       const out = [`${n} is ${d.status.status}.`]
       if (d.findings.length) {
@@ -136,7 +137,15 @@ const readTools = [
         out.push(`Crash reports (${reports.length}, newest first):`)
         for (const r of reports) out.push(`- ${r.file}: ${r.description ?? 'no description line'}`)
       }
-      return { data: d, text: out.join('\n') }
+      let data = d
+      if (doBundle) {
+        const b = await buildBundle({ server: n, scrub: scrubber() })
+        const { file, size } = await writeBundle(b, { outDir: path.join(BACKUPS_DIR, n, 'exports') })
+        data = { ...d, bundle: { file, size, findings: b.findings } }
+        out.push(`Bundle written to ${file}`)
+        for (const f of b.findings.client ?? []) out.push(`- ${f.title}. ${f.advice}`)
+      }
+      return { data, text: out.join('\n') }
     },
   },
   {
@@ -617,6 +626,7 @@ export const INSTRUCTIONS = `SpawnLoft runs Minecraft servers on this computer. 
 Changes to plugins and the server software take effect when the server next restarts. install_plugin and update_plugin take a plugins snapshot first; take a backup yourself before anything else risky.
 To change a plugin's settings, find the file with list_config_files, read it with read_config_file, and change it with write_config_file using old_text and new_text; each change is snapshotted first. Then reload the plugin with run_command, or restart.
 When a server will not start, read diagnostics before get_logs. For get_logs, prefer level "warn" over reading everything.
+When a person reports a bug, diagnostics with bundle: true writes a zip they can attach.
 Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.`
 
 // Everything that leaves goes through this as a net under the per-tool projections, for secrets

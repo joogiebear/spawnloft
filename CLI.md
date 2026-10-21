@@ -73,6 +73,13 @@ sharing them. A historical diagnostic finding is not a failed command or a plugi
 verdict. `doctor --json` is read-only and returns `ok:false` plus its findings when checks
 fail. The existing plain-text `doctor` retains its stale-state repair behavior.
 
+`spawnloft diag <server> [--lines N] [--out <dir>] [--json]` writes a zip holding the
+server console, the daemon log, crash reports, `server.properties` (secrets removed) and
+the known-problem findings, with passwords and account names stripped. The default
+destination is `backups/<server>/exports/`. With `--json`, the envelope carries `facts`,
+`findings`, `files` and `file` (the zip path); `timeline` is omitted. Exit 0 on success,
+2 for a missing name, 1 for a bad `--lines` value.
+
 Plugin JSON is inventory only: `plugins ... enable/disable --json` is rejected before
 changing a JAR. Other commands without JSON support reject the option before taking action.
 Backup creation reports warnings, skipped database dumps, mirror errors, and pruning results;

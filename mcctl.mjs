@@ -44,6 +44,7 @@ import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
 import { jsonLine, checkFlags, instanceName, keepCount, UsageError } from './src/cli-output.mjs'
 import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 import * as bots from './src/bots.mjs'
+import { buildBundle, writeBundle, summarise, TAIL_LINES } from './src/diag-bundle.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -193,6 +194,28 @@ function cmdWhy(positional) {
       out(`  ${r.file}  ${r.description ? `- ${r.description}` : ''}`)
     }
   }
+}
+
+async function cmdDiag(positional, flags) {
+  checkFlags(flags, ['lines', 'out', 'json'])
+  const name = instanceName(positional, 'diag')
+  let lines = TAIL_LINES
+  if (flags.lines !== undefined) {
+    const n = Number(flags.lines)
+    if (typeof flags.lines !== 'string' || !Number.isInteger(n) || n < 1) fail('--lines must be a positive whole number')
+    lines = n > 25000 ? 25000 : n
+  }
+  if (flags.out !== undefined && typeof flags.out !== 'string') fail('--out needs a folder, for example --out ./reports')
+  const outDir = flags.out ? path.resolve(flags.out) : path.join(paths.BACKUPS_DIR, name, 'exports')
+  const bundle = await buildBundle({ server: name, lines, scrub: scrubber() })
+  const { file } = await writeBundle(bundle, { outDir })
+  if (cliContext.json) {
+    const { timeline, ...data } = bundle
+    process.stdout.write(jsonLine('diag', { ...data, file }))
+    return
+  }
+  out(summarise(bundle))
+  out(`Written: ${file}`)
 }
 
 async function cmdStart(positional, flags) {
@@ -1903,6 +1926,8 @@ OTHER
   mcctl jars                         List stored server jars
   mcctl jars import <path> [--as x]  Add a server jar to the store
   mcctl why <name>                   Say what is wrong with a server, from its own console
+  mcctl diag <name> [--out <dir>]    Zip the console, daemon log, crash reports and findings
+                                     for a bug report (--lines N, --json)
 
 BOTS (plugin testing with scripted players)
   mcctl bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
@@ -2038,6 +2063,7 @@ const COMMANDS = {
   worlds: cmdWorlds,
   why: cmdWhy,
   diagnostics: cmdWhy,
+  diag: cmdDiag,
   metrics: cmdMetrics,
   launchers: cmdLaunchers,
   ui: cmdUi,
@@ -2074,7 +2100,7 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot', 'diag'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
   // Not for `data`: it is what puts things right after a move was interrupted, when the data folder

@@ -42,6 +42,7 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 - **Small follow-ups to the panel polish.** A running server's ⋯ menu offers Stop and edit… (it asks first, then opens the name, memory and port editor) instead of a greyed-out Rename. Backup rows keep Restore as the one labelled button, with Delete as an icon beside lock, note and download. The automatic backups card no longer changes height when the system scheduler answers.
 - **The Overview feed marks its days, and says when backup details could not load.** When the recent activity crosses midnight it is split under Today, Yesterday and dated labels. If the Overview cannot read backup ages and the machine's memory, it says so with a Try again button, and the cards say Backups unknown instead of waiting forever.
 - **A database you run elsewhere can be pointed at a new address.** Its Settings page has Edit address (also offered on the Not answering notice) for the host, port and admin login, with the password kept unless you type a new one. It saves even when nothing answers there yet and says so. On the command line: `mcctl db address <db> --port <n>`.
+- **Diagnostics in one file.** `spawnloft diag <server>`, or the assistant's `diagnostics` tool with `bundle: true`, writes a zip with the console, the daemon log, crash reports and the known-problem findings, with passwords and account names removed, for attaching to a bug report.
 
 ## Fixed
 
