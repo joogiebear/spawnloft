@@ -87,7 +87,6 @@ test('harness lifecycle: launch, connect, protocol ops, quit', async () => {
 
   channel.close()
   channel = null
-  await new Promise(r => setTimeout(r, 300))
   await assert.rejects(connectHarness('harn', 'wrong-token'), /refused the token/)
 
   channel = await connectHarness('harn', token, { timeout: 5000 })

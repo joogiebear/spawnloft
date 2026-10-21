@@ -133,6 +133,7 @@ export async function connectHarness(profileName, token, { timeout = 5000 } = {}
     pending.set(id, { resolve, reject, timer })
     socket.write(JSON.stringify({ id, op: 'hello', token }) + '\n')
   }).catch(err => {
+    socket.destroy()
     if (err instanceof UserError && /went away/.test(err.message)) {
       throw new UserError('the harness refused the token')
     }

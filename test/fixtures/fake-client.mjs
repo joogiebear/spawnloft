@@ -38,6 +38,8 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
     const messages = []
     let nextSeq = 1
     let activeSocket = null
+    // Like the mod's accept loop: a second connection waits its turn instead of being dropped.
+    const waiting = []
 
     const server = net.createServer()
     server.listen(0, '127.0.0.1', () => {
@@ -50,9 +52,13 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
 
     server.on('connection', (socket) => {
       if (activeSocket) {
-        socket.destroy()
+        waiting.push(socket)
         return
       }
+      serve(socket)
+    })
+
+    function serve(socket) {
       activeSocket = socket
       let firstRequest = true
       let buffer = ''
@@ -164,8 +170,10 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
 
       socket.on('close', () => {
         activeSocket = null
+        const next = waiting.shift()
+        if (next && !next.destroyed) serve(next)
       })
       socket.on('error', () => {})
-    })
+    }
   }
 }
