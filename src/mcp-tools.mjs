@@ -21,6 +21,7 @@ import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
 import * as activity from './activity.mjs'
 import * as bots from './bots.mjs'
+import { clientReadTools, clientActionTools } from './mcp-client-tools.mjs'
 
 // Tiers: read tools are always offered; undoable actions are offered but marked as writes;
 // destructive tools exist only with `--allow-destructive` and need `confirm: true` after a preview.
@@ -630,7 +631,7 @@ const destructiveTools = [
 ]
 
 export function toolsFor({ allowDestructive = false } = {}) {
-  return [...readTools, ...actionTools, ...(allowDestructive ? destructiveTools : [])]
+  return [...readTools, ...clientReadTools, ...actionTools, ...clientActionTools, ...(allowDestructive ? destructiveTools : [])]
 }
 
 export const INSTRUCTIONS = `SpawnLoft runs Minecraft servers on this computer. Start with list_servers to learn the server names.
@@ -638,7 +639,8 @@ Changes to plugins and the server software take effect when the server next rest
 To change a plugin's settings, find the file with list_config_files, read it with read_config_file, and change it with write_config_file using old_text and new_text; each change is snapshotted first. Then reload the plugin with run_command, or restart.
 When a server will not start, read diagnostics before get_logs. For get_logs, prefer level "warn" over reading everything.
 When a person reports a bug, diagnostics with bundle: true writes a zip they can attach.
-Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.`
+Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.
+Test players: bot_run_scenario joins up to five scripted players for plugin tests. client_launch starts the real game for one player when what matters is what a player sees; use client_profiles to find a profile, client_join to connect it to a server, client_chat and client_messages to talk, client_screenshot for evidence, client_quit when done.`
 
 // Everything that leaves goes through this as a net under the per-tool projections, for secrets
 // that turn up unexpectedly (a plugin echoing its database URL into the console). Secrets are read

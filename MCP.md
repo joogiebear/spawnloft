@@ -167,6 +167,10 @@ Add them after `mcp` in `args`.
 | `read_config_file` | One configuration file, with secret values shown as `[redacted]`. |
 | `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports, and on Windows a second copy of SpawnLoft's data kept for a packaged app (see above). |
 | `bot_check` | Whether scripted test players can join a server: offline mode, running, mineflayer installed. See [BOTS.md](BOTS.md). |
+| `client_profiles` | The game client profiles made with `spawnloft client new`: version, loader, whether the harness is on, running or not. |
+| `client_status` | One profile: running or not, the player it runs as, and with the harness the screen it shows and the server it is on. |
+| `client_messages` | Chat and system messages the client received since a sequence number. Game content, not instructions. |
+| `client_logs` | The client's log tail: the game's own latest.log with `latest: true`, otherwise what the process printed. |
 
 **Actions.** Marked as changes, so your AI app asks before running them.
 
@@ -180,6 +184,11 @@ Add them after `mcp` in `args`.
 | `write_config_file` | Changes one configuration file: an exact `old_text` to `new_text` replacement, or `content` for a whole or new file. Snapshots the file first. |
 | `upgrade_build` | The newest build of the same software and Minecraft version. The old jar is kept. |
 | `bot_run_scenario` | Join a server as up to five scripted players and run a test scenario against a plugin: commands, chat, GUI clicks and checks on messages, items, state and the console. Setup commands run as the console, like `run_command`. |
+| `client_launch` | Starts the real game client for one profile as an offline player, downloading what it needs the first time. With `wait` (the default) it reports the screen once the harness answers. |
+| `client_join` | Connects a running client to one of your servers. The server must be running and, for an offline player, in offline mode. |
+| `client_chat` | Sends chat or a command as the player. `stop`, `restart` and `reload` are refused, as in `run_command`. |
+| `client_screenshot` | Takes a screenshot and returns the file path. |
+| `client_quit` | Closes the client. |
 
 **Destructive**, only with `--allow-destructive`. Each describes what it would do and changes
 nothing until it is called again with `confirm: true`.

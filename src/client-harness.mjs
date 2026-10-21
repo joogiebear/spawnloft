@@ -140,6 +140,10 @@ export async function connectHarness(profileName, token, { timeout = 5000 } = {}
     throw err
   })
 
+  // An idle channel must not keep an MCP server alive after its client closes stdin; a pending
+  // call still holds the process through its timer.
+  socket.unref()
+
   return { call, close, hello: helloResult }
 }
 
