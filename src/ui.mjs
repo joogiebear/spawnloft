@@ -34,6 +34,7 @@ import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
+import * as client from './client.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { scrubber } from './mcp-tools.mjs'
@@ -1129,6 +1130,28 @@ async function route(req, res) {
       args: [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
     })
+  }
+
+  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, client.listProfiles().map((p) => ({ name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, running: client.status(p.name).running })))
+  }
+
+  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 5) {
+    const profileName = seg[3]
+    if (seg[4] === 'status' && req.method === 'GET') {
+      return json(res, 200, client.status(profileName))
+    }
+    if (seg[4] === 'launch' && req.method === 'POST') {
+      const body = await readBody(req)
+      // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
+      const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
+      const res2 = await client.launch(profileName, { server: typeof body?.server === 'string' && body.server ? body.server : null, fakeJava })
+      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account })
+    }
+    if (seg[4] === 'stop' && req.method === 'POST') {
+      return json(res, 200, await client.stop(profileName))
+    }
+    return json(res, 405, { error: 'method not allowed' })
   }
 
   if (seg[1] === 'health' && req.method === 'GET') {

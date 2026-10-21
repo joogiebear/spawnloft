@@ -3297,6 +3297,11 @@
           </label>
           <p id="setBetaStatus" class="hint" aria-live="polite" style="margin:10px 0 0"></p>
         </div>
+        <div id="setClient">
+          <h2>Game client</h2>
+          <p class="hint" style="margin:0 0 12px">Profiles for the real Minecraft client, launched pointed at one of your servers. Create profiles with <code>spawnloft client new</code>.</p>
+          <dl class="kv" id="clientProfiles"></dl>
+        </div>
         <div id="setMcp">
           <h2>AI assistants</h2>
           <p class="hint" style="margin:0 0 12px">
@@ -3395,6 +3400,8 @@ const databasePreviewNote = 'Automatic database installation is not available in
 
 const state = {
   rows: [],
+  // Game client profiles, from /api/client/profiles; a server's Play uses the one that fits it.
+  clientProfiles: [],
   // Databases, listed apart from the servers so nothing that iterates servers sees one.
   dbs: [],
   current: null,
@@ -4336,8 +4343,10 @@ function moreItems(row) {
   }
   const up = row.status === 'running' || row.status === 'stopping';
   const why = up ? 'Stop the server first.' : null;
+  const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
+    ...(play ? [{ label: 'Play', hint: 'Starts the game client ' + play.name + ' pointed at this server.', run: () => playClient(row) }] : []),
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -5552,10 +5561,14 @@ function buildHomeCard(name) {
   const restart = el('button', 'sc-restart');
   restart.type = 'button';
   restart.onclick = () => cardAct(name, 'restart');
+  const play = el('button', 'sc-play');
+  play.type = 'button';
+  play.textContent = 'Play';
+  play.onclick = () => playClient(rowOf(name));
   const act = el('button', 'sc-act');
   act.type = 'button';
   act.onclick = () => cardAct(name);
-  acts.append(restart, act);
+  acts.append(restart, play, act);
   head.append(acts);
 
   const stats = el('dl', 'sc-stats');
@@ -5683,6 +5696,10 @@ function updateHomeCard(card, row) {
   const restart = card.querySelector('.sc-restart');
   restart.hidden = !(row.status === 'running' || acting === 'restart');
   setVerb(restart, 'Restart', acting === 'restart' ? 'restart' : null, blocked, name);
+  const play = card.querySelector('.sc-play');
+  const pp = playProfileFor(row);
+  play.hidden = !pp;
+  if (pp) play.title = 'Starts ' + pp.name + ' pointed at this server';
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
   // Live figures while it runs; one line saying why there are none while it does not.
@@ -5823,6 +5840,30 @@ function lostContact(on) {
   $('#banner').prepend(bar);
 }
 
+async function loadClientProfiles() {
+  try { state.clientProfiles = await api('/client/profiles') } catch { state.clientProfiles = [] }
+  renderHomeCards();
+  if (state.current) buildMoreMenu();
+}
+function playProfileFor(row, profiles = state.clientProfiles) {
+  const fits = profiles.filter((p) => !row.mcVersion || p.mc === row.mcVersion);
+  return fits.find((p) => p.server === row.name) ?? fits[0] ?? null;
+}
+async function playClient(row) {
+  const p = playProfileFor(row);
+  if (!p) return;
+  const note = toast('Starting ' + p.name + '…');
+  try {
+    await post('/client/profiles/' + encodeURIComponent(p.name) + '/launch', { server: row.name });
+    note.remove();
+    toast(p.name + ' is running.', 'good')
+  } catch (e) {
+    note.remove();
+    toast(e.message, 'bad')
+  } finally {
+    await loadClientProfiles()
+  }
+}
 async function refresh() {
   // One poll at a time. A stalled request otherwise piles up behind itself, and responses landing
   // out of order overwrite newer rows with older ones.
@@ -13231,6 +13272,7 @@ function renderSettings() {
   }
 
   renderUpdateChannel();
+  renderClientProfiles();
   renderMcp();
 
   const about = $('#setAbout');
@@ -13321,6 +13363,37 @@ function mcpSnippets(launch, { destructive, ips }) {
   return { json, cli };
 }
 
+function renderClientProfiles() {
+  const dl = document.querySelector('#clientProfiles');
+  dl.innerHTML = '';
+  if (!state.clientProfiles.length) {
+    const dt = el('dt');
+    dt.textContent = 'No profiles';
+    const dd = el('dd');
+    dd.textContent = 'spawnloft client new <name> --mc 1.21.11';
+    dl.append(dt, dd);
+    return;
+  }
+  for (const p of state.clientProfiles) {
+    const dt = el('dt');
+    dt.textContent = p.name;
+    const dd = el('dd');
+    dd.append(document.createTextNode(`Minecraft ${p.mc}, ${p.loader}${p.loaderVersion ? ' ' + p.loaderVersion : ''}${p.harness ? ', harness' : ''} · ${p.running ? 'running' : 'stopped'} `));
+    const btn = el('button', 'ghost');
+    btn.textContent = p.running ? 'Stop' : 'Launch';
+    btn.onclick = async () => {
+      try {
+        await post(`/client/profiles/${encodeURIComponent(p.name)}/${p.running ? 'stop' : 'launch'}`, {});
+      } catch (e) {
+        toast(e.message, 'bad');
+      }
+      await loadClientProfiles();
+      renderClientProfiles();
+    };
+    dd.append(btn);
+    dl.append(dt, dd);
+  }
+}
 async function renderMcp() {
   let launch;
   try {
@@ -13769,6 +13842,7 @@ document.addEventListener('keydown', (e) => {
 show('empty');
 loadSettings();
 loadJavas();
+loadClientProfiles();
 refresh().then(() => {
   if (consoleOnly) {
     if (rowOf(consoleOnly)) select(consoleOnly);
