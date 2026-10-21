@@ -1,0 +1,91 @@
+import { test, after } from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
+process.env.MCCTL_DATA_ROOT = scratch
+
+const { launch, status, stop, tailClientLog, createProfile } = await import('../src/client.mjs')
+const { readClientState } = await import('../src/client-launch.mjs')
+const { clientStateFile, versionDir, versionJson } = await import('../src/client-paths.mjs')
+
+const fakeJava = path.join(here, 'fixtures', 'fake-client.mjs')
+
+// Seed one installed version without any download
+const manifest = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'client', 'version_manifest_v2.json'), 'utf8'))
+const mc = manifest.latest.release
+fs.mkdirSync(versionDir(mc), { recursive: true })
+fs.copyFileSync(path.join(here, 'fixtures', 'client', `${mc}.json`), versionJson(mc))
+
+createProfile('life', { mc })
+
+after(async () => {
+  try { await stop('life') } catch { /* already dead */ }
+  fs.rmSync(scratch, { recursive: true, force: true })
+})
+
+test('launch, status, log, stop', async () => {
+  const res = await launch('life', { fakeJava })
+  assert.ok(res.pid)
+  const st = status('life')
+  assert.equal(st.running, true)
+  assert.equal(st.pid, res.pid)
+
+  const deadline = Date.now() + 3000
+  let found = false
+  while (Date.now() < deadline && !found) {
+    found = tailClientLog('life').some(l => l.includes('Setting user: life'))
+    if (!found) await new Promise(r => setTimeout(r, 50))
+  }
+  assert.ok(found, 'Setting user: life should appear in the log')
+
+  const stopRes = await stop('life')
+  assert.deepEqual(stopRes, { stopped: true, wasRunning: true })
+  assert.equal(status('life').running, false)
+  assert.equal(fs.existsSync(clientStateFile('life')), false)
+})
+
+test('launching twice is refused', async () => {
+  await launch('life', { fakeJava })
+  await assert.rejects(launch('life', { fakeJava }), /already running/)
+  await stop('life')
+})
+
+test('a fake client that dies at once', async () => {
+  process.env.FAKE_CLIENT_FAIL = 'window'
+  try {
+    await launch('life', { fakeJava })
+  } finally {
+    delete process.env.FAKE_CLIENT_FAIL
+  }
+  const deadline = Date.now() + 3000
+  while (Date.now() < deadline && status('life').running) {
+    await new Promise(r => setTimeout(r, 50))
+  }
+  assert.equal(status('life').running, false)
+  assert.ok(tailClientLog('life').some(l => l.includes('GLFW error')))
+})
+
+test('readClientState removes the file when the pid is dead', async () => {
+  fs.mkdirSync(path.dirname(clientStateFile('life')), { recursive: true })
+  fs.writeFileSync(clientStateFile('life'), JSON.stringify({
+    pid: 999999999,
+    startedAt: new Date().toISOString(),
+    mode: 'offline',
+    account: { type: 'offline', name: 'life' },
+    javaPid: 999999999,
+    harness: null,
+  }))
+  const state = readClientState('life')
+  assert.equal(state, null)
+  assert.equal(fs.existsSync(clientStateFile('life')), false)
+})
+
+test('stop when nothing runs', async () => {
+  const res = await stop('life')
+  assert.deepEqual(res, { stopped: false, wasRunning: false })
+})

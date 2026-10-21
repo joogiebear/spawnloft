@@ -1,10 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 
 import { currentOs, jvmArguments, gameArguments, libraries, assetIndex } from './client-meta.mjs'
-import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir } from './client-paths.mjs'
+import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
+import { writeJson, readJson, UserError, pidAlive, killProcessGroup, sleep } from './util.mjs'
 
 export function substitute(template, vars) {
   const unknown = []
@@ -96,4 +98,101 @@ export function buildCommand({ version, profile, profileName, account, java, os 
   args.push(...gameArgs)
 
   return { bin: java, args, cwd: profileDir(profileName), env: { ...process.env } }
+}
+
+export async function spawnClient(command, { name, state }) {
+  fs.mkdirSync(command.cwd, { recursive: true })
+  fs.mkdirSync(clientRunDir(name), { recursive: true })
+
+  let cmd
+  let args
+  let env
+  if (/\.m?js$/i.test(command.bin)) {
+    cmd = process.execPath
+    args = [command.bin, ...command.args]
+    env = { ...command.env, ELECTRON_RUN_AS_NODE: '1' }
+  } else {
+    cmd = command.bin
+    args = command.args
+    env = command.env
+  }
+
+  const logStream = fs.createWriteStream(clientLog(name), { flags: 'a' })
+
+  const child = spawn(cmd, args, {
+    cwd: command.cwd,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: false,
+    detached: false,
+    env,
+  })
+
+  child.stdout.pipe(logStream, { end: false })
+  child.stderr.pipe(logStream, { end: false })
+  // A log that can no longer be written (disk full, folder gone) must not take the game down
+  // with it: the capture stops and the client keeps running.
+  logStream.on('error', (err) => {
+    child.stdout.unpipe(logStream)
+    child.stderr.unpipe(logStream)
+    process.stderr.write(`client log for ${name} stopped: ${err.message}\n`)
+  })
+
+  child.on('close', () => logStream.end())
+  // A stopped client's exit event can arrive after the next launch wrote its own state; leave that one alone.
+  child.on('exit', () => {
+    if (readJson(clientStateFile(name), null)?.pid === child.pid) fs.rmSync(clientStateFile(name), { force: true })
+  })
+
+  return new Promise((resolve, reject) => {
+    child.on('spawn', () => {
+      writeJson(clientStateFile(name), {
+        pid: child.pid,
+        startedAt: new Date().toISOString(),
+        mode: state.mode ?? 'offline',
+        account: { type: state.account.type, name: state.account.name },
+        javaPid: child.pid,
+        harness: state.harness ?? null,
+      })
+      resolve({ pid: child.pid, child })
+    })
+    child.on('error', (err) => reject(new UserError('could not start ' + command.bin + ': ' + err.message)))
+  })
+}
+
+export function readClientState(name) {
+  const state = readJson(clientStateFile(name), null)
+  if (state === null) return null
+  if (!pidAlive(state.pid)) {
+    fs.rmSync(clientStateFile(name), { force: true })
+    return null
+  }
+  return state
+}
+
+export async function stopClient(name, { timeout = 10000, quit = null } = {}) {
+  const state = readClientState(name)
+  if (state === null) return { stopped: false, wasRunning: false }
+
+  if (typeof quit === 'function') {
+    try { await quit() } catch { /* a failed quit falls through to the kill */ }
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline && pidAlive(state.pid)) {
+      await sleep(100)
+    }
+  }
+
+  if (pidAlive(state.pid)) {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/PID', String(state.pid), '/T', '/F'], { windowsHide: true })
+    } else {
+      killProcessGroup(state.pid)
+    }
+    const killDeadline = Date.now() + 5000
+    while (Date.now() < killDeadline && pidAlive(state.pid)) {
+      await sleep(100)
+    }
+  }
+
+  fs.rmSync(clientStateFile(name), { force: true })
+  return { stopped: true, wasRunning: true }
 }
