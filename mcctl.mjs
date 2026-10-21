@@ -45,6 +45,10 @@ import { jsonLine, checkFlags, instanceName, keepCount, UsageError } from './src
 import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 import * as bots from './src/bots.mjs'
 import { buildBundle, writeBundle, summarise, summarySection, TAIL_LINES } from './src/diag-bundle.mjs'
+import * as client from './src/client.mjs'
+import { versionJson, clientCacheDir, clientLog } from './src/client-paths.mjs'
+import { ensureVersion } from './src/client-install.mjs'
+import { fetchManifest, fetchVersionJson } from './src/client-meta.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -1935,6 +1939,17 @@ BOTS (plugin testing with scripted players)
       --instance <server>            Use this server instead of the scenario's
       --json                         The report as one JSON line; exit 1 when a step fails
 
+CLIENT (a game client for your own servers)
+  mcctl client list                  Profiles, with running state
+  mcctl client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
+  mcctl client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness
+  mcctl client remove <name>         Delete a profile (--purge also removes its game folder)
+  mcctl client install <name>        Download what the profile needs, with progress on stderr
+  mcctl client launch <name>         Install if needed and start the client (--as, --server, --wait)
+  mcctl client status <name>         Say whether the client is running
+  mcctl client stop <name>           Stop a running client
+  mcctl client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
+
 DATABASES
   mcctl db                           List databases
   mcctl db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
@@ -2014,6 +2029,163 @@ async function cmdBot(positional, flags) {
   throw new UsageError(usage)
 }
 
+// --------------------------------------------------------------------- client
+
+// Only the version JSON comes from the manifest; ensureVersion (run by `install`, and by
+// client.launch itself) fetches the rest, so `launch` does not walk every file twice.
+async function fetchProfileVersionJson(name) {
+  const profile = client.getProfile(name)
+  if (profile.loader === 'fabric') fail('fabric profiles cannot be installed yet')
+  if (!fs.existsSync(versionJson(profile.mc))) {
+    const cacheDir = clientCacheDir(name)
+    const manifest = await fetchManifest({ cacheDir })
+    await fetchVersionJson(profile.mc, { manifest, cacheDir })
+  }
+  return profile
+}
+
+/**
+ * A game client for your own servers. `new` makes a profile; `launch` installs what it needs
+ * from Mojang and starts the real Minecraft client as an offline player, pointed at one of
+ * your servers.
+ */
+async function cmdClient(positional, flags) {
+  const [sub, ...rest] = positional
+  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest]'
+  const quiet = flags.json === true
+  const onProgress = (p) => { if (!quiet) process.stderr.write(p.phase + ' ' + p.done + '/' + p.total + '\n') }
+
+  if (sub === 'list') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    const profiles = client.listProfiles().map(p => ({ ...p, running: client.status(p.name).running }))
+    if (quiet) process.stdout.write(jsonLine('client', { profiles }))
+    else if (!profiles.length) out('No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11')
+    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.running ? 'running' : 'stopped'}`)
+    return
+  }
+
+  if (sub === 'new') {
+    checkFlags(flags, ['mc', 'loader', 'memory', 'java', 'server', 'harness', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    if (!flags.mc) throw new UsageError(usage)
+    const profile = client.createProfile(rest[0], { mc: flags.mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true })
+    if (quiet) process.stdout.write(jsonLine('client', { profile }))
+    else out(`Created profile "${rest[0]}" (Minecraft ${profile.mc}, ${profile.loader}). Launch it: spawnloft client launch ${rest[0]}`)
+    return
+  }
+
+  if (sub === 'set') {
+    checkFlags(flags, ['json'])
+    if (rest.length < 2) throw new UsageError(usage)
+    const name = rest[0]
+    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness']
+    const patch = {}
+    for (const arg of rest.slice(1)) {
+      const m = arg.match(/^([a-zA-Z]+)=(.*)$/)
+      if (!m) throw new UsageError(usage)
+      const key = m[1]
+      if (!allowed.includes(key)) fail(`unknown profile field "${key}"; one of ${allowed.join(', ')}`)
+      let value = m[2]
+      if (key === 'harness') {
+        if (value !== 'true' && value !== 'false') throw new UsageError(usage)
+        value = value === 'true'
+      } else if ((key === 'loaderVersion' || key === 'java' || key === 'server') && value === '') {
+        value = null
+      }
+      patch[key] = value
+    }
+    const profile = client.updateProfile(name, patch)
+    if (quiet) process.stdout.write(jsonLine('client', { profile }))
+    else out(`Updated "${name}": ` + Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(' '))
+    return
+  }
+
+  if (sub === 'remove') {
+    checkFlags(flags, ['purge', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    client.removeProfile(rest[0], { purge: flags.purge === true })
+    if (quiet) process.stdout.write(jsonLine('client', { removed: rest[0], purged: flags.purge === true }))
+    else out(`Removed "${rest[0]}"`)
+    return
+  }
+
+  if (sub === 'install') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const profile = await fetchProfileVersionJson(rest[0])
+    const result = await ensureVersion(profile.mc, { onProgress })
+    if (quiet) process.stdout.write(jsonLine('client', { name: rest[0], ...result }))
+    else out(`Installed ${result.id}: ${result.downloaded} files (${result.bytes} bytes)`)
+    return
+  }
+
+  if (sub === 'launch') {
+    checkFlags(flags, ['as', 'server', 'wait', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
+    const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
+    if (!fakeJava) await fetchProfileVersionJson(rest[0])
+    const res = await client.launch(rest[0], { playerName: flags.as ?? null, server: flags.server ?? null, onProgress, fakeJava })
+    if (flags.wait === true) {
+      const deadline = Date.now() + 5000
+      while (Date.now() < deadline) {
+        if (!client.status(rest[0]).running) fail('the client exited within 5 s; see spawnloft client logs ' + rest[0])
+        await sleep(250)
+      }
+    }
+    if (quiet) process.stdout.write(jsonLine('client', { pid: res.pid, version: res.version, account: res.account, profile: res.profile }))
+    else out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
+    return
+  }
+
+  if (sub === 'status') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const st = client.status(rest[0])
+    if (quiet) process.stdout.write(jsonLine('client', st))
+    else if (st.running) out(`"${rest[0]}" is running (pid ${st.pid}, up ${Math.floor(st.uptimeMs / 1000)}s) as ${st.account?.name ?? '?'}`)
+    else out(`"${rest[0]}" is stopped`)
+    return
+  }
+
+  if (sub === 'stop') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const res = await client.stop(rest[0])
+    if (quiet) process.stdout.write(jsonLine('client', res))
+    else out(res.stopped ? `Stopped "${rest[0]}"` : `"${rest[0]}" was not running`)
+    return
+  }
+
+  if (sub === 'logs') {
+    checkFlags(flags, ['n', 'latest', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const count = Number(flags.n ?? 100)
+    if (!Number.isInteger(count) || count < 1) throw new UsageError('-n must be a positive whole number')
+    let lines = []
+    let file
+    if (flags.latest === true) {
+      file = client.latestLogPath(rest[0])
+      try {
+        lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err
+      }
+      if (lines.length && lines[lines.length - 1] === '') lines.pop()
+      lines = lines.slice(-count)
+    } else {
+      file = clientLog(rest[0])
+      lines = client.tailClientLog(rest[0], count)
+    }
+    if (quiet) process.stdout.write(jsonLine('client', { lines, file }))
+    else for (const l of lines) out(l)
+    return
+  }
+
+  throw new UsageError(usage)
+}
+
 // ---------------------------------------------------------------------- main
 
 const COMMANDS = {
@@ -2072,6 +2244,7 @@ const COMMANDS = {
   db: cmdDb,
   mcp: cmdMcp,
   bot: cmdBot,
+  client: cmdClient,
   uninstall: cmdUninstall,
   help: cmdHelp,
 }
@@ -2099,7 +2272,7 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot', 'diag'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot', 'diag', 'client'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
   // Not for `data`: it is what puts things right after a move was interrupted, when the data folder

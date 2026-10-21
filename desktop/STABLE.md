@@ -43,6 +43,7 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 - **The Overview feed marks its days, and says when backup details could not load.** When the recent activity crosses midnight it is split under Today, Yesterday and dated labels. If the Overview cannot read backup ages and the machine's memory, it says so with a Try again button, and the cards say Backups unknown instead of waiting forever.
 - **A database you run elsewhere can be pointed at a new address.** Its Settings page has Edit address (also offered on the Not answering notice) for the host, port and admin login, with the password kept unless you type a new one. It saves even when nothing answers there yet and says so. On the command line: `mcctl db address <db> --port <n>`.
 - **Diagnostics in one file.** `spawnloft diag <server>`, or the assistant's `diagnostics` tool with `bundle: true`, writes a zip with the console, the daemon log, crash reports and the known-problem findings, with passwords and account names removed, for attaching to a bug report.
+- **A game client.** `spawnloft client new <name> --mc 1.21.11` makes a profile, `spawnloft client launch <name>` installs what it needs from Mojang and starts the real Minecraft client as an offline player, pointed at one of your servers. Offline profiles join offline-mode servers only; Microsoft sign-in comes later.
 
 ## Fixed
 

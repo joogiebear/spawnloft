@@ -125,6 +125,15 @@ are separate planned additions.
 --json` does the same for whether the server will take bots (exit 1 with the first problem as the
 error when it will not). [BOTS.md](BOTS.md) has the scenario format.
 
+## Game client
+
+`spawnloft client new <name> --mc <version>` makes a profile; `launch` installs what it
+needs from Mojang and starts the real Minecraft client as an offline player, pointed at one
+of your servers. Every subcommand (`list`, `new`, `set`, `remove`, `install`, `launch`,
+`status`, `stop`, `logs`) takes `--json` and answers one envelope with `command` `client`.
+Offline profiles join offline-mode servers only. `logs --latest` reads the game's own
+`latest.log`.
+
 ## AI assistants
 
 `spawnloft mcp` is a Model Context Protocol server on stdio, started by an AI app such as
