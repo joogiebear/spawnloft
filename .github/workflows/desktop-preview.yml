@@ -21,6 +21,9 @@ defaults:
 
 jobs:
   release-policy:
+    # A draft pull request builds nothing: every job below needs this one, so gating it here keeps
+    # a long-running branch from spending hosted minutes until it is marked ready for review.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     outputs:
       mac-signing-mode: ${{ steps.mode.outputs.value }}
