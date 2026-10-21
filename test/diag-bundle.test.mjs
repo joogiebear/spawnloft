@@ -221,6 +221,22 @@ test('collectClient finds the connection-refused shape and the crash report', as
   assert.ok(refused.text.includes('checkConnect'), 'stack line is joined onto the entry')
 })
 
+test('collectClient keeps only what the process capture adds to latest.log', async () => {
+  const latest = fs.readFileSync(path.join(fixtureDir, 'client-latest.log'), 'utf8')
+  const processLog = path.join(clientRoot, 'run', 'fixclient', 'client.log')
+  const before = fs.readFileSync(processLog)
+  try {
+    // the game prints its log lines to stdout too, so the capture is latest.log plus the JVM's own words
+    fs.writeFileSync(processLog, latest + 'Error: Could not create the Java Virtual Machine.\n')
+    const result = await collectClient('fixclient', { lines: 100 })
+    const fromProcess = result.timeline.filter(e => e.source === 'client-process')
+    assert.equal(fromProcess.length, 1, 'the duplicated lines are not in the timeline twice')
+    assert.ok(fromProcess[0].text.includes('Could not create the Java Virtual Machine'))
+  } finally {
+    fs.writeFileSync(processLog, before)
+  }
+})
+
 test('buildBundle merges server and client timelines in time order with findings on both sides', async () => {
   const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 100 })
 

@@ -135,7 +135,10 @@ export async function collectClient(name, { lines = TAIL_LINES } = {}) {
 
   const latestPath = latestLogPath(name)
   const latestLines = await readLines(latestPath, lines)
-  const processLines = await readLines(clientLog(name), lines)
+  // The game prints to stdout what it writes to latest.log, so the process capture is kept for
+  // what only it has: JVM errors, launcher output, lines after the logger died.
+  const inLatest = new Set(latestLines)
+  const processLines = (await readLines(clientLog(name), lines)).filter((l) => !inLatest.has(l))
 
   let anchor = null
   try {

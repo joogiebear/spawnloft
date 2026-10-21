@@ -119,6 +119,13 @@ export const clientActionTools = [
       if (res.profile.harness) {
         const ch = await client.session(p)
         h = await ch.call('status')
+        // The harness answers before the game has loaded its resources; a screenshot taken then
+        // shows the loading overlay, so wait for the title screen (or a server) within reason.
+        const settled = Date.now() + 90000
+        while (/loading/i.test(h.screenTitle || h.screen || '') && Date.now() < settled) {
+          await sleep(1000)
+          h = await ch.call('status')
+        }
         extra = `Screen: ${h.screenTitle || h.screen}.`
       } else {
         const deadline = Date.now() + 5000
