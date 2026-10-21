@@ -47,14 +47,21 @@ export async function ensureHarnessJar(profileName, mc, { onProgress } = {}) {
   return { installed: true, file: path.basename(dest) }
 }
 
-export function readHarnessFile(profileName) {
+// With `pid`, a file left by an earlier run of the game (a crash skips the mod's cleanup) is
+// treated as absent: its port may belong to another program by now, and the token must not go there.
+export function readHarnessFile(profileName, { pid = null } = {}) {
   const data = readJson(path.join(profileDir(profileName), HARNESS_FILE), null)
   if (data === null || typeof data !== 'object' || typeof data.port !== 'number') return null
+  if (pid !== null && data.pid !== pid) return null
   return data
 }
 
-export async function connectHarness(profileName, token, { timeout = 5000 } = {}) {
-  const info = readHarnessFile(profileName)
+export function removeHarnessFile(profileName) {
+  fs.rmSync(path.join(profileDir(profileName), HARNESS_FILE), { force: true })
+}
+
+export async function connectHarness(profileName, token, { timeout = 5000, pid = null } = {}) {
+  const info = readHarnessFile(profileName, { pid })
   if (!info) {
     fail('profile "' + profileName + '" has no running harness')
   }
@@ -147,16 +154,16 @@ export async function connectHarness(profileName, token, { timeout = 5000 } = {}
   return { call, close, hello: helloResult }
 }
 
-export async function waitForHarness(profileName, token, { timeout = 90000, alive = () => true } = {}) {
+export async function waitForHarness(profileName, token, { timeout = 90000, alive = () => true, pid = null } = {}) {
   const start = Date.now()
   for (;;) {
     if (!alive()) {
       fail('the client exited before its harness answered')
     }
-    const info = readHarnessFile(profileName)
+    const info = readHarnessFile(profileName, { pid })
     if (info) {
       try {
-        return await connectHarness(profileName, token, { timeout: 2000 })
+        return await connectHarness(profileName, token, { timeout: 2000, pid })
       } catch (err) {
         if (err instanceof UserError) {
           if (/refused the token/.test(err.message)) throw err

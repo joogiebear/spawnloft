@@ -230,7 +230,9 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   }
 
   // the timeline and findings reach summarise() and timeline.txt, not only files, so every text field is cleaned
-  const clean = (s) => (typeof s === 'string' ? scrub(redactAccountName(s)) : s)
+  // Minecraft's crash reports list every JVM flag, the harness token among them; it dies with the
+  // game, but a bug report should not carry it anyway.
+  const clean = (s) => (typeof s === 'string' ? scrub(redactAccountName(s)).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]') : s)
   for (const f of files) f.text = clean(f.text)
   for (const finding of findings.server) {
     finding.title = clean(finding.title)

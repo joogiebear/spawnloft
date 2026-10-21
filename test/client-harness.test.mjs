@@ -101,3 +101,17 @@ test('harness lifecycle: launch, connect, protocol ops, quit', async () => {
   assert.equal(status('harn').running, false)
   assert.ok(!fs.existsSync(path.join(profileDir('harn'), 'spawnloft-harness.json')))
 })
+
+test('a harness file from another process is ignored, and launch clears it', async () => {
+  const { readHarnessFile } = await import('../src/client-harness.mjs')
+  const file = path.join(profileDir('harn'), 'spawnloft-harness.json')
+  fs.writeFileSync(file, JSON.stringify({ port: 1, pid: 999999, startedAt: new Date().toISOString(), version: 'stale' }))
+  assert.ok(readHarnessFile('harn'), 'the file reads without a pid')
+  assert.equal(readHarnessFile('harn', { pid: 4242 }), null, 'the file is ignored for another pid')
+  await assert.rejects(connectHarness('harn', 'x', { pid: 4242 }), /no running harness/)
+
+  const res = await launch('harn', { fakeJava })
+  const found = readHarnessFile('harn', { pid: res.pid })
+  assert.ok(found === null || found.version !== 'stale', 'launch removed the stale file before the game wrote its own')
+  await stop('harn')
+})

@@ -10,7 +10,7 @@ import { mergeInherited, fetchManifest, fetchVersionJson } from './client-meta.m
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
-import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
+import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 
 export const LOADERS = ['vanilla', 'fabric']
@@ -195,6 +195,8 @@ export async function launch(name, { playerName = null, server = null, onProgres
 
   const account = offlineAccount(playerName ?? defaultPlayerName(name))
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
+  // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
+  if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, harnessToken })
   const { pid } = await spawnClient(command, { name, state: { mode: 'offline', account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
@@ -211,7 +213,7 @@ export function status(name) {
     startedAt: st?.startedAt ?? null,
     uptimeMs: st ? Date.now() - Date.parse(st.startedAt) : null,
     account: st?.account ?? null,
-    harness: st?.harness ? { port: readHarnessFile(name)?.port ?? null } : null,
+    harness: st?.harness ? { port: readHarnessFile(name, { pid: st.pid })?.port ?? null } : null,
   }
 }
 
@@ -229,7 +231,7 @@ export async function session(name) {
   if (cached && cached.pid === st.pid) {
     return cached.channel
   }
-  const channel = await waitForHarness(name, st.harness.token, { timeout: 90000, alive: () => status(name).running })
+  const channel = await waitForHarness(name, st.harness.token, { timeout: 90000, alive: () => status(name).running, pid: st.pid })
   sessions.set(name, { pid: st.pid, channel })
   return channel
 }
@@ -287,9 +289,9 @@ async function quitViaHarness(name, st) {
   if (cached && cached.pid === st.pid) {
     channel = cached.channel
   } else {
-    const info = readHarnessFile(name)
+    const info = readHarnessFile(name, { pid: st.pid })
     if (!info) fail('the harness file is missing; the game may still be loading')
-    channel = await connectHarness(name, st.harness.token, { timeout: 3000 })
+    channel = await connectHarness(name, st.harness.token, { timeout: 3000, pid: st.pid })
   }
   await channel.call('quit', {}, { timeout: 5000 })
   channel.close()

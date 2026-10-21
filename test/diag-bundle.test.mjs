@@ -67,7 +67,8 @@ fs.writeFileSync(path.join(clientRoot, 'profiles.json'), JSON.stringify({
 fs.writeFileSync(path.join(profDir, 'logs', 'latest.log'), fs.readFileSync(path.join(fixtureDir, 'client-latest.log')))
 fs.writeFileSync(path.join(clientRoot, 'run', 'fixclient', 'client.log'), fs.readFileSync(path.join(fixtureDir, 'client-process.log')))
 fs.writeFileSync(path.join(profDir, 'options.txt'), fs.readFileSync(path.join(fixtureDir, 'client-options.txt')))
-fs.writeFileSync(path.join(profDir, 'crash-reports', 'crash-2026-10-20_14.00.06-client.txt'), fs.readFileSync(path.join(fixtureDir, 'crash-2026-10-20_14.00.06-client.txt')))
+fs.writeFileSync(path.join(profDir, 'crash-reports', 'crash-2026-10-20_14.00.06-client.txt'), fs.readFileSync(path.join(fixtureDir, 'crash-2026-10-20_14.00.06-client.txt'), 'utf8')
+  + '\n\tJVM Flags: 2 total; -Xmx2G -Dspawnloft.harness.token=deadbeefdeadbeefdeadbeefdeadbeef\n')
 fs.writeFileSync(path.join(profDir, 'mods', 'fabric-api-0.141.6+1.21.11.jar'), '')
 
 const t = new Date(2026, 9, 20, 14, 0, 10)
@@ -293,4 +294,12 @@ test('buildBundle with neither server nor client rejects', async () => {
 
 test('buildBundle with an unknown client profile rejects', async () => {
   await assert.rejects(buildBundle({ client: 'nosuch' }))
+})
+
+test('the harness token in a crash report never reaches the bundle', async () => {
+  const bundle = await buildBundle({ client: 'fixclient', lines: 100 })
+  const report = bundle.files.find(f => f.name.startsWith('client-crash-reports/'))
+  assert.ok(report, 'the crash report is in the bundle')
+  assert.ok(!report.text.includes('deadbeef'), 'token scrubbed')
+  assert.match(report.text, /spawnloft\.harness\.token=\[redacted\]/)
 })
