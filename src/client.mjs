@@ -9,7 +9,9 @@ import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName } from './client-auth.mjs'
-import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile } from './client-fabric.mjs'
+import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
+import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
+import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
@@ -158,6 +160,9 @@ export async function launch(name, { playerName = null, server = null, onProgres
   if (st.running) {
     fail(`profile "${name}" is already running (pid ${st.pid}); stop it first`)
   }
+  if (profile.harness && !harnessFor(profile.mc)) {
+    fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
+  }
 
   const java = fakeJava ?? await pickJava({ explicit: profile.java, needs: requiredMajor(profile.mc), what: 'Minecraft ' + profile.mc })
 
@@ -178,6 +183,8 @@ export async function launch(name, { playerName = null, server = null, onProgres
   } else {
     versionId = await prepareVersion(name, { onProgress })
     await ensureVersion(versionId, { onProgress })
+    if (profile.loader === 'fabric') await ensureFabricApi(name, profile.mc, { onProgress })
+    if (profile.harness) await ensureHarnessJar(name, profile.mc, { onProgress })
   }
 
   let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
@@ -204,13 +211,98 @@ export function status(name) {
     startedAt: st?.startedAt ?? null,
     uptimeMs: st ? Date.now() - Date.parse(st.startedAt) : null,
     account: st?.account ?? null,
-    harness: st?.harness ? { port: st.harness.port } : null,
+    harness: st?.harness ? { port: readHarnessFile(name)?.port ?? null } : null,
   }
+}
+
+const sessions = new Map()
+
+export async function session(name) {
+  const st = readClientState(name)
+  if (!st) {
+    fail('profile "' + name + '" is not running; launch it first: spawnloft client launch ' + name)
+  }
+  if (!st.harness) {
+    fail('profile "' + name + '" was launched without the harness; set harness=true on a fabric profile (spawnloft client set ' + name + ' harness=true) and launch it again')
+  }
+  const cached = sessions.get(name)
+  if (cached && cached.pid === st.pid) {
+    return cached.channel
+  }
+  const channel = await waitForHarness(name, st.harness.token, { timeout: 90000, alive: () => status(name).running })
+  sessions.set(name, { pid: st.pid, channel })
+  return channel
+}
+
+async function viaSession(name, fn) {
+  const channel = await session(name)
+  try {
+    return await fn(channel)
+  } catch (err) {
+    if (/went away/.test(err.message)) sessions.delete(name)
+    throw err
+  }
+}
+
+export async function join(name, server) {
+  const check = checkInstance(server)
+  if (!check.ok) fail(check.problems.join(' '))
+  const host = check.host
+  const port = check.inst.port
+  const result = await viaSession(name, (ch) => ch.call('join', { host, port }, { timeout: 65000 }))
+  return { ...result, server, host, port }
+}
+
+export async function chat(name, text) {
+  if (typeof text !== 'string' || text.trim() === '') fail('chat needs text')
+  if (text.startsWith('/') && REFUSED_CONSOLE.has(commandVerb(text))) {
+    fail('"' + commandVerb(text) + '" would take the server down or half-reload it; a client cannot run it, send it from the console if you mean it')
+  }
+  return viaSession(name, (ch) => ch.call('chat', { text }))
+}
+
+export async function messages(name, since = 0) {
+  return viaSession(name, (ch) => ch.call('messages', { since }))
+}
+
+export async function screenshot(name) {
+  return viaSession(name, (ch) => ch.call('screenshot'))
+}
+
+export async function player(name) {
+  return viaSession(name, (ch) => ch.call('player'))
+}
+
+export async function screen(name) {
+  return viaSession(name, (ch) => ch.call('screen'))
+}
+
+export async function disconnect(name) {
+  return viaSession(name, (ch) => ch.call('disconnect'))
+}
+
+async function quitViaHarness(name, st) {
+  const cached = sessions.get(name)
+  let channel
+  if (cached && cached.pid === st.pid) {
+    channel = cached.channel
+  } else {
+    const info = readHarnessFile(name)
+    if (!info) fail('the harness file is missing; the game may still be loading')
+    channel = await connectHarness(name, st.harness.token, { timeout: 3000 })
+  }
+  await channel.call('quit', {}, { timeout: 5000 })
+  channel.close()
+  sessions.delete(name)
 }
 
 export async function stop(name) {
   getProfile(name)
-  return stopClient(name)
+  const st = readClientState(name)
+  const quit = st?.harness ? () => quitViaHarness(name, st) : null
+  const res = await stopClient(name, { quit })
+  sessions.delete(name)
+  return res
 }
 
 export function tailClientLog(name, count = 100) {
