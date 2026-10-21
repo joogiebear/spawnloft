@@ -73,6 +73,13 @@ sharing them. A historical diagnostic finding is not a failed command or a plugi
 verdict. `doctor --json` is read-only and returns `ok:false` plus its findings when checks
 fail. The existing plain-text `doctor` retains its stale-state repair behavior.
 
+`spawnloft diag <server> [--lines N] [--out <dir>] [--json]` writes a zip holding the
+server console, the daemon log, crash reports, `server.properties` (secrets removed) and
+the known-problem findings, with passwords and account names stripped. The default
+destination is `backups/<server>/exports/`. With `--json`, the envelope carries `facts`,
+`findings`, `files` and `file` (the zip path); `timeline` is omitted. Exit 0 on success,
+2 for a missing name, 1 for a bad `--lines` value.
+
 Plugin JSON is inventory only: `plugins ... enable/disable --json` is rejected before
 changing a JAR. Other commands without JSON support reject the option before taking action.
 Backup creation reports warnings, skipped database dumps, mirror errors, and pruning results;
@@ -117,6 +124,17 @@ are separate planned additions.
 1 when a step fails, so a plugin's scenarios can run in a script or CI. `spawnloft bot check <inst>
 --json` does the same for whether the server will take bots (exit 1 with the first problem as the
 error when it will not). [BOTS.md](BOTS.md) has the scenario format.
+
+## Game client
+
+`spawnloft client new <name> --mc <version>` makes a profile; `launch` installs what it
+needs from Mojang and starts the real Minecraft client, offline or as a signed-in Microsoft
+account (`client login`, `client accounts`, `client logout <name>`), pointed at one
+of your servers. Every subcommand (`list`, `new`, `set`, `remove`, `install`, `launch`,
+`status`, `stop`, `logs`) takes `--json` and answers one envelope with `command` `client`.
+Offline profiles join offline-mode servers only. `logs --latest` reads the game's own
+`latest.log`. [CLIENT.md](CLIENT.md) has the profiles, the harness and the folder layout;
+`spawnloft diag <server> --client <profile> --json` answers one envelope with `command` `diag`.
 
 ## AI assistants
 

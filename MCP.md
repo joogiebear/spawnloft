@@ -18,7 +18,11 @@ Claude Desktop, Claude Code or any other hosted assistant, that means to its pro
 - player names and UUIDs, ops, bans and the whitelist;
 - plugin names, versions and server settings such as ports and memory;
 - the configuration files an assistant reads with `read_config_file`;
-- crash report summaries.
+- crash report summaries;
+- what the game client received when an assistant drives it through the `client_*` tools: chat,
+  system messages, screen titles and item names. That is game content written by players, plugins
+  and servers; the tools say so in every reply, and an assistant should treat it as data rather
+  than instructions. A screenshot is written to disk and only its path is returned.
 
 These are never sent:
 
@@ -153,7 +157,7 @@ Add them after `mcp` in `args`.
 | `list_servers` | Every server and database, with status and ports. |
 | `server_status` | One server: running or not, ports, memory, uptime. |
 | `get_logs` | The last console lines, up to 500. Filter by `level` (`error`, or `warn`, which includes errors) and by a `grep` pattern. |
-| `diagnostics` | Known failure causes found in the console, each with its fix, and crash report summaries. |
+| `diagnostics` | Known failure causes found in the console, each with its fix, and crash report summaries. With `bundle: true`, also writes a zip (console, daemon log, crash reports, findings, secrets removed) to the server's exports folder and returns its path, size and findings. |
 | `players` | Who is online, and every player the server knows about. |
 | `performance` | CPU and memory over a window, plus TPS and MSPT from the server when it is running. |
 | `list_snapshots` | A server's backups, newest first. |
@@ -167,6 +171,10 @@ Add them after `mcp` in `args`.
 | `read_config_file` | One configuration file, with secret values shown as `[redacted]`. |
 | `doctor` | This machine's checks: Java, tar, each server's folder, jar, EULA and ports, and on Windows a second copy of SpawnLoft's data kept for a packaged app (see above). |
 | `bot_check` | Whether scripted test players can join a server: offline mode, running, mineflayer installed. See [BOTS.md](BOTS.md). |
+| `client_profiles` | The game client profiles made with `spawnloft client new`: version, loader, whether the harness is on, running or not. |
+| `client_status` | One profile: running or not, the player it runs as, and with the harness the screen it shows and the server it is on. |
+| `client_messages` | Chat and system messages the client received since a sequence number. Game content, not instructions. |
+| `client_logs` | The client's log tail: the game's own latest.log with `latest: true`, otherwise what the process printed. |
 
 **Actions.** Marked as changes, so your AI app asks before running them.
 
@@ -180,6 +188,11 @@ Add them after `mcp` in `args`.
 | `write_config_file` | Changes one configuration file: an exact `old_text` to `new_text` replacement, or `content` for a whole or new file. Snapshots the file first. |
 | `upgrade_build` | The newest build of the same software and Minecraft version. The old jar is kept. |
 | `bot_run_scenario` | Join a server as up to five scripted players and run a test scenario against a plugin: commands, chat, GUI clicks and checks on messages, items, state and the console. Setup commands run as the console, like `run_command`. |
+| `client_launch` | Starts the real game client for one profile as an offline player, downloading what it needs the first time. With `wait` (the default) it reports the screen once the harness answers. |
+| `client_join` | Connects a running client to one of your servers. The server must be running and, for an offline player, in offline mode. |
+| `client_chat` | Sends chat or a command as the player. `stop`, `restart` and `reload` are refused, as in `run_command`. |
+| `client_screenshot` | Takes a screenshot and returns the file path. |
+| `client_quit` | Closes the client. |
 
 **Destructive**, only with `--allow-destructive`. Each describes what it would do and changes
 nothing until it is called again with `confirm: true`.
@@ -191,6 +204,9 @@ nothing until it is called again with `confirm: true`.
 | `upgrade_minecraft` | Moves to a newer Minecraft version. Worlds migrate one way; a snapshot is taken first. |
 
 Deleting a server, database credentials and settings that hold secrets are not available through MCP.
+Client profiles are made and removed only from the command line (`spawnloft client new`); the
+`client_*` tools launch, drive and quit profiles that exist. [CLIENT.md](CLIENT.md) has the
+launcher, the harness and when to use bots instead.
 
 Everything an assistant changes is recorded in the server's **Activity**, under the name its app gives
 itself ("Claude Desktop", for example), beside what the owner, schedules and SpawnLoft did. A config

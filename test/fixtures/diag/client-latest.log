@@ -1,0 +1,6 @@
+[14:00:01] [Render thread/INFO]: Setting user: Steve
+[14:00:02] [Render thread/INFO]: Backend library: LWJGL version 3.3.3
+[14:00:05] [Render thread/INFO]: Connecting to 127.0.0.1, 25565
+[14:00:05] [Render thread/ERROR]: Couldn't connect to server
+[14:00:05] [Render thread/ERROR]: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: no further information: /127.0.0.1:25565
+	at java.base/sun.nio.ch.SocketChannelImpl.checkConnect(Native Method)

@@ -29,6 +29,14 @@ const lifted = (names) => new Function(
    return { ${names.filter((n) => !/^[A-Z_]+$/.test(n)).join(', ')} }`,
 )()
 
+test('the page script parses', () => {
+  // A stray line in a generated edit left the boot block unclosed once; node --check never sees
+  // the inline script, so this does.
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1])
+  assert.ok(scripts.length >= 1)
+  for (const src of scripts) new Function(src)
+})
+
 const { levelOf } = lifted(['MCCTL_RE', 'LEVEL_RE', 'BARE_LEVEL_RE', 'CONT_RE', 'EXC_RE', 'levelOf'])
 const { cleanConsoleText } = lifted(['ANSI_STRING_RE', 'ANSI_CSI_RE', 'ANSI_ESCAPE_RE', 'LOG_CONTROL_RE', 'cleanConsoleText'])
 
@@ -210,4 +218,15 @@ test('the overview feed folds a run of the same thing into one line, and only a 
   assert.deepEqual(runs.map((r) => r.entries.length), [3, 1, 1, 2, 1, 1])
   assert.equal(runs[0].entries[0].detail, 'b0.tar.gz', 'newest first, inside a run too')
   assert.notEqual(runs[3].key, runs[5].key, 'another server is another run')
+})
+
+const { playProfileFor } = lifted(['playProfileFor'])
+
+test('Play picks the profile for the server\'s version, preferring the one pointed at it', () => {
+  const profiles = [{ name: 'a', mc: '1.21.11', server: null }, { name: 'b', mc: '1.21.11', server: 'surv' }, { name: 'c', mc: '1.20.1', server: 'surv' }]
+  assert.equal(playProfileFor({ name: 'surv', mcVersion: '1.21.11' }, profiles).name, 'b')
+  assert.equal(playProfileFor({ name: 'other', mcVersion: '1.21.11' }, profiles).name, 'a')
+  assert.equal(playProfileFor({ name: 'x', mcVersion: '1.19.4' }, profiles), null)
+  assert.equal(playProfileFor({ name: 'x', mcVersion: null }, profiles).name, 'a')
+  assert.equal(playProfileFor({ name: 'x', mcVersion: '1.21.11' }, []), null)
 })

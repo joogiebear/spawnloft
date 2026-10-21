@@ -1,0 +1,7 @@
+---- Minecraft Crash Report ----
+// Why did you do that?
+
+Time: 2026-10-20 14:00:06
+Description: Unexpected error
+
+java.lang.IllegalStateException: test fixture

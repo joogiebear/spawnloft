@@ -44,6 +44,11 @@ import { findPrivateCopies, mcpNotice } from './src/private-copy.mjs'
 import { jsonLine, checkFlags, instanceName, keepCount, UsageError } from './src/cli-output.mjs'
 import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.mjs'
 import * as bots from './src/bots.mjs'
+import { buildBundle, writeBundle, summarise, summarySection, TAIL_LINES } from './src/diag-bundle.mjs'
+import * as client from './src/client.mjs'
+import * as clientAuth from './src/client-auth.mjs'
+import { clientLog } from './src/client-paths.mjs'
+import { ensureVersion } from './src/client-install.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -193,6 +198,29 @@ function cmdWhy(positional) {
       out(`  ${r.file}  ${r.description ? `- ${r.description}` : ''}`)
     }
   }
+}
+
+async function cmdDiag(positional, flags) {
+  checkFlags(flags, ['lines', 'out', 'json', 'client'])
+  const name = positional.length ? instanceName(positional, 'diag') : null
+  let lines = TAIL_LINES
+  if (flags.lines !== undefined) {
+    const n = Number(flags.lines)
+    if (typeof flags.lines !== 'string' || !Number.isInteger(n) || n < 1) fail('--lines must be a positive whole number')
+    lines = n > 25000 ? 25000 : n
+  }
+  if (flags.client !== undefined && typeof flags.client !== 'string') fail('--client needs a profile name')
+  if (!name && !flags.client) throw new UsageError('Usage: spawnloft diag <server> [--client <profile>] [--lines N] [--out <dir>]')
+  if (flags.out !== undefined && typeof flags.out !== 'string') fail('--out needs a folder, for example --out ./reports')
+  const outDir = flags.out ? path.resolve(flags.out) : path.join(paths.BACKUPS_DIR, name ?? 'client', 'exports')
+  const bundle = await buildBundle({ server: name, client: flags.client ?? null, lines, scrub: scrubber() })
+  const { file } = await writeBundle(bundle, { outDir })
+  if (cliContext.json) {
+    process.stdout.write(jsonLine('diag', { ...summarySection(bundle), file }))
+    return
+  }
+  out(summarise(bundle))
+  out(`Written: ${file}`)
 }
 
 async function cmdStart(positional, flags) {
@@ -1903,6 +1931,8 @@ OTHER
   mcctl jars                         List stored server jars
   mcctl jars import <path> [--as x]  Add a server jar to the store
   mcctl why <name>                   Say what is wrong with a server, from its own console
+  mcctl diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings
+                                     for a bug report (--lines N, --json)
 
 BOTS (plugin testing with scripted players)
   mcctl bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
@@ -1910,6 +1940,20 @@ BOTS (plugin testing with scripted players)
   mcctl bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report
       --instance <server>            Use this server instead of the scenario's
       --json                         The report as one JSON line; exit 1 when a step fails
+
+CLIENT (a game client for your own servers)
+  mcctl client list                  Profiles, with running state
+  mcctl client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
+  mcctl client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account
+  mcctl client remove <name>         Delete a profile (--purge also removes its game folder)
+  mcctl client install <name>        Download what the profile needs, with progress on stderr
+  mcctl client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
+  mcctl client status <name>         Say whether the client is running
+  mcctl client stop <name>           Stop a running client
+  mcctl client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
+  mcctl client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
+  mcctl client logout <name>         Forget a signed-in account
+  mcctl client accounts              Signed-in accounts
 
 DATABASES
   mcctl db                           List databases
@@ -1990,6 +2034,195 @@ async function cmdBot(positional, flags) {
   throw new UsageError(usage)
 }
 
+// --------------------------------------------------------------------- client
+
+/**
+ * A game client for your own servers. `new` makes a profile; `launch` installs what it needs
+ * from Mojang and starts the real Minecraft client as an offline player, pointed at one of
+ * your servers.
+ */
+async function cmdClient(positional, flags) {
+  const [sub, ...rest] = positional
+  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
+  const quiet = flags.json === true
+  const onProgress = (p) => { if (!quiet) process.stderr.write(p.phase + ' ' + p.done + '/' + p.total + '\n') }
+
+  if (sub === 'list') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    const profiles = client.listProfiles().map(p => ({ ...p, running: client.status(p.name).running }))
+    if (quiet) process.stdout.write(jsonLine('client', { profiles }))
+    else if (!profiles.length) out('No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11')
+    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.running ? 'running' : 'stopped'}`)
+    return
+  }
+
+  if (sub === 'new') {
+    checkFlags(flags, ['mc', 'loader', 'memory', 'java', 'server', 'harness', 'account', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    if (!flags.mc) throw new UsageError(usage)
+    const profile = client.createProfile(rest[0], { mc: flags.mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true, account: flags.account ?? null })
+    if (quiet) process.stdout.write(jsonLine('client', { profile }))
+    else out(`Created profile "${rest[0]}" (Minecraft ${profile.mc}, ${profile.loader}). Launch it: spawnloft client launch ${rest[0]}`)
+    return
+  }
+
+  if (sub === 'set') {
+    checkFlags(flags, ['json'])
+    if (rest.length < 2) throw new UsageError(usage)
+    const name = rest[0]
+    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness', 'account']
+    const patch = {}
+    for (const arg of rest.slice(1)) {
+      const m = arg.match(/^([a-zA-Z]+)=(.*)$/)
+      if (!m) throw new UsageError(usage)
+      const key = m[1]
+      if (!allowed.includes(key)) fail(`unknown profile field "${key}"; one of ${allowed.join(', ')}`)
+      let value = m[2]
+      if (key === 'harness') {
+        if (value !== 'true' && value !== 'false') throw new UsageError(usage)
+        value = value === 'true'
+      } else if ((key === 'loaderVersion' || key === 'java' || key === 'server' || key === 'account') && value === '') {
+        value = null
+      }
+      patch[key] = value
+    }
+    const profile = client.updateProfile(name, patch)
+    if (quiet) process.stdout.write(jsonLine('client', { profile }))
+    else out(`Updated "${name}": ` + Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(' '))
+    return
+  }
+
+  if (sub === 'remove') {
+    checkFlags(flags, ['purge', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    client.removeProfile(rest[0], { purge: flags.purge === true })
+    if (quiet) process.stdout.write(jsonLine('client', { removed: rest[0], purged: flags.purge === true }))
+    else out(`Removed "${rest[0]}"`)
+    return
+  }
+
+  if (sub === 'install') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const id = await client.prepareVersion(rest[0], { onProgress })
+    const result = await ensureVersion(id, { onProgress })
+    if (quiet) process.stdout.write(jsonLine('client', { name: rest[0], ...result }))
+    else out(`Installed ${result.id}: ${result.downloaded} files (${result.bytes} bytes)`)
+    return
+  }
+
+  if (sub === 'launch') {
+    checkFlags(flags, ['as', 'account', 'server', 'wait', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    if (flags.as !== undefined && typeof flags.as !== 'string') throw new UsageError('--as needs a player name')
+    if (flags.account !== undefined && typeof flags.account !== 'string') throw new UsageError('--account needs "offline:<player name>" or a signed-in account name')
+    if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
+    // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
+    const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
+    const res = await client.launch(rest[0], { playerName: flags.as ?? null, account: flags.account ?? null, server: flags.server ?? null, onProgress, fakeJava })
+    if (flags.wait === true) {
+      const deadline = Date.now() + 5000
+      while (Date.now() < deadline) {
+        if (!client.status(rest[0]).running) fail('the client exited within 5 s; see spawnloft client logs ' + rest[0])
+        await sleep(250)
+      }
+    }
+    if (quiet) process.stdout.write(jsonLine('client', { pid: res.pid, version: res.version, account: res.account, profile: res.profile }))
+    else out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
+    return
+  }
+
+  if (sub === 'status') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const st = client.status(rest[0])
+    if (quiet) process.stdout.write(jsonLine('client', st))
+    else if (st.running) out(`"${rest[0]}" is running (pid ${st.pid}, up ${Math.floor(st.uptimeMs / 1000)}s) as ${st.account?.name ?? '?'}`)
+    else out(`"${rest[0]}" is stopped`)
+    return
+  }
+
+  if (sub === 'stop') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const res = await client.stop(rest[0])
+    if (quiet) process.stdout.write(jsonLine('client', res))
+    else out(res.stopped ? `Stopped "${rest[0]}"` : `"${rest[0]}" was not running`)
+    return
+  }
+
+  if (sub === 'logs') {
+    checkFlags(flags, ['n', 'latest', 'json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    client.getProfile(rest[0])
+    const count = Number(flags.n ?? 100)
+    if (typeof (flags.n ?? '') !== 'string' || !Number.isInteger(count) || count < 1) throw new UsageError('-n must be a positive whole number')
+    let lines = []
+    let file
+    if (flags.latest === true) {
+      file = client.latestLogPath(rest[0])
+      try {
+        lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
+      } catch (err) {
+        if (err.code !== 'ENOENT') throw err
+      }
+      if (lines.length && lines[lines.length - 1] === '') lines.pop()
+      lines = lines.slice(-count)
+    } else {
+      file = clientLog(rest[0])
+      lines = client.tailClientLog(rest[0], count)
+    }
+    if (quiet) process.stdout.write(jsonLine('client', { lines, file }))
+    else for (const l of lines) out(l)
+    return
+  }
+
+  if (sub === 'login') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    const account = await clientAuth.deviceCodeLogin({
+      onCode: ({ verificationUri, userCode, expiresIn }) => {
+        // On stderr so --json keeps stdout for the one envelope; the person reads this either way.
+        process.stderr.write(`Open ${verificationUri} and enter the code ${userCode} (valid ${Math.floor(expiresIn / 60)} minutes). Waiting...\n`)
+      },
+    })
+    const list = clientAuth.loadAccounts()
+    const at = list.findIndex((a) => a.uuid === account.uuid)
+    if (at === -1) list.push(account)
+    else list[at] = account
+    clientAuth.saveAccounts(list)
+    if (quiet) process.stdout.write(jsonLine('client', { account: { type: account.type, name: account.name, uuid: account.uuid } }))
+    else out(`Signed in as ${account.name}. Use it: spawnloft client launch <profile> --account ${account.name}, or spawnloft client set <profile> account=${account.name}`)
+    return
+  }
+
+  if (sub === 'logout') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const list = clientAuth.loadAccounts()
+    const keep = list.filter((a) => a.name.toLowerCase() !== rest[0].toLowerCase())
+    if (keep.length === list.length) fail(`no signed-in account named "${rest[0]}"; spawnloft client accounts lists them`)
+    clientAuth.saveAccounts(keep)
+    if (quiet) process.stdout.write(jsonLine('client', { removed: rest[0] }))
+    else out(`Signed out ${rest[0]}. Microsoft keeps its own session; sign out of your browser too if the machine is shared.`)
+    return
+  }
+
+  if (sub === 'accounts') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    // Names and expiry only: the tokens never leave the file.
+    const accounts = clientAuth.loadAccounts().map((a) => ({ name: a.name, uuid: a.uuid, expiresAt: a.expiresAt }))
+    if (quiet) process.stdout.write(jsonLine('client', { accounts }))
+    else if (!accounts.length) out('No Microsoft account is signed in. Sign in: spawnloft client login')
+    else for (const a of accounts) out(`${a.name}  ${a.uuid}  token until ${a.expiresAt}`)
+    return
+  }
+
+  throw new UsageError(usage)
+}
+
 // ---------------------------------------------------------------------- main
 
 const COMMANDS = {
@@ -2038,6 +2271,7 @@ const COMMANDS = {
   worlds: cmdWorlds,
   why: cmdWhy,
   diagnostics: cmdWhy,
+  diag: cmdDiag,
   metrics: cmdMetrics,
   launchers: cmdLaunchers,
   ui: cmdUi,
@@ -2047,6 +2281,7 @@ const COMMANDS = {
   db: cmdDb,
   mcp: cmdMcp,
   bot: cmdBot,
+  client: cmdClient,
   uninstall: cmdUninstall,
   help: cmdHelp,
 }
@@ -2074,7 +2309,7 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot', 'diag', 'client'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
   // Not for `data`: it is what puts things right after a move was interrupted, when the data folder

@@ -8,6 +8,7 @@ import crypto from 'node:crypto'
 import os from 'node:os'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { once } from 'node:events'
 
 import { modrinthRequest, pickVersion, primaryFile, extractZip, recordManaged, readManaged, forgetManaged, readZipEntry } from './plugins.mjs'
 import * as fabric from './fabric.mjs'
@@ -203,6 +204,7 @@ export async function downloadVerified(url, dest, {
   const part = `${dest}.part`
   const sums = [['sha1', sha1], ['sha512', sha512]].filter(([, want]) => want).map(([kind, want]) => ({ kind, want, hash: crypto.createHash(kind) }))
   let received = 0
+  const sink = fs.createWriteStream(part)
   try {
     await pipeline(
       Readable.fromWeb(res.body),
@@ -214,9 +216,12 @@ export async function downloadVerified(url, dest, {
           yield chunk
         }
       },
-      fs.createWriteStream(part),
+      sink,
     )
   } catch (err) {
+    // The sink opens its file asynchronously: an error before that lands would otherwise let the
+    // open recreate the part file right after it is removed here.
+    if (!sink.closed) await once(sink, 'close').catch(() => {})
     fs.rmSync(part, { force: true })
     throw err instanceof UserError ? err : new UserError(`download failed: ${err.cause?.message || err.message} (${url})`)
   }

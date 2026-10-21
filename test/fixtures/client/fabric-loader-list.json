@@ -1,0 +1,17 @@
+[
+  {
+    "loader": { "separator": "-", "build": 1, "maven": "net.fabricmc:fabric-loader:0.19.6", "version": "0.19.6", "stable": false },
+    "intermediary": { "maven": "net.fabricmc:intermediary:1.21.11", "version": "1.21.11" },
+    "launcherMeta": { "url": "https://meta.fabricmc.net/v2/versions/loader/1.21.11/0.19.6/profile/json" }
+  },
+  {
+    "loader": { "separator": "-", "build": 1, "maven": "net.fabricmc:fabric-loader:0.19.5", "version": "0.19.5", "stable": true },
+    "intermediary": { "maven": "net.fabricmc:intermediary:1.21.11", "version": "1.21.11" },
+    "launcherMeta": { "url": "https://meta.fabricmc.net/v2/versions/loader/1.21.11/0.19.5/profile/json" }
+  },
+  {
+    "loader": { "separator": "-", "build": 1, "maven": "net.fabricmc:fabric-loader:0.19.4", "version": "0.19.4", "stable": true },
+    "intermediary": { "maven": "net.fabricmc:intermediary:1.21.11", "version": "1.21.11" },
+    "launcherMeta": { "url": "https://meta.fabricmc.net/v2/versions/loader/1.21.11/0.19.4/profile/json" }
+  }
+]
