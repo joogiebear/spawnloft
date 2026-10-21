@@ -1,0 +1,15 @@
+---- Minecraft Crash Report ----
+// I feelYA
+
+Time: 2026-10-20 12:00:00
+Description: java.lang.OutOfMemoryError: Java heap space
+
+java.lang.OutOfMemoryError: Java heap space
+	at net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1234)
+	at net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:890)
+	at net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:601)
+	at net.minecraft.server.main.ServerMain.main(ServerMain.java:112)
+
+
+A detailed walkthrough of the error, follow the link below:
+https://mclo.gs/fixture-crash

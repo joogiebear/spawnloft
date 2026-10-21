@@ -1,0 +1,45 @@
+[11:59:00 INFO]: Starting minecraft server version 1.21.4
+[11:59:00 INFO]: Loading properties
+[11:59:00 INFO]: Default game type: SURVIVAL
+[11:59:00 INFO]: Starting Minecraft server on *:25565
+[11:59:00 INFO]: Using 4 threads for Netty
+[11:59:01 INFO]: Preparing level "world"
+[11:59:01 INFO]: Preparing spawn area: 12%
+[11:59:02 INFO]: Preparing spawn area: 34%
+[11:59:02 INFO]: Preparing spawn area: 58%
+[11:59:03 INFO]: Preparing spawn area: 81%
+[11:59:03 INFO]: Preparing spawn area: 100%
+[11:59:04 INFO]: Loading plugins
+[11:59:04 INFO]: [Essentials] Loading Essentials v2.21
+[11:59:04 INFO]: [Vault] Loading Vault v1.7.3
+[11:59:05 INFO]: [Essentials] Enabling Essentials v2.21
+[11:59:05 INFO]: [Vault] Enabling Vault v1.7.3
+[11:59:05 INFO]: Done (2.345s)! For help, type "help"
+[12:00:00 INFO]: Steve[/192.168.1.10:51234] logged in with entity id 42 at ([world]128.5, 64.0, -64.2)
+[12:00:01 INFO]: Steve: /help
+[12:00:15 INFO]: Alex[/192.168.1.11:51235] logged in with entity id 78 at ([world]130.1, 64.0, -62.8)
+[12:00:20 INFO]: Alex: /list
+[12:01:00 INFO]: Steve: /home
+[12:02:30 WARN]: Can't keep up! Is the server overloaded? Running 2045ms or 40 ticks behind
+[12:03:00 INFO]: Steve: /msg Alex look at this
+[12:03:05 INFO]: [Essentials] Steve: Message sent to Alex
+[12:05:00 INFO]: Alex: /back
+[12:10:00 INFO]: Steve[/192.168.1.10:51234] lost connection
+[12:10:01 INFO]: Alex[/192.168.1.11:51235] lost connection
+[12:15:00 INFO]: Steve[/192.168.1.10:51300] logged in with entity id 102 at ([world]128.0, 64.0, -64.0)
+[12:20:00 INFO]: Alex[/192.168.1.11:51400] logged in with entity id 115 at ([world]130.5, 65.0, -63.1)
+[12:30:00 INFO]: Steve: /tp Alex
+[12:30:01 INFO]: Teleported Steve to 130.5, 65.0, -63.1
+[13:00:00 WARN]: [Essentials] Session timeout for Steve (30 min idle)
+[13:00:01 INFO]: Steve[/192.168.1.10:51300] lost connection
+[13:45:00 INFO]: Alex[/192.168.1.11:51400] lost connection
+[14:00:00 INFO]: Saving worlds
+[14:00:01 INFO]: Saving chunks for level 'world'/minecraft:overworld
+[14:00:02 INFO]: Saving chunks for level 'world'/minecraft:the_nether
+[14:00:02 INFO]: Saving chunks for level 'world'/minecraft:the_end
+[14:00:03 INFO]: Saved worlds
+[14:00:03 INFO]: Server stopped
+[14:00:03 ERROR]: FAILED TO BIND TO PORT: Address already in use
+[14:00:03 ERROR]: java.net.BindException: Address already in use
+[14:00:03 ERROR]:     at java.base/sun.nio.ch.Net.bind0(Native Method)
+[14:00:03 ERROR]:     at java.base/sun.nio.ch.Net.bind(Net.java:555)

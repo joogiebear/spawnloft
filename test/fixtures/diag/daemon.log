@@ -1,0 +1,5 @@
+[2026-10-20T11:58:55.123Z] starting java process: paper-1.21.4-100.jar
+[2026-10-20T11:58:55.456Z] java process pid=4821
+[2026-10-20T11:59:00.012Z] server console ready
+[2026-10-20T14:00:03.890Z] java process exited with code 1
+[2026-10-20T14:00:03.891Z] daemon: last console line suggests a bind failure
