@@ -132,7 +132,8 @@ needs from Mojang and starts the real Minecraft client as an offline player, poi
 of your servers. Every subcommand (`list`, `new`, `set`, `remove`, `install`, `launch`,
 `status`, `stop`, `logs`) takes `--json` and answers one envelope with `command` `client`.
 Offline profiles join offline-mode servers only. `logs --latest` reads the game's own
-`latest.log`.
+`latest.log`. [CLIENT.md](CLIENT.md) has the profiles, the harness and the folder layout;
+`spawnloft diag <server> --client <profile> --json` answers one envelope with `command` `diag`.
 
 ## AI assistants
 

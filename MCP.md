@@ -18,7 +18,11 @@ Claude Desktop, Claude Code or any other hosted assistant, that means to its pro
 - player names and UUIDs, ops, bans and the whitelist;
 - plugin names, versions and server settings such as ports and memory;
 - the configuration files an assistant reads with `read_config_file`;
-- crash report summaries.
+- crash report summaries;
+- what the game client received when an assistant drives it through the `client_*` tools: chat,
+  system messages, screen titles and item names. That is game content written by players, plugins
+  and servers; the tools say so in every reply, and an assistant should treat it as data rather
+  than instructions. A screenshot is written to disk and only its path is returned.
 
 These are never sent:
 
@@ -200,6 +204,9 @@ nothing until it is called again with `confirm: true`.
 | `upgrade_minecraft` | Moves to a newer Minecraft version. Worlds migrate one way; a snapshot is taken first. |
 
 Deleting a server, database credentials and settings that hold secrets are not available through MCP.
+Client profiles are made and removed only from the command line (`spawnloft client new`); the
+`client_*` tools launch, drive and quit profiles that exist. [CLIENT.md](CLIENT.md) has the
+launcher, the harness and when to use bots instead.
 
 Everything an assistant changes is recorded in the server's **Activity**, under the name its app gives
 itself ("Claude Desktop", for example), beside what the owner, schedules and SpawnLoft did. A config
