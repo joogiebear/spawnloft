@@ -8,6 +8,7 @@ import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
 import { rconExposure } from './exposure.mjs'
 import * as java from './java.mjs'
+import { checkClientProfiles } from './doctor-client.mjs'
 import { humanBytes, dirSize, isPortFree } from './util.mjs'
 
 // Read-only unless `repair` is set, which only clears stale state files. Automation (--json, the
@@ -83,6 +84,10 @@ export async function runDoctor({ repair = false } = {}) {
     }
     notes.push(`${inst.name}: ${humanBytes(dirSize(inst.dir))} on disk at ${inst.dir}`)
   }
+  const client = checkClientProfiles({ repair, javas: javaCheck.others ?? [] })
+  problems.push(...client.problems)
+  notes.push(...client.notes)
+
   // `privateCopies` is for the MCP tool; the CLI's JSON names its fields so its shape is unchanged
   return { healthy: problems.length === 0, notes, problems, privateCopies }
 }
