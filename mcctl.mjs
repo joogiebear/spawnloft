@@ -200,17 +200,19 @@ function cmdWhy(positional) {
 }
 
 async function cmdDiag(positional, flags) {
-  checkFlags(flags, ['lines', 'out', 'json'])
-  const name = instanceName(positional, 'diag')
+  checkFlags(flags, ['lines', 'out', 'json', 'client'])
+  const name = positional.length ? instanceName(positional, 'diag') : null
   let lines = TAIL_LINES
   if (flags.lines !== undefined) {
     const n = Number(flags.lines)
     if (typeof flags.lines !== 'string' || !Number.isInteger(n) || n < 1) fail('--lines must be a positive whole number')
     lines = n > 25000 ? 25000 : n
   }
+  if (flags.client !== undefined && typeof flags.client !== 'string') fail('--client needs a profile name')
+  if (!name && !flags.client) throw new UsageError('Usage: spawnloft diag <server> [--client <profile>] [--lines N] [--out <dir>]')
   if (flags.out !== undefined && typeof flags.out !== 'string') fail('--out needs a folder, for example --out ./reports')
-  const outDir = flags.out ? path.resolve(flags.out) : path.join(paths.BACKUPS_DIR, name, 'exports')
-  const bundle = await buildBundle({ server: name, lines, scrub: scrubber() })
+  const outDir = flags.out ? path.resolve(flags.out) : path.join(paths.BACKUPS_DIR, name ?? 'client', 'exports')
+  const bundle = await buildBundle({ server: name, client: flags.client ?? null, lines, scrub: scrubber() })
   const { file } = await writeBundle(bundle, { outDir })
   if (cliContext.json) {
     process.stdout.write(jsonLine('diag', { ...summarySection(bundle), file }))
@@ -1928,7 +1930,7 @@ OTHER
   mcctl jars                         List stored server jars
   mcctl jars import <path> [--as x]  Add a server jar to the store
   mcctl why <name>                   Say what is wrong with a server, from its own console
-  mcctl diag <name> [--out <dir>]    Zip the console, daemon log, crash reports and findings
+  mcctl diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings
                                      for a bug report (--lines N, --json)
 
 BOTS (plugin testing with scripted players)

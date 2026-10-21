@@ -41,9 +41,42 @@ fs.writeFileSync(path.join(runDir, 'state.json'), JSON.stringify({
   startedAt: new Date('2026-10-20T11:59:00.000Z').getTime(),
 }))
 
+const clientRoot = path.join(data, 'client')
+const profDir = path.join(clientRoot, 'profiles', 'fixclient')
+fs.mkdirSync(path.join(profDir, 'logs'), { recursive: true })
+fs.mkdirSync(path.join(profDir, 'crash-reports'), { recursive: true })
+fs.mkdirSync(path.join(profDir, 'mods'), { recursive: true })
+fs.mkdirSync(path.join(clientRoot, 'run', 'fixclient'), { recursive: true })
+
+fs.writeFileSync(path.join(clientRoot, 'profiles.json'), JSON.stringify({
+  version: 1,
+  profiles: {
+    fixclient: {
+      mc: '1.21.11',
+      loader: 'fabric',
+      loaderVersion: '0.19.5',
+      java: null,
+      memory: '2G',
+      harness: false,
+      server: null,
+      createdAt: '2026-10-20T00:00:00.000Z',
+    },
+  },
+}))
+
+fs.writeFileSync(path.join(profDir, 'logs', 'latest.log'), fs.readFileSync(path.join(fixtureDir, 'client-latest.log')))
+fs.writeFileSync(path.join(clientRoot, 'run', 'fixclient', 'client.log'), fs.readFileSync(path.join(fixtureDir, 'client-process.log')))
+fs.writeFileSync(path.join(profDir, 'options.txt'), fs.readFileSync(path.join(fixtureDir, 'client-options.txt')))
+fs.writeFileSync(path.join(profDir, 'crash-reports', 'crash-2026-10-20_14.00.06-client.txt'), fs.readFileSync(path.join(fixtureDir, 'crash-2026-10-20_14.00.06-client.txt')))
+fs.writeFileSync(path.join(profDir, 'mods', 'fabric-api-0.141.6+1.21.11.jar'), '')
+
+const t = new Date(2026, 9, 20, 14, 0, 10)
+fs.utimesSync(path.join(profDir, 'logs', 'latest.log'), t, t)
+fs.utimesSync(path.join(clientRoot, 'run', 'fixclient', 'client.log'), t, t)
+
 process.env.MCCTL_DATA_ROOT = data
 
-const { collectServer, buildBundle, writeBundle, summarise } = await import('../src/diag-bundle.mjs')
+const { collectServer, buildBundle, writeBundle, summarise, collectClient } = await import('../src/diag-bundle.mjs')
 const { extractZip, zipEntries } = await import('../src/zip.mjs')
 const { formatTimeline } = await import('../src/log-timeline.mjs')
 
@@ -163,4 +196,101 @@ test('summary.json names the files with their size instead of repeating the logs
   assert.ok(summary.files.every(f => typeof f.bytes === 'number' && f.text === undefined))
   assert.ok(!JSON.stringify(summary).includes('FAILED TO BIND'))
   assert.match(summarise(bundle), /server java: |server status/)
+})
+
+test('collectClient finds the connection-refused shape and the crash report', async () => {
+  const result = await collectClient('fixclient', { lines: 100 })
+
+  assert.ok(result.findings.some(f => f.id === 'connection-refused'), 'connection-refused finding is present')
+  assert.deepEqual(result.facts.mods, ['fabric-api-0.141.6+1.21.11.jar'])
+  assert.equal(result.facts.loader, 'fabric')
+  assert.equal(result.facts.running, false)
+
+  assert.equal(result.crashes.length, 1)
+  assert.equal(result.crashes[0].description, 'Unexpected error')
+
+  assert.ok(result.timeline.some(e => e.source === 'client'), 'timeline has client entries')
+  assert.ok(result.timeline.some(e => e.source === 'client-process'), 'timeline has client-process entries')
+
+  const refused = result.timeline.find(e => e.text.includes('Connection refused'))
+  assert.ok(refused, 'Connection refused entry exists')
+  assert.ok(refused.text.includes('checkConnect'), 'stack line is joined onto the entry')
+})
+
+test('buildBundle merges server and client timelines in time order with findings on both sides', async () => {
+  const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 100 })
+
+  for (let i = 0; i < bundle.timeline.length - 1; i++) {
+    assert.ok(bundle.timeline[i].at <= bundle.timeline[i + 1].at, `timeline entry ${i} <= entry ${i + 1}`)
+  }
+
+  const bindIdx = bundle.timeline.findIndex(e => e.text.includes('FAILED TO BIND TO PORT'))
+  const refusedIdx = bundle.timeline.findIndex(e => e.text.includes('Connection refused'))
+  assert.ok(bindIdx !== -1, 'FAILED TO BIND TO PORT entry exists')
+  assert.ok(refusedIdx !== -1, 'Connection refused entry exists')
+  assert.ok(bindIdx < refusedIdx, 'port-in-use comes before connection-refused in the timeline')
+
+  assert.ok(bundle.findings.server.some(f => f.id === 'port-in-use'), 'server has port-in-use finding')
+  assert.ok(bundle.findings.client.some(f => f.id === 'connection-refused'), 'client has connection-refused finding')
+  assert.equal(bundle.facts.client.name, 'fixclient')
+})
+
+test('writeBundle with a client includes the four new zip entries', async () => {
+  const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 100 })
+  const outDir = path.join(scratch, 'exports-client')
+  const { file } = await writeBundle(bundle, { outDir })
+  assert.ok(fs.existsSync(file), 'the zip file exists on disk')
+
+  const fd = fs.openSync(file, 'r')
+  try {
+    const size = fs.fstatSync(fd).size
+    const onDiskNames = []
+    for (const entry of zipEntries(fd, size)) {
+      onDiskNames.push(entry.name)
+    }
+
+    const expected = [
+      'summary.json',
+      'timeline.txt',
+      'server-console.log',
+      'server-daemon.log',
+      'server.properties',
+      'crash-reports/crash-2026-10-20_12.00.00-server.txt',
+      'client-latest.log',
+      'client-process.log',
+      'options.txt',
+      'client-crash-reports/crash-2026-10-20_14.00.06-client.txt',
+    ]
+    assert.deepEqual(onDiskNames.sort(), expected.sort())
+  } finally {
+    fs.closeSync(fd)
+  }
+})
+
+test('summarise shows Server and Client sections with the client finding title', async () => {
+  const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 100 })
+  const text = summarise(bundle)
+  assert.ok(text.includes('Server:'), 'has Server heading')
+  assert.ok(text.includes('Client:'), 'has Client heading')
+  const clientFinding = bundle.findings.client.find(f => f.id === 'connection-refused')
+  assert.ok(clientFinding, 'client finding exists for title check')
+  assert.ok(text.includes(clientFinding.title), 'client finding title is in the summary')
+})
+
+test('a client-only bundle has no server and names the zip after the client', async () => {
+  const bundle = await buildBundle({ client: 'fixclient', lines: 100 })
+  assert.equal(bundle.facts.server, null)
+  assert.deepEqual(bundle.findings.server, [])
+
+  const outDir = path.join(scratch, 'exports-client-only')
+  const { file } = await writeBundle(bundle, { outDir })
+  assert.ok(path.basename(file).startsWith('fixclient_diag_'), 'zip is named after the client')
+})
+
+test('buildBundle with neither server nor client rejects', async () => {
+  await assert.rejects(buildBundle({}), /needs a server or a client profile/)
+})
+
+test('buildBundle with an unknown client profile rejects', async () => {
+  await assert.rejects(buildBundle({ client: 'nosuch' }))
 })

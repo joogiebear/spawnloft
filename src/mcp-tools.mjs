@@ -16,7 +16,7 @@ import { mcpNotice } from './private-copy.mjs'
 import { readState, activeBlock } from './control.mjs'
 import { fail, humanBytes, humanDuration } from './util.mjs'
 import { DATA_ROOT, BACKUPS_DIR } from './paths.mjs'
-import { buildBundle, writeBundle } from './diag-bundle.mjs'
+import { buildBundle, writeBundle, collectClient } from './diag-bundle.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
 import * as activity from './activity.mjs'
@@ -121,9 +121,9 @@ const readTools = [
   },
   {
     name: 'diagnostics', title: 'Why did it fail?', annotations: READ,
-    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries. With bundle: true, also writes a zip for attaching to a bug report.',
-    inputSchema: object({ name, bundle: { type: 'boolean', description: 'Write a zip with the console, daemon log, crash reports and findings for attaching to a bug report' } }, ['name']),
-    async run({ name: n, bundle: doBundle }) {
+    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries. With bundle: true, also writes a zip for attaching to a bug report. A client profile name in "client" adds the game client\'s logs and findings, on the same timeline when a bundle is written.',
+    inputSchema: object({ name, bundle: { type: 'boolean', description: 'Write a zip with the console, daemon log, crash reports and findings for attaching to a bug report' }, client: { type: 'string', description: 'A game client profile (spawnloft client list) whose logs and findings go in too' } }, ['name']),
+    async run({ name: n, bundle: doBundle, client }) {
       const d = query('diagnostics', [n], {})
       const out = [`${n} is ${d.status.status}.`]
       if (d.findings.length) {
@@ -138,10 +138,21 @@ const readTools = [
         for (const r of reports) out.push(`- ${r.file}: ${r.description ?? 'no description line'}`)
       }
       let data = d
+      if (client) {
+        const c = await collectClient(client, { lines: 400 })
+        out.push(`Client ${client} is ${c.facts.running ? 'running' : 'stopped'}.`)
+        if (c.findings.length) {
+          out.push('Known problems in the client logs, oldest first:')
+          for (const f of c.findings) out.push(`- ${f.title}. ${f.advice}\n  From: ${f.line.trim()}`)
+        } else {
+          out.push('No known failure causes in the client logs.')
+        }
+        data = { ...data, client: { name: client, facts: c.facts, findings: c.findings, crashes: c.crashes } }
+      }
       if (doBundle) {
-        const b = await buildBundle({ server: n, scrub: scrubber() })
+        const b = await buildBundle({ server: n, client: client ?? null, scrub: scrubber() })
         const { file, size } = await writeBundle(b, { outDir: path.join(BACKUPS_DIR, n, 'exports') })
-        data = { ...d, bundle: { file, size, findings: b.findings } }
+        data = { ...data, bundle: { file, size, findings: b.findings } }
         out.push(`Bundle written to ${file}`)
         for (const f of b.findings.client ?? []) out.push(`- ${f.title}. ${f.advice}`)
       }

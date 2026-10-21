@@ -13,6 +13,9 @@ import { parseLog, mergeTimelines, formatTimeline } from './log-timeline.mjs'
 import { redactAccountName } from './mclogs.mjs'
 import { humanBytes, stamp, fail } from './util.mjs'
 import { createZip, zipEntries } from './zip.mjs'
+import { getProfile, status, latestLogPath } from './client.mjs'
+import { profileDir, clientLog, clientStateFile } from './client-paths.mjs'
+import { clientDiagnose } from './client-diagnose.mjs'
 
 export const TAIL_LINES = 5000
 
@@ -126,7 +129,75 @@ export async function collectServer(name, { lines = TAIL_LINES } = {}) {
   return { facts, timeline, findings, crashes, files }
 }
 
+export async function collectClient(name, { lines = TAIL_LINES } = {}) {
+  const profile = getProfile(name)
+  const st = status(name)
+
+  const latestPath = latestLogPath(name)
+  const latestLines = await readLines(latestPath, lines)
+  const processLines = await readLines(clientLog(name), lines)
+
+  let anchor = null
+  try {
+    const state = JSON.parse(await fs.promises.readFile(clientStateFile(name), 'utf8'))
+    anchor = state.startedAt ?? null
+  } catch { /* no state file: the mtime dates the lines */ }
+
+  // each log is dated by its own mtime: the process log keeps growing after latest.log stops
+  const mtimeOf = async (file) => {
+    try { return (await fs.promises.stat(file)).mtimeMs } catch { return null }
+  }
+
+  const clientEntries = parseLog(latestLines, { source: 'client', anchor, mtime: await mtimeOf(latestPath) })
+  const processEntries = parseLog(processLines, { source: 'client-process', anchor, mtime: await mtimeOf(clientLog(name)) })
+  const timeline = mergeTimelines(clientEntries, processEntries)
+
+  const findings = clientDiagnose([...latestLines, ...processLines], { memory: profile.memory, profile: name })
+
+  const crash = crashReports({ dir: profileDir(name) }, { limit: 3 })
+  const crashes = crash.reports.map(r => ({ file: r.file, description: r.description }))
+
+  let mods = []
+  const modsDir = path.join(profileDir(name), 'mods')
+  try {
+    mods = fs.readdirSync(modsDir).filter(f => f.endsWith('.jar')).sort()
+  } catch { /* no mods folder */ }
+
+  const facts = {
+    name,
+    mc: profile.mc,
+    loader: profile.loader,
+    loaderVersion: profile.loaderVersion,
+    memory: profile.memory,
+    java: profile.java,
+    mods,
+    running: st.running,
+    startedAt: st.startedAt,
+    account: st.account,
+  }
+
+  const files = []
+  files.push({ name: 'client-latest.log', text: latestLines.join('\n') })
+  files.push({ name: 'client-process.log', text: processLines.join('\n') })
+
+  const optionsPath = path.join(profileDir(name), 'options.txt')
+  if (fs.existsSync(optionsPath)) {
+    files.push({ name: 'options.txt', text: fs.readFileSync(optionsPath, 'utf8') })
+  }
+
+  for (const r of crash.reports) {
+    const cp = path.join(profileDir(name), 'crash-reports', r.file)
+    if (fs.existsSync(cp)) {
+      files.push({ name: `client-crash-reports/${r.file}`, text: fs.readFileSync(cp, 'utf8') })
+    }
+  }
+
+  return { facts, timeline, findings, crashes, files }
+}
+
 export async function buildBundle({ server = null, client = null, lines = TAIL_LINES, scrub = (s) => s }) {
+  if (!server && !client) fail('diag needs a server or a client profile')
+
   const spawnloft = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
   const facts = {
@@ -150,6 +221,14 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
     files = result.files
   }
 
+  if (client) {
+    const result = await collectClient(client, { lines })
+    facts.client = result.facts
+    timeline = mergeTimelines(timeline, result.timeline)
+    findings.client = result.findings
+    files = [...files, ...result.files]
+  }
+
   // the timeline and findings reach summarise() and timeline.txt, not only files, so every text field is cleaned
   const clean = (s) => (typeof s === 'string' ? scrub(redactAccountName(s)) : s)
   for (const f of files) f.text = clean(f.text)
@@ -157,8 +236,13 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
     finding.title = clean(finding.title)
     finding.advice = clean(finding.advice)
   }
+  for (const finding of findings.client) {
+    finding.title = clean(finding.title)
+    finding.advice = clean(finding.advice)
+  }
   timeline = timeline.map(e => ({ ...e, text: clean(e.text), raw: clean(e.raw), thread: clean(e.thread) }))
   if (facts.server?.java) facts.server.java.path = clean(facts.server.java.path)
+  if (facts.client?.java) facts.client.java = clean(facts.client.java)
 
   return { facts, timeline, findings, files }
 }
@@ -171,9 +255,9 @@ export function summarySection(bundle) {
 }
 
 export async function writeBundle(bundle, { outDir }) {
-  const serverName = bundle.facts.server?.name ?? 'server'
+  const base = bundle.facts.server?.name ?? bundle.facts.client?.name ?? 'diag'
   await fs.promises.mkdir(outDir, { recursive: true })
-  const file = path.join(outDir, `${serverName}_diag_${stamp()}.zip`)
+  const file = path.join(outDir, `${base}_diag_${stamp()}.zip`)
 
   const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sl-diag-'))
   try {
@@ -230,9 +314,34 @@ export function summarise(bundle) {
     }
   }
 
-  const allFindings = [...(bundle.findings.server ?? []), ...(bundle.findings.client ?? [])]
-  for (const f of allFindings) {
-    parts.push(`- ${f.title}. ${f.advice}`)
+  if (bundle.facts.client) {
+    for (const [k, v] of Object.entries(bundle.facts.client)) {
+      if (v === null) continue
+      const val = Array.isArray(v) ? v.join(', ') : String(v)
+      parts.push(`client ${k}: ${val}`)
+    }
+  }
+
+  if (bundle.facts.server) {
+    parts.push('Server:')
+    if (bundle.findings.server?.length) {
+      for (const f of bundle.findings.server) {
+        parts.push(`- ${f.title}. ${f.advice}`)
+      }
+    } else {
+      parts.push('- no known failure shapes')
+    }
+  }
+
+  if (bundle.facts.client) {
+    parts.push('Client:')
+    if (bundle.findings.client?.length) {
+      for (const f of bundle.findings.client) {
+        parts.push(`- ${f.title}. ${f.advice}`)
+      }
+    } else {
+      parts.push('- no known failure shapes')
+    }
   }
 
   const last40 = bundle.timeline.slice(-40)
