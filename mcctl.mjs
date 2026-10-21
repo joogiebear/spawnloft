@@ -46,9 +46,8 @@ import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.
 import * as bots from './src/bots.mjs'
 import { buildBundle, writeBundle, summarise, summarySection, TAIL_LINES } from './src/diag-bundle.mjs'
 import * as client from './src/client.mjs'
-import { versionJson, clientCacheDir, clientLog } from './src/client-paths.mjs'
+import { clientLog } from './src/client-paths.mjs'
 import { ensureVersion } from './src/client-install.mjs'
-import { fetchManifest, fetchVersionJson } from './src/client-meta.mjs'
 
 const out = (msg = '') => process.stdout.write(`${msg}\n`)
 const cliContext = { command: null, json: false }
@@ -2031,19 +2030,6 @@ async function cmdBot(positional, flags) {
 
 // --------------------------------------------------------------------- client
 
-// Only the version JSON comes from the manifest; ensureVersion (run by `install`, and by
-// client.launch itself) fetches the rest, so `launch` does not walk every file twice.
-async function fetchProfileVersionJson(name) {
-  const profile = client.getProfile(name)
-  if (profile.loader === 'fabric') fail('fabric profiles cannot be installed yet')
-  if (!fs.existsSync(versionJson(profile.mc))) {
-    const cacheDir = clientCacheDir(name)
-    const manifest = await fetchManifest({ cacheDir })
-    await fetchVersionJson(profile.mc, { manifest, cacheDir })
-  }
-  return profile
-}
-
 /**
  * A game client for your own servers. `new` makes a profile; `launch` installs what it needs
  * from Mojang and starts the real Minecraft client as an offline player, pointed at one of
@@ -2113,8 +2099,8 @@ async function cmdClient(positional, flags) {
   if (sub === 'install') {
     checkFlags(flags, ['json'])
     if (rest.length !== 1) throw new UsageError(usage)
-    const profile = await fetchProfileVersionJson(rest[0])
-    const result = await ensureVersion(profile.mc, { onProgress })
+    const id = await client.prepareVersion(rest[0], { onProgress })
+    const result = await ensureVersion(id, { onProgress })
     if (quiet) process.stdout.write(jsonLine('client', { name: rest[0], ...result }))
     else out(`Installed ${result.id}: ${result.downloaded} files (${result.bytes} bytes)`)
     return
@@ -2127,7 +2113,6 @@ async function cmdClient(positional, flags) {
     if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
     // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
     const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
-    if (!fakeJava) await fetchProfileVersionJson(rest[0])
     const res = await client.launch(rest[0], { playerName: flags.as ?? null, server: flags.server ?? null, onProgress, fakeJava })
     if (flags.wait === true) {
       const deadline = Date.now() + 5000

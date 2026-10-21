@@ -1,13 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { parseMemoryGb } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
-import { mergeInherited } from './client-meta.mjs'
+import { mergeInherited, fetchManifest, fetchVersionJson } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName } from './client-auth.mjs'
+import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile } from './client-fabric.mjs'
 
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
@@ -130,6 +131,26 @@ export function removeProfile(name, { purge = false } = {}) {
   }
 }
 
+export async function prepareVersion(name, { onProgress = () => {} } = {}) {
+  const profile = getProfile(name)
+  if (!fs.existsSync(versionJson(profile.mc))) {
+    const cacheDir = clientCacheDir(name)
+    const manifest = await fetchManifest({ cacheDir })
+    await fetchVersionJson(profile.mc, { manifest, cacheDir })
+  }
+  if (profile.loader === 'fabric') {
+    let loaderVersion = profile.loaderVersion
+    if (loaderVersion === null) {
+      const list = await loaderVersions(profile.mc)
+      loaderVersion = pickLoader(list).version
+      updateProfile(name, { loaderVersion })
+    }
+    await ensureFabricProfile(profile.mc, loaderVersion)
+    return fabricVersionId(profile.mc, loaderVersion)
+  }
+  return profile.mc
+}
+
 export async function launch(name, { playerName = null, server = null, onProgress = () => {}, fakeJava = null } = {}) {
   const profile = getProfile(name)
   const st = status(name)
@@ -140,18 +161,24 @@ export async function launch(name, { playerName = null, server = null, onProgres
   const java = fakeJava ?? await pickJava({ explicit: profile.java, needs: requiredMajor(profile.mc), what: 'Minecraft ' + profile.mc })
 
   let versionId
-  if (profile.loader === 'fabric') {
-    if (profile.loaderVersion === null) {
-      fail(`profile "${name}" uses the fabric loader but has no loaderVersion; set one with spawnloft client set`)
+  if (fakeJava) {
+    if (profile.loader === 'fabric') {
+      if (profile.loaderVersion === null) {
+        fail(`profile "${name}" uses the fabric loader but has no loaderVersion; set one with spawnloft client set`)
+      }
+      versionId = fabricVersionId(profile.mc, profile.loaderVersion)
+    } else {
+      versionId = profile.mc
     }
-    versionId = `fabric-loader-${profile.loaderVersion}-${profile.mc}`
+    if (!fs.existsSync(versionJson(versionId))) {
+      versionId = await prepareVersion(name, { onProgress })
+      await ensureVersion(versionId, { onProgress })
+    }
   } else {
-    versionId = profile.mc
-  }
-
-  if (!(fakeJava && fs.existsSync(versionJson(versionId)))) {
+    versionId = await prepareVersion(name, { onProgress })
     await ensureVersion(versionId, { onProgress })
   }
+
   let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
   if (version.inheritsFrom) {
     const parentJson = JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8'))

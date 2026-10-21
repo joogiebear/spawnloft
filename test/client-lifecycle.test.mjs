@@ -115,3 +115,14 @@ test('stop when nothing runs', async () => {
   const res = await stop('life')
   assert.deepEqual(res, { stopped: false, wasRunning: false })
 })
+
+test('a fabric profile launches via fakeJava with the Knot main class', async () => {
+  createProfile('fab', { mc, loader: 'fabric', loaderVersion: '0.19.5' })
+  const fabricId = `fabric-loader-0.19.5-${mc}`
+  fs.mkdirSync(versionDir(fabricId), { recursive: true })
+  fs.copyFileSync(path.join(here, 'fixtures', 'client', 'fabric-profile.json'), versionJson(fabricId))
+  const res = await launch('fab', { fakeJava })
+  assert.equal(res.version, fabricId)
+  const stopRes = await stop('fab')
+  assert.deepEqual(stopRes, { stopped: true, wasRunning: true })
+})
