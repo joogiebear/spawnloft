@@ -9,7 +9,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-launch-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { offlineUuid, assertPlayerName, offlineAccount } = await import('../src/client-auth.mjs')
+const { offlineUuid, assertPlayerName, offlineAccount, defaultPlayerName } = await import('../src/client-auth.mjs')
 const { buildCommand, substitute } = await import('../src/client-launch.mjs')
 const { mergeInherited, libraries } = await import('../src/client-meta.mjs')
 const { versionJar, nativesDir, LIBRARIES_DIR } = await import('../src/client-paths.mjs')
@@ -33,6 +33,17 @@ test('offlineUuid matches the value the server derives', () => {
 test('assertPlayerName refuses names outside 3 to 16 of letters, digits, underscores', () => {
   assert.throws(() => assertPlayerName('ab'), /player name "ab" must be 3 to 16 letters, digits or underscores/)
   assert.throws(() => assertPlayerName('way_too_long_name_x'), /player name "way_too_long_name_x" must be 3 to 16 letters, digits or underscores/)
+})
+
+test('assertPlayerName takes strings only', () => {
+  assert.throws(() => assertPlayerName(true), /player name/)
+})
+
+test('defaultPlayerName turns any profile name into a valid player name', () => {
+  assert.equal(defaultPlayerName('my-client'), 'my_client')
+  assert.equal(defaultPlayerName('p'), 'p__')
+  assert.equal(defaultPlayerName('a-very-long-profile-name-here').length, 16)
+  for (const n of ['my-client', 'p', 'a-very-long-profile-name-here']) assertPlayerName(defaultPlayerName(n))
 })
 
 test('substitute replaces known variables and reports unknown ones', () => {
@@ -117,4 +128,16 @@ test('a version without the quick play placeholder gets --server and --port inst
   assert.equal(cmd.args[idx + 2], '--port')
   assert.equal(cmd.args[idx + 3], '25599')
   assert.ok(cmd.args.includes('alice'), 'the old-style arguments were substituted')
+  // the launcher supplied these itself before 1.13
+  const cp = cmd.args.indexOf('-cp')
+  assert.ok(cp !== -1 && cmd.args[cp + 1].endsWith(versionJar(vanilla.id)), 'legacy JSON still gets a classpath')
+  assert.ok(cmd.args.some((a) => a.startsWith('-Djava.library.path=') && a.endsWith(nativesDir(vanilla.id))))
+})
+
+test('quick play supplies the log path as well as the server', () => {
+  const profile = { mc, loader: 'vanilla', memory: '2G', server: 'testserver' }
+  const cmd = buildCommand({ version: vanilla, profile, profileName: 'test', account, java, os: testOs })
+  for (const a of cmd.args) assert.ok(!a.includes('${'), `unsubstituted placeholder in ${a}`)
+  const idx = cmd.args.indexOf('--quickPlayPath')
+  if (idx !== -1) assert.ok(cmd.args[idx + 1].endsWith('quickPlay.json'))
 })

@@ -162,5 +162,5 @@ test('extractNatives skips META-INF and excluded prefixes', async () => {
   assert.ok(!entries.includes('META-INF'), 'META-INF skipped')
   assert.ok(!entries.includes('skip'), 'skip/ prefix excluded')
   assert.equal(result.files, 1)
-  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), mc)
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64`)
 })

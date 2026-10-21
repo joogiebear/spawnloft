@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { PROFILES_FILE, profileDir, versionJson, clientLog } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName } from './util.mjs'
 import { parseMemoryGb } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
-import { offlineAccount } from './client-auth.mjs'
+import { offlineAccount, defaultPlayerName } from './client-auth.mjs'
 
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
@@ -23,6 +23,8 @@ function validateMc(mc) {
 function validateFields({ mc, loader, loaderVersion, java, memory, harness, server }) {
   validateMc(mc)
   parseMemoryGb(memory)
+  // -Xmx takes whole units only: 1.5G is refused by Java where a server's launcher would round it
+  if (!/^\d+[MG]$/i.test(String(memory))) fail(`memory must be a whole number of M or G, like 2G or 1536M, not "${memory}"`)
   if (!LOADERS.includes(loader)) {
     fail(`unknown loader "${loader}" - use ${LOADERS.join(' or ')}`)
   }
@@ -32,6 +34,10 @@ function validateFields({ mc, loader, loaderVersion, java, memory, harness, serv
   }
   for (const [key, value] of Object.entries({ loaderVersion, java, server })) {
     if (value !== null && (typeof value !== 'string' || !value.trim())) fail(`${key} must be text or null`)
+  }
+  // the loader version becomes part of a folder name under versions/
+  if (loaderVersion !== null && !/^[0-9A-Za-z][0-9A-Za-z.+_-]*$/.test(loaderVersion)) {
+    fail(`loaderVersion "${loaderVersion}" must be a version like 0.16.9 (letters, digits, dots, +, _ and -)`)
   }
 }
 
@@ -113,12 +119,14 @@ export function updateProfile(name, patch) {
 }
 
 export function removeProfile(name, { purge = false } = {}) {
+  if (status(name).running) fail(`profile "${name}" is running; stop it first: spawnloft client stop ${name}`)
   getProfile(name)
   const reg = loadProfiles()
   delete reg.profiles[name]
   saveProfiles(reg)
   if (purge) {
     fs.rmSync(profileDir(name), { recursive: true, force: true })
+    fs.rmSync(clientRunDir(name), { recursive: true, force: true })
   }
 }
 
@@ -150,7 +158,7 @@ export async function launch(name, { playerName = null, server = null, onProgres
     version = mergeInherited(version, parentJson)
   }
 
-  const account = offlineAccount(playerName ?? name)
+  const account = offlineAccount(playerName ?? defaultPlayerName(name))
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java })
   const { pid } = await spawnClient(command, { name, state: { mode: 'offline', account, harness: null } })
 

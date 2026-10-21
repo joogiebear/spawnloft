@@ -2123,6 +2123,8 @@ async function cmdClient(positional, flags) {
   if (sub === 'launch') {
     checkFlags(flags, ['as', 'server', 'wait', 'json'])
     if (rest.length !== 1) throw new UsageError(usage)
+    if (flags.as !== undefined && typeof flags.as !== 'string') throw new UsageError('--as needs a player name')
+    if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
     // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
     const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
     if (!fakeJava) await fetchProfileVersionJson(rest[0])
@@ -2161,8 +2163,9 @@ async function cmdClient(positional, flags) {
   if (sub === 'logs') {
     checkFlags(flags, ['n', 'latest', 'json'])
     if (rest.length !== 1) throw new UsageError(usage)
+    client.getProfile(rest[0])
     const count = Number(flags.n ?? 100)
-    if (!Number.isInteger(count) || count < 1) throw new UsageError('-n must be a positive whole number')
+    if (typeof (flags.n ?? '') !== 'string' || !Number.isInteger(count) || count < 1) throw new UsageError('-n must be a positive whole number')
     let lines = []
     let file
     if (flags.latest === true) {

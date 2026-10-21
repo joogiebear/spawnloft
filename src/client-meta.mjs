@@ -166,7 +166,8 @@ export function gameArguments(version, { os = currentOs(), features = {} } = {})
 
 export function jvmArguments(version, { os = currentOs(), features = {} } = {}) {
   if (version.arguments) return flattenArgs(version.arguments.jvm, { os, features })
-  return []
+  // Before 1.13 the JSON carried no JVM arguments; the launcher supplied these two itself.
+  return ['-Djava.library.path=${natives_directory}', '-cp', '${classpath}']
 }
 
 function flattenArgs(args, ctx) {

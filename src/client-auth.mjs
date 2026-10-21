@@ -11,10 +11,17 @@ export function offlineUuid(name) {
 }
 
 export function assertPlayerName(name) {
-  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) {
+  if (typeof name !== 'string' || !/^[A-Za-z0-9_]{3,16}$/.test(name)) {
     fail(`player name "${name}" must be 3 to 16 letters, digits or underscores`)
   }
   return name
+}
+
+// A profile name may be shorter, longer or hold a dash; the player name derived from it must
+// still pass the server's rule.
+export function defaultPlayerName(profileName) {
+  const base = String(profileName).replace(/[^A-Za-z0-9_]/g, '_').slice(0, 16)
+  return base.length >= 3 ? base : (base + '___').slice(0, 3)
 }
 
 export function offlineAccount(name) {

@@ -6,7 +6,7 @@ import { currentOs, jvmArguments, gameArguments, libraries, assetIndex } from '.
 import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
-import { writeJson, readJson, UserError, pidAlive, killProcessGroup, sleep } from './util.mjs'
+import { writeJson, readJson, UserError, pidAlive, sameProcess, killProcessGroup, sleep } from './util.mjs'
 
 export function substitute(template, vars) {
   const unknown = []
@@ -79,6 +79,8 @@ export function buildCommand({ version, profile, profileName, account, java, os 
 
   if (hasServer) {
     vars.quickPlayMultiplayer = `${host}:${port}`
+    // has_quick_plays_support also enables --quickPlayPath, the game's quick-play log
+    vars.quickPlayPath = path.join(clientRunDir(profileName), 'quickPlay.json')
   }
 
   const jvmArgs = jvmArguments(version, { os, features }).map((a) => substitute(a, vars).text)
@@ -144,6 +146,8 @@ export async function spawnClient(command, { name, state }) {
     child.on('spawn', () => {
       writeJson(clientStateFile(name), {
         pid: child.pid,
+        // javaExe lets readClientState tell this process from a later owner of the same pid
+        javaExe: path.basename(cmd),
         startedAt: new Date().toISOString(),
         mode: state.mode ?? 'offline',
         account: { type: state.account.type, name: state.account.name },
@@ -157,39 +161,78 @@ export async function spawnClient(command, { name, state }) {
   })
 }
 
+function stateAlive(state) {
+  return pidAlive(state.pid) && sameProcess(state.pid, state.javaExe, Date.parse(state.startedAt) || 0)
+}
+
 export function readClientState(name) {
-  const state = readJson(clientStateFile(name), null)
+  const file = clientStateFile(name)
+  const state = readJson(file, null)
   if (state === null) return null
-  if (!pidAlive(state.pid)) {
-    fs.rmSync(clientStateFile(name), { force: true })
-    return null
+  if (stateAlive(state)) return state
+  // Another launch may have written its own state between the read and this delete; only a
+  // file that still names the dead pid is ours to clear.
+  if (readJson(file, null)?.pid === state.pid) fs.rmSync(file, { force: true })
+  return null
+}
+
+function askToClose(pid) {
+  if (process.platform === 'win32') {
+    // Without /F taskkill sends WM_CLOSE, which the game treats as its window closing.
+    return new Promise((resolve) => {
+      const ask = spawn('taskkill', ['/PID', String(pid), '/T'], { windowsHide: true, stdio: 'ignore' })
+      ask.on('error', () => resolve(false))
+      ask.on('exit', (code) => resolve(code === 0))
+    })
   }
-  return state
+  try {
+    process.kill(-pid, 'SIGTERM')
+    return Promise.resolve(true)
+  } catch {
+    try {
+      process.kill(pid, 'SIGTERM')
+      return Promise.resolve(true)
+    } catch {
+      return Promise.resolve(false)
+    }
+  }
+}
+
+function forceKill(pid) {
+  if (process.platform === 'win32') {
+    const kill = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+    kill.on('error', () => {})
+  } else {
+    killProcessGroup(pid)
+  }
+}
+
+async function waitGone(state, ms) {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline && stateAlive(state)) await sleep(100)
+  return !stateAlive(state)
 }
 
 export async function stopClient(name, { timeout = 10000, quit = null } = {}) {
   const state = readClientState(name)
   if (state === null) return { stopped: false, wasRunning: false }
 
+  // Politely first (the harness quit, else a close request so the JVM's shutdown hooks run),
+  // then by force once the timeout passes.
+  let asked = false
   if (typeof quit === 'function') {
-    try { await quit() } catch { /* a failed quit falls through to the kill */ }
-    const deadline = Date.now() + timeout
-    while (Date.now() < deadline && pidAlive(state.pid)) {
-      await sleep(100)
-    }
+    try {
+      await quit()
+      asked = true
+    } catch { /* a failed quit falls through to the close request */ }
   }
-
-  if (pidAlive(state.pid)) {
-    if (process.platform === 'win32') {
-      spawn('taskkill', ['/PID', String(state.pid), '/T', '/F'], { windowsHide: true })
-    } else {
-      killProcessGroup(state.pid)
-    }
-    const killDeadline = Date.now() + 5000
-    while (Date.now() < killDeadline && pidAlive(state.pid)) {
-      await sleep(100)
-    }
+  if (!asked) asked = await askToClose(state.pid)
+  let gone = asked ? await waitGone(state, timeout) : false
+  if (!gone) {
+    forceKill(state.pid)
+    gone = await waitGone(state, 5000)
   }
+  if (!gone) return { stopped: false, wasRunning: true }
 
   fs.rmSync(clientStateFile(name), { force: true })
   return { stopped: true, wasRunning: true }

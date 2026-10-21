@@ -87,3 +87,17 @@ test('the registry survives a round trip through the file', () => {
   assert.equal(onDisk.version, 1)
   assert.ok(Object.hasOwn(onDisk.profiles, 'alpha'))
 })
+
+test('memory must be a whole number of M or G', () => {
+  assert.throws(() => createProfile('mem', { mc: '1.21.11', memory: '1.5G' }), /whole number/)
+  assert.throws(() => createProfile('mem', { mc: '1.21.11', memory: '2 G' }), /whole number/)
+  createProfile('mem', { mc: '1.21.11', memory: '1536M' })
+  removeProfile('mem')
+})
+
+test('loaderVersion is a plain version string', () => {
+  createProfile('lv', { mc: '1.21.11', loader: 'fabric', loaderVersion: '0.16.9' })
+  assert.throws(() => updateProfile('lv', { loaderVersion: '../../x' }), /loaderVersion/)
+  assert.throws(() => updateProfile('lv', { loaderVersion: 'a/b' }), /loaderVersion/)
+  removeProfile('lv')
+})

@@ -54,6 +54,12 @@ async function inBatches(items, limit, worker) {
   await Promise.all(workers)
 }
 
+// One data root can serve two operating systems (a dual boot, a portable drive): the stamp
+// says whose natives are extracted, so a switch re-extracts them.
+function nativesStamp(id, os) {
+  return `${id} ${os.name} ${os.arch}`
+}
+
 export async function extractNatives(id, nativeRows, { os }) {
   const dir = nativesDir(id)
   fs.rmSync(dir, { recursive: true, force: true })
@@ -78,7 +84,7 @@ export async function extractNatives(id, nativeRows, { os }) {
     files += written.length
   }
 
-  fs.writeFileSync(path.join(dir, '.complete'), id)
+  fs.writeFileSync(path.join(dir, '.complete'), nativesStamp(id, os))
   return { files }
 }
 
@@ -228,7 +234,8 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   emitEnd('assets', assetDone, assetTotal, assetBytes)
 
   const completeFile = path.join(nativesDir(id), '.complete')
-  if (nativeRows.length > 0 && (nativeWasDownloaded || !fs.existsSync(completeFile))) {
+  const stamped = fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === nativesStamp(id, os)
+  if (nativeRows.length > 0 && (nativeWasDownloaded || !stamped)) {
     await extractNatives(id, nativeRows, { os })
   }
   emitEnd('natives', nativeRows.length, nativeRows.length, 0)

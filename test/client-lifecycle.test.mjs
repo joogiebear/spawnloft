@@ -9,9 +9,9 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
-const { launch, status, stop, tailClientLog, createProfile } = await import('../src/client.mjs')
+const { launch, status, stop, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
 const { readClientState } = await import('../src/client-launch.mjs')
-const { clientStateFile, versionDir, versionJson } = await import('../src/client-paths.mjs')
+const { clientStateFile, clientRunDir, versionDir, versionJson } = await import('../src/client-paths.mjs')
 
 const fakeJava = path.join(here, 'fixtures', 'fake-client.mjs')
 
@@ -68,6 +68,32 @@ test('a fake client that dies at once', async () => {
   }
   assert.equal(status('life').running, false)
   assert.ok(tailClientLog('life').some(l => l.includes('GLFW error')))
+})
+
+test('a profile cannot be removed while it runs, and purge clears its run folder', async () => {
+  await launch('life', { fakeJava })
+  assert.throws(() => removeProfile('life'), /running/)
+  await stop('life')
+  createProfile('gone', { mc })
+  await launch('gone', { fakeJava })
+  await stop('gone')
+  removeProfile('gone', { purge: true })
+  assert.ok(!fs.existsSync(clientRunDir('gone')))
+})
+
+test('a state file whose pid now belongs to another program reads as stopped', () => {
+  // this test process is alive but is not "java"
+  fs.mkdirSync(path.dirname(clientStateFile('life')), { recursive: true })
+  fs.writeFileSync(clientStateFile('life'), JSON.stringify({ pid: process.pid, javaExe: 'java', startedAt: new Date(Date.now() - 86400000).toISOString() }))
+  assert.equal(readClientState('life'), null)
+  assert.ok(!fs.existsSync(clientStateFile('life')))
+})
+
+test('the default player name is derived from the profile name', async () => {
+  createProfile('my-client', { mc })
+  const res = await launch('my-client', { fakeJava })
+  assert.equal(res.account.name, 'my_client')
+  await stop('my-client')
 })
 
 test('readClientState removes the file when the pid is dead', async () => {
