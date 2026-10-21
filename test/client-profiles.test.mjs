@@ -26,6 +26,7 @@ test('createProfile stores the profile and writes options.txt with lang:en_us', 
   assert.equal(p.memory, '2G')
   assert.equal(p.harness, false)
   assert.equal(p.server, null)
+  assert.equal(p.account, null)
   assert.match(p.createdAt, /^\d{4}-\d{2}-\d{2}T/)
   const optionsFile = path.join(profileDir('alpha'), 'options.txt')
   assert.equal(fs.readFileSync(optionsFile, 'utf8'), 'lang:en_us\n')
@@ -86,6 +87,13 @@ test('the registry survives a round trip through the file', () => {
   assert.deepEqual(loadProfiles(), before)
   assert.equal(onDisk.version, 1)
   assert.ok(Object.hasOwn(onDisk.profiles, 'alpha'))
+})
+
+test('a profile may name an account, and an empty one means offline', () => {
+  const p = createProfile('signed', { mc: '1.21.4', account: 'Joogiebear' })
+  assert.equal(p.account, 'Joogiebear')
+  assert.equal(updateProfile('signed', { account: null }).account, null)
+  assert.throws(() => updateProfile('signed', { account: '' }), /account must be text or null/)
 })
 
 test('memory must be a whole number of M or G', () => {

@@ -30,15 +30,15 @@ with progress on stderr) and starts the game as an offline player named after th
 download is shared between profiles of the same version, so a second profile on 1.21.11 starts
 at once. `spawnloft client install <name>` does the download without starting the game.
 
-`launch` takes `--as <playerName>` to play under another name, `--server <name>` to point at a
-different server for this run, and `--wait`, which keeps the command alive for five seconds and
+`launch` takes `--as <playerName>` to play offline under another name, `--account <name>` to
+play as a signed-in Microsoft account, `--server <name>` to point at a different server for this run, and `--wait`, which keeps the command alive for five seconds and
 fails if the game died in that time. Everything else goes through `status`, `stop` and `logs`.
 
 ## Profiles
 
 ```
 spawnloft client list
-spawnloft client new <name> --mc <version> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness]
+spawnloft client new <name> --mc <version> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
 spawnloft client set <name> key=value ...
 spawnloft client remove <name> [--purge]
 ```
@@ -53,6 +53,7 @@ A profile is a few keys, all changeable with `set`:
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
 | `java` | A specific Java to use, or empty to let SpawnLoft pick. |
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
+| `account` | A signed-in Microsoft account to play as (see [Accounts](#accounts)), or empty to play offline. |
 | `harness` | `true` installs the harness mod and Fabric API into the profile's `mods/` on launch and opens the control channel. Needs `loader=fabric`. |
 
 Profile names follow the same rule as server names: letters, digits, dash and underscore, up to
@@ -65,15 +66,37 @@ way you would in any launcher.
 
 ## Accounts
 
-The client plays **offline**: the player has a name and nothing else, exactly like a scripted
-test player. That is enough for any of your servers running `online-mode=false`, which is what a
-test server usually is (`spawnloft new <name> --offline`, or `spawnloft props <name>
+By default the client plays **offline**: the player has a name and nothing else, exactly like a
+scripted test player. That is enough for any of your servers running `online-mode=false`, which
+is what a test server usually is (`spawnloft new <name> --offline`, or `spawnloft props <name>
 online-mode=false`). A server in online mode refuses an offline player, and `client_join` and the
 diagnostics say so.
 
-Signing in with a Microsoft account, to play on online-mode servers as yourself, is not in this
-version. `spawnloft client login` will arrive with it; no password will pass through SpawnLoft
-when it does, and nothing in a profile changes.
+To play on an online-mode server as yourself, sign in once:
+
+```
+spawnloft client login
+spawnloft client launch play --account Joogiebear
+spawnloft client set play account=Joogiebear
+```
+
+`login` prints a code and a Microsoft address; you enter the code in your browser, on
+Microsoft's own page, and the command finishes when you have. No password passes through
+SpawnLoft. What it keeps is a refresh token, in `client/accounts.json`, a file only your user can
+read; the game gets a short-lived session token at each launch, and a token that is about to
+expire is refreshed before the launch. `client accounts` lists who is signed in, `client logout
+<name>` forgets one. An account on a profile (`account=<name>`) is used by every launch of it;
+`--account offline:<player name>` plays offline again for one run. `--as` and `--account` do not
+mix: a signed-in account brings its own name.
+
+The account needs Minecraft: Java Edition and an Xbox profile; a child account must be allowed by
+an adult in its Microsoft family first. The sign-in itself goes through Microsoft's and Mojang's
+servers only, and Microsoft must have approved SpawnLoft's registration for Minecraft sign-in; until
+it has, the command says so and offline profiles still work.
+
+An AI assistant cannot sign in or read the accounts file: `client_launch` uses whatever account a
+profile names, and the tokens never appear in a tool result, a state file, the activity log or a
+diagnostics bundle.
 
 ## The harness
 
@@ -164,7 +187,7 @@ that would not load, a crash, and a Java too old for the version.
 
 ## What it does not do
 
-- Sign in with a Microsoft account (coming, see above). Offline players join offline-mode servers only.
+- Sign in for an AI assistant. A person signs in on the command line; offline players join offline-mode servers only.
 - Download Java. Install Java 21 or newer yourself, as for a server.
 - Bundle mods or tweaks of its own. The only mod it ever installs is the harness, and only when a profile asks for it.
 - Run on a machine with no display. The client needs a graphics driver; use bots there.

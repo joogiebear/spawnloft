@@ -9,6 +9,7 @@ import * as pluginActions from './plugin-actions.mjs'
 import * as upgrade from './upgrade.mjs'
 import { listPlayers, onlineNow } from './players.mjs'
 import { diagnose } from './diagnose.mjs'
+import { loadAccounts } from './client-auth.mjs'
 import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
@@ -672,6 +673,7 @@ function collectSecrets() {
     }
   }
   try { walk(loadRegistry()) } catch { /* no registry yet: nothing to hide */ }
+  try { walk(loadAccounts()) } catch { /* no accounts file: nothing to hide */ }
   // Longest first, so a secret containing another is not half-replaced.
   return [...found].sort((a, b) => b.length - a.length)
 }

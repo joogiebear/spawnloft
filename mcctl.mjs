@@ -46,6 +46,7 @@ import { moveData, rollbackMove, finishMove, moveStatus } from './src/data-move.
 import * as bots from './src/bots.mjs'
 import { buildBundle, writeBundle, summarise, summarySection, TAIL_LINES } from './src/diag-bundle.mjs'
 import * as client from './src/client.mjs'
+import * as clientAuth from './src/client-auth.mjs'
 import { clientLog } from './src/client-paths.mjs'
 import { ensureVersion } from './src/client-install.mjs'
 
@@ -1943,13 +1944,16 @@ BOTS (plugin testing with scripted players)
 CLIENT (a game client for your own servers)
   mcctl client list                  Profiles, with running state
   mcctl client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
-  mcctl client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness
+  mcctl client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account
   mcctl client remove <name>         Delete a profile (--purge also removes its game folder)
   mcctl client install <name>        Download what the profile needs, with progress on stderr
-  mcctl client launch <name>         Install if needed and start the client (--as, --server, --wait)
+  mcctl client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
   mcctl client status <name>         Say whether the client is running
   mcctl client stop <name>           Stop a running client
   mcctl client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
+  mcctl client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
+  mcctl client logout <name>         Forget a signed-in account
+  mcctl client accounts              Signed-in accounts
 
 DATABASES
   mcctl db                           List databases
@@ -2039,7 +2043,7 @@ async function cmdBot(positional, flags) {
  */
 async function cmdClient(positional, flags) {
   const [sub, ...rest] = positional
-  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest]'
+  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
   const quiet = flags.json === true
   const onProgress = (p) => { if (!quiet) process.stderr.write(p.phase + ' ' + p.done + '/' + p.total + '\n') }
 
@@ -2054,10 +2058,10 @@ async function cmdClient(positional, flags) {
   }
 
   if (sub === 'new') {
-    checkFlags(flags, ['mc', 'loader', 'memory', 'java', 'server', 'harness', 'json'])
+    checkFlags(flags, ['mc', 'loader', 'memory', 'java', 'server', 'harness', 'account', 'json'])
     if (rest.length !== 1) throw new UsageError(usage)
     if (!flags.mc) throw new UsageError(usage)
-    const profile = client.createProfile(rest[0], { mc: flags.mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true })
+    const profile = client.createProfile(rest[0], { mc: flags.mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true, account: flags.account ?? null })
     if (quiet) process.stdout.write(jsonLine('client', { profile }))
     else out(`Created profile "${rest[0]}" (Minecraft ${profile.mc}, ${profile.loader}). Launch it: spawnloft client launch ${rest[0]}`)
     return
@@ -2067,7 +2071,7 @@ async function cmdClient(positional, flags) {
     checkFlags(flags, ['json'])
     if (rest.length < 2) throw new UsageError(usage)
     const name = rest[0]
-    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness']
+    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness', 'account']
     const patch = {}
     for (const arg of rest.slice(1)) {
       const m = arg.match(/^([a-zA-Z]+)=(.*)$/)
@@ -2078,7 +2082,7 @@ async function cmdClient(positional, flags) {
       if (key === 'harness') {
         if (value !== 'true' && value !== 'false') throw new UsageError(usage)
         value = value === 'true'
-      } else if ((key === 'loaderVersion' || key === 'java' || key === 'server') && value === '') {
+      } else if ((key === 'loaderVersion' || key === 'java' || key === 'server' || key === 'account') && value === '') {
         value = null
       }
       patch[key] = value
@@ -2109,13 +2113,14 @@ async function cmdClient(positional, flags) {
   }
 
   if (sub === 'launch') {
-    checkFlags(flags, ['as', 'server', 'wait', 'json'])
+    checkFlags(flags, ['as', 'account', 'server', 'wait', 'json'])
     if (rest.length !== 1) throw new UsageError(usage)
     if (flags.as !== undefined && typeof flags.as !== 'string') throw new UsageError('--as needs a player name')
+    if (flags.account !== undefined && typeof flags.account !== 'string') throw new UsageError('--account needs "offline:<player name>" or a signed-in account name')
     if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
     // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
     const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
-    const res = await client.launch(rest[0], { playerName: flags.as ?? null, server: flags.server ?? null, onProgress, fakeJava })
+    const res = await client.launch(rest[0], { playerName: flags.as ?? null, account: flags.account ?? null, server: flags.server ?? null, onProgress, fakeJava })
     if (flags.wait === true) {
       const deadline = Date.now() + 5000
       while (Date.now() < deadline) {
@@ -2170,6 +2175,48 @@ async function cmdClient(positional, flags) {
     }
     if (quiet) process.stdout.write(jsonLine('client', { lines, file }))
     else for (const l of lines) out(l)
+    return
+  }
+
+  if (sub === 'login') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    const account = await clientAuth.deviceCodeLogin({
+      onCode: ({ verificationUri, userCode, expiresIn }) => {
+        // On stderr so --json keeps stdout for the one envelope; the person reads this either way.
+        process.stderr.write(`Open ${verificationUri} and enter the code ${userCode} (valid ${Math.floor(expiresIn / 60)} minutes). Waiting...\n`)
+      },
+    })
+    const list = clientAuth.loadAccounts()
+    const at = list.findIndex((a) => a.uuid === account.uuid)
+    if (at === -1) list.push(account)
+    else list[at] = account
+    clientAuth.saveAccounts(list)
+    if (quiet) process.stdout.write(jsonLine('client', { account: { type: account.type, name: account.name, uuid: account.uuid } }))
+    else out(`Signed in as ${account.name}. Use it: spawnloft client launch <profile> --account ${account.name}, or spawnloft client set <profile> account=${account.name}`)
+    return
+  }
+
+  if (sub === 'logout') {
+    checkFlags(flags, ['json'])
+    if (rest.length !== 1) throw new UsageError(usage)
+    const list = clientAuth.loadAccounts()
+    const keep = list.filter((a) => a.name.toLowerCase() !== rest[0].toLowerCase())
+    if (keep.length === list.length) fail(`no signed-in account named "${rest[0]}"; spawnloft client accounts lists them`)
+    clientAuth.saveAccounts(keep)
+    if (quiet) process.stdout.write(jsonLine('client', { removed: rest[0] }))
+    else out(`Signed out ${rest[0]}. Microsoft keeps its own session; sign out of your browser too if the machine is shared.`)
+    return
+  }
+
+  if (sub === 'accounts') {
+    checkFlags(flags, ['json'])
+    if (rest.length) throw new UsageError(usage)
+    // Names and expiry only: the tokens never leave the file.
+    const accounts = clientAuth.loadAccounts().map((a) => ({ name: a.name, uuid: a.uuid, expiresAt: a.expiresAt }))
+    if (quiet) process.stdout.write(jsonLine('client', { accounts }))
+    else if (!accounts.length) out('No Microsoft account is signed in. Sign in: spawnloft client login')
+    else for (const a of accounts) out(`${a.name}  ${a.uuid}  token until ${a.expiresAt}`)
     return
   }
 

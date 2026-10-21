@@ -97,6 +97,41 @@ test('launch with fake client, status, logs, stop', async () => {
   assert.equal(JSON.parse(status2.stdout.trim()).data.running, false)
 })
 
+test('launch --account offline:<name> plays offline under that name, and --as with --account is refused', async () => {
+  env.MCCTL_FAKE_CLIENT = path.join(root, 'test', 'fixtures', 'fake-client.mjs')
+  const both = cli(['client', 'launch', 'p', '--as', 'x', '--account', 'offline:Steve', '--json'])
+  assert.equal(both.code, 1)
+  assert.match(both.stderr + both.stdout, /not both/)
+  const res = cli(['client', 'launch', 'p', '--account', 'offline:Steve', '--json'])
+  assert.equal(res.code, 0, res.stderr)
+  assert.deepEqual(JSON.parse(res.stdout.trim()).data.account, { type: 'offline', name: 'Steve' })
+  cli(['client', 'stop', 'p'])
+  const nobody = cli(['client', 'launch', 'p', '--account', 'nobody', '--json'])
+  assert.equal(nobody.code, 1)
+  assert.match(nobody.stderr + nobody.stdout, /no Microsoft account named \\?"nobody\\?" is signed in/)
+})
+
+test('accounts lists nothing before a login, and logout of an unknown name says so', () => {
+  const list = cli(['client', 'accounts', '--json'])
+  assert.equal(list.code, 0)
+  assert.deepEqual(JSON.parse(list.stdout.trim()).data, { accounts: [] })
+  const out = cli(['client', 'logout', 'nobody'])
+  assert.equal(out.code, 1)
+  assert.match(out.stderr + out.stdout, /no signed-in account named "nobody"/)
+})
+
+test('the MCP scrubber hides the tokens of a signed-in account', async () => {
+  const { saveAccounts } = await import('../src/client-auth.mjs')
+  const { scrubber } = await import('../src/mcp-tools.mjs')
+  saveAccounts([{ type: 'microsoft', name: 'Joogiebear', uuid: 'u', accessToken: 'mc-access-secret', refreshToken: 'msa-refresh-secret', expiresAt: new Date().toISOString() }])
+  const scrub = scrubber()
+  assert.equal(scrub('token mc-access-secret and msa-refresh-secret here'), 'token [redacted] and [redacted] here')
+  const listed = cli(['client', 'accounts'])
+  assert.equal(listed.code, 0)
+  assert.ok(!listed.stdout.includes('secret'), listed.stdout)
+  saveAccounts([])
+})
+
 test('remove --purge deletes the folder', () => {
   const res = cli(['client', 'remove', 'p', '--purge'])
   assert.equal(res.code, 0)

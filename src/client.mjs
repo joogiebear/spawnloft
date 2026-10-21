@@ -8,7 +8,7 @@ import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
-import { offlineAccount, defaultPlayerName } from './client-auth.mjs'
+import { offlineAccount, defaultPlayerName, accountFor } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
 import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
@@ -16,7 +16,7 @@ import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
 
-const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server']
+const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']
 
 function validateMc(mc) {
   if (!/^\d+(\.\d+){1,2}$/.test(mc) && !/^\d{2}w\d{2}[a-z]$/.test(mc)) {
@@ -24,7 +24,7 @@ function validateMc(mc) {
   }
 }
 
-function validateFields({ mc, loader, loaderVersion, java, memory, harness, server }) {
+function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account }) {
   validateMc(mc)
   parseMemoryGb(memory)
   // -Xmx takes whole units only: 1.5G is refused by Java where a server's launcher would round it
@@ -36,7 +36,7 @@ function validateFields({ mc, loader, loaderVersion, java, memory, harness, serv
   if (harness && loader === 'vanilla') {
     fail('the harness mod needs the fabric loader')
   }
-  for (const [key, value] of Object.entries({ loaderVersion, java, server })) {
+  for (const [key, value] of Object.entries({ loaderVersion, java, server, account })) {
     if (value !== null && (typeof value !== 'string' || !value.trim())) fail(`${key} must be text or null`)
   }
   // the loader version becomes part of a folder name under versions/
@@ -85,7 +85,7 @@ export function getProfile(name) {
   return { name, ...cfg }
 }
 
-export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null }) {
+export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
   validateProfileName(name)
   const reg = loadProfiles()
   const lower = name.toLowerCase()
@@ -94,13 +94,13 @@ export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = nu
       fail(`a profile named "${existing}" already exists (names must differ in more than case)`)
     }
   }
-  validateFields({ mc, loader, loaderVersion, java, memory, harness, server })
+  validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account })
   fs.mkdirSync(profileDir(name), { recursive: true })
   const optionsFile = path.join(profileDir(name), 'options.txt')
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
-  const profile = { mc, loader, loaderVersion, java, memory, harness, server, createdAt: new Date().toISOString() }
+  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account, createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
   return { name, ...profile }
@@ -154,7 +154,7 @@ export async function prepareVersion(name, { onProgress = () => {} } = {}) {
   return profile.mc
 }
 
-export async function launch(name, { playerName = null, server = null, onProgress = () => {}, fakeJava = null } = {}) {
+export async function launch(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null } = {}) {
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
@@ -193,12 +193,16 @@ export async function launch(name, { playerName = null, server = null, onProgres
     version = mergeInherited(version, parentJson)
   }
 
-  const account = offlineAccount(playerName ?? defaultPlayerName(name))
+  // --as names an offline player; a signed-in account brings its own name. Both at once is a
+  // contradiction, not a preference.
+  const selector = accountSelector ?? profile.account ?? null
+  if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
+  const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, harnessToken })
-  const { pid } = await spawnClient(command, { name, state: { mode: 'offline', account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name } }
 }
@@ -248,7 +252,10 @@ async function viaSession(name, fn) {
 
 export async function join(name, server) {
   const check = checkInstance(server)
-  if (!check.ok) fail(check.problems.join(' '))
+  // The offline-mode rule is for players without an account; a signed-in one may join an online server.
+  const signedIn = status(name).account?.type === 'microsoft'
+  const problems = check.problems.filter((p) => !(signedIn && /runs in online mode/.test(p)))
+  if (problems.length) fail(problems.join(' '))
   const host = check.host
   const port = check.inst.port
   const result = await viaSession(name, (ch) => ch.call('join', { host, port }, { timeout: 65000 }))

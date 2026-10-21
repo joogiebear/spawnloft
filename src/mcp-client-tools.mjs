@@ -100,7 +100,7 @@ export const clientReadTools = [
 export const clientActionTools = [
   {
     name: 'client_launch', title: 'Launch a game client', annotations: WRITE_NET,
-    description: 'Starts the real game client for one profile as an offline player, downloading what it needs the first time. With "wait" (the default) it reports the screen once the harness answers.',
+    description: 'Starts the real game client for one profile, downloading what it needs the first time. The player is offline unless the profile names a signed-in Microsoft account (set on the command line; assistants cannot sign in). With "wait" (the default) it reports the screen once the harness answers.',
     inputSchema: object({
       profile,
       player_name: { type: 'string', minLength: 1 },
