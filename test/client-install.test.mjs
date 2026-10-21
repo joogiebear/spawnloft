@@ -114,6 +114,26 @@ test('corrupted library is re-downloaded', async () => {
   assert.equal(calls[0], target.url)
 })
 
+test('a loader profile links the parent jar instead of downloading it again', async () => {
+  const fabric = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'fabric-profile.json'), 'utf8'))
+  for (const lib of fabric.libraries) {
+    lib.sha1 = bodySha
+    lib.size = bodySize
+  }
+  fs.mkdirSync(versionDir(fabric.id), { recursive: true })
+  fs.writeFileSync(versionJson(fabric.id), JSON.stringify(fabric))
+
+  const { calls, fetchImpl } = makeStub()
+  const result = await ensureVersion(fabric.id, { os: winOs, fetchImpl })
+  assert.ok(!calls.includes(fixture.downloads.client.url), 'the client jar is not fetched a second time')
+  assert.equal(calls.length, fabric.libraries.length)
+  assert.equal(result.jar, versionJar(fabric.id))
+  assert.equal(fs.readFileSync(versionJar(fabric.id), 'utf8'), BODY)
+
+  const again = await ensureVersion(fabric.id, { os: winOs, fetchImpl })
+  assert.equal(again.downloaded, 0)
+})
+
 test('extractNatives skips META-INF and excluded prefixes', async () => {
   const cwd = fs.mkdtempSync(path.join(scratch, 'zip-src-'))
   fs.writeFileSync(path.join(cwd, 'a.dll'), 'native dll content')

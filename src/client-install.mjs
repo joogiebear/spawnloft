@@ -25,6 +25,15 @@ export function needsDownload(file, { sha1 = null, size = null } = {}) {
   return false
 }
 
+function linkOrCopy(from, to) {
+  fs.rmSync(to, { force: true })
+  try {
+    fs.linkSync(from, to)
+  } catch {
+    fs.copyFileSync(from, to)
+  }
+}
+
 async function inBatches(items, limit, worker) {
   let index = 0
   let failed = false
@@ -91,9 +100,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     version = mergeInherited(rawJson, parentJson)
   }
 
-  const jarPath = version.downloads?.client
-    ? versionJar(id)
-    : (rawJson.inheritsFrom ? versionJar(rawJson.inheritsFrom) : versionJar(id))
+  const jarPath = versionJar(id)
 
   let downloaded = 0
   let totalBytes = 0
@@ -113,17 +120,22 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   const dl = version.downloads?.client
   if (dl) {
-    const dest = versionJar(id)
-    const needs = needsDownload(dest, { sha1: dl.sha1, size: dl.size })
+    const needs = needsDownload(jarPath, { sha1: dl.sha1, size: dl.size })
     if (needs) {
-      fs.mkdirSync(path.dirname(dest), { recursive: true })
-      try {
-        await fetchImpl(dl.url, dest, { hash: 'sha1', expected: dl.sha1, label: `the client jar for ${id}` })
-      } catch (err) {
-        fail(`could not download the client jar for ${id} from ${dl.url}: ${err.message}`)
+      fs.mkdirSync(path.dirname(jarPath), { recursive: true })
+      if (rawJson.downloads?.client) {
+        try {
+          await fetchImpl(dl.url, jarPath, { hash: 'sha1', expected: dl.sha1, label: `the client jar for ${id}` })
+        } catch (err) {
+          fail(`could not download the client jar for ${id} from ${dl.url}: ${err.message}`)
+        }
+        downloaded++
+        totalBytes += dl.size ?? 0
+      } else {
+        // A loader profile inherits the parent's jar: the launch command expects it under the
+        // profile's own id, so it is linked there rather than fetched and stored a second time.
+        linkOrCopy(versionJar(rawJson.inheritsFrom), jarPath)
       }
-      downloaded++
-      totalBytes += dl.size ?? 0
     }
     emitEnd('client', 1, 1, needs ? (dl.size ?? 0) : 0)
   } else {
