@@ -49,6 +49,20 @@ test('launch, status, log, stop', async () => {
   assert.equal(fs.existsSync(clientStateFile('life')), false)
 })
 
+test('the process log holds the current run only', async () => {
+  const res = await launch('life', { playerName: 'secondrun', fakeJava })
+  assert.ok(res.pid)
+  const deadline = Date.now() + 3000
+  let lines = []
+  while (Date.now() < deadline && !lines.some(l => l.includes('Setting user: secondrun'))) {
+    lines = tailClientLog('life')
+    await new Promise(r => setTimeout(r, 50))
+  }
+  assert.ok(lines.some(l => l.includes('Setting user: secondrun')), 'the new run is in the log')
+  assert.ok(!lines.some(l => l.includes('Setting user: life')), 'the earlier run is gone')
+  await stop('life')
+})
+
 test('launching twice is refused', async () => {
   await launch('life', { fakeJava })
   await assert.rejects(launch('life', { fakeJava }), /already running/)

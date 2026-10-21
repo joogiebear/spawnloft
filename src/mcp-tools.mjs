@@ -155,7 +155,6 @@ const readTools = [
         const { file, size } = await writeBundle(b, { outDir: path.join(BACKUPS_DIR, n, 'exports') })
         data = { ...data, bundle: { file, size, findings: b.findings } }
         out.push(`Bundle written to ${file}`)
-        for (const f of b.findings.client ?? []) out.push(`- ${f.title}. ${f.advice}`)
       }
       return { data, text: out.join('\n') }
     },

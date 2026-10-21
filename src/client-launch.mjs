@@ -121,8 +121,9 @@ export async function spawnClient(command, { name, state }) {
 
   // The launcher may be a short-lived CLI command, so the game runs in its own session with its
   // output on a file descriptor rather than a pipe to us; windowsHide keeps java.exe's console
-  // window from appearing (the game's own window is unaffected).
-  const fd = fs.openSync(clientLog(name), 'a')
+  // window from appearing (the game's own window is unaffected). The log holds one run: a
+  // diagnosis of this launch must not find the last one's errors.
+  const fd = fs.openSync(clientLog(name), 'w')
   let child
   try {
     child = spawn(cmd, args, {
