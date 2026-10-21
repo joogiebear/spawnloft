@@ -71,9 +71,12 @@ fs.writeFileSync(path.join(profDir, 'crash-reports', 'crash-2026-10-20_14.00.06-
   + '\n\tJVM Flags: 2 total; -Xmx2G -Dspawnloft.harness.token=deadbeefdeadbeefdeadbeefdeadbeef\n')
 fs.writeFileSync(path.join(profDir, 'mods', 'fabric-api-0.141.6+1.21.11.jar'), '')
 
+// A log's mtime dates its lines, so every fixture log is pinned to the day the lines come from;
+// left at "now", the server's 14:00 lines would land on today once the clock passes 14:00.
 const t = new Date(2026, 9, 20, 14, 0, 10)
 fs.utimesSync(path.join(profDir, 'logs', 'latest.log'), t, t)
 fs.utimesSync(path.join(clientRoot, 'run', 'fixclient', 'client.log'), t, t)
+fs.utimesSync(path.join(runDir, 'console.log'), t, t)
 
 process.env.MCCTL_DATA_ROOT = data
 
