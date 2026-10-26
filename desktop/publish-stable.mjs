@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { verifyRelease } from './preview-artifacts.mjs'
 import { prepareMacFeeds } from './mac-update-feeds.mjs'
+import { windowsPowerShellEnv } from './windows-powershell.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const dir = path.resolve(process.argv[2] || path.join(here, 'dist/stable-release'))
@@ -22,7 +23,7 @@ if (run.path !== '.github/workflows/desktop-stable.yml' || run.head_branch !== '
 }
 const verified = verifyRelease(dir, { stable: true, version, sourceVersion: version, commit, macSigningMode: 'signed' })
 const installer = path.join(dir, `SpawnLoft-Setup-${version}.exe`).replaceAll("'", "''")
-execFileSync('powershell', ['-NoProfile', '-Command', `$s = Get-AuthenticodeSignature -LiteralPath '${installer}'; if ($s.Status -ne 'Valid' -or $null -eq $s.TimeStamperCertificate -or $s.SignerCertificate.Subject -notmatch 'CN=victor zemeckis(,|$)') { throw 'Invalid Windows publisher signature' }`], { stdio: 'inherit', windowsHide: true })
+execFileSync('powershell', ['-NoProfile', '-Command', `$s = Get-AuthenticodeSignature -LiteralPath '${installer}'; if ($s.Status -ne 'Valid' -or $null -eq $s.TimeStamperCertificate -or $s.SignerCertificate.Subject -notmatch 'CN=victor zemeckis(,|$)') { throw 'Invalid Windows publisher signature' }`], { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv() })
 verified.assets.push(...prepareMacFeeds(dir, verified))
 const tag = `v${version}`
 let taggedCommit
