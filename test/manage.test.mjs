@@ -1,10 +1,7 @@
 /**
  * Everything that needs a registry behind it: rebuild, rename, port checks, the snapshot flush,
- * the pid-reuse check and the panel's status codes.
- *
- * <p>Isolated the way lifecycle.test.mjs is - MCCTL_DATA_ROOT points every path at a scratch
- * folder before the first module that resolves paths is imported - so putInstance writes into a
- * registry nobody else reads and rmSync never meets a real world.
+ * the pid-reuse check and the panel's status codes. Isolated like lifecycle.test.mjs, so
+ * putInstance writes to a scratch registry and rmSync never meets a real world.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -14,8 +11,8 @@ import path from 'node:path'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-manage-'))
 process.env.MCCTL_DATA_ROOT = scratch
-// The mirror test saves settings, and MCCTL_DATA_ROOT does not move the settings file: without
-// these it rewrote the developer's own settings.json on every run.
+// the mirror test saves settings and MCCTL_DATA_ROOT does not move the settings file, so redirect
+// it or the developer's own settings.json gets rewritten
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 
@@ -43,8 +40,6 @@ function makeInstance(name, { level = 'world', port = 40000, rconPort = 40001 } 
 
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-// ---- rebuild ----------------------------------------------------------------
-
 test('rebuild wipes the worlds level-name names, not "world"', async () => {
   const inst = makeInstance('rb', { level: 'rpg' })
   world(inst.dir, 'rpg')
@@ -60,8 +55,6 @@ test('rebuild wipes the worlds level-name names, not "world"', async () => {
   assert.ok(fs.existsSync(path.join(inst.dir, 'keepme')), 'a world that is not active must survive')
   assert.ok(fs.existsSync(path.join(inst.dir, 'server.jar')), 'the jar must survive')
 })
-
-// ---- rename -----------------------------------------------------------------
 
 test('rename rewrites the launchers under the new name and moves the mirror folder', async () => {
   const inst = makeInstance('before', { port: 40010, rconPort: 40011 })
@@ -85,8 +78,6 @@ test('rename rewrites the launchers under the new name and moves the mirror fold
   assert.ok(!fs.existsSync(path.join(mirror, 'before')))
 })
 
-// ---- ports ------------------------------------------------------------------
-
 test('a port is refused when it is not a port or belongs to another instance', () => {
   makeInstance('porta', { port: 40020, rconPort: 40021 })
   makeInstance('portb', { port: 40030, rconPort: 40031 })
@@ -98,8 +89,6 @@ test('a port is refused when it is not a port or belongs to another instance', (
   assert.throws(() => assertPortUsable('porta', 40031), /already used by "portb"/, 'an RCON port counts too')
 })
 
-// ---- the pid-reuse check ----------------------------------------------------
-
 test('a live pid is the recorded process only when the executable name agrees', () => {
   const me = path.basename(process.execPath)
   assert.equal(sameProcess(process.pid, me), true)
@@ -107,8 +96,6 @@ test('a live pid is the recorded process only when the executable name agrees', 
   assert.equal(sameProcess(process.pid, 'java'), false, 'this process is not a JVM')
   assert.equal(sameProcess(process.pid, null), true, 'a state file from before the check is trusted as before')
 })
-
-// ---- the snapshot flush -----------------------------------------------------
 
 test('a hot snapshot whose flush fails is still taken, and says so', async () => {
   // RCON on a port nothing listens on: the flush cannot happen, the snapshot must.
@@ -128,8 +115,6 @@ test('a hot snapshot whose flush fails is still taken, and says so', async () =>
   const cold = await backup.createSnapshot(inst, { scope: 'plugins', running: false })
   assert.equal(cold.flushWarning, null, 'a stopped server has nothing to flush')
 })
-
-// ---- the panel's status codes -----------------------------------------------
 
 test('the panel answers a refusal with 400, an unknown server with 404, and never leaks the RCON password', async () => {
   makeInstance('panel', { port: 40050, rconPort: 40051 })

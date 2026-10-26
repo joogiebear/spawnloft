@@ -4,18 +4,16 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider')
 
-// Run the updater library that ships in the app, with network responses supplied locally.
-// A paired release must still resolve the Windows installer; old Mac-only previews must
-// never win, and stable installs must never be offered the development beta.
+// runs the updater library that ships in the app, with network responses supplied locally:
+// a paired release must still resolve the Windows installer, old Mac-only previews must never
+// win, and stable installs must never be offered the development beta
 const versions = ['0.15.0-beta.3', '0.15.0-mac.6', '0.15.0-beta.1', '0.14.0']
 const feed = '<feed>' + versions.map(version => `<entry><title>SpawnLoft ${version}</title>
   <link href="https://github.com/joogiebear/spawnloft/releases/tag/v${version}"/>
   <content>Development test</content></entry>`).join('') + '</feed>'
 
-// On Linux the updater names its feed for the machine's architecture: latest-linux.yml on x64 and
-// latest-linux-arm64.yml on arm64. The library reads the architecture of the host it runs on, and
-// this test runs on an Apple Silicon runner too - which is also what an arm64 Linux package will
-// have to publish when there is one.
+// the Linux feed is named for the host architecture (latest-linux.yml on x64,
+// latest-linux-arm64.yml on arm64), and this test also runs on Apple Silicon runners
 const LINUX_FEED = process.arch === 'x64' ? '-linux' : `-linux-${process.arch}`
 
 function provider(currentVersion, allowPrerelease, platform = 'win32', stable = false) {
@@ -103,8 +101,8 @@ test('a Linux beta asks for the Linux feed and is handed the Debian package', as
   assert.equal(info.version, '0.15.0-beta.3')
   assert.equal(client.resolveFiles(info)[0].url.href,
     'https://github.com/joogiebear/spawnloft/releases/download/v0.15.0-beta.3/SpawnLoft-0.15.0-beta.3-linux-amd64.deb')
-  // The name the preview workflow copies latest-linux.yml to. If the updater ever asked for
-  // anything else, Linux betas would install and then never hear of another release.
+  // the name the preview workflow copies latest-linux.yml to; anything else and Linux betas
+  // would never hear of another release
   assert.ok(requests.some(route => route.endsWith(`/beta${LINUX_FEED}.yml`)))
   assert.ok(requests.every(route => !route.endsWith('/beta.yml') && !route.endsWith('-mac.yml')))
 })
@@ -122,16 +120,14 @@ test('one Linux feed serves both packages: a deb install takes the .deb, an rpm 
   const { client } = provider('0.15.0-beta.1', true, 'linux')
   const files = client.resolveFiles(await client.getLatestVersion())
   assert.equal(files.length, 2)
-  // The same calls DebUpdater and RpmUpdater make. Which one runs is decided by the package-type
-  // marker each package leaves in its own resources folder.
+  // same calls DebUpdater and RpmUpdater make; which runs depends on the package-type marker in
+  // each package's resources folder
   assert.ok(findFile(files, 'deb', ['AppImage', 'rpm', 'pacman']).url.href.endsWith('-linux-amd64.deb'))
   assert.ok(findFile(files, 'rpm', ['AppImage', 'deb', 'pacman']).url.href.endsWith('-linux-x86_64.rpm'))
 })
 
-// ---- the "Get beta builds" setting -----------------------------------------------------------
-// The setting is one property, allowPrerelease, chosen independently of the running version
-// (update-channel.js). These are the transitions that choice makes possible and the installer
-// someone downloaded used to decide.
+// the "Get beta builds" setting is allowPrerelease, chosen independently of the running version
+// (update-channel.js); these cover the transitions that allows
 
 for (const platform of ['win32', 'darwin', 'linux']) {
   test(`${platform}: a stable copy that opts in is offered the newest beta from that beta's own feed`, async () => {
@@ -146,7 +142,7 @@ for (const platform of ['win32', 'darwin', 'linux']) {
   test(`${platform}: a beta copy that opts out hears of no more betas, and is never pointed at one`, async () => {
     const { client, requests } = provider('0.15.0-beta.1', false, platform)
     const info = await client.getLatestVersion()
-    // Older than what is installed, so the updater does nothing with it: downgrades are off.
+    // older than what is installed, so the updater ignores it: downgrades are off
     assert.equal(info.version, '0.14.0')
     assert.ok(requests.every(route => !route.includes('/download/v0.15.0')))
   })

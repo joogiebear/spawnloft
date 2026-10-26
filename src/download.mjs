@@ -1,11 +1,5 @@
-/**
- * Fetch a file into the jar store, hashed as it arrives, and only named once the hash matches.
- *
- * <p>The checksum is not ceremony: a truncated download produces a jar that unzips far enough
- * to look plausible and then fails at runtime with a class-loading error that says nothing about
- * the real cause. A .part file is what an interrupted or corrupt download leaves, never a jar
- * that looks stored and is not.
- */
+// Fetch a file into the jar store, hashed as it arrives. It gets its final name only once the hash
+// matches; a truncated download would look like a jar and fail later with an opaque class-loading error.
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
@@ -15,24 +9,15 @@ import { fail, humanBytes } from './util.mjs'
 
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
 
-/** A gateway that timed out, a server that is busy or restarting, a rate limit: worth asking again. */
+// timeouts, busy or restarting servers, rate limits: worth asking again
 const TRANSIENT = new Set([408, 425, 429, 500, 502, 503, 504])
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-/**
- * `fetch`, asked again when the answer is one that a second request usually changes.
- *
- * <p>GitHub's download servers answered 504 to three separate engine downloads on one release
- * day. Each was a single bad response, and each failed an install that the next request would
- * have completed. A refusal that means something - 403, 404 - is returned at once, as is the last
- * answer when every attempt was transient, so the caller's own message still names the status.
- *
- * <p>Only opening the response is retried. A download that breaks half way is the caller's to
- * report: its bytes are already being hashed and written.
- *
- * <p>`timeoutMs` rather than a signal, because an AbortSignal that has fired stays fired and each
- * attempt needs its own.
- */
+// fetch, retried when a second request usually changes the answer (GitHub's download servers return
+// stray 504s). Refusals like 403/404, and the last answer if every attempt was transient, are returned
+// at once so the caller's message names the status. Only opening the response is retried; a download
+// that breaks half way is the caller's to report. timeoutMs instead of a signal because a fired
+// AbortSignal stays fired and each attempt needs its own.
 export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500, timeoutMs = 0, fetcher = fetch, onRetry = null } = {}) {
   for (let attempt = 1; ; attempt++) {
     const last = attempt >= attempts
@@ -64,11 +49,8 @@ export async function fetchJson(url, { label = url } = {}) {
   return res.json()
 }
 
-/**
- * Download `url` to `dest`. `hash` names the algorithm and `expected` the digest the publisher
- * gave, both optional - a source that publishes none is downloaded over TLS with a size floor,
- * which is all that can be had. Progress reports the bytes that actually arrived.
- */
+// hash names the algorithm and expected the publisher's digest, both optional. A source that
+// publishes none gets TLS plus a size floor.
 export async function downloadFile(url, dest, { hash = null, expected = null, onProgress = null, minBytes = 0, label = null } = {}) {
   const what = label ?? dest
   let res

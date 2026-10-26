@@ -1,38 +1,21 @@
 #!/usr/bin/env node
-/**
- * Build a local test installer that has something to update to.
- *
- * <p>A plain `npx electron-builder --publish never` is awkward for trying the update flow, for two
- * reasons, and this script exists for both.
- *
- * <p><b>Version.</b> A build at the current version has nothing newer on the release feed, so
- * installing it proves the app starts and nothing else. Built at a version BELOW the latest
- * release, it finds that release twenty seconds after starting and walks the whole path:
- * background download, "Restart to update", silent install, relaunch on the real version.
- *
- * <p>The version is a plain one on purpose. A prerelease tag like `-test.1` would make
- * electron-builder derive an update channel from it and write `channel: test` into app-update.yml,
- * and the installed app would then look for a `test.yml` that no release has.
- *
- * <p><b>Signing.</b> Two builds are worth making, and they test different halves:
- *
- * <ul>
- *   <li><b>Unsigned</b> (the default). Azure Trusted Signing is configured in package.json and
- *       electron-builder has no switch to leave it out, so the same configuration minus
- *       `azureSignOptions` is written to dist/ and passed instead - the trick release.mjs already
- *       uses for `--unsigned`. Builds anywhere, on any machine, with no certificate. SmartScreen
- *       warns about the result.</li>
- *   <li><b>Signed</b> (`--signed`). The configuration a real release is built from, so
- *       app-update.yml carries `publisherName` and the installed app therefore VERIFIES the
- *       signature of whatever it downloads before installing it. That check is skipped entirely by
- *       an unsigned build, so it is the half only this one can exercise. Needs the signing
- *       credentials the release machine has.</li>
- * </ul>
- *
- * <p>package.json is restored whatever happens, including on a failed build.
- *
- *   node build-test.mjs [version] [--signed]     # version defaults to 0.12.9
- */
+// Build a local test installer that has something to update to.
+//
+//   node build-test.mjs [version] [--signed]     # version defaults to 0.12.9
+//
+// The build is versioned below the latest release so it finds that release shortly after start and
+// exercises the whole update path. The version is a plain one on purpose: a prerelease tag like
+// `-test.1` makes electron-builder write `channel: test` into app-update.yml, and the installed
+// app would look for a test.yml that no release has.
+//
+// Unsigned (default): electron-builder can't leave out the Azure signing config in package.json,
+// so the same config minus `azureSignOptions` is written to dist/ and passed instead. Builds
+// anywhere; SmartScreen warns about the result.
+// Signed (--signed): uses the real release config, so app-update.yml carries `publisherName` and
+// the installed app verifies the signature of what it downloads. Needs the release signing
+// credentials.
+//
+// package.json is restored afterwards, even on a failed build.
 import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 

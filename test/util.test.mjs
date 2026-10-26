@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import childProcess from 'node:child_process'
 
-import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, refreshProcessTable, acquireLock, acquireLockAsync, withLock } from '../src/util.mjs'
+import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, maskSecretArgs, refreshProcessTable, acquireLock, acquireLockAsync, withLock, lockHolder } from '../src/util.mjs'
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lock-'))
 
@@ -60,7 +60,29 @@ test('writeJson round-trips and leaves no .tmp behind', () => {
   assert.ok(!fs.existsSync(`${file}.tmp`), 'the temp file should have been renamed away')
 })
 
-// ---- locking -----------------------------------------------------------------
+test('writeJson waits out a file briefly held by a scanner instead of failing the write', (t) => {
+  const file = path.join(scratch(), 'state.json')
+  writeJson(file, { n: 0 })
+  const rename = fs.renameSync
+  let refusals = 2
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (refusals-- > 0) throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+    return rename(from, to)
+  })
+  writeJson(file, { n: 1 })
+  assert.deepEqual(readJson(file), { n: 1 })
+})
+
+test('writeJson still fails on a file that stays held, and on errors that are not a lock', (t) => {
+  const file = path.join(scratch(), 'state.json')
+  let code = 'EBUSY'
+  t.mock.method(fs, 'renameSync', () => { throw Object.assign(new Error(code), { code }) })
+  assert.throws(() => writeJson(file, { n: 1 }), { code: 'EBUSY' })
+  assert.equal(fs.renameSync.mock.callCount(), 4, 'three retries after the first refusal')
+  code = 'ENOENT'
+  assert.throws(() => writeJson(file, { n: 1 }), { code: 'ENOENT' })
+  assert.equal(fs.renameSync.mock.callCount(), 5, 'no retry for an error that is not a lock')
+})
 
 test('withLock serializes two read-modify-writes that would otherwise clobber each other', () => {
   const file = path.join(scratch(), 'counter.json')
@@ -94,10 +116,8 @@ test('a lock left behind by a pid that is no longer alive is taken over, not wai
 })
 
 test('acquireLock mode "wait" blocks until a holder in another process releases it', async () => {
-  // acquireLock's "wait" blocks this thread (Atomics.wait), which only a separate process can
-  // unblock - a timer in this same process could never fire while this thread is stuck waiting on
-  // it, which is exactly why acquireLockAsync exists for anything that shares a process with its
-  // holder. A real child process is the only honest way to exercise this mode's wait at all.
+  // acquireLock's wait blocks this thread (Atomics.wait), so only a separate process can release
+  // the lock in time. A real child process is the only way to exercise it.
   const lock = path.join(scratch(), 'wait.lock')
   const holder = childProcess.spawn(process.execPath, ['-e',
     `require('fs').writeFileSync(${JSON.stringify(lock)}, String(process.pid), { flag: 'wx' });
@@ -120,9 +140,8 @@ test('acquireLockAsync waits by yielding, not by blocking the holder\'s own prog
   const lock = path.join(scratch(), 'async.lock')
   const release = acquireLock(lock, { mode: 'fail' })
   let holderProgressed = false
-  // The holder's own "work" is just another timer - if the waiter blocked the thread instead of
-  // yielding, this would never get to run, and acquireLockAsync below would time out instead of
-  // succeeding once release() runs.
+  // The holder's "work" is just a timer: if the waiter blocked the thread instead of yielding, it
+  // would never run and acquireLockAsync would time out.
   setTimeout(() => { holderProgressed = true; release() }, 30)
   const second = await acquireLockAsync(lock, { timeoutMs: 2000 })
   assert.ok(holderProgressed, 'the holder\'s own timer fired while the second request was waiting')
@@ -138,8 +157,6 @@ test('acquireLockAsync times out with the holder named, rather than waiting fore
   )
   release()
 })
-
-// ---- the things that must not hold the event loop --------------------------
 
 test('dirSizeAsync agrees with dirSize', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-size-'))
@@ -167,4 +184,95 @@ test('the process table refreshes without blocking and keeps knowing this proces
   const b = refreshProcessTable()
   assert.equal(a, b)
   await a
+})
+
+test('a lock taken over after this holder was judged dead is not deleted by this holder\'s release', () => {
+  const lock = path.join(scratch(), 'owned.lock')
+  const release = acquireLock(lock, { mode: 'fail' })
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, image: 'node', token: 'someone-else' }))
+  release()
+  assert.ok(fs.existsSync(lock), 'a release only removes the lock it took')
+  fs.rmSync(lock)
+})
+
+test('a lock held by a live process is never taken from it, however old the lock is', () => {
+  const lock = path.join(scratch(), 'live.lock')
+  // The parent process is alive: a holder that is slow, not gone.
+  fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, token: 'slow' }))
+  const old = new Date(Date.now() - 600000)
+  fs.utimesSync(lock, old, old)
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'age alone does not make a live holder dead')
+  assert.ok(fs.existsSync(lock))
+  fs.rmSync(lock)
+})
+
+test('a lock still being written is not mistaken for an abandoned one', () => {
+  const lock = path.join(scratch(), 'young.lock')
+  fs.writeFileSync(lock, '') // created, owner has not written its pid yet
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a brand-new empty lock is held')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(lock, old, old)
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release, 'an empty lock nobody finished writing is cleared once it is old')
+  release()
+})
+
+test('while one waiter is clearing a dead holder\'s lock, another does not clear it too', () => {
+  const lock = path.join(scratch(), 'breaking.lock')
+  fs.writeFileSync(lock, '999999')
+  fs.writeFileSync(`${lock}.break`, String(process.pid)) // another waiter is mid-clear
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'waits for the clear in progress')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(`${lock}.break`, old, old)
+  assert.equal(acquireLock(lock, { mode: 'fail' }), null, 'a dead clearer\'s marker is removed, and the next try proceeds')
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.ok(release)
+  release()
+})
+
+test('many processes taking over one dead holder\'s lock never hold it together', async () => {
+  const dir = scratch()
+  const lock = path.join(dir, 'race.lock')
+  const counter = path.join(dir, 'count')
+  fs.writeFileSync(lock, '999999') // abandoned before anyone starts
+  fs.writeFileSync(counter, '0')
+  const util = new URL('../src/util.mjs', import.meta.url).href
+  const code = `import('${util}').then(({ withLock }) => { for (let i = 0; i < 40; i++) withLock(${JSON.stringify(lock)}, () => {
+    const fs = require('fs'); const n = Number(fs.readFileSync(${JSON.stringify(counter)}, 'utf8')); fs.writeFileSync(${JSON.stringify(counter)}, String(n + 1)) }, { timeoutMs: 20000 }) })`
+  const runs = Array.from({ length: 6 }, () => new Promise((resolve, reject) => {
+    const child = childProcess.spawn(process.execPath, ['-e', code], { stdio: 'inherit' })
+    child.on('exit', (c) => (c === 0 ? resolve() : reject(new Error(`worker exited ${c}`))))
+  }))
+  await Promise.all(runs)
+  assert.equal(Number(fs.readFileSync(counter, 'utf8')), 240, 'every increment survived: no two held the lock at once')
+})
+
+test('lockHolder reads a lock as acquireLock writes it, without taking or clearing anything', () => {
+  const lock = path.join(scratch(), 'held.lock')
+  assert.equal(lockHolder(lock), null, 'no file: free')
+  const release = acquireLock(lock, { mode: 'fail' })
+  assert.equal(lockHolder(lock), process.pid, 'a lock taken the real way names its holder')
+  release()
+  assert.equal(lockHolder(lock), null, 'released: free')
+
+  fs.writeFileSync(lock, String(process.ppid))
+  assert.equal(lockHolder(lock), process.ppid, 'a pid-only lock from before the record existed is still read')
+  fs.writeFileSync(lock, '999999999')
+  assert.equal(lockHolder(lock), null, 'a dead holder reads as free')
+  assert.ok(fs.existsSync(lock), 'and reading never clears it')
+
+  fs.writeFileSync(lock, '')
+  assert.equal(lockHolder(lock), -1, 'created a moment ago and not yet written: held by someone not yet named')
+  const old = new Date(Date.now() - 60000)
+  fs.utimesSync(lock, old, old)
+  assert.equal(lockHolder(lock), null, 'an empty lock nobody finished writing is not a holder')
+  fs.rmSync(lock)
+})
+
+test('maskSecretArgs hides the value of --password and --requirepass and nothing else', () => {
+  const args = ['--port', '6379', '--password', 'hunter2', '--bind', '127.0.0.1', '--requirepass=also-secret', '--passwordless']
+  assert.deepEqual(maskSecretArgs(args), ['--port', '6379', '--password', '[redacted]', '--bind', '127.0.0.1', '--requirepass=[redacted]', '--passwordless'])
+  assert.equal(maskSecretArgs(args).join(' ').includes('hunter2'), false)
+  assert.deepEqual(maskSecretArgs(['-jar', 'server.jar', 'nogui']), ['-jar', 'server.jar', 'nogui'])
+  assert.deepEqual(args[3], 'hunter2', 'the original arguments are untouched')
 })

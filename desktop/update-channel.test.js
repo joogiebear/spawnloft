@@ -13,7 +13,7 @@ let n = 0
 const fresh = () => path.join(folder, `nested-${n++}`, 'update-channel.json')
 
 test('with no choice made, a copy follows what it already followed', () => {
-  // The behaviour before the setting existed, which every installed copy must keep on upgrade.
+  // installed copies must keep following what they already followed
   assert.deepEqual(channel.describe(fresh(), '1.1.0'), { beta: false, chosen: false, onBetaBuild: false, waitingFor: null })
   assert.deepEqual(channel.describe(fresh(), '1.2.0-beta.63'), { beta: true, chosen: false, onBetaBuild: true, waitingFor: null })
 })
@@ -30,7 +30,7 @@ test('a beta copy that opts out is told which release it is waiting for', () => 
   const file = fresh()
   channel.save(file, false)
   assert.deepEqual(channel.describe(file, '1.2.0-beta.63'), { beta: false, chosen: true, onBetaBuild: true, waitingFor: '1.2.0' })
-  // The choice outlives the update that ends the wait, and then there is nothing to wait for.
+  // the choice outlives the update that ends the wait
   assert.deepEqual(channel.describe(file, '1.2.0'), { beta: false, chosen: true, onBetaBuild: false, waitingFor: null })
 })
 
@@ -44,8 +44,8 @@ test('a file that is not ours counts as no choice', () => {
 })
 
 test('the updater is never given a channel, and never allowed to downgrade', () => {
-  // electron-updater switches allowDowngrade on as a side effect of assigning `channel`. With that
-  // on, opting out of betas would reinstall the last stable release over a newer data folder.
+  // electron-updater switches allowDowngrade on when `channel` is assigned, which would reinstall
+  // the last stable over a newer data folder when opting out of betas
   const updater = { allowDowngrade: true }
   let channelAssigned = false
   Object.defineProperty(updater, 'channel', { set() { channelAssigned = true }, get() { return null } })

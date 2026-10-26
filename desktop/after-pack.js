@@ -4,36 +4,17 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 
-/**
- * Guard the build before it can become a release.
- *
- * <p>There is no CI on this repository, and `npm run release` publishes live rather than as a
- * draft, so this hook is the only thing between a wrong build and a public download.
- *
- * <p>Two jobs, because they have to happen at different moments:
- *
- * <ol>
- *   <li><b>Structure</b>, checked here and now: the core, the panel and the wizard are all present
- *       in what was just packed.</li>
- *   <li><b>The icon</b>, which cannot be checked here - electron-builder applies it with rcedit
- *       AFTER this hook runs, and the `afterSign` hook that comes later is skipped entirely for an
- *       unsigned build. So rather than checking the result, this checks the cause: whether rcedit
- *       is available at all. When it is not, electron-builder logs a warning and ships Electron's
- *       default atom, which is the silent failure that went out in v0.1.0.</li>
- * </ol>
- *
- * <p>`npm run verify` checks the finished artifact, and is the belt to this hook's braces.
- */
-/**
- * Where rcedit is, according to whichever electron-builder this is.
- *
- * <p>There is no public API for this, and the internal one moved between 24 and 26 -
- * `getSignVendorPath` in codeSign/windowsCodeSign became `getRceditBundle` in toolsets/windows. So
- * this tries what it knows and returns null when it recognises nothing, rather than pretending a
- * missing resolver is a missing toolchain.
- */
+// Pre-release guard: there is no CI and `npm run release` publishes live, so this hook (checks
+// the packed structure) plus `npm run verify` (checks the finished artifact) stand between a
+// bad build and a public download.
+//
+// The icon can't be checked here: electron-builder applies it with rcedit after this hook runs,
+// and afterSign is skipped for unsigned builds. So we check that rcedit exists; when it doesn't,
+// electron-builder only warns and ships Electron's default icon.
+
+// No public API for this. The internal one moved between electron-builder 24
+// (getSignVendorPath) and 25+ (getRceditBundle), so try both and return null if neither exists.
 async function findRcedit(context) {
-  // electron-builder 25+
   try {
     const { getRceditBundle } = require('app-builder-lib/out/toolsets/windows')
     if (typeof getRceditBundle === 'function') {
@@ -41,9 +22,8 @@ async function findRcedit(context) {
       return bundle?.x64 ?? null
     }
   } catch {
-    /* fall through to the older shape */
+    /* try the older shape */
   }
-  // electron-builder 24
   try {
     const { getSignVendorPath } = require('app-builder-lib/out/codeSign/windowsCodeSign')
     if (typeof getSignVendorPath === 'function') return path.join(await getSignVendorPath(), 'rcedit-x64.exe')
@@ -53,17 +33,8 @@ async function findRcedit(context) {
   return null
 }
 
-/**
- * Which commit produced this build.
- *
- * <p>The source repository is private and the releases repository holds only binaries, so nothing
- * otherwise connects mcctl-Setup-0.2.7.exe to the code that made it. Six months later "what is
- * actually in this build" has no answer beyond trusting the version number, and a version number
- * is a label someone typed.
- *
- * <p>Recorded at build time rather than publish time, because those are not the same moment - a
- * draft can sit for a week while the branch moves on.
- */
+// Which commit produced this build. Recorded at build time, not publish time, because a draft
+// can sit for a week while the branch moves on.
 function buildInfo() {
   const repo = path.resolve(__dirname, '..')
   const git = (args) => {
@@ -71,12 +42,9 @@ function buildInfo() {
     return res.status === 0 ? res.stdout.trim() : null
   }
   const commit = git(['rev-parse', 'HEAD'])
-  // A build from a dirty tree is not reproducible from any commit, and saying so is the whole point.
   const status = commit ? git(['status', '--porcelain']) : null
   const dirty = status === null ? null : status !== ''
-  // What was dirty, not just that something was. v0.3.0 shipped flagged because of one untracked
-  // file that is not in the packaged set - true, and useless without knowing which file it was.
-  // Ten is enough to tell "a stray script" from "half the source".
+  // list which files, capped at ten
   const changed = status
     ? status.split(/\r?\n/).filter(Boolean).map((l) => l.trim()).slice(0, 10)
     : []
@@ -91,13 +59,11 @@ function buildInfo() {
 }
 
 exports.default = async function afterPack(context) {
-  // ---- 1. the icon toolchain has to exist, or the icon is silently skipped -------------------
   if (context.electronPlatformName === 'win32' && context.packager.platformSpecificBuildOptions.signAndEditExecutable !== false) {
     const rcedit = await findRcedit(context)
     if (rcedit == null) {
-      // Not knowing is not the same as knowing it is broken, and a guard that fails a good build
-      // because electron-builder moved a private function is worse than no guard. `npm run verify`
-      // checks the finished executable for the icon bytes themselves and is the real authority.
+      // warn only: failing a good build because electron-builder moved a private function is
+      // worse than no guard. `npm run verify` checks the icon bytes in the finished exe.
       console.warn(
         '  warn rcedit could not be located through any known electron-builder internal, so the\n' +
           '       icon pre-flight was skipped. Run "npm run verify" after the build.',
@@ -111,7 +77,6 @@ exports.default = async function afterPack(context) {
     }
   }
 
-  // ---- 2. record what built this, for the app and for the release notes ----------------------
   const info = buildInfo()
   info.sourceVersion = info.version
   info.version = context.packager.appInfo.version
@@ -133,7 +98,6 @@ exports.default = async function afterPack(context) {
   fs.writeFileSync(path.join(__dirname, 'dist', 'build-info.json'), body)
   require('./cli-launchers.cjs').writeCliLaunchers(resources, context.electronPlatformName)
 
-  // ---- 3. everything the app needs is actually in the package --------------------------------
   const res = spawnSync(
     process.execPath,
     [path.join(__dirname, 'verify-build.mjs'), context.appOutDir, '--structure-only', `--platform=${context.electronPlatformName}`],

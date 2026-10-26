@@ -32,33 +32,26 @@ import * as neoforge from './neoforge.mjs'
 import * as worlds from './worlds.mjs'
 import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
+import * as files from './files.mjs'
+import * as activity from './activity.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
+import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
-/**
- * A local control panel for mcctl.
- *
- * <p>Bound to 127.0.0.1 and nothing else. This exposes start/stop and console input, which is
- * remote code execution by another name — it is a convenience for the person at this keyboard, not
- * a service. Binding it to a LAN address would put an unauthenticated server console on the network.
- *
- * <p>Served from Node's own http module with the page as one embedded file: no framework, no build
- * step, and no dependency that can rot between the day this is written and the day it is needed.
- */
+// Local control panel. Keep it on 127.0.0.1: it can start/stop servers and type into their
+// consoles, so exposing it on a LAN address would hand out an unauthenticated server console.
 export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   guardProcess()
   watchEventLoop()
-  // The first read of the process table is synchronous by design (see util.mjs). Taken now,
-  // while nothing is waiting on it, rather than inside the first poll.
+  // synchronous on purpose (see util.mjs); do it now rather than inside the first poll
   refreshProcessTable()
 
-  // Task shims and launchers name this installation by absolute path. If it moved since they were
-  // written (the rename from mcctl to SpawnLoft moved it), they are rewritten before anything can
-  // run one. Here because the desktop app always starts the panel; see relocate.mjs.
+  // task shims and launchers name this install by absolute path; rewrite them if it moved
+  // before anything can run one (the desktop app always starts the panel, see relocate.mjs)
   try {
     const repaired = repairAfterMove()
     if (repaired.moved) {
@@ -73,18 +66,15 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       if (!isLocalRequest(req)) {
         return json(res, 403, { error: 'this panel only answers requests addressed to localhost' })
       }
-      await route(req, res)
+      await activity.asActor({ kind: 'panel' }, () => route(req, res))
     } catch (err) {
-      // A route that threw after starting a stream (the SSE routes write their headers first)
-      // cannot be answered with JSON: writeHead would throw ERR_HTTP_HEADERS_SENT from inside
-      // this catch, which is an unhandled rejection, which exits the process - and the desktop
-      // app's panel with it. Close the stream and let the page reconnect.
+      // SSE routes write their headers first; writeHead here would throw ERR_HTTP_HEADERS_SENT
+      // out of this catch and take the process down. Close the stream and let the page reconnect.
       if (res.headersSent) {
         res.end()
         return
       }
-      // A refusal ("the server is running", "that is not a port") is the person's to fix and
-      // answers 400; anything else is mcctl's fault and answers 500. Both used to be 500.
+      // user-fixable refusals are 400, anything else is ours
       const refusal = err instanceof UserError || err?.userFacing === true
       json(res, refusal ? 400 : 500, { error: err?.message ?? String(err), ...(err?.code ? { code: err.code } : {}) })
     }
@@ -92,8 +82,7 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
 
   return new Promise((resolve) => {
     server.listen(port, host, () => {
-      // Report the port actually bound, not the one asked for: the desktop app passes 0 so the OS
-      // picks a free one, and a URL built from the request would point at port zero.
+      // the desktop app passes port 0, so report the port actually bound
       const bound = server.address().port
       const url = `http://${host}:${bound}/`
       if (open) openBrowser(url)
@@ -102,31 +91,17 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   })
 }
 
-/**
- * The panel's own log: what went wrong in the panel process, and when it stalled.
- *
- * <p>The console log is the server's; the daemon log is the daemon's. Until this existed the
- * panel process had nowhere to say anything, so a stall or a swallowed failure was invisible to
- * the person reporting "it hesitates sometimes" and to whoever read the report. Appended, never
- * rotated: it only gets a line when something is wrong, and it is included in the diagnostics.
- */
+// The panel process's own log. Never rotated: it only gets a line when something is wrong.
 export function panelLog(msg) {
   try {
     fs.mkdirSync(LAYOUT.runDir, { recursive: true })
     fs.appendFile(path.join(LAYOUT.runDir, 'panel.log'), `[${new Date().toISOString()}] ${msg}\n`, () => {})
   } catch {
-    /* a log line lost is not worth an error */
+    /* losing a log line is fine */
   }
 }
 
-/**
- * Do not die on a promise nobody caught.
- *
- * <p>Node's default for an unhandled rejection is to exit the process. Here that process is the
- * panel - and in the desktop app, the whole application window - so one forgotten catch on a
- * webhook, a mirror copy or a stream write after the socket closed took everything down with no
- * message. The servers survive either way; the panel should too. Logged, so the leak is found.
- */
+// Node exits on an unhandled rejection, which here would close the whole desktop app. Log instead.
 let guarded = false
 function guardProcess() {
   if (guarded) return
@@ -136,15 +111,8 @@ function guardProcess() {
   })
 }
 
-/**
- * Notice when the panel stops answering.
- *
- * <p>Everything the panel does runs on one event loop, so anything synchronous - a child
- * process waited on, a directory walked - holds every request and the console stream for as
- * long as it takes. That is exactly the "weird hesitation" nobody can reproduce on demand.
- * Sampled every second and written to the panel log whenever the loop was held for longer
- * than a quarter of a second, so a report of a stutter comes with the time and the size of it.
- */
+// Everything runs on one event loop, so synchronous work stalls every request and the console
+// stream. Log any stall over LAG_LOG_MS.
 const LAG_LOG_MS = 250
 function watchEventLoop() {
   const h = monitorEventLoopDelay({ resolution: 20 })
@@ -157,7 +125,6 @@ function watchEventLoop() {
   timer.unref()
 }
 
-/** The last lines of the panel log, for the diagnostics bundle. */
 function panelLogTail(count) {
   try {
     const lines = fs.readFileSync(path.join(LAYOUT.runDir, 'panel.log'), 'utf8').split(/\r?\n/).filter(Boolean)
@@ -167,45 +134,25 @@ function panelLogTail(count) {
   }
 }
 
-/**
- * Everything a bug report needs, as one block of text.
- *
- * <p>Without this a report is a screenshot and "it doesn't work". With it, it is the version,
- * the Java, where things live, every server with its status, the panel's own log, and the last
- * lines of the console for the server being looked at. Nothing secret goes in: no RCON
- * password, and no webhook URL - a Discord webhook is a credential, and this text is meant to
- * be pasted somewhere public.
- */
 function packageInfo() {
   try {
     return JSON.parse(readFileSync(path.join(HERE, '..', 'package.json'), 'utf8'))
   } catch {
-    // A checkout without package.json is still a checkout.
     return {}
   }
 }
 
-/**
- * Where this project lives on GitHub, from package.json's `repository`.
- *
- * <p>One field, read rather than repeated: the desktop's update feed, the issue template and the
- * feedback links all have to agree on it, and a fork that changes it in one place should not be
- * sending its users' reports to this one.
- */
+// GitHub URL from package.json's `repository`, so a fork only changes it in one place.
 export function projectUrl() {
   const repo = String(packageInfo().repository ?? '')
   const m = /^(?:github:)?([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(repo) ?? /github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(repo)
   return m ? `https://github.com/${m[1]}` : null
 }
 
-/**
- * Where ideas and questions go: GitHub Discussions, each straight into its category, so an idea
- * lands in Ideas and a question in Q&A without the person choosing from a list first. A Discord
- * invite belongs here the day one exists, which is why these are strings rather than derived.
- */
 const IDEAS_URL = () => `${projectUrl()}/discussions/new?category=ideas`
 const QUESTION_URL = () => `${projectUrl()}/discussions/new?category=q-a`
 
+// Plain-text bug report bundle. It gets pasted publicly, so no RCON password and no webhook URL.
 async function diagnostics(instanceName, { short = false } = {}) {
   const lines = []
   const add = (k, v) => lines.push(`${k}: ${v}`)
@@ -252,8 +199,7 @@ async function diagnostics(instanceName, { short = false } = {}) {
     lines.push('')
     lines.push(`== ${instanceName}: diagnosis ==`)
     lines.push(...(findings.length ? findings.map((f) => `- ${f.title}: ${f.advice}`) : ['(nothing recognised)']))
-    // The console tail is the part that does not fit in a URL; the short form leaves it to the
-    // clipboard, and the issue body says so.
+    // the console tail doesn't fit in a URL, so the short form leaves it to the clipboard
     if (!short) {
       lines.push('')
       lines.push(`== ${instanceName}: console (last 60) ==`)
@@ -263,16 +209,8 @@ async function diagnostics(instanceName, { short = false } = {}) {
   return lines.join('\n') + '\n'
 }
 
-/**
- * The two doors of the Feedback sheet, as URLs the page opens in the real browser.
- *
- * <p>A bug report opens GitHub's new-issue form already filled in: the template, a title, and
- * the short diagnostics in the body. Browsers and GitHub both cap a URL at a few thousand
- * characters, so the body carries what fits - version, Java, servers, the panel log tail and
- * the diagnosis - and the full bundle goes to the clipboard for pasting under it. The person
- * only has to say what they were doing. Nothing is sent by mcctl itself; the browser hop is
- * the consent.
- */
+// URLs for the Feedback sheet. The bug link prefills GitHub's new-issue form with the short
+// diagnostics (URLs are capped); the full bundle goes to the clipboard. Nothing is sent from here.
 async function feedback(instanceName, { title = '' } = {}) {
   const home = projectUrl()
   if (!home) return { bug: null, ideas: null, question: null, full: '' }
@@ -294,7 +232,6 @@ async function feedback(instanceName, { title = '' } = {}) {
   ].join('\n')
   const params = new URLSearchParams({ template: 'bug_report.md', labels: 'bug', title, body })
   let bug = `${home}/issues/new?${params}`
-  // Over the limit, the body is trimmed to what always fits rather than the link failing.
   if (bug.length > 7500) {
     params.set('body', body.slice(0, 7500 - `${home}/issues/new?`.length - 400) + '\n```\n\n(trimmed - paste the full diagnostics from your clipboard)\n')
     bug = `${home}/issues/new?${params}`
@@ -302,14 +239,8 @@ async function feedback(instanceName, { title = '' } = {}) {
   return { bug, ideas: IDEAS_URL(), question: QUESTION_URL(), full }
 }
 
-/**
- * Progress for long-running creates.
- *
- * <p>Creating an instance downloads a ~50MB server jar. That is the slowest thing a new user does
- * and the one place where silence reads as a hang, so the create call reports where it has got to
- * and the page streams it. Kept in memory and keyed by an id the caller supplies: a job is only
- * interesting while the page that started it is still open, and a restart losing them is correct.
- */
+// Progress for long-running creates, streamed to the page. In memory, keyed by a caller-supplied
+// id; losing them on restart is fine.
 const jobs = new Map()
 const JOB_LIMIT = 32
 
@@ -319,22 +250,13 @@ function jobUpdate(id, patch) {
   Object.assign(job, patch)
   jobs.set(id, job)
   for (const send of job.listeners ?? []) send(job)
-  // Oldest first: Map preserves insertion order, so this drops the job least likely to be watched.
+  // Map keeps insertion order, so this drops the oldest
   while (jobs.size > JOB_LIMIT) jobs.delete(jobs.keys().next().value)
 }
 
-/**
- * The server.properties keys the panel offers.
- *
- * <p>An allowlist, for two reasons. server.properties has around fifty keys and a panel that showed
- * all of them would be a worse text editor than the file already is - `mcctl props` exists for the
- * rest. And several keys are owned by mcctl rather than by the person: the ports and the RCON
- * password come from the registry and syncProps rewrites them on every launch, so letting the page
- * set them would produce a value that silently reverts.
- *
- * <p>`type` is what the page renders. `note` is shown next to the control when the choice has a
- * consequence worth knowing before making it.
- */
+// server.properties keys the panel offers. Allowlist: the ports and RCON password are owned by the
+// registry and rewritten by syncProps on every launch, so editing them here would silently revert.
+// `type` is what the page renders; `note` shows next to the control.
 const EDITABLE_PROPS = [
   {
     key: 'online-mode',
@@ -356,13 +278,7 @@ const EDITABLE_PROPS = [
   { key: 'spawn-protection', group: 'gameplay', label: 'Spawn protection', type: 'int', fallback: '16', min: 0, max: 256 },
 ]
 
-/**
- * How the settings screen is divided up.
- *
- * <p>Declared beside the fields rather than in the page, so the two cannot drift: a field added
- * above without a group still renders, in a section at the end, instead of quietly vanishing from
- * the only screen that can edit it.
- */
+// A field with no group here still renders, in a section at the end.
 const PROP_GROUPS = [
   { key: 'access', icon: 'user', title: 'Who can join',
     blurb: 'Identity, the whitelist, and how many people at once.' },
@@ -374,7 +290,6 @@ const PROP_GROUPS = [
 
 const PROP_BY_KEY = new Map(EDITABLE_PROPS.map((p) => [p.key, p]))
 
-/** Reject a value the server would reject, before it reaches the file. */
 function coerceProp(spec, raw) {
   const value = String(raw).trim()
   if (spec.type === 'bool') {
@@ -392,26 +307,12 @@ function coerceProp(spec, raw) {
     }
     return String(n)
   }
-  // Text. A newline would split the line and silently create a second key.
+  // a newline would split the line and create a second key
   if (/[\r\n]/.test(value)) fail(`${spec.key} cannot contain a line break`)
   return value
 }
 
-/**
- * Read or update the properties the panel offers.
- *
- * <p>Writes go through writeProps, which rewrites only the keys it is handed and leaves every other
- * line - and every comment - where it was. The server reads this file once at boot, so a change
- * made while it is running takes effect on the next start, and the response says so rather than
- * leaving someone to wonder why nothing happened.
- */
-/**
- * A database's own backups, for its Backups tool.
- *
- * <p>The download is the file itself, streamed, named as it is on disk: a dump is plain SQL, and
- * the point of downloading one is to keep it somewhere SpawnLoft is not. Everything else answers
- * with the list as it now stands, so the tool redraws from one answer.
- */
+// A database's own backups (plain SQL dumps). Every non-download answer returns the current list.
 async function handleDatabaseBackups(req, res, name, seg, url) {
   const verb = seg[4] ?? null
   const answer = async (extra = {}) => json(res, 200, {
@@ -442,14 +343,9 @@ async function handleDatabaseBackups(req, res, name, seg, url) {
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * The whole of server.properties, as text, for the settings screen's raw editor.
- *
- * <p>The same path the assistant's write_config_file takes, so the two cannot differ on what is
- * safe: the file is shown with its RCON password hidden, a save puts every hidden value back from
- * the file on disk, refuses a change to the ports and RCON settings SpawnLoft writes at every start,
- * and snapshots the file on its own first, so the Backups tool can put back just this one file.
- */
+// Raw server.properties editor. Same path as the assistant's write_config_file: hidden values
+// (RCON password) are restored from disk on save, port/RCON changes are refused, and the file is
+// snapshotted first.
 async function handleRawProps(req, res, name) {
   const inst = registry.getInstance(name)
   if (req.method === 'GET') {
@@ -466,9 +362,10 @@ async function handleRawProps(req, res, name) {
     hiddenRestored: true,
   })
   const snap = await backup.createSnapshot(inst, { scope: 'config', label: 'before-edit', members: [plan.shown], flush: false })
-  // The snapshot took a moment; the server writing its own properties meanwhile must not be lost.
+  // the server may have rewritten its properties while the snapshot ran
   if (!configFiles.unchangedSince(plan)) fail('server.properties changed while it was being snapshotted; reload it and try again')
   configFiles.applyConfigWrite(plan)
+  activity.record(name, 'config-edit', { detail: 'server.properties', snapshot: path.basename(snap.file) })
   return json(res, 200, {
     snapshot: path.basename(snap.file),
     appliesOnRestart: supervisor.isRunning(name),
@@ -476,12 +373,104 @@ async function handleRawProps(req, res, name) {
   })
 }
 
+// Files tool; see files.mjs for what is refused. An upload body is raw file bytes, not JSON, with
+// the destination in the query string.
+async function handleFiles(req, res, name, seg, url) {
+  const inst = registry.getInstance(name)
+  const verb = seg[4] ?? null
+  const running = supervisor.isRunning(name)
+  const q = (k) => url.searchParams.get(k) ?? ''
+
+  if (req.method === 'GET') {
+    if (!verb) return json(res, 200, { ...files.listDir(inst, q('path'), { running }), running })
+    if (verb === 'read') return json(res, 200, await files.readFile(inst, q('path')))
+    if (verb === 'search') return json(res, 200, { ...await files.searchNames(inst, q('path'), q('q'), { running }), running })
+    if (verb === 'download') {
+      const out = await files.downloadable(inst, q('path'))
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'content-length': out.size,
+        // filename* carries non-ASCII names; the plain one is the fallback
+        'content-disposition': `attachment; filename="${out.name.replace(/[^\x20-\x7e]|"/g, '_')}"; filename*=UTF-8''${encodeURIComponent(out.name)}`,
+        'cache-control': 'no-store',
+      })
+      const stream = fs.createReadStream(out.file)
+      stream.on('close', out.done)
+      stream.pipe(res)
+      return
+    }
+    return json(res, 404, { error: 'not found' })
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+
+  if (verb === 'upload') {
+    return json(res, 200, await files.uploadFile(inst, q('dir'), q('name'), req, { overwrite: q('overwrite') === '1', running }))
+  }
+  const body = await readBody(req)
+  if (verb === 'write') {
+    return json(res, 200, {
+      ...await files.writeFile(inst, body.path, { text: body.text, version: body.version ?? null, create: body.create === true, force: body.force === true }),
+      appliesOnRestart: running,
+    })
+  }
+  if (verb === 'mkdir') return json(res, 200, files.makeFolder(inst, body.dir, body.name))
+  if (verb === 'move') return json(res, 200, files.movePath(inst, body.from, body.to, { running }))
+  if (verb === 'delete') return json(res, 200, await files.deletePaths(inst, body.paths, { withoutCopy: body.withoutCopy === true, running }))
+  if (verb === 'archive') return json(res, 200, await files.archivePaths(inst, body.paths, body.name))
+  if (verb === 'extract') return json(res, 200, await files.extractArchive(inst, body.path, { running }))
+  return json(res, 404, { error: 'not found' })
+}
+
+// server-icon.png: Minecraft ignores it unless it is a 64x64 PNG. The page scales before sending.
+async function handleIcon(req, res, name, seg) {
+  const inst = registry.getInstance(name)
+  const file = path.join(inst.dir, 'server-icon.png')
+  if (req.method === 'GET') {
+    let bytes
+    try { bytes = await fs.promises.readFile(file) } catch { return json(res, 404, { error: 'no icon' }) }
+    res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'no-store' })
+    return res.end(bytes)
+  }
+  if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+  if (seg[4] === 'remove') {
+    await fs.promises.rm(file, { force: true })
+    activity.record(name, 'settings', { detail: 'server icon removed' })
+    return json(res, 200, { icon: false })
+  }
+  const body = await readBody(req)
+  const png = Buffer.from(String(body.png ?? '').replace(/^data:image\/png;base64,/, ''), 'base64')
+  const isPng = png.length > 24 && png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (!isPng) return json(res, 400, { error: 'the icon must be a PNG image' })
+  if (png.readUInt32BE(16) !== 64 || png.readUInt32BE(20) !== 64) return json(res, 400, { error: 'the icon must be 64 by 64 pixels' })
+  if (png.length > 256 * 1024) return json(res, 400, { error: 'that icon is too large' })
+  const tmp = `${file}.${process.pid}.tmp`
+  await fs.promises.writeFile(tmp, png)
+  await fs.promises.rename(tmp, file)
+  activity.record(name, 'settings', { detail: 'server icon changed' })
+  return json(res, 200, { icon: true, appliesOnRestart: supervisor.isRunning(name) })
+}
+
+function activityQuery(url, server = null) {
+  const q = (k) => url.searchParams.get(k) || null
+  const limit = Math.min(500, Math.max(1, Number(q('limit')) || 100))
+  return { server: server ?? q('server'), before: q('before'), since: q('since'), by: q('by'), limit }
+}
+
+// One server's history, plus undo for changes that kept a copy. An undo is recorded too.
+async function handleActivity(req, res, name, seg, url) {
+  if (req.method === 'GET' && !seg[4]) return json(res, 200, { ...activity.readActivity(activityQuery(url, name)), running: supervisor.isRunning(name) })
+  if (req.method === 'POST' && seg[4] === 'undo') {
+    const body = await readBody(req)
+    if (!body.snapshot) return json(res, 400, { error: 'which change?' })
+    return json(res, 200, await files.undoSnapshot(registry.getInstance(name), String(body.snapshot), { running: supervisor.isRunning(name) }))
+  }
+  return json(res, 404, { error: 'not found' })
+}
+
 async function handleProps(req, res, name) {
   const inst = registry.getInstance(name)
   const file = path.join(inst.dir, 'server.properties')
-  // A server that has never booted has only the keys mcctl wrote; Paper fills the rest in on its
-  // first start. Showing those as blank would be wrong - the server has a value for them, it just
-  // has not written it down yet - so the effective default is shown, flagged as not-yet-set.
+  // a server that has never booted lacks most keys; show the effective default, flagged as not set
   const shape = (current) => EDITABLE_PROPS.map((spec) => ({
     ...spec,
     value: current.get(spec.key) ?? spec.fallback,
@@ -489,8 +478,7 @@ async function handleProps(req, res, name) {
   }))
 
   if (req.method === 'GET') {
-    // Who the world already knows about, so the page can warn before online mode is changed under
-    // them. Switching does not migrate anyone - it hands everybody a different identity.
+    // stored players let the page warn before online-mode changes: switching gives everyone a different identity
     return json(res, 200, { fields: shape(readProps(file)), groups: PROP_GROUPS, file, players: storedPlayers(inst.dir) })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -505,6 +493,7 @@ async function handleProps(req, res, name) {
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
 
   writeProps(file, updates)
+  activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => `${k} = ${v}`).join(', ') })
   return json(res, 200, {
     changed: Object.keys(updates),
     appliesOnRestart: supervisor.isRunning(name),
@@ -512,31 +501,37 @@ async function handleProps(req, res, name) {
   })
 }
 
-/**
- * Snapshots: what exists, making one, restoring one, throwing one away.
- *
- * <p>Restore is the dangerous one - it extracts over a live server's files while the server holds
- * them open and its own state in memory, which corrupts a world rather than replacing it. The CLI
- * has always refused on a running server; this refuses for the same reason rather than trusting the
- * page to have disabled a button.
- */
+// Snapshots. Restore refuses on a running server (like the CLI) instead of trusting the page to
+// have disabled the button.
 async function handleBackups(req, res, name, seg) {
   const inst = registry.getInstance(name)
   const action = seg[4] ?? null
 
+  if (req.method === 'GET' && action === 'download') {
+    const url = new URL(req.url, 'http://localhost')
+    const snap = backup.resolveSnapshot(name, String(url.searchParams.get('snapshot') ?? ''))
+    res.writeHead(200, {
+      'content-type': 'application/gzip',
+      'content-length': snap.size,
+      'content-disposition': `attachment; filename="${snap.name}"`,
+      'cache-control': 'no-store',
+    })
+    fs.createReadStream(snap.path).pipe(res)
+    return
+  }
+
   if (req.method === 'GET') {
     const history = {
       snapshots: backup.listSnapshots(name),
+      exclude: backup.excludePatterns(inst),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       mirror: backup.mirrorRoot(),
       running: supervisor.isRunning(name),
       scopes: backup.SCOPES,
     }
-    // A visible history polls for CLI-created snapshots. That does not need to start
-    // PowerShell to query Windows Task Scheduler or replace anyone's schedule edits. It is also
-    // what the tab draws first: the scheduler's answer can take seconds on a cold machine, and the
-    // snapshots and "Back up now" should not wait for it.
+    // the tab draws this first and polls it; the scheduler lookup (PowerShell on Windows) can take
+    // seconds on a cold machine and must not block it
     if (action === 'history') return json(res, 200, history)
     const auto = await autoBackupTask(name)
     const automatic = {
@@ -553,7 +548,6 @@ async function handleBackups(req, res, name, seg) {
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
       background: schedule.background(),
     }
-    // The schedule on its own, which the tab fills in once the scheduler answers.
     if (action === 'auto') return json(res, 200, automatic)
     return json(res, 200, { ...history, ...automatic })
   }
@@ -562,8 +556,7 @@ async function handleBackups(req, res, name, seg) {
   const body = await readBody(req)
 
   if (!action) {
-    // A snapshot of a running server is legitimate - it is what "back up before I try this" means -
-    // and createSnapshot leaves out the files the server holds locked, and says which.
+    // snapshotting a running server is allowed; createSnapshot skips files the server holds locked
     const running = supervisor.isRunning(name)
     const out = await backup.createSnapshot(inst, {
       scope: backup.SCOPES.includes(body.scope) ? body.scope : 'standard',
@@ -577,20 +570,37 @@ async function handleBackups(req, res, name, seg) {
       skipped: out.skipped,
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
+      saveOnWarning: out.saveOnWarning,
     })
   }
 
   if (action === 'restore') {
     if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
-    if (supervisor.isRunning(name)) {
+    const blocked = activeBlock(name, 'restoring')
+    if (blocked) {
       return json(res, 409, {
-        error: `"${name}" is running. Stop it before restoring - extracting over a server that has `
-          + 'those files open corrupts a world rather than replacing it.',
+        error: `${blocked} Extracting over a server that has those files open corrupts a world `
+          + 'rather than replacing it.',
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))
-    const out = await backup.restoreSnapshot(inst, snap)
+    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true })
     return json(res, 200, out)
+  }
+
+  if (action === 'lock') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotLocked(name, String(body.snapshot), body.locked !== false))
+  }
+  if (action === 'note') {
+    if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
+    return json(res, 200, backup.setSnapshotNote(name, String(body.snapshot), body.note))
+  }
+  if (action === 'exclude') {
+    const patterns = backup.cleanExcludePatterns(body.patterns)
+    registry.updateInstance(name, { backupExclude: patterns.length ? patterns : null })
+    activity.record(name, 'settings', { detail: patterns.length ? `backups leave out ${patterns.join(', ')}` : 'backups leave nothing out' })
+    return json(res, 200, { exclude: patterns })
   }
 
   if (action === 'delete') {
@@ -605,13 +615,9 @@ async function handleBackups(req, res, name, seg) {
       if (existing) schedule.remove(existing.id)
       return json(res, 200, { auto: null })
     }
-    // One automatic backup per server - the one this tab owns. A second would race the first for
-    // the same tar and prune each other's output. Tasks the user made in the Scheduler tab are not
-    // this tab's to touch, and autoBackupTask is what keeps them out of it.
-    //
-    // Changed in place rather than removed and remade. The old order deleted a working schedule
-    // first, so a create that then failed - Task Scheduler service stopped, a transient schtasks
-    // error - left the server with no automatic backup at all and a toggle that still read On.
+    // one automatic backup per server: a second would race the first for the same tar and prune
+    // its output. Update in place rather than remove and recreate, so a failed create (scheduler
+    // service stopped, schtasks error) doesn't leave the server with no schedule.
     const keep = Number(body.keep)
     const action = { type: 'backup', keep: Number.isInteger(keep) && keep > 0 ? keep : null }
     const when = body.schedule ?? { kind: 'daily', at: '03:00' }
@@ -624,16 +630,9 @@ async function handleBackups(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * The one automatic backup the Backups tab owns for this server.
- *
- * <p>Identified by its owner mark, never by "a task whose action is backup" - the Scheduler tab
- * lets people make those too, and matching one of theirs meant the toggle deleted it.
- *
- * <p>The fallback adopts a task made before the mark existed. It is deliberately narrow: the
- * Backups tab has only ever created this task under one name, so a task with that exact name and
- * no owner is one of ours, and anything else is left alone.
- */
+// The automatic backup the Backups tab owns. Match by owner mark, not by action type: the
+// Scheduler tab can make backup tasks too. The fallback adopts an unowned task with the exact
+// default name (made before the mark existed).
 async function autoBackupTask(name) {
   const mine = (await schedule.list()).filter((t) => t.instance === name && t.action.type === 'backup')
   return mine.find((t) => t.owner === schedule.OWNER_BACKUPS)
@@ -641,13 +640,8 @@ async function autoBackupTask(name) {
     ?? null
 }
 
-/**
- * How hard this server has been working.
- *
- * <p>Read from the file the daemon writes rather than measured here: the panel is a different
- * process that may have been started after the server, and CPU is a rate that needs two readings
- * taken by whoever was watching at the time.
- */
+// Read from the file the daemon writes: the panel may have started after the server, and CPU is
+// a rate that needs two readings.
 function handleMetrics(req, res, name, url) {
   registry.getInstance(name)
   if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
@@ -656,14 +650,12 @@ function handleMetrics(req, res, name, url) {
   }
 
   const asked = Number(url.searchParams.get('seconds'))
-  // Capped at what is kept. Asking for a day gets everything there is rather than an error.
+  // capped at what is kept
   const seconds = Number.isFinite(asked) && asked > 0 ? Math.min(asked, 18000) : 3600
   const status = supervisor.statusOf(name)
   const all = metrics.readSamples(name)
   const cutoff = Math.floor(Date.now() / 1000) - seconds
-  // Both the window and what lies outside it. A stopped server whose last run ended an hour ago
-  // has nothing in the last five minutes and plenty on disk, and the page has to be able to tell
-  // "never measured" from "not in this range" - they call for opposite things to say.
+  // history lets the page tell "never measured" from "nothing in this range"
   const newest = all.length ? all[all.length - 1].at : null
   return json(res, 200, {
     samples: all.filter((s) => s.at >= cutoff),
@@ -671,8 +663,7 @@ function handleMetrics(req, res, name, url) {
       count: all.length,
       oldest: all.length ? all[0].at : null,
       newest,
-      // How far back the shortest range would have to reach to catch anything, so the page can
-      // name one rather than inviting someone to try all five.
+      // how far back a range must reach to catch anything
       staleSeconds: newest === null ? null : Math.max(0, Math.floor(Date.now() / 1000) - newest),
     },
     everySeconds: metrics.SAMPLE_SECONDS,
@@ -684,14 +675,9 @@ function handleMetrics(req, res, name, url) {
   })
 }
 
-/**
- * The server software itself: what its project offers, and moving to it.
- *
- * <p>GET asks PaperMC, Purpur or InfernalSuite what exists - on demand only, so the panel stays off the network until
- * the person clicks. POST with no version is a routine build update; POST naming a version
- * crosses Minecraft versions, which the page has already made someone confirm, and
- * applyUpgrade takes a standard snapshot before anything is swapped.
- */
+// GET queries the upstream project (on demand only). POST with no version is a build update; with
+// a version it crosses Minecraft versions, which the page has already had confirmed. applyUpgrade
+// snapshots first.
 async function handleUpgrade(req, res, name) {
   const inst = registry.getInstance(name)
   if (req.method === 'GET') {
@@ -716,13 +702,7 @@ async function handleConsole(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * Worlds: what the instance holds, switched, imported, exported, deleted.
- *
- * <p>The dangerous gates live in worlds.mjs - a running server cannot switch, export its
- * live world, or delete - so this stays a thin translation layer, the way players.mjs's
- * routes are.
- */
+// Thin layer; the running-server gates live in worlds.mjs.
 async function handleWorlds(req, res, name, seg) {
   const inst = registry.getInstance(name)
   const verb = seg[4] ?? null
@@ -737,27 +717,29 @@ async function handleWorlds(req, res, name, seg) {
   const body = await readBody(req)
 
   if (verb === 'activate') {
-    return json(res, 200, worlds.activateWorld(inst, String(body.name)))
+    const out = worlds.activateWorld(inst, String(body.name))
+    activity.record(name, 'world-activate', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'import') {
     if (!body.source || !body.name) return json(res, 400, { error: 'a source path and a name are required' })
-    return json(res, 200, await worlds.importWorld(inst, String(body.source), { name: String(body.name) }))
+    const out = await worlds.importWorld(inst, String(body.source), { name: String(body.name) })
+    activity.record(name, 'world-import', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   if (verb === 'export') {
     return json(res, 200, await worlds.exportWorld(inst, String(body.name)))
   }
   if (verb === 'delete') {
-    return json(res, 200, worlds.deleteWorld(inst, String(body.name)))
+    const out = worlds.deleteWorld(inst, String(body.name))
+    activity.record(name, 'world-delete', { detail: String(body.name) })
+    return json(res, 200, out)
   }
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * A modpack server's pack: what release it runs, whether a newer one exists, and moving to
- * it. The update refuses a running server in the core - files must not change under a live
- * JVM - and narrates through the same job stream creation uses, because it is the same
- * dozens-of-downloads shape.
- */
+// Modpack version check and update. The core refuses a running server; progress goes through the
+// same job stream as creation.
 async function handlePack(req, res, name) {
   const inst = registry.getInstance(name)
   if (req.method === 'GET') {
@@ -781,19 +763,12 @@ async function handlePack(req, res, name) {
   }
 }
 
-/**
- * Plugins: what the server loads, and what Modrinth can add to it.
- *
- * <p>The installed list needs no network and always answers. Search, install and the update
- * check reach Modrinth and fail with a readable message when they cannot - the panel offline
- * still manages what is already on disk.
- */
+// The installed list needs no network; search, install and update checks do.
 async function handlePlugins(req, res, name, seg, url) {
   const inst = registry.getInstance(name)
   const verb = seg[4] ?? null
   const gameVersion = plugins.mcVersionOf(inst)
-  // Plugins on a Paper-family server, mods on a Fabric one - same tab, different folder,
-  // vocabulary and Modrinth facet. Hangar hosts only plugins, so mods skip it entirely.
+  // plugins on Paper-family servers, mods on Fabric; Hangar only hosts plugins
   const kind = plugins.contentKindFor(inst)
 
   if (req.method === 'GET' && !verb) {
@@ -806,7 +781,6 @@ async function handlePlugins(req, res, name, seg, url) {
       word: kind.word,
       hangar: kind.hangar,
       software: kind.label,
-      // Enough for the page to say what built this server and what a joining player needs.
       pack: pack ? { name: pack.name, version: pack.versionNumber, project: pack.project } : null,
     })
   }
@@ -834,8 +808,7 @@ async function handlePlugins(req, res, name, seg, url) {
   if (verb === 'update') {
     return json(res, 200, await pluginActions.updateWithSnapshot(inst, body.file))
   }
-  // Every known update at once, behind one snapshot, reporting each step on the job stream.
-  // The restart that follows is the page's to ask for, through the route every restart uses.
+  // one snapshot for all updates; the page asks for the restart separately
   if (verb === 'update-all') {
     const files = Array.isArray(body.files) ? body.files.map(String).filter(Boolean) : []
     if (!files.length) return json(res, 400, { error: 'files is required' })
@@ -853,13 +826,8 @@ async function handlePlugins(req, res, name, seg, url) {
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * Who a server knows about, and what it thinks of them.
- *
- * <p>Every write goes through players.mjs rather than being decided here, because whether a change
- * belongs in a file or down the console depends on whether the server is running - and getting
- * that wrong is invisible until the next restart undoes it.
- */
+// Writes go through players.mjs: whether a change belongs in a file or down the console depends
+// on whether the server is running, and getting it wrong only shows after the next restart.
 async function handlePlayers(req, res, name, seg) {
   const inst = registry.getInstance(name)
   const verb = seg[4] ?? null
@@ -869,15 +837,13 @@ async function handlePlayers(req, res, name, seg) {
     const rows = players.listPlayers(inst).map((p) => ({
       ...p,
       online: Boolean(p.name && here.has(p.name.toLowerCase())),
-      // Somebody standing in the world has joined it, whatever the files say - the .dat is not
-      // written until they log out or the world saves.
+      // the player .dat isn't written until logout or a world save
       joined: p.joined || Boolean(p.name && here.has(p.name.toLowerCase())),
     }))
     return json(res, 200, {
       players: rows,
       running: supervisor.isRunning(name),
-      // Whether a name can be recovered at all depends on this, and the tab explains the
-      // difference rather than leaving an id where a name should be.
+      // names can only be recovered in online mode
       onlineMode: safeInstance(supervisor.statusOf(name)).onlineMode,
     })
   }
@@ -887,20 +853,28 @@ async function handlePlayers(req, res, name, seg) {
   if (!body.uuid) return json(res, 400, { error: 'which player?' })
   const uuid = String(body.uuid)
 
-  if (verb === 'op') return json(res, 200, await players.setOp(inst, uuid, body.on !== false))
-  if (verb === 'ban') return json(res, 200, await players.setBan(inst, uuid, body.on !== false, body.reason))
-  if (verb === 'forget') return json(res, 200, players.forgetPlayer(inst, uuid))
+  const who = () => players.listPlayers(inst).find((p) => p.uuid === uuid)?.name ?? uuid
+  if (verb === 'op') {
+    const out = await players.setOp(inst, uuid, body.on !== false)
+    activity.record(name, body.on !== false ? 'player-op' : 'player-deop', { detail: who() })
+    return json(res, 200, out)
+  }
+  if (verb === 'ban') {
+    const out = await players.setBan(inst, uuid, body.on !== false, body.reason)
+    activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
+    return json(res, 200, out)
+  }
+  if (verb === 'forget') {
+    const out = players.forgetPlayer(inst, uuid)
+    activity.record(name, 'player-forget', { detail: out.name ?? uuid })
+    return json(res, 200, out)
+  }
 
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * Scheduled tasks for one server.
- *
- * <p>Scoped to an instance rather than global, and every id is checked to belong to the instance in
- * the URL. Without that check the instance name would be decoration: any name plus another server's
- * task id would delete that server's backup schedule.
- */
+// Every task id is checked against the instance in the URL; otherwise any name plus another
+// server's task id could delete that server's schedule.
 async function handleSchedules(req, res, name, seg) {
   registry.getInstance(name)
   if (!platformCapabilities().scheduler) {
@@ -921,8 +895,7 @@ async function handleSchedules(req, res, name, seg) {
     enabled: t.enabled,
     owner: t.owner ?? null,
     createdAt: t.createdAt,
-    // Windows is the authority on whether this actually exists and when it last ran. A task mcctl
-    // believes in that the scheduler has never heard of reports known:false rather than as working.
+    // the OS scheduler is the authority; a task it doesn't know reports known:false
     known: Boolean(t.windows),
     state: t.windows?.state ?? null,
     lastRun: t.windows?.lastRun ?? null,
@@ -947,9 +920,8 @@ async function handleSchedules(req, res, name, seg) {
 
   const body = await readBody(req)
 
-  // Reserved, because autoBackupTask still recognises a task by this name when it has no owner
-  // mark - that is how a schedule made before the mark existed is adopted. A task the user named
-  // the same thing would be adopted instead, and the toggle would then delete it.
+  // reserved: autoBackupTask adopts unowned tasks by this name, so a user task with it would get
+  // adopted and then deleted by the Backups toggle
   if (body.name !== undefined && String(body.name).trim().toLowerCase() === 'automatic backup') {
     return json(res, 400, {
       error: '"Automatic backup" is the name the Backups tab uses for the schedule behind its own '
@@ -968,7 +940,6 @@ async function handleSchedules(req, res, name, seg) {
     return json(res, 200, shape({ ...made, windows: null }))
   }
 
-  // Every id-addressed route below acts on a task, so the ownership check happens once, here.
   const owned = (await mine()).find((t) => t.id === id)
   if (!owned) return json(res, 404, { error: `"${name}" has no scheduled task "${id}"` })
 
@@ -989,8 +960,8 @@ async function handleSchedules(req, res, name, seg) {
 
   if (verb === 'run') {
     schedule.runNow(id)
-    // Fired, not finished: schtasks /Run returns as soon as Windows has started the task. What it
-    // did shows up in the run log a moment later, which is what the panel re-reads.
+    activity.record(name, 'schedule-run', { detail: owned.name })
+    // fired, not finished: schtasks /Run returns once Windows has started the task
     return json(res, 200, { started: true })
   }
 
@@ -1001,28 +972,14 @@ async function handleSchedules(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
-/**
- * An instance as the page is allowed to see it.
- *
- * <p>The RCON password is a credential. The page has never needed it, but only the list route was
- * stripping it - every start, stop, restart and settings response was handing it back, where it
- * lands in a browser cache, a screenshot, or a pasted bug report.
- */
-/**
- * Record the display name a creation request carried, once the instance exists, and hand back
- * the instance as the panel will see it. Four creation paths share this rather than each
- * learning about labels.
- */
+// Saves the display label from a creation request and returns the instance status.
 function labelled(name, raw) {
   const label = cleanLabel(raw)
   if (label && label !== name) registry.updateInstance(name, { label })
   return supervisor.statusOf(name)
 }
 
-/**
- * A database for the page. The root password and every attachment's password are stripped: the
- * page asks for one set of credentials when someone clicks, and never holds them otherwise.
- */
+// strips the root and attachment passwords; the page fetches credentials on demand
 function safeDatabase(row) {
   const { root, attachments, tools, ...safe } = row
   const shown = {}
@@ -1041,11 +998,10 @@ function safeDatabase(row) {
   }
 }
 
+// never send the RCON password to the page (browser cache, screenshots, pasted reports)
 function safeInstance(row) {
   const { rcon, ...safe } = row
-  // Whether anyone can join as any name is a property of the server, not of the registry, so it is
-  // read from the file. The panel badges it: an offline server behaves differently for any plugin
-  // that keys data by UUID, and its logs get bug reports refused.
+  // online-mode lives in server.properties, not the registry
   let onlineMode = null
   let levelName = null
   try {
@@ -1053,30 +1009,20 @@ function safeInstance(row) {
     onlineMode = props.get('online-mode') !== 'false'
     levelName = props.get('level-name') || 'world'
   } catch {
-    /* a directory that has gone missing is already reported through status */
+    /* a missing directory is already reported through status */
   }
-  return { ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)) }
+  return {
+    ...safe, rconPort: rcon?.port ?? null, onlineMode, levelName, javaNeeds: java.requiredMajor(plugins.mcVersionOf(row)),
+    // what it would launch with if it had no Java arguments of its own
+    ...(registry.isDatabase(row) ? {} : { defaultJvmFlags: registry.jvmFlagsFor(row.memory ?? '4G') }),
+  }
 }
 
-/**
- * Whether this request was actually addressed to the loopback panel.
- *
- * <p>Binding to 127.0.0.1 stops other machines connecting; it does not stop the browser already on
- * this machine. Any web page can point a script at http://127.0.0.1:8770, and DNS rebinding lets a
- * page reach it under its own origin. This endpoint can start processes and type into a server
- * console, so "local" has to mean local, not merely reachable.
- *
- * <p>Two checks, both cheap: the Host header must name a loopback address, which defeats rebinding
- * (the attacker's own hostname is what arrives); and an Origin, when there is one, must match that
- * Host exactly - port included. Requests with no Origin - the panel's own fetches, curl, the CLI -
- * are allowed through, because that is what a first-party request looks like.
- *
- * <p>The port is the half that matters here and was missing. Comparing only the hostname made
- * every page on loopback first-party, and this machine is full of them: dynmap, BlueMap, Plan and
- * friends all serve web UIs on their own loopback ports, all of them rendering names and chat that
- * players chose. One stored-content injection in a map plugin was enough to reach an endpoint that
- * can type into a server console.
- */
+// Binding to 127.0.0.1 doesn't stop web pages in the local browser from calling this, and DNS
+// rebinding lets a page reach it under its own origin. So: the Host header must be loopback
+// (defeats rebinding), and any Origin must match Host exactly, port included. Plugin web UIs
+// (dynmap, BlueMap, Plan) run on other loopback ports and render player-chosen text, so a
+// hostname-only check would trust them. Requests with no Origin (own fetches, curl, CLI) pass.
 const LOOPBACK_HOST = /^(?:127\.\d+\.\d+\.\d+|\[::1\]|localhost)(?::\d+)?$/i
 
 function isLocalRequest(req) {
@@ -1085,7 +1031,6 @@ function isLocalRequest(req) {
   const origin = req.headers.origin
   if (!origin) return true
   try {
-    // Exact match against our own Host, not merely "also on loopback".
     return new URL(origin).host.toLowerCase() === host.toLowerCase()
   } catch {
     return false
@@ -1114,9 +1059,8 @@ async function route(req, res) {
   const seg = url.pathname.split('/').filter(Boolean)
 
   if (url.pathname === '/') {
-    // The desktop uses a fresh localhost port at every launch. Persisting the
-    // palette in localStorage would lose it with the old origin. Render the saved
-    // choice before the first paint instead, from the app's existing settings.
+    // the desktop gets a new localhost port (so a new origin) each launch, which loses
+    // localStorage; inject the saved theme into the page instead
     const html = readFileSync(path.join(HERE, 'ui.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
       .replace('name="spawnloft-platform" content="win32"', `name="spawnloft-platform" content="${process.platform}"`)
@@ -1128,8 +1072,7 @@ async function route(req, res) {
 
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
 
-  // Appearance has its own narrow endpoint so a palette change cannot also
-  // relocate data or alter server configuration.
+  // separate from /settings so a palette change can't touch data locations
   if (seg[1] === 'appearance' && seg.length === 2) {
     if (req.method === 'GET') return json(res, 200, { theme: readTheme() })
     if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
@@ -1141,13 +1084,8 @@ async function route(req, res) {
     return json(res, 200, create.listJars().map((j) => ({ name: j.name, size: j.sizeHuman })))
   }
 
-  // ---- prerequisites ---------------------------------------------------------
-  // Java is the one thing mcctl needs and cannot provide. Asked here so the panel can say so up
-  // front instead of letting it surface as "spawn java ENOENT" after a fifty-megabyte download.
-  // ---- how an AI client launches `spawnloft mcp` on this install ------------
-  // The panel runs on the same runtime the command line does, so it knows the real executable and
-  // script paths. Pointing a client straight at them avoids the .cmd launcher, which a client that
-  // spawns without a shell cannot start on Windows.
+  // real executable and script paths for an MCP client config; the .cmd launcher can't be started
+  // by a client that spawns without a shell on Windows
   if (seg[1] === 'mcp' && seg.length === 2 && req.method === 'GET') {
     return json(res, 200, {
       command: process.execPath,
@@ -1160,7 +1098,6 @@ async function route(req, res) {
     return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })
   }
 
-  // ---- what Java each version needs, next to what is installed -----------------
   if (seg[1] === 'java' && seg[2] === 'needs' && req.method === 'GET') {
     const versions = String(url.searchParams.get('versions') ?? '').split(',').filter(Boolean).slice(0, 500)
     const { best } = await java.discover()
@@ -1169,7 +1106,6 @@ async function route(req, res) {
     return json(res, 200, { needs, have: best?.major ?? null, download: java.DOWNLOAD_URL })
   }
 
-  // ---- every Java on this machine, for the per-server picker ----------------
   if (seg[1] === 'java' && seg.length === 2 && req.method === 'GET') {
     const { best, onPath, all } = await java.discover()
     return json(res, 200, {
@@ -1180,14 +1116,12 @@ async function route(req, res) {
     })
   }
 
-  // ---- the feedback doors: prefilled issue, discussions, full bundle ---------
   if (seg[1] === 'feedback' && req.method === 'GET') {
     return json(res, 200, await feedback(url.searchParams.get('instance'), {
       title: String(url.searchParams.get('title') ?? '').slice(0, 120),
     }))
   }
 
-  // ---- a bug report's worth of facts, as text ------------------------------
   if (seg[1] === 'diagnostics' && req.method === 'GET') {
     const text = await diagnostics(url.searchParams.get('instance'))
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' })
@@ -1195,14 +1129,11 @@ async function route(req, res) {
     return
   }
 
-  // ---- where everything lives, for the settings screen ----------------------
-  // The data root itself stays read-only here: it is resolved at import, and a process that
-  // created an instance in one directory and looked for it in another would be worse than a
-  // restart. backupsDir is settable because nothing holds a snapshot open across the change - but
-  // it still only takes effect on restart, and the response says so rather than implying otherwise.
+  // The data root stays read-only here: it is resolved at import, so changing it live would split
+  // instance creation and lookup across directories. backupsDir is settable but applies on restart.
   if (seg[1] === 'settings' && req.method === 'POST') {
     const body = await readBody(req)
-    // The mirror reads live from settings, so unlike backupsDir it needs no restart.
+    // the mirror is read live, so no restart needed
     if (Object.hasOwn(body, 'backupsMirrorDir')) {
       const raw = String(body.backupsMirrorDir ?? '').trim()
       if (!raw) {
@@ -1248,12 +1179,10 @@ async function route(req, res) {
     })
   }
 
-  // ---- let scheduled work run while logged out (Linux) ---------------------
   if (seg[1] === 'scheduler' && seg[2] === 'linger' && req.method === 'POST') {
     return json(res, 200, schedule.keepRunningLoggedOut())
   }
 
-  // ---- progress for a create in flight -------------------------------------
   if (seg[1] === 'jobs' && seg[3] === 'stream' && req.method === 'GET') {
     res.writeHead(200, {
       'content-type': 'text/event-stream',
@@ -1263,8 +1192,7 @@ async function route(req, res) {
     const id = seg[2]
     const send = (job) => res.write(`data: ${JSON.stringify(job)}\n\n`)
     const job = jobs.get(id) ?? { id, stage: 'start', percent: null, message: '', done: false }
-    // Replay first: the page opens this stream immediately after firing the POST, and the two
-    // race. Whatever has already happened is sent before anything new is.
+    // replay current state first: the page opens this stream right after firing the POST, so they race
     const { listeners: _drop, ...snapshot } = job
     send(snapshot)
     job.listeners = job.listeners ?? []
@@ -1279,8 +1207,7 @@ async function route(req, res) {
     return
   }
 
-  // ---- what can be created, and the versions each offers ---------------------
-  // The page builds its Software dropdown from this, so the list of kinds lives in one table.
+  // the page builds its Software dropdown from this
   if (seg[1] === 'software' && seg.length === 2 && req.method === 'GET') {
     return json(res, 200, software.SOFTWARE.map(({ id, label, content, blurb, slow }) => ({
       id, label, content, blurb, slow: Boolean(slow),
@@ -1294,11 +1221,9 @@ async function route(req, res) {
     return json(res, 200, { results: q ? await plugins.searchModpacks(q) : [] })
   }
 
-  // ---- databases -----------------------------------------------------------
-  // Listed apart from the servers: the page draws them under their own heading, and nothing that
-  // iterates servers should ever see one.
+  // databases are kept out of the server list so nothing that iterates servers sees one
   if (seg[1] === 'databases' && seg.length === 2 && req.method === 'GET') {
-    // An external database has no daemon to ask, so it is asked itself, briefly, in parallel.
+    // an external database has no daemon to ask, so probe it directly
     const rows = await Promise.all(registry.listServices().map(async (i) => {
       let row
       try {
@@ -1371,12 +1296,11 @@ async function route(req, res) {
       if (!server) return json(res, 400, { error: 'server is required' })
       return json(res, 200, services.credentials(db, server))
     }
-    // Root, for the person: shown on a click under the database's Settings, never in the list.
+    // root credentials are only sent on request, never in the list
     if (seg[3] === 'root' && req.method === 'GET') {
       const inst = services.getDatabase(db)
       return json(res, 200, { host: inst.host ?? '127.0.0.1', port: inst.port, user: inst.root?.user ?? 'root', password: inst.root?.password ?? '' })
     }
-    // Its own backups: SQL dumps, listed, taken, put back, deleted and downloaded.
     if (seg[3] === 'backups') return handleDatabaseBackups(req, res, db, seg, url)
     if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
     const body = await readBody(req)
@@ -1391,11 +1315,20 @@ async function route(req, res) {
     if (seg[3] === 'delete') {
       return json(res, 200, services.removeDatabase(db, { purge: body.purge === true }))
     }
+    if (seg[3] === 'address') {
+      const updated = await services.updateExternal(db, {
+        host: body.host != null ? String(body.host) : null,
+        port: body.port != null && body.port !== '' ? Number(body.port) : null,
+        user: body.user != null ? String(body.user) : null,
+        // Left out, or blank, keeps the password it has: the form never holds the old one.
+        password: body.password ? String(body.password) : null,
+      })
+      return json(res, 200, safeDatabase(updated))
+    }
     return json(res, 404, { error: 'not found' })
   }
   if (seg[1] === 'databases' && seg[2]) return json(res, 404, { error: 'no such database' })
 
-  // ---- instances -----------------------------------------------------------
   if (seg[1] === 'instances' && seg.length === 2 && req.method === 'GET') {
     const rows = registry.listInstances().map((i) => {
       let row
@@ -1404,35 +1337,41 @@ async function route(req, res) {
       } catch {
         row = { ...i, status: 'unknown' }
       }
-      // The page never needs the RCON password, so it never receives it. Local-only or not,
-      // a credential that is not sent cannot be read out of a browser cache or a screenshot.
       return safeInstance(row)
     })
-    // The newest reading of each running server - players, TPS, memory - for its tab and its
-    // header. Read from the end of each file, together, so the list costs one small read per
-    // running server rather than a history each.
+    // newest metrics sample per running server, read from the end of each file
     await Promise.all(rows.map(async (row) => {
       row.latest = row.status === 'running' ? await metrics.latestSample(row.name) : null
     }))
     return json(res, 200, rows)
   }
 
-  // ---- the overview: what every server needs, in one answer -------------------
-  // The per-server facts the Overview screen needs and the server list does not carry: when each
-  // was last backed up and whether it backs itself up. The schedule is read from SpawnLoft's own
-  // task file, not asked of the operating system's scheduler - that starts a process per ask, and
-  // this is asked for every server at once. Plus the machine's memory, for "14 of 32 GB reserved".
+  if (seg[1] === 'activity' && seg.length === 2 && req.method === 'GET') {
+    return json(res, 200, activity.readActivity(activityQuery(url)))
+  }
+
+  // The schedule comes from SpawnLoft's task file, not the OS scheduler, which spawns a process
+  // per query and this covers every server at once.
   if (seg[1] === 'overview' && seg.length === 2 && req.method === 'GET') {
     const tasks = Object.values(schedule.load().tasks)
     const servers = {}
     await Promise.all(registry.listInstances().map(async (i) => {
       const mine = tasks.filter((t) => t.instance === i.name && t.action?.type === 'backup')
       const auto = mine.find((t) => t.owner === schedule.OWNER_BACKUPS) ?? mine.find((t) => !t.owner && t.name === 'Automatic backup') ?? null
+      const kept = await backup.snapshotSummary(i.name)
       servers[i.name] = {
-        lastBackupAt: await backup.newestSnapshotAt(i.name),
+        lastBackupAt: kept.newestAt,
+        backupCount: kept.count,
         autoBackup: auto ? { enabled: auto.enabled !== false, schedule: auto.schedule, keep: auto.action.keep ?? null } : null,
       }
     }))
+    // No archive on disk is either "never backed up" or "backed up, then deleted"; the log tells
+    // which, so the page does not call a server that had eighteen backups this morning "never".
+    const bare = Object.keys(servers).filter((n) => !servers[n].backupCount)
+    if (bare.length) {
+      const trails = activity.backupTrails(bare)
+      for (const n of bare) servers[n].backupTrail = trails[n]
+    }
     return json(res, 200, {
       machine: { memoryMb: Math.round(os.totalmem() / 1048576) },
       automaticAvailable: platformCapabilities().scheduler,
@@ -1440,15 +1379,10 @@ async function route(req, res) {
     })
   }
 
-  // ---- adopt a server that already exists ----------------------------------
-  // The most likely person to download mcctl already runs a Minecraft server. Registering the
-  // folder they have is a first-class path, not an advanced one, so the empty panel offers it
-  // next to "create". Nothing is moved or rewritten - the core reads the ports and RCON password
-  // out of the directory's own server.properties.
+  // adopt an existing server folder; nothing is moved, ports and RCON password are read from its server.properties
   if (seg[1] === 'instances' && seg[2] === 'adopt' && req.method === 'POST') {
     const body = await readBody(req)
-    // A label alone is enough: the name - the folder, the registry key - is derived from it, and
-    // made unique if the obvious one is taken. The panel derives it too, so the person sees it.
+    // a label alone is enough; the name is derived from it (the page derives it too)
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     if (!body.dir) return json(res, 400, { error: 'a server folder is required' })
@@ -1461,15 +1395,12 @@ async function route(req, res) {
 
   if (seg[1] === 'instances' && req.method === 'POST' && seg.length === 2) {
     const body = await readBody(req)
-    // A label alone is enough: the name - the folder, the registry key - is derived from it, and
-    // made unique if the obvious one is taken. The panel derives it too, so the person sees it.
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     const jobId = body.jobId ? String(body.jobId) : null
     try {
       let jar = body.jar || null
-      // A modpack is a whole different creation path: the pack decides the loader, the
-      // Minecraft version, the mods and the config; the person decides the name and memory.
+      // a modpack decides the loader, Minecraft version, mods and config itself
       if (body.modpack) {
         const result = await mrpack.createFromModpack(String(body.name), String(body.modpack), {
           memory: body.memory || '4G',
@@ -1480,8 +1411,7 @@ async function route(req, res) {
         jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
         return json(res, 200, { ...safeInstance(labelled(String(body.name), body.label)), pack: result })
       }
-      // NeoForge is its own creation path too: installer-laid, starter-jar launched, and the
-      // whole build-or-tear-down flow lives in neoforge.createServer.
+      // NeoForge is installer-laid and launched from a starter jar; see neoforge.createServer
       if (body.loader === 'neoforge') {
         if (!body.neoforgeVersion) return json(res, 400, { error: 'a Minecraft version is required for a NeoForge server' })
         const result = await neoforge.createServer(String(body.name), String(body.neoforgeVersion), {
@@ -1499,10 +1429,8 @@ async function route(req, res) {
         jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
         return json(res, 200, safeInstance(labelled(String(body.name), body.label)))
       }
-      // Every jar-shaped kind - Paper, Purpur, Folia, ASP, vanilla, Spigot, CraftBukkit, Fabric -
-      // takes the same road: resolve the version, fetch or build the jar into the store, place
-      // it. `version` is the field; the older per-loader names are still read for a page that
-      // was loaded before this changed.
+      // every jar-based loader: resolve the version, fetch or build the jar, place it.
+      // The per-loader version field names are still read for pages loaded before `version` existed.
       const loader = sources.isJarSource(body.loader) ? body.loader : 'paper'
       const version = body.version ?? body[`${loader}Version`] ?? body.paperVersion ?? null
       let mcVersion = null
@@ -1515,9 +1443,7 @@ async function route(req, res) {
           message: 'Downloading the server jar',
         })
       }
-      // Which Java, decided before the download: the one named, or the newest installed that
-      // the version can run on. A version nothing here can run is refused now, not at first
-      // start - unless the page asked to go ahead anyway.
+      // pick Java before downloading so an unrunnable version is refused now, not at first start
       const chosenJava = await java.pickJava({
         explicit: body.java ? String(body.java) : null,
         needs: version ? java.requiredMajor(String(version)) : null,
@@ -1527,7 +1453,7 @@ async function route(req, res) {
       if (version) {
         const label = sources.labelFor(loader)
         jobUpdate(jobId, { stage: 'resolve', percent: null, message: `Finding ${label} ${version}` })
-        // BuildTools compiles with a JDK: hand it the same Java the server will get.
+        // BuildTools compiles with a JDK; give it the Java the server will use
         const fetched = await sources.fetchJar(loader, String(version), { onProgress, java: chosenJava })
         jar = fetched.name
         mcVersion = String(version)
@@ -1544,15 +1470,13 @@ async function route(req, res) {
         port: body.port ? Number(body.port) : null,
         motd: body.motd || null,
         onlineMode: body.onlineMode !== false,
-        // The panel is local and the person clicking Create is the operator; making them re-accept
-        // the EULA in a second place would be ceremony, not consent.
+        // the person clicking Create is the local operator; no second EULA prompt
         acceptEula: true,
       })
       jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${inst.name}`, done: true })
       return json(res, 200, safeInstance(labelled(inst.name, body.label)))
     } catch (err) {
-      // The POST answers with the error too; the job carries it as well so a page that is watching
-      // the stream shows the failure at the step it happened on rather than a bare rejected fetch.
+      // also put the error on the job stream so a watching page shows where it failed
       jobUpdate(jobId, { stage: 'error', message: err?.message ?? String(err), done: true })
       throw err
     }
@@ -1561,7 +1485,6 @@ async function route(req, res) {
   const name = seg[2]
   if (!name || !registry.hasInstance(name)) return json(res, 404, { error: 'no such instance' })
 
-  // ---- console stream (SSE) ------------------------------------------------
   if (seg[3] === 'stream' && req.method === 'GET') {
     res.writeHead(200, {
       'content-type': 'text/event-stream',
@@ -1574,8 +1497,7 @@ async function route(req, res) {
     const stop = supervisor.followLog(name, (line) => {
       res.write(`data: ${JSON.stringify(line)}\n\n`)
     })
-    // A heartbeat keeps proxies and idle-timeouts from silently dropping a console that is simply
-    // quiet — a stopped server produces no output, and a dead stream looks exactly the same.
+    // heartbeat so idle timeouts don't drop a quiet console
     const beat = setInterval(() => res.write(': ping\n\n'), 20000)
     req.on('close', () => {
       clearInterval(beat)
@@ -1584,7 +1506,7 @@ async function route(req, res) {
     return
   }
 
-  // Reads and writes, so it sits above the gate that allows only POST past this point.
+  // these take GET and POST, so they sit above the POST-only gate below
   if (seg[3] === 'props' && seg[4] === 'raw') return handleRawProps(req, res, name)
   if (seg[3] === 'props') return handleProps(req, res, name)
   if (seg[3] === 'backups') return handleBackups(req, res, name, seg)
@@ -1594,10 +1516,11 @@ async function route(req, res) {
   if (seg[3] === 'upgrade') return handleUpgrade(req, res, name)
   if (seg[3] === 'pack') return handlePack(req, res, name)
   if (seg[3] === 'worlds') return handleWorlds(req, res, name, seg)
+  if (seg[3] === 'files') return handleFiles(req, res, name, seg, url)
+  if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
+  if (seg[3] === 'icon') return handleIcon(req, res, name, seg)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
 
-  // What went wrong, in words: the known failure shapes found in this server's console,
-  // plus the crash reports Minecraft itself wrote.
   if (seg[3] === 'diagnose' && req.method === 'GET') {
     const inst = registry.getInstance(name)
     const findings = diagnose(supervisor.tailLog(name, 400), {
@@ -1607,20 +1530,17 @@ async function route(req, res) {
       crashDir: path.join(inst.dir, 'crash-reports'),
     })
     const crashes = crashReports(inst, { limit: 5 })
-    // Not read from the console, but it belongs with what is: something wrong with this server
-    // that its owner can act on. Only while it runs - a stopped server has no port open - and
-    // first, because the panel shows two findings and this is the one that cannot wait.
+    // only while running (a stopped server has no port open); first because the panel shows two findings
     const exposed = supervisor.isRunning(name) ? rconExposure(inst) : null
     if (exposed) findings.unshift({ ...exposed, line: null })
     return json(res, 200, {
-      // The line each finding was read from rides along, so the panel can put it in front of
-      // the person in the console rather than telling them to go and look for it.
+      // `line` lets the panel show the console line each finding came from
       findings: findings.map(({ id, title, advice, line }) => ({ id, title, advice, line })),
       crashes: { count: crashes.reports.length, newest: crashes.reports[0] ?? null, dir: crashes.dir },
     })
   }
   if (seg[3] === 'metrics') return handleMetrics(req, res, name, url)
-  // The databases this server is attached to, without passwords; those are one click further.
+  // attached databases, without passwords
   if (seg[3] === 'databases' && req.method === 'GET') {
     if (seg.length !== 4) return json(res, 404, { error: 'not found' })
     return json(res, 200, services.serverAttachments(name))
@@ -1628,13 +1548,7 @@ async function route(req, res) {
 
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
 
-  /**
-   * Start, and say so only if it actually started.
-   *
-   * <p>supervisor.start waits for Paper to report ready and returns whether it did. That result was
-   * being thrown away, so a server that died on a bad jar, a taken port or an unaccepted EULA
-   * answered 200 and the panel said "started" over a console full of the reason it had not.
-   */
+  // supervisor.start waits for ready and reports whether it got there
   const started = async () => {
     const out = await supervisor.start(name)
     const status = safeInstance(supervisor.statusOf(name))
@@ -1644,9 +1558,7 @@ async function route(req, res) {
   }
 
   if (seg[3] === 'start') return started()
-  // A database of this server's own, in one step: made on the port after the game port, started,
-  // attached. Progress goes out on the job stream the Add sheet uses, since the download is the
-  // long part and a button that sits there for a minute with nothing to say looks broken.
+  // create, start and attach a database on the port after the game port; progress goes out on the job stream
   if (seg[3] === 'databases' && seg[4] === 'create') {
     if (!platformCapabilities().managedDatabases) return json(res, 400, { error: PREVIEW_LIMITS.managedDatabases })
     const body = await readBody(req)
@@ -1698,45 +1610,38 @@ async function route(req, res) {
   }
   if (seg[3] === 'reveal') {
     const body = await readBody(req)
-    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null) })
+    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
   }
   if (seg[3] === 'settings') {
     const body = await readBody(req)
-    // Only the fields the panel offers. An allowlist rather than a merge: a settings endpoint that
-    // writes whatever it is handed is how a typo in the page silently rewrites the registry.
+    // allowlist, not a merge: a page typo must not rewrite arbitrary registry fields
     const patch = {}
     if (body.memory) {
-      // parseMemoryGb throws a readable message for anything that is not 4G or 6144M, and it is
-      // the same parser the launcher uses - so what the panel accepts is exactly what will start.
+      // same parser the launcher uses, so what is accepted here will start
       const memory = String(body.memory).trim()
       registry.parseMemoryGb(memory)
       patch.memory = memory
     }
     if (body.port) {
-      // Range and collision, the same check the CLI's `set` runs. A port already spoken for by
-      // another instance would collide the next time both start, and the failure would show up
-      // minutes later as a server that would not boot. Throws a UserError, which answers 400.
+      // range and collision check, same as the CLI's `set`; throws a UserError (400)
       patch.port = registry.assertPortUsable(name, Number(body.port))
     }
     if (body.jar) {
-      // Placed before it is recorded, for the reason spelled out on placeJar: an instance runs the
-      // jar in its own directory, and a registry entry naming one that is not there is a server
-      // that cannot start. Throws a readable message when the jar is not in the store.
+      // place the jar before recording it: the instance runs the jar in its own directory (see placeJar)
       patch.jar = String(body.jar)
       create.placeJar(registry.getInstance(name).dir, patch.jar)
     }
     if (body.java) {
-      // Asked its version before it is recorded. A path that cannot be run would otherwise sit in
-      // the registry and fail at the next start, which is when nobody is looking at this screen.
-      // Any Java that runs is accepted, whatever its version: a test server for an old plugin may
-      // want 17 on purpose, and which Java a server runs on is the person's call, not this one's.
+      // probe before recording so a bad path fails here, not at the next start. Any Java that runs
+      // is accepted whatever its version; the user may want an old one on purpose.
       const bin = String(body.java).trim()
       const state = await java.probe(bin)
       if (!state.found) return json(res, 400, { error: `${bin} could not be run: ${state.message}` })
       patch.java = bin
     }
     if (Object.hasOwn(body, 'autoRestart')) patch.autoRestart = body.autoRestart === true
-    // Empty clears it, and the panel falls back to the name.
+    if (Object.hasOwn(body, 'jvmFlags')) patch.jvmFlags = registry.cleanJvmFlags(body.jvmFlags)
+    // empty clears it; the panel falls back to the name
     if (Object.hasOwn(body, 'label')) patch.label = cleanLabel(body.label)
     if (Object.hasOwn(body, 'webhook')) {
       const url = String(body.webhook ?? '').trim()
@@ -1746,6 +1651,11 @@ async function route(req, res) {
       patch.webhook = url || null
     }
     registry.updateInstance(name, patch)
+    // the webhook is a credential; history records that it changed, not the value
+    const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed')
+      : k === 'jvmFlags' ? (v ? `Java arguments: ${v.join(' ')}` : 'Java arguments back to the recommended ones')
+      : `${k} = ${v}`)
+    if (said.length) activity.record(name, 'settings', { detail: said.join(', ') })
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'command') {
@@ -1768,7 +1678,7 @@ function openBrowser(url) {
     try {
       spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
     } catch {
-      // No browser is not an error: the URL is printed either way.
+      // no browser is fine; the URL is printed anyway
     }
   })
 }

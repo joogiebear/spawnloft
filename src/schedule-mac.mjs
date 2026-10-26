@@ -6,8 +6,7 @@ import { spawnSync, execFile } from 'node:child_process'
 import { DATA_ROOT, ROOT } from './paths.mjs'
 import { fail } from './util.mjs'
 
-// A separate namespace per data folder prevents test installations and independent
-// libraries from replacing one another's agents. Only this user's agents are touched.
+// namespaced per data folder so separate installs don't replace each other's agents
 const namespace = crypto.createHash('sha256').update(DATA_ROOT).digest('hex').slice(0, 16)
 export function label(id) {
   if (!/^[a-z0-9][a-z0-9_-]{0,100}$/i.test(id)) fail('Invalid scheduled task id')
@@ -45,7 +44,7 @@ export function plist(id, task) {
   return '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">' + plistValue({
     Label: label(id), ProgramArguments: ['/bin/sh', shimFile(id)],
     WorkingDirectory: DATA_ROOT, Disabled: !task.enabled,
-    // Server daemons intentionally survive the short-lived task that starts them.
+    // server daemons must outlive the task that starts them
     AbandonProcessGroup: true,
     AssociatedBundleIdentifiers: ['io.github.joogiebear.mcctl'],
     ...trigger(task.schedule),
@@ -66,7 +65,7 @@ export function writeShim(id) {
   const file = shimFile(id)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const env = { MCCTL_DATA_ROOT: DATA_ROOT, ELECTRON_RUN_AS_NODE: '1' }
-  // Preserve explicit settings locations, not the caller's entire environment or secrets.
+  // pass only the settings locations, not the caller's whole environment
   for (const key of ['HOME', 'APPDATA', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME']) if (process.env[key]) env[key] = process.env[key]
   const script = '#!/bin/sh\n' + Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}\n`).join('') +
     `exec ${quote(process.execPath)} ${quote(path.join(ROOT, 'mcctl.mjs'))} task run ${quote(id)}\n`
@@ -75,7 +74,7 @@ export function writeShim(id) {
 }
 function unload(id) {
   const res = launchctl(['bootout', target(id)])
-  // ESRCH (3) means the agent is already absent. Other failures must not orphan a trigger.
+  // 3 (ESRCH) means the agent is already absent
   if (res.error || (res.status !== 0 && res.status !== 3)) {
     fail(`Could not unload macOS task ${id}: ${res.error?.message || res.stderr?.trim()}`)
   }
@@ -83,7 +82,7 @@ function unload(id) {
 export function write(id, task) {
   const file = agentFile(id)
   const previous = fs.existsSync(file) ? fs.readFileSync(file) : null
-  // Do not interrupt a backup or a restart halfway through to edit its schedule.
+  // don't interrupt a running backup or restart to edit its schedule
   const state = launchctl(['print', target(id)])
   if (/^\s*pid = \d+/m.test(state.stdout || '')) fail('This task is running. Wait for it to finish before editing it.')
   writeShim(id)
@@ -109,7 +108,7 @@ export function remove(id) {
   unload(id)
   fs.rmSync(agentFile(id), { force: true })
   fs.rmSync(shimFile(id), { force: true })
-  // Clear the persistent disabled override as well as the plist.
+  // clear the persistent disabled override as well as the plist
   checked(['enable', target(id)])
 }
 export function runNow(id, task) {
@@ -138,7 +137,7 @@ export async function query(tasks, recentRuns) {
     const code = /^\s*last exit code = (\d+)/m.exec(state)
     return [id, { state: /^\s*pid = \d+/m.test(state) ? 'Running' : 'Ready',
       lastRun: last?.at ?? null, lastResult: code ? Number(code[1]) : null,
-      // launchd does not publish an exact next firing time for interval jobs.
+      // launchd doesn't publish a next firing time for interval jobs
       nextRun: nextCalendarRun(task.schedule) }]
   }))
   return new Map(rows.filter(([, row]) => row))

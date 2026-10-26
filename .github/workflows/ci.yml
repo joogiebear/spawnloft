@@ -62,7 +62,8 @@ jobs:
   # jobs count; neither stands in for the other. The job keeps its name because branch
   # protection on main requires a check called test-linux.
   test-linux:
-    runs-on: ubuntu-latest
+    # Runs on the gh-runners VM (a single runner, so Node 22 and 24 never overlap on ports and sockets).
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

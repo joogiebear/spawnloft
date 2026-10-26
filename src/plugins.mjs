@@ -1,21 +1,6 @@
-/**
- * Plugins: what a server has, and what Modrinth can give it.
- *
- * <p>Everything a jar says about itself lives in its plugin.yml (or paper-plugin.yml), which
- * sits inside a zip. mcctl ships no dependencies, so the zip is read here by hand - the format
- * is stable, the entry wanted is tiny, and zlib's inflateRaw is built into node. Only the
- * bytes needed are read: the end-of-central-directory record, the central directory, and the
- * one entry - never the whole of a fifty-megabyte jar.
- *
- * <p>Disabling a plugin renames it to `<file>.disabled` in place. The server only loads
- * `*.jar`, so the file stays exactly where it was, keeps its config folder, and comes back
- * with a rename - no second folder to keep in sync.
- *
- * <p>Modrinth is the install source: open API, no key, and version metadata that says which
- * game versions and loaders a build supports - so "this does not run on your server" is
- * caught before the download. Everything network-facing degrades to a readable error;
- * the installed list works with no network at all.
- */
+// Installed plugins/mods of a server, and installing them from Modrinth and Hangar.
+// Manifests are read straight out of the jar with node's zlib (no zip dependency), reading only
+// the central directory and the one entry wanted. Disabling renames <file>.jar to <file>.jar.disabled.
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -23,17 +8,13 @@ import zlib from 'node:zlib'
 import { fail, UserError, readJson, writeJson } from './util.mjs'
 import { loaderOf } from './registry.mjs'
 import { softwareOf, versionFromJar } from './software.mjs'
-
-// ---- reading one entry out of a zip -----------------------------------------
+import * as activity from './activity.mjs'
 
 const EOCD_SIG = 0x06054b50
 const CENTRAL_SIG = 0x02014b50
 const LOCAL_SIG = 0x04034b50
 
-/**
- * Find the end-of-central-directory record. It sits at the very end of the file, behind an
- * optional comment of up to 64 KiB, so the search reads only that tail.
- */
+// the end-of-central-directory record is at the end of the file, behind an optional comment of up to 64 KiB
 function readEocd(fd, size) {
   const tailSize = Math.min(size, 22 + 65535)
   const tail = Buffer.alloc(tailSize)
@@ -50,7 +31,6 @@ function readEocd(fd, size) {
   return null
 }
 
-/** Walk the central directory, yielding one record per entry. Shared by every reader below. */
 function* zipEntries(fd, size) {
   const eocd = readEocd(fd, size)
   if (!eocd || eocd.cdOffset === 0xffffffff) return
@@ -74,11 +54,9 @@ function* zipEntries(fd, size) {
   }
 }
 
-/** The bytes of one entry, following its local header. Null for anything unreadable. */
 function readEntryData(fd, entry) {
   if (entry.compressed === 0xffffffff || entry.localOffset === 0xffffffff) return null
-  // The local header repeats the name and extra field, and the extra field there can differ
-  // in length from the central one - so it is read, not assumed.
+  // the local header's extra field can differ in length from the central one, so read it
   const local = Buffer.alloc(30)
   fs.readSync(fd, local, 0, 30, entry.localOffset)
   if (local.readUInt32LE(0) !== LOCAL_SIG) return null
@@ -90,12 +68,7 @@ function readEntryData(fd, entry) {
   return null
 }
 
-/**
- * Read one named entry from a zip, or null when it is not there.
- *
- * <p>Zip64 archives report 0xffffffff sizes and are declined rather than misread - a
- * plugin.yml has never needed four gigabytes.
- */
+// Zip64 archives (0xffffffff sizes) are declined rather than misread.
 export function readZipEntry(file, wanted) {
   const fd = fs.openSync(file, 'r')
   try {
@@ -109,14 +82,8 @@ export function readZipEntry(file, wanted) {
   }
 }
 
-/**
- * Extract a zip's files into a directory, with the caller deciding where each lands.
- *
- * <p>`mapPath(name)` returns the destination RELATIVE to dest, or null to skip the entry -
- * which is how a modpack's `overrides/` prefix is stripped and everything outside it left
- * behind. Every path is confined to dest before a byte is written: entry names arrive from
- * the archive, and "../" in one would otherwise turn "extract a pack" into "write anywhere".
- */
+// mapPath(name) returns the destination relative to dest, or null to skip the entry.
+// Entry names come from the archive, so every path is confined to dest before writing.
 export function extractZip(file, dest, { mapPath = (n) => n } = {}) {
   const fd = fs.openSync(file, 'r')
   const written = []
@@ -143,16 +110,8 @@ export function extractZip(file, dest, { mapPath = (n) => n } = {}) {
   }
 }
 
-// ---- just enough YAML -------------------------------------------------------
-
-/**
- * The top-level scalars and simple lists of a plugin.yml.
- *
- * <p>Not a YAML parser - a reader for the handful of fields a plugin manifest actually uses.
- * Nested blocks (commands, permissions) are skipped whole; folded scalars keep their first
- * following lines; flow and block lists become arrays. Anything it cannot read it leaves
- * out, and a missing field is normal.
- */
+// Reads the top-level scalars and simple lists of a plugin.yml. Not a YAML parser: nested
+// blocks are skipped and anything unreadable is left out.
 export function parsePluginYml(text) {
   const out = {}
   const lines = String(text).split(/\r?\n/)
@@ -165,7 +124,7 @@ export function parsePluginYml(text) {
     let value = m[2].trim()
 
     if (value === '' || value === '|' || value === '>' || value === '|-' || value === '>-') {
-      // A block: either a list, a folded scalar, or a nested map (which is skipped).
+      // block: a list, a folded scalar, or a nested map (skipped)
       const block = []
       let j = i + 1
       while (j < lines.length && (/^\s/.test(lines[j]) || lines[j] === '')) {
@@ -196,16 +155,10 @@ function unquote(v) {
   return t
 }
 
-// ---- the installed list -----------------------------------------------------
-
 const DISABLED = '.disabled'
 
-/**
- * What "content" means for this instance. A Bukkit-family server loads plugins from plugins/;
- * a mod loader loads mods from mods/; vanilla loads nothing. Same management, different folder
- * and vocabulary - and a different Modrinth facet, because a plugin will not load as a mod or
- * vice versa. The table in software.mjs is the authority; this shapes its answer.
- */
+// Bukkit-family servers load plugins/, mod loaders load mods/, vanilla loads nothing.
+// software.mjs decides which; a plugin won't load as a mod, hence the different Modrinth facet.
 export function contentKindFor(inst) {
   const sw = softwareOf(loaderOf(inst))
   if (sw.content === 'mods') return { dir: 'mods', kind: 'mods', word: 'mod', projectType: 'mod', hangar: false, label: sw.label }
@@ -213,7 +166,6 @@ export function contentKindFor(inst) {
   return { dir: 'plugins', kind: 'plugins', word: 'plugin', projectType: 'plugin', hangar: sw.hangar, label: sw.label }
 }
 
-/** The Modrinth loader facet for this instance's content. */
 export function loadersFor(inst) {
   const sw = softwareOf(loaderOf(inst))
   return sw.modrinth.length ? sw.modrinth : LOADERS
@@ -223,21 +175,9 @@ function pluginsDir(inst) {
   return path.join(inst.dir, contentKindFor(inst).dir)
 }
 
-// ---- what mcctl itself installed --------------------------------------------
-
-/**
- * Provenance: which jars in this folder mcctl put there, and from where.
- *
- * <p>The distinction carries the whole feature. A jar somebody dropped in by hand - a custom
- * build, a premium plugin bought elsewhere - is theirs: it would never show an update, its
- * hash must not be sent to Modrinth to ask, and a manager that lists it anyway is claiming
- * jurisdiction it does not have. So mcctl manages exactly what it installed, records that
- * here, and leaves everything else alone.
- *
- * <p>The record lives IN the plugins folder (the server ignores non-jar files), so a
- * plugins-scope snapshot carries it and a restore keeps the managed set consistent with the
- * jars beside it.
- */
+// Record of the jars mcctl installed. Hand-dropped jars are not managed: no updates, and their
+// hashes are never sent to Modrinth. Kept in the plugins folder (the server ignores non-jars)
+// so snapshots carry it.
 const STORE = '.mcctl-plugins.json'
 
 export function readManaged(inst) {
@@ -263,7 +203,6 @@ export function forgetManaged(inst, file) {
   }
 }
 
-/** A rename (enable/disable, or an update that changed the filename) moves the record along. */
 function moveManaged(inst, from, to) {
   const store = readManaged(inst)
   if (Object.hasOwn(store.managed, from)) {
@@ -273,18 +212,13 @@ function moveManaged(inst, from, to) {
   }
 }
 
-/** The Minecraft version this server runs: recorded when the registry knows it, else read
- * from the jar's filename; null when unclear. */
 export function mcVersionOf(inst) {
   if (inst?.mcVersion) return String(inst.mcVersion)
   return versionFromJar(inst?.jar)
 }
 
-/**
- * Just enough TOML for a NeoForge mod manifest - the first [[mods]] block's scalar fields,
- * the same way plugin.yml got a YAML-lite. `${file.jarVersion}` is the one indirection worth
- * chasing: it means "my version is in the jar manifest", and that is where it is read from.
- */
+// Minimal TOML for a NeoForge manifest: scalar fields of the first [[mods]] block. A version of
+// ${file.jarVersion} means it lives in the jar's MANIFEST.MF.
 export function parseModsToml(text, { jarVersion = null } = {}) {
   const lines = String(text).split(/\r?\n/)
   const start = lines.findIndex((l) => l.trim() === '[[mods]]')
@@ -328,7 +262,6 @@ function readNeoforgeManifest(full) {
   return parseModsToml(raw.toString('utf8'), { jarVersion })
 }
 
-/** What a Fabric mod's own manifest says, mapped to the same shape plugin.yml yields. */
 function readFabricManifest(full) {
   const raw = readZipEntry(full, 'fabric.mod.json')
   if (!raw) return null
@@ -338,7 +271,7 @@ function readFabricManifest(full) {
   } catch {
     return null
   }
-  // authors entries are strings or { name } objects, in the wild both at once.
+  // authors are strings or { name } objects, sometimes both
   const authors = (Array.isArray(data.authors) ? data.authors : [])
     .map((a) => (typeof a === 'string' ? a : a?.name))
     .filter(Boolean)
@@ -351,13 +284,7 @@ function readFabricManifest(full) {
   }
 }
 
-/**
- * Every plugin jar this server has, enabled or not, with what its manifest says about it.
- *
- * <p>A jar with no readable manifest still appears - it is on disk and will be loaded (or
- * refused) by the server, and hiding it from the one screen that manages plugins would make
- * that screen lie. It simply carries no name beyond its filename.
- */
+// A jar with no readable manifest is still listed, by filename.
 export function listPlugins(inst) {
   const dir = pluginsDir(inst)
   let entries = []
@@ -379,15 +306,14 @@ export function listPlugins(inst) {
       if (yml) meta = parsePluginYml(yml.toString('utf8'))
       else meta = readFabricManifest(full) ?? readNeoforgeManifest(full) ?? {}
     } catch {
-      /* an unreadable jar is still listed by filename */
+      /* unreadable jar: still listed by filename */
     }
     const st = fs.statSync(full)
     const record = store.managed[file] ?? null
     rows.push({
       file,
       enabled,
-      // Managed means mcctl installed it and may update it. A jar dropped in by hand is the
-      // person's own - listed here for the CLI's inventory, but never offered management.
+      // managed = mcctl installed it; hand-dropped jars are listed but never managed
       managed: Boolean(record),
       source: record?.source ?? null,
       project: record?.project ?? null,
@@ -405,7 +331,6 @@ export function listPlugins(inst) {
   return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 }
 
-/** Flip one plugin on or off by renaming it in place. Takes effect at the next start. */
 export function setPluginEnabled(inst, file, enabled) {
   const dir = pluginsDir(inst)
   const current = safePluginPath(dir, file)
@@ -414,6 +339,7 @@ export function setPluginEnabled(inst, file, enabled) {
   const next = enabled ? file.slice(0, -DISABLED.length) : `${file}${DISABLED}`
   fs.renameSync(current, path.join(dir, next))
   moveManaged(inst, file, next)
+  activity.record(inst.name, enabled ? 'plugin-enable' : 'plugin-disable', { detail: file.replace(/\.disabled$/, '') })
   return { file: next, enabled: Boolean(enabled) }
 }
 
@@ -421,13 +347,11 @@ export function removePlugin(inst, file) {
   const dir = pluginsDir(inst)
   fs.rmSync(safePluginPath(dir, file), { force: true })
   forgetManaged(inst, file)
+  activity.record(inst.name, 'plugin-remove', { detail: file })
   return { removed: file }
 }
 
-/**
- * The file must be a plain name inside the plugins folder. The name arrives over HTTP, and a
- * path that walks out of the folder would turn "delete a plugin" into "delete anything".
- */
+// the name arrives over HTTP; only a plain jar name inside the plugins folder is allowed
 function safePluginPath(dir, file) {
   const name = String(file)
   if (!/^[^\\/]+\.jar(\.disabled)?$/.test(name) || name.includes('..')) {
@@ -438,11 +362,8 @@ function safePluginPath(dir, file) {
   return full
 }
 
-// ---- Modrinth ---------------------------------------------------------------
-
 const MODRINTH = 'https://api.modrinth.com/v2'
-// The loaders a Paper server can actually load. Paper runs Spigot and Bukkit plugins, so a
-// build published for those is as installable as one published for Paper itself.
+// Paper also runs Spigot and Bukkit plugins
 export const LOADERS = ['paper', 'spigot', 'bukkit', 'folia']
 
 export async function modrinthRequest(pathname, init) {
@@ -455,7 +376,7 @@ async function modrinth(pathname, init) {
     res = await fetch(`${MODRINTH}${pathname}`, {
       ...init,
       headers: {
-        // Modrinth asks every client to say who it is.
+        // Modrinth requires a user-agent
         'user-agent': 'joogiebear/spawnloft (github.com/joogiebear/spawnloft)',
         ...(init?.body ? { 'content-type': 'application/json' } : {}),
         ...init?.headers,
@@ -469,14 +390,8 @@ async function modrinth(pathname, init) {
   return res.json()
 }
 
-/**
- * Search Modrinth for content this kind of server can load - plugins or mods by loader.
- *
- * <p>Deliberately NOT filtered by game version. Hiding everything that does not list the
- * server's exact version hid half the ecosystem behind sparse metadata; the version is a
- * preference applied when a build is PICKED, where a mismatch can be said instead of
- * silently pre-empted. People choose what to run; mcctl states the claim.
- */
+// Not filtered by game version: sparse metadata would hide much of the ecosystem. The version
+// is applied when a build is picked, where a mismatch can be reported.
 export async function searchPlugins(query, { limit = 20, loaders = LOADERS, projectType = 'plugin' } = {}) {
   const facets = [
     [`project_type:${projectType}`],
@@ -500,11 +415,8 @@ export async function searchPlugins(query, { limit = 20, loaders = LOADERS, proj
   }))
 }
 
-/**
- * Search Modrinth for modpacks a SERVER can be built from: packs whose server side is not
- * unsupported, on a loader mcctl can run (Fabric, until the NeoForge phase lands). A pack
- * that is client-only would install fine and then be an empty world with none of its point.
- */
+// Modpacks a server can be built from: server side not unsupported, on fabric or neoforge.
+// Client-only packs would install as an empty world.
 export async function searchModpacks(query, { limit = 20 } = {}) {
   const facets = [
     ['project_type:modpack'],
@@ -528,22 +440,9 @@ export async function searchModpacks(query, { limit = 20 } = {}) {
   }))
 }
 
-// ---- Hangar -----------------------------------------------------------------
-
-/**
- * Hangar is PaperMC's own plugin platform, and the second source - plenty of Paper-ecosystem
- * plugins publish there and nowhere else. Two things make it different from Modrinth:
- *
- * <ul>
- *   <li>Some projects host their downloads elsewhere (an external release page instead of a
- *       file). Those cannot be installed by mcctl and are said to be so, with the link -
- *       installing by hand is exactly what the manual-plugins boundary is for.</li>
- *   <li>Version support is a sparse, exact list ("26.1.2" but not "26.2"), maintained by
- *       hand. An exact match is preferred; failing that, the newest downloadable build is
- *       offered WITH the mismatch stated, because "claims up to 26.1.2" is information the
- *       person should weigh - not a reason to silently offer nothing.</li>
- * </ul>
- */
+// Hangar is PaperMC's plugin platform. Some projects host downloads externally; those can't be
+// installed and are reported with the link. Version support is a sparse exact list ("26.1.2" but
+// not "26.2"), so an exact match is preferred, else the newest build is offered with the mismatch stated.
 const HANGAR = 'https://hangar.papermc.io/api/v1'
 
 async function hangar(pathname) {
@@ -574,11 +473,8 @@ export async function searchHangar(query, { limit = 10 } = {}) {
   }))
 }
 
-/**
- * Choose a Hangar version: newest Release with a real Paper file and an exact game-version
- * match; then any channel with both; then the newest downloadable at all, flagged as a
- * version mismatch for the caller to say out loud. Null only when nothing is downloadable.
- */
+// Prefer a Release with a Paper file and an exact game-version match, then any channel, then
+// the newest downloadable (exactMatch false, for the caller to report). Null if none is downloadable.
 export function pickHangarVersion(versions, { gameVersion = null } = {}) {
   const downloadable = (v) => Boolean(v.downloads?.PAPER?.downloadUrl && v.downloads?.PAPER?.fileInfo)
   const exact = (v) => !gameVersion || (v.platformDependencies?.PAPER ?? []).includes(gameVersion)
@@ -638,20 +534,14 @@ export async function installFromHangar(inst, slug, { gameVersion = null } = {})
     installed: name,
     version: version.name,
     size: bytes.length,
-    // Carried up so the person is told, not protected from, a claims mismatch.
     versionNote: exactMatch || !gameVersion
       ? null
       : `Hangar lists support for ${(version.platformDependencies?.PAPER ?? []).slice(-1)[0] ?? 'other versions'}, not ${gameVersion} - it will probably run, but that is its author's claim, not SpawnLoft's.`,
   }
 }
 
-/**
- * Choose the version to install from what a project offers.
- *
- * <p>Newest first is Modrinth's order. The first release that supports one of our loaders
- * (and the server's game version, when known) wins; with nothing but pre-releases, the
- * newest compatible one of those is better than nothing and is labelled by its own type.
- */
+// Modrinth lists newest first. Take the first release matching our loaders and game version,
+// else the newest compatible pre-release.
 export function pickVersion(versions, { gameVersion = null, loaders = LOADERS } = {}) {
   const fits = (v) =>
     v.loaders.some((l) => loaders.includes(l)) &&
@@ -659,25 +549,17 @@ export function pickVersion(versions, { gameVersion = null, loaders = LOADERS } 
   return versions.find((v) => v.version_type === 'release' && fits(v)) ?? versions.find(fits) ?? null
 }
 
-/** The downloadable file of a version: the one marked primary, else the first. */
 export function primaryFile(version) {
   return version.files.find((f) => f.primary) ?? version.files[0] ?? null
 }
 
-/**
- * Download one project's best version into the plugins folder.
- *
- * <p>The bytes are checked against the sha1 Modrinth published before the file is allowed to
- * keep its name - a truncated or tampered download must not sit there looking installed.
- */
+// Verifies the sha1 Modrinth published before the file is written under its final name.
 export async function installPlugin(inst, projectId, { gameVersion = null } = {}) {
   const loaders = loadersFor(inst)
   const { word } = contentKindFor(inst)
   const params = new URLSearchParams({ loaders: JSON.stringify(loaders) })
   const versions = await modrinth(`/project/${encodeURIComponent(projectId)}/version?${params}`)
-  // The server's version is a preference, not a wall: an exact match wins, and failing one
-  // the newest build for the right loader installs WITH the mismatch stated - the same deal
-  // Hangar's sparse version lists already get.
+  // the game version is a preference: fall back to the newest build for the loader and report the mismatch
   let version = pickVersion(versions, { gameVersion, loaders })
   let versionNote = null
   if (!version && gameVersion) {
@@ -711,8 +593,7 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
   const name = path.basename(String(file.filename || `${projectId}.jar`))
   if (!/^[^\\/]+\.jar$/.test(name)) fail(`Modrinth offered a file named "${name}", which is not a plugin jar`)
   fs.writeFileSync(path.join(dir, name), bytes)
-  // Recorded as mcctl's to manage. Only jars with a record here are ever listed by the panel,
-  // offered updates, or have their hashes sent anywhere.
+  // only jars with a record here are listed as managed, offered updates, or hashed to Modrinth
   recordManaged(inst, name, {
     source: 'modrinth',
     project: String(version.project_id ?? projectId),
@@ -722,26 +603,15 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
   return { installed: name, version: version.version_number, size: bytes.length, versionNote }
 }
 
-/**
- * Which of the jars MCCTL INSTALLED have a newer build, asked by hash.
- *
- * <p>Hashes rather than names, because a jar knows nothing reliable about where it came
- * from - Modrinth's version_files/update endpoint maps a file's sha1 straight to the latest
- * version of whatever project it belongs to.
- *
- * <p>Only managed jars are asked about, and that is a boundary, not an optimisation: a
- * custom or premium plugin somebody dropped in by hand is not mcctl's to update, and its
- * hash is not mcctl's to send to anyone.
- */
+// Asks Modrinth by sha1 (version_files/update) for newer builds of the jars mcctl installed.
+// Hand-dropped jars are never asked about; their hashes are not ours to send.
 export async function checkUpdates(inst, { gameVersion = null } = {}) {
   const rows = listPlugins(inst).filter((p) => p.enabled && p.managed)
   if (!rows.length) return []
   const dir = pluginsDir(inst)
   const updates = []
 
-  // Modrinth-installed jars go by hash, in one batch. Pack-owned jars are deliberately not
-  // asked about at all: the pack governs their versions, and offering one mod an individual
-  // update out from under its pack is how packs break.
+  // Pack-owned jars are skipped: offering one mod an update out from under its pack breaks packs.
   const modrinthRows = rows.filter((p) => p.source !== 'hangar' && p.source !== 'modpack')
   if (modrinthRows.length) {
     const byHash = new Map()
@@ -760,7 +630,6 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
       const v = latest[sha]
       if (!v) continue
       const file = primaryFile(v)
-      // Same hash means same file: already the newest.
       if (!file || file.hashes?.sha1 === sha) continue
       updates.push({
         file: p.file,
@@ -773,9 +642,8 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
     }
   }
 
-  // Hangar has no hash lookup, but the provenance record knows exactly which version was
-  // installed, so the comparison is the recorded name against the newest pick. One project
-  // failing to answer must not sink the whole check.
+  // Hangar has no hash lookup, so compare the recorded version name against the newest pick.
+  // One project failing to answer must not sink the whole check.
   for (const p of rows.filter((r) => r.source === 'hangar')) {
     try {
       const picked = pickHangarVersion(await hangarVersions(p.project), { gameVersion })
@@ -789,7 +657,7 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
         source: 'hangar',
       })
     } catch {
-      /* an unreachable project simply reports nothing this round */
+      /* unreachable project: report nothing */
     }
   }
   return updates
@@ -799,11 +667,8 @@ function sha1File(file) {
   return crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex')
 }
 
-/**
- * Replace one installed jar with its latest build. The old jar is deleted only after the new
- * one is fully on disk and checksummed - the failure mode must be "two jars, remove one",
- * never "no plugin at all".
- */
+// The old jar is deleted only after the new one is on disk and checksummed, so a failure
+// leaves two jars rather than none.
 export async function updatePlugin(inst, file, { gameVersion = null } = {}) {
   const dir = pluginsDir(inst)
   const current = safePluginPath(dir, file)

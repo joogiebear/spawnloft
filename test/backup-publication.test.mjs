@@ -58,6 +58,7 @@ test('history and restore ignore an in-flight archive until its manifest is comp
   assert.throws(() => backup.resolveSnapshot(inst.name, 'latest'), /no snapshots exist/)
   fs.appendFileSync(file, ' now complete')
   child.emit('exit', 0)
+  child.emit('close', 0)
   const created = await creating
   const history = backup.listSnapshots(inst.name)
   assert.equal(history.length, 1)
@@ -82,6 +83,7 @@ test('failed and empty tar output is removed without publishing a snapshot', asy
     fs.writeFileSync(file, contents)
     child.stderr.write('fixture tar failure')
     child.emit('exit', code)
+    child.emit('close', code)
     await assert.rejects(creating, expected)
     assert.deepEqual(backup.listSnapshots(inst.name), [])
     assert.deepEqual(fs.readdirSync(path.join(BACKUPS_DIR, inst.name)), [])
@@ -104,6 +106,7 @@ test('a failed final rename cleans only its own pending archive and manifest', a
   await spawned(children, 0)
   fs.writeFileSync(children[0].file, 'completed archive')
   children[0].child.emit('exit', 0)
+  children[0].child.emit('close', 0)
   await assert.rejects(creating, /fixture publication failure/)
   assert.deepEqual(fs.readdirSync(dir).sort(), ['existing.json', 'existing.tar.gz'])
   assert.equal(fs.readFileSync(path.join(dir, 'existing.tar.gz'), 'utf8'), 'existing snapshot')
@@ -116,23 +119,25 @@ test('same-second concurrent snapshots of one instance serialize instead of raci
   const first = backup.createSnapshot(inst, { scope: 'plugins' })
   const second = backup.createSnapshot(inst, { scope: 'plugins' })
   const { child: child0, file: file0 } = await spawned(children, 0)
-  // The second request's tar must not start until the first snapshot has published and released
-  // the lock - two tars racing the same instance's save-off/save-on is exactly the torn-copy risk
-  // this lock exists to close.
+  // the second tar must not start until the first snapshot has published and released the lock;
+  // two tars racing one instance's save-off/save-on risk a torn copy
   assert.equal(children.length, 1)
   assert.deepEqual(backup.listSnapshots(inst.name), [])
   fs.writeFileSync(file0, `contents of ${path.basename(file0)}`)
   child0.emit('exit', 0)
+  child0.emit('close', 0)
   const a = await first
   const { child: child1, file: file1 } = await spawned(children, 1)
   assert.notEqual(file1, file0)
   fs.writeFileSync(file1, `contents of ${path.basename(file1)}`)
   child1.emit('exit', 0)
+  child1.emit('close', 0)
   const b = await second
   const third = backup.createSnapshot(inst, { scope: 'plugins' })
   const { child: child2, file: file2 } = await spawned(children, 2)
   fs.writeFileSync(file2, `contents of ${path.basename(file2)}`)
   child2.emit('exit', 0)
+  child2.emit('close', 0)
   const c = await third
   assert.equal(new Set([a.file, b.file, c.file]).size, 3)
   for (const s of [a, b, c]) {
@@ -167,6 +172,7 @@ test('an archive tar gave up on partway through is discarded, not published', as
       setImmediate(() => {
         child.stderr.write('tar.exe: (null)\n')
         child.emit('exit', 1)
+        child.emit('close', 1)
       })
     } else {
       assert.equal(args[0], '-tzf')
@@ -175,6 +181,7 @@ test('an archive tar gave up on partway through is discarded, not published', as
         child.stdout.write('plugins/example.jar\n')
         child.stderr.write('tar.exe: Truncated input file (needed 1501696 bytes, only 0 available)\n')
         child.emit('exit', 1)
+        child.emit('close', 1)
       })
     }
     return child
@@ -236,7 +243,7 @@ test('a restore reads the archive first and refuses a broken one without touchin
   const good = await backup.createSnapshot(inst, { scope: 'plugins', label: 'good' })
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'second version')
   const broken = await backup.createSnapshot(inst, { scope: 'plugins', label: 'broken' })
-  // Cut it off halfway, the way a hot snapshot with a locked plugin file used to come out.
+  // cut it off halfway, like a hot snapshot with a locked plugin file
   const bytes = fs.readFileSync(broken.file)
   fs.writeFileSync(broken.file, bytes.subarray(0, Math.floor(bytes.length / 2)))
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'current version')
@@ -247,7 +254,6 @@ test('a restore reads the archive first and refuses a broken one without touchin
     /would not restore cleanly, so nothing was changed[\s\S]*verify restore-refusal --all/)
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'current version')
 
-  // The good one still restores.
   await backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, path.basename(good.file)))
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins', 'example.jar'), 'utf8'), 'fixture plugin contents')
 })
@@ -275,6 +281,7 @@ test('tar exiting 1 while extracting is a failed restore, not a warning', async 
     setImmediate(() => {
       child.stderr.write('tar.exe: Error exit delayed from previous errors\n')
       child.emit('exit', 1)
+      child.emit('close', 1)
     })
     return child
   })

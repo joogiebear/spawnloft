@@ -1,43 +1,34 @@
 ## SpawnLoft desktop development preview
 
 Separate Windows, Mac and Linux installers, built from the same development commit with the
-same version. The release is published only after Windows x64, Apple Silicon, Intel Mac and
-Linux x64 packages all pass their native checks. Each release is immutable and numbered.
+same version. The release is published only after Windows x64, Apple Silicon Mac and Linux
+(x64 and arm64) packages all pass their native checks. Intel Macs are no longer built. Each release is immutable and numbered.
 
 ### Fixes to try
 
-- **A redesigned panel (new in 1.4):** solid surfaces in place of the frosted glass, new
-  colours in both themes, a dense backups table, compact Performance widgets and hover states
-  throughout. Classic's faintest text is brighter, and SpawnLoft has its sharper corners back.
-  Only the look changed. Please say where anything reads worse than before, especially small
-  grey text and the smallest window size.
-- **The console stays on screen (new in 1.4):** servers are tabs across the top, and a server's
-  tools - Plugins, Worlds, Backups, Players, Stats, Schedule, Settings - open from a dock on the
-  right, beside the console instead of in place of it. Settings and Backups open full width with
-  the console's newest line along the bottom; the button at the top of any tool swaps between
-  the two. Under each server's name are its players, TPS, memory and last backup, and Plugins can
-  update everything it found in one go and restart. Please say which tool you wanted open beside
-  the console and could not, and how it all fits at the smallest window size.
-- **An overview of every server (new in 1.4):** the grid tab at the left of the server tabs.
-  Each server's state, players, TPS, memory and last backup on one screen, with Start or Stop on
-  its card, and a "Needs attention" row for a crash, plugin updates a check found, a server with
-  no backups, or a missing Java - each with the one button that deals with it. Please say what
-  it flagged that you did not care about, and what it missed that you did.
-- **Server settings as one form (new in 1.4):** a server's Settings list their sections down the
-  side, with a dot on any holding an unsaved change. Each setting says Default until the file has
-  it and Changed until it is saved, and the bar at the bottom saves, discards, or saves and
-  restarts. Memory is set here now, beside Java, and server.properties can be edited whole, with
-  the RCON password kept hidden and the file snapshotted first. Please try an edit in the whole
-  file, and say which setting you looked for in the form and did not find.
-- **Database backups of their own (new in 1.4):** a MySQL database now has a Backups tool.
-  Back up now writes a SQL dump of the databases your servers use in it; each dump in the list
-  can be downloaded, put back or deleted, and putting one back saves how things were first.
-  Please download one and open it somewhere else, and try a restore on a test database.
-- **AI assistants change config files (new in 1.4):** ask your assistant to change a plugin
-  setting. It lists, reads and edits the server's text config through `list_config_files`,
-  `read_config_file` and `write_config_file`, snapshotting each file before it changes it.
-  Passwords in those files show as `[redacted]` and cannot be written. Please try a real edit
-  and a reload, then put it back from the Backups tab, and say what your assistant got wrong.
+- **Files (new in 1.5):** a server's folder in the panel - the Files tool in the sidebar. Browse,
+  open any text file in an editor that colours YAML, JSON and properties files, and save it;
+  upload by dropping files onto the list, download, rename or move, zip and unzip, make files
+  and folders, and find anything by name. Every edit, replaced file and delete keeps a copy
+  first, which Backups can put back on its own. While the server runs, what it holds open -
+  the active world, its jar, the plugins it loaded - cannot be moved, replaced or deleted.
+  Please edit a real plugin config beside the console and reload it, and say what you reached
+  for that was not there.
+- **Activity (new in 1.5):** the Activity tool in the sidebar lists what was done to a server and
+  who did it - you, a schedule, an AI assistant (by its app's name) or SpawnLoft's crash guard.
+  Edits, replaced files, deletes and an assistant's config changes have Undo. Please have your
+  assistant change something, then find it there and undo it, and say what was missing.
+- **Chained schedules (new in 1.5):** in Schedule, "Several steps in order" builds a task of
+  steps - countdown, backup, restart, commands, waits - run one after another. Please set up a
+  nightly restart from the ready-made chain, press Run now, and watch Recent runs and Activity.
+- **Backup controls (new in 1.5):** in Backups, lock a snapshot (retention and Delete leave it
+  alone), give it a note, download it, and list paths to leave out. Restore offers "Clear first",
+  which ends exactly as the backup was and keeps what it cleared. Please try a clean restore on a
+  test server and say whether the result was what you expected.
+- **Small things (new in 1.5):** Settings shows the server as the multiplayer list does - icon,
+  name, coloured MOTD - with colour swatches and "Change icon"; Java and memory takes Java
+  arguments of your own and shows the launch line; the console toolbar opens the console in its
+  own window. Please try each once.
 - **MySQL and Redis on both platforms:** new setups offer MySQL 8.4 LTS (the default)
   and Redis (Garnet) on Windows x64, Apple Silicon, and Intel Mac. MariaDB is removed
   from new setup choices. Garnet automatically downloads its verified private runtime;
@@ -118,8 +109,7 @@ production builds use the existing Azure signing profile on the release machine.
 
 ### Mac
 
-- **Apple Silicon (M-series):** download the `mac-arm64.dmg` asset.
-- **Intel:** download the `mac-x64.dmg` asset.
+- **Apple Silicon (M-series):** download the `mac-arm64.dmg` asset. Intel Macs are not supported.
 - Requires **macOS 13 Ventura or later** and a Java version suitable for your server.
 
 Quit SpawnLoft, open the DMG, and drag SpawnLoft to Applications to replace the previous

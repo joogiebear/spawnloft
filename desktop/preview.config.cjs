@@ -1,7 +1,7 @@
 'use strict'
 
-// One version for three native builds. The workflow starts at run 1; adding one
-// avoids the already-published beta.1 without rewriting either source package.
+// one version for three native builds; the workflow starts at run 1, and adding one avoids the
+// already-published beta.1
 const source = require('./package.json')
 const { signingMode, requireCredentials } = require('./mac-signing.cjs')
 const signedMac = signingMode() === 'signed'
@@ -13,9 +13,8 @@ if (!/^[1-9]\d*$/.test(build || '') || !Number.isSafeInteger(Number(build) + 1))
 }
 const version = `${source.version.split('-')[0]}-beta.${Number(build) + 1}`
 const win = { ...source.build.win }
-// A beta pushed to dev is signed with the same Azure profile as a release, through the workflow's
-// federated login. It has to be: a signed install that turns on betas refuses an update whose
-// publisher does not match its own. Pull requests and local test builds stay unsigned.
+// dev betas are signed with the release Azure profile: a signed install that turns on betas
+// refuses an update whose publisher differs. PRs and local test builds stay unsigned.
 const signedWin = process.env.WINDOWS_SIGNING_MODE === 'signed'
 if (!signedWin) delete win.azureSignOptions
 module.exports = {

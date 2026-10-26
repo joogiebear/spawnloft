@@ -1,11 +1,6 @@
-/**
- * Classify every region as real content or void stubs, and report the map's
- * true built extent.
- *
- * A chunk occupying a single 4 KiB sector holds essentially nothing - air with
- * no terrain. Regions made entirely of those are artifacts of the author's
- * world, not part of the build, and counting them inflates the apparent extent.
- */
+// Classifies each region as real content or void stubs and reports the true built extent.
+// A chunk occupying a single 4 KiB sector is empty air, so regions made only of those are
+// excluded or they inflate the extent.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -57,7 +52,7 @@ console.log(`  region  x ${minx}..${maxx}   z ${minz}..${maxz}`)
 console.log(`  block   x ${minx * 512}..${(maxx + 1) * 512 - 1}   z ${minz * 512}..${(maxz + 1) * 512 - 1}`)
 console.log(`  size    ${(maxx - minx + 1) * 512} x ${(maxz - minz + 1) * 512} blocks`)
 
-// What the 3000x2500 render actually covered: regions x -3..2, z -3..2
+// the 3000x2500 render covered regions x -3..2, z -3..2
 const covered = content.filter((r) => r.rx >= -3 && r.rx <= 2 && r.rz >= -3 && r.rz <= 2)
 console.log('')
 console.log(`content regions inside the 3000x2500 render: ${covered.length} / ${content.length}`)

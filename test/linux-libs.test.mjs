@@ -83,9 +83,7 @@ test('a binary with nothing missing needs no private folder', { skip: process.pl
   assert.ok(!fs.existsSync(path.join(engine, LIBS_FOLDER)))
 })
 
-// ---- dnf -----------------------------------------------------------------------------------------
-
-/** A stand-in for spawnSync that plays dnf and the unpackers, and records what it was asked. */
+// stands in for spawnSync, playing dnf and the unpackers
 function fakeDnf({ download = true, cpio = true, bsdtar = true } = {}) {
   const calls = []
   const unpack = (cwd, file) => {

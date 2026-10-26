@@ -21,8 +21,9 @@ cannot be merged.
 - **No build step.** The panel is served from source; the wizard is loaded from disk.
 - **Honesty over polish.** Errors name what went wrong and the way out. Nothing is
   silently capped, silently skipped, or silently retried.
-- **Comments carry the why.** The codebase documents its reasoning next to the code —
-  read a file's comments before reshaping it, and keep yours in the same voice.
+- **Comments say why, not what.** Write one when a line is the way it is for a reason the code
+  can't show: a race, an OS quirk, a protocol detail, a trap in the ordering. Leave out what the
+  code already says. If it takes a paragraph to explain what a function does, change the function.
 
 ## Working on it
 
@@ -115,7 +116,7 @@ reconstruction from a month of commit messages.
 ### Betas
 
 The `desktop-preview` workflow builds the same `dev` commit natively on Windows x64, Apple
-Silicon, Intel Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all five
+Silicon Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all four
 pass core tests, bundle verification and the packaged-app smoke checks; on Linux the `.deb` is
 installed with apt on Ubuntu 24.04 and the installed app is what gets opened, and the `.rpm` is
 installed with dnf in a Fedora container. It is all or nothing: one platform failing holds back the

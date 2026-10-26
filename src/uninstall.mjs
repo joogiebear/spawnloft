@@ -8,27 +8,19 @@ import * as supervisor from './supervisor.mjs'
 import * as schedule from './schedule.mjs'
 import { settingsFile } from './settings.mjs'
 
-/**
- * What the uninstaller runs before it removes the program.
- *
- * <p>The installer removes the program folder and nothing else, on purpose: someone uninstalling
- * to reinstall, or moving to a new version by hand, must not lose their worlds. But two kinds of
- * leftover are never wanted. A scheduled task that outlives the program fires forever at a batch
- * file whose program is gone, and a server left running keeps a port and a Java process alive with
- * nothing to stop it. Both are cleared here, always.
- *
- * <p>Deleting the data is the person's choice, asked by the uninstaller, and it is not "delete the
- * data folder": someone may have pointed that at a drive that holds other things. Only what this
- * program created goes - each server it created, its own store folders, its files - and a server
- * that was added from a folder the person already had is never touched. Folders are removed
- * afterwards only if that left them empty.
- */
+// Runs before the uninstaller removes the program. The program folder is removed and nothing
+// else, so reinstalling doesn't lose worlds, but scheduled tasks and running servers are always
+// cleared: both would otherwise outlive the program with nothing to stop them.
+//
+// Deleting data is the person's choice and never "delete the data folder", which may sit on a
+// drive with other things. Only what this program created is removed, never an adopted server,
+// and folders only if that leaves them empty.
 
-/** Everything to delete when the person asks for their data to go. Pure, so it can be tested. */
+// pure, so it can be tested
 export function purgeTargets({ instances, layout, settings, desktopDirs = [] }) {
   const remove = []
   for (const inst of instances) {
-    // Adopted servers were the person's before this program saw them. They stay, whatever happens.
+    // adopted servers were the person's before this program saw them
     if (inst.origin?.adopted) continue
     if (inst.dir) remove.push(inst.dir)
   }
@@ -47,11 +39,8 @@ export function purgeTargets({ instances, layout, settings, desktopDirs = [] }) 
   return { remove: [...new Set(remove.filter(Boolean))], removeIfEmpty: [...new Set(removeIfEmpty.filter(Boolean))] }
 }
 
-/**
- * Electron's own folder for the desktop app: the saved window position and the updater's cache.
- * Named here rather than found, because this runs as plain Node. Only a folder that actually holds
- * the window state is claimed, so something else that happens to share the name is left alone.
- */
+// Electron's folder for the desktop app (window position, updater cache), named here because this
+// runs as plain Node. Only claimed if it holds window-state.json, in case another app shares the name.
 function desktopDataDirs() {
   const base = process.platform === 'win32'
     ? process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
@@ -65,16 +54,16 @@ function rmdirIfEmpty(dir) {
   try {
     if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
   } catch {
-    /* not empty, or in use: leave it */
+    /* in use: leave it */
   }
 }
 
 export async function run({ data = false, log = () => {} } = {}) {
   const result = { stopped: [], tasks: false, removed: [], failed: [] }
 
-  // Servers first: a daemon that outlives the program is a Java process nobody can stop from here.
+  // servers first: a daemon that outlives the program is a Java process nobody can stop
   for (const inst of listAll()) {
-    if (!supervisor.isRunning(inst.name)) continue
+    if (!supervisor.isActive(inst.name)) continue
     log(`stopping ${inst.name}`)
     try {
       await supervisor.stop(inst.name, { timeout: 60000 })
@@ -82,7 +71,7 @@ export async function run({ data = false, log = () => {} } = {}) {
       try {
         await supervisor.kill(inst.name)
       } catch {
-        /* it may already be gone; the uninstall goes on either way */
+        /* may already be gone */
       }
     }
     result.stopped.push(inst.name)

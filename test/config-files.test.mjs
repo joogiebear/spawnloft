@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import {
   redactConfig, resolveConfigPath, listConfigFiles, readConfigFile, planConfigWrite, applyConfigWrite,
   unchangedSince, summarizeChange, restoreHidden,
@@ -58,11 +60,69 @@ test('secret values are hidden, and ordinary keys that only look alike are not',
 })
 
 test('a URL password with no user in front of it is hidden too, and URLs without one are left alone', () => {
-  // How TAB and most Redis clients write it; the first real config read through the tool had one.
+  // How TAB and most Redis clients write it.
   assert.equal(redactConfig("    url: 'redis://:r3dis-pass@localhost:6379/0'"), "    url: 'redis://:[redacted]@localhost:6379/0'")
   for (const kept of ["url: 'redis://localhost:6379/0'", 'site: https://example.com:8443/path', 'dl: https://user@host/x']) {
     assert.equal(redactConfig(kept), kept)
   }
+})
+
+test('secrets in one-line maps and nested JSON are hidden', () => {
+  assert.equal(redactConfig('{"password": "json-secret", "count": 3}'), '{"password": "[redacted]", "count": 3}')
+  assert.equal(redactConfig('{"db":{"password":"hunter2","user":"root"}}'), '{"db":{"password":"[redacted]","user":"root"}}')
+  assert.equal(redactConfig('storage: {password: hunter2, user: root}'), 'storage: {password: [redacted], user: root}')
+  assert.equal(redactConfig("{ 'token': 'abc' }"), "{ 'token': '[redacted]' }")
+  for (const kept of ['{"name": "lobby", "count": 3}', '{"password": "", "enabled": false}', 'a=1,b=2', '{"tokens": 5, "token-cost": 10}']) {
+    assert.equal(redactConfig(kept), kept)
+  }
+})
+
+test('camelCase credential names are recognised, and ordinary camelCase names are not', () => {
+  assert.equal(redactConfig('botToken: abc.def'), 'botToken: [redacted]')
+  assert.equal(redactConfig('  "accessToken": "t0k3n",'), '  "accessToken": "[redacted]",')
+  assert.equal(redactConfig('privateKey: s3cr3t'), 'privateKey: [redacted]')
+  for (const kept of ['tokenCost: 10', 'tokens: 5', 'tokenizer: simple', 'compass: north']) assert.equal(redactConfig(kept), kept)
+})
+
+test('credentials in a URL or JDBC query string are hidden', () => {
+  assert.equal(redactConfig('url: jdbc:mysql://db/app?user=root&password=hunter2&useSSL=false'),
+    'url: jdbc:mysql://db/app?user=root&password=[redacted]&useSSL=false')
+  assert.equal(redactConfig('url: jdbc:sqlserver://db;user=sa;password=hunter2;encrypt=true'),
+    'url: jdbc:sqlserver://db;user=sa;password=[redacted];encrypt=true')
+  assert.equal(redactConfig('endpoint: https://x.example/api?accessToken=abc&page=2'), 'endpoint: https://x.example/api?accessToken=[redacted]&page=2')
+  for (const kept of ['url: jdbc:mysql://db/app?user=root&useSSL=false', 'q: https://x.example/?page=2&tokens=5']) assert.equal(redactConfig(kept), kept)
+})
+
+test('a PEM private key is hidden line for line, and the file keeps its line count', () => {
+  const pem = ['tls:', '  key: |', '    -----BEGIN PRIVATE KEY-----', '    MIIEvQIBADANBgkq', '    hkiG9w0BAQEFAASC', '    -----END PRIVATE KEY-----', '  cert: public.pem'].join('\n')
+  const shown = redactConfig(pem).split('\n')
+  assert.equal(shown.length, 7)
+  assert.equal(shown[2], '    -----BEGIN PRIVATE KEY-----')
+  assert.deepEqual(shown.slice(3, 5), ['[redacted]', '[redacted]'])
+  assert.equal(shown[5], '    -----END PRIVATE KEY-----')
+  assert.equal(shown[6], '  cert: public.pem')
+  assert.equal(redactConfig('key: "-----BEGIN PRIVATE KEY-----\\nMIIEv\\n-----END PRIVATE KEY-----"'),
+    'key: "-----BEGIN PRIVATE KEY-----[redacted]-----END PRIVATE KEY-----"')
+  assert.equal(redactConfig('-----BEGIN CERTIFICATE-----\nMIIDdz\n-----END CERTIFICATE-----'), '-----BEGIN CERTIFICATE-----\nMIIDdz\n-----END CERTIFICATE-----')
+})
+
+test('a file with the newly hidden shapes still round-trips through restoreHidden', () => {
+  const before = ['{"db":{"password":"hunter2"}}', 'botToken: abc', 'url: jdbc:mysql://h/d?password=x', '-----BEGIN PRIVATE KEY-----', 'MIIE', '-----END PRIVATE KEY-----', 'motd: hi', ''].join('\n')
+  const shown = redactConfig(before)
+  assert.notEqual(shown, before)
+  assert.equal(restoreHidden(before, shown), before)
+  assert.equal(restoreHidden(before, shown.replace('motd: hi', 'motd: hello')), before.replace('motd: hi', 'motd: hello'))
+})
+
+test('redaction takes linear time on whitespace, comma and brace runs', () => {
+  const script = `
+    import { redactConfig } from ${JSON.stringify(new URL('../src/config-files.mjs', import.meta.url).href)}
+    const n = 20000
+    for (const text of ['a: b' + ' '.repeat(n) + 'x', ' '.repeat(n) + 'x', '{,'.repeat(n), ',  '.repeat(n), 'password: ' + 'a, '.repeat(n), '?a=b'.repeat(n)]) redactConfig(text)
+  `
+  const res = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 10000 })
+  assert.equal(res.error, undefined, 'redaction did not finish in 10 s')
+  assert.equal(res.status, 0, res.stderr)
 })
 
 test('paths stay inside the server folder and away from worlds, logs and player data', () => {
@@ -85,6 +145,11 @@ test('paths stay inside the server folder and away from worlds, logs and player 
     'plugins/EcoItems': /not a text configuration file/,
   }
   for (const [p, why] of Object.entries(refused)) assert.throws(() => resolveConfigPath(inst, p), why, p)
+})
+
+test('a folder whose name starts with two dots is inside the server, not outside it', () => {
+  const inst = server({ '..cache/settings.yml': 'a: 1\n' })
+  assert.equal(resolveConfigPath(inst, '..cache/settings.yml').shown, '..cache/settings.yml')
 })
 
 test('a link that leads out of the server folder is refused', (t) => {
@@ -191,8 +256,6 @@ test('a listing cut short keeps the top-level files and loses the deepest ones',
   const paths = files.map((f) => f.path)
   assert.ok(paths.includes('server.properties') && paths.includes('plugins/Zed/config.yml'))
 })
-
-// ---- the panel's raw server.properties editor --------------------------------
 
 test('a file edited as it was shown gets its hidden values back, line for line', () => {
   const inst = server({ 'server.properties': PROPS.replaceAll('\n', '\r\n') })

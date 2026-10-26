@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
 
-import { parseIndex, planRemovals } from '../src/mrpack.mjs'
+import { parseIndex, planRemovals, allowedPackUrl, ALLOWED_PACK_HOSTS } from '../src/mrpack.mjs'
 import { extractZip } from '../src/plugins.mjs'
 import { UserError } from '../src/util.mjs'
 
@@ -47,7 +47,9 @@ function buildZip(entries) {
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mrpack-'))
 
-// ---- the index reader -------------------------------------------------------
+const SHA1 = 'a'.repeat(40)
+const SHA512 = 'b'.repeat(128)
+const CDN = 'https://cdn.modrinth.com/data/AANobbMI/versions/abc'
 
 const INDEX = {
   formatVersion: 1,
@@ -56,11 +58,15 @@ const INDEX = {
   name: 'Example Pack',
   dependencies: { minecraft: '26.2', 'fabric-loader': '0.19.3' },
   files: [
-    { path: 'mods/lithium.jar', hashes: { sha1: 'a'.repeat(40) }, downloads: ['https://cdn/lith.jar'], fileSize: 10 },
-    { path: 'mods/clientshader.jar', env: { server: 'unsupported' }, hashes: {}, downloads: ['https://cdn/x.jar'] },
-    { path: 'config/lithium.properties', hashes: {}, downloads: ['https://cdn/c.prop'] },
+    { path: 'mods/lithium.jar', hashes: { sha1: SHA1, sha512: SHA512 }, downloads: [`${CDN}/lith.jar`], fileSize: 10 },
+    // Client-only, so never fetched: its host and hashes are not held to the policy.
+    { path: 'mods/clientshader.jar', env: { server: 'unsupported' }, hashes: {}, downloads: ['http://example.invalid/x.jar'] },
+    { path: 'config/lithium.properties', hashes: { sha1: SHA1 }, downloads: [`${CDN}/c.prop`] },
   ],
 }
+
+// INDEX with its one server file replaced, so a test changes exactly one thing
+const withFile = (file) => ({ ...INDEX, files: [{ path: 'mods/x.jar', hashes: { sha1: SHA1 }, downloads: [`${CDN}/x.jar`], ...file }] })
 
 test('a fabric pack index reduces to what the install needs', () => {
   const out = parseIndex(INDEX)
@@ -91,12 +97,100 @@ test('a pack with no loader, no minecraft version, or the wrong shape is refused
 
 test('a pack file path that escapes the instance folder poisons the whole pack', () => {
   for (const bad of ['../outside.jar', '/absolute.jar', 'C:/windows/system32/evil.jar', 'mods/../../up.jar']) {
-    const evil = { ...INDEX, files: [{ path: bad, hashes: {}, downloads: ['https://cdn/x'] }] }
-    assert.throws(() => parseIndex(evil), UserError, `accepted "${bad}"`)
+    assert.throws(() => parseIndex(withFile({ path: bad })), /outside its own folder/, `accepted "${bad}"`)
   }
 })
 
-// ---- what a pack update may delete ------------------------------------------
+test('a parsed file carries its checksums, its size and the one download it may use', () => {
+  const [lithium, config] = parseIndex(INDEX).files
+  assert.deepEqual(lithium, { path: 'mods/lithium.jar', sha1: SHA1, sha512: SHA512, url: `${CDN}/lith.jar`, size: 10 })
+  assert.deepEqual(config, { path: 'config/lithium.properties', sha1: SHA1, sha512: null, url: `${CDN}/c.prop`, size: 0 })
+})
+
+test('a loader or game version that is not version-shaped refuses the whole pack', () => {
+  for (const bad of ['1/../x', '../../etc', '0.19.3/../x', 'a b', '0.19.3?x=1', '..', '', 'x'.repeat(65)]) {
+    const fabric = { ...INDEX, dependencies: { minecraft: '26.2', 'fabric-loader': bad } }
+    const neo = { ...INDEX, dependencies: { minecraft: '26.2', neoforge: bad } }
+    const game = { ...INDEX, dependencies: { minecraft: bad, 'fabric-loader': '0.19.3' } }
+    for (const [what, index] of [['fabric loader', fabric], ['neoforge', neo], ['minecraft', game]]) {
+      assert.throws(() => parseIndex(index), UserError, `accepted ${what} version ${JSON.stringify(bad)}`)
+    }
+  }
+})
+
+test('the version shapes real loaders use are accepted', () => {
+  for (const v of ['0.19.3', '0.16.10', '21.1.172', '26.2.0.75', '21.1.0-beta', '1.21.1+build.3']) {
+    assert.equal(parseIndex({ ...INDEX, dependencies: { minecraft: '26.2', 'fabric-loader': v } }).loader.version, v)
+  }
+  for (const mc of ['1.21.1', '26.2', '24w14a', '1.21-pre1']) {
+    assert.equal(parseIndex({ ...INDEX, dependencies: { minecraft: mc, 'fabric-loader': '0.19.3' } }).mc, mc)
+  }
+})
+
+test('a download must be https from a host the pack format allows', () => {
+  for (const host of ALLOWED_PACK_HOSTS) {
+    assert.ok(allowedPackUrl(`https://${host}/some/file.jar`), host)
+  }
+  for (const bad of [
+    'http://cdn.modrinth.com/x.jar',
+    'https://example.com/x.jar',
+    'https://cdn.modrinth.com.evil.test/x.jar',
+    'https://evil.test/cdn.modrinth.com/x.jar',
+    'https://cdn.modrinth.com@evil.test/x.jar',
+    'https://user:pass@cdn.modrinth.com/x.jar',
+    'https://cdn.modrinth.com:8443/x.jar',
+    'https://localhost/x.jar',
+    'https://127.0.0.1/x.jar',
+    'https://169.254.169.254/latest/meta-data',
+    'file:///etc/passwd',
+    'ftp://cdn.modrinth.com/x.jar',
+    'not a url',
+    '',
+  ]) {
+    assert.equal(allowedPackUrl(bad), null, `allowed ${JSON.stringify(bad)}`)
+  }
+})
+
+test('a file offered only from a host a pack may not use refuses the whole pack', () => {
+  for (const url of ['http://cdn.modrinth.com/x.jar', 'https://example.com/x.jar', 'https://127.0.0.1:25565/x.jar', 'http://localhost/x']) {
+    assert.throws(() => parseIndex(withFile({ downloads: [url] })), /host a pack may not use/, url)
+  }
+})
+
+test('the first allowed download is the one used, whichever position it is in', () => {
+  const out = parseIndex(withFile({ downloads: ['https://example.com/x.jar', 'http://cdn.modrinth.com/x.jar', `${CDN}/ok.jar`] }))
+  assert.equal(out.files[0].url, `${CDN}/ok.jar`)
+})
+
+test('a file with no checksum, or a malformed one, refuses the whole pack', () => {
+  assert.throws(() => parseIndex(withFile({ hashes: {} })), /no checksum/)
+  assert.throws(() => parseIndex(withFile({ hashes: undefined })), /no checksum/)
+  assert.throws(() => parseIndex(withFile({ hashes: { sha1: '' } })), /not a checksum/)
+  assert.throws(() => parseIndex(withFile({ hashes: { sha1: 'zz'.repeat(20) } })), /not a checksum/)
+  assert.throws(() => parseIndex(withFile({ hashes: { sha1: SHA1, sha512: 'short' } })), /not a checksum/)
+  assert.throws(() => parseIndex(withFile({ hashes: { sha512: 123 } })), /not a checksum/)
+})
+
+test('either checksum on its own is enough, and uppercase hex is normalised', () => {
+  assert.equal(parseIndex(withFile({ hashes: { sha512: SHA512 } })).files[0].sha1, null)
+  assert.equal(parseIndex(withFile({ hashes: { sha1: SHA1.toUpperCase() } })).files[0].sha1, SHA1)
+})
+
+test('a file with no download, or an impossible size, refuses the whole pack', () => {
+  assert.throws(() => parseIndex(withFile({ downloads: [] })), /no download/)
+  assert.throws(() => parseIndex(withFile({ downloads: undefined })), /no download/)
+  for (const fileSize of [-1, 1.5, '10', Number.MAX_SAFE_INTEGER + 2, NaN]) {
+    assert.throws(() => parseIndex(withFile({ fileSize })), /impossible size/, String(fileSize))
+  }
+})
+
+test('a pack path is normalised, and an empty or NUL one is refused', () => {
+  assert.equal(parseIndex(withFile({ path: 'mods//a.jar' })).files[0].path, 'mods/a.jar')
+  assert.equal(parseIndex(withFile({ path: './mods/a.jar' })).files[0].path, 'mods/a.jar')
+  for (const bad of ['', '.', './', 'mods/\0a.jar']) {
+    assert.throws(() => parseIndex(withFile({ path: bad })), /outside its own folder/, JSON.stringify(bad))
+  }
+})
 
 test('an update deletes only what the old pack owned and the new one dropped', () => {
   const old = ['mods/a-1.0.jar', 'mods/b-1.0.jar', 'config/a.toml']
@@ -106,7 +200,7 @@ test('an update deletes only what the old pack owned and the new one dropped', (
 
 test('what the person added is never a removal candidate, because it was never owned', () => {
   const old = ['mods/pack-mod.jar']
-  // hand-added.jar is on disk but not in either record - it simply never appears here.
+  // hand-added.jar is on disk but in neither record, so it never appears here
   assert.deepEqual(planRemovals(old, []), ['mods/pack-mod.jar'])
 })
 
@@ -126,8 +220,6 @@ test('path tricks in a record never become deletions', () => {
   const removals = planRemovals(old, [])
   assert.deepEqual(removals, ['mods/windows-style.jar'], 'backslashes normalise; escapes are dropped')
 })
-
-// ---- extraction -------------------------------------------------------------
 
 test('overrides extract with their prefix stripped and everything else left behind', () => {
   const dir = scratch()

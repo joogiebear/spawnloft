@@ -1,11 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { REGISTRY_FILE, INSTANCES_DIR } from './paths.mjs'
-import { readJson, writeJson, fail, validateName, withLock } from './util.mjs'
+import { readJson, writeJson, fail, validateName, withLock, PRIVATE_FILE_MODE } from './util.mjs'
 
-// One lock for the whole registry file: putInstance/updateInstance/removeInstance each read it,
-// change one entry, and write it back, and the daemon recording a pid at the same moment the
-// panel changes a setting is exactly the kind of overlap a plain read-modify-write loses silently.
+// one lock for the whole registry: the daemon recording a pid while the panel changes a setting
+// would otherwise lose one of the writes
 const REGISTRY_LOCK = `${REGISTRY_FILE}.lock`
 
 const EMPTY = { version: 1, instances: {} }
@@ -16,18 +15,13 @@ export function loadRegistry() {
   return data
 }
 
+// holds RCON, database and webhook secrets, so it is owner-only
 export function saveRegistry(data) {
-  writeJson(REGISTRY_FILE, data)
+  writeJson(REGISTRY_FILE, data, { mode: PRIVATE_FILE_MODE })
 }
 
-/**
- * What an entry in the registry is: a Minecraft server, or a database that serves them.
- *
- * <p>Absent means server: every entry made before databases existed is one, and defaulting here
- * migrates them all without a write. Servers and databases share one namespace on purpose - a
- * name is a folder under run/, a control pipe and a command-line argument, and two things called
- * "survival" would fight over all three.
- */
+// Absent kind means server. Servers and databases share one namespace: a name is a folder under
+// run/, a control pipe and a CLI argument.
 export function kindOf(inst) {
   return inst?.kind === 'database' ? 'database' : 'server'
 }
@@ -36,7 +30,6 @@ export function isDatabase(inst) {
   return kindOf(inst) === 'database'
 }
 
-/** Every registry entry, whatever it is, sorted by name. */
 export function listAll() {
   const reg = loadRegistry()
   return Object.entries(reg.instances)
@@ -44,16 +37,11 @@ export function listAll() {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/**
- * The servers. Databases are left out deliberately: everything that iterates "the servers" -
- * launchers, backups, the panel's list, a scheduled task's instance picker - was written before
- * databases existed and would treat one as a server with no jar.
- */
+// Servers only: launchers, backups and the panel's lists predate databases and would treat one as a server with no jar.
 export function listInstances() {
   return listAll().filter((i) => !isDatabase(i))
 }
 
-/** The databases. */
 export function listServices() {
   return listAll().filter(isDatabase)
 }
@@ -73,9 +61,7 @@ export function getInstance(name) {
 }
 
 export function hasInstance(name) {
-  // Own properties only. `instances` comes straight out of JSON.parse, so it inherits
-  // Object.prototype - and a plain lookup answers true for "constructor" or "toString", which is
-  // enough to get a request past the panel's existence check and into a confusing failure.
+  // own properties only: instances comes from JSON.parse, so a plain lookup is true for "constructor"
   return Object.hasOwn(loadRegistry().instances, name)
 }
 
@@ -98,11 +84,7 @@ export function updateInstance(name, patch) {
   })
 }
 
-/**
- * The first free name from a base: the base itself, then base-2, base-3, kept within the name
- * limit. For a name derived from a label, where "survival" may already be taken by the last
- * survival server.
- */
+// first free name from a base: base, base-2, base-3, within the name limit
 export function freeName(base) {
   let name = base
   for (let i = 2; hasInstance(name); i++) {
@@ -120,7 +102,6 @@ export function removeInstance(name) {
   })
 }
 
-/** Ports already claimed in the registry, so allocation never double-books. */
 export function usedPorts() {
   const taken = new Set()
   for (const inst of listAll()) {
@@ -130,13 +111,7 @@ export function usedPorts() {
   return taken
 }
 
-/**
- * Refuse a port that is not a port, or that another instance already holds.
- *
- * <p>One check for the CLI's `set` and the panel's settings route. The panel had this and the CLI
- * did not, so `mcctl set x port=abc` recorded NaN and the collision showed up minutes later as a
- * server that would not bind.
- */
+// one check for the CLI's set and the panel's settings route
 export function assertPortUsable(name, port, label = 'port') {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     fail(`${port} is not a ${label} number - use 1 to 65535`)
@@ -164,10 +139,7 @@ export function assertInstanceDir(inst) {
   if (!fs.existsSync(jar)) fail(`server jar not found for "${inst.name}": ${jar}`)
 }
 
-/**
- * Aikar's G1 flags. The large-heap variant kicks in above 12G because the
- * young-gen sizing that works for 4G starves a big heap.
- */
+// Aikar's G1 flags; the large-heap variant starts at 12G because the young-gen sizing for 4G starves a big heap
 export function jvmFlagsFor(memory) {
   const gb = parseMemoryGb(memory)
   const large = gb >= 12
@@ -195,10 +167,26 @@ export function jvmFlagsFor(memory) {
   ]
 }
 
-/**
- * Which server software family an instance runs. Absent means paper: every instance made
- * before the field existed is one, and defaulting here migrates them all without a write.
- */
+// Checks a server's own Java arguments (space- or line-separated text, or a list); empty gives null,
+// meaning the recommended flags. -Xms/-Xmx and -jar are rejected: memory comes from the Memory setting
+// that the panel, the reserved-memory sum and crash diagnosis read.
+export function cleanJvmFlags(input) {
+  if (input == null) return null
+  const tokens = (Array.isArray(input) ? input.map(String) : String(input).split(/\s+/))
+    .map((t) => t.trim())
+    .filter(Boolean)
+  if (!tokens.length) return null
+  if (tokens.length > 60) fail('that is more than 60 Java arguments')
+  for (const t of tokens) {
+    if (t.length > 300) fail(`"${t.slice(0, 40)}..." is too long for one argument`)
+    if (!t.startsWith('-')) fail(`"${t}" is not a Java option - each starts with a dash, like -XX:+UseG1GC`)
+    if (/^-Xm[sx]/i.test(t)) fail(`${t}: memory is set by the Memory setting, so both stay in step`)
+    if (/^-(jar|cp|classpath)$/i.test(t) || /^--class-path$/i.test(t)) fail(`${t}: which jar runs is the server's own jar`)
+  }
+  return tokens
+}
+
+// absent means paper: instances made before the field existed
 export function loaderOf(inst) {
   return inst?.loader ?? 'paper'
 }

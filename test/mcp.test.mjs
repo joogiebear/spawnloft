@@ -42,7 +42,6 @@ const LEGACY = { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { 
 const meta = (extra = {}) => ({ 'io.modelcontextprotocol/protocolVersion': '2026-07-28',
   'io.modelcontextprotocol/clientCapabilities': {}, ...extra })
 
-/** Send every message, close stdin, and collect what came back: replies by id, and the rest. */
 function session(messages, args = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp', ...args],
@@ -105,6 +104,21 @@ test('--allow-destructive adds restore, kill and upgrade_minecraft, marked destr
     assert.ok(tool.inputSchema.properties.confirm)
   }
   assert.ok(!tools.some((t) => t.name === 'rm'))
+})
+
+test('a modern tools/list says how long it may be cached; a legacy one carries no cache fields', async () => {
+  const s = await session([
+    { id: 'm', method: 'tools/list', params: { _meta: meta() } },
+    { id: 'l', method: 'tools/list' },
+  ])
+  const modern = s.byId.get('m').result
+  assert.equal(modern.resultType, 'complete')
+  assert.equal(typeof modern.ttlMs, 'number')
+  assert.ok(['public', 'private'].includes(modern.cacheScope))
+  assert.ok(modern.tools.length > 0)
+  const legacy = s.byId.get('l').result
+  assert.equal(legacy.ttlMs, undefined)
+  assert.equal(legacy.cacheScope, undefined)
 })
 
 test('modern requests are served statelessly, with resultType and serverInfo', async () => {
@@ -329,10 +343,26 @@ test('config files: listed, read with secrets hidden, changed with a one-file sn
   assert.ok(!w.stdout.includes('plugin-db-pass'))
   assert.match(fs.readFileSync(cfg, 'utf8'), /password: plugin-db-pass\nradius: 12\n/)
 
-  // The snapshot holds that one file, so restoring it puts the file back and nothing else.
   fs.writeFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'untouched: changed later\n')
   const r = await session([call(1, 'restore', { name: 'royalplugins', snapshot: done.structuredContent.snapshot, confirm: true })], ['--allow-destructive'])
   assert.equal(r.byId.get(1).result.isError, undefined, r.byId.get(1).result.content[0].text)
   assert.match(fs.readFileSync(cfg, 'utf8'), /radius: 5\n$/)
   assert.equal(fs.readFileSync(path.join(instance, 'plugins', 'Example', 'other.yml'), 'utf8'), 'untouched: changed later\n')
+})
+
+test('what an assistant does is in the activity log, under the name its app gives', async () => {
+  const s = await session([
+    { id: 1, method: 'initialize', params: { ...LEGACY, clientInfo: { name: 'Fixture Assistant', version: '1' } } },
+    { method: 'notifications/initialized' },
+    call(2, 'write_config_file', { name: 'royalplugins', path: 'plugins/Activity/config.yml', content: 'enabled: true\n' }),
+    call(3, 'get_activity', { name: 'royalplugins', limit: 5 }),
+  ])
+  assert.equal(s.byId.get(2).result.isError, undefined, s.byId.get(2).result.content[0].text)
+  const { entries } = s.byId.get(3).result.structuredContent
+  assert.equal(entries[0].action, 'config-create')
+  assert.equal(entries[0].detail, 'plugins/Activity/config.yml')
+  assert.deepEqual(entries[0].by, { kind: 'assistant', name: 'Fixture Assistant' })
+  assert.match(s.byId.get(3).result.content[0].text, /config-create: plugins\/Activity\/config\.yml {2}- by AI assistant \(Fixture Assistant\)/)
+  // A modern request that names no app is still the assistant's doing.
+  assert.ok(entries.some((e) => e.action === 'backup' && e.by.kind === 'assistant'))
 })

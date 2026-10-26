@@ -1,26 +1,11 @@
 #!/usr/bin/env node
-/**
- * Check that a build actually came out the way it is supposed to.
- *
- * <p>There is no CI on this repository, so the only thing standing between a broken build and a
- * published release is a check that runs on the machine doing the building. These are the things
- * that have silently gone wrong before, each of which produces an artifact that looks completely
- * normal until someone installs it:
- *
- * <ul>
- *   <li>The icon not reaching the executable. electron-builder applies it with rcedit, which lives
- *       in a toolchain it downloads on first use; if that extraction fails - it needs permission to
- *       create symlinks, which Windows withholds unless Developer Mode is on - the build carries on
- *       and ships Electron's default atom.</li>
- *   <li>The core not being copied into resources, which makes the app start and then fail at the
- *       first thing it tries to do.</li>
- *   <li>src/ui.html missing, which is the entire panel.</li>
- * </ul>
- *
- * <p>Called from the afterPack hook during a build (structure only, because the icon is applied
- * after that hook runs) and again by `npm run verify` on the finished artifact. Zero dependencies,
- * like everything else here.
- */
+// Checks that a build came out right: the icon reached the exe, the core is in resources, and the
+// panel (src/ui.html) is present. Run by the afterPack hook (structure only, since the icon is
+// applied after that hook) and again by `npm run verify` on the finished artifact.
+//
+// The icon check matters because electron-builder applies it with rcedit from a toolchain it
+// downloads on first use; if extraction fails (it needs symlink permission, which Windows withholds
+// without Developer Mode) the build carries on and ships Electron's default icon.
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
@@ -28,15 +13,14 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-// electron-builder passes the directory it just packed; run by hand, the usual one is assumed.
+// electron-builder passes the packed directory; run by hand, the default is assumed
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'))
 const UNPACKED = args[0] ? path.resolve(args[0]) : path.join(HERE, 'dist', 'win-unpacked')
-// The afterPack hook runs BEFORE electron-builder applies the icon, so it asks for the structural
-// checks only. Run on a finished build, everything is checked.
+// afterPack runs before the icon is applied, so it asks for structural checks only
 const STRUCTURE_ONLY = process.argv.includes('--structure-only')
 const MAC = process.argv.includes('--platform=darwin') || UNPACKED.endsWith('.app')
 const LINUX = process.argv.includes('--platform=linux')
-// Both are unix: launchers are shell scripts that must be executable, not .cmd files.
+// launchers are executable shell scripts here, not .cmd files
 const POSIX = MAC || LINUX
 const APP = UNPACKED.endsWith('.app') ? UNPACKED : path.join(UNPACKED, 'SpawnLoft.app')
 const RESOURCES = MAC ? path.join(APP, 'Contents', 'Resources') : path.join(UNPACKED, 'resources')
@@ -48,8 +32,8 @@ const problems = []
 const notes = []
 
 const pkg = JSON.parse(fs.readFileSync(path.join(HERE, 'package.json'), 'utf8'))
-// An override used by electron-builder must also be used here. Otherwise a deliberately
-// unsigned development package is judged against the production Azure signing profile.
+// honour the same --config override electron-builder used, or a deliberately unsigned dev package
+// is judged against the production Azure signing profile
 const configArg = process.argv.find(arg => arg.startsWith('--config='))
 const buildConfig = configArg
   ? createRequire(import.meta.url)(path.resolve(configArg.slice('--config='.length)))
@@ -61,7 +45,7 @@ if (configArg) {
   }
 }
 
-/** Every image in an .ico, as raw bytes. The format is a 6-byte header then 16 bytes per entry. */
+// .ico layout: 6-byte header, then 16 bytes per entry
 function icoFrames(file) {
   const ico = fs.readFileSync(file)
   const count = ico.readUInt16LE(4)
@@ -84,8 +68,7 @@ if (STRUCTURE_ONLY) {
   if (!fs.readdirSync(RESOURCES).some(name => name.endsWith('.icns'))) problems.push('the Mac bundle has no application icon')
   else notes.push('icon: present in the Mac application bundle')
 } else if (LINUX) {
-  // A Linux executable carries no icon. The window's comes from a file beside the app, and the
-  // launcher's from the package; without the first, every window wears Electron's default.
+  // a Linux executable carries no icon; the window's comes from a file beside the app
   if (!fs.existsSync(path.join(RESOURCES, 'icon.png'))) problems.push('resources/icon.png is missing, so the window would have no icon')
   else notes.push('icon: resources/icon.png is packaged for the window')
 } else if (!fs.existsSync(ICO)) {
@@ -121,26 +104,16 @@ const asar = path.join(RESOURCES, 'app.asar')
 if (!fs.existsSync(asar)) {
   problems.push('resources/app.asar is missing')
 } else {
-  // setup.html is listed in the build's `files` allowlist. Anything added to desktop/ and not
-  // listed there is silently left out, and the first-run wizard is the screen that would go.
+  // package.json's `files` is an allowlist; anything added to desktop/ and not listed is silently left out
   const bytes = fs.readFileSync(asar)
-  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'update-channel.js']) {
+  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'ui-zoom.js', 'update-channel.js']) {
     if (!bytes.includes(Buffer.from(name))) problems.push(`${name} is not in app.asar - check the "files" list in package.json`)
   }
-  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, update-channel.js and setup.html are packaged')
+  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js and setup.html are packaged')
 }
 
-/**
- * Is the executable signed, and will the signature outlive its certificate?
- *
- * <p>Artifact Signing issues certificates that live about three days and rotate. That is by design,
- * and it is also why the timestamp matters more here than anywhere else: without one, every
- * signature stops validating within the week rather than staying good for the moment it was signed
- * in. So this checks both, and treats a missing timestamp as a failure rather than a detail.
- *
- * <p>Skipped entirely when the build is not configured to sign, so an unsigned local build is not
- * reported as broken.
- */
+// Artifact Signing certificates live about three days, so without a timestamp every signature
+// stops validating within the week. A missing timestamp is a failure.
 function checkSignature(file) {
   const ps = spawnSync(
     'powershell',
@@ -161,22 +134,13 @@ function checkSignature(file) {
   return { ok: true, publisher: cn ? cn[1] : subject }
 }
 
-/**
- * The two design-token blocks have to stay identical.
- *
- * <p>setup.html is loaded from disk by Electron before the panel server exists, so it cannot share
- * a stylesheet with ui.html without a build step, and there is no build step. Both files say so in
- * a comment ending "change both or neither" - and that comment failed silently the first time a
- * real change tested it, because a comment cannot check anything.
- *
- * <p>This can. A wizard whose palette has drifted from the panel's is not a build worth shipping.
- */
+// setup.html loads from disk before the panel server exists, so it can't share a stylesheet with
+// ui.html; the two :root token blocks are duplicated and must stay identical.
 function checkTokensMatch() {
   const grab = (file) => {
     let text
     try {
-      // Normalised, because autocrlf checks one file out with CRLF and leaves the other LF, and
-      // an identical palette must not fail the build over the line terminator.
+      // normalise line endings: autocrlf can check one file out CRLF and the other LF
       text = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
     } catch {
       return null
@@ -202,7 +166,7 @@ function checkTokensMatch() {
 }
 
 if (LINUX) {
-  // Linux has no equivalent of Authenticode or notarization; there is no signature to check.
+  // no Authenticode or notarization equivalent on Linux
   notes.push('signing: not applicable on Linux')
 } else if (!STRUCTURE_ONLY && !MAC && fs.existsSync(EXE)) {
   const configured = Boolean(buildConfig?.win?.azureSignOptions || buildConfig?.win?.signtoolOptions)

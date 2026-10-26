@@ -3,30 +3,14 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-/**
- * Remembering where the window was.
- *
- * <p>Its own module because the interesting part is not the storing, it is deciding whether a
- * remembered position is still somewhere a person can reach - and that is worth being able to test
- * on its own, without launching an application to find out.
- */
-
 const DEFAULT_BOUNDS = { width: 1280, height: 820 }
 const MIN_WIDTH = 900
 const MIN_HEIGHT = 600
 
-/**
- * Is this rectangle somewhere a person could actually see?
- *
- * <p>The classic way to lose a window is to restore it onto a monitor that is no longer attached:
- * the app launches, reports itself running, and paints at x=-1920 where nobody will ever find it.
- * A saved position is honoured only when a usable part of it lands inside some display's work
- * area - enough of the title bar to grab, not merely a pixel of contact. Otherwise the position is
- * dropped and the window is centred.
- *
- * <p>`displays` is passed in rather than read from Electron so this can be checked against
- * arrangements that are not plugged into the machine running the test.
- */
+// A saved position may point at a monitor that is no longer attached. It only counts if enough of
+// the window (a grabbable title bar, not a pixel) overlaps some display's work area; otherwise
+// the position is dropped and the window is centred. `displays` is passed in so tests can supply
+// arrangements.
 function isVisibleSomewhere(bounds, displays) {
   return displays.some((area) => {
     const overlapX = Math.min(bounds.x + bounds.width, area.x + area.width) - Math.max(bounds.x, area.x)
@@ -35,13 +19,12 @@ function isVisibleSomewhere(bounds, displays) {
   })
 }
 
-/** Read the saved state, discarding anything that is not usable on the displays we have now. */
 function load(file, displays) {
   let saved = null
   try {
     saved = JSON.parse(fs.readFileSync(file, 'utf8'))
   } catch {
-    // Missing, or written by something that is not this. Either way, defaults.
+    // missing or unreadable: use defaults
     return { ...DEFAULT_BOUNDS, maximized: false }
   }
 
@@ -59,14 +42,8 @@ function load(file, displays) {
   return state
 }
 
-/**
- * Follow a window and record where it ends up.
- *
- * <p>Written on a short delay rather than on every event, because dragging emits a move per frame
- * and none of them are the answer - only the one where the person stopped. Maximised is stored
- * separately from the bounds, and getNormalBounds is what gets saved, so un-maximising later
- * restores the size the window had before rather than the size of the screen.
- */
+// Debounced: dragging emits a move per frame. getNormalBounds is saved (maximised is stored
+// separately) so un-maximising restores the earlier size, not the screen size.
 function track(win, file) {
   let timer = null
 
@@ -84,7 +61,7 @@ function track(win, file) {
       }
       fs.writeFileSync(file, JSON.stringify(state, null, 2) + '\n')
     } catch {
-      // Losing the remembered position is a smaller problem than failing to close.
+      // losing the position is a smaller problem than failing to close
     }
   }
 
@@ -94,7 +71,7 @@ function track(win, file) {
   }
 
   for (const event of ['resize', 'move', 'maximize', 'unmaximize']) win.on(event, later)
-  // 'close', not 'closed': the window still has bounds to read at this point.
+  // 'close', not 'closed': the window still has bounds to read
   win.on('close', () => {
     clearTimeout(timer)
     save()

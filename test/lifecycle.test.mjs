@@ -1,16 +1,11 @@
 /**
- * The lifecycle, end to end, against a real daemon.
+ * The lifecycle end to end against a real detached daemon, control pipe, console log and state
+ * file: start-to-ready, console injection, graceful stop, crash recovery, giving up, forced stop,
+ * kill and a failed launch. Only the JVM is faked (test/fixtures/fake-java.mjs).
  *
- * <p>Everything else in this suite tests pure modules. This one spawns the actual detached daemon,
- * talks to it over the actual control pipe, reads the actual console log and state file, and
- * drives the paths that were never covered: start-to-ready, console injection, graceful stop,
- * crash recovery, giving up, a forced stop, kill, and a launch that fails. The only thing faked is
- * the JVM - test/fixtures/fake-java.mjs prints what a server prints and obeys what a server obeys.
- *
- * <p>Isolated by MCCTL_DATA_ROOT, set before any module that resolves paths is imported, so the
- * registry, the run directory and the daemons all live in a scratch folder and never touch the
- * servers on the machine running the tests. The restart delay is shortened the same way, or the
- * crash tests would spend ten seconds apiece waiting for it.
+ * MCCTL_DATA_ROOT is set before any module that resolves paths is imported, so the registry, run
+ * directory and daemons live in a scratch folder. The restart delay is shortened the same way, or
+ * each crash test would wait ten seconds.
  */
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -116,9 +111,8 @@ test('a second start while running is refused; a stop of a stopped server is a n
 })
 
 test('two near-simultaneous starts of the same instance never both spawn a daemon', { timeout: 30000 }, async () => {
-  // Before the start.lock, both of these would read "not running" and each spawn its own daemon -
-  // two java processes against the same world. Firing them back to back (not awaiting the first)
-  // is what exercises the race; sequential starts, above, never hit the lock at all.
+  // fired back to back (not awaited in turn) to hit the race; without start.lock each would read
+  // "not running" and spawn its own daemon on the same world. Sequential starts never reach the lock
   const name = await makeInstance('race')
   const [a, b] = await Promise.allSettled([sup.start(name, { timeout: 15000 }), sup.start(name, { timeout: 15000 })])
   const results = [a, b]
@@ -193,7 +187,7 @@ test('a force kill takes what the server forked along with it',
     await sleep(200)
     const res = await sup.stop(name, { timeout: 1500 })
     assert.equal(res.forced, true)
-    // Signalling the JVM alone left this running, holding whatever it held.
+    // signalling the JVM alone would leave the helper running
     assert.ok(await until(() => !pidAlive(helper), 5000), 'the forked helper outlived the force kill')
   })
 
@@ -232,4 +226,55 @@ test('a java that does not exist fails the start instead of hanging', { timeout:
   }
   assert.equal(outcome.ready, false)
   assert.equal(outcome.failed, true)
+})
+
+test('a chained task tells the players, backs up and restarts, in one run', { timeout: 60000 }, async () => {
+  const name = await makeInstance('chain')
+  await sup.start(name, { timeout: 15000 })
+  const firstPid = readState(name).state.javaPid
+  // written straight into the task file: task run is what the system scheduler calls, so this makes
+  // that call without involving the system scheduler
+  const id = `${name}-steps`
+  fs.writeFileSync(path.join(scratch, 'schedules.json'), JSON.stringify({ version: 1, tasks: {
+    [id]: { instance: name, name: 'Nightly restart', enabled: true, schedule: { kind: 'daily', at: '03:00' },
+      action: { type: 'steps', onlyWhenRunning: false, keepGoing: false, steps: [
+        { do: 'say', text: 'chain says hello' }, { do: 'backup', keep: 1 }, { do: 'restart' },
+      ] } },
+  } }))
+  execFileSync(process.execPath, [fileURLToPath(new URL('../spawnloft.mjs', import.meta.url)), 'task', 'run', id],
+    { encoding: 'utf8', timeout: 45000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MCCTL_DATA_ROOT: scratch } })
+
+  const log = fs.readFileSync(path.join(scratch, 'run', name, 'tasks.log'), 'utf8').trim().split('\n').at(-1)
+  assert.match(log, new RegExp(`\t${id}\tok\tsteps\ttold the players "chain says hello"; backed up .*\.tar\.gz .*; restarted$`))
+  assert.equal(readState(name).status, 'running')
+  assert.notEqual(readState(name).state.javaPid, firstPid, 'the restart step must have started a new process')
+  // Who: every entry the run made is the schedule's, by the task's name.
+  const { readActivity } = await import('../src/activity.mjs')
+  const byTask = readActivity({ server: name, by: 'schedule' }).entries.map((e) => e.action)
+  assert.deepEqual(byTask, ['start', 'stop', 'backup', 'command'])
+  await sup.stop(name)
+})
+
+test('a failed console write does not take the daemon down or orphan the server', { timeout: 30000 }, async () => {
+  // the server closes its console, so the daemon's next writes hit EPIPE; that must not exit the
+  // daemon and leave the detached JVM running with no supervisor
+  const name = await makeInstance('epipe')
+  await sup.start(name, { timeout: 15000 })
+  const before = readState(name).state
+
+  await sup.sendConsole(name, 'closestdin')
+  await sleep(300)
+  for (let i = 0; i < 3; i++) {
+    await sup.sendConsole(name, `after close ${i}`).catch(() => {})
+    await sleep(100)
+  }
+  await sleep(500)
+
+  const { status, state } = readState(name)
+  assert.equal(status, 'running', `daemon should survive a closed console, got ${status}`)
+  assert.equal(state.javaPid, before.javaPid)
+  assert.ok(pidAlive(state.daemonPid), 'the daemon is still up')
+
+  await sup.kill(name)
+  assert.equal(readState(name).status, 'stopped')
 })

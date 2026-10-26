@@ -2,17 +2,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UserError, PRIVATE_FILE_MODE, renameOver } from './util.mjs'
 
-/** Where the code lives. Distinct from where data lives — see below. */
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-/**
- * Where mcctl keeps its own settings.
- *
- * <p>Deliberately NOT next to the code. Once this ships as an installed application the program
- * directory is read-only for the person running it, and the one thing that must be findable before
- * anything else is the file that says where everything else lives.
- */
+// Settings live in the user config dir, not next to the code: an installed program directory is
+// read-only, and this file says where everything else lives.
 export function settingsFile() {
   const base = process.platform === 'win32'
     ? process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
@@ -20,23 +15,108 @@ export function settingsFile() {
   return path.join(base, 'mcctl', 'settings.json')
 }
 
-export function load() {
+// kind 'content': read but unusable (empty, not JSON, not an object). kind 'io': could not be read
+// (permissions, a lock, a folder in its place). Only content damage can be mended by setting the file aside.
+function read(file) {
+  let text
   try {
-    return JSON.parse(fs.readFileSync(settingsFile(), 'utf8'))
-  } catch {
-    return {}
+    text = fs.readFileSync(file, 'utf8')
+  } catch (err) {
+    return err.code === 'ENOENT' ? { settings: {}, exists: false } : { settings: {}, exists: true, error: err.message, kind: 'io' }
+  }
+  try {
+    // Some Windows editors begin a UTF-8 file with a byte-order mark, which JSON.parse takes for garbage.
+    const parsed = JSON.parse(text.replace(/^﻿/, ''))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { settings: {}, exists: true, error: 'it is not a JSON object', kind: 'content' }
+    return { settings: parsed, exists: true }
+  } catch (err) {
+    return { settings: {}, exists: true, error: err.message, kind: 'content' }
   }
 }
 
-export function save(patch) {
+let lastWarning = null
+
+// Defaults when there is no file or it is unusable. An unusable file warns on stderr (once per
+// process while unchanged) because it holds the data folder: silently falling back to the default
+// folder looks like lost servers.
+export function load() {
   const file = settingsFile()
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  const merged = { ...load(), ...patch }
-  fs.writeFileSync(file, JSON.stringify(merged, null, 2) + '\n')
+  const found = read(file)
+  if (!found.error) {
+    lastWarning = null
+    return found.settings
+  }
+  const said = `settings file ${file} could not be read (${found.error}); using the defaults until you fix it or delete it`
+  if (said !== lastWarning) {
+    lastWarning = said
+    process.stderr.write(`spawnloft: ${said}\n`)
+  }
+  return found.settings
+}
+
+// for doctor: { ok: true, exists } or { ok: false, file, error }
+export function inspect() {
+  const file = settingsFile()
+  const found = read(file)
+  return found.error ? { ok: false, file, error: found.error } : { ok: true, exists: found.exists }
+}
+
+// Merges patch into the settings via temp file + rename, so a crash leaves the old file whole.
+// Refuses when the existing file is unreadable: merging into nothing would erase the data folder.
+// replaceUnreadable is for deliberately choosing the data folder (first-run wizard, config set-root):
+// a file with damaged content is copied aside (onSetAside is told where) and replaced. A file that
+// cannot be read at all is never moved. The new file is written and flushed before the damaged one
+// is copied, so no failure leaves no settings file. A symlinked file is changed where the link points.
+export function save(patch, { replaceUnreadable = false, onSetAside = null } = {}) {
+  const file = linkTarget(settingsFile())
+  const found = read(file)
+  const damaged = Boolean(found.error)
+  if (damaged && !(replaceUnreadable && found.kind === 'content')) {
+    throw new UserError(`settings file ${file} could not be read (${found.error}), so it was not changed; fix it or delete it (a deleted file forgets your data folder: spawnloft config set-root <folder> sets it again), then try again`)
+  }
+  const merged = { ...found.settings, ...patch }
+  const tmp = `${file}.${process.pid}.tmp`
+  let aside = null
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    // owner-only; also tightens a file that was written earlier with wider permissions
+    const fd = fs.openSync(tmp, 'w', PRIVATE_FILE_MODE)
+    try {
+      if (process.platform !== 'win32') fs.fchmodSync(fd, PRIVATE_FILE_MODE)
+      fs.writeFileSync(fd, JSON.stringify(merged, null, 2) + '\n')
+      fs.fsyncSync(fd)
+    } finally {
+      fs.closeSync(fd)
+    }
+    if (damaged) {
+      aside = `${file}.unreadable-${new Date().toISOString().replace(/[:.]/g, '-')}`
+      fs.copyFileSync(file, aside, fs.constants.COPYFILE_EXCL)
+    }
+    renameOver(tmp, file)
+  } catch (err) {
+    // undo whatever was half done; the old file is untouched
+    for (const leftover of [tmp, aside]) {
+      if (!leftover) continue
+      try {
+        fs.rmSync(leftover, { force: true })
+      } catch { /* the error that matters is the one below */ }
+    }
+    throw err instanceof UserError ? err : new UserError(`could not write settings file ${file} (${err.message}); it was left as it was`)
+  }
+  if (aside && onSetAside) onSetAside(aside)
   return merged
 }
 
-/** The default data location for a fresh install: per-user, writable, and not inside the program. */
+// a dotfile manager's symlink is written through, not replaced
+function linkTarget(file) {
+  try {
+    return fs.lstatSync(file).isSymbolicLink() ? fs.realpathSync(file) : file
+  } catch {
+    return file
+  }
+}
+
+// per-user and writable, unlike the program directory
 export function defaultDataRoot() {
   const base = process.platform === 'win32'
     ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
@@ -44,35 +124,19 @@ export function defaultDataRoot() {
   return path.join(base, 'mcctl')
 }
 
-/**
- * Resolve every location mcctl uses.
- *
- * <p>Three sources, in order:
- *
- * <ol>
- *   <li><b>Settings</b>, if the person has chosen locations.</li>
- *   <li><b>The code directory</b>, when it already holds an {@code instances.json}. This is what
- *       keeps an existing checkout working after this change: its registry, worlds and backups stay
- *       exactly where they are rather than the tool waking up one day pointed at an empty folder and
- *       reporting no servers.</li>
- *   <li><b>A per-user data directory</b>, for a fresh install.</li>
- * </ol>
- *
- * <p>Servers can live on a different drive from everything else. That is the one split worth
- * supporting directly: worlds and backups are the large, growing things, and the reason to move
- * them is usually that they no longer fit where the program was installed.
- */
+// Order: settings; the code directory if it already holds instances.json (keeps an existing
+// checkout pointed at its servers); a per-user data directory. Servers can sit on another drive,
+// since worlds and backups are what outgrow the install location.
 export function resolveRoots(overrides = {}) {
   const s = { ...load(), ...overrides }
 
   const legacy = fs.existsSync(path.join(CODE_ROOT, 'instances.json'))
-  // MCCTL_DATA_ROOT wins over everything: it is how the lifecycle tests keep a real daemon, registry
-  // and run directory inside a scratch folder instead of the person's own servers. It is inherited
-  // by the daemons this process spawns, so they land in the same place.
+  // MCCTL_DATA_ROOT wins: lifecycle tests use it to keep daemons and registry in a scratch folder,
+  // and spawned daemons inherit it.
   const forced = process.env.MCCTL_DATA_ROOT
   const dataRoot = forced ? path.resolve(forced) : s.dataRoot ? path.resolve(s.dataRoot) : legacy ? CODE_ROOT : defaultDataRoot()
 
-  // separateInstances is the toggle: off (default) means servers live with everything else.
+  // off (default): servers live under the data root
   const instancesDir = s.separateInstances && s.instancesDir
     ? path.resolve(s.instancesDir)
     : path.join(dataRoot, 'instances')
@@ -84,9 +148,7 @@ export function resolveRoots(overrides = {}) {
     registryFile: path.join(dataRoot, 'instances.json'),
     templatesDir: path.join(dataRoot, 'templates'),
     jarsDir: path.join(dataRoot, 'jars'),
-    // Snapshots are the thing most likely to outgrow the drive everything else is on, so they get
-    // the same escape hatch the instances directory has. Changing it does not move what already
-    // exists - the panel says so rather than letting history appear to vanish.
+    // snapshots are likeliest to outgrow the drive; changing this does not move existing ones, and the panel says so
     backupsDir: s.backupsDir ? path.resolve(s.backupsDir) : path.join(dataRoot, 'backups'),
     runDir: path.join(dataRoot, 'run'),
     // Database engines (one folder per engine version, shared) and the databases that run on them.
@@ -97,17 +159,9 @@ export function resolveRoots(overrides = {}) {
   }
 }
 
-/**
- * Other places on this machine that hold a registry with servers in it, when the data root in use
- * holds none.
- *
- * <p>The desktop app resolves its data root once, at launch; the CLI and the MCP server resolve it
- * on every run. So if settings.json changes under a running app - a second copy of SpawnLoft on the
- * same account, a development checkout, a hand edit - the app keeps showing the servers it started
- * with while every fresh process looks somewhere else and reports that nothing exists. That reads
- * as "my servers are gone" when they are one folder away. Checked only where SpawnLoft itself would
- * have put them: the per-user default and the legacy checkout layout.
- */
+// Other registries on this machine, for when the data root in use has none. The desktop app resolves
+// its data root once at launch while the CLI re-resolves on every run, so a changed settings.json makes
+// servers look gone. Only checks the per-user default and the legacy checkout.
 export function serversElsewhere(dataRoot) {
   const here = path.resolve(dataRoot)
   const found = []
@@ -124,20 +178,14 @@ export function serversElsewhere(dataRoot) {
   return found
 }
 
-/** One line per other location, for the places that report an empty data root. */
 export function describeServersElsewhere(dataRoot) {
   return serversElsewhere(dataRoot).map(({ root, names }) =>
     `${names.length} server(s) (${names.join(', ')}) are registered in ${root}, which is not the data root in use. ` +
     `If they are yours: spawnloft config set-root "${root}"`)
 }
 
-/**
- * Whether a directory can be written to, checked by actually writing.
- *
- * <p>Permission bits and free-space numbers both lie — a network share, a read-only mount, or a
- * drive that has been unplugged all look fine until the first write. The picker needs a real answer
- * before someone points their servers at a location that cannot hold them.
- */
+// Checks by actually writing: permission bits and free space lie on network shares, read-only mounts
+// and unplugged drives.
 export function checkWritable(dir) {
   const probe = path.join(dir, '.mcctl-write-test')
   try {

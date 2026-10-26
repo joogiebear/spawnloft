@@ -4,37 +4,21 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fail } from './util.mjs'
 
-/**
- * The shared libraries a downloaded Linux engine expects the system to have.
- *
- * <p>Oracle's MySQL tarball is built against libaio, libnuma and ncurses, and says nothing about it:
- * on a machine without them mysqld exits with "error while loading shared libraries", which to
- * someone who clicked Add database is no explanation at all. A stock Ubuntu or Debian server has
- * none of the three. Windows and macOS archives carry what they need, so none of this runs there.
- *
- * <p>Three answers are tried, cheapest first, and the engine is only installed if one works:
- * <ol>
- *   <li>The system already has them.</li>
- *   <li>The system has them under the name Debian's 64-bit time_t transition gave them. Ubuntu
- *       24.04 ships libaio as libaio.so.1t64, so mysqld cannot find it EVEN AFTER the package it
- *       asked for is installed. A link under the old name, in a folder of the engine's own, is the
- *       whole fix.</li>
- *   <li>The packages are fetched with `apt-get download` or `dnf download` - which need no root,
- *       and verify what they fetch against the distribution's signed metadata like any install -
- *       and unpacked beside the engine. Nothing is installed on the system and nothing outside the
- *       engine's folder is written.</li>
- * </ol>
- * Failing all three, the refusal names the command that fixes it for this distribution.
- */
+// Shared libraries a downloaded Linux engine expects the system to have. Oracle's MySQL tarball needs
+// libaio, libnuma and ncurses and says nothing when they are missing; mysqld just exits with a loader
+// error. Windows and macOS archives bundle theirs. Tried cheapest first, and the engine is installed
+// only if one works: already present; present under Debian's t64 name (Ubuntu 24.04 ships
+// libaio.so.1t64), fixed with a link in the engine's own folder; or fetched with apt-get/dnf download
+// (no root, verified by the distribution's signed metadata) and unpacked beside the engine.
+// Failing all three, the refusal names the command that fixes it.
 
 export const LIBS_FOLDER = 'spawnloft-libs'
 
-/** The engine's private library folder, given any binary inside its bin/. */
 export function libsDirFor(binaryPath) {
   return path.join(path.dirname(path.dirname(binaryPath)), LIBS_FOLDER)
 }
 
-/** The environment a tool from this engine should run with: its private libraries first. */
+// the engine's private libraries go first on LD_LIBRARY_PATH
 export function libraryEnv(binaryPath, env = process.env, platform = process.platform) {
   if (platform !== 'linux') return env
   const dir = libsDirFor(binaryPath)
@@ -42,7 +26,6 @@ export function libraryEnv(binaryPath, env = process.env, platform = process.pla
   return { ...env, LD_LIBRARY_PATH: env.LD_LIBRARY_PATH ? `${dir}:${env.LD_LIBRARY_PATH}` : dir }
 }
 
-/** The names ldd could not resolve, from its output. */
 export function parseLdd(text) {
   const missing = new Set()
   for (const line of String(text).split('\n')) {
@@ -52,7 +35,7 @@ export function parseLdd(text) {
   return [...missing]
 }
 
-/** Null when there is no ldd to ask, which is an unknown rather than a clean bill of health. */
+// null when there is no ldd to ask: unknown, not a clean bill of health
 export function missingLibraries(binaries, env = process.env) {
   const missing = new Set()
   for (const file of binaries) {
@@ -63,7 +46,7 @@ export function missingLibraries(binaries, env = process.env) {
   return [...missing]
 }
 
-/** `ldconfig -p` lines look like "\tlibaio.so.1t64 (libc6,x86-64) => /lib/x86_64-linux-gnu/libaio.so.1t64". */
+// ldconfig -p lines look like "\tlibaio.so.1t64 (libc6,x86-64) => /lib/x86_64-linux-gnu/libaio.so.1t64"
 export function parseLdconfig(text) {
   const found = new Map()
   for (const line of String(text).split('\n')) {
@@ -73,7 +56,6 @@ export function parseLdconfig(text) {
   return found
 }
 
-/** Which package carries a library, by distribution family. First name that exists wins. */
 export const PACKAGES = Object.freeze({
   'libaio.so.1': { apt: ['libaio1t64', 'libaio1'], dnf: 'libaio', pacman: 'libaio', zypper: 'libaio1' },
   'libnuma.so.1': { apt: ['libnuma1'], dnf: 'numactl-libs', pacman: 'numactl', zypper: 'libnuma1' },
@@ -81,7 +63,6 @@ export const PACKAGES = Object.freeze({
   'libtinfo.so.6': { apt: ['libtinfo6'], dnf: 'ncurses-libs', pacman: 'ncurses', zypper: 'libtinfo6' },
 })
 
-/** apt, dnf, pacman or zypper, from /etc/os-release; null for a distribution this does not know. */
 export function packageFamily(osRelease) {
   const ids = [...String(osRelease).matchAll(/^(?:ID|ID_LIKE)=(.*)$/gm)].flatMap(m => m[1].replaceAll('"', '').split(/\s+/))
   if (ids.some(id => ['debian', 'ubuntu'].includes(id))) return 'apt'
@@ -91,7 +72,6 @@ export function packageFamily(osRelease) {
   return null
 }
 
-/** The sentence someone can act on: what is missing and the one command that supplies it. */
 export function installHint(missing, family, engineLabel = 'MySQL') {
   const names = missing.join(', ')
   const packages = [...new Set(missing.map(name => {
@@ -109,18 +89,10 @@ function readOsRelease() {
   try { return fs.readFileSync('/etc/os-release', 'utf8') } catch { return '' }
 }
 
-/**
- * Whether the system's C library is musl (Alpine and a few others) rather than glibc.
- *
- * <p>Everything below this assumes glibc's `ldd`/`ldconfig` output format, because the engines it
- * installs libraries for are themselves built against glibc - no package this module could fetch
- * makes a glibc binary run against musl, that is an ABI mismatch, not a missing file. On musl,
- * `ldd` is a different program with different output: parseLdd's regex does not match any of it,
- * so missingLibraries() silently returns no missing libraries, and an engine that cannot run at
- * all is reported as fully satisfied. Checked by name rather than left to fall out of the parse
- * mismatch, so the refusal says what is actually wrong instead of surfacing later as an opaque
- * native crash.
- */
+// Everything below assumes glibc's ldd/ldconfig output, and the engines are built against glibc. On musl
+// (Alpine) no package fixes that ABI mismatch, and musl's ldd output doesn't match parseLdd, so
+// missingLibraries() would report nothing missing for an engine that can't run. Checked by name so the
+// refusal says what is actually wrong.
 export function isMusl(run = spawnSync) {
   try {
     const res = run('ldd', ['--version'], { encoding: 'utf8', timeout: 5000 })
@@ -131,7 +103,7 @@ export function isMusl(run = spawnSync) {
   )
 }
 
-/** Step two: the library is here, under its t64 name. Link it under the name that was asked for. */
+// the library exists under its t64 name; link it under the name that was asked for
 function linkRenamed(missing, libs) {
   const res = spawnSync('ldconfig', ['-p'], { encoding: 'utf8', timeout: 15000, env: { ...process.env, LC_ALL: 'C' } })
   // ldconfig lives in /sbin, which a user's PATH may not include.
@@ -143,7 +115,6 @@ function linkRenamed(missing, libs) {
   }
 }
 
-/** Step three: the distribution's own packages, downloaded and unpacked without installing them. */
 function fetchWithApt(missing, libs, onProgress) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-libs-'))
   try {
@@ -169,25 +140,17 @@ function fetchWithApt(missing, libs, onProgress) {
   }
 }
 
-/** dnf's name for this machine. Without it a 64-bit Fedora is handed the i686 package as well. */
+// dnf's arch name; without it a 64-bit Fedora is handed the i686 package too
 export const RPM_ARCH = Object.freeze({ x64: 'x86_64', arm64: 'aarch64' })
 
-/** One package can supply several libraries: ncurses-libs is both libncurses and libtinfo. */
+// one package can supply several libraries: ncurses-libs is both libncurses and libtinfo
 export function dnfPackagesFor(missing) {
   return [...new Set(missing.map(name => PACKAGES[name]?.dnf).filter(Boolean))]
 }
 
-/**
- * The same as fetchWithApt, for the Fedora and RHEL families.
- *
- * <p>`dnf download` is part of dnf 5, and of dnf-plugins-core before it, which a RHEL-family
- * install normally has; where it is missing the command fails and the refusal names the packages,
- * as it did before this existed. An rpm is unpacked with rpm2cpio, which comes with rpm itself,
- * into cpio, which comes with anything that builds an initramfs; bsdtar reads an rpm directly and
- * is tried where there is no cpio. A machine with neither gets the same refusal.
- *
- * <p>`run` is passed in so the order of those decisions can be checked without a Fedora.
- */
+// fetchWithApt for the Fedora and RHEL families. `dnf download` is in dnf 5 and dnf-plugins-core; where
+// it is missing the command fails and the refusal names the packages. rpm2cpio | cpio unpacks the rpm,
+// with bsdtar as the fallback. run is injectable so the order can be tested without a Fedora.
 export function fetchWithDnf(missing, libs, onProgress = null, { run = spawnSync, arch = process.arch } = {}) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-libs-'))
   try {
@@ -218,7 +181,7 @@ export function fetchWithDnf(missing, libs, onProgress = null, { run = spawnSync
   }
 }
 
-/** Every shared object under a package's tree, links kept as links so the sonames still resolve. */
+// links are kept as links so the sonames still resolve
 function copyLibraries(from, to) {
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
     const source = path.join(from, entry.name)
@@ -231,13 +194,9 @@ function copyLibraries(from, to) {
   }
 }
 
-/**
- * Make sure everything these binaries load is loadable, or refuse with a reason.
- *
- * <p>`engineRoot` is the folder holding bin/; the private library folder is made beside it, and
- * only if something was actually missing. Called before an engine is moved into place, so an
- * engine that cannot run is never left looking installed.
- */
+// Makes everything these binaries load loadable, or refuses with a reason. engineRoot is the folder
+// holding bin/; the private library folder is created beside it only if something is missing. Called
+// before an engine is moved into place so one that can't run is never left looking installed.
 export function ensureLibraries(engineRoot, binaries, { onProgress = null, engineLabel = 'MySQL', allowFetch = true } = {}) {
   if (process.platform !== 'linux') return { missing: [], supplied: [] }
   if (isMusl()) {

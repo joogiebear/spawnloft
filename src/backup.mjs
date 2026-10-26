@@ -3,22 +3,16 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { BACKUPS_DIR } from './paths.mjs'
-import { runTar, tarBinary } from './tar.mjs'
+import { runTar, tarBinary, tarMember } from './tar.mjs'
 import * as services from './services.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
-import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync } from './util.mjs'
+import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync, safeRelativePath } from './util.mjs'
+import * as activity from './activity.mjs'
 
-/**
- * The mirror: a second location every snapshot is copied to as it is taken.
- *
- * <p>This closes the oldest risk in the tool: servers and their snapshots on one drive
- * means one disk failure takes both the thing and its way back. Read live from settings
- * rather than resolved at startup, so turning it on needs no restart - and a mirror that
- * cannot be written never fails the backup that just succeeded: the primary snapshot is
- * real, and the failure to copy it is reported, loudly, as exactly that.
- */
+// The mirror is a second location every snapshot is copied to. Read from settings on each call
+// so enabling it needs no restart. A failed mirror copy is reported but never fails the backup.
 export function mirrorRoot() {
   const dir = settings.load().backupsMirrorDir
   return dir ? path.resolve(dir) : null
@@ -40,7 +34,7 @@ function mirrorCopy(name, file) {
   }
 }
 
-/** Deletions keep the mirror in step - a retention limit that only thins one side is not one. */
+// deletions are mirrored too, so retention applies to both copies
 function mirrorRemove(name, snapName) {
   const root = mirrorRoot()
   if (!root) return
@@ -48,40 +42,22 @@ function mirrorRemove(name, snapName) {
     fs.rmSync(path.join(root, name, snapName), { force: true })
     fs.rmSync(path.join(root, name, snapName.replace(/\.tar\.gz$/, '.json')), { force: true })
   } catch {
-    /* a mirror that cannot be tidied is rediscovered at the next copy */
+    /* ignore: a mirror that can't be tidied is retried at the next copy */
   }
 }
 
 export const SCOPES = ['plugins', 'worlds', 'config', 'standard', 'full']
 
-/**
- * Things that must never go into a snapshot.
- *
- * <p>`session.lock` is the one that matters. Minecraft holds it open exclusively for as long as the
- * server runs, and bsdtar does not skip a file it cannot read - it gives up on the whole archive,
- * exits 1, and leaves a zero-byte .tar.gz behind. So every snapshot of a running server produced
- * nothing while reporting success.
- *
- * <p>Excluding it costs nothing: it is a lock, it is regenerated on the next start, and restoring
- * a stale one would be actively wrong.
- */
+// session.lock is held open exclusively while the server runs, and bsdtar gives up on the whole
+// archive (exit 1, zero-byte output) instead of skipping a file it can't read. It is regenerated
+// on start, so it is never worth backing up.
 export const EXCLUDE_ARGS = ['--exclude', 'session.lock']
 
-/**
- * Files under `members` that cannot be read right now, as archive paths.
- *
- * <p>session.lock is not the only one. Any plugin with an embedded database holds its file the
- * same way - LuckPerms' default H2 store is the common case - and bsdtar does not skip it either:
- * it stops writing at that file and exits 1, the code it also uses for harmless hot-snapshot
- * warnings. The result was an archive cut off partway through the plugins folder, with no world
- * in it, recorded as a successful backup of the right size to look plausible.
- *
- * <p>A file that cannot be read cannot be backed up by anything, so these are excluded and named
- * in the manifest's warnings: the rest of the server is still worth having, and the warning says
- * exactly what is missing. Windows only: POSIX locks are advisory and tar reads straight through
- * them. Asynchronous, because a world is thousands of files and the panel's event loop must not
- * stall on them.
- */
+// Files under `members` that can't be read right now, as archive paths. Plugins with an embedded
+// database (LuckPerms' H2 store) hold their file locked like session.lock, and bsdtar stops
+// writing at that file with exit 1, the same code it uses for harmless hot-snapshot warnings.
+// These are excluded and named in the manifest warnings. Windows only: POSIX locks are advisory.
+// Async so scanning thousands of world files doesn't stall the panel's event loop.
 async function lockedFiles(cwd, members) {
   if (process.platform !== 'win32') return []
   const locked = []
@@ -106,7 +82,7 @@ async function lockedFiles(cwd, members) {
       }
       return
     }
-    // Opening succeeds on a locked file; it is the read that fails, so one byte is read.
+    // open succeeds on a locked file, only the read fails
     if (!stat.isFile() || stat.size === 0 || path.basename(rel) === 'session.lock') return
     let handle
     try {
@@ -122,7 +98,7 @@ async function lockedFiles(cwd, members) {
   return locked.sort()
 }
 
-// A literal path as a bsdtar pattern: the glob characters are bracketed so they match themselves.
+// bracket glob characters so a literal path works as a bsdtar pattern
 const literalPattern = (p) => p.replace(/[[*?]/g, (c) => `[${c}]`)
 
 const ROOT_CONFIG_FILES = [
@@ -141,7 +117,7 @@ const ROOT_CONFIG_FILES = [
   'eula.txt',
 ]
 
-/** Directories that are large, regenerable, and pointless to snapshot. */
+// large, regenerable directories skipped by the full scope
 const FULL_EXCLUDES = ['cache', 'libraries', 'versions', 'logs']
 
 function backupDir(name) {
@@ -151,9 +127,8 @@ function backupDir(name) {
 }
 
 function reserveSnapshot(dir, base) {
-  // The reservation is also tar's output. It never ends in .tar.gz, so history
-  // cannot offer a partially written archive to restore. Exclusive creation
-  // coordinates the CLI, panel, and scheduled tasks even in the same second.
+  // The .pending file is also tar's output; it never ends in .tar.gz, so history can't offer a
+  // partial archive. Exclusive creation keeps the CLI, panel and scheduled tasks from colliding.
   for (let index = 0; ; index++) {
     const file = path.join(dir, `${base}${index ? `_${index + 1}` : ''}.tar.gz`)
     const pending = file + '.pending'
@@ -177,8 +152,7 @@ function membersFor(inst, scope) {
   const props = readProps(path.join(inst.dir, 'server.properties'))
   const exists = (p) => fs.existsSync(path.join(inst.dir, p))
 
-  // Mods are plugins' sibling on a Fabric server; the plugins scope covers both, because the
-  // scope names the ROLE (the server's content) rather than the folder.
+  // the plugins scope covers mods too (Fabric servers)
   const plugins = [...(exists('plugins') ? ['plugins'] : []), ...(exists('mods') ? ['mods'] : [])]
   const worlds = worldDirs(props).filter(exists)
   const config = [...ROOT_CONFIG_FILES.filter(exists), ...(exists('config') ? ['config'] : [])]
@@ -202,57 +176,66 @@ function membersFor(inst, scope) {
   }
 }
 
-export { runTar, tarBinary } from './tar.mjs'
+export { runTar, tarBinary, tarMember } from './tar.mjs'
 
-/**
- * Take a snapshot.
- *
- * <p>A RUNNING server is flushed first: `save-off` stops it writing chunks mid-archive, `save-all
- * flush` pushes everything it holds in memory to disk, and `save-on` afterwards hands the world
- * back. Without that a hot snapshot is a torn copy of a world mid-write. This lives here, not in
- * the callers, because it used to live in exactly one caller - the CLI's `backup` command - while
- * the panel's "back up now", the nightly scheduled backup, and the pre-upgrade snapshot all took
- * unflushed copies and the README promised otherwise. A flush that cannot be done (RCON down) is
- * reported in the result and the manifest rather than failing the snapshot: an unflushed copy is
- * still worth more than none.
- */
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null } = {}) {
-  // `members` narrows a snapshot to named paths inside the server folder - one config file before
-  // an assistant changes it - so restoring it puts back that file and touches nothing else.
-  const members = only ?? membersFor(inst, scope)
+// two minutes: well past an ordinary command's eight seconds, but short enough that a hung server
+// doesn't hold a backup for long. The env override is for tests.
+export const FLUSH_TIMEOUT_MS = Number(process.env.MCCTL_FLUSH_TIMEOUT_MS) > 0
+  ? Number(process.env.MCCTL_FLUSH_TIMEOUT_MS)
+  : 120 * 1000
+
+// Returns a warning when save-on could not be confirmed, else null. A refused connection means the
+// server stopped mid-backup and has nothing to turn on; a server that is up but silent may still
+// have saving off.
+async function turnSavingBackOn(inst) {
+  try {
+    await rconExec(inst, ['save-on'])
+    return null
+  } catch (err) {
+    if (err.refused) return null
+    return `autosave may still be off: save-on was not confirmed (${err.message}). Type save-on in the server's console if it is`
+  }
+}
+
+// The stack is updated along with the message because it is what gets printed for non-SpawnLoft
+// errors. Engines differ on when the stack's first line is built, so read it first to fix it.
+function appendToError(err, line) {
+  const before = err.message
+  const stack = typeof err.stack === 'string' ? err.stack : null
+  err.message = `${before}\n  ${line}`
+  if (stack && before) err.stack = stack.replace(before, () => err.message)
+}
+
+// A running server is flushed first (save-off, save-all flush, then save-on afterwards) so the
+// copy isn't torn mid-write. A flush that can't be done (RCON down) is reported in the result and
+// manifest rather than failing the snapshot.
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false } = {}) {
+  // `members` narrows a snapshot to named paths, e.g. one config file before it is changed. The
+  // owner's leave-out list applies to every normal backup but not to a copy of named files.
+  const leaveOut = only ? [] : excludePatterns(inst)
+  const members = (only ?? membersFor(inst, scope)).filter((m) => !leaveOut.includes(m)).map(tarMember)
   if (!members.length) fail(`nothing to back up for scope "${scope}" in ${inst.dir}`)
 
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''
   const base = `${slug}${scope}_${stamp()}`
   const dir = backupDir(inst.name)
 
-  // Two snapshots of the same instance running at once would each flip save-off/save-on around
-  // their own tar independently - whichever finishes first turns saving back on while the other's
-  // tar is still reading, handing it a torn copy. Serialized per instance rather than refused, so
-  // a scheduled task and a person clicking "Backup now" both still get their snapshot, just not
-  // at the same moment. Waits rather than failing fast: a backup can legitimately take minutes,
-  // and the point is to queue behind it, not to make the second request start over. Async so a
-  // second snapshot of the same instance requested from this same process - two panel requests,
-  // not just a separate CLI call - waits by yielding, not by freezing the one thread the first
-  // snapshot's own awaits need in order to ever finish and release it.
+  // Serialize snapshots per instance: if two overlapped, whichever finished first would turn
+  // saving back on while the other's tar was still reading. The second one queues rather than
+  // failing. The lock is async so a second request from this same process yields instead of
+  // blocking the thread the first snapshot needs to finish.
   const release = await acquireLockAsync(path.join(dir, '.snapshot.lock'), { timeoutMs: 30 * 60 * 1000 })
   try {
-    return await createSnapshotLocked(inst, { scope, label, running, taskId, flush }, { members, base, dir })
+    return await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut })
   } finally {
     release()
   }
 }
 
-async function createSnapshotLocked(inst, { scope, label, running, taskId, flush }, { members, base, dir }) {
-  /*
-    The databases this server is attached to go in too, as a `databases/` member holding one SQL
-    dump per database. Dumped into a scratch folder and added from there with -C, so the server's
-    own folder never holds a copy of its database. Only for the scopes that mean "the data":
-    plugins, worlds and config each name one kind of file, and a dump is none of them.
-
-    A database that is not running cannot be dumped. That is a warning in the manifest, not a
-    failed backup: the worlds are still worth taking, and the warning says what is missing.
-  */
+async function createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut }) {
+  // Attached databases go in as a `databases/` member with one SQL dump each, dumped into a
+  // scratch folder and added with -C so the server folder never holds them. Only for the standard
+  // and full scopes. A database that isn't running becomes a manifest warning, not a failure.
   let dumps = { dumped: [], skipped: [] }
   let dumpDir = null
   if (scope === 'standard' || scope === 'full') {
@@ -267,11 +250,25 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
   const dumpArgs = dumps.dumped.length ? ['-C', dumpDir, 'databases'] : []
   const archived = dumps.dumped.length ? [...members, 'databases'] : members
 
+  // save-off may take effect even if its reply never arrives (timeout, cut socket), so this is
+  // set before the call and saving is owed back from then on.
+  let savingMayBeOff = false
+  let saveOnWarning = null
   let flushed = false
   let flushWarning = null
   if (running && flush) {
     try {
-      await rconExec(inst, ['save-off', 'save-all flush'])
+      try {
+        savingMayBeOff = true
+        await rconExec(inst, ['save-off'])
+      } catch (err) {
+        // failed before anything was sent (no RCON, wrong password), so saving can't be off
+        if (err.unsent) savingMayBeOff = false
+        throw err
+      }
+      // longer timeout than ordinary commands, and no retry: a flush that timed out would only
+      // make the backup wait as long again
+      await rconExec(inst, ['save-all flush'], { timeout: FLUSH_TIMEOUT_MS, retryTimeouts: false })
       flushed = true
     } catch (err) {
       flushWarning = `could not flush the world before the snapshot (${err.message}); the copy may be torn`
@@ -285,29 +282,21 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
     let code
     try {
       reservation = reserveSnapshot(dir, base)
-      // After the flush, so the files are checked in the state tar will find them.
+      // after the flush, so files are checked in the state tar will find them
       skipped = await lockedFiles(inst.dir, members)
-      const skipArgs = skipped.flatMap((f) => ['--exclude', literalPattern(f)])
+      const skipArgs = [...skipped.flatMap((f) => ['--exclude', literalPattern(f)]), ...leaveOut.flatMap((p) => ['--exclude', p])]
       ;({ stderr, code } = await runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...skipArgs, ...members, ...dumpArgs], inst.dir))
     } finally {
-      // save-on whether or not tar succeeded: leaving a live server with saving off is worse than
-      // any failed backup.
-      if (flushed) {
-        try {
-          await rconExec(inst, ['save-on'])
-        } catch {
-          /* the server may have stopped mid-backup; nothing is left to turn back on */
-        }
-      }
+      // save-on even if tar or the flush failed; a live server left with saving off is worse
+      // than a failed backup
+      if (savingMayBeOff) saveOnWarning = await turnSavingBackOn(inst)
       if (dumpDir) fs.rmSync(dumpDir, { recursive: true, force: true })
     }
 
     const { file, pending, manifestFile } = reservation
     const size = fs.statSync(pending).size
-    // An empty archive is not a snapshot, and this one is load-bearing: rebuild and delete both take
-    // one "first" and both are safe only if it exists. bsdtar reports a locked file as exit 1, which
-    // is deliberately tolerated above because a hot snapshot legitimately skips things - so without
-    // this check a failure that produced nothing at all would be recorded as a successful backup.
+    // Load-bearing: rebuild and delete take a snapshot first and are only safe if it exists. Exit 1
+    // is tolerated above, so without this an empty result would be recorded as a good backup.
     if (size === 0) {
       const said = stderr.trim().split(/\r?\n/)[0]
       fail(
@@ -315,10 +304,8 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
           (said ? `\n  tar said: ${said}` : ''),
       )
     }
-    // Exit 1 is tolerated above, but it is also how bsdtar reports giving up partway through - a
-    // file that became locked after the check, or anything else it could not read. So an archive
-    // written with warnings is read back before it is published. A clean exit means tar read
-    // everything, and a large world is not read twice for nothing.
+    // Exit 1 is also how bsdtar reports giving up partway (e.g. a file locked after the check), so
+    // an archive written with warnings is read back before publishing. A clean exit skips this.
     if (code !== 0) {
       const check = await verifyArchive(reservation.pending, archived, dumps.dumped.map((d) => d.file))
       if (!check.ok) {
@@ -333,24 +320,23 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
       instance: inst.name,
       scope,
       label,
-      // Which scheduled task produced this, so its retention limit governs its own snapshots
-      // and nobody else's. Null for anything a person asked for directly.
+      // scheduled task that produced this (its retention applies), null for manual snapshots
       taskId,
       members: archived,
-      // The dumps, by file inside the archive, so a restore knows what to import and verify knows
-      // what to look for. Empty when the server is attached to nothing.
+      // dumps by file inside the archive
       databases: dumps.dumped,
+      ...(leaveOut.length ? { excluded: leaveOut } : {}),
       sourceDir: inst.dir,
       createdAt: new Date().toISOString(),
       size,
       serverWasRunning: running,
       flushed,
-      // Files left out because another program held them locked, by archive path.
+      // locked files left out, by archive path
       skipped,
-      // bsdtar emits an undescribed "tar: (null)" (or "tar.exe: (null)") alongside exit 1 when it
-      // meets a locked file. That carries no signal.
+      // bsdtar prints a bare "tar: (null)" with exit 1 on a locked file; filtered out below
       warnings: [
         ...(flushWarning ? [flushWarning] : []),
+        ...(saveOnWarning ? [saveOnWarning] : []),
         ...dumps.skipped.map((d) => `database ${d.database} on ${d.service} not included: ${d.reason}`),
         ...skipped.map((f) => `${f} not included: another program has it locked, usually the running server`),
         ...stderr
@@ -360,16 +346,20 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
       ].slice(0, 10),
     }
     writeJson(manifestFile, manifest)
-    // Both are on the same filesystem. History sees the final filename only after
-    // tar has closed it and its complete manifest is already available.
+    // same filesystem; history only sees the final name once tar is done and the manifest exists
     fs.renameSync(pending, file)
     published = true
     const { mirrored, mirrorError } = mirrorCopy(inst.name, file)
-    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning }
+    // narrowed or quiet snapshots are taken before a change, and that change records itself
+    if (!only && !quiet) activity.record(inst.name, 'backup', { detail: `${scope}${label ? ` (${label})` : ''}, ${humanBytes(size)}`, snapshot: path.basename(file) })
+    return { file, size, members: archived, databases: dumps.dumped, databasesSkipped: dumps.skipped, skipped, manifest, mirrored, mirrorError, flushed, flushWarning, saveOnWarning }
+  } catch (err) {
+    // put the save-on warning in the error the person is about to read
+    if (saveOnWarning && err instanceof Error) appendToError(err, saveOnWarning)
+    throw err
   } finally {
     if (reservation && !published) {
-      // Keep the name reserved until its metadata is gone. Releasing it first
-      // lets a simultaneous CLI backup claim the name while this cleanup runs.
+      // keep the name reserved until its metadata is gone, so a concurrent backup can't claim it
       fs.rmSync(reservation.manifestFile, { force: true })
       fs.rmSync(reservation.manifestFile + '.tmp', { force: true })
       fs.rmSync(reservation.pending, { force: true })
@@ -396,30 +386,32 @@ export function listSnapshots(name) {
         label: manifest.label ?? '',
         taskId: manifest.taskId ?? null,
         members: manifest.members ?? [],
+        locked: manifest.locked === true,
+        note: manifest.note ?? null,
+        excluded: manifest.excluded ?? [],
         databases: manifest.databases ?? [],
       }
     })
     .sort((a, b) => b.mtime - a.mtime)
 }
 
-/**
- * When the newest snapshot of a server was taken, or null if it has none.
- *
- * <p>For the panel's overview, which asks this of every server at once: the archives' own times
- * and nothing else - no manifests read, no folder made for a server that has never been backed up -
- * and asynchronous, because it runs on the panel's request path.
- */
-export async function newestSnapshotAt(name) {
+// Newest snapshot time and how many there are. Used by the panel overview for every server at
+// once, so it only stats archives: no manifests, no folder created, async.
+export async function snapshotSummary(name) {
   const dir = path.join(BACKUPS_DIR, name)
   let files
   try {
     files = (await fs.promises.readdir(dir)).filter((f) => f.endsWith('.tar.gz'))
   } catch {
-    return null
+    return { newestAt: null, count: 0 }
   }
   const times = await Promise.all(files.map((f) => fs.promises.stat(path.join(dir, f)).then((s) => s.mtimeMs, () => 0)))
   const newest = Math.max(0, ...times)
-  return newest || null
+  return { newestAt: newest || null, count: times.filter(Boolean).length }
+}
+
+export async function newestSnapshotAt(name) {
+  return (await snapshotSummary(name)).newestAt
 }
 
 export function resolveSnapshot(name, ref) {
@@ -436,24 +428,24 @@ export function resolveSnapshot(name, ref) {
   fail(`no snapshot matching "${ref}" for "${name}"`)
 }
 
-/**
- * Whether a snapshot would restore: the whole archive read back and checked against its manifest.
- *
- * <p>Separate from restoreSnapshot so a preview can say it before anyone confirms.
- */
+// separate from restoreSnapshot so a preview can check before anyone confirms
 export function checkRestorable(snapshot) {
   return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
 }
 
-export async function restoreSnapshot(inst, snapshot) {
+export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = false } = {}) {
   if (!fs.existsSync(inst.dir)) fail(`instance directory is missing: ${inst.dir}`)
+  if (clean && !(snapshot.members ?? []).some((m) => m !== 'databases')) {
+    fail(`${snapshot.name} does not record what it holds, so there is nothing it can safely clear first`)
+  }
+  // a clean restore deletes what the manifest names, so a manifest listing "../x" must not be trusted
+  const outside = clean ? (snapshot.members ?? []).find((m) => m !== 'databases' && safeRelativePath(m) === null) : undefined
+  if (outside !== undefined) {
+    fail(`${snapshot.name} lists "${outside}", which is not inside the server folder, so it cannot clear anything first; nothing was changed`)
+  }
 
-  // Checked before a single file is touched. Extraction overwrites in place and cannot be undone,
-  // so an archive that stops partway - as every hot snapshot of a server with a locked plugin
-  // database did before that was fixed, and as a disk error can do to any archive - would replace
-  // the start of the server with its old copy and leave the rest as it was: a server that is
-  // neither the backup nor what it replaced. "latest" makes that the default choice whenever the
-  // newest snapshot is the broken one.
+  // Check before touching any file: extraction overwrites in place, so an archive that stops
+  // partway would leave a server that is neither the backup nor what it replaced.
   const check = await checkRestorable(snapshot)
   if (!check.ok) {
     fail(`${snapshot.name} would not restore cleanly, so nothing was changed.\n  ` +
@@ -461,8 +453,22 @@ export async function restoreSnapshot(inst, snapshot) {
       `\n  Choose an older snapshot; "spawnloft verify ${inst.name} --all" checks every one.`)
   }
 
-  // runTar accepts exit 1 because bsdtar uses it for warnings while creating an archive. Reading
-  // one, it means the archive did not read, so here it is a failure like any other.
+  // A clean restore clears what the snapshot holds first, since an ordinary restore only adds and
+  // overwrites. What gets cleared is snapshotted whole (including leave-out paths) so the clean
+  // restore can itself be undone.
+  let safety = null
+  if (clean) {
+    const present = snapshot.members
+      .filter((m) => m !== 'databases')
+      .filter((m) => fs.existsSync(path.join(inst.dir, ...m.split(/[\\/]/))))
+    if (present.length) {
+      const res = await createSnapshot(inst, { scope: 'files', label: 'pre-restore', members: present, flush: false })
+      safety = path.basename(res.file)
+      for (const m of present) await fs.promises.rm(path.join(inst.dir, ...m.split(/[\\/]/)), { recursive: true, force: true })
+    }
+  }
+
+  // runTar tolerates exit 1 (a warning when creating), but when reading it means a bad archive
   const { code, stderr } = await runTar(['-xzf', snapshot.path], inst.dir)
   if (code !== 0) {
     fail(`restoring ${snapshot.name} stopped partway (tar exited ${code}` +
@@ -470,40 +476,76 @@ export async function restoreSnapshot(inst, snapshot) {
       `Some files in ${inst.dir} may already have been replaced; restore another snapshot before starting it.`)
   }
 
-  // The dumps came out with everything else, under databases/ in the server folder. Imported
-  // into the databases they came from, then removed from the folder; a dump that cannot be
-  // imported - its database gone, or stopped - is left where it is and named, so it can be
-  // imported by hand rather than lost.
+  // The dumps were extracted under databases/ in the server folder. Import them and remove them;
+  // a dump that can't be imported stays in place so it can be imported by hand.
   let databases = { imported: [], skipped: [] }
   const dumps = snapshot.databases ?? []
   if (dumps.length) {
     databases = await services.importDumps(inst.name, dumps, inst.dir)
-    for (const d of databases.imported) fs.rmSync(path.join(inst.dir, d.file), { force: true })
+    for (const d of databases.imported) {
+      const rel = safeRelativePath(d.file)
+      if (rel !== null) fs.rmSync(path.join(inst.dir, ...rel.split('/')), { force: true })
+    }
     const folder = path.join(inst.dir, 'databases')
     try {
       if (fs.existsSync(folder) && fs.readdirSync(folder).length === 0) fs.rmdirSync(folder)
     } catch {
-      /* a folder that will not go is not worth failing a restore that already happened */
+      /* ignore: not worth failing a restore that already happened */
     }
   }
-  return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases }
+  if (!quiet) activity.record(inst.name, 'restore', { detail: snapshot.name + (safety ? `, cleared first; how it was is kept as ${safety}` : ''), snapshot: safety })
+  return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases, safety }
 }
 
-/**
- * Read one archive back, end to end, and check it holds what it is supposed to.
- *
- * <p>A backup only actually exists at restore time - until then it is a file nothing has read
- * since the day it was written. Listing with -t decompresses every block, so the gzip checksums
- * are genuinely checked: this is not a stricter test than restoring, it IS restoring, minus the
- * writes. Any complaint here is the complaint a restore would make on the day it mattered.
- *
- * <p>The listing is then compared against the manifest's top-level members. That catches the
- * other way a snapshot lies: an archive that reads back perfectly but is missing a world,
- * because something held it locked on the night it was taken.
- *
- * <p>Unlike creation, a non-zero exit here is always a failure. runTar tolerates exit 1 because
- * bsdtar uses it for hot-snapshot warnings; on a read, exit 1 is how corruption reports itself.
- */
+function manifestOf(snap) {
+  return readJson(snap.path.replace(/\.tar\.gz$/, '.json'), {})
+}
+
+function updateManifest(snap, patch) {
+  const file = snap.path.replace(/\.tar\.gz$/, '.json')
+  // older snapshots have no manifest; create one for the lock/note
+  writeJson(file, { ...readJson(file, {}), ...patch })
+}
+
+// a locked snapshot is never deleted by retention or the Delete button until unlocked
+export function setSnapshotLocked(name, ref, locked) {
+  const snap = resolveSnapshot(name, ref)
+  updateManifest(snap, { locked: Boolean(locked) })
+  activity.record(name, locked ? 'backup-lock' : 'backup-unlock', { detail: snap.name })
+  return { name: snap.name, locked: Boolean(locked) }
+}
+
+// short note shown beside the snapshot name, e.g. "before the 1.21 upgrade"
+export function setSnapshotNote(name, ref, note) {
+  const snap = resolveSnapshot(name, ref)
+  const clean = String(note ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || null
+  updateManifest(snap, { note: clean })
+  activity.record(name, 'backup-note', { detail: `${snap.name}: ${clean ?? '(note removed)'}` })
+  return { name: snap.name, note: clean }
+}
+
+export function excludePatterns(inst) {
+  return Array.isArray(inst.backupExclude) ? inst.backupExclude : []
+}
+
+// Leave-out list: paths inside the server folder, one per line, optional * wildcards
+// ("plugins/dynmap/web", "*.log"). No absolute paths, no "..", not the whole folder.
+export function cleanExcludePatterns(input) {
+  const lines = (Array.isArray(input) ? input : String(input ?? '').split(/\r?\n/))
+    .map((l) => String(l).trim().replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, ''))
+    .filter((l) => l && !l.startsWith('#'))
+  if (lines.length > 40) fail('keep the list to 40 lines')
+  for (const l of lines) {
+    if (l.length > 200) fail(`"${l.slice(0, 40)}..." is too long`)
+    if (l.startsWith('/') || /^[a-z]:/i.test(l) || l.split('/').includes('..')) fail(`"${l}" must be a path inside the server folder`)
+    if (l === '*' || l === '**' || l === '.') fail(`"${l}" would leave out everything`)
+  }
+  return [...new Set(lines)]
+}
+
+// Reads the archive back with -t, which decompresses every block and so checks the gzip
+// checksums, then compares the listing to the manifest's top-level members (catches an archive
+// that reads fine but lacks a world). Any non-zero exit is a failure here, unlike creation.
 export async function verifyArchive(file, expectedMembers = [], expectedFiles = []) {
   const problems = []
   let size = 0
@@ -518,8 +560,7 @@ export async function verifyArchive(file, expectedMembers = [], expectedFiles = 
 
   let entries = 0
   const roots = new Set()
-  // Every entry, kept only when a caller asked about specific files: the database dumps have to
-  // be there by name, not merely under a folder that exists.
+  // every entry, kept only when specific files are expected (database dumps must be there by name)
   const files = expectedFiles.length ? new Set() : null
   const sawEntry = (line) => {
     const entry = line.trim().replace(/\\/g, '/')
@@ -545,7 +586,8 @@ export async function verifyArchive(file, expectedMembers = [], expectedFiles = 
         reject(new Error(err.code === 'ENOENT'
           ? 'tar was not found on PATH (Windows 10/11 ships tar.exe in System32)'
           : err.message)))
-      child.on('exit', (code) => {
+      // 'close', not 'exit': exit can fire while the listing is still in the stdout pipe
+      child.on('close', (code) => {
         sawEntry(tail)
         if (code === 0) resolve()
         else reject(new Error(stderr.trim().split(/\r?\n/)[0] || `tar exited ${code}`))
@@ -558,8 +600,7 @@ export async function verifyArchive(file, expectedMembers = [], expectedFiles = 
   let missing = []
   if (!problems.length) {
     if (!entries) problems.push('the archive reads back but holds no entries')
-    // Only checked when the walk succeeded: a truncated archive's partial listing would report
-    // every later member missing, which buries the actual finding under its consequences.
+    // skipped when the read failed: a truncated listing would report every later member missing
     missing = expectedMembers.filter((m) => !roots.has(String(m).replace(/\\/g, '/').split('/')[0]))
     for (const member of missing) {
       problems.push(`the manifest lists "${member}" but the archive does not contain it`)
@@ -578,51 +619,39 @@ export async function verifyArchive(file, expectedMembers = [], expectedFiles = 
 export async function verifySnapshot(name, ref) {
   const snap = resolveSnapshot(name, ref)
   const result = await verifyArchive(snap.path, snap.members, (snap.databases ?? []).map((d) => d.file))
-  // No manifest means the member check was vacuous, not that it passed. Said, so an "ok" on a
-  // manifest-less archive is read at its actual strength.
+  // without a manifest the member check proves nothing, so report that
   const hasManifest = fs.existsSync(snap.path.replace(/\.tar\.gz$/, '.json'))
   return { snapshot: snap, hasManifest, ...result }
 }
 
-/**
- * Delete one snapshot, and the manifest that describes it.
- *
- * <p>Both or neither: a manifest without its archive is a row in the history that cannot be
- * restored, and an archive without its manifest loses the record of what is inside it.
- */
+// removes the archive and its manifest together
 export function removeSnapshot(name, ref) {
   const snap = resolveSnapshot(name, ref)
+  if (manifestOf(snap).locked) fail(`${snap.name} is locked. Unlock it first if it really should go.`)
   fs.rmSync(snap.path, { force: true })
   fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
   mirrorRemove(name, snap.name)
+  activity.record(name, 'backup-delete', { detail: snap.name })
   return { removed: snap.name, size: snap.size }
 }
 
-/**
- * Trim a server's snapshots down to a limit.
- *
- * <p>`only` narrows it to snapshots carrying one label, and the scheduler always passes it.
- * Retention is a rule about the automatic backups a schedule produces, not a licence to delete
- * everything else in the folder - and everything else is where the important ones live. A
- * `pre-rebuild` snapshot is the single copy of a world taken before it was wiped, and a `manual`
- * one was taken because somebody was about to try something. An hourly task set to keep 5 would
- * have deleted both within five hours of them being made.
- */
+// `only` limits pruning to one label and the scheduler always passes it: retention covers the
+// automatic backups a schedule makes, not pre-rebuild or manual snapshots.
 export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) {
+  if (!Number.isInteger(keep) || keep < 1) throw new UserError('keep must be a whole number of at least 1')
   const all = listSnapshots(name).filter((s) => {
     if (only && s.label !== only) return false
-    // A limit belongs to the task that set it. Two scheduled backups on one server - a nightly
-    // keeping 7 and a weekly archive keeping 8 - were drawing from the same pool, so whichever ran
-    // next applied its own number to the other's snapshots and the smaller limit always won. The
-    // weekly archive could never accumulate eight weeks of anything.
+    // a limit applies only to the task that set it
     if (taskId && s.taskId !== taskId) return false
     return true
   })
-  const remove = all.slice(keep)
+  // locked snapshots neither count toward the limit nor get removed by it
+  const remove = all.filter((s) => !s.locked).slice(keep)
   for (const snap of remove) {
     fs.rmSync(snap.path, { force: true })
     fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
     mirrorRemove(name, snap.name)
   }
+  if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} old snapshot${remove.length === 1 ? '' : 's'} removed, keeping ${keep}` })
   return remove
 }

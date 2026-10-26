@@ -1,10 +1,5 @@
-/**
- * Purpur downloads, against api.purpurmc.org.
- *
- * <p>A Paper fork, served the way Paper is: versions, builds per version, one jar per build, an
- * md5 beside it. The API lists versions oldest-first and builds oldest-first; both are reversed
- * here so "the first one" means the newest everywhere in mcctl.
- */
+// Purpur downloads from api.purpurmc.org. The API lists versions and builds oldest-first; both are
+// reversed here so the first entry is the newest everywhere in mcctl.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -15,13 +10,12 @@ import { fetchJson, downloadFile } from './download.mjs'
 const API = 'https://api.purpurmc.org/v2/purpur'
 const LABEL = 'the Purpur API'
 
-/** Every Minecraft version Purpur publishes, newest first. */
 export async function versions() {
   const data = await fetchJson(API, { label: LABEL })
   return [...(data.versions ?? [])].reverse()
 }
 
-/** Build ids for a version, newest first, and which one the project calls latest. */
+// newest first, plus the build the project calls latest
 export async function builds(version) {
   const data = await fetchJson(`${API}/${encodeURIComponent(version)}`, { label: LABEL })
   const all = [...(data.builds?.all ?? [])].reverse()

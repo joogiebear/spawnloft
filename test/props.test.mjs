@@ -8,8 +8,6 @@ import { parseProps, writeProps, readProps, worldDirs } from '../src/props.mjs'
 
 const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-props-'))
 
-// ---- parsing ---------------------------------------------------------------
-
 test('comments, blanks and lines with no equals are skipped', () => {
   const map = parseProps('#Minecraft server properties\n!legacy comment\n\nnot a pair\nserver-port=25565\n')
   assert.deepEqual([...map], [['server-port', '25565']])
@@ -23,8 +21,6 @@ test('the key is trimmed; the value is kept verbatim after the first equals', ()
 test('both line endings parse the same', () => {
   assert.deepEqual(parseProps('a=1\r\nb=2\r\n'), parseProps('a=1\nb=2\n'))
 })
-
-// ---- writing ---------------------------------------------------------------
 
 const ORIGINAL = [
   '#Minecraft server properties',
@@ -74,8 +70,6 @@ test('writing to a file that does not exist yet creates it', () => {
 test('reading a missing file is an empty map, not an error', () => {
   assert.deepEqual([...readProps(path.join(scratch(), 'nope.properties'))], [])
 })
-
-// ---- world names -----------------------------------------------------------
 
 test('world directories follow level-name, with a fallback', () => {
   assert.deepEqual(worldDirs(new Map([['level-name', 'rpg']])), ['rpg', 'rpg_nether', 'rpg_the_end'])

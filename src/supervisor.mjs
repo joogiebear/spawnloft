@@ -5,19 +5,16 @@ import { fileURLToPath } from 'node:url'
 import { getInstance, assertInstanceDir, updateInstance, isDatabase } from './registry.mjs'
 import * as java from './java.mjs'
 import { mcVersionOf } from './plugins.mjs'
-import { readState, clearState, controlRequest } from './control.mjs'
+import { readState, clearState, controlRequest, isActiveStatus } from './control.mjs'
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
-import { patternsFor } from './ready.mjs'
+import { patternsFor, scanConsole } from './ready.mjs'
+import * as activity from './activity.mjs'
 
 const DAEMON = path.join(path.dirname(fileURLToPath(import.meta.url)), 'daemon.mjs')
 
-/**
- * The registry is the source of truth for ports and RCON. Push it into
- * server.properties before every launch so editing the file by hand can't
- * silently desync an instance from what mcctl thinks it is.
- */
+// The registry is the source of truth for ports and RCON; pushed into server.properties on every launch.
 export function syncProps(inst) {
   const file = path.join(inst.dir, 'server.properties')
   const updates = {
@@ -25,7 +22,6 @@ export function syncProps(inst) {
     'enable-rcon': 'true',
     'rcon.port': String(inst.rcon.port),
     'rcon.password': inst.rcon.password,
-    // LAN-only by design: RCON must never listen on a routable interface.
     'broadcast-rcon-to-ops': 'true',
   }
   if (inst.bind) updates['server-ip'] = inst.bind
@@ -44,15 +40,10 @@ export function assertEula(inst) {
   }
 }
 
-/**
- * Make sure the Java a server is about to run on can actually be run.
- *
- * <p>Checked here, before the daemon is spawned, because the daemon's answer to a Java it cannot
- * find is "spawn java ENOENT" in a state file, fifteen seconds later. A server on the bare name
- * `java` whose PATH has stopped resolving it - the common case is the desktop app started before
- * Java was installed - is moved onto the best Java found elsewhere on the machine, and the move
- * is recorded so it holds. A server pointed at an explicit path that has gone is refused by name.
- */
+// Checked before the daemon is spawned, since a missing Java there only surfaces as "spawn java
+// ENOENT" in the state file seconds later. A server on the bare name `java` that PATH no longer
+// resolves is moved to the best Java found elsewhere (and the move is saved); one pointed at an
+// explicit path that has gone is refused.
 async function ensureJava(inst, { force = false } = {}) {
   const bin = inst.java || 'java'
   // A script standing in for the JVM (the lifecycle tests) is run by node, not asked its version.
@@ -60,10 +51,8 @@ async function ensureJava(inst, { force = false } = {}) {
   const needs = java.requiredMajor(mcVersionOf(inst))
   const state = await java.probe(bin)
   if (state.found) {
-    // Runs, but is certainly too old for this version: the class files will not load, and the
-    // crash would say so in a stack trace fifteen seconds from now. A server on the bare name
-    // is moved to a Java that fits, if one is installed; a server someone pointed at a Java of
-    // their own is refused by name, with the way out - or started anyway with --force.
+    // Too old for this version: the class files won't load. A bare `java` is moved to one that
+    // fits if installed; an explicit path is refused unless --force.
     if (!needs || state.major == null || state.major >= needs || force) return inst
     if (bin === 'java') {
       const fit = await java.javaFor(needs)
@@ -86,12 +75,25 @@ async function ensureJava(inst, { force = false } = {}) {
   return updateInstance(inst.name, { java: fallback })
 }
 
-export async function start(name, { wait = true, timeout = 180000, sync = true, force = false } = {}) {
+// Only records activity once a daemon was actually launched; a refused start changed nothing.
+export async function start(name, options = {}) {
+  const attempt = { launched: false }
+  try {
+    const out = await launch(name, options, attempt)
+    const failed = out.failed || out.timedOut
+    activity.record(name, 'start', failed ? { ok: false, detail: out.reason ?? 'had not finished starting when SpawnLoft stopped waiting' } : {})
+    return out
+  } catch (err) {
+    if (attempt.launched) activity.record(name, 'start', { ok: false, detail: err.message })
+    throw err
+  }
+}
+
+async function launch(name, { wait = true, timeout = 180000, sync = true, force = false } = {}, attempt = {}) {
   let inst = getInstance(name)
   if (inst.external) fail(`"${name}" is a database that runs elsewhere (${inst.host ?? '127.0.0.1'}:${inst.port}); it is not started or stopped from here`)
   assertInstanceDir(inst)
-  // The EULA, Java and server.properties are Minecraft's; a database has an engine instead, and
-  // its launch spec is what checks that the engine is there.
+  // EULA, Java and server.properties are Minecraft's; a database's launch spec checks its engine.
   const database = isDatabase(inst)
   if (!database) {
     assertEula(inst)
@@ -100,11 +102,9 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
 
   fs.mkdirSync(runDir(name), { recursive: true })
 
-  // The window this closes: the status check just below reads "not running", but nothing stopped
-  // a second start() - another CLI call, the panel, a scheduled task - from reading the very same
-  // thing microseconds earlier and already spawning its own daemon. Held from the check through
-  // the daemon publishing its own state (or failing to), the same span the race actually spans;
-  // released well before `wait`'s much longer run-until-ready, which readState already guards.
+  // Without this, two concurrent starts (CLI, panel, scheduler) could both read "not running"
+  // and each spawn a daemon. Held from the status check until the daemon publishes its state,
+  // and released before the much longer wait for ready.
   const release = acquireLock(path.join(runDir(name), 'start.lock'), { mode: 'fail' })
   if (!release) fail(`"${name}" is already being started by another request - wait for it to finish.`)
 
@@ -120,8 +120,7 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
       )
     }
     if (status === 'stale') clearState(name)
-    // A failure record from a previous attempt would otherwise be read as this attempt's failure, so
-    // a server that had one bad start could never be started again without deleting a file by hand.
+    // A failure record from a previous attempt would be read as this attempt's failure.
     if (state?.error) clearState(name)
 
     if (sync && !database) syncProps(inst)
@@ -131,26 +130,21 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
       stdio: 'ignore',
       windowsHide: true,
       cwd: path.dirname(DAEMON),
-      // The desktop app runs this code INSIDE Electron, where process.execPath is mcctl.exe rather
-      // than node. Without this flag that spawn re-launches the whole application - a second hidden
-      // copy of the GUI, no daemon, and a fifteen-second wait ending in "did not come up". Plain
-      // node ignores the variable, so the CLI path is unaffected.
+      // In the desktop app process.execPath is the Electron binary, not node; without this flag
+      // the spawn would relaunch the whole app instead of the daemon. Plain node ignores it.
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
     })
     child.unref()
+    attempt.launched = true
 
-    // Wait for the daemon to publish its state file before reporting success.
     const deadline = Date.now() + 15000
     while (Date.now() < deadline) {
       await sleep(150)
       const cur = readState(name)
-      // A stopped daemon leaves its state and console behind. On a quick restart,
-      // those can still describe the previous launch while this child is booting.
-      // Only this child's state can acknowledge this start (or report its failure).
+      // On a quick restart the state file can still describe the previous launch; only this
+      // child's state can acknowledge this start or report its failure.
       if (cur.state?.daemonPid !== child.pid) continue
-      // A daemon that failed during startup writes its reason and nothing else. Watching only for a
-      // successful launch meant waiting the full fifteen seconds and then reporting that nothing came
-      // up, when the answer had been sitting on disk since the first tick.
+      // A daemon that failed during startup writes its reason and nothing else.
       if (cur.state?.error) fail(`"${name}" could not start: ${cur.state.error}`)
       if (cur.state && cur.state.daemonPid && cur.state.startedAt) {
         live = cur
@@ -158,7 +152,7 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
       }
     }
     if (!live) {
-      // Naming a log file that was never written sends people looking for a file that is not there.
+      // Don't point at a log file that was never written.
       const log = daemonLog(name)
       fail(fs.existsSync(log)
         ? `"${name}" did not start - see ${log}`
@@ -175,18 +169,18 @@ export async function start(name, { wait = true, timeout = 180000, sync = true, 
   return { started: true, javaPid: live.state.javaPid, ...ready }
 }
 
-/** Tail the captured console until the server reports ready, dies, or we time out. */
+// Tails the captured console until the server reports ready, dies, or we time out.
 export async function waitForReady(name, timeout = 180000) {
   const file = consoleLog(name)
   const deadline = Date.now() + timeout
   let offset = 0
+  let carry = ''
   let patterns
   try {
     patterns = patternsFor(getInstance(name))
   } catch {
     patterns = patternsFor(null)
   }
-  const { ready: READY_RE, failed: FAILED_RE } = patterns
 
   while (Date.now() < deadline) {
     let text = ''
@@ -205,13 +199,10 @@ export async function waitForReady(name, timeout = 180000) {
     }
 
     if (text) {
-      if (READY_RE.test(text)) {
-        const m = READY_RE.exec(text)
-        return { ready: true, readyLine: m[0] }
-      }
-      if (FAILED_RE.test(text)) {
-        return { ready: false, failed: true, reason: FAILED_RE.exec(text)[0] }
-      }
+      const found = scanConsole(carry, text, patterns)
+      if (found.ready) return { ready: true, readyLine: found.ready }
+      if (found.failed) return { ready: false, failed: true, reason: found.failed }
+      carry = found.carry
     }
 
     const cur = readState(name)
@@ -254,14 +245,20 @@ export async function stop(name, { timeout = 90000 } = {}) {
   const res = await controlRequest(name, { op: 'stop', timeout }, { timeout: timeout + 30000 })
   if (!res.ok) fail(res.error || 'stop failed')
 
-  // The daemon outlives its java child by a moment while it flushes logs and
-  // releases the control pipe. Wait for it, or a following start races it for
-  // the pipe name and comes up with no control channel.
+  // The daemon outlives its java child briefly; wait for it, or a following start races it
+  // for the control pipe name.
   await waitForPidExit(state.daemonPid)
+  activity.record(name, 'stop')
   return res
 }
 
 export async function kill(name) {
+  const out = await forceStop(name)
+  if (!out.alreadyStopped) activity.record(name, 'kill')
+  return out
+}
+
+async function forceStop(name) {
   const { status, state } = readState(name)
   if (status === 'stopped' || status === 'stale') {
     clearState(name)
@@ -274,9 +271,7 @@ export async function kill(name) {
     return { forced: true, orphan: true }
   }
 
-  // Ask the daemon first so it can clean up after itself, but fall back to the
-  // pids when the control channel is unreachable - kill is the last resort and
-  // must never be the thing that cannot recover an instance.
+  // Ask the daemon first so it can clean up; fall back to the pids if the channel is unreachable.
   try {
     const res = await controlRequest(name, { op: 'kill' }, { timeout: 30000 })
     if (res.ok) {
@@ -298,14 +293,20 @@ export async function kill(name) {
 export async function sendConsole(name, line) {
   const res = await controlRequest(name, { op: 'send', line })
   if (!res.ok) throw new UserError(res.error || 'send failed')
+  activity.record(name, 'command', { detail: line })
   return res
 }
 
+/** Up and answering a command; not a check for whether it is safe to delete. */
 export function isRunning(name) {
   return readState(name).status === 'running'
 }
 
-/** Read the last `count` lines of an instance's captured console. */
+/** Running, shutting down or orphaned: anything that still owns the instance's files. */
+export function isActive(name) {
+  return isActiveStatus(readState(name).status)
+}
+
 export function tailLog(name, count = 60) {
   const file = consoleLog(name)
   if (!fs.existsSync(file)) return []
@@ -321,7 +322,6 @@ export function tailLog(name, count = 60) {
   return lines.slice(-count)
 }
 
-/** Follow the captured console, invoking onLine for each new line. */
 export function followLog(name, onLine, { from = null } = {}) {
   const file = consoleLog(name)
   let offset = from ?? (fs.existsSync(file) ? fs.statSync(file).size : 0)
@@ -370,8 +370,7 @@ export function statusOf(name) {
     exitCode: state?.exitCode ?? null,
     // True once the last run ended in a crash nobody asked for; the next start clears it.
     crashed: Boolean(state?.crashed),
-    // How many times crash guard has brought it back since it was started. Each comeback is a
-    // fresh launch, so startedAt is when the latest one happened.
+    // Crash-guard relaunches since start; startedAt is the latest launch.
     restarts: state?.restarts ?? 0,
     stoppedAt: state?.stoppedAt ?? null,
     lastError: state?.error ?? null,

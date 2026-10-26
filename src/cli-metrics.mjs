@@ -27,8 +27,8 @@ export function metricsCsv(data, header = true) {
     [csvField(data.instance), csvField(data.runId), row.timestamp, row.cpuPercent, row.rssMiB, data.cores].join(',') + '\n').join('')
 }
 
-/** A run change resets the cursor; trimming a history file does not. Timestamp is
- * unique at the sampler's ten-second cadence. It also handles a clock moving back. */
+// A run change resets the cursor; trimming the history file does not. Timestamps are unique
+// at the sampler's ten-second cadence, and a clock moving backwards also counts as a reset.
 export function metricCursor() {
   let runId
   let lastAt = null
@@ -38,8 +38,7 @@ export function metricCursor() {
     const reset = runId !== undefined && (runId !== data.runId || (newest !== null && lastAt !== null && newest < lastAt))
     if (runId === undefined || reset) { seen = new Set(); lastAt = null }
     const rows = data.samples.filter(row => !seen.has(row.at))
-    // A trim briefly truncates the file before rewriting it. An empty read during
-    // that window must not make every old row look new on the next poll.
+    // a trim briefly truncates the file; an empty read must not make every old row look new
     if (data.samples.length) seen = new Set(data.samples.map(row => row.at))
     runId = data.runId
     if (newest !== null) lastAt = newest
@@ -63,7 +62,7 @@ export async function cmdMetrics(positional, flags) {
   }
   const first = readMetrics(name, seconds)
   if (flags.output) {
-    // Exclusive creation protects previous test runs and arbitrary existing files.
+    // 'wx' so an existing file is never overwritten
     fs.writeFileSync(flags.output, metricsCsv(first), { flag: 'wx' })
     process.stderr.write(`Exported ${first.samples.length} measurements to ${flags.output}\n`)
     return

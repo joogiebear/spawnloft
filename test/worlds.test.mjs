@@ -21,8 +21,6 @@ function fakeInstance({ active = 'world' } = {}) {
   return { name: 'worlds-test-not-registered', dir }
 }
 
-// ---- listing ----------------------------------------------------------------
-
 test('worlds are folders with a level.dat; companions fold into their base row', async () => {
   const inst = fakeInstance({ active: 'rpg' })
   world(inst.dir, 'rpg')
@@ -41,8 +39,6 @@ test('a companion with no base world of its own is listed as a world', async () 
   world(inst.dir, 'orphan_nether')
   assert.deepEqual((await listWorlds(inst)).worlds.map((w) => w.name), ['orphan_nether'])
 })
-
-// ---- finding a world inside a download --------------------------------------
 
 test('the shallowest level.dat wins, however the download is wrapped', () => {
   const dir = scratch()
@@ -66,8 +62,6 @@ test('a nested backup can never win over the map itself', () => {
   world(path.join(dir, 'map', 'backups'), 'old-copy')
   assert.equal(findWorldRoot(dir), path.join(dir, 'map'))
 })
-
-// ---- importing --------------------------------------------------------------
 
 test('importing a folder copies the world in under the new name, lock stripped', async () => {
   const inst = fakeInstance()
@@ -97,8 +91,6 @@ test('a source with no world in it is a readable refusal', async () => {
   const inst = fakeInstance()
   await assert.rejects(() => importWorld(inst, scratch(), { name: 'nothing' }), /does not hold a world/)
 })
-
-// ---- switching and deleting -------------------------------------------------
 
 test('activate writes level-name; a non-world target is refused', async () => {
   const inst = fakeInstance({ active: 'world' })

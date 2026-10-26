@@ -4,8 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// The actual settings and HTTP boundary are exercised, with every path redirected
-// before importing the core. This must never change the developer's appearance.
+// every path is redirected before importing the core so this never touches the developer's real appearance settings
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-appearance-'))
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')

@@ -1,0 +1,476 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import crypto from 'node:crypto'
+import { parseProps, readProps, worldDirs } from './props.mjs'
+import { checkFormat, MANAGED_PROPS } from './config-files.mjs'
+import * as backup from './backup.mjs'
+import { createZip, extractZip, isZip } from './zip.mjs'
+import { runTar } from './tar.mjs'
+import { fail, humanBytes, isInside } from './util.mjs'
+import * as activity from './activity.mjs'
+
+// The owner's view of a server folder in the Files tool: every file, unlike the assistant's
+// text-only view in config-files.mjs. It keeps that module's confinement (nothing outside the
+// server folder, links included) and undo: every edit, overwrite and delete snapshots what it
+// replaces first.
+//
+// While the server runs, files it holds open (active worlds, its jar, folders it loads code
+// from) are not moved, replaced or deleted. Editing text is allowed everywhere.
+
+// Past this the editor is not offered and the file downloads instead.
+export const MAX_EDIT_BYTES = 2 * 1024 * 1024
+// A delete bigger than this asks before it copies: gzipping a whole world can take minutes.
+export const MAX_COPY_BYTES = 1024 * 1024 * 1024
+const MAX_SEARCH_RESULTS = 200
+const MAX_SEARCH_VISITS = 50000
+
+const FILE_NAME_BAD = /[<>:"|?*\u0000-\u001f]/
+
+function assertLinkStaysInside(base, full, rel) {
+  let real
+  try { real = fs.realpathSync(full) } catch { return }
+  if (!isInside(base, real)) fail(`${rel} leads outside the server folder`)
+}
+
+const toSlash = (p) => p.split(path.sep).join('/')
+
+// Resolves a panel path inside the server folder; '' is the folder itself. The target is not
+// followed if it is a link (deleting or renaming acts on the link), but its parent chain is, so a
+// linked folder leading out of the server can't be walked into.
+export function resolvePath(inst, relative, { mustExist = true, allowRoot = false } = {}) {
+  const raw = typeof relative === 'string' ? relative : ''
+  const clean = raw.trim().replace(/\\/g, '/').replace(/^\.\/+/, '').replace(/\/+$/, '')
+  if (clean.includes('\0') || path.isAbsolute(clean) || /^[a-z]:/i.test(clean) || clean.startsWith('/')) {
+    fail(`"${raw}" must be a path inside the server folder`)
+  }
+  const parts = clean.split('/').filter((p) => p && p !== '.')
+  if (parts.includes('..')) fail(`"${raw}" must stay inside the server folder`)
+  if (!parts.length && !allowRoot) fail('choose a file or folder inside the server folder')
+
+  const base = fs.realpathSync(inst.dir)
+  const full = path.join(base, ...parts)
+  const rel = parts.join('/')
+  let existing = parts.length ? path.dirname(full) : base
+  while (!fs.existsSync(existing)) existing = path.dirname(existing)
+  if (!isInside(base, fs.realpathSync(existing))) fail(`${rel} leads outside the server folder`)
+
+  let stat = null
+  try { stat = fs.lstatSync(full) } catch { /* not there */ }
+  if (mustExist && !stat) fail(`${rel || 'the server folder'} does not exist`)
+  return { base, full, rel, stat }
+}
+
+function checkName(name) {
+  const n = typeof name === 'string' ? name.trim() : ''
+  if (!n || n === '.' || n === '..' || n.includes('/') || n.includes('\\')) fail('a name is one file or folder name, with no slashes')
+  if (FILE_NAME_BAD.test(n) || /[. ]$/.test(n)) fail(`"${n}" is not a name a file can have here`)
+  if (n.length > 200) fail('that name is too long')
+  return n
+}
+
+// Lower-cased top-level names the running server holds; empty while stopped. `libraries` and
+// `versions` are Paper's own code. Loaded plugin jars are checked separately in assertFree.
+export function inUse(inst, running) {
+  if (!running) return new Set()
+  const props = readProps(path.join(inst.dir, 'server.properties'))
+  const names = [...worldDirs(props), 'libraries', 'versions', 'cache']
+  if (inst.jar) names.push(inst.jar.split(/[\\/]/)[0])
+  return new Set(names.map((n) => n.toLowerCase()))
+}
+
+// `removing`: the path goes away (deleted, or moved from), so the plugins or mods folder itself
+// counts too - it takes every jar the server loaded with it.
+function assertFree(inst, rel, running, doing, { removing = false } = {}) {
+  if (!running) return
+  const top = rel.split('/')[0].toLowerCase()
+  const busy = inUse(inst, true)
+  const loadedJar = /^(plugins|mods)\/[^/]+\.jar$/i.test(rel)
+  const jarFolder = removing && /^(plugins|mods)$/i.test(rel)
+  if (busy.has(top) || loadedJar || jarFolder || rel === '') {
+    fail(`${rel || 'the server folder'} is in use by the running server. Stop it first to ${doing} it.`)
+  }
+}
+
+export function listDir(inst, relative = '', { running = false } = {}) {
+  const { base, full, rel, stat } = resolvePath(inst, relative, { allowRoot: true })
+  assertLinkStaysInside(base, full, rel)
+  if (!stat.isDirectory() && !(stat.isSymbolicLink() && fs.statSync(full).isDirectory())) fail(`${rel} is not a folder`)
+  const busy = inUse(inst, running)
+  const entries = []
+  for (const d of fs.readdirSync(full, { withFileTypes: true })) {
+    const p = rel ? `${rel}/${d.name}` : d.name
+    let s
+    try { s = fs.lstatSync(path.join(full, d.name)) } catch { continue }
+    let type = s.isDirectory() ? 'dir' : s.isFile() ? 'file' : s.isSymbolicLink() ? 'link' : 'other'
+    if (type === 'link') {
+      // A link that stays inside reads as its target; one that leaves is shown but inert.
+      try {
+        const target = fs.realpathSync(path.join(full, d.name))
+        if (isInside(fs.realpathSync(inst.dir), target)) type = fs.statSync(target).isDirectory() ? 'dir' : 'file'
+      } catch { /* a dangling link stays a link */ }
+    }
+    const top = p.split('/')[0].toLowerCase()
+    entries.push({
+      name: d.name,
+      path: p,
+      type,
+      size: type === 'file' ? s.size : null,
+      modified: s.mtime.toISOString(),
+      inUse: running && (busy.has(top) || /^(plugins|mods)\/[^/]+\.jar$/i.test(p)),
+    })
+  }
+  entries.sort((a, b) => (a.type === 'dir') !== (b.type === 'dir')
+    ? (a.type === 'dir' ? -1 : 1)
+    : a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+  return { path: rel, entries }
+}
+
+const versionOf = (buf) => crypto.createHash('sha1').update(buf).digest('hex')
+
+// A file too big, or not text, comes back without its text and the panel offers a download.
+export async function readFile(inst, relative) {
+  const { base: root, full, rel } = resolvePath(inst, relative)
+  assertLinkStaysInside(root, full, rel)
+  const s = await fs.promises.stat(full)
+  if (!s.isFile()) fail(`${rel} is not a file`)
+  const base = { path: rel, size: s.size, modified: s.mtime.toISOString() }
+  if (s.size > MAX_EDIT_BYTES) return { ...base, text: null, reason: 'large' }
+  const buf = await fs.promises.readFile(full)
+  // A NUL early on means binary.
+  if (buf.subarray(0, 8192).includes(0)) return { ...base, text: null, reason: 'binary' }
+  return { ...base, text: buf.toString('utf8'), version: versionOf(buf) }
+}
+
+// Copies what is about to change on its own, so Backups can restore exactly it. Paths that
+// don't exist yet are skipped.
+async function snapshotFirst(inst, rels, label) {
+  const members = rels.filter((r) => fs.existsSync(path.join(inst.dir, ...r.split('/'))))
+  if (!members.length) return null
+  const snap = await backup.createSnapshot(inst, { scope: 'files', label, members, flush: false })
+  return path.basename(snap.file)
+}
+
+function atomicWrite(full, data) {
+  fs.mkdirSync(path.dirname(full), { recursive: true })
+  const tmp = `${full}.spawnloft-${process.pid}.tmp`
+  fs.writeFileSync(tmp, data)
+  try {
+    fs.renameSync(tmp, full)
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+}
+
+// `version` is what readFile reported; a save over a file that changed since is refused rather
+// than undoing that change. A tab in YAML and broken JSON are refused unless `force`, with a
+// code the panel turns into "Save anyway".
+export async function writeFile(inst, relative, { text, version = null, create = false, force = false } = {}) {
+  if (typeof text !== 'string') fail('text is required')
+  const { full, rel, stat } = resolvePath(inst, relative, { mustExist: !create })
+  if (create && stat) fail(`${rel} already exists`)
+  if (create) checkName(path.basename(rel))
+  if (stat && !stat.isFile()) fail(`${rel} is not a file`)
+  if (Buffer.byteLength(text) > MAX_EDIT_BYTES) fail(`that would make ${rel} over ${humanBytes(MAX_EDIT_BYTES)}`)
+
+  const beforeBuf = stat ? await fs.promises.readFile(full) : null
+  if (beforeBuf && version !== versionOf(beforeBuf)) {
+    const err = new Error(`${rel} has changed on disk since it was opened. Reload it to see the change, then make yours again.`)
+    err.userFacing = true
+    err.code = 'changed'
+    throw err
+  }
+  const before = beforeBuf ? beforeBuf.toString('utf8') : null
+
+  let after = text
+  // Restore the file's own line endings and byte-order mark, which a textarea drops.
+  if (before !== null && before.includes('\r\n') && !after.includes('\r\n')) after = after.replace(/\n/g, '\r\n')
+  if (before !== null && before.charCodeAt(0) === 0xfeff && after.charCodeAt(0) !== 0xfeff) after = '﻿' + after
+
+  if (rel.toLowerCase() === 'server.properties') {
+    const was = parseProps(before ?? '')
+    const now = parseProps(after)
+    const touched = MANAGED_PROPS.filter((k) => (was.get(k) ?? '').trim() !== (now.get(k) ?? '').trim())
+    if (touched.length) {
+      fail(`${touched.join(', ')} ${touched.length > 1 ? 'are' : 'is'} set by SpawnLoft at every start and would be put back. ` +
+        'Change the port and RCON in the server\'s Settings instead.')
+    }
+  }
+  if (!force) {
+    try {
+      checkFormat(rel, after)
+    } catch (err) {
+      err.code = 'format'
+      throw err
+    }
+  }
+
+  const snapshot = await snapshotFirst(inst, stat ? [rel] : [], 'file-edit')
+  // The copy takes a moment; don't clobber a write the server made meanwhile.
+  if (beforeBuf && versionOf(await fs.promises.readFile(full)) !== versionOf(beforeBuf)) {
+    fail(`${rel} changed while it was being copied; reload it and try again`)
+  }
+  atomicWrite(full, after)
+  activity.record(inst.name, stat ? 'file-edit' : 'file-create', { detail: rel, snapshot })
+  return { path: rel, version: versionOf(Buffer.from(after)), snapshot }
+}
+
+export function makeFolder(inst, parent, name) {
+  const { rel: dir } = resolvePath(inst, parent, { allowRoot: true })
+  const n = checkName(name)
+  const { full, rel, stat } = resolvePath(inst, dir ? `${dir}/${n}` : n, { mustExist: false })
+  if (stat) fail(`${rel} already exists`)
+  fs.mkdirSync(full)
+  activity.record(inst.name, 'folder-create', { detail: rel })
+  return { path: rel }
+}
+
+// Streamed to a temporary name beside the target, then renamed, so a server reading the folder
+// never sees half a jar. Replacing a file snapshots the old one first.
+export async function uploadFile(inst, parent, name, stream, { overwrite = false, running = false } = {}) {
+  const { rel: dir, stat: dirStat } = resolvePath(inst, parent, { allowRoot: true })
+  if (!dirStat.isDirectory()) fail(`${dir} is not a folder`)
+  // A dropped folder arrives file by file with its relative path ("Pack/sub/a.yml"); each
+  // segment gets the same checks as a typed name.
+  const segments = String(name ?? '').replace(/\\/g, '/').split('/').filter(Boolean)
+  if (!segments.length) fail('a file needs a name')
+  const n = segments.map(checkName).join('/')
+  const { full, rel, stat } = resolvePath(inst, dir ? `${dir}/${n}` : n, { mustExist: false })
+  if (stat && !overwrite) {
+    const err = new Error(`${rel} already exists`)
+    err.userFacing = true
+    err.code = 'exists'
+    throw err
+  }
+  if (stat && !stat.isFile()) fail(`${rel} is a folder; a file cannot replace it`)
+  // Adding a file is harmless to a running server; replacing one it holds open is not.
+  if (stat) assertFree(inst, rel, running, 'replace')
+
+  if (segments.length > 1) {
+    try {
+      fs.mkdirSync(path.dirname(full), { recursive: true })
+    } catch (err) {
+      fail(`could not make the folders for ${rel}: ${err.code === 'ENOTDIR' || err.code === 'EEXIST' ? 'a file is in the way' : err.message}`)
+    }
+  }
+  const tmp = `${full}.spawnloft-${process.pid}-${Date.now()}.part`
+  let size = 0
+  try {
+    await new Promise((resolve, reject) => {
+      const out = fs.createWriteStream(tmp)
+      stream.on('data', (c) => { size += c.length })
+      stream.on('error', reject)
+      out.on('error', reject)
+      out.on('finish', resolve)
+      stream.pipe(out)
+    })
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+  let snapshot = null
+  try {
+    snapshot = stat ? await snapshotFirst(inst, [rel], 'file-replace') : null
+    fs.renameSync(tmp, full)
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+  activity.record(inst.name, stat ? 'file-replace' : 'file-upload', { detail: `${rel} (${humanBytes(size)})`, snapshot })
+  return { path: rel, size, snapshot }
+}
+
+// Rename or move; `to` is the new path from the server folder. No snapshot: the old name is the undo.
+export function movePath(inst, from, to, { running = false } = {}) {
+  const src = resolvePath(inst, from)
+  const dstRaw = typeof to === 'string' ? to.trim().replace(/\\/g, '/') : ''
+  checkName(dstRaw.split('/').filter(Boolean).pop() ?? '')
+  const dst = resolvePath(inst, dstRaw, { mustExist: false })
+  if (dst.stat) fail(`${dst.rel} already exists`)
+  if (dst.rel === src.rel) fail('that is its name already')
+  if (dst.rel.toLowerCase().startsWith(src.rel.toLowerCase() + '/')) fail('a folder cannot be moved inside itself')
+  assertFree(inst, src.rel, running, 'move', { removing: true })
+  assertFree(inst, dst.rel, running, 'move into')
+  const parent = path.dirname(dst.full)
+  if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) fail(`${toSlash(path.relative(src.base, parent))} is not a folder`)
+  fs.renameSync(src.full, dst.full)
+  activity.record(inst.name, 'file-move', { detail: `${src.rel} to ${dst.rel}` })
+  return { from: src.rel, path: dst.rel }
+}
+
+async function sizeOf(full) {
+  const s = await fs.promises.lstat(full)
+  if (!s.isDirectory()) return s.size
+  let total = 0
+  for (const d of await fs.promises.readdir(full, { withFileTypes: true })) total += await sizeOf(path.join(full, d.name))
+  return total
+}
+
+// Deletes after taking a copy. Past MAX_COPY_BYTES (gzip would take minutes) it refuses with code
+// 'large' and the panel asks whether to delete without one.
+export async function deletePaths(inst, paths, { withoutCopy = false, running = false } = {}) {
+  if (!Array.isArray(paths) || !paths.length) fail('choose something to delete')
+  const targets = paths.map((p) => resolvePath(inst, p))
+  for (const t of targets) assertFree(inst, t.rel, running, 'delete', { removing: true })
+  // Drop paths already covered by a chosen parent folder.
+  const rels = [...new Set(targets.map((t) => t.rel))]
+    .filter((r, _, all) => !all.some((o) => o !== r && r.startsWith(o + '/')))
+
+  let snapshot = null
+  if (!withoutCopy) {
+    let bytes = 0
+    for (const r of rels) bytes += await sizeOf(path.join(inst.dir, ...r.split('/')))
+    if (bytes > MAX_COPY_BYTES) {
+      const err = new Error(`that is ${humanBytes(bytes)}; keeping a copy first would take a while and as much space again`)
+      err.userFacing = true
+      err.code = 'large'
+      err.bytes = bytes
+      throw err
+    }
+    snapshot = await snapshotFirst(inst, rels, 'file-delete')
+  }
+  for (const r of rels) await fs.promises.rm(path.join(inst.dir, ...r.split('/')), { recursive: true, force: true })
+  activity.record(inst.name, 'file-delete', { detail: rels.join(', ') + (withoutCopy ? ' (no copy kept)' : ''), snapshot })
+  return { deleted: rels, snapshot }
+}
+
+export async function archivePaths(inst, paths, name) {
+  if (!Array.isArray(paths) || !paths.length) fail('choose something to archive')
+  const targets = paths.map((p) => resolvePath(inst, p))
+  const dir = path.posix.dirname(targets[0].rel)
+  if (targets.some((t) => path.posix.dirname(t.rel) !== dir)) fail('archive things from one folder at a time')
+  let n = checkName(name || (targets.length === 1 ? targets[0].rel.split('/').pop() : 'archive'))
+  if (!/\.zip$/i.test(n)) n += '.zip'
+  const out = resolvePath(inst, dir === '.' ? n : `${dir}/${n}`, { mustExist: false })
+  if (out.stat) fail(`${out.rel} already exists`)
+  const cwd = dir === '.' ? out.base : path.join(out.base, ...dir.split('/'))
+  const tmp = `${out.full}.spawnloft-${process.pid}.part`
+  try {
+    await createZip(tmp, cwd, targets.map((t) => t.rel.split('/').pop()))
+    fs.renameSync(tmp, out.full)
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+  activity.record(inst.name, 'file-zip', { detail: out.rel })
+  return { path: out.rel, size: fs.statSync(out.full).size }
+}
+
+// Unpacks into a new folder beside the archive, never over existing files; merging is left to
+// the person afterwards.
+export async function extractArchive(inst, relative, { running = false } = {}) {
+  const src = resolvePath(inst, relative)
+  if (!src.stat.isFile()) fail(`${src.rel} is not a file`)
+  const lower = src.rel.toLowerCase()
+  const kind = lower.endsWith('.zip') || lower.endsWith('.mrpack') ? 'zip'
+    : lower.endsWith('.tar.gz') || lower.endsWith('.tgz') ? 'tgz' : null
+  if (!kind) fail(`${src.rel} is not a .zip or .tar.gz`)
+  const stem = src.rel.split('/').pop().replace(/\.(zip|mrpack|tar\.gz|tgz)$/i, '') || 'archive'
+  const dir = path.posix.dirname(src.rel)
+  let target = null
+  for (let i = 0; i < 100 && !target; i++) {
+    const candidate = (dir === '.' ? '' : dir + '/') + (i ? `${stem} (${i + 1})` : stem)
+    if (!fs.existsSync(path.join(src.base, ...candidate.split('/')))) target = candidate
+  }
+  if (!target) fail(`there are already too many folders named ${stem}`)
+  assertFree(inst, target, running, 'extract into')
+
+  const full = path.join(src.base, ...target.split('/'))
+  const staging = fs.mkdtempSync(path.join(path.dirname(full), '.spawnloft-extract-'))
+  try {
+    if (kind === 'zip') {
+      if (!isZip(src.full)) fail(`${src.rel} is not a zip archive`)
+      await extractZip(src.full, staging)
+    } else {
+      const { code, stderr } = await runTar(['-xzf', src.full, '-C', staging], staging)
+      if (code !== 0) fail(`could not unpack ${src.rel}: ${stderr.trim().split(/\r?\n/)[0] || `tar exited ${code}`}`)
+    }
+    fs.renameSync(staging, full)
+  } catch (err) {
+    fs.rmSync(staging, { recursive: true, force: true })
+    throw err
+  }
+  activity.record(inst.name, 'file-unzip', { detail: `${src.rel} into ${target}` })
+  return { path: target }
+}
+
+// Breadth first and capped, so searching a large world answers quickly with what is nearest.
+export async function searchNames(inst, relative, query, { running = false } = {}) {
+  const q = typeof query === 'string' ? query.trim().toLowerCase() : ''
+  if (q.length < 2) fail('search for at least two characters')
+  const { base, full, rel } = resolvePath(inst, relative, { allowRoot: true })
+  assertLinkStaysInside(base, full, rel)
+  const busy = inUse(inst, running)
+  const results = []
+  let visits = 0
+  let level = [full]
+  while (level.length && results.length < MAX_SEARCH_RESULTS && visits < MAX_SEARCH_VISITS) {
+    const next = []
+    for (const dir of level) {
+      let entries
+      try { entries = await fs.promises.readdir(dir, { withFileTypes: true }) } catch { continue }
+      for (const d of entries) {
+        if (++visits > MAX_SEARCH_VISITS || results.length >= MAX_SEARCH_RESULTS) break
+        const abs = path.join(dir, d.name)
+        const p = toSlash(path.relative(base, abs))
+        if (d.name.toLowerCase().includes(q)) {
+          let s = null
+          try { s = await fs.promises.lstat(abs) } catch { continue }
+          results.push({
+            name: d.name,
+            path: p,
+            type: s.isDirectory() ? 'dir' : 'file',
+            size: s.isFile() ? s.size : null,
+            modified: s.mtime.toISOString(),
+            inUse: running && busy.has(p.split('/')[0].toLowerCase()),
+          })
+        }
+        if (d.isDirectory()) next.push(abs)
+      }
+    }
+    level = next
+  }
+  return { path: rel, query: q, results, truncated: results.length >= MAX_SEARCH_RESULTS || visits >= MAX_SEARCH_VISITS }
+}
+
+// Changes whose snapshot holds exactly them, so the Activity tool can offer Undo.
+export const UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit'])
+
+// The Activity tool's Undo. Only snapshots of named files/folders qualify; a whole-server snapshot
+// is a restore. Unlike a restore it works while the server runs, provided nothing it puts back
+// is held open.
+export async function undoSnapshot(inst, snapshotName, { running = false } = {}) {
+  const snap = backup.resolveSnapshot(inst.name, String(snapshotName))
+  const members = (snap.members ?? []).map((m) => String(m).replace(/\\/g, '/'))
+  // Config edits snapshot as scope config labelled before-edit; a user-made config backup of a
+  // single file is still a backup, not an undo.
+  const narrowed = snap.scope === 'files' || (snap.scope === 'config' && snap.label === 'before-edit' && members.length === 1)
+  if (!narrowed || !members.length || (snap.databases ?? []).length) {
+    fail(`${snap.name} is a backup of the server, not a copy of one change. Restore it from Backups, with the server stopped.`)
+  }
+  for (const m of members) assertFree(inst, m, running, 'put back')
+  await backup.restoreSnapshot(inst, snap, { quiet: true })
+  activity.record(inst.name, 'undo', { detail: members.join(', '), snapshot: snap.name })
+  return { restored: snap.name, members }
+}
+
+// A file as itself, a folder zipped to a temp file first. The caller streams `file` and calls
+// `done` when finished.
+export async function downloadable(inst, relative) {
+  const { base, full, rel, stat } = resolvePath(inst, relative)
+  assertLinkStaysInside(base, full, rel)
+  const real = stat.isSymbolicLink() ? fs.statSync(full) : stat
+  if (real.isFile()) return { file: full, name: rel.split('/').pop(), size: real.size, done: () => {} }
+  if (!real.isDirectory()) fail(`${rel} cannot be downloaded`)
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dl-'))
+  const name = `${rel.split('/').pop()}.zip`
+  const file = path.join(tmpDir, name)
+  try {
+    await createZip(file, path.dirname(full), [path.basename(full)])
+  } catch (err) {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    throw err
+  }
+  return { file, name, size: fs.statSync(file).size, done: () => fs.rmSync(tmpDir, { recursive: true, force: true }) }
+}

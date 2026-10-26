@@ -2,8 +2,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-// Resolve everything relative to the launcher, so replacing or moving the application
-// does not leave embedded paths pointing at an old build. No separate Node install.
+// paths resolve relative to the launcher so moving or replacing the app leaves nothing stale;
+// the bundled Electron runs the core as Node, so no separate install is needed
 exports.writeCliLaunchers = function (resources, platform) {
   const bin = path.join(resources, 'bin')
   fs.mkdirSync(bin, { recursive: true })
@@ -15,7 +15,7 @@ exec env ELECTRON_RUN_AS_NODE=1 "$SCRIPT_DIR/../../MacOS/SpawnLoft" "$SCRIPT_DIR
 `
       fs.writeFileSync(path.join(bin, name), script, { mode: 0o755 })
     } else if (platform === 'linux') {
-      // resources/bin -> resources -> the application folder, where the executable sits.
+      // resources/bin -> resources -> the application folder, where the executable sits
       const script = `#!/bin/sh
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)" || exit 1
 exec env ELECTRON_RUN_AS_NODE=1 "$SCRIPT_DIR/../../spawnloft-desktop" "$SCRIPT_DIR/../core/${name}.mjs" "$@"

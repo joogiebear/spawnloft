@@ -58,7 +58,6 @@ test('the Java a Minecraft version needs follows Mojang, and unknown names answe
 test('picking a Java refuses one that is certainly too old, unless forced', async () => {
   const { best } = await discover()
   if (!best) return
-  // Something no installed Java can satisfy.
   const impossible = best.major + 50
   await assert.rejects(pickJava({ needs: impossible, what: 'a future version' }), (err) => {
     assert.ok(err instanceof UserError)
@@ -69,9 +68,7 @@ test('picking a Java refuses one that is certainly too old, unless forced', asyn
   })
   const forced = await pickJava({ needs: impossible, force: true })
   assert.ok(forced === 'java' || forced === best.path)
-  // Something it can: the answer is one that fits.
   const fine = await pickJava({ needs: best.major })
   assert.ok(fine === 'java' || fine === best.path)
-  // No requirement at all is the default Java.
   assert.equal(await pickJava({}), await defaultJava())
 })

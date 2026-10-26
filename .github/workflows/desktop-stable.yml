@@ -22,12 +22,6 @@ jobs:
             arch: arm64
             app: desktop/dist/mac-arm64/SpawnLoft.app
             smoke: desktop/dist/mac-arm64/SpawnLoft.app
-          - runner: macos-15-intel
-            platform: darwin
-            target: mac
-            arch: x64
-            app: desktop/dist/mac/SpawnLoft.app
-            smoke: desktop/dist/mac/SpawnLoft.app
           # Windows is built and signed on the Azure signing host, not here. Linux has no signing
           # step, so it is built where the Macs are. Pinned to 24.04: see desktop-preview.yml.
           - runner: ubuntu-24.04
@@ -81,7 +75,17 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --config stable.config.cjs --mac --${{ matrix.arch }} --publish never
+        # Notarizing talks to Apple twice: notarytool submits the app, then stapler fetches the
+        # ticket from CloudKit. That fetch drops now and then (exit 68 with a lost connection) on
+        # a build Apple has already accepted, so a failed run is tried again. A real signing or
+        # notarization failure still fails the step, after the last try.
+        run: |
+          for attempt in 1 2 3; do
+            npx electron-builder --config stable.config.cjs --mac --${{ matrix.arch }} --publish never && exit 0
+            echo "::warning::Mac signing and notarization failed on attempt $attempt of 3"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          exit 1
       - name: Install the rpm build tool
         if: matrix.platform == 'linux'
         # electron-builder makes the .rpm with rpmbuild, which an Ubuntu runner does not carry.

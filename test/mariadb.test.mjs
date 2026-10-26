@@ -25,7 +25,7 @@ test('releases come from the stable majors, each asked for its point releases, n
   assert.equal(list[0].series, '11.8')
   assert.equal(list[0].date, '2026-08-20')
   assert.deepEqual(releasesFrom(root, majors, { includeUnstable: true }).map((r) => r.version), ['13.0.1', '11.8.4', '11.8.3', '11.4.13', '11.4.9'])
-  // The old reading: `releases` on the root. The root has none, so this must be empty, not a crash.
+  // releases on the root: the root has none, so this must be empty, not a crash
   assert.deepEqual(releasesFrom({ releases: { '11.4.5': { release_id: '11.4.5', release_status: 'Stable' } } }), [])
   assert.deepEqual(releasesFrom({}), [])
   // A stable major the per-major request did not answer contributes nothing rather than failing.

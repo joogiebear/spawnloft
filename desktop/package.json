@@ -1,6 +1,6 @@
 {
   "name": "mcctl-desktop",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
   "productName": "SpawnLoft",
@@ -13,7 +13,7 @@
     "dist": "electron-builder",
     "release": "node release.mjs",
     "verify": "node verify-build.mjs",
-    "test": "node window-state.test.js && node --test update-channel.test.js",
+    "test": "node window-state.test.js && node ui-zoom.test.js && node --test update-channel.test.js",
     "release:publish": "node finish-release.mjs",
     "release:stable": "node release-stable.mjs"
   },
@@ -29,6 +29,7 @@
       "preload.js",
       "setup.html",
       "window-state.js",
+      "ui-zoom.js",
       "update-channel.js",
       "package.json"
     ],

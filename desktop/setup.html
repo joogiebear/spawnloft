@@ -40,10 +40,12 @@
 
     --ink:      #e9ecf4;
     --ink-2:    #9aa4ba;
-    /* Lifted from #6d7589, which measured under 4.5:1 on --surface and is used for 12px text. */
-    --ink-3:    #8089a0;
-    /* Below the reading line on purpose: console timestamps, which are looked up, not read. */
-    --ink-4:    #545d72;
+    /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
+       the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
+    --ink-3:    #8f98ae;
+    /* The quietest text: console timestamps, line numbers, separators. Quiet, but still text, so
+       it holds 4.5:1 on every plane up to --raised-hi (#545d72 was 2.3:1 there). */
+    --ink-4:    #868fa4;
 
     --lapis:     #5b84ff;
     --lapis-dim: #2c3f8f;
@@ -52,7 +54,7 @@
     --live:  #4ade80;
     --warn:  #f0b64d;
     --fault: #f2645c;
-    --idle:  #8089a0;
+    --idle:  #8f98ae;
 
     --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
     /* Headings and big numbers: the display cut of the same family, drawn for sizes above 20px. */
@@ -89,7 +91,22 @@
     --t-6: 22px;   /* a server's name, a big number */
     --t-7: 32px;   /* the one display heading */
 
-    /* Spacing, on a four-pixel grid. */
+    /* Type roles. A role is size, weight, line height and family together, so a title is one
+       decision rather than four. Use these for new type; a raw --t-* is for the odd fact that is
+       none of them. --track-* is the letter-spacing that goes with a role. */
+    --type-display: 650 var(--t-7)/1.1 var(--display);   /* Overview's one heading */
+    --type-page:    650 var(--t-6)/1.15 var(--display);  /* a page or sheet title */
+    --type-section: 650 var(--t-5)/1.25 var(--display);  /* a pane, tool or dialog title */
+    --type-card:    600 var(--t-4)/1.35 var(--ui);       /* the name on a card or a row */
+    --type-body:    400 var(--t-3)/1.5 var(--ui);        /* running text inside panes */
+    --type-meta:    400 var(--t-2)/1.45 var(--ui);       /* hints, timestamps, secondary lines */
+    --type-label:   650 var(--t-1)/1.3 var(--ui);        /* uppercase field and section labels */
+    --type-mono:    400 var(--t-3)/1.5 var(--mono);      /* paths, addresses, the console */
+    --track-display: -.025em;
+    --track-label: .08em;
+
+    /* Spacing, on a four-pixel grid. Every gap, padding and margin should be one of these; a
+       value between two steps is a sign the layout wants the smaller one. */
     --s-1: 4px;
     --s-2: 8px;
     --s-3: 12px;
@@ -97,6 +114,20 @@
     --s-5: 20px;
     --s-6: 28px;
     --s-7: 40px;
+
+    /* The smallest thing a pointer is asked to hit. Buttons, tabs, segments and disclosures are at
+       least this tall; an icon-only button is this square. */
+    --hit: 32px;
+
+    /* Cards: one padding, corner, border and shadow for every boxed group in the panel - an
+       Overview server, a backup control, a chart, a scheduled task. */
+    --card-pad: var(--s-5);
+    --card-radius: var(--r-lg);
+
+    /* Focus. One ring for every control, keyboard or not, in the accent colour. */
+    --ring-width: 2px;
+    --ring-offset: 2px;
+    --ring-color: var(--lapis);
 
     /* Depth. Every plane is solid: the frame is --chrome, a sheet or dialog is --raised, and the
        one-pixel --lift along the top says which is in front. Glass needs something behind it to
@@ -179,9 +210,9 @@
     --edge: #485541;
     --ink: #efeee6;
     --ink-2: #b5bcac;
-    --ink-3: #909a86;
-    --ink-4: #5f6a58;
-    --idle: #909a86;
+    --ink-3: #9aa48f;
+    --ink-4: #8d9783;
+    --idle: #9aa48f;
     --lapis: #c4f566;
     --lapis-dim: #546e2a;
     --lapis-wash: rgba(196, 245, 102, .12);
@@ -242,7 +273,8 @@
     padding: 28px;
     overflow: auto;
   }
-  :focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; border-radius: 4px; }
+  /* The panel's ring, lifted over component transitions the same way; see src/ui.html. */
+  :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); transition-property: none; }
 
   .card {
     width: min(660px, 100%);
@@ -252,61 +284,72 @@
     border: 1px solid var(--line);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-lg);
-    padding: 32px 36px 28px;
+    padding: var(--s-6) var(--s-7) var(--s-6);
   }
 
-  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
+  .brand { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-6); }
   .brand svg { display: block; }
   .brand polygon:nth-child(1) { fill: var(--cube-top); }
   .brand polygon:nth-child(2) { fill: var(--cube-left); }
   .brand polygon:nth-child(3) { fill: var(--cube-right); }
   .brand polygon:nth-child(4) { fill: var(--cube-cutout); }
   .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
-  .brand .step { margin-left: auto; font: 500 var(--t-1)/1 var(--mono); color: var(--ink-3); padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(var(--ink-rgb), .025); }
+  /* Where this screen sits in getting started. Two steps because that is all there is: choosing
+     folders here, then the panel itself. The done-or-current dot is filled so the eye finds
+     "you are here" without reading the labels. */
+  .steps { margin: 0 0 0 auto; padding: 0; list-style: none; display: flex; align-items: center; gap: var(--s-2); font: 500 var(--t-2)/1 var(--ui); color: var(--ink-3); }
+  .steps li { display: flex; align-items: center; gap: 6px; }
+  .steps li + li::before { content: ""; width: 18px; height: 1px; background: var(--line); margin-right: 2px; }
+  .steps .dot { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--edge); font: 600 var(--t-1)/1 var(--ui); color: var(--ink-3); }
+  .steps [aria-current="step"] { color: var(--ink); }
+  .steps [aria-current="step"] .dot { background: var(--lapis); border-color: var(--lapis); color: var(--void); }
 
-  h1 { font: 650 var(--t-6)/1.2 var(--display); margin: 0 0 10px; letter-spacing: -.025em; }
-  p.sub { color: var(--ink-2); margin: 0 0 28px; font-size: var(--t-4); line-height: 1.6; }
+  h1 { font: 650 var(--t-6)/1.2 var(--display); margin: 0 0 var(--s-2); letter-spacing: -.025em; }
+  p.sub { color: var(--ink-2); margin: 0 0 var(--s-6); font-size: var(--t-4); line-height: 1.6; }
   p.sub b { color: var(--ink); font-weight: 600; }
 
   .fieldlabel {
     display: block;
-    margin-bottom: 7px;
+    margin-bottom: var(--s-2);
     font: 650 var(--t-1)/1 var(--ui);
     text-transform: uppercase;
     letter-spacing: .08em;
     color: var(--ink-3);
   }
-  .pathrow { display: flex; gap: 8px; margin-bottom: 8px; }
+  .pathrow { display: flex; gap: var(--s-2); margin-bottom: var(--s-2); }
   input[type="text"] {
     flex: 1;
     background: var(--sunken);
     color: var(--ink);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
-    padding: 9px 12px;
-    font: var(--t-2)/1.4 var(--mono);
+    padding: 7px 11px;
+    font: var(--t-3)/1.4 var(--mono);
     width: 100%;
+    min-height: var(--hit);
     /* Carved into the surface the way the panel's fields are. */
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
     transition: all var(--ease);
   }
   input[type="text"]:hover { border-color: var(--edge); }
-  input[type="text"]:focus {
-    outline: none;
+  :root input[type="text"]:focus {
+    outline: var(--ring-width) solid var(--ring-color);
+    outline-offset: -1px;
     border-color: var(--lapis-edge);
     background-color: var(--field-focus);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 0 0 3px var(--lapis-wash);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
   }
 
   button {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    min-height: var(--hit);
     background: rgba(var(--ink-rgb), .035);
     color: var(--ink);
     border: 1px solid var(--edge);
     border-radius: var(--r-sm);
-    padding: 8px 14px;
+    padding: 0 12px;
     font: 500 var(--t-3)/1.4 var(--ui);
     cursor: pointer;
     white-space: nowrap;
@@ -315,22 +358,24 @@
   }
   button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--hover-hi); transform: translateY(-1px); }
   button:where(:active:not(:disabled)) { transform: translateY(0); }
-  button:disabled { opacity: .38; cursor: default; }
-  button.primary { background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom)); border-color: var(--setup-primary-edge); color: var(--setup-primary-ink); font-weight: 600; padding: 10px 24px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 6px 18px -8px rgba(var(--accent-rgb), .75); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  /* The panel's primary, at its size: the wizard's own larger, padded Continue made the first
+     screen look like a different app from the one it opens. */
+  button.primary { background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom)); border-color: var(--setup-primary-edge); color: var(--setup-primary-ink); font-weight: 600; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 6px 18px -8px rgba(var(--accent-rgb), .75); }
   button.primary:hover:not(:disabled) { background: linear-gradient(180deg, var(--primary-hover-top), var(--primary-hover-bottom)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .26), 0 10px 24px -8px rgba(var(--accent-rgb), .85); }
-  button.small { padding: 5px 12px; font-size: var(--t-2); }
+  button.sm { padding: 0 var(--s-2); font-size: var(--t-2); gap: 5px; }
 
   .hint { font-size: var(--t-2); color: var(--ink-3); line-height: 1.5; }
 
   .toggle {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
-    gap: 4px 12px;
-    padding: 14px 16px;
+    gap: var(--s-1) var(--s-3);
+    padding: var(--s-3) var(--s-4);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
     background: var(--surface);
-    margin: 22px 0;
+    margin: var(--s-5) 0;
     cursor: pointer;
     transition: all var(--ease);
   }
@@ -340,7 +385,7 @@
      against the whole block - a control beside the explanation reads as if it belongs to the
      explanation - and pinning the text to column 2 stops auto-placement dropping it into the
      checkbox's column and collapsing the layout. */
-  .toggle input { grid-row: 1; grid-column: 1; align-self: center; accent-color: var(--lapis); margin: 0; }
+  .toggle input { grid-row: 1; grid-column: 1; align-self: center; width: 16px; height: 16px; accent-color: var(--lapis); margin: 0; cursor: pointer; }
   .toggle b { grid-row: 1; grid-column: 2; font-size: var(--t-3); font-weight: 600; }
   .toggle .why { grid-row: 2; grid-column: 2; color: var(--ink-3); font-size: var(--t-2); line-height: 1.5; }
 
@@ -349,12 +394,12 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 4px 12px;
-    padding: 14px 16px;
+    gap: var(--s-1) var(--s-3);
+    padding: var(--s-3) var(--s-4);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
     background: var(--surface);
-    margin-bottom: 22px;
+    margin-bottom: var(--s-5);
   }
   /* Explicit columns: the button is hidden when Java is fine, and auto-placement would otherwise
      slide the explanation into the empty third column and strand it against the right edge. */
@@ -391,13 +436,16 @@
     background: var(--fault-wash);
     border: 1px solid var(--fault-edge);
     border-radius: var(--r-sm);
-    padding: 10px 14px;
+    padding: var(--s-3) var(--s-4);
     font-size: var(--t-3);
     white-space: pre-wrap;
-    margin-bottom: 16px;
+    margin-bottom: var(--s-4);
   }
 
-  footer { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 6px; }
+  footer { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  /* The servers folder sits between the toggle and the Java readout; without its own gap its hint
+     ran straight into the readout's border. */
+  #serversBlock { margin-bottom: var(--s-5); }
 
   :root[data-theme="spawnloft"] ::selection { background: var(--lapis); color: var(--void); }
   :root[data-theme="spawnloft"] ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -421,7 +469,10 @@
       <polygon points="51.2,29.0 35.4,36.9 35.4,42.6 51.2,34.7" fill="#cfe0ff"/>
     </svg>
     <b>SpawnLoft</b>
-    <span class="step">First run</span>
+    <ol class="steps" aria-label="Getting started">
+      <li aria-current="step"><span class="dot">1</span>Choose folders</li>
+      <li><span class="dot">2</span>Open the panel</li>
+    </ol>
   </div>
 
   <!--
@@ -472,7 +523,7 @@
     <span class="lamp"></span>
     <b id="javaTitle">Checking for Java…</b>
     <span class="why" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
-    <button type="button" class="small" id="javaGet" hidden>Get Java</button>
+    <button type="button" class="sm" id="javaGet" hidden>Get Java</button>
   </div>
 
   <div class="err" id="err" hidden></div>
@@ -531,6 +582,17 @@ async function init() {
     return;
   }
   $('#root').value = defaults.defaultDataRoot;
+  const problem = defaults.settingsProblem;
+  if (problem && !problem.ok) {
+    // Why this screen is here at all, when the person may have servers already: the file that says
+    // where they are could not be read. Choosing a folder keeps that file beside the new one.
+    fail(
+      'SpawnLoft could not read its settings file, so it does not know where your servers are.\n\n' +
+      problem.file + '\n(' + problem.error + ')\n\n' +
+      'If you already have servers, close SpawnLoft and mend or delete that file, or choose the folder that holds them below. ' +
+      'The damaged file is kept next to the new one.'
+    );
+  }
   // Seeded from the layout the core actually resolved, not from a guessed folder name.
   $('#servers').value =
     (defaults.current && defaults.current.instancesDir) || serversUnder(defaults.defaultDataRoot);

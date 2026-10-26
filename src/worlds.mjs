@@ -1,30 +1,17 @@
-/**
- * Worlds: what an instance actually holds, imported, exported and switched.
- *
- * <p>Until now the world was a name in server.properties and a folder mcctl walked around.
- * This module makes it a first-class thing: list what exists (a downloaded map, an old
- * world, the current one), bring a new one in from a zip or a folder, hand one out as a
- * zip, and choose which one the server runs - which is what stock's enforce-access setup
- * has been quietly prepared for all along.
- *
- * <p>The safety shape mirrors the rest of the tool. Importing never overwrites anything -
- * a name that already exists is refused, so no snapshot is needed. Switching only writes
- * one line of server.properties. The two genuinely destructive moments - deleting a world,
- * exporting the live one out from under a running server - are refused or gated where they
- * are dangerous, in the core, not just greyed out in a page.
- */
+// Lists, imports, exports, switches and deletes the worlds an instance holds. The destructive
+// cases (deleting a world, exporting the live one) are refused here in the core, not just in the UI.
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { BACKUPS_DIR } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
-import { readState } from './control.mjs'
-import { runTar, EXCLUDE_ARGS } from './backup.mjs'
+import { readState, activeBlock, isActiveStatus } from './control.mjs'
+import { runTar, tarMember, EXCLUDE_ARGS } from './backup.mjs'
 import { tarHandlesZip } from './tar.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { fail, dirSizeAsync, humanBytes, stamp, validateName } from './util.mjs'
 
-/** The dimension companions a Bukkit-family server keeps beside a world. */
+// dimension folders a Bukkit-family server keeps beside a world
 const DIM_SUFFIXES = ['_nether', '_the_end']
 
 function isWorldDir(dir) {
@@ -35,29 +22,19 @@ function isWorldDir(dir) {
   }
 }
 
-/**
- * A world name must be a plain directory entry of this instance - no separators, no
- * traversal. Names arrive over HTTP, and the world list is the only authority on them.
- */
+// names arrive over HTTP, so reject separators and traversal
 function safeWorldName(name) {
   const n = String(name)
   if (!n || /[\\/]/.test(n) || n === '.' || n === '..') fail(`"${name}" is not a world name`)
   return n
 }
 
-/** The world the server saves into, as server.properties names it. */
 export function activeWorld(inst) {
   return readProps(path.join(inst.dir, 'server.properties')).get('level-name') || 'world'
 }
 
-/**
- * Every world this instance holds. The active one first, then alphabetical; dimension
- * companions are folded into their world's row rather than listed as worlds of their own.
- *
- * <p>Async for the sizes alone. A mature world is tens of thousands of region, entity and poi
- * files, and walking them synchronously held the whole panel - every request, and the console
- * stream - for the seconds it took whenever the Worlds tab opened.
- */
+// Active world first, then alphabetical; dimension folders are folded into their world's row.
+// Async for the sizes: a mature world is tens of thousands of files and a sync walk blocks the panel.
 export async function listWorlds(inst) {
   let entries = []
   try {
@@ -71,7 +48,6 @@ export async function listWorlds(inst) {
   const active = activeWorld(inst)
   const rows = []
   for (const name of worldDirsHere) {
-    // A companion belongs to its base world's row when the base is a world here too.
     const suffix = DIM_SUFFIXES.find((s) => name.endsWith(s))
     if (suffix && worldDirsHere.has(name.slice(0, -suffix.length))) continue
 
@@ -90,17 +66,12 @@ export async function listWorlds(inst) {
   return { active, worlds: rows }
 }
 
-/**
- * Point the server at a different world. One line of server.properties, and the server
- * reads it at the next start - but only written while stopped, because a running server
- * saving into a world the registry no longer names is how two worlds get interleaved.
- */
+// Only while stopped: a running server saving into a world server.properties no longer names
+// can interleave two worlds.
 export function activateWorld(inst, name) {
   safeWorldName(name)
-  const { status } = readState(inst.name)
-  if (status === 'running' || status === 'stopping') {
-    fail(`"${inst.name}" is running - stop it before switching worlds`)
-  }
+  const why = activeBlock(inst.name, 'switching worlds')
+  if (why) fail(why)
   if (!isWorldDir(path.join(inst.dir, name))) {
     fail(`"${name}" is not a world in ${inst.dir} (no level.dat)`)
   }
@@ -108,14 +79,8 @@ export function activateWorld(inst, name) {
   return { active: name }
 }
 
-/**
- * Find the world inside whatever somebody downloaded.
- *
- * <p>Map archives arrive in every shape: level.dat at the root, one wrapping folder, a
- * README beside a folder, or a folder of folders. The shallowest directory holding a
- * level.dat is the world; breadth-first, so a nested backup inside the map can never win
- * over the map itself. Exported pure-ish for its tests.
- */
+// Map archives come in many shapes (wrapping folder, README beside a folder, ...). The world is
+// the shallowest directory with a level.dat; breadth-first so a nested backup can't win.
 export function findWorldRoot(dir, { maxDepth = 4 } = {}) {
   let layer = [dir]
   for (let depth = 0; depth <= maxDepth && layer.length; depth++) {
@@ -127,7 +92,7 @@ export function findWorldRoot(dir, { maxDepth = 4 } = {}) {
           if (e.isDirectory()) next.push(path.join(candidate, e.name))
         }
       } catch {
-        /* unreadable branches simply are not the world */
+        /* unreadable branches can't be the world */
       }
     }
     layer = next
@@ -137,18 +102,12 @@ export function findWorldRoot(dir, { maxDepth = 4 } = {}) {
 
 function copyWorld(srcRoot, dest) {
   fs.cpSync(srcRoot, dest, { recursive: true })
-  // A downloaded world often ships the lock of whatever server last ran it.
+  // downloaded worlds often ship the lock of the server that last ran them
   fs.rmSync(path.join(dest, 'session.lock'), { force: true })
 }
 
-/**
- * Bring a world in from a zip (or tar.gz) or a folder, as a NEW world.
- *
- * <p>Never an overwrite: a taken name is refused, which is why this needs no snapshot and
- * is safe on a running server - the new folder is invisible until someone activates it.
- * If the source keeps Bukkit-style dimension folders beside the world, they come along
- * under the new name's own suffixes.
- */
+// Imports from a zip, tar.gz or folder as a new world. A taken name is refused, so it never
+// overwrites and is safe on a running server. Dimension folders beside the world come along.
 export async function importWorld(inst, source, { name } = {}) {
   validateName(name ?? '')
   const dest = path.join(inst.dir, name)
@@ -164,13 +123,11 @@ export async function importWorld(inst, source, { name } = {}) {
       root = findWorldRoot(src)
       if (!root) fail(`no level.dat found under ${src} - that folder does not hold a world`)
     } else {
-      // Extracted inside the instance's own directory so the final move is a same-volume
-      // rename, not a second copy of a multi-gigabyte world across drives.
+      // inside the instance dir so the final move is a same-volume rename, not a second copy
       tmp = path.join(inst.dir, `.mcctl-import-${Date.now()}`)
       fs.mkdirSync(tmp, { recursive: true })
-      // bsdtar reads zip and tar.gz alike, and refuses absolute paths and ".." members on
-      // extraction - the zip-slip guard comes with the tool. GNU tar reads no zip at all, so
-      // there the zip is read here, with the same guard written out by hand.
+      // bsdtar reads zip and tar.gz and refuses absolute and ".." members (zip-slip guard).
+      // GNU tar can't read zips, so extractZip does it with its own guard.
       if (!tarHandlesZip() && isZip(src)) await extractZip(src, tmp)
       else await runTar(['-xf', src], tmp)
       root = findWorldRoot(tmp)
@@ -184,7 +141,6 @@ export async function importWorld(inst, source, { name } = {}) {
     moveOrCopy(root, dest)
     fs.rmSync(path.join(dest, 'session.lock'), { force: true })
 
-    // Bukkit-style companions sitting beside the world come along under the new name.
     const base = path.basename(root)
     const dims = []
     for (const suffix of DIM_SUFFIXES) {
@@ -204,15 +160,8 @@ export async function importWorld(inst, source, { name } = {}) {
   }
 }
 
-/**
- * Hand a world out as a zip - the format people actually share maps in, and one Windows
- * opens bare-handed. Exports land beside the instance's snapshots but in their own
- * folder, so the Backups history never mistakes one for a snapshot.
- *
- * <p>The ACTIVE world of a RUNNING server is refused: the server holds its files mid-write
- * and the result would be a torn copy wearing a healthy filename. Take a backup instead -
- * that path flushes the world first. Inactive worlds export any time.
- */
+// Exports as a zip into its own `exports` folder so Backups history doesn't list it. The active
+// world of a running server is refused (torn copy); a backup flushes first instead.
 export async function exportWorld(inst, name) {
   safeWorldName(name)
   if (!isWorldDir(path.join(inst.dir, name))) {
@@ -220,7 +169,7 @@ export async function exportWorld(inst, name) {
   }
   const active = activeWorld(inst)
   const { status } = readState(inst.name)
-  if (name === active && (status === 'running' || status === 'stopping')) {
+  if (name === active && isActiveStatus(status)) {
     fail(`"${name}" is the world the running server is saving into - stop the server first, or take a backup instead`)
   }
 
@@ -229,9 +178,9 @@ export async function exportWorld(inst, name) {
   const file = path.join(outDir, `${name}_${stamp()}.zip`)
   const members = [name, ...DIM_SUFFIXES.map((s) => `${name}${s}`)
     .filter((d) => isWorldDir(path.join(inst.dir, d)))]
-  // -a lets bsdtar pick the format from the extension: .zip in, zip out. GNU tar takes the same
-  // flags, exits 0, and writes a tar archive called .zip - so it is never asked.
-  if (tarHandlesZip()) await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members], inst.dir)
+  // -a makes bsdtar pick the format from the extension. GNU tar accepts the flags but writes a
+  // tar archive named .zip, so it is never used here.
+  if (tarHandlesZip()) await runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members.map(tarMember)], inst.dir)
   else await createZip(file, inst.dir, members, { exclude: EXCLUDE_ARGS.filter((arg) => arg !== '--exclude') })
   const size = fs.statSync(file).size
   if (size === 0) {
@@ -241,18 +190,12 @@ export async function exportWorld(inst, name) {
   return { file, size, sizeHuman: humanBytes(size), members }
 }
 
-/**
- * Delete a world for good. The active one is refused outright - deactivate it first by
- * switching, which is itself gated on a stopped server - and the caller is expected to
- * have made the person confirm, because ONLY the active world ever appears in snapshots:
- * an inactive world deleted here has no way back unless it was exported.
- */
+// Callers must confirm with the person first: only the active world appears in snapshots, so an
+// inactive world deleted here is gone unless it was exported.
 export function deleteWorld(inst, name) {
   safeWorldName(name)
-  const { status } = readState(inst.name)
-  if (status === 'running' || status === 'stopping') {
-    fail(`"${inst.name}" is running - stop it before deleting worlds`)
-  }
+  const why = activeBlock(inst.name, 'deleting worlds')
+  if (why) fail(why)
   const active = activeWorld(inst)
   if (name === active) {
     fail(`"${name}" is the active world - switch to another world first, or use rebuild to reset it`)

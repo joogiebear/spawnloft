@@ -7,55 +7,30 @@ import { runDir } from './paths.mjs'
 import { startDarwinSampler } from './metrics-darwin.mjs'
 import { startLinuxSampler } from './metrics-linux.mjs'
 
-/**
- * How hard a server is working, over time.
- *
- * <p>Node can measure its own CPU and nothing else's, and the thing worth measuring is the java
- * process the daemon started. Windows will report it, but only through a tool: Get-Process gives
- * total processor seconds and working set for any pid.
- *
- * <p>Calling that once per sample would mean spawning PowerShell every ten seconds for as long as
- * the server runs, which is a process launch per sample to read two numbers. Instead one PowerShell
- * is started with the server and left running, refreshing the same process object in a loop and
- * printing a line each time. One extra process for the life of the server, not one per reading.
- * macOS supplies the same cumulative CPU time and resident memory through a short asynchronous
- * /bin/ps query. Its moving-average %cpu field has a different time window, so it is not used.
- * Linux needs no tool at all: the kernel publishes both numbers per process under /proc.
- *
- * <p>Samples go to a plain text file in the run directory rather than being held in memory,
- * because the thing that reads them is the panel, in a different process, possibly started after
- * the server was.
- */
+// CPU and memory history of the java process. Windows has no cheap native API, so one
+// long-lived PowerShell loop runs Get-Process for the life of the server instead of one launch
+// per sample. macOS uses a short /bin/ps query (its %cpu is a moving average, so cumulative CPU
+// time is used instead); Linux reads /proc. Samples go to a file in the run directory because
+// the panel reads them from another process.
 
-/** Ten seconds. Four hours of history is 1440 samples, which is a file of about thirty kilobytes. */
 const INTERVAL_SEC = 10
 
-/** Five hours kept, so the four-hour view is always full rather than filling up as you watch. */
+// five hours, so the four-hour view is always full
 const KEEP = 1800
 
-/** Trimmed in batches; rewriting the file every ten seconds to drop one line is not worth it. */
+// trimmed in batches rather than rewriting the file every sample
 const TRIM_AT = KEEP + 600
 
 export function metricsFile(name) {
   return path.join(runDir(name), 'metrics.log')
 }
 
-/**
- * CPU as a share of the whole machine, the way Task Manager counts it.
- *
- * <p>Per-core would read above 100% and invite the question of how many cores there are. This does
- * not, at the cost of a server pinning one core of sixteen looking quiet - so the core count is
- * reported alongside and the panel says what the number is a share of.
- */
+// CPU is a share of the whole machine (like Task Manager), so one pinned core of sixteen looks
+// quiet; the core count is reported alongside.
 const CORES = Math.max(1, os.cpus()?.length || 1)
 
-/**
- * Watch a process until it exits.
- *
- * <p>Returns a function that stops watching. Failure to start the sampler is not failure to start
- * the server: a graph is worth less than the thing it graphs, so this reports and gives up rather
- * than taking the daemon down with it.
- */
+// Returns a stop function. A sampler that can't start reports and gives up rather than
+// taking the daemon down.
 export function startSampler(name, pid, { onError = () => {}, extra = () => null } = {}) {
   if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     onError(new Error('performance sampling is only implemented on Windows, macOS and Linux'))
@@ -79,24 +54,20 @@ export function startSampler(name, pid, { onError = () => {}, extra = () => null
 
   const script = [
     '$ErrorActionPreference = "Stop"',
-    // Every number is printed in the invariant culture. PowerShell formats a double with the
-    // machine's decimal separator otherwise, so on a German Windows the CPU figure arrives as
-    // "29,765" and parses as 29 - a wrong graph rather than a missing one.
+    // invariant culture: otherwise a German Windows prints "29,765", which parses as 29
     '$inv = [System.Globalization.CultureInfo]::InvariantCulture',
     `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue`,
     'if (-not $p) { exit 0 }',
     'while ($true) {',
     '  try { $p.Refresh() } catch { break }',
     '  if ($p.HasExited) { break }',
-    // ToUnixTimeSeconds, not Get-Date -UFormat %s: that is culture-formatted too. And the line
-    // is concatenated rather than built with -f, because the cast in `[int][double]::Parse(x), a, b`
-    // binds to the whole comma list instead of the first item and the format silently produced
-    // nothing at all.
+    // ToUnixTimeSeconds because Get-Date -UFormat %s is culture-formatted too. The line is
+    // concatenated rather than built with -f: a cast in `[int][double]::Parse(x), a, b` binds
+    // to the whole comma list and the format silently produced nothing.
     '  $t = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()',
     '  $c = $p.CPU',
     '  if ($null -eq $c) { $c = 0 }',
-    // Written through [Console] and flushed: PowerShell buffers its own output pipeline, and a
-    // sample that arrives in a batch ten minutes later is not a sample of anything useful.
+    // through [Console] and flushed: PowerShell's own output pipeline buffers and delivers samples late
     '  [Console]::Out.WriteLine($t.ToString($inv) + " " + $c.ToString($inv) + " " + $p.WorkingSet64.ToString($inv))',
     '  [Console]::Out.Flush()',
     `  Start-Sleep -Seconds ${INTERVAL_SEC}`,
@@ -129,13 +100,12 @@ export function startSampler(name, pid, { onError = () => {}, extra = () => null
   ps.on('error', error => { if (!stopped) onError(error) })
   return () => {
     stopped = true
-    try { ps.kill() } catch { /* already gone with the server */ }
+    try { ps.kill() } catch { /* already gone */ }
   }
 }
 
-/** Both native collectors supply cumulative CPU seconds and resident bytes. Keep the
- * conversion shared so the same workload has the same scale on Mac and Windows.
- * A reset counter, clock adjustment, or long sleep starts a new baseline, not a spike. */
+// Collectors supply cumulative CPU seconds and resident bytes. A reset counter, clock
+// adjustment or long sleep starts a new baseline instead of producing a spike.
 export function sampleRecorder(write, cores = CORES) {
   let previous = null
   return ({ at, seconds, bytes }) => {
@@ -150,12 +120,8 @@ export function sampleRecorder(write, cores = CORES) {
   }
 }
 
-/**
- * One line of the file: time, CPU and memory, then what the server said about itself if it said
- * anything - ticks per second, players online, the player limit - with "-" for a figure it did not
- * give. The three new columns are only ever appended, so a reader that knows the first three reads
- * a new file exactly as it read an old one.
- */
+// Columns: time, cpu, rss, then optional tps, players online, player limit ("-" when unknown).
+// Extra columns are only appended so readers of the first three still work.
 export function sampleLine(sample, server) {
   const base = `${sample.at} ${sample.cpu.toFixed(1)} ${sample.rss}`
   if (!server) return base + '\n'
@@ -169,18 +135,12 @@ function trim(file) {
     if (lines.length <= TRIM_AT) return
     fs.writeFileSync(file, lines.slice(-KEEP).join('\n') + '\n')
   } catch {
-    /* a sample lost to a locked file is one gap in a graph */
+    /* worst case is a gap in the graph */
   }
 }
 
-/**
- * Every sample kept for this server, oldest first.
- *
- * <p>Unfiltered on purpose. Windowing happens in the caller, which needs to know both what falls
- * inside the range and whether anything falls outside it - a stopped server whose history is older
- * than the chosen window has plenty recorded, and telling someone "nothing recorded" because they
- * were looking at the last five minutes is a lie about their own data.
- */
+// Oldest first and unfiltered: the caller windows it, and needs to tell "nothing recorded"
+// from "nothing in this range".
 export function readSamples(name, { strict = false } = {}) {
   let text
   try {
@@ -196,8 +156,7 @@ export function readSamples(name, { strict = false } = {}) {
     const at = Number(ts)
     const row = { at, cpu: Number(cpu), rss: Number(rss) }
     if (!Object.values(row).every(Number.isFinite) || row.at <= 0 || row.cpu < 0 || row.cpu > 100 || row.rss < 0) continue
-    // Only present when the server answered, so a sample without them is the same object it always
-    // was. "-" is how an unanswered figure is written, and it stays out.
+    // "-" marks a figure the server didn't answer; leave it off the row
     if (figure(tps) !== null) row.tps = figure(tps)
     if (figure(online) !== null) row.players = figure(online)
     if (figure(max) !== null) row.maxPlayers = figure(max)
@@ -212,14 +171,8 @@ function figure(text) {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-/**
- * The newest sample, read from the end of the file without reading the rest of it.
- *
- * <p>For the server list, which the panel asks for every four seconds for every server: reading
- * five hours of history to learn one line would be most of the work of that request. Asynchronous,
- * because it runs on the panel's request path. Anything older than three intervals is not current
- * and is not returned - a server that stopped an hour ago is not still using 2 GB.
- */
+// Newest sample, read from the tail of the file; the panel polls this for every server every
+// four seconds. Async because it's on the request path. Null if older than three intervals.
 export async function latestSample(name, { now = Date.now() } = {}) {
   let handle
   try {

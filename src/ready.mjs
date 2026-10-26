@@ -1,10 +1,4 @@
-/**
- * What a server's console says at the two moments that matter to a supervisor.
- *
- * <p>One definition, shared by the daemon (which watches for it to announce a recovery) and the
- * supervisor (which waits for it on every start). They used to be two identical regexes in two
- * files, which is one edit away from a start that never returns while the daemon says "ready".
- */
+// Console patterns for ready and failed starts, shared by the daemon and the supervisor.
 
 /** Paper, Fabric and NeoForge all print vanilla's line: Done (12.345s)! For help, type "help" */
 export const READY_RE = /Done \([\d.,]+s\)!/
@@ -19,6 +13,20 @@ export const MARIADB_FAILED_RE = /\[ERROR\] (?:Aborting|Can't start server|maria
 /** Garnet, and Redis itself: the line every Redis-speaking server prints once it listens. */
 export const GARNET_READY_RE = /ready to accept connections/i
 export const GARNET_FAILED_RE = /address already in use|only one usage of each socket|unhandled exception|cannot bind/i
+
+// Longer than any line the patterns above have to see whole.
+const OVERLAP = 512
+
+// A read can end mid-line, so the tail of the previous read is searched along with the new text.
+// Pass the returned `carry` back in with the next text.
+export function scanConsole(carry, text, { ready, failed }) {
+  const scan = carry + text
+  const hit = ready.exec(scan)
+  if (hit) return { carry: '', ready: hit[0] }
+  const bad = failed.exec(scan)
+  if (bad) return { carry: '', failed: bad[0] }
+  return { carry: scan.slice(-OVERLAP) }
+}
 
 /** The pair that fits an instance: a database's engine has its own lines. */
 export function patternsFor(inst) {

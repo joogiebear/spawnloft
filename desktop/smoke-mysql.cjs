@@ -4,11 +4,10 @@ const path = require('node:path')
 const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 
-/** Native Oracle binaries, created through the packaged GUI from an empty engine store. */
-module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record }) {
+// native Oracle binaries, created through the packaged GUI from an empty engine store
+module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings }) {
   const dbName = `${name}-db`
-  // A second press on an open tool closes it, so press only if Settings is not already open.
-  if (await page.locator('#tabSettings').getAttribute('aria-expanded') !== 'true') await page.locator('#tabSettings').click()
+  await openDatabaseSettings()
   const create = page.locator('#settingsBody').getByRole('button', { name: 'Create a database', exact: true })
   await create.scrollIntoViewIfNeeded()
   assert.equal(await create.isEnabled(), true)
@@ -16,12 +15,22 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
   const configBefore = fs.readFileSync(config, 'utf8')
   assert.deepEqual(fs.readdirSync(path.join(data, 'engines')), [], 'GUI must exercise the first download')
   await create.click()
-  // Even initialization must yield to the panel so progress, console, and other servers work.
+  // even initialization must yield to the panel so progress, console and other servers keep working
   const deadline = Date.now() + 600000
-  let created = false, polls = 0
+  let created = false, polls = 0, answeredAt = Date.now()
   while (Date.now() < deadline) {
-    const response = await fetch(new URL('/api/databases', page.url()), { signal: AbortSignal.timeout(4000) })
-    const rows = await response.json()
+    // One slow answer while MySQL initializes is a busy Windows runner, not a stuck panel: what
+    // fails the test is the panel going quiet, so it is judged over a window, not a single poll.
+    let rows
+    try {
+      const response = await fetch(new URL('/api/databases', page.url()), { signal: AbortSignal.timeout(4000) })
+      rows = await response.json()
+    } catch (err) {
+      if (err.name !== 'TimeoutError') throw err
+      if (Date.now() - answeredAt > 30000) throw Error('Panel stopped answering for 30 seconds during database setup')
+      continue
+    }
+    answeredAt = Date.now()
     polls++
     if (rows.some(row => row.name === dbName && row.status === 'running' && row.attachments[name])) { created = true; break }
     const hint = await create.locator('..').textContent().catch(() => '')

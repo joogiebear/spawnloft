@@ -2,12 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
-/**
- * The panel is one document with no build step, so its logic cannot be imported. The pure
- * functions worth testing are lifted out of the source by name instead: a const is one line,
- * a function runs to its balanced closing brace. If someone reshapes the file these throw
- * loudly rather than testing nothing.
- */
+// The panel is one document with no build step, so its logic cannot be imported. The pure
+// functions are lifted out of the source by name instead (a const is one line, a function runs to
+// its balanced closing brace) and throw if the file is reshaped, rather than testing nothing.
 const html = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
 
 function constSource(name) {
@@ -31,8 +28,6 @@ const lifted = (names) => new Function(
   `${names.map((n) => (/^[A-Z_]+$/.test(n) ? constSource(n) : fnSource(n))).join('\n')}
    return { ${names.filter((n) => !/^[A-Z_]+$/.test(n)).join(', ')} }`,
 )()
-
-// ---- the console level classifier ------------------------------------------
 
 const { levelOf } = lifted(['MCCTL_RE', 'LEVEL_RE', 'BARE_LEVEL_RE', 'CONT_RE', 'EXC_RE', 'levelOf'])
 const { cleanConsoleText } = lifted(['ANSI_STRING_RE', 'ANSI_CSI_RE', 'ANSI_ESCAPE_RE', 'LOG_CONTROL_RE', 'cleanConsoleText'])
@@ -166,8 +161,6 @@ test('mcctl speaking for itself is sys, never a server level', () => {
   assert.equal(levelOf('[mcctl] server process exited (code=0)'), 'sys')
 })
 
-// ---- the memory ceiling reader ---------------------------------------------
-
 const { memoryCeilingMb } = lifted(['memoryCeilingMb'])
 
 test('the memory graph ceiling accepts both units and refuses junk', () => {
@@ -179,13 +172,8 @@ test('the memory graph ceiling accepts both units and refuses junk', () => {
   assert.equal(memoryCeilingMb(''), null)
 })
 
-// ---- the duplicated token block --------------------------------------------
-
-/**
- * The design tokens are deliberately duplicated between the panel and the setup wizard -
- * "change both or neither". verify-build checks this too, but only during a packaged build;
- * this catches the half-edit the day it happens.
- */
+// The design tokens are deliberately duplicated between the panel and the setup wizard (change
+// both or neither). verify-build checks this only in a packaged build; this catches a half-edit sooner.
 function tokensOf(file, website = false) {
   const src = fs.readFileSync(new URL(file, import.meta.url), 'utf8')
   const block = (website ? /:root\[data-theme="spawnloft"\]\s*\{([\s\S]*?)\n {2}\}/ : /:root\s*\{([\s\S]*?)\n {2}\}/).exec(src)
@@ -202,4 +190,24 @@ test('the panel and the setup wizard share one token block, values included', ()
 
 test('the website palette stays consistent between the panel and setup wizard', () => {
   assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../desktop/setup.html', true))
+})
+
+test('the overview feed folds a run of the same thing into one line, and only a run', () => {
+  const { groupActivity } = lifted(['FEED_RUN_GAP_MS', 'actorKey', 'groupActivity'])
+  const you = { kind: 'panel' }
+  const at = (min) => new Date(Date.UTC(2026, 9, 17, 12, 0) - min * 60000).toISOString()
+  const del = (min, by = you) => ({ at: at(min), server: 'RoyalSkyblock', action: 'backup-delete', by, detail: `b${min}.tar.gz` })
+  const runs = groupActivity([
+    del(0), del(1), del(2),
+    // the same action by someone else is not the same run
+    del(3, { kind: 'assistant', name: 'Claude' }),
+    { at: at(4), server: 'RoyalSkyblock', action: 'schedule-remove', by: you, detail: 'Automatic backup' },
+    del(5), del(6),
+    // more than half an hour after the one before it: a new run
+    del(60),
+    { at: at(61), server: 'Lobby', action: 'backup-delete', by: you, detail: 'x.tar.gz' },
+  ])
+  assert.deepEqual(runs.map((r) => r.entries.length), [3, 1, 1, 2, 1, 1])
+  assert.equal(runs[0].entries[0].detail, 'b0.tar.gz', 'newest first, inside a run too')
+  assert.notEqual(runs[3].key, runs[5].key, 'another server is another run')
 })

@@ -1,23 +1,14 @@
-/**
- * Fabric downloads, against meta.fabricmc.net.
- *
- * <p>Fabric's server story is friendlier than its reputation: the meta API serves a single
- * bundled launcher jar per (game, loader, installer) triple, and that jar runs with a plain
- * `-jar` exactly like Paper - it fetches the vanilla server and its libraries itself on first
- * start. So a Fabric server is created the same shape as a Paper one: pick a version,
- * download one jar into the store, place it. The daemon needs no new launch machinery.
- *
- * <p>One honest difference from paper.mjs: the meta API publishes no checksum for the
- * launcher jar, so the download cannot be hash-verified - it is TLS to fabricmc.net and a
- * sanity floor on the size, and that is all that can be had.
- */
+// Fabric downloads from meta.fabricmc.net. The meta API serves one bundled launcher jar per (game,
+// loader, installer) triple; it runs with plain -jar and fetches vanilla and its libraries on first
+// start, so a Fabric server is created like a Paper one. No checksum is published, so there is no
+// hash verification, only TLS and a size floor.
 import fs from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
-import { fail, humanBytes } from './util.mjs'
+import { fail, humanBytes, assertSafeVersion, isInside } from './util.mjs'
 
 const API = 'https://meta.fabricmc.net/v2'
 const HEADERS = { 'User-Agent': 'SpawnLoft (github.com/joogiebear/spawnloft)', Accept: 'application/json' }
@@ -33,13 +24,12 @@ async function api(url) {
   return res.json()
 }
 
-/** Every stable Minecraft version Fabric supports, newest first (the API's own order). */
+// newest first, the API's own order
 export async function versions() {
   const all = await api(`${API}/versions/game`)
   return all.filter((v) => v.stable).map((v) => v.version)
 }
 
-/** The newest stable loader and installer - the pair the launcher jar is built from. */
 async function latestStable(pathname, label) {
   const all = await api(`${API}${pathname}`)
   const hit = all.find((v) => v.stable) ?? all[0]
@@ -47,33 +37,35 @@ async function latestStable(pathname, label) {
   return hit.version
 }
 
-/** What the launcher jar for a triple is called. Exported so a name can be recognised. */
 export function launcherName(game, loader, installer) {
   return `fabric-server-mc.${game}-loader.${loader}-launcher.${installer}.jar`
 }
 
-/**
- * Download the Fabric server launcher for a game version into the jars store.
- *
- * <p>The loader defaults to the newest stable, but a modpack pins the one its mods were
- * built against - its index names it, and `loader` passes it through. The installer is
- * always the newest stable; it only bootstraps.
- */
+// The loader defaults to the newest stable, but a modpack pins the one its mods were built against.
+// The installer is always the newest stable; it only bootstraps.
 export async function fetchLauncher(game, { loader: pinned = null, force = false, onProgress = null } = {}) {
+  // a modpack index or command line is not trusted to be a version; both end up in a file name and the URL
+  assertSafeVersion(game, 'the Minecraft version')
+  if (pinned != null) assertSafeVersion(pinned, 'the Fabric loader version')
   const [loader, installer] = await Promise.all([
     pinned ?? latestStable('/versions/loader', 'loader'),
     latestStable('/versions/installer', 'installer'),
   ])
+  assertSafeVersion(loader, 'the Fabric loader version')
+  assertSafeVersion(installer, 'the Fabric installer version')
   const name = launcherName(game, loader, installer)
 
   fs.mkdirSync(JARS_DIR, { recursive: true })
   const dest = path.join(JARS_DIR, name)
+  if (!isInside(JARS_DIR, dest) || path.dirname(dest) !== path.resolve(JARS_DIR)) {
+    fail(`the Fabric launcher name "${name}" would land outside the jars folder`)
+  }
   if (fs.existsSync(dest) && !force) {
     onProgress?.({ received: fs.statSync(dest).size, total: fs.statSync(dest).size, cached: true })
     return { name, path: dest, game, loader, installer, cached: true }
   }
 
-  const url = `${API}/versions/loader/${encodeURIComponent(game)}/${loader}/${installer}/server/jar`
+  const url = `${API}/versions/loader/${encodeURIComponent(game)}/${encodeURIComponent(loader)}/${encodeURIComponent(installer)}/server/jar`
   let res
   try {
     res = await fetch(url, { headers: { 'User-Agent': HEADERS['User-Agent'] } })
@@ -96,8 +88,7 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
   })
   await pipeline(source, fs.createWriteStream(tmp))
 
-  // No published checksum to verify against, so the floor is structural: a launcher jar is
-  // never a handful of bytes, and an HTML error page saved as a jar would be exactly that.
+  // no published checksum, so a structural floor: an HTML error page saved as a jar would be tiny
   const size = fs.statSync(tmp).size
   if (size < 100 * 1024) {
     fs.rmSync(tmp, { force: true })

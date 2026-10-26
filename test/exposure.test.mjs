@@ -48,7 +48,7 @@ test('the warning speaks only on the machine it is about', () => {
   assert.match(found.advice, /198\.199\.70\.20/)
   assert.match(found.advice, /port 25575/)
   assert.match(found.advice, /No firewall was found/)
-  // The remedy opens the game port and SSH, and never RCON; and says why the order matters.
+  // the remedy opens the game port and SSH, never RCON
   assert.match(found.advice, /ufw allow OpenSSH && sudo ufw allow 25565\/tcp && sudo ufw enable/)
   assert.doesNotMatch(found.advice, /ufw allow 25575/)
   assert.match(rconExposure(inst, { ...vps, firewall: null }).advice, /could not be confirmed/)

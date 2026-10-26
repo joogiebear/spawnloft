@@ -1,25 +1,22 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { DATA_ROOT, ROOT } from './paths.mjs'
-import { describeServersElsewhere } from './settings.mjs'
+import { DATA_ROOT, LAYOUT, ROOT } from './paths.mjs'
+import { describeServersElsewhere, inspect as inspectSettings } from './settings.mjs'
+import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
 import { rconExposure } from './exposure.mjs'
 import * as java from './java.mjs'
 import { humanBytes, dirSize, isPortFree } from './util.mjs'
 
-/**
- * The environment checks behind `spawnloft doctor`, as data. Read-only unless `repair` is set,
- * which clears stale state files - the one fix doctor has always made on its own. Automation
- * (--json, the MCP server) never repairs: it reports, and a person runs doctor to fix.
- */
+// Read-only unless `repair` is set, which only clears stale state files. Automation (--json, the
+// MCP server) never repairs.
 export async function runDoctor({ repair = false } = {}) {
   const problems = []
   const notes = []
 
-  // The same probe the panel and the first-run wizard use, so all three agree about what
-  // counts as a usable Java.
+  // same probe as the panel and first-run wizard, so they agree on what a usable Java is
   const javaCheck = await java.health()
   if (!javaCheck.ok) problems.push(`java: ${javaCheck.message} ${java.DOWNLOAD_URL}`)
   else notes.push(`java: ${javaCheck.version}${javaCheck.onPath ? '' : ` at ${javaCheck.path} (not on PATH)`}`)
@@ -34,9 +31,20 @@ export async function runDoctor({ repair = false } = {}) {
   notes.push(`node: ${process.version}`)
   notes.push(`root: ${ROOT}`)
   notes.push(`data root: ${DATA_ROOT}`)
+  // an unreadable settings file falls back to defaults (see settings.load)
+  const stored = inspectSettings()
+  if (!stored.ok) {
+    problems.push(`settings file ${stored.file} could not be read (${stored.error}), so SpawnLoft is using the defaults and the data root in use may not be the data folder you chose. Fix the file or delete it.`)
+  }
   if (!listInstances().length) {
     for (const line of describeServersElsewhere(DATA_ROOT)) problems.push(line)
   }
+
+  // always checked: a redirected process can't tell it is reading a copy (see private-copy.mjs)
+  const privateCopies = await findPrivateCopies()
+  const described = describePrivateCopies(privateCopies, { backupsDir: LAYOUT.backupsDir })
+  problems.push(...described.problems)
+  notes.push(...described.notes)
 
   const seenPorts = new Map()
   for (const inst of listInstances()) {
@@ -59,8 +67,7 @@ export async function runDoctor({ repair = false } = {}) {
     }
     const { status } = readState(inst.name)
     if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
-    // Asked whether or not it is running: the port opens the moment it starts, and doctor is what
-    // someone runs before they start it.
+    // checked even when stopped: the port opens as soon as it starts
     const exposed = rconExposure(inst)
     if (exposed) problems.push(`${inst.name}: ${exposed.title.toLowerCase()}. ${exposed.advice}`)
     if (status === 'stale') {
@@ -76,5 +83,6 @@ export async function runDoctor({ repair = false } = {}) {
     }
     notes.push(`${inst.name}: ${humanBytes(dirSize(inst.dir))} on disk at ${inst.dir}`)
   }
-  return { healthy: problems.length === 0, notes, problems }
+  // `privateCopies` is for the MCP tool; the CLI's JSON names its fields so its shape is unchanged
+  return { healthy: problems.length === 0, notes, problems, privateCopies }
 }

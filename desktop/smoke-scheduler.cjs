@@ -47,7 +47,7 @@ module.exports = async ({ api, cli, close, launch, data, name, record }) => {
     const backups = await api(`${base}/backups`)
     assert.equal(backups.automaticAvailable, true)
     assert.equal(backups.auto.id, auto.auto.id)
-    // Automatic retention must not delete the manual CLI snapshots made earlier.
+    // automatic retention must not delete the manual CLI snapshots made earlier
     assert.ok(backups.snapshots.some(s => JSON.stringify(s).includes('cli-visible-smoke')))
     const taskLog = runs(auto.auto.id)
     assert.ok(taskLog.length >= 2)

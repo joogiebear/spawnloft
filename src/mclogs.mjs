@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { BACKUPS_DIR, RUN_DIR, consoleLog } from './paths.mjs'
-import { fail, humanBytes, stamp } from './util.mjs'
+import { fail, humanBytes, stamp, writeFileWithMode, PRIVATE_FILE_MODE } from './util.mjs'
 
 export const MAX_LINES = 25000
 export const MAX_BYTES = 10 * 1024 * 1024
@@ -26,20 +26,13 @@ function splitLines(text) {
   return { parts, trailing }
 }
 
-/**
- * Take the person's account name out of the paths before the log goes public.
- *
- * <p>A server log is full of paths - the working directory, every plugin's data folder, every
- * stack trace with a file in it - and on Windows those paths carry the account name:
- * C:\Users\Josh\AppData\... mclo.gs removes IP addresses on its side, best effort, and nothing
- * else; Aternos's own upload mod strips the system username on the device before sending, and
- * this is the same courtesy. Player names, plugin output and everything else are left as they
- * are, and the consent dialog says so.
- */
+// Strips the account name from paths before the log goes public: Windows paths carry it
+// (C:\Users\Josh\AppData\...) and mclo.gs only removes IP addresses. Player names and everything
+// else are left alone, and the consent dialog says so.
 export function redactAccountName(text) {
   return String(text)
-    // Up to the next separator first, so "Josh Smith" goes whole; then a name with no separator
-    // after it. The second pass cannot touch what the first wrote, because it stops at "<".
+    // up to the next separator first so "Josh Smith" goes whole, then a name with no separator after it;
+    // the second pass stops at "<", so it can't touch what the first wrote
     .replace(/([A-Za-z]:[\\/]+Users[\\/]+)([^\\/\r\n"'<>|:*?]+?)(?=[\\/])/g, '$1<user>')
     .replace(/([A-Za-z]:[\\/]+Users[\\/]+)([^\\/\s"'<>|:*?]+)/g, '$1<user>')
     .replace(/(\/(?:home|Users)\/)([^/\s"'<>|:]+)/g, '$1<user>')
@@ -93,7 +86,8 @@ function rememberToken(tokenFile, entry) {
   kept.push(entry)
   try {
     fs.mkdirSync(path.dirname(tokenFile), { recursive: true })
-    fs.writeFileSync(tokenFile, JSON.stringify(kept, null, 2))
+    // whoever holds a deletion token can delete the uploaded log, so the file is owner-only
+    writeFileWithMode(tokenFile, JSON.stringify(kept, null, 2), PRIVATE_FILE_MODE)
   } catch {}
 }
 
