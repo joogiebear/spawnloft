@@ -102,7 +102,8 @@ if (alreadyBuilt() && !REBUILD) {
   step('Windows: opening the packaged app and running the smoke test')
   // playwright isn't a project dependency, so it lives in a temp folder
   const tool = path.join(os.tmpdir(), 'spawnloft-smoke-tool')
-  if (!fs.existsSync(path.join(tool, 'node_modules', 'playwright'))) {
+  // its package.json, not the folder: an interrupted install leaves the folder and nothing usable
+  if (!fs.existsSync(path.join(tool, 'node_modules', 'playwright', 'package.json'))) {
     run('npm', ['install', '--prefix', tool, '--no-save', '--no-package-lock', 'playwright@1.63.0'], { shell: true })
   }
   run(process.execPath, [path.join(HERE, 'smoke-desktop.cjs'), path.join(HERE, 'dist', 'win-unpacked'), path.join(HERE, 'dist', 'smoke-win32-x64')],
