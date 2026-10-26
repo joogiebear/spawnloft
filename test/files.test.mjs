@@ -59,6 +59,23 @@ test('a link that leads out of the server folder cannot be walked into', (t) => 
   assert.equal(entry.type, 'link')
 })
 
+test('a link that leads out of the server folder cannot be listed or searched', async (t) => {
+  const inst = server()
+  const outside = fs.mkdtempSync(path.join(scratch, 'outside-'))
+  fs.mkdirSync(path.join(outside, 'keys'))
+  fs.writeFileSync(path.join(outside, 'keys', 'id_rsa'), 'nope')
+  try {
+    fs.symlinkSync(outside, path.join(inst.dir, 'escape'), 'junction')
+  } catch {
+    t.skip('this machine cannot make links')
+    return
+  }
+  assert.throws(() => files.listDir(inst, 'escape'), /leads outside/)
+  await assert.rejects(files.searchNames(inst, 'escape', 'id_'), /leads outside/)
+  // a search from the top does not follow the link either
+  assert.deepEqual((await files.searchNames(inst, '', 'id_')).results, [])
+})
+
 test('a file link that leads out of the server folder cannot be read or downloaded', async (t) => {
   const inst = server()
   const outside = path.join(fs.mkdtempSync(path.join(scratch, 'outside-')), 'secret.txt')
@@ -184,6 +201,7 @@ test('rename and move, but not into itself and not what the running server holds
   assert.throws(() => files.movePath(inst, 'archive', 'archive/inner'), /inside itself/)
   assert.throws(() => files.movePath(inst, 'world', 'world2', { running: true }), /in use/)
   assert.throws(() => files.movePath(inst, 'plugins/Example.jar', 'plugins/Other.jar', { running: true }), /in use/)
+  assert.throws(() => files.movePath(inst, 'plugins', 'plugins-old', { running: true }), /in use/)
   assert.throws(() => files.movePath(inst, 'paper.jar', 'server.properties'), /already exists/)
 })
 
@@ -196,6 +214,7 @@ test('a delete keeps a copy of everything it removes', async () => {
   assert.equal(snap.label, 'file-delete')
   assert.deepEqual(snap.members.sort(), ['plugins/Example', 'plugins/Example.jar'])
   await assert.rejects(files.deletePaths(inst, ['world'], { running: true }), /in use/)
+  await assert.rejects(files.deletePaths(inst, ['plugins'], { running: true }), /in use/)
   const bare = await files.deletePaths(inst, ['paper.jar'], { withoutCopy: true })
   assert.equal(bare.snapshot, null)
 })
