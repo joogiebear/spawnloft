@@ -200,3 +200,36 @@ test('the lock is released when the launch fails', async () => {
   await assert.rejects(launch('nojava', {}))
   assert.equal(fs.existsSync(clientLaunchLock('nojava')), false)
 })
+
+test('Linux arm64 is refused before Java is looked for or anything downloads', async () => {
+  createProfile('armless', { mc: '1.21.4' })
+  const fetches = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url) => { fetches.push(String(url)); throw new Error('no network in this test') }
+  try {
+    await assert.rejects(launch('armless', { os: { name: 'linux', arch: 'arm64', version: '6.1' } }),
+      { message: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  assert.deepEqual(fetches, [])
+  assert.equal(fs.existsSync(versionJson('1.21.4')), false)
+  assert.equal(fs.existsSync(clientLaunchLock('armless')), false)
+})
+
+test('Windows arm64 is refused for a version without arm64 natives, and launches with them', async () => {
+  const older = JSON.parse(fs.readFileSync(versionJson(mc), 'utf8'))
+  older.id = '1.20.4'
+  older.libraries = older.libraries.filter((l) => !l.name.endsWith(':natives-windows-arm64'))
+  fs.mkdirSync(versionDir('1.20.4'), { recursive: true })
+  fs.writeFileSync(versionJson('1.20.4'), JSON.stringify(older))
+  createProfile('winarm', { mc: '1.20.4' })
+  const winArm = { name: 'windows', arch: 'arm64', version: '10.0' }
+  await assert.rejects(launch('winarm', { fakeJava, os: winArm }),
+    { message: '1.20.4 ships no Windows arm64 natives; use a newer Minecraft version on this machine' })
+  assert.equal(status('winarm').running, false)
+
+  const res = await launch('life', { fakeJava, os: winArm })
+  assert.ok(res.pid)
+  await stop('life')
+})

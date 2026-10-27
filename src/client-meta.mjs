@@ -98,6 +98,53 @@ export function libraryPath(name) {
   return `${group}/${artifact}/${version}/${artifact}-${version}${cls}.${ext}`
 }
 
+// The natives classifier Mojang ships for this machine: natives-<os> is the x64 build, the
+// other arches carry a suffix. null when Mojang names none for this arch.
+export function nativesClassifier(os = currentOs()) {
+  const base = `natives-${os.name === 'osx' ? 'macos' : os.name}`
+  if (os.arch === 'x64') return base
+  if (os.arch === 'arm64') return `${base}-arm64`
+  if (os.arch === 'x86' && os.name === 'windows') return `${base}-x86`
+  return null
+}
+
+function classifierOf(name) {
+  const parts = name.split(':')
+  return parts.length >= 4 ? parts[3].split('@')[0] : ''
+}
+
+// The suffixes that name an arch build of a natives jar. Anything else after natives-<os>-
+// (or another OS altogether) is not an arch variant and is left to the rules, as before.
+const ARCH_SUFFIXES = ['', '-arm64', '-x86']
+
+// For a natives-<os>[-arch] classifier of this machine's OS, whether it is this machine's arch;
+// null when the classifier is not an arch build of this OS's natives.
+function archMatch(classifier, os) {
+  const base = `natives-${os.name === 'osx' ? 'macos' : os.name}`
+  if (!classifier.startsWith(base)) return null
+  if (!ARCH_SUFFIXES.includes(classifier.slice(base.length))) return null
+  return classifier === nativesClassifier(os)
+}
+
+const OS_LABEL = { windows: 'Windows', osx: 'macOS', linux: 'Linux' }
+
+// Why this machine cannot run the client, or null. Without a version only the machine is
+// judged (Linux arm64 and other arches Mojang has never built for, refused before anything
+// downloads); with one, a version whose natives rows have arch builds for this OS but not for
+// this arch is refused too (Windows arm64 before 1.21), rather than starting without natives.
+export function platformRefusal(version = null, os = currentOs()) {
+  if (nativesClassifier(os) === null || (os.name === 'linux' && os.arch === 'arm64')) {
+    return `the Minecraft client has no ${OS_LABEL[os.name] ?? os.name} ${os.arch} build; use bots on this machine`
+  }
+  if (!version) return null
+  const matches = (version.libraries ?? [])
+    .filter(lib => ruleAllows(lib.rules, { os }))
+    .map(lib => archMatch(classifierOf(lib.name), os))
+    .filter(m => m !== null)
+  if (matches.length === 0 || matches.includes(true)) return null
+  return `${version.id ?? 'this version'} ships no ${OS_LABEL[os.name] ?? os.name} ${os.arch} natives; use a newer Minecraft version on this machine`
+}
+
 export function libraries(version, { os = currentOs() } = {}) {
   const rows = []
   for (const lib of version.libraries ?? []) {
@@ -109,31 +156,35 @@ export function libraries(version, { os = currentOs() } = {}) {
     const s1 = dl?.artifact?.sha1 ?? lib.sha1 ?? null
     const sz = dl?.artifact?.size ?? lib.size ?? null
 
+    // Mojang's rules pick the OS but not the arch, so a Mac is offered both natives-macos and
+    // natives-macos-arm64: only the one for this arch is taken, and the others are left out
+    // altogether (neither extracted nor on the classpath).
+    const classifier = classifierOf(lib.name)
+    const arch = archMatch(classifier, os)
+    if (arch === false) continue
     // Mojang names the macOS natives "natives-macos", not "natives-osx" as the rules do
-    const lastSeg = lib.name.split(':').pop()
     const nativeOs = os.name === 'osx' ? 'macos' : os.name
-    const isModernNative = lastSeg.startsWith('natives-') && lastSeg.slice(8).startsWith(nativeOs)
-
-    if (isModernNative) {
+    if (arch === true || classifier.startsWith(`natives-${nativeOs}`)) {
       rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: { extract: { exclude: [] } } })
-    } else {
-      rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
+      continue
+    }
 
-      const nativesKey = lib.natives?.[os.name]
-      if (nativesKey) {
-        const archNum = os.arch === 'x86' ? '32' : '64'
-        const resolved = nativesKey.replace('${arch}', archNum)
-        const clsDl = dl?.classifiers?.[resolved]
-        if (clsDl) {
-          rows.push({
-            name: `${lib.name}:${resolved}`,
-            path: clsDl.path ?? libraryPath(`${lib.name}:${resolved}`),
-            url: clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + (clsDl.path ?? libraryPath(`${lib.name}:${resolved}`)),
-            sha1: clsDl.sha1 ?? null,
-            size: clsDl.size ?? null,
-            native: { extract: { exclude: lib.extract?.exclude ?? [] } },
-          })
-        }
+    rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
+
+    const nativesKey = lib.natives?.[os.name]
+    if (nativesKey) {
+      const archNum = os.arch === 'x86' ? '32' : '64'
+      const resolved = nativesKey.replace('${arch}', archNum)
+      const clsDl = dl?.classifiers?.[resolved]
+      if (clsDl) {
+        rows.push({
+          name: `${lib.name}:${resolved}`,
+          path: clsDl.path ?? libraryPath(`${lib.name}:${resolved}`),
+          url: clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + (clsDl.path ?? libraryPath(`${lib.name}:${resolved}`)),
+          sha1: clsDl.sha1 ?? null,
+          size: clsDl.size ?? null,
+          native: { extract: { exclude: lib.extract?.exclude ?? [] } },
+        })
       }
     }
   }

@@ -3,7 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir } from './client-paths.mjs'
-import { currentOs, mergeInherited, libraries, assetIndex, assetObjects } from './client-meta.mjs'
+import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal } from './client-meta.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
 import { fail } from './util.mjs'
@@ -56,8 +56,9 @@ async function inBatches(items, limit, worker) {
 
 // One data root can serve two operating systems (a dual boot, a portable drive): the stamp
 // says whose natives are extracted, so a switch re-extracts them.
+// v2: natives are now chosen per arch, so a folder extracted with every arch's jars is redone
 function nativesStamp(id, os) {
-  return `${id} ${os.name} ${os.arch}`
+  return `${id} ${os.name} ${os.arch} natives-v2`
 }
 
 export async function extractNatives(id, nativeRows, { os }) {
@@ -105,6 +106,9 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     const parentJson = JSON.parse(fs.readFileSync(versionJson(rawJson.inheritsFrom), 'utf8'))
     version = mergeInherited(rawJson, parentJson)
   }
+  // before the first download: natives this machine cannot load are not worth fetching
+  const refusal = platformRefusal(version, os)
+  if (refusal) fail(refusal)
 
   const jarPath = versionJar(id)
 

@@ -145,3 +145,20 @@ test('the panel lists, launches, reports and stops a client profile', async () =
   const stopData2 = await stopRes2.json()
   assert.equal(stopData2.stopped, false)
 })
+
+test('the panel shows the Linux arm64 refusal as the launch error', async () => {
+  // currentOs() reads these on every call; the refusal comes before anything else is touched
+  const real = { platform: process.platform, arch: process.arch }
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+  Object.defineProperty(process, 'arch', { value: 'arm64', configurable: true })
+  let res
+  try {
+    res = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  } finally {
+    Object.defineProperty(process, 'platform', { value: real.platform, configurable: true })
+    Object.defineProperty(process, 'arch', { value: real.arch, configurable: true })
+  }
+  assert.equal(res.status, 400)
+  assert.deepEqual(await res.json(), { error: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })
+  assert.equal(client.status('pp').running, false)
+})

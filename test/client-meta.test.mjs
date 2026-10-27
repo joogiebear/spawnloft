@@ -19,6 +19,8 @@ const {
   mergeInherited,
   libraryPath,
   libraries,
+  nativesClassifier,
+  platformRefusal,
   assetIndex,
   assetObjects,
   gameArguments,
@@ -67,18 +69,74 @@ test('mergeInherited: minecraftArguments carried across when neither side has ar
   assert.deepEqual(gameArguments(merged), ['a', 'b', 'c'])
 })
 
-test('libraries(): native row only for windows', () => {
-  const winOs = { name: 'windows', arch: 'x64', version: '10.0' }
-  const linuxOs = { name: 'linux', arch: 'x64', version: '5.10' }
+const nativeNames = (os) => libraries(versionFixture, { os }).filter(r => r.native !== false).map(r => r.name).sort()
 
-  const winRows = libraries(versionFixture, { os: winOs })
-  const linuxRows = libraries(versionFixture, { os: linuxOs })
+test('libraries(): exactly one arch of natives per machine', () => {
+  const cases = [
+    [{ name: 'osx', arch: 'arm64', version: '24.0' }, ['org.lwjgl:lwjgl:3.3.3:natives-macos-arm64']],
+    [{ name: 'osx', arch: 'x64', version: '24.0' }, ['org.lwjgl:lwjgl:3.3.3:natives-macos']],
+    // the old-style map row (pre-1.19 shape) is left as it was: its ${arch} is only 32 or 64
+    [{ name: 'windows', arch: 'arm64', version: '10.0' }, ['org.lwjgl:lwjgl:3.3.3:natives-windows', 'org.lwjgl:lwjgl:3.3.3:natives-windows-arm64']],
+    // the jtracy row is x64 only; the old-style map row adds natives-windows on x64 (and x86)
+    [{ name: 'windows', arch: 'x64', version: '10.0' }, ['com.mojang:jtracy:1.0.37:natives-windows', 'org.lwjgl:lwjgl:3.3.3:natives-windows'].sort()],
+    // the old-style map row has no ${arch} in it, and its jars carried 32 and 64 bit alike
+    [{ name: 'windows', arch: 'x86', version: '10.0' }, ['org.lwjgl:lwjgl:3.3.3:natives-windows', 'org.lwjgl:lwjgl:3.3.3:natives-windows-x86']],
+    [{ name: 'linux', arch: 'x64', version: '6.1' }, ['org.lwjgl:lwjgl:3.3.3:natives-linux']],
+  ]
+  for (const [os, expected] of cases) {
+    assert.deepEqual(nativeNames(os), expected, `${os.name}/${os.arch}`)
+  }
+})
 
-  const winNative = winRows.filter(r => r.native !== false)
-  assert.ok(winNative.length > 0, 'expected native rows on windows')
+test('libraries(): another arch\'s natives are not put on the classpath either', () => {
+  const rows = libraries(versionFixture, { os: { name: 'osx', arch: 'arm64', version: '24.0' } })
+  assert.ok(!rows.some(r => r.name === 'org.lwjgl:lwjgl:3.3.3:natives-macos'))
+  assert.ok(!rows.some(r => r.name.includes(':natives-') && !r.name.endsWith(':natives-macos-arm64')))
+})
 
-  const linuxNative = linuxRows.filter(r => r.native !== false)
-  assert.equal(linuxNative.length, 0, 'no native rows on linux')
+test('nativesClassifier: x64 has no suffix, arm64 and Windows x86 do, anything else has none', () => {
+  assert.equal(nativesClassifier({ name: 'osx', arch: 'x64' }), 'natives-macos')
+  assert.equal(nativesClassifier({ name: 'osx', arch: 'arm64' }), 'natives-macos-arm64')
+  assert.equal(nativesClassifier({ name: 'windows', arch: 'x86' }), 'natives-windows-x86')
+  assert.equal(nativesClassifier({ name: 'linux', arch: 'x86' }), null)
+  assert.equal(nativesClassifier({ name: 'linux', arch: 'riscv64' }), null)
+})
+
+test('platformRefusal: Linux arm64 always, Windows arm64 only without arm64 natives', () => {
+  const linuxArm = { name: 'linux', arch: 'arm64', version: '6.1' }
+  const winArm = { name: 'windows', arch: 'arm64', version: '10.0' }
+  assert.equal(platformRefusal(null, linuxArm), 'the Minecraft client has no Linux arm64 build; use bots on this machine')
+  assert.equal(platformRefusal(versionFixture, linuxArm), 'the Minecraft client has no Linux arm64 build; use bots on this machine')
+  assert.equal(platformRefusal(null, winArm), null)
+  assert.equal(platformRefusal(versionFixture, winArm), null)
+  for (const os of [
+    { name: 'osx', arch: 'arm64', version: '24.0' },
+    { name: 'windows', arch: 'x64', version: '10.0' },
+    { name: 'linux', arch: 'x64', version: '6.1' },
+  ]) assert.equal(platformRefusal(versionFixture, os), null, `${os.name}/${os.arch}`)
+
+  const older = { ...versionFixture, id: '1.20.4', libraries: versionFixture.libraries.filter(l => !l.name.endsWith(':natives-windows-arm64')) }
+  assert.equal(platformRefusal(older, winArm), '1.20.4 ships no Windows arm64 natives; use a newer Minecraft version on this machine')
+  assert.equal(platformRefusal(older, { name: 'windows', arch: 'x64', version: '10.0' }), null)
+  // a version without arch builds of natives (none at all, or only the old per-OS map) is not judged
+  assert.equal(platformRefusal({ id: 'x', libraries: [] }, winArm), null)
+  const legacy = { id: '1.18.2', libraries: [{ name: 'org.lwjgl:lwjgl:3.2.1', natives: { osx: 'natives-macos' } }] }
+  assert.equal(platformRefusal(legacy, { name: 'osx', arch: 'arm64', version: '24.0' }), null)
+  // an arch Mojang names no natives for at all is refused like Linux arm64
+  assert.equal(platformRefusal(null, { name: 'linux', arch: 'arm', version: '6.1' }), 'the Minecraft client has no Linux arm build; use bots on this machine')
+  assert.equal(platformRefusal(null, { name: 'windows', arch: 'x86', version: '10.0' }), null)
+})
+
+test('libraries(): a natives row that is not an arch build (natives-macos-patch) is kept as before', () => {
+  const version = { id: 'p', libraries: [
+    { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos-patch', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/p.jar', url: 'https://x/g/p.jar', sha1: null, size: 1 } } },
+    { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/x.jar', url: 'https://x/g/x.jar', sha1: null, size: 1 } } },
+    { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos-arm64', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/a.jar', url: 'https://x/g/a.jar', sha1: null, size: 1 } } },
+  ] }
+  const names = (arch) => libraries(version, { os: { name: 'osx', arch, version: '24.0' } }).filter(r => r.native !== false).map(r => r.name.split(':')[3])
+  assert.deepEqual(names('arm64'), ['natives-macos-patch', 'natives-macos-arm64'])
+  assert.deepEqual(names('x64'), ['natives-macos-patch', 'natives-macos'])
+  assert.equal(platformRefusal(version, { name: 'osx', arch: 'arm64', version: '24.0' }), null)
 })
 
 test('assetObjects: two-character prefix in path and url', () => {

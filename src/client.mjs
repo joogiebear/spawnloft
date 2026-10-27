@@ -6,7 +6,7 @@ import { readJson, writeJson, fail, validateName, acquireLock, lockHolder } from
 import { parseMemoryGb } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
-import { mergeInherited, fetchManifest, fetchVersionJson } from './client-meta.mjs'
+import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
@@ -192,12 +192,15 @@ export async function launch(name, opts = {}) {
 
 // `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
 // Microsoft account is then allowed only on a profile whose assistantAccount key says so.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false, os = currentOs() }) {
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
     fail(`profile "${name}" is already running (pid ${st.pid}); stop it first`)
   }
+  // a machine Mojang never built for is refused before Java is looked for or anything downloads
+  const machineRefusal = platformRefusal(null, os)
+  if (machineRefusal) fail(machineRefusal)
   if (profile.harness && !harnessFor(profile.mc)) {
     fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
   }
@@ -216,11 +219,11 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     }
     if (!fs.existsSync(versionJson(versionId))) {
       versionId = await prepareVersion(name, { onProgress })
-      await ensureVersion(versionId, { onProgress })
+      await ensureVersion(versionId, { os, onProgress })
     }
   } else {
     versionId = await prepareVersion(name, { onProgress })
-    await ensureVersion(versionId, { onProgress })
+    await ensureVersion(versionId, { os, onProgress })
     if (profile.loader === 'fabric') await ensureFabricApi(name, profile.mc, { onProgress })
     if (profile.harness) await ensureHarnessJar(name, profile.mc, { onProgress })
   }
@@ -230,6 +233,9 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     const parentJson = JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8'))
     version = mergeInherited(version, parentJson)
   }
+  // ensureVersion refuses too, but an installed version can skip it (the fakeJava path)
+  const versionRefusal = platformRefusal(version, os)
+  if (versionRefusal) fail(versionRefusal)
 
   // --as names an offline player; a signed-in account brings its own name. Both at once is a
   // contradiction, not a preference.
@@ -242,7 +248,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
-  const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, harnessToken })
+  const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, os, harnessToken })
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name } }

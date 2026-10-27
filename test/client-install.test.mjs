@@ -162,5 +162,21 @@ test('extractNatives skips META-INF and excluded prefixes', async () => {
   assert.ok(!entries.includes('META-INF'), 'META-INF skipped')
   assert.ok(!entries.includes('skip'), 'skip/ prefix excluded')
   assert.equal(result.files, 1)
-  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64`)
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64 natives-v2`)
+})
+
+test('ensureVersion refuses natives this machine cannot load before the first download', async () => {
+  const older = JSON.parse(JSON.stringify(fixture))
+  older.id = '1.20.4-noarm'
+  older.libraries = older.libraries.filter(l => !l.name.endsWith(':natives-windows-arm64'))
+  fs.mkdirSync(versionDir(older.id), { recursive: true })
+  fs.writeFileSync(versionJson(older.id), JSON.stringify(older))
+
+  const { calls, fetchImpl } = makeStub()
+  await assert.rejects(ensureVersion(older.id, { os: { name: 'windows', arch: 'arm64', version: '10' }, fetchImpl }),
+    { message: '1.20.4-noarm ships no Windows arm64 natives; use a newer Minecraft version on this machine' })
+  await assert.rejects(ensureVersion(older.id, { os: { name: 'linux', arch: 'arm64', version: '6.1' }, fetchImpl }),
+    { message: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })
+  assert.deepEqual(calls, [])
+  assert.equal(fs.existsSync(versionJar(older.id)), false)
 })
