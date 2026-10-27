@@ -32,7 +32,23 @@ at once. `spawnloft client install <name>` does the download without starting th
 
 `launch` takes `--as <playerName>` to play offline under another name, `--account <name>` to
 play as a signed-in Microsoft account, `--server <name>` to point at a different server for this run, and `--wait`, which keeps the command alive for five seconds and
-fails if the game died in that time. Everything else goes through `status`, `stop` and `logs`.
+fails if the game died in that time. It does not wait for the game to load or join; the
+assistant's `client_launch` does (see [The harness](#the-harness)). Everything else goes through `status`, `stop` and `logs`.
+
+If the profile's server is stopped, or is in online mode while the player is offline, `launch`
+still starts the game but prints a `warning:` (and `--json` carries it in `warnings`), because the
+game would only show "Connection refused" or a login refusal. Start the server, sign in, or set
+`online-mode=false` on a test server. A profile whose `server` is a database target is refused
+before anything downloads.
+
+**Platforms.** Windows x64, macOS on Apple Silicon (tested on an arm64 Mac with arm64 Java) and
+Linux x64 are supported. Linux arm64 is not: Mojang ships no arm64 Linux natives, so `launch` and
+`install` refuse with "use bots on this machine" before downloading anything. Windows arm64 works
+only for Minecraft versions that ship Windows arm64 natives (1.21 and newer) and is refused for
+older ones. The native libraries come from the machine's own CPU architecture, as Node reports
+it, not from the chosen Java's: a Java of the other architecture
+than the machine's (an x64 Java under Rosetta on Apple Silicon) will not load them, so use a
+native Java there.
 
 ## Profiles
 
@@ -54,11 +70,13 @@ A profile is a few keys, all changeable with `set`:
 | `java` | A specific Java to use, or empty to let SpawnLoft pick. |
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
 | `account` | A signed-in Microsoft account to play as (see [Accounts](#accounts)), or empty to play offline. |
+| `assistantAccount` | `true` lets an AI assistant launch this profile when it plays as a signed-in Microsoft account (`account=`). `false` by default for every profile, however it was made; only `set` turns it on. Offline profiles are not affected. |
 | `harness` | `true` installs the harness mod and Fabric API into the profile's `mods/` on launch and opens the control channel. Needs `loader=fabric`. |
 
 Profile names follow the same rule as server names: letters, digits, dash and underscore, up to
-32 characters. `remove` forgets the profile; `--purge` also deletes its game folder, with its
-saves, screenshots and mods.
+32 characters. `remove` forgets the profile but keeps its game folder, with its saves,
+screenshots and mods, on disk; `--purge` deletes the folder too. A profile that is running or
+being launched cannot be removed.
 
 Each profile has its own game folder, so its `options.txt`, resource packs, mods and
 screenshots are its own. Put mods in `client/profiles/<name>/mods/` (see the layout below) the
@@ -94,9 +112,17 @@ an adult in its Microsoft family first. The sign-in itself goes through Microsof
 servers only, and Microsoft must have approved SpawnLoft's registration for Minecraft sign-in; until
 it has, the command says so and offline profiles still work.
 
-An AI assistant cannot sign in or read the accounts file: `client_launch` uses whatever account a
-profile names, and the tokens never appear in a tool result, a state file, the activity log or a
-diagnostics bundle.
+An AI assistant cannot sign in or read the accounts file, and it cannot launch a profile that plays
+as your Microsoft account until you allow it for that profile:
+
+```
+spawnloft client set play assistantAccount=true
+```
+
+`client_launch` refuses such a profile with that command in the message, and `client_profiles`
+marks it "not for assistants". Launching from the command line or the panel is never affected, and
+an offline profile needs no permission. The tokens never appear in a tool result, the activity log
+or a diagnostics bundle.
 
 ## The harness
 
@@ -110,6 +136,14 @@ token: SpawnLoft, on the same machine. The first request on a connection must ca
 the connection is closed without a word; one connection is served at a time; the token is fresh
 on every launch and dies with the game.
 
+`client_launch` waits (up to 90 seconds) until the game has loaded: the title screen, or the world
+when the profile joins a server, plus a moment for Mojang's loading overlay to fade, so a
+screenshot taken right after is not the splash. `client_join` waits until the player is in the
+world (up to 60 seconds) and says so if the server kicks it during loading. If the game is still
+joining the profile's own server it waits for that connection instead of starting a second one, it
+does nothing if the player is already there, and it refuses another server until the first
+connection is done.
+
 What the harness can do, in the words the MCP tools use: tell what screen the game shows and
 which server it is on (`client_status`), join one of your servers (`client_join`), send chat or a
 command as the player (`client_chat`; `stop`, `restart` and `reload` are refused, as they are from
@@ -118,12 +152,16 @@ the console tools), read the messages the client received (`client_messages`), t
 reach anything the player could not.
 
 Everything the harness returns, chat, titles, screen titles and item names, is game content
-written by players, plugins and servers. The tools say so in their replies, and an assistant
-should treat it as data rather than instructions.
+written by players, plugins and servers. The tools say so in their replies (`client_logs` and
+`client_status` too), and an assistant should treat it as data rather than instructions.
+`client_chat` waits a few seconds for the server's echo of the message before it returns.
 
-Two things to know about the token. It is passed to the game as a JVM flag, so anyone who can
-list the processes on this machine can read it while the game runs; on a machine you share with
-people you do not trust, leave the harness off. And Minecraft's crash reports list the JVM flags,
+Two things to know about the token. It is passed to the game as a JVM flag
+(`-Dspawnloft.harness.token=...`), so any other user on this machine can read it from the process
+list while the game runs (`ps`, Task Manager's command line column, `/proc/<pid>/cmdline` on
+Linux); with it they can drive your game window through the harness. On a machine you share with
+people you do not trust, leave the harness off. The profile's `run/<name>/state.json`, which also
+holds the token, is readable only by your own user. And Minecraft's crash reports list the JVM flags,
 so a crash report in the profile's `crash-reports/` holds a token that is already dead; the
 diagnostics bundle redacts it anyway.
 
@@ -162,7 +200,8 @@ client/
   libraries/                 shared by every version
   assets/                    shared by every version
   natives/<id>/              the native libraries, per version
-  run/<name>/state.json      what is running: pid, start time, player, harness port
+  run/<name>/state.json      what is running: pid, start time, player, server, harness token and port (owner-only)
+  run/<name>/launch.lock     held while a launch is under way, so two Play clicks cannot start two games
   run/<name>/client.log      SpawnLoft's capture of what the game process printed, one launch at a time
   run/<name>/cache/          Mojang's and Fabric's version lists, with the time they were fetched
 ```
@@ -170,13 +209,19 @@ client/
 `spawnloft client logs <name>` shows the process capture (JVM errors land there);
 `--latest` shows the game's own `logs/latest.log`.
 
+A second launch of a profile that is starting or running is refused ("is being launched (pid N)").
+The lock treats its holder as alive when that process id exists, like every other SpawnLoft lock,
+so after a crash or reboot a process id reused by something unrelated keeps the profile refused
+until that process exits. If it never does, delete `client/run/<name>/launch.lock`.
+
 ## When something goes wrong
 
 `spawnloft diag <server> --client <profile>` writes one zip with the server's console and
 daemon log, the client's `latest.log` and process capture, both sides' newest crash reports, the
 profile's `options.txt`, and the known-problem findings for each side, all on one timeline so a
-client error lines up with what the server was doing at that moment. Passwords and your account
-name are removed first. `diag --client <profile>` on its own does the client half. An AI
+client error lines up with what the server was doing at that moment. Passwords and your computer
+account's name in file paths are removed first; the Minecraft player name is not, so an offline
+`--as` name stays in the bundle. `diag --client <profile>` on its own does the client half. An AI
 assistant gets the same through the `diagnostics` tool with `client: "<profile>"`.
 
 The findings the client side knows: out of memory, a graphics driver that cannot open a window
@@ -190,7 +235,7 @@ that would not load, a crash, and a Java too old for the version.
 - Sign in for an AI assistant. A person signs in on the command line; offline players join offline-mode servers only.
 - Download Java. Install Java 21 or newer yourself, as for a server.
 - Bundle mods or tweaks of its own. The only mod it ever installs is the harness, and only when a profile asks for it.
-- Run on a machine with no display. The client needs a graphics driver; use bots there.
+- Run on Linux arm64, or on a machine with no display. The client needs a graphics driver; use bots there.
 - Drive the game through anything but the harness: no screen scraping, no input injection.
 - Create or delete profiles from an AI assistant. That stays with you, on the command line, so an
   assistant cannot fill the disk with game versions.

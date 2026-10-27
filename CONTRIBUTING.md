@@ -34,6 +34,8 @@ npm test                 # node:test, no dependencies, ~a second
 node mcctl.mjs ui --no-open --port 8771    # the panel, from source
 ```
 
+`npm test` runs `tools/run-tests.mjs`, which lists the test files itself because Node 20's `--test` does not expand a glob (21 and later do); extra arguments go through, e.g. `npm test -- --test-name-pattern=client`. To run one file, use `node --test test/<file>`. `MCCTL_FAKE_CLIENT` (a stand-in game for the client tests) is honoured only with `NODE_ENV=test`; it is not a user setting.
+
 Tests live in `test/` and run on every push and pull request, on Windows and on
 Linux. Both count: each platform has a scheduler, a control channel and a process table of
 its own, and code that only runs there. New behaviour that has a pure core should come with tests for

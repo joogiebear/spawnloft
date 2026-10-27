@@ -13,7 +13,8 @@ It also launches the game itself. `spawnloft client new play --mc 1.21.11 --serv
 `spawnloft client launch play` installs the real Minecraft client from Mojang and starts it
 pointed at your server, as an offline player. With the harness mod on a profile, an AI assistant
 can join, chat, take a screenshot and read the client's logs as a real player, where scripted
-bots only see packets. See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
+bots only see packets. Windows, Apple Silicon Macs and Linux x64 are supported (not Linux arm64).
+See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
 
 Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
 GNU tar, which cannot read or write a zip, world import and export use a zip reader and
