@@ -253,7 +253,8 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, os, harnessToken })
   const warnings = target ? serverWarnings(target, account) : []
-  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
+  // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
 }
@@ -329,6 +330,24 @@ async function viaSession(name, fn) {
   }
 }
 
+// a kick can land on the disconnect screen or straight back on the title or server list
+const leftServer = (screen) => screen === 'disconnected' || screen === 'title' || screen === 'multiplayer'
+
+async function waitInWorld(name, server, waitMs) {
+  // The mod answers once the player entity exists, while the screen still says "Loading
+  // terrain"; anything done then lands before the world is there. Wait for "ingame".
+  const deadline = Date.now() + waitMs
+  let st = await viaSession(name, (ch) => ch.call('status'))
+  while (st.screen !== 'ingame' && !leftServer(st.screen) && Date.now() < deadline) {
+    await sleep(500)
+    st = await viaSession(name, (ch) => ch.call('status'))
+  }
+  if (leftServer(st.screen)) {
+    fail(`"${name}" was disconnected from ${server} while the world loaded; read the reason with client_status or spawnloft client logs ${name}`)
+  }
+  return st
+}
+
 export async function join(name, server, { loadWaitMs = 60000 } = {}) {
   const check = checkInstance(server)
   // The offline-mode rule is for players without an account; a signed-in one may join an online server.
@@ -337,21 +356,58 @@ export async function join(name, server, { loadWaitMs = 60000 } = {}) {
   if (problems.length) fail(problems.join(' '))
   const host = check.host
   const port = check.inst.port
-  const result = await viaSession(name, (ch) => ch.call('join', { host, port }, { timeout: 65000 }))
-  // The mod answers once the player entity exists, while the screen still says "Loading
-  // terrain"; anything done then lands before the world is there. Wait for "ingame".
-  const deadline = Date.now() + loadWaitMs
+  // A profile with a server joins it by itself on launch. Asked to join while that is under way
+  // (the connect screen comes before there is a connection the mod can see), a second connect
+  // would race the first, so wait for the first one instead; another server has to wait its turn.
+  const before = await viaSession(name, (ch) => ch.call('status'))
+  const isHere = (st) => Boolean(st.connected && st.connected.host === host && st.connected.port === port)
+  const launchTarget = readClientState(name)?.server ?? null
+  let result
+  if (isHere(before)) {
+    result = { joined: true, already: true }
+  } else if (!before.connected && launchTarget === server && (before.screen === 'connecting' || before.screen === 'other')) {
+    // still loading, or on the connect screen: the launch's own join is coming or under way
+    result = { joined: true, already: true }
+  } else if (before.screen === 'connecting' && !before.connected) {
+    fail(`"${name}" is still connecting to a server; wait until client_status shows it in the world, then disconnect before joining ${server}`)
+  } else {
+    result = await viaSession(name, (ch) => ch.call('join', { host, port }, { timeout: 65000 }))
+  }
+  const st = await waitInWorld(name, server, loadWaitMs)
+  // a connect we waited on may have been to another server (one picked in the game's server list)
+  if (st.connected && !isHere(st)) {
+    fail(`"${name}" is on ${st.connected.host}:${st.connected.port}, not ${server}; disconnect first`)
+  }
+  return { ...result, server, host, port, loaded: st.screen === 'ingame', screen: st.screen }
+}
+
+// The harness answers before the game has loaded its resources (no screen yet), and a launch
+// with a server then shows the connect and terrain screens; a screenshot taken before the end
+// shows Mojang's loading overlay. Wait for the title screen, or the world (or a disconnect)
+// when the launch joins a server, then for the overlay's one-second fade-out. While resources
+// load there is no screen at all ("other" with no title); a titled "other" is a real screen,
+// such as the accessibility one a fresh profile opens with.
+export const LAUNCH_WAIT_MS = 90000
+
+export async function waitUntilLoaded(name, { server = null, timeoutMs = LAUNCH_WAIT_MS, fadeMs = 1500 } = {}) {
+  const booting = (st) => (st.screen === 'other' && !st.screenTitle) || /loading/i.test(st.screenTitle || '')
+  let connecting = false
+  const loaded = (st) => {
+    if (st.screen === 'connecting') connecting = true
+    if (!server) return !booting(st) && st.screen !== 'connecting'
+    // a refused or kicked join can land back on the title screen, but so can the moment before
+    // the launch's join starts, so the title counts only once the join was seen
+    return st.screen === 'ingame' || st.screen === 'disconnected' || st.screen === 'multiplayer' || (connecting && st.screen === 'title')
+  }
+  const deadline = Date.now() + timeoutMs
   let st = await viaSession(name, (ch) => ch.call('status'))
-  // a kick can land on the disconnect screen or straight back on the title or server list
-  const gone = (screen) => screen === 'disconnected' || screen === 'title' || screen === 'multiplayer'
-  while (st.screen !== 'ingame' && !gone(st.screen) && Date.now() < deadline) {
+  while (!loaded(st) && Date.now() < deadline) {
     await sleep(500)
     st = await viaSession(name, (ch) => ch.call('status'))
   }
-  if (gone(st.screen)) {
-    fail(`"${name}" was disconnected from ${server} while the world loaded; read the reason with client_status or spawnloft client logs ${name}`)
-  }
-  return { ...result, server, host, port, loaded: st.screen === 'ingame', screen: st.screen }
+  if (!loaded(st)) return { ...st, loaded: false }
+  await sleep(fadeMs)
+  return { ...(await viaSession(name, (ch) => ch.call('status'))), loaded: true }
 }
 
 export async function chat(name, text) {

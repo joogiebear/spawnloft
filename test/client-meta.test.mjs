@@ -127,16 +127,32 @@ test('platformRefusal: Linux arm64 always, Windows arm64 only without arm64 nati
   assert.equal(platformRefusal(null, { name: 'windows', arch: 'x86', version: '10.0' }), null)
 })
 
-test('libraries(): a natives row that is not an arch build (natives-macos-patch) is kept as before', () => {
+test('libraries(): natives-macos-patch is the Intel Mac build, left out on Apple Silicon', () => {
   const version = { id: 'p', libraries: [
     { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos-patch', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/p.jar', url: 'https://x/g/p.jar', sha1: null, size: 1 } } },
     { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/x.jar', url: 'https://x/g/x.jar', sha1: null, size: 1 } } },
     { name: 'org.lwjgl:lwjgl-glfw:3.3.3:natives-macos-arm64', rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: 'g/a.jar', url: 'https://x/g/a.jar', sha1: null, size: 1 } } },
   ] }
   const names = (arch) => libraries(version, { os: { name: 'osx', arch, version: '24.0' } }).filter(r => r.native !== false).map(r => r.name.split(':')[3])
-  assert.deepEqual(names('arm64'), ['natives-macos-patch', 'natives-macos-arm64'])
+  assert.deepEqual(names('arm64'), ['natives-macos-arm64'])
   assert.deepEqual(names('x64'), ['natives-macos-patch', 'natives-macos'])
   assert.equal(platformRefusal(version, { name: 'osx', arch: 'arm64', version: '24.0' }), null)
+})
+
+test('libraries(): the 1.21.11 freetype rows give an Intel Mac the patch jar and Apple Silicon only arm64', () => {
+  // as in Mojang's 1.21.11.json: freetype has a -patch row (macos/x64 files) and an arm64 row,
+  // but no plain natives-macos row
+  const row = (cls, file) => ({ name: `org.lwjgl:lwjgl-freetype:3.3.3:${cls}`, rules: [{ action: 'allow', os: { name: 'osx' } }], downloads: { artifact: { path: `f/${file}.jar`, url: `https://x/f/${file}.jar`, sha1: null, size: 1 } } })
+  const version = { id: '1.21.11', libraries: [row('natives-macos-patch', 'p'), row('natives-macos-arm64', 'a')] }
+  const names = (arch) => libraries(version, { os: { name: 'osx', arch, version: '24.0' } }).map(r => r.name.split(':')[3])
+  assert.deepEqual(names('arm64'), ['natives-macos-arm64'])
+  assert.deepEqual(names('x64'), ['natives-macos-patch'])
+  // the patch jar is an x64 build, so an Intel Mac is not refused for lacking plain natives-macos
+  assert.equal(platformRefusal(version, { name: 'osx', arch: 'x64', version: '14' }), null)
+  assert.equal(platformRefusal(version, { name: 'osx', arch: 'arm64', version: '14' }), null)
+  // elsewhere a -patch suffix is not an arch build and is left to the rules
+  const winPatch = { id: 'w', libraries: [{ ...row('natives-windows-patch', 'wp'), rules: [{ action: 'allow', os: { name: 'windows' } }] }] }
+  assert.deepEqual(libraries(winPatch, { os: { name: 'windows', arch: 'arm64', version: '10.0' } }).map(r => r.name.split(':')[3]), ['natives-windows-patch'])
 })
 
 test('assetObjects: two-character prefix in path and url', () => {

@@ -188,8 +188,8 @@ Add them after `mcp` in `args`.
 | `write_config_file` | Changes one configuration file: an exact `old_text` to `new_text` replacement, or `content` for a whole or new file. Snapshots the file first. |
 | `upgrade_build` | The newest build of the same software and Minecraft version. The old jar is kept. |
 | `bot_run_scenario` | Join a server as up to five scripted players and run a test scenario against a plugin: commands, chat, GUI clicks and checks on messages, items, state and the console. Setup commands run as the console, like `run_command`. |
-| `client_launch` | Starts the real game client for one profile as an offline player, downloading what it needs the first time. With `wait` (the default) it reports the screen once the harness answers. |
-| `client_join` | Connects a running client to one of your servers. The server must be running and, for an offline player, in offline mode. |
+| `client_launch` | Starts the real game client for one profile as an offline player, downloading what it needs the first time. With `wait` (the default) it waits until the game has loaded (the title screen, or the world when the profile joins a server) and reports the screen. |
+| `client_join` | Connects a running client to one of your servers. The server must be running and, for an offline player, in offline mode. If the game is already joining or in that server (a profile with a `server` joins it on launch), it waits for that connection instead of starting a second one. |
 | `client_chat` | Sends chat or a command as the player. `stop`, `restart` and `reload` are refused, as in `run_command`. |
 | `client_screenshot` | Takes a screenshot and returns the file path. |
 | `client_quit` | Closes the client. |

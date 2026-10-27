@@ -11,7 +11,7 @@ process.env.MCCTL_DATA_ROOT = scratch
 // the fake game shows "connecting" this long after a join answers, as the real one loads terrain
 process.env.FAKE_CLIENT_LOAD_MS = '700'
 
-const { launch, status, stop, createProfile, session, join, chat, messages, screenshot, player, screen, disconnect } = await import('../src/client.mjs')
+const { launch, status, stop, createProfile, session, join, chat, messages, screenshot, player, screen, disconnect, waitUntilLoaded, tailClientLog } = await import('../src/client.mjs')
 const { putInstance } = await import('../src/registry.mjs')
 const { stateFile, INSTANCES_DIR } = await import('../src/paths.mjs')
 const { writeJson } = await import('../src/util.mjs')
@@ -39,7 +39,9 @@ makeServer('online', 45631, 'online-mode=true\nserver-ip=\n')
 makeServer('offline', 45633, 'online-mode=false\nserver-ip=127.0.0.1\n')
 
 after(async () => {
-  try { await stop('harn') } catch {}
+  for (const name of ['harn', 'boot', 'qp']) {
+    try { await stop(name) } catch {}
+  }
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
@@ -152,4 +154,101 @@ test('stop resolves and cleans up', async () => {
 
 test('session rejects after stop', async () => {
   await assert.rejects(session('harn'), /not running/)
+})
+
+// The fake game reads these when it starts, so each test sets them around its own launch.
+async function launchWith(name, env, opts = {}) {
+  const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]))
+  Object.assign(process.env, env)
+  try {
+    return await launch(name, { fakeJava, ...opts })
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  }
+}
+
+test('waitUntilLoaded waits past the resource load for the title screen', async () => {
+  createProfile('boot', { mc: '1.21.11', loader: 'fabric', loaderVersion: '0.19.5', harness: true })
+  try {
+    await launchWith('boot', { FAKE_CLIENT_BOOT_MS: '800' })
+    assert.equal((await session('boot').then((ch) => ch.call('status'))).screen, 'other')
+    const st = await waitUntilLoaded('boot', { fadeMs: 0 })
+    assert.equal(st.loaded, true)
+    assert.equal(st.screen, 'title')
+    // and one that outlasts the wait says so
+    await stop('boot')
+    await launchWith('boot', { FAKE_CLIENT_BOOT_MS: '5000' })
+    const early = await waitUntilLoaded('boot', { timeoutMs: 200, fadeMs: 0 })
+    assert.equal(early.loaded, false)
+    assert.equal(early.screen, 'other')
+  } finally {
+    await stop('boot')
+  }
+})
+
+test('a launch with a server: waitUntilLoaded waits for the world, and join waits for that connect instead of racing it', async () => {
+  makeServer('other', 45639, 'online-mode=false\nserver-ip=127.0.0.1\n')
+  createProfile('qp', { mc: '1.21.11', loader: 'fabric', loaderVersion: '0.19.5', harness: true, server: 'offline' })
+  try {
+    await launchWith('qp', { FAKE_CLIENT_QUICKPLAY_MS: '1500' })
+    const loaded = await waitUntilLoaded('qp', { server: 'offline', fadeMs: 0 })
+    assert.equal(loaded.loaded, true)
+    assert.equal(loaded.screen, 'ingame')
+    assert.deepEqual(loaded.connected, { host: '127.0.0.1', port: 45633 })
+    // already in the world on that server: nothing to do
+    const again = await join('qp', 'offline')
+    assert.equal(again.already, true)
+    assert.equal(again.loaded, true)
+    await stop('qp')
+
+    await launchWith('qp', { FAKE_CLIENT_QUICKPLAY_MS: '1500' })
+    const ch = await session('qp')
+    const until = Date.now() + 5000
+    while ((await ch.call('status')).screen !== 'connecting') {
+      assert.ok(Date.now() < until, 'the fake game never showed the connect screen')
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    // another server while the launch's connect is under way is refused, not raced
+    await assert.rejects(join('qp', 'other'), /"qp" is still connecting to a server; wait until client_status shows it in the world, then disconnect before joining other/)
+    const res = await join('qp', 'offline')
+    assert.deepEqual(res, { joined: true, already: true, server: 'offline', host: '127.0.0.1', port: 45633, loaded: true, screen: 'ingame' })
+    assert.ok(!tailClientLog('qp', 200).some((l) => /already connecting/.test(l)), 'join started a second connect')
+    await stop('qp')
+
+    // asked while resources still load (client_launch with wait false), join waits too
+    await launchWith('qp', { FAKE_CLIENT_BOOT_MS: '600', FAKE_CLIENT_QUICKPLAY_MS: '600' })
+    assert.equal((await session('qp').then((c) => c.call('status'))).screen, 'other')
+    const early = await join('qp', 'offline')
+    assert.equal(early.already, true)
+    assert.equal(early.loaded, true)
+    assert.ok(!tailClientLog('qp', 200).some((l) => /already connecting/.test(l)), 'join started a second connect')
+    await stop('qp')
+
+    // a refused launch join that lands back on the title screen ends the wait, not 90 s later
+    await launchWith('qp', { FAKE_CLIENT_QUICKPLAY_MS: '600', FAKE_CLIENT_QUICKPLAY_FAIL: '1' })
+    const started = Date.now()
+    const refused = await waitUntilLoaded('qp', { server: 'offline', fadeMs: 0, timeoutMs: 10000 })
+    assert.equal(refused.loaded, true)
+    assert.equal(refused.screen, 'title')
+    assert.ok(Date.now() - started < 5000)
+  } finally {
+    await stop('qp')
+  }
+})
+
+test('waitUntilLoaded counts a titled screen of its own (a fresh profile\'s accessibility screen) as loaded', async () => {
+  try {
+    await launchWith('boot', { FAKE_CLIENT_BOOT_MS: '300', FAKE_CLIENT_SCREEN_TITLE: 'Accessibility Menu' })
+    const started = Date.now()
+    const st = await waitUntilLoaded('boot', { fadeMs: 0, timeoutMs: 10000 })
+    assert.equal(st.loaded, true)
+    assert.equal(st.screen, 'other')
+    assert.equal(st.screenTitle, 'Accessibility Menu')
+    assert.ok(Date.now() - started < 5000)
+  } finally {
+    await stop('boot')
+  }
 })

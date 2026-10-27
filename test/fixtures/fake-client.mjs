@@ -35,6 +35,42 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
     let screen = 'title'
     let connected = null
     let player = null
+    // FAKE_CLIENT_BOOT_MS: like the real game, no screen ("other") while resources load.
+    // FAKE_CLIENT_QUICKPLAY_MS: with --quickPlayMultiplayer, the connect screen ("connecting",
+    // nothing the mod sees as a connection yet) for that long, then the world.
+    const bootMs = Number(process.env.FAKE_CLIENT_BOOT_MS) || 0
+    const quickPlayMs = Number(process.env.FAKE_CLIENT_QUICKPLAY_MS) || 0
+    const qpIdx = process.argv.indexOf('--quickPlayMultiplayer')
+    const quickPlay = quickPlayMs && qpIdx !== -1 ? process.argv[qpIdx + 1] : null
+    // FAKE_CLIENT_SCREEN_TITLE: after the load, a titled screen of its own ("other"), as the
+    // accessibility screen of a fresh profile. FAKE_CLIENT_QUICKPLAY_FAIL: the launch's join is
+    // refused and the game goes back to the title screen.
+    const firstTitle = process.env.FAKE_CLIENT_SCREEN_TITLE || ''
+    let screenTitleOverride = ''
+    if (bootMs) {
+      screen = 'other'
+      setTimeout(() => {
+        if (screen !== 'other') return
+        if (firstTitle) screenTitleOverride = firstTitle
+        else screen = 'title'
+      }, bootMs)
+    }
+    if (quickPlay) {
+      setTimeout(() => {
+        screen = 'connecting'
+        setTimeout(() => {
+          if (screen !== 'connecting') return
+          if (process.env.FAKE_CLIENT_QUICKPLAY_FAIL) {
+            screen = 'title'
+            return
+          }
+          const [qpHost, qpPort] = quickPlay.split(':')
+          screen = 'ingame'
+          connected = { host: qpHost, port: Number(qpPort) }
+          player = { name: userName, uuid: '00000000-0000-0000-0000-000000000000' }
+        }, quickPlayMs)
+      }, bootMs)
+    }
     const messages = []
     let nextSeq = 1
     let activeSocket = null
@@ -88,7 +124,7 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
 
           switch (op) {
             case 'status': {
-              const screenTitle = screen === 'title' ? 'Title Screen' : ''
+              const screenTitle = screen === 'title' ? 'Title Screen' : screen === 'other' ? screenTitleOverride : ''
               socket.write(JSON.stringify({ id, ok: true, screen, screenTitle, connected, player, fps: 60 }) + '\n')
               break
             }
@@ -96,6 +132,10 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
               const { host, port: joinPort } = args
               if (connected !== null) {
                 socket.write(JSON.stringify({ id, ok: false, error: 'already connected; call disconnect first' }) + '\n')
+              } else if (screen === 'connecting') {
+                // the real game logs this and carries on with the first connect
+                process.stdout.write('[00:00:00] [Render thread/ERROR]: Attempt to connect while already connecting\n')
+                socket.write(JSON.stringify({ id, ok: true, joined: true }) + '\n')
               } else if (host === 'refused.invalid') {
                 setTimeout(() => {
                   if (socket.destroyed) return

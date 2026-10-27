@@ -105,7 +105,7 @@ export const clientReadTools = [
 export const clientActionTools = [
   {
     name: 'client_launch', title: 'Launch a game client', annotations: WRITE_NET,
-    description: 'Starts the real game client for one profile, downloading what it needs the first time. The player is offline unless the profile names a signed-in Microsoft account (set on the command line; assistants cannot sign in, and such a profile launches only when its assistantAccount key is true). With "wait" (the default) it reports the screen once the harness answers.',
+    description: 'Starts the real game client for one profile, downloading what it needs the first time. The player is offline unless the profile names a signed-in Microsoft account (set on the command line; assistants cannot sign in, and such a profile launches only when its assistantAccount key is true). With "wait" (the default) it waits until the game has loaded (the title screen, or the world when it joins a server) and reports the screen.',
     inputSchema: object({
       profile,
       player_name: { type: 'string', minLength: 1 },
@@ -126,16 +126,11 @@ export const clientActionTools = [
       let h = null
       let extra
       if (res.profile.harness) {
-        const ch = await client.session(p)
-        h = await ch.call('status')
-        // The harness answers before the game has loaded its resources; a screenshot taken then
-        // shows the loading overlay, so wait for the title screen (or a server) within reason.
-        const settled = Date.now() + 90000
-        while (/loading/i.test(h.screenTitle || h.screen || '') && Date.now() < settled) {
-          await sleep(1000)
-          h = await ch.call('status')
-        }
-        extra = `Screen: ${h.screenTitle || h.screen}.`
+        const target = srv ?? prof.server ?? null
+        h = await client.waitUntilLoaded(p, { server: target })
+        extra = h.loaded
+          ? `Screen: ${h.screenTitle || h.screen}.`
+          : `Still loading after ${client.LAUNCH_WAIT_MS / 1000} s (screen: ${h.screenTitle || h.screen}); check client_status before a screenshot.`
       } else {
         const deadline = Date.now() + 5000
         while (Date.now() < deadline) {
@@ -156,7 +151,7 @@ export const clientActionTools = [
     async run({ profile: p, server: s }) {
       const res = await client.join(p, s)
       const text = res.loaded
-        ? `"${p}" joined ${s} at ${res.host}:${res.port} and is in the world.`
+        ? `"${p}" ${res.already ? 'was already joining or in' : 'joined'} ${s} at ${res.host}:${res.port} and is in the world.`
         : `"${p}" connected to ${s} at ${res.host}:${res.port}, but the world is still loading after 60 s (screen: ${res.screen}); check client_status before acting.`
       return { data: { profile: p, ...res }, text }
     },

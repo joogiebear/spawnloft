@@ -113,17 +113,24 @@ function classifierOf(name) {
   return parts.length >= 4 ? parts[3].split('@')[0] : ''
 }
 
-// The suffixes that name an arch build of a natives jar. Anything else after natives-<os>-
-// (or another OS altogether) is not an arch variant and is left to the rules, as before.
-const ARCH_SUFFIXES = ['', '-arm64', '-x86']
+// The suffixes that name an arch build of a natives jar, and the arch each one is. Anything
+// else after natives-<os>- (or another OS altogether) is not an arch variant and is left to the
+// rules, as before.
+const ARCH_SUFFIXES = { '': 'x64', '-arm64': 'arm64', '-x86': 'x86' }
+// natives-macos-patch (lwjgl-freetype since 1.21) holds only macos/x64 files: it is the Intel
+// Mac's freetype, which has no plain natives-macos row, while Apple Silicon takes its freetype
+// from natives-macos-arm64. So on macOS it counts as an x64 build.
+const MACOS_ARCH_SUFFIXES = { ...ARCH_SUFFIXES, '-patch': 'x64' }
 
 // For a natives-<os>[-arch] classifier of this machine's OS, whether it is this machine's arch;
 // null when the classifier is not an arch build of this OS's natives.
 function archMatch(classifier, os) {
   const base = `natives-${os.name === 'osx' ? 'macos' : os.name}`
   if (!classifier.startsWith(base)) return null
-  if (!ARCH_SUFFIXES.includes(classifier.slice(base.length))) return null
-  return classifier === nativesClassifier(os)
+  const suffixes = os.name === 'osx' ? MACOS_ARCH_SUFFIXES : ARCH_SUFFIXES
+  const suffix = classifier.slice(base.length)
+  if (!Object.hasOwn(suffixes, suffix)) return null
+  return suffixes[suffix] === os.arch && nativesClassifier(os) !== null
 }
 
 const OS_LABEL = { windows: 'Windows', osx: 'macOS', linux: 'Linux' }

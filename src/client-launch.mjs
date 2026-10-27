@@ -155,6 +155,7 @@ export async function spawnClient(command, { name, state }) {
         account: { type: state.account.type, name: state.account.name },
         javaPid: child.pid,
         harness: state.harness ?? null,
+        server: state.server ?? null,
       }, { mode: PRIVATE_FILE_MODE })
       child.unref()
       resolve({ pid: child.pid, child })

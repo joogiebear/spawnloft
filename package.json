@@ -6,7 +6,7 @@
   "description": "SpawnLoft core: the mcctl command line and panel - a multi-instance Minecraft server supervisor with console capture, RCON, and snapshots",
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node tools/run-tests.mjs"
   },
   "bin": {
     "spawnloft": "./spawnloft.mjs",

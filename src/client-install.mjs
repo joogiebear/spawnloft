@@ -57,8 +57,9 @@ async function inBatches(items, limit, worker) {
 // One data root can serve two operating systems (a dual boot, a portable drive): the stamp
 // says whose natives are extracted, so a switch re-extracts them.
 // v2: natives are now chosen per arch, so a folder extracted with every arch's jars is redone
+// v3: Apple Silicon no longer takes natives-macos-patch (x64 freetype), so its macos/x64 goes
 function nativesStamp(id, os) {
-  return `${id} ${os.name} ${os.arch} natives-v2`
+  return `${id} ${os.name} ${os.arch} natives-v3`
 }
 
 export async function extractNatives(id, nativeRows, { os }) {
