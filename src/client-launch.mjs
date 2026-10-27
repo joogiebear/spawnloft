@@ -6,7 +6,7 @@ import { currentOs, jvmArguments, gameArguments, libraries, assetIndex } from '.
 import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
-import { writeJson, readJson, UserError, pidAlive, sameProcess, killProcessGroup, sleep } from './util.mjs'
+import { writeJson, readJson, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
 
 export function substitute(template, vars) {
   const unknown = []
@@ -145,6 +145,7 @@ export async function spawnClient(command, { name, state }) {
 
   return new Promise((resolve, reject) => {
     child.on('spawn', () => {
+      // The state carries the harness token: owner-only, like the accounts file.
       writeJson(clientStateFile(name), {
         pid: child.pid,
         // javaExe lets readClientState tell this process from a later owner of the same pid
@@ -154,7 +155,7 @@ export async function spawnClient(command, { name, state }) {
         account: { type: state.account.type, name: state.account.name },
         javaPid: child.pid,
         harness: state.harness ?? null,
-      })
+      }, { mode: PRIVATE_FILE_MODE })
       child.unref()
       resolve({ pid: child.pid, child })
     })

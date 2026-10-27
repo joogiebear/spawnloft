@@ -11,7 +11,7 @@ process.env.MCCTL_DATA_ROOT = scratch
 
 const { launch, status, stop, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
 const { readClientState } = await import('../src/client-launch.mjs')
-const { clientStateFile, clientRunDir, versionDir, versionJson } = await import('../src/client-paths.mjs')
+const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson } = await import('../src/client-paths.mjs')
 
 const fakeJava = path.join(here, 'fixtures', 'fake-client.mjs')
 
@@ -139,4 +139,64 @@ test('a fabric profile launches via fakeJava with the Knot main class', async ()
   assert.equal(res.version, fabricId)
   const stopRes = await stop('fab')
   assert.deepEqual(stopRes, { stopped: true, wasRunning: true })
+})
+
+test('state.json is owner-only and the launch lock is gone once the client runs', async () => {
+  const res = await launch('life', { fakeJava })
+  assert.ok(res.pid)
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(clientStateFile('life')).mode & 0o777, 0o600)
+  }
+  assert.equal(fs.existsSync(clientLaunchLock('life')), false, 'the lock is released after state.json is written')
+  await stop('life')
+})
+
+test('two concurrent launches: exactly one wins and its state and log are intact', async () => {
+  const results = await Promise.allSettled([
+    launch('life', { playerName: 'winner', fakeJava }),
+    launch('life', { playerName: 'loser', fakeJava }),
+  ])
+  const ok = results.filter((r) => r.status === 'fulfilled')
+  const failed = results.filter((r) => r.status === 'rejected')
+  assert.equal(ok.length, 1)
+  assert.equal(failed.length, 1)
+  assert.match(failed[0].reason.message, /profile "life" is being launched \(pid (\d+|\?)\)/)
+  const st = status('life')
+  assert.equal(st.running, true)
+  assert.equal(st.pid, ok[0].value.pid)
+  assert.equal(st.account.name, 'winner')
+  const deadline = Date.now() + 3000
+  let lines = []
+  while (Date.now() < deadline && !lines.some((l) => l.includes('Setting user: winner'))) {
+    lines = tailClientLog('life')
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  assert.ok(lines.some((l) => l.includes('Setting user: winner')), 'the winner wrote the log')
+  assert.ok(!lines.some((l) => l.includes('Setting user: loser')), 'the loser never started')
+  assert.equal(fs.existsSync(clientLaunchLock('life')), false)
+  await stop('life')
+})
+
+test('a launch lock left by a dead process is replaced', async () => {
+  fs.mkdirSync(clientRunDir('life'), { recursive: true })
+  fs.writeFileSync(clientLaunchLock('life'), JSON.stringify({ pid: 999999999, token: 'old', startedAt: new Date().toISOString() }))
+  const res = await launch('life', { fakeJava })
+  assert.ok(res.pid)
+  assert.equal(fs.existsSync(clientLaunchLock('life')), false)
+  await stop('life')
+})
+
+test('a launch lock held by a live process refuses launch and remove, and the lock is left alone', async () => {
+  fs.mkdirSync(clientRunDir('life'), { recursive: true })
+  fs.writeFileSync(clientLaunchLock('life'), JSON.stringify({ pid: process.pid, token: 'theirs' }))
+  await assert.rejects(launch('life', { fakeJava }), new RegExp(`profile "life" is being launched \\(pid ${process.pid}\\)`))
+  assert.throws(() => removeProfile('life'), /is being launched/)
+  assert.ok(fs.existsSync(clientLaunchLock('life')))
+  fs.rmSync(clientLaunchLock('life'))
+})
+
+test('the lock is released when the launch fails', async () => {
+  createProfile('nojava', { mc, java: path.join(scratch, 'no-such-java') })
+  await assert.rejects(launch('nojava', {}))
+  assert.equal(fs.existsSync(clientLaunchLock('nojava')), false)
 })

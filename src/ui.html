@@ -5700,6 +5700,7 @@ function updateHomeCard(card, row) {
   const pp = playProfileFor(row);
   play.hidden = !pp;
   if (pp) play.title = 'Starts ' + pp.name + ' pointed at this server';
+  play.disabled = Boolean(pp && launching.has(pp.name));
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
   // Live figures while it runs; one line saying why there are none while it does not.
@@ -5849,9 +5850,21 @@ function playProfileFor(row, profiles = state.clientProfiles) {
   const fits = profiles.filter((p) => !row.mcVersion || p.mc === row.mcVersion);
   return fits.find((p) => p.server === row.name) ?? fits[0] ?? null;
 }
+// One launch per profile at a time: the Play buttons stay disabled until the POST returns, and a
+// second click meanwhile only says so (the server refuses a second launch anyway).
+const launching = new Set();
+function setPlayDisabled(name, disabled) {
+  for (const btn of document.querySelectorAll('.scard .sc-play')) {
+    const pp = playProfileFor(rowOf(btn.closest('.scard').dataset.name) || {});
+    if (pp && pp.name === name) btn.disabled = disabled;
+  }
+}
 async function playClient(row) {
   const p = playProfileFor(row);
   if (!p) return;
+  if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
+  launching.add(p.name);
+  setPlayDisabled(p.name, true);
   const note = toast('Starting ' + p.name + '…');
   try {
     await post('/client/profiles/' + encodeURIComponent(p.name) + '/launch', { server: row.name });
@@ -5861,6 +5874,8 @@ async function playClient(row) {
     note.remove();
     toast(e.message, 'bad')
   } finally {
+    launching.delete(p.name);
+    setPlayDisabled(p.name, false);
     await loadClientProfiles()
   }
 }
@@ -13381,11 +13396,19 @@ function renderClientProfiles() {
     dd.append(document.createTextNode(`Minecraft ${p.mc}, ${p.loader}${p.loaderVersion ? ' ' + p.loaderVersion : ''}${p.harness ? ', harness' : ''} · ${p.running ? 'running' : 'stopped'} `));
     const btn = el('button', 'ghost');
     btn.textContent = p.running ? 'Stop' : 'Launch';
+    btn.disabled = launching.has(p.name);
     btn.onclick = async () => {
+      if (!p.running) {
+        if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
+        launching.add(p.name);
+      }
+      btn.disabled = true;
       try {
         await post(`/client/profiles/${encodeURIComponent(p.name)}/${p.running ? 'stop' : 'launch'}`, {});
       } catch (e) {
         toast(e.message, 'bad');
+      } finally {
+        launching.delete(p.name);
       }
       await loadClientProfiles();
       renderClientProfiles();

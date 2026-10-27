@@ -109,3 +109,23 @@ test('loaderVersion is a plain version string', () => {
   assert.throws(() => updateProfile('lv', { loaderVersion: 'a/b' }), /loaderVersion/)
   removeProfile('lv')
 })
+
+test('assistantAccount starts false for every profile and only set turns it on', () => {
+  const p = createProfile('aa', { mc: '1.21.4', account: 'Someone' })
+  assert.equal(p.assistantAccount, false)
+  assert.equal(getProfile('aa').assistantAccount, false)
+  assert.equal(listProfiles().find((x) => x.name === 'aa').assistantAccount, false)
+  assert.equal(updateProfile('aa', { assistantAccount: true }).assistantAccount, true)
+  assert.equal(getProfile('aa').assistantAccount, true)
+  assert.throws(() => updateProfile('aa', { assistantAccount: 'yes' }), /assistantAccount must be true or false/)
+  removeProfile('aa', { purge: true })
+})
+
+test('a profile written before assistantAccount existed reads as false', () => {
+  const reg = loadProfiles()
+  reg.profiles.legacy = { mc: '1.21.4', loader: 'vanilla', loaderVersion: null, java: null, memory: '2G', harness: false, server: null, account: 'Someone', createdAt: new Date().toISOString() }
+  saveProfiles(reg)
+  assert.equal(getProfile('legacy').assistantAccount, false)
+  assert.equal(updateProfile('legacy', { memory: '3G' }).assistantAccount, false)
+  removeProfile('legacy')
+})

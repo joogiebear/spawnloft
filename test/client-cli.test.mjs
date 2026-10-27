@@ -137,3 +137,17 @@ test('remove --purge deletes the folder', () => {
   assert.equal(res.code, 0)
   assert.equal(fs.existsSync(profileDir('p')), false)
 })
+
+test('set assistantAccount=true is reflected and anything else is refused', () => {
+  assert.equal(cli(['client', 'new', 'aa', '--mc', mc]).code, 0)
+  const setRes = cli(['client', 'set', 'aa', 'assistantAccount=true'])
+  assert.equal(setRes.code, 0, setRes.stderr)
+  const listRes = cli(['client', 'list', '--json'])
+  const parsed = JSON.parse(listRes.stdout.trim())
+  assert.equal(parsed.data.profiles.find((x) => x.name === 'aa').assistantAccount, true)
+  const bad = cli(['client', 'set', 'aa', 'assistantAccount=maybe'])
+  assert.notEqual(bad.code, 0)
+  assert.equal(cli(['client', 'set', 'aa', 'assistantAccount=false']).code, 0)
+  assert.equal(JSON.parse(cli(['client', 'list', '--json']).stdout.trim()).data.profiles.find((x) => x.name === 'aa').assistantAccount, false)
+  assert.equal(cli(['client', 'remove', 'aa', '--purge']).code, 0)
+})

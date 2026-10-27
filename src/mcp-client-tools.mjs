@@ -24,9 +24,9 @@ export const clientReadTools = [
       }
       const rows = profiles.map((p) => {
         const st = client.status(p.name)
-        return { name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, running: st.running }
+        return { name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, account: p.account, assistantAccount: p.assistantAccount, running: st.running }
       })
-      const text = rows.map((r) => `${r.name}: Minecraft ${r.mc}, ${r.loader}${r.loaderVersion ? ' ' + r.loaderVersion : ''}${r.harness ? ', harness' : ''}, ${r.running ? 'running' : 'stopped'}`).join('\n')
+      const text = rows.map((r) => `${r.name}: Minecraft ${r.mc}, ${r.loader}${r.loaderVersion ? ' ' + r.loaderVersion : ''}${r.harness ? ', harness' : ''}${r.account ? `, Microsoft account ${r.account}${r.assistantAccount ? '' : ' (not for assistants)'}` : ''}, ${r.running ? 'running' : 'stopped'}`).join('\n')
       return { data: { profiles: rows }, text }
     },
   },
@@ -100,7 +100,7 @@ export const clientReadTools = [
 export const clientActionTools = [
   {
     name: 'client_launch', title: 'Launch a game client', annotations: WRITE_NET,
-    description: 'Starts the real game client for one profile, downloading what it needs the first time. The player is offline unless the profile names a signed-in Microsoft account (set on the command line; assistants cannot sign in). With "wait" (the default) it reports the screen once the harness answers.',
+    description: 'Starts the real game client for one profile, downloading what it needs the first time. The player is offline unless the profile names a signed-in Microsoft account (set on the command line; assistants cannot sign in, and such a profile launches only when its assistantAccount key is true). With "wait" (the default) it reports the screen once the harness answers.',
     inputSchema: object({
       profile,
       player_name: { type: 'string', minLength: 1 },
@@ -110,7 +110,11 @@ export const clientActionTools = [
     async run({ profile: p, player_name: playerName = null, server: srv = null, wait = true }, { progress }) {
       // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
       const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
-      const res = await client.launch(p, { playerName: playerName ?? null, server: srv ?? null, onProgress: (x) => progress(`${x.phase} ${x.done}/${x.total}`), fakeJava })
+      // Playing as a real Microsoft account on any server is the person's call, per profile. The
+      // early check gives the message before any download; launch() enforces it again under its lock.
+      const prof = client.getProfile(p)
+      if (prof.account && !prof.assistantAccount) fail(client.assistantAccountRefusal(p))
+      const res = await client.launch(p, { playerName: playerName ?? null, server: srv ?? null, onProgress: (x) => progress(`${x.phase} ${x.done}/${x.total}`), fakeJava, assistant: true })
       if (!wait) {
         return { data: { profile: p, pid: res.pid, version: res.version, account: res.account, harness: null }, text: `Launched "${p}" as ${res.account.name} (pid ${res.pid}).` }
       }

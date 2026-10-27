@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir } from './client-paths.mjs'
-import { readJson, writeJson, fail, validateName } from './util.mjs'
+import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir, clientLaunchLock } from './client-paths.mjs'
+import { readJson, writeJson, fail, validateName, acquireLock, lockHolder } from './util.mjs'
 import { parseMemoryGb } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
@@ -16,7 +16,7 @@ import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
 
-const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']
+const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'assistantAccount']
 
 function validateMc(mc) {
   if (!/^\d+(\.\d+){1,2}$/.test(mc) && !/^\d{2}w\d{2}[a-z]$/.test(mc)) {
@@ -24,7 +24,7 @@ function validateMc(mc) {
   }
 }
 
-function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account }) {
+function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount }) {
   validateMc(mc)
   parseMemoryGb(memory)
   // -Xmx takes whole units only: 1.5G is refused by Java where a server's launcher would round it
@@ -33,6 +33,7 @@ function validateFields({ mc, loader, loaderVersion, java, memory, harness, serv
     fail(`unknown loader "${loader}" - use ${LOADERS.join(' or ')}`)
   }
   if (typeof harness !== 'boolean') fail('harness must be true or false')
+  if (typeof assistantAccount !== 'boolean') fail('assistantAccount must be true or false')
   if (harness && loader === 'vanilla') {
     fail('the harness mod needs the fabric loader')
   }
@@ -64,10 +65,16 @@ export function saveProfiles(data) {
   writeJson(PROFILES_FILE, data)
 }
 
+// Profiles written before the key existed read as false: an assistant may not play as a
+// Microsoft account unless someone said so for that profile.
+function withDefaults(cfg) {
+  return { assistantAccount: false, ...cfg }
+}
+
 export function listProfiles() {
   const reg = loadProfiles()
   return Object.entries(reg.profiles)
-    .map(([name, cfg]) => ({ name, ...cfg }))
+    .map(([name, cfg]) => ({ name, ...withDefaults(cfg) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -82,9 +89,10 @@ export function getProfile(name) {
         (known.length ? `. Known profiles: ${known.join(', ')}` : '. Create one with: spawnloft client new <name> --mc <version>'),
     )
   }
-  return { name, ...cfg }
+  return { name, ...withDefaults(cfg) }
 }
 
+// assistantAccount starts false for every profile, whoever made it; only `set` turns it on.
 export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
   validateProfileName(name)
   const reg = loadProfiles()
@@ -94,13 +102,14 @@ export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = nu
       fail(`a profile named "${existing}" already exists (names must differ in more than case)`)
     }
   }
-  validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account })
+  const assistantAccount = false
+  validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount })
   fs.mkdirSync(profileDir(name), { recursive: true })
   const optionsFile = path.join(profileDir(name), 'options.txt')
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
-  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account, createdAt: new Date().toISOString() }
+  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
   return { name, ...profile }
@@ -119,19 +128,30 @@ export function updateProfile(name, patch) {
   const reg = loadProfiles()
   reg.profiles[name] = { ...reg.profiles[name], ...patch }
   saveProfiles(reg)
-  return { name, ...reg.profiles[name] }
+  return { name, ...withDefaults(reg.profiles[name]) }
 }
 
 export function removeProfile(name, { purge = false } = {}) {
   if (status(name).running) fail(`profile "${name}" is running; stop it first: spawnloft client stop ${name}`)
   getProfile(name)
-  const reg = loadProfiles()
-  delete reg.profiles[name]
-  saveProfiles(reg)
-  if (purge) {
-    fs.rmSync(profileDir(name), { recursive: true, force: true })
-    fs.rmSync(clientRunDir(name), { recursive: true, force: true })
+  // Under the launch lock, so a launch that passed getProfile cannot recreate the run folder
+  // after the purge.
+  const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })
+  if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`)
+  try {
+    const reg = loadProfiles()
+    delete reg.profiles[name]
+    saveProfiles(reg)
+    if (purge) fs.rmSync(profileDir(name), { recursive: true, force: true })
+  } finally {
+    release()
   }
+  if (purge) fs.rmSync(clientRunDir(name), { recursive: true, force: true })
+}
+
+function holderText(name) {
+  const holder = lockHolder(clientLaunchLock(name))
+  return holder === null || holder === -1 ? '?' : String(holder)
 }
 
 export async function prepareVersion(name, { onProgress = () => {} } = {}) {
@@ -154,7 +174,25 @@ export async function prepareVersion(name, { onProgress = () => {} } = {}) {
   return profile.mc
 }
 
-export async function launch(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null } = {}) {
+export async function launch(name, opts = {}) {
+  getProfile(name)
+  // Taken before anything else, released once state.json names the new process (or on any
+  // failure), so a second launch of the same profile during the downloads is refused instead of
+  // overwriting the first one's state and truncating its log. A lock whose holder has died is
+  // taken over (see acquireLock); one held by this very process counts as held, which is the
+  // panel's two Play clicks.
+  const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })
+  if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`)
+  try {
+    return await launchLocked(name, opts)
+  } finally {
+    release()
+  }
+}
+
+// `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
+// Microsoft account is then allowed only on a profile whose assistantAccount key says so.
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false }) {
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
@@ -197,6 +235,9 @@ export async function launch(name, { playerName = null, account: accountSelector
   // contradiction, not a preference.
   const selector = accountSelector ?? profile.account ?? null
   if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
+  if (assistant && selector && !selector.startsWith('offline:') && !profile.assistantAccount) {
+    fail(assistantAccountRefusal(name))
+  }
   const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
@@ -205,6 +246,10 @@ export async function launch(name, { playerName = null, account: accountSelector
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name } }
+}
+
+export function assistantAccountRefusal(name) {
+  return `profile "${name}" plays as a Microsoft account; allow an assistant to launch it with: spawnloft client set ${name} assistantAccount=true`
 }
 
 export function status(name) {

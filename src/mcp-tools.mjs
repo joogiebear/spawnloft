@@ -10,12 +10,14 @@ import * as upgrade from './upgrade.mjs'
 import { listPlayers, onlineNow } from './players.mjs'
 import { diagnose } from './diagnose.mjs'
 import { loadAccounts } from './client-auth.mjs'
+import { listProfiles as listClientProfiles } from './client.mjs'
+import { clientStateFile } from './client-paths.mjs'
 import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
 import { mcpNotice } from './private-copy.mjs'
 import { readState, activeBlock } from './control.mjs'
-import { fail, humanBytes, humanDuration } from './util.mjs'
+import { fail, humanBytes, humanDuration, readJson } from './util.mjs'
 import { DATA_ROOT, BACKUPS_DIR } from './paths.mjs'
 import { buildBundle, writeBundle, collectClient } from './diag-bundle.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
@@ -674,6 +676,13 @@ function collectSecrets() {
   }
   try { walk(loadRegistry()) } catch { /* no registry yet: nothing to hide */ }
   try { walk(loadAccounts()) } catch { /* no accounts file: nothing to hide */ }
+  // A running client's state file carries its harness token. One unreadable file must not hide
+  // the others' tokens from the scrubber.
+  let clientProfiles = []
+  try { clientProfiles = listClientProfiles() } catch { /* no client registry: nothing to hide */ }
+  for (const p of clientProfiles) {
+    try { walk(readJson(clientStateFile(p.name), null)) } catch { /* damaged state file */ }
+  }
   // Longest first, so a secret containing another is not half-replaced.
   return [...found].sort((a, b) => b.length - a.length)
 }

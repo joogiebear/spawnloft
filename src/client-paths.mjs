@@ -41,6 +41,12 @@ export function clientLog(name) {
   return path.join(clientRunDir(name), 'client.log')
 }
 
+// Held from the start of launch() until state.json is written, so two launches (two Play
+// clicks, panel plus CLI) cannot both pass the "already running" check and start two games.
+export function clientLaunchLock(name) {
+  return path.join(clientRunDir(name), 'launch.lock')
+}
+
 export function clientCacheDir(name) {
   return path.join(clientRunDir(name), 'cache')
 }
