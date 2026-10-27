@@ -11,6 +11,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import { windowsPowerShellEnv } from './windows-powershell.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 // electron-builder passes the packed directory; run by hand, the default is assumed
@@ -122,7 +123,7 @@ function checkSignature(file) {
       `Write-Output $s.Status; ` +
       `Write-Output $s.SignerCertificate.Subject; ` +
       `Write-Output ($s.TimeStamperCertificate -ne $null)`],
-    { encoding: 'utf8', windowsHide: true, timeout: 60000 },
+    { encoding: 'utf8', windowsHide: true, timeout: 60000, env: windowsPowerShellEnv() },
   )
   if (ps.status !== 0) return { ok: false, why: 'could not read the signature' }
   const [status, subject, stamped] = String(ps.stdout).trim().split(/\r?\n/)

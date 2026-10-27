@@ -79,18 +79,22 @@ export function inUse(inst, running) {
   return new Set(names.map((n) => n.toLowerCase()))
 }
 
-function assertFree(inst, rel, running, doing) {
+// `removing`: the path goes away (deleted, or moved from), so the plugins or mods folder itself
+// counts too - it takes every jar the server loaded with it.
+function assertFree(inst, rel, running, doing, { removing = false } = {}) {
   if (!running) return
   const top = rel.split('/')[0].toLowerCase()
   const busy = inUse(inst, true)
   const loadedJar = /^(plugins|mods)\/[^/]+\.jar$/i.test(rel)
-  if (busy.has(top) || loadedJar || rel === '') {
+  const jarFolder = removing && /^(plugins|mods)$/i.test(rel)
+  if (busy.has(top) || loadedJar || jarFolder || rel === '') {
     fail(`${rel || 'the server folder'} is in use by the running server. Stop it first to ${doing} it.`)
   }
 }
 
 export function listDir(inst, relative = '', { running = false } = {}) {
-  const { full, rel, stat } = resolvePath(inst, relative, { allowRoot: true })
+  const { base, full, rel, stat } = resolvePath(inst, relative, { allowRoot: true })
+  assertLinkStaysInside(base, full, rel)
   if (!stat.isDirectory() && !(stat.isSymbolicLink() && fs.statSync(full).isDirectory())) fail(`${rel} is not a folder`)
   const busy = inUse(inst, running)
   const entries = []
@@ -286,7 +290,7 @@ export function movePath(inst, from, to, { running = false } = {}) {
   if (dst.stat) fail(`${dst.rel} already exists`)
   if (dst.rel === src.rel) fail('that is its name already')
   if (dst.rel.toLowerCase().startsWith(src.rel.toLowerCase() + '/')) fail('a folder cannot be moved inside itself')
-  assertFree(inst, src.rel, running, 'move')
+  assertFree(inst, src.rel, running, 'move', { removing: true })
   assertFree(inst, dst.rel, running, 'move into')
   const parent = path.dirname(dst.full)
   if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) fail(`${toSlash(path.relative(src.base, parent))} is not a folder`)
@@ -308,7 +312,7 @@ async function sizeOf(full) {
 export async function deletePaths(inst, paths, { withoutCopy = false, running = false } = {}) {
   if (!Array.isArray(paths) || !paths.length) fail('choose something to delete')
   const targets = paths.map((p) => resolvePath(inst, p))
-  for (const t of targets) assertFree(inst, t.rel, running, 'delete')
+  for (const t of targets) assertFree(inst, t.rel, running, 'delete', { removing: true })
   // Drop paths already covered by a chosen parent folder.
   const rels = [...new Set(targets.map((t) => t.rel))]
     .filter((r, _, all) => !all.some((o) => o !== r && r.startsWith(o + '/')))
@@ -395,8 +399,8 @@ export async function extractArchive(inst, relative, { running = false } = {}) {
 export async function searchNames(inst, relative, query, { running = false } = {}) {
   const q = typeof query === 'string' ? query.trim().toLowerCase() : ''
   if (q.length < 2) fail('search for at least two characters')
-  const { full, rel } = resolvePath(inst, relative, { allowRoot: true })
-  const base = fs.realpathSync(inst.dir)
+  const { base, full, rel } = resolvePath(inst, relative, { allowRoot: true })
+  assertLinkStaysInside(base, full, rel)
   const busy = inUse(inst, running)
   const results = []
   let visits = 0
