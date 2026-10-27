@@ -2,17 +2,25 @@
      A pull request that changes something a person would notice adds its line here, under the
      version it will ship in, so that release day is a read-through. Rewrite the top for each
      release; the build procedure at the bottom stays. -->
-SpawnLoft 1.5 puts a server's files in the panel: browse them, edit any text file beside the console, upload, download and tidy up, with a copy of everything changed kept in Backups. The panel itself is laid out anew, with every server and its tools in a sidebar, and it makes use of a wide screen.
+SpawnLoft 1.6 adds a game client: start the real Minecraft client from SpawnLoft, pointed at one of your servers, sign in with your Microsoft account, and let an AI assistant drive the game to test a plugin. One zip of diagnostics now puts a server's logs and the client's on the same timeline. Everything new in 1.5 - Files, Activity, multi-step scheduled tasks, the sidebar - is listed below it.
 
-- **Windows 10/11 x64:** download `SpawnLoft-Setup-1.5.0.exe`, signed through Microsoft Azure Artifact Signing.
-- **Mac with Apple Silicon:** download `SpawnLoft-1.5.0-mac-arm64.dmg`.
+- **Windows 10/11 x64:** download `SpawnLoft-Setup-1.6.0.exe`, signed through Microsoft Azure Artifact Signing.
+- **Mac with Apple Silicon:** download `SpawnLoft-1.6.0-mac-arm64.dmg`.
 - The Mac build is Developer ID signed, hardened, Apple-notarized and stapled. The app requires macOS 13 or later; managed MySQL requires macOS 15 or later.
-- **Mac with Intel:** 1.4 is the last version built for Intel Macs. An Intel Mac stays on 1.4 and is not offered 1.5; its update check reports that there is no update file for it.
-- **Linux, Debian and Ubuntu (22.04+, Debian 12+):** `SpawnLoft-1.5.0-linux-amd64.deb`, or `-linux-arm64.deb` on arm64. Install with `sudo apt install ./<file>`.
-- **Linux, Fedora, RHEL-family and openSUSE:** `SpawnLoft-1.5.0-linux-x86_64.rpm`, or `-linux-aarch64.rpm` on arm64. Install with `sudo dnf install ./<file>`.
+- **Mac with Intel:** 1.4 is the last version built for Intel Macs. An Intel Mac stays on 1.4 and is not offered 1.6; its update check reports that there is no update file for it.
+- **Linux, Debian and Ubuntu (22.04+, Debian 12+):** `SpawnLoft-1.6.0-linux-amd64.deb`, or `-linux-arm64.deb` on arm64. Install with `sudo apt install ./<file>`.
+- **Linux, Fedora, RHEL-family and openSUSE:** `SpawnLoft-1.6.0-linux-x86_64.rpm`, or `-linux-aarch64.rpm` on arm64. Install with `sudo dnf install ./<file>`.
 - Java is separate on every platform, and which one depends on your Minecraft version. On Debian and Ubuntu: `sudo apt install openjdk-25-jre-headless`. On Fedora the newest is `sudo dnf install java-latest-openjdk-headless`.
 
-Existing installs receive 1.5 through the built-in updater. ZIP files are used by the Mac updater; choose the DMG for a manual installation. A Linux install updates through a system password prompt, and takes the package of its own kind.
+Existing installs receive 1.6 through the built-in updater. ZIP files are used by the Mac updater; choose the DMG for a manual installation. A Linux install updates through a system password prompt, and takes the package of its own kind.
+
+## New in 1.6
+
+- **Diagnostics in one file.** `spawnloft diag <server>`, or the assistant's `diagnostics` tool with `bundle: true`, writes a zip with the console, the daemon log, crash reports and the known-problem findings, with passwords and account names removed, for attaching to a bug report. With `--client <profile>` the game client's logs go in too, on the same timeline as the server's.
+- **A game client.** `spawnloft client new <name> --mc 1.21.11` makes a profile, `spawnloft client launch <name>` installs what it needs from Mojang and starts the real Minecraft client, pointed at one of your servers. Profiles can run vanilla or Fabric, and a profile with `--harness` lets an AI assistant drive the game through `client_*` tools: join, chat, read what came back, take a screenshot, quit. Offline profiles join offline-mode servers only. See [CLIENT.md](https://github.com/joogiebear/spawnloft/blob/main/CLIENT.md).
+- **Play from the panel.** When a client profile matches a server's version, its card and ⋯ menu offer Play, which starts the game pointed at that server. Preferences lists the profiles.
+- **Sign in with Microsoft.** `spawnloft client login` signs the launcher into your Minecraft account with a code you type on Microsoft's page; no password passes through SpawnLoft, and the tokens stay in a file only you can read. A profile with `account=<name>` plays as you on online-mode servers.
+- **Doctor checks client profiles.** `spawnloft doctor` says, per profile, whether a Java new enough is installed, whether the version is downloaded, whether a harness profile's mods are the published ones, and clears a harness file left by a crashed game.
 
 ## New in 1.5
 
@@ -46,11 +54,6 @@ Existing installs receive 1.5 through the built-in updater. ZIP files are used b
 - **Small follow-ups to the panel polish.** A running server's ⋯ menu offers Stop and edit… (it asks first, then opens the name, memory and port editor) instead of a greyed-out Rename. Backup rows keep Restore as the one labelled button, with Delete as an icon beside lock, note and download. The automatic backups card no longer changes height when the system scheduler answers.
 - **The Overview feed marks its days, and says when backup details could not load.** When the recent activity crosses midnight it is split under Today, Yesterday and dated labels. If the Overview cannot read backup ages and the machine's memory, it says so with a Try again button, and the cards say Backups unknown instead of waiting forever.
 - **A database you run elsewhere can be pointed at a new address.** Its Settings page has Edit address (also offered on the Not answering notice) for the host, port and admin login, with the password kept unless you type a new one. It saves even when nothing answers there yet and says so. On the command line: `mcctl db address <db> --port <n>`.
-- **Diagnostics in one file.** `spawnloft diag <server>`, or the assistant's `diagnostics` tool with `bundle: true`, writes a zip with the console, the daemon log, crash reports and the known-problem findings, with passwords and account names removed, for attaching to a bug report. With `--client <profile>` the game client's logs go in too, on the same timeline as the server's.
-- **A game client.** `spawnloft client new <name> --mc 1.21.11` makes a profile, `spawnloft client launch <name>` installs what it needs from Mojang and starts the real Minecraft client, pointed at one of your servers. Profiles can run vanilla or Fabric, and a profile with `--harness` lets an AI assistant drive the game through `client_*` tools: join, chat, read what came back, take a screenshot, quit. Offline profiles join offline-mode servers only. See [CLIENT.md](https://github.com/joogiebear/spawnloft/blob/main/CLIENT.md).
-- **Play from the panel.** When a client profile matches a server's version, its card and ⋯ menu offer Play, which starts the game pointed at that server. Preferences lists the profiles.
-- **Sign in with Microsoft.** `spawnloft client login` signs the launcher into your Minecraft account with a code you type on Microsoft's page; no password passes through SpawnLoft, and the tokens stay in a file only you can read. A profile with `account=<name>` plays as you on online-mode servers.
-- **Doctor checks client profiles.** `spawnloft doctor` says, per profile, whether a Java new enough is installed, whether the version is downloaded, whether a harness profile's mods are the published ones, and clears a harness file left by a crashed game.
 
 ## Fixed
 
