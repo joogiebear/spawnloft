@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir, clientLaunchLock } from './client-paths.mjs'
-import { readJson, writeJson, fail, validateName, acquireLock, lockHolder } from './util.mjs'
-import { parseMemoryGb } from './registry.mjs'
+import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
+import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
@@ -201,6 +201,9 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // a machine Mojang never built for is refused before Java is looked for or anything downloads
   const machineRefusal = platformRefusal(null, os)
   if (machineRefusal) fail(machineRefusal)
+  // before any download: a database is a registered instance but nothing a game can join
+  const target = server ?? profile.server
+  if (target && isDatabase(getInstance(target))) fail(`"${target}" is a database, not a Minecraft server; point the profile at a server`)
   if (profile.harness && !harnessFor(profile.mc)) {
     fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
   }
@@ -249,9 +252,34 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, os, harnessToken })
+  const warnings = target ? serverWarnings(target, account) : []
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null } })
 
-  return { pid, profile, version: versionId, account: { type: account.type, name: account.name } }
+  return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
+}
+
+// The game opens either way; these say why it will stop at "Connection refused" or a kick
+// screen, so nobody waits on a join that cannot happen.
+function serverWarnings(server, account) {
+  let check
+  // advisory only: an unreadable server.properties must not stop a launch that got this far
+  try { check = checkInstance(server) } catch { return [] }
+  const warnings = []
+  if (!check.problems.length) return warnings
+  if (check.problems.some((p) => /is not running/.test(p))) {
+    warnings.push(`server "${server}" is not running, so the game will show "Connection refused"; start it first: spawnloft start ${server}`)
+  }
+  if (account.type !== 'microsoft' && check.problems.some((p) => /runs in online mode/.test(p))) {
+    warnings.push(`server "${server}" runs in online mode and ${account.name} is an offline player, so the server will refuse the join; sign in (spawnloft client login) or set online-mode=false on a test server`)
+  }
+  return warnings
+}
+
+// MCCTL_FAKE_CLIENT points launch at a script run by this Node instead of Java (the test suite's
+// fake game). It is honoured only with NODE_ENV=test, so a stray variable in a user's environment
+// cannot make SpawnLoft run an arbitrary script in place of the game.
+export function fakeClientJava(env = process.env) {
+  return env.NODE_ENV === 'test' && env.MCCTL_FAKE_CLIENT ? env.MCCTL_FAKE_CLIENT : null
 }
 
 export function assistantAccountRefusal(name) {
@@ -301,7 +329,7 @@ async function viaSession(name, fn) {
   }
 }
 
-export async function join(name, server) {
+export async function join(name, server, { loadWaitMs = 60000 } = {}) {
   const check = checkInstance(server)
   // The offline-mode rule is for players without an account; a signed-in one may join an online server.
   const signedIn = status(name).account?.type === 'microsoft'
@@ -310,7 +338,20 @@ export async function join(name, server) {
   const host = check.host
   const port = check.inst.port
   const result = await viaSession(name, (ch) => ch.call('join', { host, port }, { timeout: 65000 }))
-  return { ...result, server, host, port }
+  // The mod answers once the player entity exists, while the screen still says "Loading
+  // terrain"; anything done then lands before the world is there. Wait for "ingame".
+  const deadline = Date.now() + loadWaitMs
+  let st = await viaSession(name, (ch) => ch.call('status'))
+  // a kick can land on the disconnect screen or straight back on the title or server list
+  const gone = (screen) => screen === 'disconnected' || screen === 'title' || screen === 'multiplayer'
+  while (st.screen !== 'ingame' && !gone(st.screen) && Date.now() < deadline) {
+    await sleep(500)
+    st = await viaSession(name, (ch) => ch.call('status'))
+  }
+  if (gone(st.screen)) {
+    fail(`"${name}" was disconnected from ${server} while the world loaded; read the reason with client_status or spawnloft client logs ${name}`)
+  }
+  return { ...result, server, host, port, loaded: st.screen === 'ingame', screen: st.screen }
 }
 
 export async function chat(name, text) {

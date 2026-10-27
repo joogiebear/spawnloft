@@ -148,3 +148,26 @@ test('formatTimeline produces the expected exact output', () => {
   const out = formatTimeline(entries)
   assert.equal(out, `${hms(entries[0].at)}.000 server  INFO  Starting server\n${hms(entries[1].at)}.000 client  WARN  Something wrong`)
 })
+
+test('Paper\'s first unstamped line and log4j\'s ISO lines get their own time, not the file\'s', () => {
+  // As seen on Desktop-Main: "Starting ..." landed at the file's mtime, minutes after the start.
+  const lines = [
+    'Starting org.bukkit.craftbukkit.Main',
+    '2026-10-27T22:17:23.120Z ServerMain WARN Advanced terminal features are not available',
+    '[17:17:30 INFO]: Done (6.1s)!',
+  ]
+  const mtime = new Date(2026, 9, 27, 17, 22, 59).getTime()
+  const entries = parseLog(lines, { source: 'server', mtime })
+  assert.equal(entries.length, 3)
+  assert.equal(entries[1].at, '2026-10-27T22:17:23.120Z')
+  assert.equal(entries[1].level, 'WARN')
+  assert.equal(entries[1].thread, 'ServerMain')
+  assert.equal(entries[1].text, 'Advanced terminal features are not available')
+  assert.equal(entries[0].at, entries[1].at, 'the unstamped first line takes the next stamped line\'s time')
+  const r = parseLine('2026-08-31T05:42:27.5Z ServerMain ERROR Boom')
+  assert.equal(r.level, 'ERROR')
+  assert.equal(r.iso, '2026-08-31T05:42:27.5Z')
+  // a log with no stamp at all (a JVM that never started) still sits at the file's time
+  const bare = parseLog(['Error occurred during initialization of VM'], { source: 'client-process', mtime })
+  assert.equal(bare[0].at, new Date(mtime).toISOString())
+})

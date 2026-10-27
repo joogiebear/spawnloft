@@ -98,3 +98,32 @@ test('ensureFabricProfile: throws when the meta answers for another id', async (
 test('ensureFabricApi is exported as a function', () => {
   assert.equal(typeof ensureFabricApi, 'function')
 })
+
+test('a Fabric API dropped into mods/ by hand is used, and two copies are refused, all before any download', async () => {
+  const { createZip } = await import('../src/zip.mjs')
+  const { profileDir } = await import('../src/client-paths.mjs')
+  const mods = path.join(profileDir('hand'), 'mods')
+  fs.mkdirSync(mods, { recursive: true })
+  const src = fs.mkdtempSync(path.join(scratch, 'jar-'))
+  fs.writeFileSync(path.join(src, 'fabric.mod.json'), JSON.stringify({ id: 'fabric-api', version: '0.140.0' }))
+  // named so nothing but its fabric.mod.json says what it is
+  await createZip(path.join(mods, 'my-api.jar'), src, ['fabric.mod.json'])
+  fs.writeFileSync(path.join(src, 'fabric.mod.json'), JSON.stringify({ id: 'sodium' }))
+  await createZip(path.join(mods, 'sodium.jar'), src, ['fabric.mod.json'])
+  fs.writeFileSync(path.join(mods, 'broken.jar'), 'not a zip')
+
+  // Modrinth is never asked: a request would fail here with no network stub.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = () => { throw new Error('no download expected') }
+  try {
+    assert.deepEqual(await ensureFabricApi('hand', '1.21.11'), { installed: false, file: 'my-api.jar', handDropped: true })
+    fs.copyFileSync(path.join(mods, 'my-api.jar'), path.join(mods, 'fabric-api-0.141.0+1.21.11.jar'))
+    await assert.rejects(ensureFabricApi('hand', '1.21.11'), (err) => {
+      assert.match(err.message, /holds 2 copies of Fabric API/)
+      assert.ok(err.message.includes('my-api.jar') && err.message.includes('fabric-api-0.141.0+1.21.11.jar'), err.message)
+      return true
+    })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})

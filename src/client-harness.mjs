@@ -43,7 +43,9 @@ export async function ensureHarnessJar(profileName, mc, { onProgress } = {}) {
     }
   }
 
-  await downloadFile(row.url, dest, { hash: 'sha256', expected: row.sha256, onProgress, label: 'harness mod ' + row.version })
+  // downloadFile reports { received, total } per chunk; the launch's progress is { phase, done, total, bytes } per file
+  await downloadFile(row.url, dest, { hash: 'sha256', expected: row.sha256, label: 'harness mod ' + row.version })
+  onProgress?.({ phase: 'harness mod', done: 1, total: 1, bytes: fs.statSync(dest).size })
   return { installed: true, file: path.basename(dest) }
 }
 

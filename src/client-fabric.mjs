@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fetchJson, downloadFile } from './download.mjs'
 import { versionJson, versionDir, profileDir } from './client-paths.mjs'
 import { fail, assertSafeVersion, readJson, writeJson } from './util.mjs'
-import { modrinthRequest, pickVersion, primaryFile } from './plugins.mjs'
+import { modrinthRequest, pickVersion, primaryFile, readZipEntry } from './plugins.mjs'
 
 export const META_URL = 'https://meta.fabricmc.net/v2'
 
@@ -51,24 +51,49 @@ export async function ensureFabricProfile(mc, loader, { fetchImpl = fetchJson } 
   return id
 }
 
+// Jars in mods/ whose fabric.mod.json says id "fabric-api", whatever the file is called.
+function fabricApiJars(modsDir) {
+  let names = []
+  try { names = fs.readdirSync(modsDir) } catch (err) { if (err.code !== 'ENOENT') throw err }
+  return names.filter((n) => /\.jar$/i.test(n)).filter((n) => {
+    try {
+      const raw = readZipEntry(path.join(modsDir, n), 'fabric.mod.json')
+      return raw !== null && raw !== undefined && JSON.parse(raw.toString('utf8')).id === 'fabric-api'
+    } catch {
+      return false
+    }
+  })
+}
+
 export async function ensureFabricApi(profileName, mc, { onProgress = () => {} } = {}) {
+  const modsDir = path.join(profileDir(profileName), 'mods')
+  const recordFile = path.join(modsDir, '.spawnloft-mods.json')
+  const record = readJson(recordFile, null) ?? { version: 1, managed: {} }
+
+  // Fabric refuses to start with two copies of one mod. A Fabric API someone put in mods/ by hand
+  // is used as it is; a second copy beside it is a mistake to fix, not to download a third for.
+  const present = fabricApiJars(modsDir)
+  const handDropped = present.filter((n) => !Object.hasOwn(record.managed, n))
+  // Two managed copies are SpawnLoft's own leftover (a crash mid-update); the download below
+  // replaces them, so only a copy someone dropped in makes this a person's problem.
+  if (handDropped.length && present.length > 1) {
+    fail(`mods/ in profile "${profileName}" holds ${present.length} copies of Fabric API (${present.join(', ')}), and the game will not start with more than one; remove all but one from ${modsDir}`)
+  }
+  if (handDropped.length === 1) return { installed: false, file: handDropped[0], handDropped: true }
+
+  for (const [filename, meta] of Object.entries(record.managed)) {
+    if (meta.project === 'fabric-api' && meta.mc === mc && present.length <= 1) {
+      const filePath = path.join(modsDir, filename)
+      if (fs.existsSync(filePath)) return { installed: false, file: filename }
+    }
+  }
+
   const versions = await modrinthRequest(
     '/project/fabric-api/version?' + new URLSearchParams({ loaders: JSON.stringify(['fabric']), game_versions: JSON.stringify([mc]) }),
   )
   const version = pickVersion(versions, { gameVersion: mc, loaders: ['fabric'] })
   const file = version && primaryFile(version)
   if (!file) fail('no Fabric API build is published for Minecraft ' + mc)
-
-  const modsDir = path.join(profileDir(profileName), 'mods')
-  const recordFile = path.join(modsDir, '.spawnloft-mods.json')
-  const record = readJson(recordFile, null) ?? { version: 1, managed: {} }
-
-  for (const [filename, meta] of Object.entries(record.managed)) {
-    if (meta.project === 'fabric-api' && meta.mc === mc) {
-      const filePath = path.join(modsDir, filename)
-      if (fs.existsSync(filePath)) return { installed: false, file: filename }
-    }
-  }
 
   if (!/^[^\\/]+\.jar$/.test(file.filename)) {
     fail('Modrinth offered a file named "' + file.filename + '", which is not a mod jar')
@@ -78,13 +103,9 @@ export async function ensureFabricApi(profileName, mc, { onProgress = () => {} }
   fs.mkdirSync(modsDir, { recursive: true })
   await downloadFile(file.url, dest, { hash: 'sha1', expected: file.hashes.sha1, label: 'Fabric API ' + version.version_number })
 
-  for (const [filename, meta] of Object.entries(record.managed)) {
-    if (meta.project === 'fabric-api') {
-      fs.rmSync(path.join(modsDir, filename), { force: true })
-      delete record.managed[filename]
-    }
-  }
-
+  // Recorded before the old copy goes, so a crash in between leaves two managed jars (replaced on
+  // the next launch) rather than one the duplicate check would take for hand-dropped.
+  const old = Object.entries(record.managed).filter(([filename, meta]) => meta.project === 'fabric-api' && filename !== file.filename)
   record.managed[file.filename] = {
     source: 'modrinth',
     project: 'fabric-api',
@@ -93,5 +114,10 @@ export async function ensureFabricApi(profileName, mc, { onProgress = () => {} }
     installedAt: new Date().toISOString(),
   }
   writeJson(recordFile, record)
+  for (const [filename] of old) {
+    fs.rmSync(path.join(modsDir, filename), { force: true })
+    delete record.managed[filename]
+  }
+  if (old.length) writeJson(recordFile, record)
   return { installed: true, file: file.filename, version: version.version_number }
 }

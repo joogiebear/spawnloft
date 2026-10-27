@@ -73,6 +73,7 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
       if (xerr === 2148916233) fail('this Microsoft account has no Xbox profile; create one at https://www.xbox.com and sign in again')
       if (xerr === 2148916238) fail('this is a child account; an adult in the Microsoft family must allow it to play before it can sign in')
       if (xerr === 2148916235) fail('Xbox Live is not available in this account\'s country')
+      if (xerr === 2148916236 || xerr === 2148916237) fail('this account has to finish the age verification Xbox asks for in South Korea; do it at https://account.xbox.com and sign in again')
       fail(`Xbox Live refused the sign-in (XErr ${xerr})`)
     }
     fail(`Xbox Live sign-in failed (HTTP ${xstsRes.status})`)
@@ -84,7 +85,13 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
   const mcBody = JSON.stringify({ identityToken: 'XBL3.0 x=' + uhs + ';' + xsts.Token })
   const mcRes = await fetchImpl(MC_LOGIN_URL, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: mcBody })
   if (!mcRes.ok) {
-    if (mcRes.status === 403) fail(`Microsoft has not yet approved this build of SpawnLoft for Minecraft sign-in (client id ${MSA_CLIENT_ID}); offline profiles still work`)
+    // A 403 here has two causes, and only the app registration's owner can fix either: Mojang has
+    // not put the client id on the Minecraft API allow list, or the Azure app does not allow
+    // public client flows. Mojang's own errorMessage, when it sends one, says which.
+    if (mcRes.status === 403) {
+      const said = String((await bodyOf(mcRes)).errorMessage ?? '').slice(0, 200)
+      fail(`Minecraft refused the sign-in (HTTP 403) for client id ${MSA_CLIENT_ID}${said ? ` ("${said}")` : ''}. Either Mojang has not approved that id for Minecraft sign-in, or its Azure app registration does not allow public client flows (Authentication > Allow public client flows). Offline profiles still work`)
+    }
     fail(`Minecraft sign-in failed (HTTP ${mcRes.status})`)
   }
   const mc = await bodyOf(mcRes)
@@ -158,6 +165,35 @@ export function saveAccounts(list) {
   writeJson(ACCOUNTS_FILE, { version: 1, accounts: list }, { mode: PRIVATE_FILE_MODE })
 }
 
+// Accounts are keyed by uuid; the name is what people type, and it can change at Mojang. A login
+// replaces the entry with the same uuid, and drops a stale entry still holding the same name
+// (Mojang names are unique, so the fresh sign-in is the account that owns it now).
+export function upsertAccount(list, account, { uuid = account.uuid } = {}) {
+  const out = []
+  let placed = false
+  for (const a of list) {
+    if (a.uuid === uuid) {
+      if (!placed) out.push(account)
+      placed = true
+    } else if (a.uuid !== account.uuid && a.name.toLowerCase() !== account.name.toLowerCase()) {
+      out.push(a)
+    }
+  }
+  if (!placed) out.push(account)
+  return out
+}
+
+// A uuid (dashed or not) or a name, case-insensitive; the uuid wins when both could match.
+export function findAccount(list, selector) {
+  const sel = String(selector).toLowerCase()
+  const bare = sel.replace(/-/g, '')
+  if (/^[0-9a-f]{32}$/.test(bare)) {
+    const byUuid = list.findIndex((a) => String(a.uuid).toLowerCase().replace(/-/g, '') === bare)
+    if (byUuid !== -1) return byUuid
+  }
+  return list.findIndex((a) => a.name.toLowerCase() === sel)
+}
+
 export async function accountFor(selector, { fetchImpl = fetch, now = Date.now } = {}) {
   if (typeof selector !== 'string' || !selector) {
     fail('an account is "offline:<player name>" or the name of a signed-in Microsoft account')
@@ -166,15 +202,18 @@ export async function accountFor(selector, { fetchImpl = fetch, now = Date.now }
     return offlineAccount(selector.slice('offline:'.length))
   }
   const accounts = loadAccounts()
-  const idx = accounts.findIndex((a) => a.name.toLowerCase() === selector.toLowerCase())
+  const idx = findAccount(accounts, selector)
   if (idx === -1) {
     fail(`no Microsoft account named "${selector}" is signed in; spawnloft client login, or use offline:<player name>`)
   }
   const account = accounts[idx]
   if (Date.parse(account.expiresAt) - now() < 5 * 60 * 1000) {
     const refreshed = await refreshAccount(account, { fetchImpl, now })
-    accounts[idx] = refreshed
-    saveAccounts(accounts)
+    // Re-read: a login in another process (or the panel) during the refresh must survive it, and
+    // a logout of this account meanwhile must stay a logout. There is no lock across processes;
+    // the window is the time between this read and the write.
+    const latest = loadAccounts()
+    if (latest.some((a) => a.uuid === account.uuid)) saveAccounts(upsertAccount(latest, refreshed, { uuid: account.uuid }))
     return refreshed
   }
   return account

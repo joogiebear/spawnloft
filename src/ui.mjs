@@ -1143,10 +1143,9 @@ async function route(req, res) {
     }
     if (seg[4] === 'launch' && req.method === 'POST') {
       const body = await readBody(req)
-      // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
-      const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
+      const fakeJava = client.fakeClientJava()
       const res2 = await client.launch(profileName, { server: typeof body?.server === 'string' && body.server ? body.server : null, fakeJava })
-      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account })
+      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account, warnings: res2.warnings })
     }
     if (seg[4] === 'stop' && req.method === 'POST') {
       return json(res, 200, await client.stop(profileName))

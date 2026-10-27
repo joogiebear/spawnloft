@@ -233,3 +233,11 @@ test('Windows arm64 is refused for a version without arm64 natives, and launches
   assert.ok(res.pid)
   await stop('life')
 })
+
+test('MCCTL_FAKE_CLIENT is honoured only under NODE_ENV=test', async () => {
+  const { fakeClientJava } = await import('../src/client.mjs')
+  assert.equal(fakeClientJava({ MCCTL_FAKE_CLIENT: '/x/fake.mjs' }), null)
+  assert.equal(fakeClientJava({ MCCTL_FAKE_CLIENT: '/x/fake.mjs', NODE_ENV: 'production' }), null)
+  assert.equal(fakeClientJava({ MCCTL_FAKE_CLIENT: '/x/fake.mjs', NODE_ENV: 'test' }), '/x/fake.mjs')
+  assert.equal(fakeClientJava({ NODE_ENV: 'test' }), null)
+})

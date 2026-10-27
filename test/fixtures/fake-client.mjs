@@ -105,7 +105,11 @@ if (process.env.FAKE_CLIENT_FAIL === 'window') {
               } else {
                 setTimeout(() => {
                   if (socket.destroyed) return
-                  screen = 'ingame'
+                  // Like the real mod: join answers once the player exists, and the screen says
+                  // "connecting" (Loading terrain) for FAKE_CLIENT_LOAD_MS more.
+                  const loadMs = Number(process.env.FAKE_CLIENT_LOAD_MS) || 0
+                  screen = loadMs ? 'connecting' : 'ingame'
+                  if (loadMs) setTimeout(() => { if (screen === 'connecting') screen = 'ingame' }, loadMs)
                   connected = { host, port: joinPort }
                   player = { name: userName, uuid: '00000000-0000-0000-0000-000000000000' }
                   socket.write(JSON.stringify({ id, ok: true, joined: true }) + '\n')

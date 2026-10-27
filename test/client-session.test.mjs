@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-session-'))
 process.env.MCCTL_DATA_ROOT = scratch
+// the fake game shows "connecting" this long after a join answers, as the real one loads terrain
+process.env.FAKE_CLIENT_LOAD_MS = '700'
 
 const { launch, status, stop, createProfile, session, join, chat, messages, screenshot, player, screen, disconnect } = await import('../src/client.mjs')
 const { putInstance } = await import('../src/registry.mjs')
@@ -75,9 +77,11 @@ test('join refuses an online-mode server', async () => {
   await assert.rejects(join('harn', 'online'), /online mode/)
 })
 
-test('join succeeds on an offline server', async () => {
+test('join succeeds on an offline server, once the world has loaded', async () => {
+  const started = Date.now()
   const res = await join('harn', 'offline')
-  assert.deepEqual(res, { joined: true, server: 'offline', host: '127.0.0.1', port: 45633 })
+  assert.deepEqual(res, { joined: true, server: 'offline', host: '127.0.0.1', port: 45633, loaded: true, screen: 'ingame' })
+  assert.ok(Date.now() - started >= 900, 'join returned before the loading screen went away')
 })
 
 test('player name matches account', async () => {
@@ -98,6 +102,40 @@ test('screenshot returns an existing file', async () => {
 
 test('disconnect resolves', async () => {
   await disconnect('harn')
+})
+
+test('join says the world is still loading when it outlasts the wait', async () => {
+  const res = await join('harn', 'offline', { loadWaitMs: 100 })
+  assert.equal(res.loaded, false)
+  assert.equal(res.screen, 'connecting')
+  await disconnect('harn')
+})
+
+test('launch warns when the server it points at is stopped or will refuse an offline player', async () => {
+  makeServer('down', 45635, 'online-mode=false\nserver-ip=127.0.0.1\n')
+  fs.rmSync(stateFile('down'), { force: true })
+  createProfile('warn', { mc: '1.21.11' })
+  try {
+    const res = await launch('warn', { fakeJava, server: 'down', playerName: 'tester' })
+    assert.equal(res.warnings.length, 1)
+    assert.match(res.warnings[0], /server "down" is not running.*spawnloft start down/)
+    await stop('warn')
+    const online = await launch('warn', { fakeJava, server: 'online', playerName: 'tester' })
+    assert.equal(online.warnings.length, 1)
+    assert.match(online.warnings[0], /online mode and tester is an offline player/)
+    await stop('warn')
+    const fine = await launch('warn', { fakeJava, server: 'offline', playerName: 'tester' })
+    assert.deepEqual(fine.warnings, [])
+    await stop('warn')
+    // a database is refused before anything is looked up or started
+    const dbDir = path.join(INSTANCES_DIR, 'db')
+    fs.mkdirSync(dbDir, { recursive: true })
+    putInstance('db', { dir: dbDir, kind: 'database', engine: 'mysql', port: 45637 })
+    await assert.rejects(launch('warn', { fakeJava, server: 'db', playerName: 'tester' }), /"db" is a database/)
+    assert.equal(status('warn').running, false)
+  } finally {
+    await stop('warn')
+  }
 })
 
 test('status harness port is a number', () => {

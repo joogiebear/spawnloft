@@ -9,6 +9,7 @@ process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 process.env.MCCTL_FAKE_CLIENT = path.resolve(process.cwd(), 'test', 'fixtures', 'fake-client.mjs')
+process.env.NODE_ENV = 'test'
 const { serve } = await import('../src/ui.mjs')
 const registry = await import('../src/registry.mjs')
 const { UserError } = await import('../src/util.mjs')
@@ -121,6 +122,8 @@ test('the panel lists, launches, reports and stops a client profile', async () =
   assert.equal(launchRes.status, 200)
   const launchData = await launchRes.json()
   assert.equal(typeof launchData.pid, 'number')
+  // "quick" is not running here, and the panel says so instead of a silent "is running"
+  assert.ok(launchData.warnings.some((w) => /server "quick" is not running/.test(w)), JSON.stringify(launchData.warnings))
 
   const statusRes = await fetch(panel.url + 'api/client/profiles/pp/status')
   assert.equal(statusRes.status, 200)

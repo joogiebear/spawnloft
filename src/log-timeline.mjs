@@ -8,6 +8,8 @@ const PAPER_RE = /^\[(\d{2}:\d{2}:\d{2}) (\w+)\]: (.*)$/
 const FABRIC_RE = /^\[(\d{2}:\d{2}:\d{2})\] \[([^\]]*)\/(\w+)\]: (.*)$/
 const FABRIC_MOD_RE = /^\[(\d{2}:\d{2}:\d{2})\] \[([^\]]*)\/(\w+)\] \(([^)]+)\) (.*)$/
 const DAEMON_RE = /^\[(\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\] (.*)$/
+// log4j before Paper configures logging: `2026-08-31T05:42:27.5Z ServerMain WARN Advanced terminal...`
+const LOG4J_ISO_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}))\s+(\S+)\s+(INFO|WARN|WARNING|ERROR|SEVERE|FATAL|DEBUG|TRACE)\s+(.*)$/
 
 function normalizeLevel(level) {
   if (!level) return null
@@ -35,6 +37,11 @@ export function parseLine(raw) {
   m = DAEMON_RE.exec(line)
   if (m) {
     return { time: null, iso: m[1], level: null, thread: null, text: m[2] }
+  }
+
+  m = LOG4J_ISO_RE.exec(line)
+  if (m) {
+    return { time: null, iso: m[1], level: normalizeLevel(m[3]), thread: m[2], text: m[4] }
   }
 
   return { time: null, iso: null, level: null, thread: null, text: line }
@@ -87,7 +94,7 @@ export function parseLog(lines, { source, anchor = null, mtime = null }) {
     }
 
     if (parsed.iso !== null) {
-      entries.push({ at: isoOf(parsed.iso), day: null, source, level: null, thread: null, text: parsed.text, raw: line })
+      entries.push({ at: isoOf(parsed.iso), day: null, source, level: parsed.level, thread: parsed.thread, text: parsed.text, raw: line })
       continue
     }
 
@@ -111,10 +118,16 @@ export function parseLog(lines, { source, anchor = null, mtime = null }) {
     base = new Date(mtime ?? Date.now())
   }
 
-  return entries.map(({ day, time, ...e }) => ({
+  const out = entries.map(({ day, time, ...e }) => ({
     ...e,
-    at: e.at ?? (day === null ? base.toISOString() : dateAt(base, day, time)),
+    at: e.at ?? (day === null ? null : dateAt(base, day, time)),
   }))
+  // Only lines before the first stamped one are left (later ones joined the line above them),
+  // such as Paper's "Starting org.bukkit.craftbukkit.Main": they were written just before the
+  // next stamped line, not at the file's mtime, which can be minutes or days later.
+  const firstAt = out.find((e) => e.at !== null)?.at ?? base.toISOString()
+  for (const e of out) if (e.at === null) e.at = firstAt
+  return out
 }
 
 export function mergeTimelines(...lists) {

@@ -69,6 +69,7 @@ test('set memory=lots fails naming the field', () => {
 })
 
 test('launch with fake client, status, logs, stop', async () => {
+  env.NODE_ENV = 'test'
   env.MCCTL_FAKE_CLIENT = path.join(root, 'test', 'fixtures', 'fake-client.mjs')
   const launchRes = cli(['client', 'launch', 'p', '--as', 'tester', '--json'])
   assert.equal(launchRes.code, 0)
@@ -98,6 +99,7 @@ test('launch with fake client, status, logs, stop', async () => {
 })
 
 test('launch --account offline:<name> plays offline under that name, and --as with --account is refused', async () => {
+  env.NODE_ENV = 'test'
   env.MCCTL_FAKE_CLIENT = path.join(root, 'test', 'fixtures', 'fake-client.mjs')
   const both = cli(['client', 'launch', 'p', '--as', 'x', '--account', 'offline:Steve', '--json'])
   assert.equal(both.code, 1)

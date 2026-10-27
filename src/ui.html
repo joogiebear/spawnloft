@@ -4346,7 +4346,7 @@ function moreItems(row) {
   const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
-    ...(play ? [{ label: 'Play', hint: 'Starts the game client ' + play.name + ' pointed at this server.', run: () => playClient(row) }] : []),
+    ...(play ? [{ label: 'Play', hint: play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) }] : []),
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -5699,7 +5699,8 @@ function updateHomeCard(card, row) {
   const play = card.querySelector('.sc-play');
   const pp = playProfileFor(row);
   play.hidden = !pp;
-  if (pp) play.title = 'Starts ' + pp.name + ' pointed at this server';
+  play.textContent = pp && pp.running ? 'Playing' : 'Play';
+  if (pp) play.title = pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
   play.disabled = Boolean(pp && launching.has(pp.name));
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
@@ -5841,8 +5842,19 @@ function lostContact(on) {
   $('#banner').prepend(bar);
 }
 
-async function loadClientProfiles() {
-  try { state.clientProfiles = await api('/client/profiles') } catch { state.clientProfiles = [] }
+// Polled with the servers, since a game closed from its own window changes nothing here; the
+// cards and the menu are rebuilt only when a profile or its running state changed.
+// One request at a time, so a late answer cannot overwrite a newer one.
+let loadingProfiles = null;
+function loadClientProfiles() {
+  if (!loadingProfiles) loadingProfiles = fetchClientProfiles().finally(() => { loadingProfiles = null });
+  return loadingProfiles;
+}
+async function fetchClientProfiles() {
+  let next;
+  try { next = await api('/client/profiles') } catch { next = [] }
+  if (JSON.stringify(next) === JSON.stringify(state.clientProfiles)) return;
+  state.clientProfiles = next;
   renderHomeCards();
   if (state.current) buildMoreMenu();
 }
@@ -5863,13 +5875,16 @@ async function playClient(row) {
   const p = playProfileFor(row);
   if (!p) return;
   if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
+  // An acknowledgement, not an error: the game is already open, which is what Play is for.
+  if (p.running) { toast(p.name + ' is already running. Stop it under Preferences \u203a Game client.'); return; }
   launching.add(p.name);
   setPlayDisabled(p.name, true);
   const note = toast('Starting ' + p.name + '…');
   try {
-    await post('/client/profiles/' + encodeURIComponent(p.name) + '/launch', { server: row.name });
+    const out = await post('/client/profiles/' + encodeURIComponent(p.name) + '/launch', { server: row.name });
     note.remove();
-    toast(p.name + ' is running.', 'good')
+    if (out.warnings && out.warnings.length) toast(p.name + ' is running. ' + out.warnings.map((w) => w.charAt(0).toUpperCase() + w.slice(1) + '.').join(' '), 'bad');
+    else toast(p.name + ' is running.', 'good')
   } catch (e) {
     note.remove();
     toast(e.message, 'bad')
@@ -5908,6 +5923,7 @@ async function refresh() {
   }
   renderList(rows, dbs);
   renderJavaChip();
+  loadClientProfiles();
 
   if (!state.current) {
     if (state.view === 'empty' || state.view === 'home') showHome();
@@ -13282,7 +13298,7 @@ function renderSettings() {
   } else {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'To move these, run: mcctl config set-root <path>';
+    hint.textContent = 'To move these, run: spawnloft config set-root <path>';
     actions.append(hint);
   }
 

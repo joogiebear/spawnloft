@@ -2045,7 +2045,9 @@ async function cmdClient(positional, flags) {
   const [sub, ...rest] = positional
   const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
   const quiet = flags.json === true
-  const onProgress = (p) => { if (!quiet) process.stderr.write(p.phase + ' ' + p.done + '/' + p.total + '\n') }
+  // Only a phase that fetches something is worth a line: a cached launch re-checks every file and
+  // would otherwise print the whole list, reading as if it downloaded the game again.
+  const onProgress = (p) => { if (!quiet && p.bytes > 0) process.stderr.write(p.phase + ' ' + p.done + '/' + p.total + ' (' + humanBytes(p.bytes) + ')\n') }
 
   if (sub === 'list') {
     checkFlags(flags, ['json'])
@@ -2118,8 +2120,7 @@ async function cmdClient(positional, flags) {
     if (flags.as !== undefined && typeof flags.as !== 'string') throw new UsageError('--as needs a player name')
     if (flags.account !== undefined && typeof flags.account !== 'string') throw new UsageError('--account needs "offline:<player name>" or a signed-in account name')
     if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
-    // MCCTL_FAKE_CLIENT is test-only: any java ending in .mjs is run by this Node (like fake-java.mjs).
-    const fakeJava = process.env.MCCTL_FAKE_CLIENT || null
+    const fakeJava = client.fakeClientJava()
     const res = await client.launch(rest[0], { playerName: flags.as ?? null, account: flags.account ?? null, server: flags.server ?? null, onProgress, fakeJava })
     if (flags.wait === true) {
       const deadline = Date.now() + 5000
@@ -2128,8 +2129,11 @@ async function cmdClient(positional, flags) {
         await sleep(250)
       }
     }
-    if (quiet) process.stdout.write(jsonLine('client', { pid: res.pid, version: res.version, account: res.account, profile: res.profile }))
-    else out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
+    if (quiet) process.stdout.write(jsonLine('client', { pid: res.pid, version: res.version, account: res.account, profile: res.profile, warnings: res.warnings }))
+    else {
+      out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
+      for (const w of res.warnings) process.stderr.write(`warning: ${w}\n`)
+    }
     return
   }
 
@@ -2187,11 +2191,7 @@ async function cmdClient(positional, flags) {
         process.stderr.write(`Open ${verificationUri} and enter the code ${userCode} (valid ${Math.floor(expiresIn / 60)} minutes). Waiting...\n`)
       },
     })
-    const list = clientAuth.loadAccounts()
-    const at = list.findIndex((a) => a.uuid === account.uuid)
-    if (at === -1) list.push(account)
-    else list[at] = account
-    clientAuth.saveAccounts(list)
+    clientAuth.saveAccounts(clientAuth.upsertAccount(clientAuth.loadAccounts(), account))
     if (quiet) process.stdout.write(jsonLine('client', { account: { type: account.type, name: account.name, uuid: account.uuid } }))
     else out(`Signed in as ${account.name}. Use it: spawnloft client launch <profile> --account ${account.name}, or spawnloft client set <profile> account=${account.name}`)
     return
@@ -2201,11 +2201,12 @@ async function cmdClient(positional, flags) {
     checkFlags(flags, ['json'])
     if (rest.length !== 1) throw new UsageError(usage)
     const list = clientAuth.loadAccounts()
-    const keep = list.filter((a) => a.name.toLowerCase() !== rest[0].toLowerCase())
-    if (keep.length === list.length) fail(`no signed-in account named "${rest[0]}"; spawnloft client accounts lists them`)
-    clientAuth.saveAccounts(keep)
-    if (quiet) process.stdout.write(jsonLine('client', { removed: rest[0] }))
-    else out(`Signed out ${rest[0]}. Microsoft keeps its own session; sign out of your browser too if the machine is shared.`)
+    const at = clientAuth.findAccount(list, rest[0])
+    if (at === -1) fail(`no signed-in account named "${rest[0]}"; spawnloft client accounts lists them`)
+    const [gone] = list.splice(at, 1)
+    clientAuth.saveAccounts(list)
+    if (quiet) process.stdout.write(jsonLine('client', { removed: gone.name, uuid: gone.uuid }))
+    else out(`Signed out ${gone.name}. Microsoft keeps its own session; sign out of your browser too if the machine is shared.`)
     return
   }
 
