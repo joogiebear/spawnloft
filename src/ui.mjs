@@ -87,8 +87,11 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   })
 
   clientLogin.setLoginHooks({ log: panelLog })
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    // a port already taken (another panel, usually) rejects instead of crashing the process
+    server.once('error', reject)
     server.listen(port, host, () => {
+      server.off('error', reject)
       // the desktop app passes port 0, so report the port actually bound
       const bound = server.address().port
       // the sign-in callback's redirect URI carries this port (Microsoft matches localhost on any port)
@@ -2012,7 +2015,7 @@ async function route(req, res) {
   return json(res, 404, { error: 'not found' })
 }
 
-function openBrowser(url) {
+export function openBrowser(url) {
   import('node:child_process').then(({ spawn }) => {
     const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
       : process.platform === 'darwin' ? ['open', [url]]

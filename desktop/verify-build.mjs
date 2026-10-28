@@ -107,10 +107,10 @@ if (!fs.existsSync(asar)) {
 } else {
   // package.json's `files` is an allowlist; anything added to desktop/ and not listed is silently left out
   const bytes = fs.readFileSync(asar)
-  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'ui-zoom.js', 'update-channel.js']) {
+  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'ui-zoom.js', 'update-channel.js', 'launcher-window.js', 'login-window.js']) {
     if (!bytes.includes(Buffer.from(name))) problems.push(`${name} is not in app.asar - check the "files" list in package.json`)
   }
-  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js and setup.html are packaged')
+  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js, launcher-window.js, login-window.js and setup.html are packaged')
 }
 
 // Artifact Signing certificates live about three days, so without a timestamp every signature

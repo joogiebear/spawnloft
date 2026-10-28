@@ -1804,4 +1804,16 @@
       if (prefill && typeof prefill === 'object') openForm(null, { mc: typeof prefill.mc === 'string' ? prefill.mc : '', server: typeof prefill.server === 'string' ? prefill.server : '' })
     })
   }
+
+  // The same, for a launcher that was already open: the panel brings this window forward rather
+  // than reloading it, and the storage event is how the card's choice arrives. A form already open
+  // keeps what was typed into it.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== NEW_PROFILE_KEY || !e.newValue) return
+    let prefill = null
+    try { prefill = JSON.parse(e.newValue) } catch { /* ignored */ }
+    stored('local', NEW_PROFILE_KEY, null)
+    if (!prefill || typeof prefill !== 'object' || S.form) return
+    openForm(null, { mc: typeof prefill.mc === 'string' ? prefill.mc : '', server: typeof prefill.server === 'string' ? prefill.server : '' })
+  })
 </script>

@@ -1244,14 +1244,43 @@ function cmdLaunchers(positional) {
 }
 
 async function cmdUi(positional, flags) {
-  const { url } = await ui.serve({
-    port: Number(flags.port ?? 8770),
-    // --no-open arrives as { open: false }.
-    open: flags.open !== false,
-  })
+  const port = Number(flags.port ?? 8770)
+  // --no-open arrives as { open: false }.
+  const open = flags.open !== false
+  // --launcher opens the game launcher's page instead of the panel's. A second panel cannot bind the
+  // port, so with one already running it opens that panel's launcher and stops there.
+  const launcher = flags.launcher === true
+  let url
+  try {
+    ({ url } = await ui.serve({ port, open: open && !launcher }))
+  } catch (err) {
+    if (err?.code !== 'EADDRINUSE') throw err
+    const running = `http://127.0.0.1:${port}/`
+    const panel = await isPanelAt(running)
+    if (launcher && panel) {
+      if (open) ui.openBrowser(running + 'launcher')
+      out(`SpawnLoft launcher: ${running}launcher (the panel already running on port ${port})`)
+      return
+    }
+    fail(`port ${port} is already in use${panel ? ` by a SpawnLoft panel: open ${running}` : ''}. Pick another with --port <n>.`)
+  }
+  if (launcher && open) ui.openBrowser(url + 'launcher')
   out(`SpawnLoft panel: ${url}`)
+  if (launcher) out(`Game launcher: ${url}launcher`)
   out('Bound to 127.0.0.1 only — it can start servers and type console commands, so it is')
   out('for this machine, not the network. Ctrl+C to stop the panel (servers keep running).')
+}
+
+// Something on the port answers the launcher's summary route the way a SpawnLoft panel does.
+async function isPanelAt(base) {
+  try {
+    const res = await fetch(base + 'api/client/launcher', { redirect: 'error', signal: AbortSignal.timeout(2000) })
+    if (!res.ok) return false
+    const body = await res.json()
+    return Array.isArray(body?.profiles)
+  } catch {
+    return false
+  }
 }
 
 async function cmdPaper(positional, flags) {
@@ -1907,7 +1936,9 @@ SNAPSHOTS
 OTHER
   mcctl templates                    List templates
   mcctl templates save <inst> <tpl>  Save an instance's plugins+config as a template
-  mcctl ui [--port n] [--no-open]    Serve the local control panel (and open it in a browser)
+  mcctl ui [--port n] [--no-open] [--launcher]
+                                    Serve the local control panel (and open it in a browser);
+                                    --launcher opens the game launcher instead
   mcctl paper versions               Paper versions available to download
   mcctl paper fetch <version>        Download a Paper build into the jar store
   mcctl upgrade <name> [--check]     Move to the newest build for its version (Paper,

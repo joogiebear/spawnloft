@@ -19,17 +19,18 @@ function isVisibleSomewhere(bounds, displays) {
   })
 }
 
-function load(file, displays) {
+// `defaults` is the size a window opens at the first time (the launcher's differs from the panel's).
+function load(file, displays, defaults = DEFAULT_BOUNDS) {
   let saved = null
   try {
     saved = JSON.parse(fs.readFileSync(file, 'utf8'))
   } catch {
     // missing or unreadable: use defaults
-    return { ...DEFAULT_BOUNDS, maximized: false }
+    return { width: defaults.width, height: defaults.height, maximized: false }
   }
 
-  const width = Math.max(MIN_WIDTH, Math.round(Number(saved.width) || DEFAULT_BOUNDS.width))
-  const height = Math.max(MIN_HEIGHT, Math.round(Number(saved.height) || DEFAULT_BOUNDS.height))
+  const width = Math.max(MIN_WIDTH, Math.round(Number(saved.width) || defaults.width))
+  const height = Math.max(MIN_HEIGHT, Math.round(Number(saved.height) || defaults.height))
   const state = { width, height, maximized: saved.maximized === true }
 
   if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
