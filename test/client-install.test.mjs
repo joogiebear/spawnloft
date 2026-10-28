@@ -23,7 +23,7 @@ const INDEX = JSON.stringify({ objects: { 'minecraft/sounds/a.ogg': { hash: body
 const indexSha = crypto.createHash('sha1').update(INDEX).digest('hex')
 const indexSize = INDEX.length
 
-const { PARALLEL, needsDownload, ensureVersion, extractNatives } = await import('../src/client-install.mjs')
+const { PARALLEL, needsDownload, ensureVersion, extractNatives, materialiseAssets, assetTreeDir } = await import('../src/client-install.mjs')
 const { versionJson, versionDir, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } = await import('../src/client-paths.mjs')
 const { libraries, assetObjects } = await import('../src/client-meta.mjs')
 const { createZip } = await import('../src/zip.mjs')
@@ -326,35 +326,57 @@ test('1.7.10 installs: every download is a URL the JSON names, and the natives-o
   assert.ok(fs.existsSync(path.join(nativesDir(old.id), '.complete')), 'natives extracted')
 })
 
-test('an asset index laid out in a way SpawnLoft does not set up is refused before the jar and the libraries (review S-5)', async () => {
+// A copy of 1.12.2 whose asset index is one of the fixtures, every download answered locally.
+function layoutCase(file) {
   const base = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.12.2.json'), 'utf8'))
-  const cases = [
-    ['legacy.json', /older layout \(asset index legacy-test\)/],
-    ['pre-1.6.json', /older layout \(asset index pre-1\.6-test\)/],
-    ['bad.json', /older layout/],
-    ['future-pack.json', /laid out in a way SpawnLoft does not know/],
-  ]
-  for (const [file, message] of cases) {
-    const version = JSON.parse(JSON.stringify(base))
-    version.id = `layout-${file.replace('.json', '')}`
-    const indexText = fs.readFileSync(path.join(fixtureDir, 'assets', file))
-    version.assetIndex = { id: file.replace('.json', '-test'), url: `https://example.invalid/indexes/${file}`, sha1: crypto.createHash('sha1').update(indexText).digest('hex'), size: indexText.length }
-    fs.mkdirSync(versionDir(version.id), { recursive: true })
-    fs.writeFileSync(versionJson(version.id), JSON.stringify(version))
-    const calls = []
-    const fetchImpl = async (url, dest) => {
-      calls.push(url)
-      fs.mkdirSync(path.dirname(dest), { recursive: true })
-      fs.writeFileSync(dest, url === version.assetIndex.url ? indexText : BODY)
-    }
-    await assert.rejects(ensureVersion(version.id, { os: winOs, fetchImpl }), (err) => {
-      assert.equal(err.code, 'unknown-asset-layout', file)
-      assert.match(err.message, message, file)
-      assert.match(err.message, /Update SpawnLoft\.$/, file)
-      return true
-    })
+  const version = JSON.parse(JSON.stringify(base))
+  version.id = `layout-${file.replace('.json', '')}`
+  const indexText = fs.readFileSync(path.join(fixtureDir, 'assets', file))
+  version.assetIndex = { id: file.replace('.json', '-test'), url: `https://example.invalid/indexes/${file}`, sha1: crypto.createHash('sha1').update(indexText).digest('hex'), size: indexText.length }
+  fs.mkdirSync(versionDir(version.id), { recursive: true })
+  fs.writeFileSync(versionJson(version.id), JSON.stringify(version))
+  const calls = []
+  const fetchImpl = async (url, dest) => {
+    calls.push(url)
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, url === version.assetIndex.url ? indexText : BODY)
+  }
+  return { version, calls, fetchImpl }
+}
+
+test('an asset index SpawnLoft cannot lay out is refused before the jar and the libraries (review S-5)', async () => {
+  for (const [file, check] of [
+    ['future-pack.json', (err) => err.code === 'unknown-asset-layout' && /laid out in a way SpawnLoft does not know\. Update SpawnLoft\.$/.test(err.message)],
+    ['bad.json', (err) => /names the file "\.\.\/x", which would land outside its folder/.test(err.message)],
+  ]) {
+    const { version, calls, fetchImpl } = layoutCase(file)
+    await assert.rejects(ensureVersion(version.id, { os: winOs, fetchImpl }), (err) => check(err) || assert.fail(`${file}: ${err.code} ${err.message}`))
     assert.deepEqual(calls, [version.assetIndex.url], `${file}: only the index was fetched`)
   }
+})
+
+test('the older asset layouts are laid out under real names, once per index (V1c)', async () => {
+  for (const [file, layout] of [['legacy.json', 'virtual'], ['pre-1.6.json', 'resources']]) {
+    const { version, fetchImpl } = layoutCase(file)
+    const res = await ensureVersion(version.id, { os: winOs, fetchImpl })
+    assert.equal(res.assetsLayout, layout)
+    const dest = assetTreeDir(layout, res.assetIndex.id, path.join(scratch, 'profile-' + layout))
+    assert.equal(dest, layout === 'virtual' ? path.join(ASSETS_DIR, 'virtual', version.assetIndex.id) : path.join(scratch, 'profile-' + layout, 'resources'))
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 3 })
+    const index = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'assets', file), 'utf8'))
+    for (const [name, entry] of Object.entries(index.objects)) {
+      const laid = path.join(dest, name)
+      assert.equal(fs.readFileSync(laid, 'utf8'), fs.readFileSync(path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash), 'utf8'), name)
+    }
+    assert.equal(fs.readFileSync(path.join(dest, '.complete'), 'utf8'), version.assetIndex.sha1)
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 0 }, 'stamped: nothing to do')
+    // a half-done tree (no stamp) is laid out again
+    fs.rmSync(path.join(dest, '.complete'))
+    fs.rmSync(path.join(dest, Object.keys(index.objects)[0]))
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 3 })
+    assert.ok(fs.existsSync(path.join(dest, Object.keys(index.objects)[0])))
+  }
+  assert.equal(assetTreeDir('objects', 'x', scratch), null)
 })
 
 test('a library path that would leave the libraries folder is refused (review N-7)', () => {

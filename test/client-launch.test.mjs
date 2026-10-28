@@ -195,3 +195,21 @@ test('the old versions\' session text is redacted in the log lines the panel sho
   assert.equal(redactClientLine('(Session ID is token:eyJhbGciOi.abc:40f5db53a47a33eeb1f6db0e20deded4)'), '(Session ID is token:[redacted]:40f5db53a47a33eeb1f6db0e20deded4)')
   assert.equal(redactClientLine('--accessToken secret --version 1.21.11'), '--accessToken [redacted] --version 1.21.11')
 })
+
+test('${game_assets} names the tree an older asset layout was laid out in (V1c)', () => {
+  const v172 = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.7.2.json'), 'utf8'))
+  const profile = { mc: '1.7.2', loader: 'vanilla', memory: '2G', server: null }
+  const tree = path.join(ASSETS_DIR, 'virtual', 'legacy')
+  const cmd = buildCommand({ version: v172, profile, profileName: 'old', account, java, os: testOs, assetsDir: tree })
+  assert.equal(cmd.args[cmd.args.indexOf('--assetsDir') + 1], tree)
+  const plain = buildCommand({ version: v172, profile, profileName: 'old', account, java, os: testOs })
+  assert.equal(plain.args[plain.args.indexOf('--assetsDir') + 1], ASSETS_DIR)
+})
+
+test('an asset index id that is not a plain name is refused', async () => {
+  const { assetIndex } = await import('../src/client-meta.mjs')
+  for (const id of ['../x', 'a/b', '', '..']) {
+    assert.throws(() => assetIndex({ id: 'v', assetIndex: { id } }), /is not a plain name/, id)
+  }
+  assert.equal(assetIndex({ id: 'v', assetIndex: { id: 'pre-1.6' } }).id, 'pre-1.6')
+})

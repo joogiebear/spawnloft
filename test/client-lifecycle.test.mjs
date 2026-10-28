@@ -262,6 +262,10 @@ test('a version with no arm64 natives runs as x64 on an arm64 machine that can e
     assert.equal(facts.arch, 'x64')
     assert.equal(facts.emulated, true)
     assert.equal(facts.java.major, 8)
+    await stop('emu')
+    // Windows 11 on arm64 runs it too, said to be experimental (review N4)
+    const res = await launch('emu', { fakeJava, os: { name: 'windows', arch: 'arm64', version: '10.0.22631' }, hostCaps: { x64: true } })
+    assert.deepEqual(res.warnings, ['running under Windows x64 emulation (experimental)'])
   } finally {
     try { await stop('emu') } catch { /* not running */ }
     removeProfile('emu')

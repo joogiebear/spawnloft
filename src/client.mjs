@@ -6,7 +6,7 @@ import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, client
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
-import { ensureVersion } from './client-install.mjs'
+import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
@@ -444,6 +444,18 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   }
 
   const installed = fakeInstalled ? null : await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
+  // the older asset layouts: a tree under real names, shared (virtual) or in the profile (resources)
+  const assetsDir = installed ? assetTreeDir(installed.assetsLayout, installed.assetIndex.id, profileDir(name)) : null
+  if (assetsDir) {
+    onStage({ stage: 'assets', message: 'Laying out the sounds and language files' })
+    await materialiseAssets(installed.assetIndex, assetsDir)
+  }
+  // N4: no machine the project has can try it
+  if (resolved.emulated && runOs.name === 'windows') {
+    const w = 'running under Windows x64 emulation (experimental)'
+    warnings.push(w)
+    onWarning(w)
+  }
   if (!fakeJava) {
     if (profile.loader === 'fabric') {
       onStage({ stage: 'fabric', message: 'Checking Fabric API' })
@@ -464,7 +476,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
-  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address })
+  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address, assetsDir })
   onStage({ stage: 'spawn', message: 'Starting the game' })
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed) } })

@@ -389,10 +389,13 @@ client/
   accounts.json              the signed-in Microsoft accounts with their tokens, and the launcher's offline accounts (owner-only, see Accounts)
   profiles/<name>/           one profile's game folder: options.txt, mods/, logs/latest.log,
                              screenshots/, saves/, crash-reports/, spawnloft-harness.json (while the harness runs)
+                             and, for a version before 1.6, resources/ (its sounds, linked from assets/)
   versions/<id>/             the client jar and its version JSON, one folder per version
   libraries/                 shared by every version
   assets/                    shared by every version; log_configs/ holds the log4j configs Mojang names
                              for each version (its Log4Shell mitigation, passed to the game at launch)
+                             virtual/<index>/ lays out 1.6.1 to 1.7.2's sounds and language files under
+                             their real names (hard links into objects/)
   natives/<id>/              the native libraries, per version
   run/<name>/state.json      what is running: pid, start time, player, server, harness token and port (owner-only)
   run/<name>/launch.lock     held while a launch is under way, so two Play clicks cannot start two games
