@@ -292,8 +292,9 @@
   select { appearance: none; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5l3.5 3.5 3.5-3.5' fill='none' stroke='%239aa4ba' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
   input::placeholder { color: var(--ink-4); }
   input:focus, select:focus { background-color: var(--field-focus); border-color: var(--lapis-edge); }
-  label.field { display: grid; gap: var(--s-1); min-width: 0; }
-  label.field > span { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
+  .field { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
+  .field > .label { margin-bottom: 0; }
+  label.field > span, .field > span.label { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
 
   /* ---- window ---------------------------------------------------------------- */
   .app { display: grid; grid-template-columns: 196px minmax(0, 1fr); height: 100vh; min-width: 0; }
@@ -358,6 +359,13 @@
   .pill.accent { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 
+  .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); width: max-content; margin-bottom: var(--s-1); }
+  .seg button { min-height: 26px; padding: 0 var(--s-3); font-size: var(--t-2); background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); border-radius: var(--r-xs); }
+  .seg button.on { background: var(--raised-hi); color: var(--ink); border-color: var(--line); }
+  .note-line { display: flex; gap: var(--s-2); align-items: flex-start; width: 100%; }
+  .note-line .ico { margin-top: 3px; flex: none; }
+  .field > small.hint { font: var(--type-meta); }
+
   /* ---- Play ------------------------------------------------------------------ */
   .play { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--s-5); align-items: start; }
   .hero { padding: var(--s-7) var(--s-6) var(--s-6); display: grid; gap: var(--s-5); justify-items: start; background: linear-gradient(180deg, var(--surface-hi), var(--surface)); }
@@ -366,7 +374,7 @@
   .launch { min-height: 56px; padding: 0 var(--s-7); font-size: var(--t-5); border-radius: var(--r); }
   .launch .ico { font-size: 18px; }
   .hero .does { font: var(--type-body); color: var(--ink-2); margin-top: calc(var(--s-3) * -1); }
-  .pickers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); width: 100%; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
+  .pickers { align-items: start; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); width: 100%; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
   .facts { display: grid; gap: var(--s-3); }
   .facts dl { margin: 0; display: grid; gap: var(--s-3); }
   .facts dt { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
@@ -517,8 +525,9 @@
       <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins <b>survival</b> · as Wunga_</p>
       <div class="pickers">
         <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <label class="field"><span>Server</span><select><option>Join survival (running)</option></select></label>
+        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button class="on" aria-pressed="true">Your servers</button><button aria-pressed="false">Other server</button></div><select aria-label="Your servers"><option>Join survival (running)</option></select></div>
       </div>
+      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
     </div>
     <aside class="card facts"><h2>survival-test</h2><dl>
       <div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div>
@@ -537,7 +546,7 @@
       <p class="does">Starts <b>survival</b> first (up to 2 minutes), then launches Minecraft 1.21.11 · Fabric 0.17.3 as Wunga_ and joins it.</p>
       <div class="pickers">
         <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <label class="field"><span>Server</span><select><option>Join survival (stopped)</option></select></label>
+        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button class="on" aria-pressed="true">Your servers</button><button aria-pressed="false">Other server</button></div><select aria-label="Your servers"><option>Join survival (stopped)</option></select></div>
       </div>
     </div>
     <aside class="card facts"><h2>survival-test</h2><dl>
@@ -563,9 +572,48 @@
             <div class="row"><span>survival</span><span class="meta">running</span></div>
             <div class="row"><span>lobby</span><span class="meta">stopped</span></div>
             <div class="row" style="opacity:.5;cursor:not-allowed"><span>public-smp</span><span class="meta">needs a Microsoft account</span></div>
+            <hr><div class="row act"><span>Other server…</span><span class="meta">type an address</span></div>
           </div>
         </div>
       </div>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
+  </div>
+</div></section>
+
+<section class="view" data-view="play.address"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Ready</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
+      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins play.example.net · as Wunga_</p>
+      <div class="pickers">
+        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
+        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button aria-pressed="false">Your servers</button><button class="on" aria-pressed="true">Other server</button></div>
+          <input aria-label="Server address" value="play.example.net:25565"><small class="hint">Host, or host:port. Plays like any Minecraft server; online servers need a Microsoft account (you are signed in as Wunga_).</small></div>
+      </div>
+      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
+  </div>
+</div></section>
+
+<section class="view" data-view="play.addresserror"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill fault"><span class="dot"></span>Check address</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
+      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins an address · as Wunga_</p>
+      <div class="pickers">
+        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
+        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button aria-pressed="false">Your servers</button><button class="on" aria-pressed="true">Other server</button></div>
+          <input aria-label="Server address" value="play example net" style="border-color:var(--fault)"><small class="hint" style="color:var(--fault-ink)">That doesn't look like a server address. Use a host name or IP, optionally with :port.</small></div>
+      </div>
+      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
     </div>
     <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
   </div>
