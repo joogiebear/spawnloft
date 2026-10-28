@@ -308,8 +308,9 @@ test('rules: a versionRange with no OS name never matches on a Mac, at launch or
 })
 
 // A stand-in Java: a shell script answering -version (and -XshowSettings unless told to refuse it).
+// Each in a folder of its own, made here: nothing else in the run can have removed it.
 function stubJava(name, { major, arch = 'x86_64', refuseSettings = false }) {
-  const file = path.join(scratch, name)
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sl-stub-java-')), name)
   const version = major === 8 ? '1.8.0_402' : `${major}.0.1`
   fs.writeFileSync(file, [
     '#!/bin/sh',
@@ -342,7 +343,8 @@ test('Java: an explicit Java of the wrong arch, too old, or newer with a warning
   const picked = await pickClientJava({ explicit: newer, requirement: req, arch: 'x64', what: 'Minecraft 1.16.5' })
   assert.equal(picked.path, newer)
   assert.match(picked.warning, /^Minecraft 1\.16\.5 wants Java 8 to 17; using Java 21 at .*, which is newer, so the game may not start\./)
-  assert.deepEqual(await pickClientJava({ explicit: stubJava('java-8', { major: 8 }), requirement: req, arch: 'x64' }), { path: path.join(scratch, 'java-8'), warning: null })
+  const eight = stubJava('java-8', { major: 8 })
+  assert.deepEqual(await pickClientJava({ explicit: eight, requirement: req, arch: 'x64' }), { path: eight, warning: null })
 })
 
 test('Java: probe() asks again with -version when a Java refuses -XshowSettings (review N-4)', { skip: posixOnly }, async () => {
