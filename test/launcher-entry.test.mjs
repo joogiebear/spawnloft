@@ -116,7 +116,7 @@ test('the desktop app exposes exactly the two launcher calls, and packages their
   assert.match(preload, /openMicrosoftLogin: \(url\) => ipcRenderer\.invoke\('mcctl:openMicrosoftLogin', String\(url \?\? ''\)\)/)
   const main = fs.readFileSync(path.join(root, 'desktop', 'main.js'), 'utf8')
   for (const channel of ['mcctl:openProfileFolder', 'mcctl:openMicrosoftLogin']) {
-    assert.match(main, new RegExp(`ipcMain\\.handle\\('${channel}', async \\(e, \\w+\\) => \\{\\n  if \\(!fromPanel\\(e\\)\\) return \\{ ok: false \\}`))
+    assert.match(main, new RegExp(`ipcMain\\.handle\\('${channel}', async \\(e, \\w+\\) => \\{\\r?\\n  if \\(!fromPanel\\(e\\)\\) return \\{ ok: false \\}`))
   }
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'desktop', 'package.json'), 'utf8'))
   for (const file of ['launcher-window.js', 'login-window.js']) assert.ok(pkg.build.files.includes(file), file)
