@@ -102,13 +102,91 @@ spawnloft client set play account=Joogiebear
 ```
 
 `login` prints a code and a Microsoft address; you enter the code in your browser, on
-Microsoft's own page, and the command finishes when you have. No password passes through
-SpawnLoft. What it keeps is a refresh token, in `client/accounts.json`, a file only your user can
-read; the game gets a short-lived session token at each launch, and a token that is about to
-expire is refreshed before the launch. `client accounts` lists who is signed in, `client logout
-<name>` forgets one. An account on a profile (`account=<name>`) is used by every launch of it;
-`--account offline:<player name>` plays offline again for one run. `--as` and `--account` do not
-mix: a signed-in account brings its own name.
+Microsoft's own page, and the command finishes when you have (Ctrl-C gives up on it). No password
+passes through SpawnLoft. What it keeps is a refresh token, in `client/accounts.json`, a file only
+your user can read; the game gets a short-lived session token at each launch, and a token that is
+about to expire is refreshed before the launch. `client accounts` lists who is signed in, `client
+logout <name>` forgets one. An account on a profile (`account=<name>`) is used by every launch of
+it; `--account offline:<player name>` plays offline again for one run. `--as` and `--account` do
+not mix: a signed-in account brings its own name.
+
+Accounts are told apart by uuid; the name is what you type and what Mojang may let the person
+change. A profile's `account` key is stored as the uuid when the account is in the list (a key
+written as a name by an older SpawnLoft keeps working), and the CLI, the panel and the assistant
+show it as the name. The game launcher's offline accounts (below) are in the same file, as a name
+and the uuid an offline-mode server derives from it, with no tokens; `client logout <name>`
+removes one of those too.
+
+### Default account and precedence
+
+The game launcher keeps a **default account** (`defaultAccount` in `client/profiles.json`, a
+uuid): the first account added through the launcher, or whichever one you make the default
+there. It is only a preference. A launch plays as, in this order: `--as <player name>` (offline),
+then `--account <account>`, then the profile's own `account` key, then the default account, then
+offline under the profile's name. So an existing profile with no `account` plays as your
+Microsoft account the moment you sign in through the launcher and make it the default, which is
+right for a person and harmless on offline-mode servers. **An assistant launch never uses the
+default account**: `client_launch` plays offline unless the profile itself names an account and
+`assistantAccount` allows it. A default that points at an account you have since signed out is
+dropped, not an error; the launch falls through to offline.
+
+A running game's `state.json` says who started it (`launchedBy`: `cli`, `panel`, `launcher` or
+`assistant`), and `client status --json` and `client_status` show it.
+
+### Signing in from the launcher
+
+The game launcher (the panel's `/launcher` page, in the desktop app or a browser) signs in through
+Microsoft's own sign-in page instead of a code: OAuth authorization code with PKCE and a loopback
+redirect, the flow every launcher uses. The Azure registration (client id
+`946097b5-241d-4f83-9981-c6d0778e5507`, a public client, no secret anywhere) has exactly one
+redirect URI, `http://localhost/api/client/accounts/login/callback`; Microsoft matches localhost
+redirects on any port, so it covers the desktop app's per-launch port and the CLI panel's 8770,
+and the path has to match exactly. The chain after the Microsoft token (Xbox Live, XSTS,
+Minecraft, profile) is the one the device code runs, so Mojang's approval of the app id applies
+to both.
+
+How it runs, in the panel process (`src/client-login.mjs`):
+
+1. The page asks `POST /api/client/accounts/login`. The panel makes an in-memory record (a
+   random `state`, a PKCE verifier, the time) and answers `{ loginId, authorizeUrl }`. The
+   verifier and the state never leave the process except inside that URL.
+2. The page opens `GET /api/client/accounts/login/<loginId>/stream` (server-sent events; the
+   first event is `{ status: "pending" }`), then opens `authorizeUrl` in a window.
+3. Microsoft redirects the window to `GET /api/client/accounts/login/callback?code=…&state=…`.
+   A `state` that names the one live record is consumed at once and the window gets a short
+   static page ("Finishing the sign-in in SpawnLoft. You can close this window."); anything
+   else, including a replay, is a 400 that changes nothing. The code is exchanged and the chain
+   runs after that answer, in the background.
+4. The outcome reaches the page on the stream only: `{ status: "done", account }` (name, uuid,
+   type, expiry) or `{ status: "failed", message }` with Microsoft's `access_denied`, an expired
+   code, the Xbox errors and a lost connection each mapped to one line. The first account that
+   signs in this way becomes the default account.
+
+`DELETE /api/client/accounts/login/<loginId>` cancels (the stream ends with `cancelled`). One
+sign-in runs at a time: a second `POST` is a 409 while the first still has an open stream, and
+replaces it when nobody is listening. A record whose stream has been gone for 10 seconds is
+dropped, and every record expires 10 minutes after it was made. The callback is the one route a
+page cannot reach by itself (it has no Origin header, being a top-level navigation), and it is
+useless without the state that exists only in the panel's memory. Nothing from the callback (the
+code, the state, Microsoft's error text) is written to `panel.log`; the log line is "signed in
+<name>".
+
+The accounts routes, all behind the panel's localhost Host and Origin check and none of them ever
+carrying a token:
+
+| Route | Does |
+| --- | --- |
+| `GET /api/client/accounts` | `{ accounts: [{ name, uuid, type, expiresAt, refreshFailedAt }], defaultAccount }` |
+| `POST /api/client/accounts/offline` `{ name }` | Adds an offline account (3 to 16 letters, digits, underscore) |
+| `POST /api/client/accounts/default` `{ uuid }` | Sets the default account (`null` clears it) |
+| `DELETE /api/client/accounts/<uuid>` | Signs out a Microsoft account or removes an offline one |
+
+`refreshFailedAt` is set on a Microsoft account when a refresh at launch fails (the launch itself
+fails with "sign in again"); a new sign-in clears it. `expiresAt` is the day-long game token and
+means nothing about whether the account still works, which is why the launcher shows "sign in
+again" from `refreshFailedAt` and not from the expiry. Every write to `accounts.json` re-reads
+the file and changes only its own entry, so a sign-in in the launcher and a `client login` or
+`client logout` in a terminal at the same time cannot lose each other.
 
 The account needs Minecraft: Java Edition and an Xbox profile; a child account must be allowed by
 an adult in its Microsoft family first. The sign-in itself goes through Microsoft's and Mojang's
@@ -216,7 +294,7 @@ Everything client-side sits under the data folder, beside the servers, in `clien
 ```
 client/
   profiles.json              the profiles
-  accounts.json              the signed-in Microsoft accounts with their tokens (owner-only, see Accounts)
+  accounts.json              the signed-in Microsoft accounts with their tokens, and the launcher's offline accounts (owner-only, see Accounts)
   profiles/<name>/           one profile's game folder: options.txt, mods/, logs/latest.log,
                              screenshots/, saves/, crash-reports/, spawnloft-harness.json (while the harness runs)
   versions/<id>/             the client jar and its version JSON, one folder per version

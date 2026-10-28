@@ -8,7 +8,7 @@ import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
-import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName } from './client-auth.mjs'
+import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
 import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
@@ -65,7 +65,69 @@ export function loadProfiles() {
 }
 
 export function saveProfiles(data) {
+  // a default account that was signed out is dropped on the next save, not an error
+  if (data.defaultAccount != null && !accountExists(data.defaultAccount)) delete data.defaultAccount
   writeJson(PROFILES_FILE, data)
+}
+
+// A damaged accounts.json must not take the profiles with it: the launch that needs it fails
+// on its own, everything else treats the list as unknown (null).
+function accountsOrNull() {
+  try { return loadAccounts() } catch { return null }
+}
+
+function accountExists(uuid) {
+  const list = accountsOrNull()
+  return list === null ? true : list.some((a) => sameUuid(a.uuid, uuid))
+}
+
+// The launcher's default account (a uuid from accounts.json, top-level in profiles.json): what a
+// launch from the CLI, the panel or the launcher plays as when neither the command line nor the
+// profile names an account. Assistant launches never use it (see launchLocked). Null when none
+// is set or the account is gone.
+export function getDefaultAccount() {
+  const uuid = loadProfiles().defaultAccount
+  const list = accountsOrNull()
+  return typeof uuid === 'string' && list !== null && list.some((a) => sameUuid(a.uuid, uuid)) ? uuid : null
+}
+
+export function setDefaultAccount(uuid) {
+  const reg = loadProfiles()
+  if (uuid === null) {
+    delete reg.defaultAccount
+  } else {
+    const idx = findAccount(loadAccounts(), String(uuid))
+    if (idx === -1) fail(`no account with uuid "${uuid}" is in the list; sign in or add an offline account first`)
+    reg.defaultAccount = loadAccounts()[idx].uuid
+  }
+  saveProfiles(reg)
+  return reg.defaultAccount ?? null
+}
+
+// A profile's account key written as a name keeps working (resolved by name at launch); from now
+// on the uuid is stored when the account is in the list, so a Mojang name change cannot detach
+// the profile. "offline:<name>" and an unknown name are stored as typed.
+function accountKeyFor(value) {
+  if (typeof value !== 'string' || value.startsWith('offline:')) return value
+  const list = accountsOrNull()
+  if (list === null) return value
+  const idx = findAccount(list, value)
+  return idx === -1 ? value : list[idx].uuid
+}
+
+// The name to show for a profile's account key (a uuid, a name, or offline:<name>), and its
+// type: 'microsoft', 'offline', or null for a name no longer in the list.
+export function accountLabel(value) {
+  return accountInfo(value).name
+}
+
+export function accountInfo(value) {
+  if (typeof value !== 'string') return { name: value, type: null }
+  if (value.startsWith('offline:')) return { name: value.slice('offline:'.length), type: 'offline' }
+  const list = accountsOrNull()
+  if (list === null) return { name: value, type: null }
+  const idx = findAccount(list, value)
+  return idx === -1 ? { name: value, type: null } : { name: list[idx].name, type: list[idx].type ?? 'microsoft' }
 }
 
 // Profiles written before the key existed read as false: an assistant may not play as a
@@ -112,7 +174,7 @@ export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = nu
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
-  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, createdAt: new Date().toISOString() }
+  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account: accountKeyFor(account), assistantAccount, createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
   return { name, ...profile }
@@ -142,7 +204,7 @@ export function updateProfile(name, patch, { launching = false } = {}) {
   const merged = { ...existing, ...patch }
   validateFields(merged)
   const reg = loadProfiles()
-  reg.profiles[name] = { ...reg.profiles[name], ...patch }
+  reg.profiles[name] = { ...reg.profiles[name], ...patch, ...(Object.hasOwn(patch, 'account') ? { account: accountKeyFor(patch.account) } : {}) }
   saveProfiles(reg)
   return { name, ...withDefaults(reg.profiles[name]) }
 }
@@ -239,21 +301,27 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   }
 
   // --as names an offline player; a signed-in account brings its own name. Both at once is a
-  // contradiction, not a preference.
-  const selector = accountSelector ?? profile.account ?? null
-  if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
-  if (assistant && selector && !selector.startsWith('offline:') && !profile.assistantAccount) {
-    fail(assistantAccountRefusal(name))
-  }
+  // contradiction, not a preference. The launcher's default account is only a preference: it
+  // applies when neither the caller nor the profile names an account, never to an assistant
+  // launch (which would otherwise play as a Microsoft account the assistantAccount rule never
+  // allowed), and --as beats it.
+  const named = accountSelector ?? profile.account ?? null
+  if (playerName && named) fail('use either --as <player name> or --account <account>, not both')
+  const selector = named ?? (assistant || playerName ? null : getDefaultAccount())
   // An offline player against an online-mode server is refused here, before Java is looked for
   // or anything downloads, with the words join() uses: the server would refuse the join for
   // sure, so a launch would only show a kick screen. A stopped server is a warning, told to the
   // caller now (before the launch line, not under it) and carried in the result, since it can be
   // started while the game loads. The account itself is resolved later (a refresh needs the
-  // network); its type and name are known from the selector.
-  const provisional = selector
-    ? (selector.startsWith('offline:') ? { type: 'offline', name: assertPlayerName(selector.slice('offline:'.length)) } : { type: 'microsoft', name: selector })
+  // network); its type and name are read from the list now, which also refuses an unknown
+  // account before anything downloads.
+  const stored = selector ? peekAccount(selector) : null
+  const provisional = stored
+    ? { type: stored.type, name: stored.name }
     : { type: 'offline', name: playerName ? assertPlayerName(playerName) : defaultPlayerName(name) }
+  if (assistant && provisional.type !== 'offline' && !profile.assistantAccount) {
+    fail(assistantAccountRefusal(name))
+  }
   const { refusal, warnings: found, stopped } = target ? serverCheck(target, provisional) : { refusal: null, warnings: [], stopped: false }
   // the launcher has no --account flag to point at; it has an account picker
   if (refusal) fail(by === 'launcher' ? `${target} requires a Microsoft account (online-mode=true); sign in or pick another server` : refusal)

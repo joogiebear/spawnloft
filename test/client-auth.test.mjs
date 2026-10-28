@@ -8,7 +8,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-auth-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { MSA_CLIENT_ID, deviceCodeLogin, refreshAccount, loadAccounts, saveAccounts, accountFor, offlineAccount, upsertAccount, findAccount, DEVICECODE_URL, TOKEN_URL, XBL_URL, XSTS_URL, MC_LOGIN_URL, MC_PROFILE_URL } = await import('../src/client-auth.mjs')
+const { MSA_CLIENT_ID, SCOPES, deviceCodeLogin, refreshAccount, loadAccounts, saveAccounts, accountFor, offlineAccount, offlineUuid, upsertAccount, findAccount, startBrowserLogin, finishBrowserLogin, addOfflineAccount, removeAccount, updateAccounts, publicAccount, peekAccount, AUTHORIZE_URL, DEVICECODE_URL, TOKEN_URL, XBL_URL, XSTS_URL, MC_LOGIN_URL, MC_PROFILE_URL } = await import('../src/client-auth.mjs')
+const crypto = await import('node:crypto')
 const { ACCOUNTS_FILE } = await import('../src/client-paths.mjs')
 
 function scripted(steps) {
@@ -411,4 +412,191 @@ test('a refresh does not bring back an account signed out meanwhile', async () =
   ]
   await accountFor('Gone', { fetchImpl: scripted(steps), now })
   assert.deepEqual(loadAccounts(), [])
+})
+
+// ---------------------------------------------------------------- launcher sign-in (auth code + PKCE)
+
+const REDIRECT = 'http://localhost:8770/api/client/accounts/login/callback'
+
+test('startBrowserLogin builds the authorize URL with PKCE, state and the account picker', () => {
+  const { state, verifier, authorizeUrl } = startBrowserLogin({ redirectUri: REDIRECT })
+  const u = new URL(authorizeUrl)
+  assert.equal(u.origin + u.pathname, AUTHORIZE_URL)
+  const q = u.searchParams
+  assert.equal(q.get('client_id'), MSA_CLIENT_ID)
+  assert.equal(q.get('response_type'), 'code')
+  assert.equal(q.get('redirect_uri'), REDIRECT)
+  assert.equal(q.get('scope'), SCOPES)
+  assert.equal(q.get('response_mode'), 'query')
+  assert.equal(q.get('code_challenge_method'), 'S256')
+  assert.equal(q.get('code_challenge'), crypto.createHash('sha256').update(verifier, 'ascii').digest('base64url'))
+  assert.equal(q.get('state'), state)
+  assert.equal(q.get('prompt'), 'select_account')
+  // RFC 7636: 43 to 128 unreserved characters; 32 random bytes in base64url are 43
+  assert.match(verifier, /^[A-Za-z0-9_-]{43}$/)
+  assert.match(state, /^[A-Za-z0-9_-]{22}$/)
+  // the verifier is not in the URL; two sign-ins never share a state or verifier
+  assert.ok(!authorizeUrl.includes(verifier))
+  const again = startBrowserLogin({ redirectUri: REDIRECT })
+  assert.notEqual(again.state, state)
+  assert.notEqual(again.verifier, verifier)
+  // only the panel's own callback address is accepted as the redirect
+  for (const bad of ['http://localhost:8770/', 'https://localhost:8770/api/client/accounts/login/callback', 'http://127.0.0.1:8770/api/client/accounts/login/callback', 'http://evil.example/api/client/accounts/login/callback', REDIRECT + '?x=1']) {
+    assert.throws(() => startBrowserLogin({ redirectUri: bad }), /callback address/)
+  }
+})
+
+test('finishBrowserLogin exchanges the code with the verifier and the same redirect URI, then runs the chain', async () => {
+  const steps = [
+    {
+      match(url, init) {
+        assert.equal(url, TOKEN_URL)
+        const body = new URLSearchParams(init.body)
+        assert.equal(body.get('grant_type'), 'authorization_code')
+        assert.equal(body.get('client_id'), MSA_CLIENT_ID)
+        assert.equal(body.get('code'), 'the-code')
+        assert.equal(body.get('redirect_uri'), REDIRECT)
+        assert.equal(body.get('code_verifier'), 'v'.repeat(43))
+      },
+      reply: { status: 200, json: tokenReply },
+    },
+    { match(url) { assert.equal(url, XBL_URL) }, reply: { status: 200, json: xblReply } },
+    { match(url) { assert.equal(url, XSTS_URL) }, reply: { status: 200, json: xstsReply } },
+    { match(url) { assert.equal(url, MC_LOGIN_URL) }, reply: { status: 200, json: mcLoginReply } },
+    { match(url) { assert.equal(url, MC_PROFILE_URL) }, reply: { status: 200, json: profileReply } },
+  ]
+  const account = await finishBrowserLogin({ code: 'the-code', verifier: 'v'.repeat(43), redirectUri: REDIRECT, fetchImpl: scripted(steps), now })
+  assert.equal(account.name, 'Joogiebear')
+  assert.equal(account.type, 'microsoft')
+  assert.equal(account.refreshToken, 'msa-refresh')
+})
+
+test('finishBrowserLogin maps an expired code, a refusal and a lost connection, naming no code', async () => {
+  const expired = scripted([{ match() {}, reply: { status: 400, json: { error: 'invalid_grant', error_description: 'AADSTS70008: expired' } } }])
+  await assert.rejects(finishBrowserLogin({ code: 'c0de', verifier: 'v', redirectUri: REDIRECT, fetchImpl: expired, now }), (err) => {
+    assert.match(err.message, /the sign-in expired; try again/)
+    assert.ok(!err.message.includes('c0de'))
+    return true
+  })
+  const refused = scripted([{ match() {}, reply: { status: 400, json: { error: 'invalid_client', error_description: 'AADSTS7000218: something\nline two' } } }])
+  await assert.rejects(finishBrowserLogin({ code: 'c0de', verifier: 'v', redirectUri: REDIRECT, fetchImpl: refused, now }), /Microsoft refused the sign-in: AADSTS7000218: something$/)
+  const lost = async () => { throw new TypeError('fetch failed') }
+  await assert.rejects(finishBrowserLogin({ code: 'c0de', verifier: 'v', redirectUri: REDIRECT, fetchImpl: lost, now }), /lost the connection to Microsoft; start the sign-in again/)
+  await assert.rejects(finishBrowserLogin({ code: '', verifier: 'v', redirectUri: REDIRECT, fetchImpl: lost, now }), /no sign-in code/)
+  const html = scripted([{ match() {}, reply: { status: 502, json: undefined } }])
+  await assert.rejects(finishBrowserLogin({ code: 'c0de', verifier: 'v', redirectUri: REDIRECT, fetchImpl: html, now }), /HTTP 502/)
+})
+
+test('deviceCodeLogin stops at once when its signal is aborted', async () => {
+  resetSleep()
+  const abort = new AbortController()
+  let polls = 0
+  const pendingForever = async (url) => {
+    if (url === DEVICECODE_URL) return { ok: true, status: 200, json: async () => dcReply }
+    polls++
+    return { ok: false, status: 400, json: async () => ({ error: 'authorization_pending' }) }
+  }
+  // a sleep that never ends on its own: only the abort can wake the poll
+  const stuck = () => new Promise(() => {})
+  const login = deviceCodeLogin({ onCode: () => {}, fetchImpl: pendingForever, sleepImpl: stuck, now, signal: abort.signal })
+  setTimeout(() => abort.abort(), 20)
+  await assert.rejects(login, /the sign-in was cancelled/)
+  assert.equal(polls, 0)
+  // already aborted: no request at all
+  let calls = 0
+  await assert.rejects(deviceCodeLogin({ onCode: () => {}, fetchImpl: async () => { calls++ }, sleepImpl, now, signal: abort.signal }), /cancelled/)
+  assert.equal(calls, 0)
+})
+
+// ---------------------------------------------------------------- the accounts file
+
+test('offline accounts live in the file without tokens, by the uuid an offline server derives', () => {
+  saveAccounts([])
+  const a = addOfflineAccount('Tester_1')
+  assert.deepEqual(a, { type: 'offline', name: 'Tester_1', uuid: offlineUuid('Tester_1') })
+  assert.deepEqual(loadAccounts(), [a])
+  assert.throws(() => addOfflineAccount('no spaces'), /3 to 16 letters/)
+  // adding it again, in any case, is the same entry; a Microsoft account of that name wins the name
+  addOfflineAccount('Tester_1')
+  assert.deepEqual(addOfflineAccount('tester_1'), a)
+  assert.equal(loadAccounts().length, 1)
+  saveAccounts([{ type: 'microsoft', name: 'Joogiebear', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', accessToken: 'x', refreshToken: 'y', expiresAt: new Date(now() + 86400000).toISOString() }])
+  assert.throws(() => addOfflineAccount('joogiebear'), /is a signed-in Microsoft account/)
+  assert.equal(loadAccounts().length, 1)
+  // what leaves the process about each kind
+  assert.deepEqual(publicAccount(loadAccounts()[0]), { name: 'Joogiebear', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', type: 'microsoft', expiresAt: loadAccounts()[0].expiresAt, refreshFailedAt: null })
+  assert.deepEqual(publicAccount(a), { name: 'Tester_1', uuid: a.uuid, type: 'offline', expiresAt: null, refreshFailedAt: null })
+  // an entry written before the type key existed reads as a Microsoft account
+  assert.equal(publicAccount({ name: 'Old', uuid: 'u', expiresAt: 'e' }).type, 'microsoft')
+  saveAccounts([])
+})
+
+test('accountFor plays a stored offline account offline and resolves it by uuid too', async () => {
+  saveAccounts([])
+  const a = addOfflineAccount('Tester_1')
+  const byName = await accountFor('Tester_1', { fetchImpl: scripted([]), now })
+  assert.deepEqual(byName, offlineAccount('Tester_1'))
+  const byUuid = await accountFor(a.uuid.replace(/-/g, ''), { fetchImpl: scripted([]), now })
+  assert.equal(byUuid.name, 'Tester_1')
+  assert.equal(peekAccount(a.uuid).type, 'offline')
+  assert.equal(peekAccount('offline:Someone').type, 'offline')
+  assert.throws(() => peekAccount('nobody'), /no Microsoft account named "nobody"/)
+  saveAccounts([])
+})
+
+test('removeAccount drops one entry by uuid and leaves the rest, whatever form the uuid takes', () => {
+  const far = new Date(now() + 86400000).toISOString()
+  saveAccounts([
+    { type: 'microsoft', name: 'A', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', accessToken: 'x', refreshToken: 'y', expiresAt: far },
+    { type: 'offline', name: 'B', uuid: offlineUuid('B') },
+  ])
+  assert.equal(removeAccount('11111111-1111-1111-1111-111111111111'), null)
+  assert.equal(loadAccounts().length, 2)
+  const gone = removeAccount('069A79F444E94726A5BEFCA90E38AAF5')
+  assert.deepEqual(gone, { name: 'A', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', type: 'microsoft', expiresAt: far, refreshFailedAt: null })
+  assert.deepEqual(loadAccounts().map((a) => a.name), ['B'])
+  saveAccounts([])
+})
+
+test('a failed refresh marks the account with refreshFailedAt and a new login clears it', async () => {
+  const soon = new Date(1_700_000_000_000 + 60000).toISOString()
+  saveAccounts([{ type: 'microsoft', name: 'tired', uuid: 'c'.repeat(32), accessToken: 'stale', expiresAt: soon, refreshToken: 'dead', xuid: '', userType: 'msa', clientId: MSA_CLIENT_ID }])
+  const refused = scripted([{ match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 400, json: { error: 'invalid_grant' } } }])
+  await assert.rejects(accountFor('tired', { fetchImpl: refused, now }), /sign-in for tired no longer works/)
+  const marked = loadAccounts()[0]
+  assert.equal(marked.refreshFailedAt, new Date(1_700_000_000_000).toISOString())
+  assert.equal(marked.refreshToken, 'dead', 'the entry keeps its tokens; only the mark is added')
+  assert.equal(publicAccount(marked).refreshFailedAt, marked.refreshFailedAt)
+  // a later successful login (same uuid) replaces the entry, mark included
+  const fresh = { type: 'microsoft', name: 'tired', uuid: 'c'.repeat(32), accessToken: 'new', expiresAt: new Date(now() + 86400000).toISOString(), refreshToken: 'alive', xuid: '', userType: 'msa', clientId: MSA_CLIENT_ID }
+  updateAccounts((list) => upsertAccount(list, fresh))
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  assert.equal(loadAccounts()[0].refreshToken, 'alive')
+  saveAccounts([])
+})
+
+test('a refresh and a login interleaved: both accounts survive (the re-read-and-upsert rule)', async () => {
+  const soon = new Date(1_700_000_000_000 + 60000).toISOString()
+  const refreshing = { type: 'microsoft', name: 'first', uuid: 'd'.repeat(32), accessToken: 'stale', expiresAt: soon, refreshToken: 'r1', xuid: '', userType: 'msa', clientId: MSA_CLIENT_ID }
+  saveAccounts([refreshing])
+  const steps = [
+    {
+      match(url) {
+        assert.equal(url, TOKEN_URL)
+        // while the refresh waits on Microsoft, a sign-in in another process writes a second account
+        updateAccounts((list) => upsertAccount(list, { type: 'microsoft', name: 'second', uuid: 'e'.repeat(32), accessToken: 'tok2', refreshToken: 'r2', expiresAt: new Date(now() + 86400000).toISOString() }))
+      },
+      reply: { status: 200, json: tokenReply },
+    },
+    { match(url) { assert.equal(url, XBL_URL) }, reply: { status: 200, json: xblReply } },
+    { match(url) { assert.equal(url, XSTS_URL) }, reply: { status: 200, json: xstsReply } },
+    { match(url) { assert.equal(url, MC_LOGIN_URL) }, reply: { status: 200, json: mcLoginReply } },
+    { match(url) { assert.equal(url, MC_PROFILE_URL) }, reply: { status: 200, json: { ...profileReply, id: 'd'.repeat(32), name: 'first' } } },
+  ]
+  const got = await accountFor('first', { fetchImpl: scripted(steps), now })
+  assert.equal(got.accessToken, 'mc-token')
+  const names = loadAccounts().map((a) => a.name).sort()
+  assert.deepEqual(names, ['first', 'second'])
+  assert.equal(loadAccounts().find((a) => a.name === 'first').accessToken, 'mc-token')
+  saveAccounts([])
 })

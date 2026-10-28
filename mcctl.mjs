@@ -1952,8 +1952,8 @@ CLIENT (a game client for your own servers)
   mcctl client stop <name>           Stop a running client
   mcctl client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
   mcctl client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
-  mcctl client logout <name>         Forget a signed-in account
-  mcctl client accounts              Signed-in accounts
+  mcctl client logout <name>         Forget a signed-in (or offline) account
+  mcctl client accounts              Signed-in and offline accounts, and the launcher's default
 
 DATABASES
   mcctl db                           List databases
@@ -2052,10 +2052,11 @@ async function cmdClient(positional, flags) {
   if (sub === 'list') {
     checkFlags(flags, ['json'])
     if (rest.length) throw new UsageError(usage)
-    const profiles = client.listProfiles().map(p => ({ ...p, running: client.status(p.name).running }))
+    // account may be a uuid; accountName and accountType are what a script should read
+    const profiles = client.listProfiles().map(p => ({ ...p, accountName: p.account ? client.accountInfo(p.account).name : null, accountType: p.account ? client.accountInfo(p.account).type : null, running: client.status(p.name).running }))
     if (quiet) process.stdout.write(jsonLine('client', { profiles }))
     else if (!profiles.length) out('No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11')
-    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.account ? `account ${p.account}` : 'offline'}  ${p.running ? 'running' : 'stopped'}`)
+    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.account ? `account ${client.accountLabel(p.account)}` : 'offline'}  ${p.running ? 'running' : 'stopped'}`)
     return
   }
 
@@ -2184,13 +2185,25 @@ async function cmdClient(positional, flags) {
   if (sub === 'login') {
     checkFlags(flags, ['json'])
     if (rest.length) throw new UsageError(usage)
-    const account = await clientAuth.deviceCodeLogin({
-      onCode: ({ verificationUri, userCode, expiresIn }) => {
-        // On stderr so --json keeps stdout for the one envelope; the person reads this either way.
-        process.stderr.write(`Open ${verificationUri} and enter the code ${userCode} (valid ${Math.floor(expiresIn / 60)} minutes). Waiting...\n`)
-      },
-    })
-    clientAuth.saveAccounts(clientAuth.upsertAccount(clientAuth.loadAccounts(), account))
+    // Ctrl-C ends the wait at once (the device code stays valid on Microsoft's side until it
+    // expires on its own, but nothing here polls for it any more).
+    const abort = new AbortController()
+    const onInt = () => abort.abort()
+    process.once('SIGINT', onInt)
+    let account
+    try {
+      account = await clientAuth.deviceCodeLogin({
+        signal: abort.signal,
+        onCode: ({ verificationUri, userCode, expiresIn }) => {
+          // On stderr so --json keeps stdout for the one envelope; the person reads this either way.
+          process.stderr.write(`Open ${verificationUri} and enter the code ${userCode} (valid ${Math.floor(expiresIn / 60)} minutes). Waiting...\n`)
+        },
+      })
+    } finally {
+      process.off('SIGINT', onInt)
+    }
+    // re-read and upsert by uuid: a sign-in from the launcher meanwhile survives this one
+    clientAuth.updateAccounts((list) => clientAuth.upsertAccount(list, account))
     if (quiet) process.stdout.write(jsonLine('client', { account: { type: account.type, name: account.name, uuid: account.uuid } }))
     else out(`Signed in as ${account.name}. Use it: spawnloft client launch <profile> --account ${account.name}, or spawnloft client set <profile> account=${account.name}`)
     return
@@ -2202,9 +2215,9 @@ async function cmdClient(positional, flags) {
     const list = clientAuth.loadAccounts()
     const at = clientAuth.findAccount(list, rest[0])
     if (at === -1) fail(`no signed-in account named "${rest[0]}"; spawnloft client accounts lists them`)
-    const [gone] = list.splice(at, 1)
-    clientAuth.saveAccounts(list)
+    const gone = clientAuth.removeAccount(list[at].uuid) ?? clientAuth.publicAccount(list[at])
     if (quiet) process.stdout.write(jsonLine('client', { removed: gone.name, uuid: gone.uuid }))
+    else if (gone.type === 'offline') out(`Removed the offline account ${gone.name}.`)
     else out(`Signed out ${gone.name}. Microsoft keeps its own session; sign out of your browser too if the machine is shared.`)
     return
   }
@@ -2213,10 +2226,16 @@ async function cmdClient(positional, flags) {
     checkFlags(flags, ['json'])
     if (rest.length) throw new UsageError(usage)
     // Names and expiry only: the tokens never leave the file.
-    const accounts = clientAuth.loadAccounts().map((a) => ({ name: a.name, uuid: a.uuid, expiresAt: a.expiresAt }))
-    if (quiet) process.stdout.write(jsonLine('client', { accounts }))
+    const accounts = clientAuth.loadAccounts().map(clientAuth.publicAccount)
+    const defaultAccount = client.getDefaultAccount()
+    if (quiet) process.stdout.write(jsonLine('client', { accounts, defaultAccount }))
     else if (!accounts.length) out('No Microsoft account is signed in. Sign in: spawnloft client login')
-    else for (const a of accounts) out(`${a.name}  ${a.uuid}  token until ${a.expiresAt}`)
+    else {
+      for (const a of accounts) {
+        const state = a.type === 'offline' ? 'offline (offline-mode servers only)' : a.refreshFailedAt ? `sign in again (the saved sign-in stopped working ${a.refreshFailedAt})` : `token until ${a.expiresAt}`
+        out(`${a.name}  ${a.uuid}  ${state}${defaultAccount && clientAuth.sameUuid(a.uuid, defaultAccount) ? '  (default)' : ''}`)
+      }
+    }
     return
   }
 

@@ -33,6 +33,7 @@ export function offlineAccount(name) {
 export const MSA_CLIENT_ID = process.env.SPAWNLOFT_MSA_CLIENT_ID ?? '946097b5-241d-4f83-9981-c6d0778e5507'
 export const SCOPES = 'XboxLive.signin offline_access'
 export const DEVICECODE_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode'
+export const AUTHORIZE_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize'
 export const TOKEN_URL = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token'
 export const XBL_URL = 'https://user.auth.xboxlive.com/user/authenticate'
 export const XSTS_URL = 'https://xsts.auth.xboxlive.com/xsts/authorize'
@@ -121,7 +122,9 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
 // unreadable token-endpoint answers in a row before the poll gives up
 const TOKEN_POLL_HICCUPS = 5
 
-export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = sleep, now = Date.now } = {}) {
+export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = sleep, now = Date.now, signal = null } = {}) {
+  const cancelled = () => fail('the sign-in was cancelled before it finished')
+  if (signal?.aborted) cancelled()
   const dcBody = new URLSearchParams({ client_id: MSA_CLIENT_ID, scope: SCOPES }).toString()
   const dcRes = await fetchImpl(DEVICECODE_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: dcBody })
   if (!dcRes.ok) fail(`Microsoft did not start the sign-in (HTTP ${dcRes.status}); try again in a minute`)
@@ -137,7 +140,9 @@ export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = s
   let interval = dc.interval ?? 5
   let hiccups = 0
   for (;;) {
-    await sleepImpl(interval * 1000)
+    // Ctrl-C in the CLI: the wait ends at once instead of after the current interval
+    await abortableSleep(sleepImpl, interval * 1000, signal)
+    if (signal?.aborted) cancelled()
     if (now() >= deadline) fail('the code expired before it was entered; run spawnloft client login again')
     const tBody = new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: MSA_CLIENT_ID, device_code: dc.device_code }).toString()
     let tRes = null
@@ -169,6 +174,73 @@ export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = s
   }
 }
 
+function abortableSleep(sleepImpl, ms, signal) {
+  if (!signal) return sleepImpl(ms)
+  return new Promise((resolve) => {
+    const done = () => { signal.removeEventListener('abort', done); resolve() }
+    signal.addEventListener('abort', done, { once: true })
+    sleepImpl(ms).then(done, done)
+  })
+}
+
+// The launcher's sign-in: Microsoft's own page in a window, authorization code with PKCE on a
+// loopback redirect. A public client has no secret; the verifier (kept in the panel's memory,
+// never given to a page) is what ties the code Microsoft redirects with to the process that
+// started the sign-in, and `state` is what the callback is looked up by. `redirectUri` carries
+// the panel's actual port; Microsoft matches localhost redirect URIs on any port, path exact.
+export function startBrowserLogin({ redirectUri, randomBytes = crypto.randomBytes } = {}) {
+  if (typeof redirectUri !== 'string' || !/^http:\/\/localhost:\d+\/api\/client\/accounts\/login\/callback$/.test(redirectUri)) {
+    throw new Error('redirectUri must be the panel\'s own callback address')
+  }
+  const state = randomBytes(16).toString('base64url')
+  const verifier = randomBytes(32).toString('base64url')
+  const challenge = crypto.createHash('sha256').update(verifier, 'ascii').digest('base64url')
+  const params = new URLSearchParams({
+    client_id: MSA_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    scope: SCOPES,
+    response_mode: 'query',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    state,
+    // adding a second account must show the picker, not silently reuse the first
+    prompt: 'select_account',
+  })
+  return { state, verifier, authorizeUrl: `${AUTHORIZE_URL}?${params}` }
+}
+
+// The code from the callback, exchanged with the verifier and the identical redirect URI, then
+// the same Xbox and Minecraft chain as the device code. Microsoft's errors are mapped to one
+// line each; nothing of the request (code, verifier) ends up in a message.
+export async function finishBrowserLogin({ code, verifier, redirectUri, fetchImpl = fetch, now = Date.now }) {
+  if (typeof code !== 'string' || !code) fail('Microsoft sent no sign-in code; try again')
+  const body = new URLSearchParams({ grant_type: 'authorization_code', client_id: MSA_CLIENT_ID, code, redirect_uri: redirectUri, code_verifier: verifier, scope: SCOPES }).toString()
+  // A hung connection must not hold the sign-in slot: every request in this chain is bounded
+  // (the device-code poll bounds itself by the code's lifetime).
+  const timed = (url, init) => fetchImpl(url, { ...init, signal: AbortSignal.timeout(STEP_TIMEOUT_MS) })
+  let res
+  try {
+    res = await timed(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  } catch {
+    fail('lost the connection to Microsoft; start the sign-in again')
+  }
+  const t = await bodyOf(res)
+  if (!res.ok || !t.access_token) {
+    if (t.error === 'invalid_grant') fail('the sign-in expired; try again')
+    if (t.error) fail(`Microsoft refused the sign-in: ${String(t.error_description ?? t.error).split('\n')[0].slice(0, 200)}`)
+    fail(`Microsoft did not finish the sign-in (HTTP ${res.status}); try again in a minute`)
+  }
+  try {
+    return await minecraftFromMicrosoft(t.access_token, t.refresh_token, { fetchImpl: timed, now })
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') fail('lost the connection to Microsoft; start the sign-in again')
+    throw err
+  }
+}
+
+const STEP_TIMEOUT_MS = 30_000
+
 export async function refreshAccount(account, { fetchImpl = fetch, now = Date.now } = {}) {
   const body = new URLSearchParams({ grant_type: 'refresh_token', client_id: MSA_CLIENT_ID, refresh_token: account.refreshToken, scope: SCOPES }).toString()
   const res = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
@@ -182,6 +254,59 @@ export async function refreshAccount(account, { fetchImpl = fetch, now = Date.no
 
 export function loadAccounts() {
   return readJson(ACCOUNTS_FILE, null)?.accounts ?? []
+}
+
+// What leaves the process about an account (the panel's list, the CLI's list): never a token.
+export function publicAccount(a) {
+  return { name: a.name, uuid: a.uuid, type: a.type ?? 'microsoft', expiresAt: a.type === 'offline' ? null : a.expiresAt ?? null, refreshFailedAt: a.refreshFailedAt ?? null }
+}
+
+// The write rule: every change re-reads the file first and changes only its own entry, so a
+// login finishing in the panel while the CLI signs out another account, or a refresh that took
+// seconds while a login landed, cannot lose the other's write. There is no lock across
+// processes; the window is the time between the read and the rename.
+export function updateAccounts(change) {
+  const latest = loadAccounts()
+  const next = change(latest)
+  saveAccounts(next)
+  return next
+}
+
+// Offline accounts (a name, no tokens) live in the same file so the launcher has one list. The
+// uuid is the one an offline-mode server derives from the name, so the entry's uuid is the
+// player's uuid on every such server.
+export function addOfflineAccount(name) {
+  assertPlayerName(name)
+  const account = { type: 'offline', name, uuid: offlineUuid(name) }
+  let stored = account
+  updateAccounts((list) => {
+    const clash = list.find((a) => a.name.toLowerCase() === name.toLowerCase())
+    if (clash && clash.type === 'microsoft') fail(`"${clash.name}" is a signed-in Microsoft account; play as it instead, or pick another offline name`)
+    // the same offline name in another case is the same entry (the uuid is derived from the
+    // exact spelling, so re-keying it would detach the profiles that name it)
+    if (clash) {
+      stored = clash
+      return list
+    }
+    return upsertAccount(list, account)
+  })
+  return stored
+}
+
+// Sign-out and remove: by uuid, whatever else changed meanwhile. Returns the removed entry
+// (without tokens) or null.
+export function removeAccount(uuid) {
+  let gone = null
+  updateAccounts((list) => list.filter((a) => {
+    if (!sameUuid(a.uuid, uuid)) return true
+    gone = publicAccount(a)
+    return false
+  }))
+  return gone
+}
+
+export function sameUuid(a, b) {
+  return String(a ?? '').toLowerCase().replace(/-/g, '') === String(b ?? '').toLowerCase().replace(/-/g, '')
 }
 
 // Owner-only on every platform (an explicit ACL on Windows), and not written at all when that
@@ -231,26 +356,46 @@ export function findAccount(list, selector) {
   return list.findIndex((a) => a.name.toLowerCase() === sel)
 }
 
-export async function accountFor(selector, { fetchImpl = fetch, now = Date.now } = {}) {
+// The stored entry a selector names, without touching the network: "offline:<name>" is an
+// offline player whether or not it is in the file; anything else must be in the file, by uuid
+// (dashed or not) or by name.
+export function peekAccount(selector, list = loadAccounts()) {
   if (typeof selector !== 'string' || !selector) {
     fail('an account is "offline:<player name>" or the name of a signed-in Microsoft account')
   }
   if (selector.startsWith('offline:')) {
     return offlineAccount(selector.slice('offline:'.length))
   }
-  const accounts = loadAccounts()
-  const idx = findAccount(accounts, selector)
+  const idx = findAccount(list, selector)
   if (idx === -1) {
+    // a profile key is a uuid the person never typed: say what it stands for
+    if (/^[0-9a-f-]{32,36}$/i.test(selector)) fail(`the account this profile names (uuid ${selector}) is no longer in the list; sign in again, or set account= on the profile`)
     fail(`no Microsoft account named "${selector}" is signed in; spawnloft client login, or use offline:<player name>`)
   }
-  const account = accounts[idx]
+  // an entry from before the type key existed is a Microsoft account: the assistant rule reads
+  // the type, so it must never be missing
+  return { ...list[idx], type: list[idx].type ?? 'microsoft' }
+}
+
+export async function accountFor(selector, { fetchImpl = fetch, now = Date.now } = {}) {
+  const account = peekAccount(selector)
+  if (account.type === 'offline') return offlineAccount(account.name)
   if (Date.parse(account.expiresAt) - now() < 5 * 60 * 1000) {
-    const refreshed = await refreshAccount(account, { fetchImpl, now })
+    let refreshed
+    try {
+      refreshed = await refreshAccount(account, { fetchImpl, now })
+    } catch (err) {
+      // Marked on the entry (a time, no token values) so the accounts page can say "sign in
+      // again"; a later login or refresh replaces the entry and clears it. The mark must not
+      // hide the real error when the file cannot be written.
+      try {
+        updateAccounts((latest) => latest.map((a) => (sameUuid(a.uuid, account.uuid) ? { ...a, refreshFailedAt: new Date(now()).toISOString() } : a)))
+      } catch { /* the launch fails with the sign-in error either way */ }
+      throw err
+    }
     // Re-read: a login in another process (or the panel) during the refresh must survive it, and
-    // a logout of this account meanwhile must stay a logout. There is no lock across processes;
-    // the window is the time between this read and the write.
-    const latest = loadAccounts()
-    if (latest.some((a) => a.uuid === account.uuid)) saveAccounts(upsertAccount(latest, refreshed, { uuid: account.uuid }))
+    // a logout of this account meanwhile must stay a logout (updateAccounts re-reads).
+    updateAccounts((latest) => (latest.some((a) => sameUuid(a.uuid, account.uuid)) ? upsertAccount(latest, refreshed, { uuid: account.uuid }) : latest))
     return refreshed
   }
   return account

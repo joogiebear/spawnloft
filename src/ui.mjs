@@ -35,8 +35,9 @@ import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
 import * as client from './client.mjs'
-import { loadAccounts } from './client-auth.mjs'
 import { platformRefusal } from './client-meta.mjs'
+import * as clientAuth from './client-auth.mjs'
+import * as clientLogin from './client-login.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { scrubber } from './mcp-tools.mjs'
@@ -85,16 +86,21 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
     }
   })
 
+  clientLogin.setLoginHooks({ log: panelLog })
   return new Promise((resolve) => {
     server.listen(port, host, () => {
       // the desktop app passes port 0, so report the port actually bound
       const bound = server.address().port
+      // the sign-in callback's redirect URI carries this port (Microsoft matches localhost on any port)
+      panelPort = bound
       const url = `http://${host}:${bound}/`
       if (open) openBrowser(url)
       resolve({ server, url, port: bound })
     })
   })
 }
+
+let panelPort = null
 
 // The panel process's own log. Never rotated: it only gets a line when something is wrong.
 export function panelLog(msg) {
@@ -809,7 +815,8 @@ function clientProfileRow(p) {
   const st = client.status(p.name)
   return {
     name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, java: p.java,
-    harness: p.harness, server: p.server, account: p.account, assistantAccount: p.assistantAccount,
+    // the key may be a uuid; the page shows the name and tells offline from Microsoft by the type
+    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, assistantAccount: p.assistantAccount,
     running: st.running, pid: st.pid, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
   }
 }
@@ -825,14 +832,8 @@ async function hasModJars(profileName) {
 // Names, uuids and the two dates only: no route hands a token to a page.
 function publicAccounts() {
   let list = []
-  try { list = loadAccounts() } catch { /* an unreadable file lists nothing; sign-in rewrites it */ }
-  return list.filter((a) => a && typeof a.name === 'string').map((a) => ({
-    name: a.name,
-    uuid: a.uuid ?? null,
-    type: a.type === 'offline' ? 'offline' : 'microsoft',
-    expiresAt: a.expiresAt ?? null,
-    refreshFailedAt: a.refreshFailedAt ?? null,
-  }))
+  try { list = clientAuth.loadAccounts() } catch { /* an unreadable file lists nothing; sign-in rewrites it */ }
+  return list.filter((a) => a && typeof a.name === 'string').map(clientAuth.publicAccount)
 }
 
 // One read for the launcher's poll: profiles with their running state (from state.json and the
@@ -1235,6 +1236,108 @@ function safeInstance(row) {
   }
 }
 
+// The launcher's accounts: the list, offline accounts, the default, sign-out, and the Microsoft
+// sign-in (CLIENT.md, "Signing in from the launcher"). Everything here is behind the Host and
+// Origin check like every other route, and no answer carries a token: an account is its name,
+// uuid, type and two times. The one exception to the Origin rule is the callback, a top-level
+// navigation Microsoft's page makes (so it has no Origin header and passes on the Host check);
+// it is useless without the state of the one live sign-in, which exists only in this process.
+async function handleAccounts(req, res, seg, url) {
+  if (seg.length === 3) {
+    if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+    return json(res, 200, { accounts: publicAccounts(), defaultAccount: client.getDefaultAccount() })
+  }
+  if (seg[3] === 'offline' && seg.length === 4) {
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    const account = clientAuth.addOfflineAccount(String(body?.name ?? ''))
+    if (client.getDefaultAccount() === null) client.setDefaultAccount(account.uuid)
+    return json(res, 200, { account: clientAuth.publicAccount(account), defaultAccount: client.getDefaultAccount() })
+  }
+  if (seg[3] === 'default' && seg.length === 4) {
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    const uuid = body?.uuid === null || body?.uuid === undefined || body?.uuid === '' ? null : String(body.uuid)
+    if (uuid !== null && !/^[0-9a-f-]{32,36}$/i.test(uuid)) return json(res, 400, { error: 'uuid must be the account\'s uuid' })
+    return json(res, 200, { defaultAccount: client.setDefaultAccount(uuid) })
+  }
+  if (seg[3] === 'login') {
+    if (seg.length === 4) {
+      if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+      try {
+        return json(res, 200, clientLogin.startLogin({ redirectUri: callbackUri() }))
+      } catch (err) {
+        if (err instanceof clientLogin.LoginInProgress) return json(res, 409, { error: err.message })
+        throw err
+      }
+    }
+    if (seg[4] === 'callback' && seg.length === 5) {
+      if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+      // Answered before the exchange starts: the desktop closes this window as soon as it has
+      // loaded, and the outcome goes to the launcher through the stream. Nothing from the query
+      // is echoed or logged.
+      const { ok } = clientLogin.handleCallback(url.searchParams)
+      return callbackPage(res, ok)
+    }
+    const loginId = seg[4]
+    if (typeof loginId !== 'string' || !/^[0-9a-f]{32}$/.test(loginId)) return json(res, 404, { error: 'no such sign-in' })
+    if (seg.length === 5 && req.method === 'DELETE') {
+      return json(res, 200, { cancelled: clientLogin.cancelLogin(loginId) })
+    }
+    if (seg.length === 6 && seg[5] === 'stream' && req.method === 'GET') {
+      const detach = clientLogin.listenLogin(loginId, (event) => {
+        if (!res.headersSent) {
+          res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+        }
+        res.write(`data: ${JSON.stringify(event)}\n\n`)
+        if (event.status !== 'pending') res.end()
+      })
+      if (!detach) return json(res, 404, { error: 'no such sign-in; start it again' })
+      const beat = setInterval(() => { if (!res.writableEnded) res.write(': ping\n\n') }, 20000)
+      req.on('close', () => {
+        clearInterval(beat)
+        detach()
+      })
+      return
+    }
+    return json(res, 405, { error: 'method not allowed' })
+  }
+  if (seg.length === 4 && req.method === 'DELETE') {
+    const gone = clientAuth.removeAccount(seg[3])
+    if (!gone) return json(res, 404, { error: 'no such account' })
+    // the registry drops a default that no longer exists on its next save; do it now so the
+    // answer is right
+    if (client.loadProfiles().defaultAccount !== undefined) client.saveProfiles(client.loadProfiles())
+    return json(res, 200, { removed: gone, defaultAccount: client.getDefaultAccount() })
+  }
+  return json(res, 405, { error: 'method not allowed' })
+}
+
+function callbackUri() {
+  if (!panelPort) fail('the panel has no port yet; try again')
+  return `http://localhost:${panelPort}/api/client/accounts/login/callback`
+}
+
+// What Microsoft's window shows after the redirect: a few words and no script. The window is
+// closed by the desktop app within a second; in a browser the tab stays until the person closes
+// it. The outcome of the sign-in is never shown here (the stream carries it), so a replayed or
+// forged callback learns nothing but "not valid".
+function callbackPage(res, ok) {
+  const title = ok ? 'Finishing sign-in' : 'This sign-in link is not valid any more'
+  const body = ok
+    ? 'Finishing the sign-in in SpawnLoft. You can close this window.'
+    : 'Start the sign-in again from the SpawnLoft launcher.'
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center}h1{font-size:20px;margin:0 0 8px}p{margin:0;color:#bbb}</style></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`
+  res.writeHead(ok ? 200 : 400, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+    'referrer-policy': 'no-referrer',
+    'x-content-type-options': 'nosniff',
+  })
+  res.end(html)
+}
+
 // Binding to 127.0.0.1 doesn't stop web pages in the local browser from calling this, and DNS
 // rebinding lets a page reach it under its own origin. So: the Host header must be loopback
 // (defeats rebinding), and any Origin must match Host exactly, port included. Plugin web UIs
@@ -1320,6 +1423,7 @@ async function route(req, res) {
     })
   }
 
+  if (seg[1] === 'client' && seg[2] === 'accounts') return handleAccounts(req, res, seg, url)
   if (seg[1] === 'client') return handleClient(req, res, seg, url)
 
   if (seg[1] === 'health' && req.method === 'GET') {

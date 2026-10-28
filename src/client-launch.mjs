@@ -162,6 +162,7 @@ export async function spawnClient(command, { name, state }) {
         harness: state.harness ?? null,
         server: state.server ?? null,
         address: state.address ?? null,
+        // who asked for this run: launcher, panel, cli or assistant
         launchedBy: state.launchedBy ?? null,
       }, { mode: PRIVATE_FILE_MODE })
       child.unref()
