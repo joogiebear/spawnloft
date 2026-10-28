@@ -288,8 +288,14 @@ test('a full sign-in: stream first, authorize URL, callback answered before Micr
   res = await api(`accounts/login/${loginId}`, { method: 'DELETE' })
   assert.deepEqual(await res.json(), { cancelled: false })
 
-  // the panel log names the account and nothing from the exchange
-  const log = fs.existsSync(path.join(LAYOUT.runDir, 'panel.log')) ? fs.readFileSync(path.join(LAYOUT.runDir, 'panel.log'), 'utf8') : ''
+  // the panel log names the account and nothing from the exchange; panelLog appends without
+  // waiting, so the line can land a moment after the stream has said done
+  const readLog = () => (fs.existsSync(path.join(LAYOUT.runDir, 'panel.log')) ? fs.readFileSync(path.join(LAYOUT.runDir, 'panel.log'), 'utf8') : '')
+  let log = readLog()
+  for (let i = 0; i < 100 && !/signed in Joogiebear/.test(log); i++) {
+    await new Promise((r) => setTimeout(r, 20))
+    log = readLog()
+  }
   assert.match(log, /signed in Joogiebear/)
   for (const secret of ['the-code', state, ACCESS, REFRESH, 'msa-access', 'code_verifier']) assert.ok(!log.includes(secret), secret)
 })
@@ -388,7 +394,11 @@ test('a cancel while Microsoft is still answering keeps the account out of the f
   release()
   await new Promise((r) => setTimeout(r, 50))
   assert.ok(!auth.loadAccounts().some((a) => a.name === 'LateComer'))
-  const log = fs.readFileSync(path.join(LAYOUT.runDir, 'panel.log'), 'utf8')
+  let log = ''
+  for (let i = 0; i < 100 && !/finished after it was cancelled/.test(log); i++) {
+    log = fs.readFileSync(path.join(LAYOUT.runDir, 'panel.log'), 'utf8')
+    if (!/finished after it was cancelled/.test(log)) await new Promise((r) => setTimeout(r, 20))
+  }
   assert.match(log, /finished after it was cancelled/)
   assert.ok(!log.includes('signed in LateComer'))
 })
