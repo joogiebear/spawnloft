@@ -35,6 +35,15 @@ function linkOrCopy(from, to) {
   }
 }
 
+function sameFile(a, b) {
+  try {
+    const [x, y] = [fs.statSync(a), fs.statSync(b)]
+    return x.ino === y.ino && x.dev === y.dev
+  } catch {
+    return false
+  }
+}
+
 async function inBatches(items, limit, worker) {
   let index = 0
   let failed = false
@@ -119,7 +128,9 @@ function assetTreeRows(index) {
   const rows = []
   for (const [name, entry] of Object.entries(index.objects ?? {})) {
     const rel = safeRelativePath(name)
-    if (rel === null || rel === '.complete') fail(`the asset index names the file "${String(name).slice(0, 80)}", which would land outside its folder`)
+    if (rel === null) fail(`the asset index names the file "${String(name).slice(0, 80)}", which would land outside its folder`)
+    // the stamp's own name, in any case (Windows and macOS fold it) and as a folder too
+    if (rel.split('/')[0].toLowerCase() === '.complete') fail(`the asset index names the file "${rel.slice(0, 80)}", which SpawnLoft keeps for itself`)
     if (!/^[0-9a-f]{40}$/.test(String(entry?.hash))) fail(`the asset index names "${rel}" with a malformed hash`)
     rows.push([rel, `objects/${entry.hash.slice(0, 2)}/${entry.hash}`])
   }
@@ -137,11 +148,14 @@ export function assetTreeDir(layout, indexId, profileFolder) {
 
 // Lays out an index in an older layout as hard links into the object store (copies where links
 // fail), with a .complete stamp holding the index's sha1: a tree whose stamp is missing or names
-// another index is laid out again, so a half-done one is finished on the next launch.
-export async function materialiseAssets({ file, sha1 }, dest) {
+// another index is laid out again, so a half-done one is finished on the next launch. `copy`
+// copies every file instead: a tree in the profile's folder is the game's and the user's to
+// write, and a write through a hard link would change the shared object store.
+export async function materialiseAssets({ file, sha1 }, dest, { copy = false } = {}) {
   const stampFile = path.join(dest, '.complete')
   let stamp = null
   try { stamp = fs.readFileSync(stampFile, 'utf8') } catch { /* not laid out yet */ }
+  if (!/^[0-9a-f]{40}$/i.test(String(sha1))) fail('the asset index has no sha1 to check it by')
   if (stamp === sha1) return { files: 0 }
   const rows = assetTreeRows(JSON.parse(fs.readFileSync(file, 'utf8')))
   fs.mkdirSync(dest, { recursive: true })
@@ -150,7 +164,13 @@ export async function materialiseAssets({ file, sha1 }, dest) {
     const to = path.join(dest, rel)
     if (!isInside(dest, to)) fail(`the asset index names the file "${rel}", which would land outside its folder`)
     fs.mkdirSync(path.dirname(to), { recursive: true })
-    linkOrCopy(path.join(ASSETS_DIR, object), to)
+    if (copy) {
+      fs.rmSync(to, { force: true })
+      fs.copyFileSync(path.join(ASSETS_DIR, object), to)
+    } else if (!sameFile(path.join(ASSETS_DIR, object), to)) {
+      // a link already in place stays, so a game running from a shared tree never sees it missing
+      linkOrCopy(path.join(ASSETS_DIR, object), to)
+    }
   }
   fs.writeFileSync(stampFile, sha1)
   return { files: rows.length }

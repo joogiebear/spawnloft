@@ -362,21 +362,36 @@ test('the older asset layouts are laid out under real names, once per index (V1c
     assert.equal(res.assetsLayout, layout)
     const dest = assetTreeDir(layout, res.assetIndex.id, path.join(scratch, 'profile-' + layout))
     assert.equal(dest, layout === 'virtual' ? path.join(ASSETS_DIR, 'virtual', version.assetIndex.id) : path.join(scratch, 'profile-' + layout, 'resources'))
-    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 3 })
+    const copy = layout === 'resources'
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest, { copy }), { files: 3 })
     const index = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'assets', file), 'utf8'))
     for (const [name, entry] of Object.entries(index.objects)) {
       const laid = path.join(dest, name)
-      assert.equal(fs.readFileSync(laid, 'utf8'), fs.readFileSync(path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash), 'utf8'), name)
+      const object = path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash)
+      assert.equal(fs.readFileSync(laid, 'utf8'), fs.readFileSync(object, 'utf8'), name)
+      // the profile's tree is copied, so a write there cannot reach the shared store (review S-1)
+      assert.equal(fs.statSync(laid).ino === fs.statSync(object).ino, !copy, `${name}: ${copy ? 'a copy' : 'a link'}`)
     }
     assert.equal(fs.readFileSync(path.join(dest, '.complete'), 'utf8'), version.assetIndex.sha1)
-    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 0 }, 'stamped: nothing to do')
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest, { copy }), { files: 0 }, 'stamped: nothing to do')
     // a half-done tree (no stamp) is laid out again
     fs.rmSync(path.join(dest, '.complete'))
     fs.rmSync(path.join(dest, Object.keys(index.objects)[0]))
-    assert.deepEqual(await materialiseAssets(res.assetIndex, dest), { files: 3 })
+    assert.deepEqual(await materialiseAssets(res.assetIndex, dest, { copy }), { files: 3 })
     assert.ok(fs.existsSync(path.join(dest, Object.keys(index.objects)[0])))
   }
   assert.equal(assetTreeDir('objects', 'x', scratch), null)
+})
+
+test('the stamp name is refused in an index in any case, and an index needs its sha1 (review N-2, N-4)', async () => {
+  const hash = 'a'.repeat(40)
+  const dest = path.join(scratch, 'stamp-tree')
+  for (const name of ['.complete', '.COMPLETE', '.Complete/x']) {
+    const file = path.join(scratch, 'stamp-index.json')
+    fs.writeFileSync(file, JSON.stringify({ map_to_resources: true, objects: { [name]: { hash, size: 1 } } }))
+    await assert.rejects(materialiseAssets({ file, sha1: 'b'.repeat(40) }, dest), /which SpawnLoft keeps for itself/, name)
+  }
+  await assert.rejects(materialiseAssets({ file: path.join(scratch, 'stamp-index.json'), sha1: undefined }, dest), /has no sha1/)
 })
 
 test('a library path that would leave the libraries folder is refused (review N-7)', () => {
