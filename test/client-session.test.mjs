@@ -245,8 +245,10 @@ test('a launch with a server: waitUntilLoaded waits for the world, and join wait
     assert.ok(!tailClientLog('qp', 200).some((l) => /already connecting/.test(l)), 'join started a second connect')
     await stop('qp')
 
-    // asked while resources still load (client_launch with wait false), join waits too
-    await launchWith('qp', { FAKE_CLIENT_BOOT_MS: '600', FAKE_CLIENT_QUICKPLAY_MS: '600' })
+    // asked while resources still load (client_launch with wait false), join waits too. The
+    // launch plus the session connect must finish inside the boot window: 600 ms was missed
+    // twice on the self-hosted runner, so it is 3 s.
+    await launchWith('qp', { FAKE_CLIENT_BOOT_MS: '3000', FAKE_CLIENT_QUICKPLAY_MS: '600' })
     assert.equal((await session('qp').then((c) => c.call('status'))).screen, 'other')
     const early = await join('qp', 'offline')
     assert.equal(early.already, true)

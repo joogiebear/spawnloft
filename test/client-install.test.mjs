@@ -24,7 +24,7 @@ const indexSha = crypto.createHash('sha1').update(INDEX).digest('hex')
 const indexSize = INDEX.length
 
 const { PARALLEL, needsDownload, ensureVersion, extractNatives } = await import('../src/client-install.mjs')
-const { versionJson, versionDir, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir } = await import('../src/client-paths.mjs')
+const { versionJson, versionDir, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } = await import('../src/client-paths.mjs')
 const { libraries, assetObjects } = await import('../src/client-meta.mjs')
 const { createZip } = await import('../src/zip.mjs')
 
@@ -45,6 +45,8 @@ for (const lib of fixture.libraries) {
 }
 fixture.assetIndex.sha1 = indexSha
 fixture.assetIndex.size = indexSize
+fixture.logging.client.file.sha1 = bodySha
+fixture.logging.client.file.size = bodySize
 
 fs.mkdirSync(versionDir(mc), { recursive: true })
 fs.writeFileSync(versionJson(mc), JSON.stringify(fixture))
@@ -73,11 +75,15 @@ test('first ensureVersion downloads everything', async () => {
   const objRows = assetObjects(indexJson)
   const distinctAssetPaths = new Set(objRows.map(r => r.path)).size
 
-  const expected = 1 + distinctLibPaths + 1 + distinctAssetPaths
+  // the client jar, the log config, the libraries, the asset index and the assets
+  const expected = 1 + 1 + distinctLibPaths + 1 + distinctAssetPaths
   assert.equal(result.downloaded, expected)
   assert.equal(calls.length, expected)
 
   assert.ok(calls.includes(fixture.downloads.client.url), 'client jar downloaded')
+  assert.ok(calls.includes(fixture.logging.client.file.url), 'log config downloaded')
+  assert.equal(fs.readFileSync(logConfigPath(fixture.logging.client.file.id), 'utf8'), BODY)
+  assert.equal(result.logConfig, fixture.logging.client.file.id)
   for (const row of libRows) {
     assert.ok(calls.includes(row.url), `library ${row.name} downloaded`)
   }
@@ -227,4 +233,56 @@ test('26.x natives go to the java/ folder its java.library.path names, and old i
   assert.equal(fs.readFileSync(path.join(nDir, 'java', 'windows', 'x64', 'org', 'lwjgl', 'lwjgl.dll'), 'utf8'), 'lwjgl dll')
   assert.equal(fs.existsSync(path.join(nDir, 'windows')), false, 'the old top-level copy is gone')
   assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${v26.id} windows x64 natives-v4`)
+})
+
+test('a log config that cannot be fetched refuses the version instead of leaving it open to Log4Shell', async () => {
+  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, '1.12.2.json'), 'utf8'))
+  fs.mkdirSync(versionDir(old.id), { recursive: true })
+  fs.writeFileSync(versionJson(old.id), JSON.stringify(old))
+
+  const calls = []
+  const fetchImpl = async (url, dest) => {
+    calls.push(url)
+    if (url === old.logging.client.file.url) throw new Error('HTTP 503')
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, BODY)
+  }
+  await assert.rejects(ensureVersion(old.id, { os: winOs, fetchImpl }), {
+    message: `could not download the log config client-1.12.xml from ${old.logging.client.file.url}: HTTP 503; without it 1.12.2 would run open to Log4Shell, so it is not launched`,
+  })
+  assert.ok(!calls.some(u => u.includes('/org/')), 'no library was fetched before the refusal')
+  assert.equal(fs.existsSync(logConfigPath('client-1.12.xml')), false)
+})
+
+test('1.7.10 installs: every download is a URL the JSON names, and the natives-only jars are extracted', async () => {
+  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, '1.7.10.json'), 'utf8'))
+  const named = new Set([old.downloads.client.url, old.logging.client.file.url, old.assetIndex.url])
+  for (const lib of old.libraries) {
+    if (lib.downloads?.artifact) { lib.downloads.artifact.sha1 = bodySha; lib.downloads.artifact.size = bodySize; named.add(lib.downloads.artifact.url) }
+    for (const cls of Object.values(lib.downloads?.classifiers ?? {})) { cls.sha1 = bodySha; cls.size = bodySize; named.add(cls.url) }
+  }
+  old.downloads.client.sha1 = bodySha
+  old.downloads.client.size = bodySize
+  old.logging.client.file.sha1 = bodySha
+  old.logging.client.file.size = bodySize
+  old.assetIndex.sha1 = indexSha
+  old.assetIndex.size = indexSize
+  fs.mkdirSync(versionDir(old.id), { recursive: true })
+  fs.writeFileSync(versionJson(old.id), JSON.stringify(old))
+
+  const calls = []
+  const fetchImpl = async (url, dest) => {
+    calls.push(url)
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, url === old.assetIndex.url ? INDEX : BODY)
+  }
+  const result = await ensureVersion(old.id, { os: winOs, fetchImpl })
+  const unnamed = calls.filter(u => !named.has(u))
+  assert.deepEqual(unnamed, [], 'no made-up URL was fetched')
+  assert.ok(!calls.some(u => u.endsWith('/lwjgl-platform-2.9.1.jar')), 'no plain lwjgl-platform jar')
+  assert.ok(calls.some(u => u.endsWith('/lwjgl-platform-2.9.1-natives-windows.jar')), 'the Windows natives jar')
+  assert.ok(calls.some(u => u.endsWith('/twitch-platform-5.16-natives-windows-64.jar')), 'the ${arch} natives key is resolved')
+  assert.equal(result.natives, 4)
+  assert.equal(result.logConfig, 'client-1.7.xml')
+  assert.ok(fs.existsSync(path.join(nativesDir(old.id), '.complete')), 'natives extracted')
 })

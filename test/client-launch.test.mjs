@@ -12,7 +12,7 @@ after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 const { offlineUuid, assertPlayerName, offlineAccount, defaultPlayerName } = await import('../src/client-auth.mjs')
 const { buildCommand, substitute } = await import('../src/client-launch.mjs')
 const { mergeInherited, libraries } = await import('../src/client-meta.mjs')
-const { versionJar, nativesDir, LIBRARIES_DIR } = await import('../src/client-paths.mjs')
+const { versionJar, nativesDir, LIBRARIES_DIR, logConfigPath } = await import('../src/client-paths.mjs')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.join(here, 'fixtures', 'client')
@@ -140,4 +140,29 @@ test('quick play supplies the log path as well as the server', () => {
   for (const a of cmd.args) assert.ok(!a.includes('${'), `unsubstituted placeholder in ${a}`)
   const idx = cmd.args.indexOf('--quickPlayPath')
   if (idx !== -1) assert.ok(cmd.args[idx + 1].endsWith('quickPlay.json'))
+})
+
+test('Log4Shell: the log config argument and the lookup switch are JVM arguments for 1.12.2 and 1.17.1', () => {
+  for (const id of ['1.12.2', '1.17.1']) {
+    const version = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${id}.json`), 'utf8'))
+    const profile = { mc: id, loader: 'vanilla', memory: '2G', server: null }
+    const cmd = buildCommand({ version, profile, profileName: 'old', account, java, os: testOs })
+    const mainIdx = cmd.args.indexOf(version.mainClass)
+    assert.ok(mainIdx > 0, `${id}: main class in args`)
+    const jvm = cmd.args.slice(0, mainIdx)
+    assert.ok(jvm.includes(`-Dlog4j.configurationFile=${logConfigPath('client-1.12.xml')}`), `${id}: log config argument, got ${jvm.join(' ')}`)
+    assert.ok(jvm.includes('-Dlog4j2.formatMsgNoLookups=true'), `${id}: lookup switch`)
+    assert.ok(!cmd.args.some((a) => a.includes('${path}')), `${id}: \${path} substituted`)
+    assert.ok(!cmd.args.some((a) => a.includes('${')), `${id}: no variable left unsubstituted: ${cmd.args.filter((a) => a.includes('${')).join(' ')}`)
+  }
+})
+
+test('Log4Shell: 1.21.11 gets its log config as Mojang\'s launcher passes it, and no lookup switch', () => {
+  const profile = { mc, loader: 'vanilla', memory: '2G', server: null }
+  const cmd = buildCommand({ version: vanilla, profile, profileName: 'test', account, java, os: testOs })
+  const mainIdx = cmd.args.indexOf(vanilla.mainClass)
+  const jvm = cmd.args.slice(0, mainIdx)
+  assert.ok(jvm.includes(`-Dlog4j.configurationFile=${logConfigPath('client-1.21.2.xml')}`), 'log config argument')
+  assert.ok(!cmd.args.includes('-Dlog4j2.formatMsgNoLookups=true'), 'no switch for log4j 2.16+')
+  assert.deepEqual(cmd.args.filter((a) => a.startsWith('-Dlog4j')).length, 1)
 })

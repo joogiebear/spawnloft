@@ -26,6 +26,8 @@ const {
   gameArguments,
   jvmArguments,
   nativesLibrarySubdir,
+  loggingConfig,
+  log4jNoLookupsNeeded,
   fetchManifest,
   fetchVersionJson,
 } = await import('../src/client-meta.mjs')
@@ -35,6 +37,8 @@ const manifestFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versio
 const mcVersion = manifestFixture.latest.release
 const versionFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${mcVersion}.json`), 'utf8'))
 const fabricFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'fabric-profile.json'), 'utf8'))
+// Mojang's own JSONs for the older eras, as published (not trimmed)
+const era = (id) => JSON.parse(fs.readFileSync(path.join(fixtureDir, `${id}.json`), 'utf8'))
 
 test('ruleAllows: last matching rule wins, no-match is disallow', () => {
   const rules = [
@@ -275,4 +279,128 @@ test('nativesLibrarySubdir follows the java.library.path argument', () => {
   assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}x']), { os: win }), '')
   assert.equal(nativesLibrarySubdir(withJvm([]), { os: win }), '')
   assert.equal(nativesLibrarySubdir({}, { os: win }), '')
+})
+
+test('loggingConfig: the Log4Shell config of each era, none before 1.7, and a loader profile inherits it', () => {
+  assert.deepEqual(loggingConfig(era('1.7.10')), {
+    id: 'client-1.7.xml',
+    url: 'https://launcher.mojang.com/v1/objects/50c9cc4af6d853d9fc137c84bcd153e2bd3a9a82/client-1.7.xml',
+    sha1: '50c9cc4af6d853d9fc137c84bcd153e2bd3a9a82',
+    size: 966,
+    argument: '-Dlog4j.configurationFile=${path}',
+  })
+  for (const id of ['1.12.2', '1.17.1']) assert.equal(loggingConfig(era(id)).id, 'client-1.12.xml', id)
+  assert.equal(loggingConfig(versionFixture).id, 'client-1.21.2.xml')
+  assert.equal(loggingConfig({ id: '1.5.2', libraries: [] }), null)
+  assert.equal(loggingConfig(mergeInherited(fabricFixture, versionFixture)).id, 'client-1.21.2.xml')
+})
+
+test('loggingConfig refuses a config it cannot fetch and place safely', () => {
+  const withFile = (file, rest = {}) => ({
+    id: 'x',
+    logging: { client: { type: 'log4j2-xml', argument: '-Dlog4j.configurationFile=${path}', file: { id: 'client-1.12.xml', sha1: 'bd65e7d2e3c237be76cfbef4c2405033d7f91521', size: 888, url: 'https://piston-data.mojang.com/v1/objects/x/client-1.12.xml', ...file }, ...rest } },
+  })
+  assert.equal(loggingConfig(withFile({})).id, 'client-1.12.xml')
+  for (const id of ['../client.xml', 'a/b.xml', 'a\\b.xml', '..', '', 'c:d.xml']) {
+    assert.throws(() => loggingConfig(withFile({ id })), /names a file outside log_configs/, id)
+  }
+  assert.throws(() => loggingConfig(withFile({ sha1: 'abc' })), /has no sha1/)
+  assert.throws(() => loggingConfig(withFile({ sha1: undefined })), /has no sha1/)
+  assert.throws(() => loggingConfig(withFile({ url: 'http://piston-data.mojang.com/client-1.12.xml' })), /has no https URL/)
+  assert.throws(() => loggingConfig(withFile({}, { type: 'log4j-properties' })), /unknown type "log4j-properties"/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=client.xml' })), /has the unknown argument/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dfoo=${path}' })), /has the unknown argument/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=${path} ${other}' })), /has the unknown argument/)
+})
+
+test('mergeInherited: a loader profile with an empty logging block keeps the parent\'s Log4Shell config', () => {
+  const parent = era('1.12.2')
+  const child = { id: '1.12.2-forge', inheritsFrom: '1.12.2', mainClass: 'x', libraries: [], logging: {} }
+  assert.equal(loggingConfig(mergeInherited(child, parent)).id, 'client-1.12.xml')
+  const own = { ...child, logging: { client: { ...parent.logging.client, file: { ...parent.logging.client.file, id: 'client-other.xml' } } } }
+  assert.equal(loggingConfig(mergeInherited(own, parent)).id, 'client-other.xml')
+  assert.equal(loggingConfig(mergeInherited({ ...child, logging: undefined }, { ...parent, logging: undefined })), null)
+})
+
+test('log4jNoLookupsNeeded: log4j-core 2.0-beta9, 2.8.1 and 2.14.1 need the switch, newer and no log4j do not', () => {
+  for (const id of ['1.7.10', '1.12.2', '1.17.1']) assert.equal(log4jNoLookupsNeeded(era(id)), true, id)
+  assert.equal(log4jNoLookupsNeeded(versionFixture), false)
+  assert.equal(log4jNoLookupsNeeded({ libraries: [] }), false)
+  const core = (v) => ({ libraries: [{ name: `org.apache.logging.log4j:log4j-core:${v}` }, { name: 'org.apache.logging.log4j:log4j-api:2.14.1' }] })
+  assert.equal(log4jNoLookupsNeeded(core('2.15.0')), true)
+  assert.equal(log4jNoLookupsNeeded(core('2.16.0')), false)
+  assert.equal(log4jNoLookupsNeeded(core('2.17.0')), false)
+  assert.equal(log4jNoLookupsNeeded(core('3.0.0')), false)
+})
+
+const ERA_OS = {
+  windows: { name: 'windows', arch: 'x64', version: '10' },
+  linux: { name: 'linux', arch: 'x64', version: '6' },
+  osx: { name: 'osx', arch: 'x64', version: '24.0' },
+}
+
+test('libraries(): before 1.13 the natives-only rows (lwjgl-platform, jinput-platform, twitch) are extracted, never put on the classpath', () => {
+  const expectedNatives = {
+    '1.5.2': {
+      windows: ['lwjgl-platform:2.9.0:natives-windows', 'jinput-platform:2.0.5:natives-windows'],
+      linux: ['lwjgl-platform:2.9.0:natives-linux', 'jinput-platform:2.0.5:natives-linux'],
+      osx: ['lwjgl-platform:2.9.0:natives-osx', 'jinput-platform:2.0.5:natives-osx'],
+    },
+    '1.7.10': {
+      windows: ['lwjgl-platform:2.9.1:natives-windows', 'jinput-platform:2.0.5:natives-windows', 'twitch-platform:5.16:natives-windows-64', 'twitch-external-platform:4.5:natives-windows-64'],
+      linux: ['lwjgl-platform:2.9.1:natives-linux', 'jinput-platform:2.0.5:natives-linux'],
+      osx: ['lwjgl-platform:2.9.1:natives-osx', 'jinput-platform:2.0.5:natives-osx', 'twitch-platform:5.16:natives-osx'],
+    },
+    '1.12.2': {
+      windows: ['lwjgl-platform:2.9.4-nightly-20150209:natives-windows', 'jinput-platform:2.0.5:natives-windows', 'text2speech:1.10.3:natives-windows'],
+      linux: ['lwjgl-platform:2.9.4-nightly-20150209:natives-linux', 'jinput-platform:2.0.5:natives-linux', 'text2speech:1.10.3:natives-linux'],
+      osx: ['lwjgl-platform:2.9.2-nightly-20140822:natives-osx', 'jinput-platform:2.0.5:natives-osx', 'java-objc-bridge:1.0.0:natives-osx'],
+    },
+  }
+  for (const [id, perOs] of Object.entries(expectedNatives)) {
+    const version = era(id)
+    const artifactUrls = new Set()
+    const classifierUrls = new Set()
+    for (const lib of version.libraries) {
+      if (lib.downloads?.artifact) artifactUrls.add(lib.downloads.artifact.url)
+      for (const c of Object.values(lib.downloads?.classifiers ?? {})) classifierUrls.add(c.url)
+    }
+    for (const [osName, os] of Object.entries(ERA_OS)) {
+      const rows = libraries(version, { os })
+      const label = `${id} on ${osName}`
+      for (const row of rows.filter(r => r.native === false)) {
+        assert.ok(artifactUrls.has(row.url), `${label}: classpath row ${row.name} has the JSON's artifact URL, not ${row.url}`)
+        assert.ok(row.sha1, `${label}: classpath row ${row.name} is hash-checked`)
+      }
+      for (const row of rows.filter(r => r.native !== false)) {
+        assert.ok(classifierUrls.has(row.url), `${label}: natives row ${row.name} has the JSON's classifier URL`)
+      }
+      // one natives jar per row; 1.5.2 lists jinput-platform twice and both rows are kept, as before
+      const natives = rows.filter(r => r.native !== false).map(r => r.name.split(':').slice(1).join(':'))
+      assert.deepEqual([...new Set(natives)], perOs[osName], label)
+      assert.ok(rows.filter(r => r.native === false).length >= 7, `${label}: the real jars are still on the classpath`)
+    }
+  }
+})
+
+test('libraries(): a row with downloads but no artifact and no natives for this OS is left out altogether', () => {
+  // twitch-external-platform has Windows natives only; its rules allow Linux
+  const version = era('1.7.10')
+  const linux = libraries(version, { os: ERA_OS.linux }).map(r => r.name)
+  assert.ok(!linux.some(n => n.includes('twitch-platform') || n.includes('twitch-external')), `no twitch natives row on Linux: ${linux.filter(n => n.includes('twitch'))}`)
+  assert.ok(linux.includes('tv.twitch:twitch:5.16'), 'the plain twitch jar stays')
+  // a legacy row with no downloads block at all (a loader profile's) still gets its Maven URL
+  const legacy = libraries({ libraries: [{ name: 'net.fabricmc:fabric-loader:0.16.0', url: 'https://maven.fabricmc.net/' }] }, { os: ERA_OS.linux })
+  assert.deepEqual(legacy.map(r => r.url), ['https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.16.0/fabric-loader-0.16.0.jar'])
+})
+
+test('libraries(): 1.13+ rows that carry both an artifact and natives keep the jar on the classpath (1.17.1, 1.21.11 unchanged)', () => {
+  const v17 = era('1.17.1')
+  const rows = libraries(v17, { os: ERA_OS.windows })
+  // 1.17.1 lists org.lwjgl:lwjgl:3.2.2 twice: a plain row and one with an artifact plus natives
+  const lwjgl = rows.filter(r => r.name.startsWith('org.lwjgl:lwjgl:3.2.2'))
+  assert.deepEqual([...new Set(lwjgl.map(r => `${r.name} ${r.native !== false}`))], ['org.lwjgl:lwjgl:3.2.2 false', 'org.lwjgl:lwjgl:3.2.2:natives-windows true'])
+  for (const row of rows) assert.ok(row.url.startsWith('https://libraries.minecraft.net/') && row.sha1, row.name)
+  const latest = libraries(versionFixture, { os: ERA_OS.windows })
+  assert.equal(latest.filter(r => r.native === false).length, versionFixture.libraries.filter(l => ruleAllows(l.rules, { os: ERA_OS.windows }) && !l.name.includes(':natives-')).length)
 })

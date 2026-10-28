@@ -58,6 +58,9 @@ export function mergeInherited(child, parent) {
     }
   }
   delete result.inheritsFrom
+  // A loader profile with an empty logging block (Forge's and NeoForge's carry one) must not
+  // drop the parent's Log4Shell config (see loggingConfig)
+  if (!result.logging?.client && parent.logging?.client) result.logging = parent.logging
   result.mainClass = child.mainClass
   result.libraries = [...(child.libraries ?? []), ...(parent.libraries ?? [])]
 
@@ -176,7 +179,10 @@ export function libraries(version, { os = currentOs() } = {}) {
       continue
     }
 
-    rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
+    // Before 1.13 the natives rows (lwjgl-platform, jinput-platform, twitch-platform) carry
+    // classifiers only: there is no plain jar of them to put on the classpath, and the URL
+    // libraryPath would make up for one is a 404.
+    if (!dl || dl.artifact) rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
 
     const nativesKey = lib.natives?.[os.name]
     if (nativesKey) {
@@ -196,6 +202,40 @@ export function libraries(version, { os = currentOs() } = {}) {
     }
   }
   return rows
+}
+
+// Mojang's Log4Shell (CVE-2021-44228) mitigation. 1.7 through 1.18.0 ship a log4j that resolves
+// ${jndi:...} in logged text, so a chat line or a server's MOTD can run code on this machine;
+// the launcher is expected to pass `logging.client`: a log4j config without lookups, named by
+// -Dlog4j.configurationFile. The file id becomes a file name under assets/log_configs, so it is
+// held to one path segment.
+export function loggingConfig(version) {
+  const client = version.logging?.client
+  if (!client) return null
+  const id = version.id ?? 'this version'
+  const bad = (what) => fail(`the logging config of ${id} ${what}; SpawnLoft cannot launch it safely`)
+  if (client.type !== 'log4j2-xml') bad(`has the unknown type "${client.type}"`)
+  // Mojang has only ever shipped this one argument; anything else would name a property log4j
+  // never reads, and the game would start reported as mitigated.
+  if (client.argument !== '-Dlog4j.configurationFile=${path}') bad(`has the unknown argument "${client.argument}"`)
+  const file = client.file
+  if (!file || typeof file.id !== 'string' || !/^[\w.-]+$/.test(file.id) || /^\.+$/.test(file.id)) bad('names a file outside log_configs')
+  if (typeof file.sha1 !== 'string' || !/^[0-9a-f]{40}$/i.test(file.sha1)) bad('has no sha1 to check the file against')
+  if (typeof file.url !== 'string' || !/^https:\/\//.test(file.url)) bad('has no https URL')
+  return { id: file.id, url: file.url, sha1: file.sha1.toLowerCase(), size: Number.isInteger(file.size) ? file.size : null, argument: client.argument }
+}
+
+// Whether to pass -Dlog4j2.formatMsgNoLookups=true as well: log4j-core 2.0 to 2.15 resolve
+// lookups in messages, and 2.10 and newer honour the property (older ones ignore it, and 2.16+
+// have no lookups to turn off). A second guard beside the config file, as Mojang's launcher.
+export function log4jNoLookupsNeeded(version) {
+  for (const lib of version.libraries ?? []) {
+    const parts = String(lib.name ?? '').split(':')
+    if (parts[0] !== 'org.apache.logging.log4j' || parts[1] !== 'log4j-core') continue
+    const m = /^(\d+)\.(\d+)/.exec(parts[2] ?? '')
+    if (m && Number(m[1]) === 2 && Number(m[2]) < 16) return true
+  }
+  return false
 }
 
 export function assetIndex(version) {

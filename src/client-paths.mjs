@@ -25,6 +25,11 @@ export function versionJar(id) {
   return path.join(versionDir(id), `${id}.jar`)
 }
 
+// Mojang's layout for the log4j configs the version JSONs name (see loggingConfig)
+export function logConfigPath(id) {
+  return path.join(ASSETS_DIR, 'log_configs', id)
+}
+
 export function nativesDir(id) {
   return path.join(NATIVES_DIR, id)
 }
