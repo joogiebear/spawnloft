@@ -1,0 +1,17 @@
+{
+  "map_to_resources": true,
+  "objects": {
+    "sound/step/grass1.ogg": {
+      "hash": "b71df021880846702c6917a09b48490cc0c71f79",
+      "size": 21
+    },
+    "music/calm1.ogg": {
+      "hash": "5f4305636c9f636719f9213886e413fc384d12af",
+      "size": 15
+    },
+    "newsound/damage/hurtflesh1.ogg": {
+      "hash": "b7002b3b7261ff082382681f7e977e6b3be179f4",
+      "size": 30
+    }
+  }
+}

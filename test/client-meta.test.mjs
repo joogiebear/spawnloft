@@ -38,7 +38,7 @@ const mcVersion = manifestFixture.latest.release
 const versionFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${mcVersion}.json`), 'utf8'))
 const fabricFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'fabric-profile.json'), 'utf8'))
 // Mojang's own JSONs for the older eras, as published (not trimmed)
-const era = (id) => JSON.parse(fs.readFileSync(path.join(fixtureDir, `${id}.json`), 'utf8'))
+const era = (id) => JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', `${id}.json`), 'utf8'))
 
 test('ruleAllows: last matching rule wins, no-match is disallow', () => {
   const rules = [

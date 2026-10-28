@@ -1,0 +1,17 @@
+{
+  "virtual": true,
+  "objects": {
+    "lang/de_DE.lang": {
+      "hash": "3f678cf9bbee911e77caca65a432283b483d80b6",
+      "size": 15
+    },
+    "../x": {
+      "hash": "72e4d01dd8ef43d874f587e727c565e2f8838716",
+      "size": 4
+    },
+    "sound/random/click.ogg": {
+      "hash": "09207d4ad3f34c34b40f93a1e0acaf8181b6ea55",
+      "size": 22
+    }
+  }
+}

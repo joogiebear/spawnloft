@@ -94,6 +94,28 @@ export async function extractNatives(id, nativeRows, { os, subdir = '' }) {
   return { files }
 }
 
+// What ensureVersion fetches and unpacks for a version on this machine, decided without touching
+// the disk or the network: the tests run it for every era and OS.
+export function planInstall(version, { os = currentOs() } = {}) {
+  // Mojang JSONs can list one jar under two rows; two workers on one file would race
+  const libRows = libraries(version, { os })
+  const byPath = new Map()
+  for (const row of libRows) {
+    if (!byPath.has(row.path)) byPath.set(row.path, row)
+  }
+  return {
+    id: version.id,
+    client: version.downloads?.client ?? null,
+    logConfig: loggingConfig(version),
+    libraries: [...byPath.values()],
+    natives: libRows.filter(r => r.native !== false),
+    nativesSubdir: nativesLibrarySubdir(version, { os }),
+    assetIndex: assetIndex(version),
+    // every library row ensureVersion counts, duplicates included
+    libraryRows: libRows.length,
+  }
+}
+
 export async function ensureVersion(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile } = {}) {
   let rawJson
   try {
@@ -176,18 +198,13 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     emitEnd('log config', 1, 1, needs ? (logCfg.size ?? 0) : 0)
   }
 
-  // Mojang JSONs can list one jar under two rows; two workers on one file would race
-  const libRows = libraries(version, { os })
-  const nativeRows = libRows.filter(r => r.native !== false)
+  const plan = planInstall(version, { os })
+  const nativeRows = plan.natives
   let libBytes = 0
   let libDone = 0
   let nativeWasDownloaded = false
 
-  const libByPath = new Map()
-  for (const row of libRows) {
-    if (!libByPath.has(row.path)) libByPath.set(row.path, row)
-  }
-  const libDownloads = [...libByPath.values()]
+  const libDownloads = plan.libraries
   const nativePaths = new Set(nativeRows.map(r => r.path))
 
   await inBatches(libDownloads, PARALLEL, async (row) => {
@@ -213,7 +230,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   emitEnd('libraries', libDone, libDownloads.length, libBytes)
 
   // two index entries can share a hash, so key the queue by destination path
-  const ai = assetIndex(version)
+  const ai = plan.assetIndex
   const indexDest = path.join(ASSETS_DIR, 'indexes', `${ai.id}.json`)
   let assetDone = 0
   let assetBytes = 0
@@ -264,7 +281,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   const completeFile = path.join(nativesDir(id), '.complete')
   const stamped = fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === nativesStamp(id, os)
   if (nativeRows.length > 0 && (nativeWasDownloaded || !stamped)) {
-    await extractNatives(id, nativeRows, { os, subdir: nativesLibrarySubdir(version, { os }) })
+    await extractNatives(id, nativeRows, { os, subdir: plan.nativesSubdir })
   }
   emitEnd('natives', nativeRows.length, nativeRows.length, 0)
 
@@ -272,7 +289,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     id,
     jar: jarPath,
     logConfig: logCfg?.id ?? null,
-    libraries: libRows.length,
+    libraries: plan.libraryRows,
     natives: nativeRows.length,
     assets: objRows.length,
     downloaded,
