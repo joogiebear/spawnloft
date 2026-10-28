@@ -230,7 +230,10 @@ function createWindow(loadUrl, theme = 'classic') {
       // Chromium hands a second window.open with the same name to the open window itself (see
       // will-navigate below); this catches the cases where it cannot find it by name
       if (focusLauncher()) return { action: 'deny' }
-      launcherState = windowState.load(launcherStateFile(), displayAreas(), launcherWindow.LAUNCHER_BOUNDS)
+      // the first size follows the zoom on the panel's screen; after that the saved size wins
+      const size = launcherWindow.launcherBounds(zoom, currentDisplay().workArea)
+      const min = { width: size.minWidth, height: size.minHeight }
+      launcherState = windowState.load(launcherStateFile(), displayAreas(), size, min)
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -238,8 +241,8 @@ function createWindow(loadUrl, theme = 'classic') {
           height: launcherState.height,
           x: launcherState.x,
           y: launcherState.y,
-          minWidth: windowState.MIN_WIDTH,
-          minHeight: windowState.MIN_HEIGHT,
+          minWidth: min.width,
+          minHeight: min.height,
           title: launcherWindow.LAUNCHER_TITLE,
           backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
           icon: fs.existsSync(ICON) ? ICON : undefined,

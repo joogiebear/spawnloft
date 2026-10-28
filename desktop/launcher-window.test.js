@@ -7,7 +7,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { windowKind, openProfileFolder } = require('./launcher-window')
+const { windowKind, openProfileFolder, launcherBounds } = require('./launcher-window')
 const windowState = require('./window-state')
 
 const LOAD = 'http://127.0.0.1:51234/'
@@ -49,13 +49,55 @@ test('non-strings are refused', () => {
   assert.equal(windowKind(LOAD + 'launcher', undefined), null)
 })
 
-test('the launcher window opens at its own size the first time and is never smaller than 900x600', () => {
+test('the launcher opens at 1040x640 CSS pixels times the zoom, never under 640x520 of them', () => {
+  const big = { x: 0, y: 0, width: 3840, height: 2100 }
+  // [zoom, width, height, minWidth, minHeight]
+  for (const [zoom, w, h, mw, mh] of [
+    [1, 1040, 640, 640, 520],
+    [0.9, 936, 576, 576, 468],
+    [1.25, 1300, 800, 800, 650],
+    [1.5, 1560, 960, 960, 780],
+    [1.75, 1820, 1120, 1120, 910],
+    [2, 2080, 1280, 1280, 1040],
+  ]) assert.deepEqual(launcherBounds(zoom, big), { width: w, height: h, minWidth: mw, minHeight: mh }, String(zoom))
+})
+
+test('the launcher\'s size and minimum are clamped to the work area', () => {
+  // 1366x768 less a taskbar, at a zoom someone chose by hand
+  const area = { x: 0, y: 0, width: 1366, height: 728 }
+  assert.deepEqual(launcherBounds(2, area), { width: 1366, height: 728, minWidth: 1280, minHeight: 728 })
+  assert.deepEqual(launcherBounds(1.75, { width: 1000.6, height: 700.4 }), { width: 1000, height: 700, minWidth: 1000, minHeight: 700 })
+})
+
+test('a bad zoom or a missing work area falls back to 100% and no clamp', () => {
+  const at100 = { width: 1040, height: 640, minWidth: 640, minHeight: 520 }
+  for (const zoom of [undefined, NaN, 0, -1, 'big']) assert.deepEqual(launcherBounds(zoom, undefined), at100, String(zoom))
+  assert.deepEqual(launcherBounds(1.5, { width: 0, height: 0 }), { width: 1560, height: 960, minWidth: 960, minHeight: 780 })
+})
+
+test('the launcher window remembers its size afterwards, held to its own minimum', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-launcher-ws-'))
   const file = path.join(tmp, 'launcher-window-state.json')
   const display = [{ x: 0, y: 0, width: 2560, height: 1392 }]
-  assert.deepEqual(windowState.load(file, display, { width: 1180, height: 760 }), { width: 1180, height: 760, maximized: false })
+  const size = launcherBounds(1.25, display[0])
+  const min = { width: size.minWidth, height: size.minHeight }
+  assert.deepEqual(windowState.load(file, display, size, min), { width: 1300, height: 800, maximized: false })
+  // a size the person dragged it to wins over the zoomed default
+  fs.writeFileSync(file, JSON.stringify({ width: 1700, height: 900, x: 10, y: 10 }))
+  assert.deepEqual(windowState.load(file, display, size, min), { width: 1700, height: 900, maximized: false, x: 10, y: 10 })
+  // and a saved size under the minimum is raised to it: 640x520 CSS pixels at 125%
   fs.writeFileSync(file, JSON.stringify({ width: 400, height: 300, x: 10, y: 10 }))
-  const s = windowState.load(file, display, { width: 1180, height: 760 })
+  const s = windowState.load(file, display, size, min)
+  assert.equal(s.width, 800)
+  assert.equal(s.height, 650)
+  fs.rmSync(tmp, { recursive: true, force: true })
+})
+
+test('the panel window keeps its 900x600 minimum when no minimum is passed', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-panel-ws-'))
+  const file = path.join(tmp, 'window-state.json')
+  fs.writeFileSync(file, JSON.stringify({ width: 400, height: 300 }))
+  const s = windowState.load(file, [{ x: 0, y: 0, width: 2560, height: 1392 }])
   assert.equal(s.width, 900)
   assert.equal(s.height, 600)
   fs.rmSync(tmp, { recursive: true, force: true })
