@@ -704,6 +704,12 @@
     return patch
   }
 
+  // The value a stored account has in a setup's "Play as" list: its uuid, or the setup's own
+  // "offline:<name>" key when that key names this offline account, so it is listed once.
+  function accountValue(account, current) {
+    return account.type === 'offline' && current === `offline:${account.name}` ? current : account.uuid
+  }
+
   // The name a setup gets when nobody gives it one: its version, made into a profile name
   // ("1.21.11" -> "1-21-11", "-fabric" for Fabric), then -2, -3... past the names already taken.
   function nameBase(mc, loader) {
@@ -1024,10 +1030,12 @@
 
   const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
 
+  const menuItems = (menu) => [...menu.querySelectorAll('button:not(:disabled), input')]
+
   // Up and down move through a menu's buttons, as in any menu.
   function menuKeys(e) {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    const items = [...e.currentTarget.querySelectorAll('button:not(:disabled), input')]
+    const items = menuItems(e.currentTarget)
     if (!items.length) return
     e.preventDefault()
     const at = items.indexOf(document.activeElement)
@@ -1043,6 +1051,9 @@
     // a re-render (a poll, a keystroke that changes a hint) keeps the focused field and caret
     const active = document.activeElement
     const keep = active?.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null
+    // a row in an open menu has no id: it is found again by its place in the rebuilt menu
+    const inMenu = !keep && active?.closest?.('.menu[id]')
+    const row = inMenu ? { menu: inMenu.id, at: menuItems(inMenu).indexOf(active) } : null
     $('chipwrap').replaceChildren(...(S.down ? [] : accountChip()))
     $('stage').replaceChildren(S.down ? unreachableView() : playView())
     $('sheet').replaceChildren(...(S.sheet && !S.down ? [sheetView()] : []))
@@ -1052,6 +1063,11 @@
         el.focus({ preventScroll: true })
         try { if (keep.start !== null && keep.start !== undefined) el.setSelectionRange(keep.start, keep.end) } catch { /* not a text field */ }
       }
+    }
+    if (row && row.at !== -1) {
+      const menu = $(row.menu)
+      const items = menu ? menuItems(menu) : []
+      items[Math.min(row.at, items.length - 1)]?.focus({ preventScroll: true })
     }
   }
 
@@ -1183,7 +1199,7 @@
     const machine = S.summary.machineRefusal
     const does = machine
       ? h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', { text: `Minecraft can't be launched on this computer: ${sentence(machine).replace(/\.?$/, '.')}` }))
-      : h('p', { class: 'does', id: 'does' }, mc ? parts(def ? plan.sentence : ['Opens ', { b: `Minecraft ${mc}` }, plan.picked ? [' and joins ', { b: plan.picked.name }] : ' on the title screen', '. Pick who is playing first.']) : S.versions?.error ? `The version list could not be read: ${S.versions.error}.` : 'Reading Mojang\'s version list…')
+      : h('p', { class: 'does', id: 'does' }, mc ? parts(def ? plan.sentence : ['Opens ', { b: `Minecraft ${mc}` }, plan.picked ? [' and joins ', { b: plan.picked.name }] : ' on the title screen', '. Pick who is playing first.']) : S.versions?.error ? [`The version list could not be read: ${S.versions.error}. `, h('button', { type: 'button', class: 'linkbtn', id: 'versionsAgain', onclick: loadVersions }, 'Try again')] : 'Reading Mojang\'s version list…')
     return h('div', { class: 'playbox' }, flashNotice(),
       h('div', { class: 'split menuhost', 'data-menu': 'version' },
         h('button', { class: 'primary play', id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play'), S.firstRun ? 'Getting ready…' : 'Play'),
@@ -1405,6 +1421,8 @@
 
   async function startLaunch(p) {
     if (!S.summary) return render()
+    // the fresh-install draft is not a setup yet: Play there makes one first
+    if (p.name === FIRST) return firstPlay()
     const plan = launchPlan(p)
     if (plan.blocked) return render()
     if (plan.addrProblem) {
@@ -1718,8 +1736,8 @@
       h('label', { class: 'field' }, h('span', { text: 'Play as' }),
         h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
           h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in' }),
-          accountsNow().map((a) => h('option', { value: a.uuid, text: `${a.name} (${a.type === 'offline' ? 'Offline' : 'Microsoft'})` })),
-          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} (Offline)` : `${p?.accountName ?? f.account} (no longer signed in)` }))),
+          accountsNow().map((a) => h('option', { value: accountValue(a, f.account), text: `${a.name} (${a.type === 'offline' ? 'Offline' : 'Microsoft'})` })),
+          f.account && !accountsNow().some((a) => accountValue(a, f.account) === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} (Offline)` : `${p?.accountName ?? f.account} (no longer signed in)` }))),
       h('label', { class: 'field' }, h('span', { text: 'Usually joins' }),
         h('select', { id: 'fServer', value: f.server, onchange: set('server') },
           h('option', { value: '', text: 'Title screen only' }),
@@ -2127,17 +2145,22 @@
 
   // A server card's Play with no fitting setup leaves { mc, server }: a setup of that version is
   // picked and joins the server, or the New setup sheet opens filled in for it.
+  function prefillPick(prefill, profiles) {
+    const mc = typeof prefill?.mc === 'string' ? prefill.mc : ''
+    const server = typeof prefill?.server === 'string' ? prefill.server : ''
+    const fits = profiles.filter((p) => !mc || p.mc === mc)
+    return { mc, server, profile: fits.find((q) => q.server === server) ?? fits[0] ?? null }
+  }
+
   function takePrefill(prefill) {
     if (!prefill || typeof prefill !== 'object' || S.sheet) return
-    const mc = typeof prefill.mc === 'string' ? prefill.mc : ''
-    const server = typeof prefill.server === 'string' ? prefill.server : ''
-    const fits = profilesNow().filter((p) => !mc || p.mc === mc)
-    const p = fits.find((q) => q.server === server) ?? fits[0]
-    if (p && !p.running && S.job?.profile !== p.name) {
+    const { mc, server, profile: p } = prefillPick(prefill, profilesNow())
+    if (p) {
+      // a running or launching setup is shown as it is; its Join changes from the next launch
       pickProfile(p.name)
       if (server && serversNow().some((s) => s.name === server)) setTarget(p, { server })
       render()
-    } else if (!p) {
+    } else {
       openSheet(null, { mc, server })
     }
   }

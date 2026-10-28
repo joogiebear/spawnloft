@@ -309,3 +309,42 @@ test('the setup sheet\'s memory and facts', () => {
   assert.deepEqual(versionFacts(null, { fabric: false }), ['no Fabric'])
   assert.deepEqual(versionFacts(null, null), [])
 })
+
+test('on a fresh install, Enter in Join plays the way Play does, and a failed version list can be read again', () => {
+  // the first-run draft is not a setup the panel knows: it must never be launched by name
+  assert.match(fnSource('startLaunch'), /if \(p\.name === FIRST\) return firstPlay\(\)/)
+  assert.match(fnSource('firstRunView'), /joinField\(draft, plan, false\)/)
+  assert.match(fnSource('firstRunView'), /id: 'versionsAgain', onclick: loadVersions/)
+})
+
+test('a re-render keeps focus on the same row of an open menu', () => {
+  const src = fnSource('render')
+  assert.match(src, /closest\?\.\('\.menu\[id\]'\)/)
+  assert.match(src, /menuItems\(menu\)/)
+  for (const id of ['menuAccount', 'menuVersion', 'menuJoin', 'menuAsk']) assert.ok(html.includes(`id: '${id}'`), id)
+})
+
+test('an offline account a setup names by key is listed once in Play as', () => {
+  const { accountValue } = lifted(['accountValue'])
+  const steve = { uuid: 'u-steve', name: 'Steve', type: 'offline' }
+  const alex = { uuid: 'u-alex', name: 'Alex', type: 'microsoft' }
+  assert.equal(accountValue(steve, 'offline:Steve'), 'offline:Steve')
+  assert.equal(accountValue(steve, 'u-steve'), 'u-steve')
+  assert.equal(accountValue(steve, 'offline:Alex'), 'u-steve')
+  assert.equal(accountValue(alex, 'offline:Alex'), 'u-alex')
+  assert.equal(accountValue(steve, ''), 'u-steve')
+})
+
+test('a server card\'s pre-fill picks the setup that fits, running or not', () => {
+  const { prefillPick } = lifted(['prefillPick'])
+  const profiles = [
+    { name: 'a', mc: '1.21.11', server: null, running: false },
+    { name: 'b', mc: '1.21.11', server: 'survival', running: true },
+    { name: 'c', mc: '1.20.1', server: null },
+  ]
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'survival' }, profiles).profile.name, 'b')
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'creative' }, profiles).profile.name, 'a')
+  assert.equal(prefillPick({ mc: '1.19.4', server: 'x' }, profiles).profile, null)
+  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0] })
+  assert.doesNotMatch(fnSource('takePrefill'), /!p\.running/)
+})
