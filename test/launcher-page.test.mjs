@@ -289,3 +289,23 @@ test('a version the panel refuses outright is told apart from a launch that fail
   assert.equal(versionRefusal({ code: 'java-missing', message: 'no Java 21 found' }), false)
   assert.equal(versionRefusal(null), false)
 })
+
+test('the setup sheet\'s memory and facts', () => {
+  const { memoryGb, memoryFromGb, defaultMemory, versionFacts } = lifted(['memoryGb', 'memoryFromGb', 'defaultMemory', 'versionFacts'])
+  assert.equal(memoryGb('4G'), 4)
+  assert.equal(memoryGb('1536M'), 1.5)
+  assert.equal(memoryGb('4096m'), 4)
+  assert.equal(memoryGb('lots'), null)
+  assert.equal(memoryFromGb(4), '4G')
+  assert.equal(memoryFromGb('2.5'), '2560M')
+  assert.equal(memoryFromGb(0.2), '1G')
+  // the slider and the panel agree on every half step
+  for (let gb = 1; gb <= 64; gb += 0.5) assert.equal(memoryGb(memoryFromGb(gb)), gb)
+  assert.equal(defaultMemory('vanilla'), '2G')
+  assert.equal(defaultMemory('fabric'), '4G')
+  // today's picker rows carry only the harness; the all-versions plan adds the rest
+  assert.deepEqual(versionFacts({ id: '1.21.1', harness: false }, null), ['harness not published'])
+  assert.deepEqual(versionFacts({ id: '26.3', harness: false, fabric: true, javaNeeds: 25 }, { harness: true, emulated: true }), ['Java 25', 'Fabric available', 'harness published', 'runs under emulation'])
+  assert.deepEqual(versionFacts(null, { fabric: false }), ['no Fabric'])
+  assert.deepEqual(versionFacts(null, null), [])
+})

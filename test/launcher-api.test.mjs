@@ -386,6 +386,8 @@ test('no client route hands a page a token, the log route included', async () =>
   assert.equal(summary.defaultAccount, null)
   assert.deepEqual(summary.servers.map((s) => [s.name, s.mc, s.status, s.onlineMode]), [['open', mc, 'stopped', false], ['strict', mc, 'stopped', true]])
   assert.ok(summary.profiles.some((p) => p.name === 'leaky'))
+  assert.ok(Number.isInteger(summary.machine.totalMemory) && summary.machine.totalMemory > 0)
+  assert.ok(Number.isInteger(summary.machine.freeMemory) && summary.machine.freeMemory <= summary.machine.totalMemory)
 
   // a launch as the Microsoft account: its job events carry the name, never the token
   const msEvents = await jobEvents('ms-job', () => call('client/profiles/leaky/launch', { method: 'POST', body: { jobId: 'ms-job', account: 'Wunga_', server: false } }))

@@ -468,6 +468,9 @@
   details.adv { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
   details.adv summary { cursor: pointer; padding: var(--s-3) var(--s-4); font-size: var(--t-3); font-weight: 600; color: var(--ink-2); }
   details.adv .in { padding: 0 var(--s-4) var(--s-4); display: grid; gap: var(--s-4); }
+  .slider { display: flex; align-items: center; gap: var(--s-3); }
+  .slider input { flex: 1; min-height: 20px; padding: 0; background: none; border: 0; accent-color: var(--lapis); }
+  .slider output { font-size: var(--t-3); font-weight: 600; min-width: 6ch; text-align: right; }
   .sheet .foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
   .sheet .foot .hint { margin-right: auto; }
   .confirm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); background: var(--fault-wash); border-radius: var(--r-sm); font-size: var(--t-3); color: var(--fault-ink); }
@@ -528,7 +531,8 @@
   // a game that ends this soon after it started gets the crash callout
   const CRASH_WINDOW_MS = 60000
   const LOG_LINES = 20
-  const MEMORY_CHOICES = ['1G', '2G', '3G', '4G', '6G', '8G']
+  // the memory segments; anything else is Custom, a slider in half-gigabyte steps
+  const MEMORY_CHOICES = ['2G', '4G', '8G']
   const STOPPED = new Set(['stopped', 'stale'])
   const NEW_PROFILE_KEY = 'spawnloft.launcher.newProfile'
   const JOB_KEY = 'spawnloft.launcher.job'
@@ -762,6 +766,43 @@
     return m[2].toUpperCase() === 'G' ? `${m[1]} GB` : `${m[1]} MB`
   }
 
+  // "1536M" -> 1.5, "4G" -> 4; null when it is neither.
+  function memoryGb(memory) {
+    const m = /^(\d+)([MG])$/i.exec(String(memory ?? ''))
+    if (!m) return null
+    return m[2].toUpperCase() === 'G' ? Number(m[1]) : Math.round((Number(m[1]) / 1024) * 2) / 2
+  }
+
+  // The slider's gigabytes as the panel writes memory: whole ones in G, halves in M.
+  function memoryFromGb(gb) {
+    const half = Math.max(1, Math.round(Number(gb) * 2) / 2)
+    return Number.isInteger(half) ? `${half}G` : `${half * 1024}M`
+  }
+
+  // A new setup's memory: 2 GB for Vanilla, 4 GB for Fabric (mods want more).
+  function defaultMemory(loader) {
+    return loader === 'fabric' ? '4G' : '2G'
+  }
+
+  // The facts line under the version field, from the picker row and the version's details when
+  // the panel has them (javaNeeds, fabric, harness, emulated); a fact nobody knows is left out.
+  function versionFacts(row, details) {
+    const d = { ...(row ?? {}), ...(details ?? {}) }
+    const out = []
+    if (d.javaNeeds) out.push(`Java ${d.javaNeeds}`)
+    if (d.fabric === true) out.push('Fabric available')
+    else if (d.fabric === false) out.push('no Fabric')
+    if (d.harness === true) out.push('harness published')
+    else if (d.harness === false) out.push('harness not published')
+    if (d.emulated) out.push('runs under emulation')
+    return out
+  }
+
+  function gbText(bytes) {
+    const gb = Number(bytes) / 1024 ** 3
+    return `${gb >= 10 ? Math.round(gb) : Math.round(gb * 10) / 10} GB`
+  }
+
   function loaderText(profile) {
     if (profile.loader !== 'fabric') return 'Vanilla'
     return profile.loaderVersion ? `Fabric ${profile.loaderVersion}` : 'Fabric'
@@ -897,6 +938,14 @@
     menu: null,
     // the setup sheet's values while it is open, so a re-render keeps them
     sheet: null,
+    // version id -> its details from GET client/versions/<id>; detailsRoute false once the panel
+    // has said it has no such route
+    details: {},
+    detailsRoute: null,
+    // the setup to play once "Who's playing?" is answered with a Microsoft sign-in
+    afterLogin: null,
+    // making the first setup on a fresh install
+    firstRun: false,
     versions: null,
     versionShow: 'release',
     login: null,
@@ -970,7 +1019,7 @@
     if (!was) return
     S.menu = null
     render()
-    if (refocus) $({ account: 'chip', version: 'verBtn', join: 'join' }[was])?.focus({ preventScroll: true })
+    if (refocus) $({ account: 'chip', version: 'verBtn', join: 'join', ask: 'play' }[was])?.focus({ preventScroll: true })
   }
 
   const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
@@ -1085,11 +1134,7 @@
       return h('div', { class: 'playbox', 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('width:320px;height:64px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
     }
     const p = currentProfile()
-    if (!p) {
-      return h('div', { class: 'playbox' }, flashNotice(),
-        h('div', { class: 'split' }, h('button', { class: 'primary play', id: 'play', onclick: () => openSheet() }, ico('plus'), 'New setup')),
-        h('p', { class: 'does', text: 'A setup is a Minecraft version with its own worlds, options and mods. Make one to start playing.' }))
-    }
+    if (!p) return firstRunView()
     const plan = launchPlan(p)
     const { state } = plan
     const kids = [flashNotice()]
@@ -1120,6 +1165,78 @@
     if (fix === 'title-screen') return link('play on the title screen', () => { setTarget(p, {}); render() })
     if (fix === 'edit') return link('pick another version', () => openSheet(p, null, 'fMc'))
     return null
+  }
+
+  // A fresh install: no setup yet. Play makes one for the latest release, then asks who is playing
+  // (unless someone already signs in here), then plays. Nothing downloads before that answer.
+  const FIRST = '#first'
+  function latestRelease() {
+    return (S.versions?.versions ?? []).find((v) => v.type === 'release' && !v.refusal)?.id ?? null
+  }
+
+  function firstRunView() {
+    if (!S.versions) loadVersions()
+    const mc = latestRelease()
+    const draft = { name: FIRST, mc: mc ?? 'latest', loader: 'vanilla', server: null, account: null, running: false }
+    const plan = launchPlan(draft)
+    const def = defaultAccount()
+    const machine = S.summary.machineRefusal
+    const does = machine
+      ? h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', { text: `Minecraft can't be launched on this computer: ${sentence(machine).replace(/\.?$/, '.')}` }))
+      : h('p', { class: 'does', id: 'does' }, mc ? parts(def ? plan.sentence : ['Opens ', { b: `Minecraft ${mc}` }, plan.picked ? [' and joins ', { b: plan.picked.name }] : ' on the title screen', '. Pick who is playing first.']) : S.versions?.error ? `The version list could not be read: ${S.versions.error}.` : 'Reading Mojang\'s version list…')
+    return h('div', { class: 'playbox' }, flashNotice(),
+      h('div', { class: 'split menuhost', 'data-menu': 'version' },
+        h('button', { class: 'primary play', id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play'), S.firstRun ? 'Getting ready…' : 'Play'),
+        h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': 'Setup: the latest release. Change setup', onclick: toggleMenu('version') },
+          h('span', { class: 'vt' }, h('b', { text: mc ?? '…' }), h('small', { text: 'Latest release' })), ico('chev')),
+        S.menu === 'version' && h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'menu', 'aria-label': 'Setups', onkeydown: menuKeys },
+          h('div', { class: 'mhead', text: 'Play with' }),
+          h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own:' }),
+          h('button', { class: 'row act', role: 'menuitem', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })))),
+      does,
+      joinField(draft, plan, false))
+  }
+
+  async function firstPlay() {
+    const mc = latestRelease()
+    if (!mc || S.firstRun) return
+    S.firstRun = true
+    S.menu = null
+    render()
+    let made = null
+    try {
+      made = await api('client/profiles', { method: 'POST', body: { name: autoName(mc, 'vanilla', profilesNow().map((q) => q.name)), mc, loader: 'vanilla', memory: defaultMemory('vanilla') } })
+    } catch (err) {
+      if (err instanceof PanelDown) S.down = true
+      S.flash = { tone: 'fault', title: 'Couldn\'t make a setup', text: sentence(err.message) }
+    }
+    S.firstRun = false
+    if (!made) return render()
+    // where Join pointed carries over to the setup it was for
+    if (S.targets[FIRST]) S.targets[made.name] = S.targets[FIRST]
+    delete S.targets[FIRST]
+    saveTargets()
+    pickProfile(made.name)
+    await refresh()
+    const p = profileNamed(made.name)
+    if (p) startLaunch(p)
+  }
+
+  // "Who's playing?": asked when a setup has no account of its own and nobody signs in here.
+  function askMenu(p) {
+    const o = S.offline
+    return h('div', { class: 'menu ask', id: 'menuAsk', role: 'dialog', 'aria-label': 'Who\'s playing?', onkeydown: menuKeys },
+      h('div', { class: 'mhead', text: 'Who\'s playing?' }),
+      S.acctNotice && acctNotice(S.acctNotice),
+      S.login ? waitingStrip(S.login) : h('button', { class: 'primary', style: 'width:100%;min-height:36px', onclick: () => { S.afterLogin = p.name; startLogin() } }, ico('ext'), 'Sign in with Microsoft'),
+      h('p', { class: 'note', text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password. Needed for online servers.' }),
+      h('hr'),
+      h('div', { class: 'mhead', text: 'Or play offline on local servers' }),
+      h('div', { class: 'inline' },
+        h('input', { id: 'askName', 'aria-label': 'Offline name', value: o.name, maxlength: '16', placeholder: 'Name, 3 to 16 characters', class: o.error ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
+          oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline(p.name) } }),
+        h('button', { class: 'sm', onclick: () => addOffline(p.name) }, 'Play')),
+      o.error && h('small', { class: 'hint bad', text: sentence(o.error) }))
   }
 
   function flashNotice() {
@@ -1156,11 +1273,12 @@
   function playButton(p, plan) {
     const label = plan.startsServer ? 'Start server and play' : plan.state.kind === 'closed-early' ? 'Play again' : 'Play'
     const given = givenName(p)
-    return h('div', { class: 'split menuhost', 'data-menu': 'version' },
+    return h('div', { class: 'split menuhost', 'data-menu': 'version ask' },
       h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => startLaunch(p) }, ico('play'), label),
       h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
         h('span', { class: 'vt' }, h('b', { text: p.mc }), h('small', { text: `${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${given ? ` · ${given}` : ''}` })), ico('chev')),
-      S.menu === 'version' && versionMenu(p))
+      S.menu === 'version' && versionMenu(p),
+      S.menu === 'ask' && askMenu(p))
   }
 
   function setupSub(q) {
@@ -1293,6 +1411,10 @@
       render()
       return $('join')?.focus()
     }
+    if (!p.account && !defaultAccount()) {
+      S.acctNotice = null
+      return openMenu('ask')
+    }
     const body = { jobId: newId() }
     if (plan.picked) {
       body.server = plan.picked.name
@@ -1407,18 +1529,20 @@
   // ---- the setup sheet -----------------------------------------------------------------------
 
   // New and Edit. `p` is the profile to edit; with none it is a new setup, prefilled from
-  // `prefill` ({ mc, server }, what a server card's Play leaves when no setup fits).
+  // `prefill` ({ mc, server }, what a server card's Play leaves when no setup fits). `focus` is
+  // the field to put the caret in.
   function openSheet(p = null, prefill = null, focus = null) {
     const servers = serversNow()
     S.menu = null
     S.sheet = p
       ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false, removing: false }
-      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'fabric', loaderVersion: '', memory: '4G', java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false, removing: false }
+      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false, removing: false }
     if (!p && prefill?.server && !S.sheet.server) S.sheet.server = prefill.server
+    S.sheet.custom = !MEMORY_CHOICES.includes(String(S.sheet.memory).toUpperCase())
     if (!S.versions || S.versions.error) loadVersions()
     else defaultVersion(S.sheet)
     render()
-    $(focus ?? (p ? 'fMc' : 'fName'))?.focus()
+    $(focus ?? 'fMc')?.focus()
   }
 
   function closeSheet() {
@@ -1444,21 +1568,52 @@
       const first = (S.versions?.versions ?? []).find((v) => v.type === 'release' && !v.refusal)
       if (first) f.mc = first.id
     }
-    fixHarness(f)
+    fixLoader(f)
+    loadDetails(f.mc)
   }
 
   const versionRow = (id) => (S.versions?.versions ?? []).find((v) => v.id === id) ?? null
 
-  // The harness needs Fabric and a published mod for the version; when either goes, it goes off.
+  // A version's details (exact Java, Fabric, harness), when the panel has the route; asked once
+  // per version, and not at all once the panel has answered that it has no such route. The route
+  // comes with the all-versions picker, whose rows carry `kind`; a panel without those is not asked.
+  async function loadDetails(id) {
+    if (!id || S.detailsRoute === false || S.details[id] !== undefined) return
+    if (!(S.versions?.versions ?? []).some((r) => r.kind)) return
+    S.details[id] = null
+    try {
+      S.details[id] = await api(`client/versions/${enc(id)}`)
+      S.detailsRoute = true
+    } catch (err) {
+      if (err.status === 404 && !S.detailsRoute) S.detailsRoute = false
+      delete S.details[id]
+      return
+    }
+    if (S.sheet) {
+      fixLoader(S.sheet)
+      render()
+    }
+  }
+
+  // What the panel knows about a version: the picker row, with the details on top.
+  const versionInfo = (id) => ({ ...(versionRow(id) ?? {}), ...(S.details[id] ?? {}) })
+
+  // Fabric where Fabric has the version; the harness where it is published (and Fabric is on).
+  function fabricBlock(f) {
+    return versionInfo(f.mc).fabric === false ? `Fabric has no build for ${f.mc}.` : null
+  }
+
   function harnessBlock(f) {
-    if (f.loader !== 'fabric') return 'Needs the Fabric loader.'
+    if (f.loader !== 'fabric') return 'Needs Fabric. Pick Fabric above to turn it on.'
     const row = versionRow(f.mc)
-    if (row && !row.harness) return `Not published for ${f.mc} yet, so it stays off for this version.`
+    const info = versionInfo(f.mc)
+    if (info.harness === false) return `Not published for ${f.mc} yet, so it stays off for this version.`
     if (!row && S.versions?.versions) return `Not published for ${f.mc || 'this version'} yet.`
     return null
   }
 
-  function fixHarness(f) {
+  function fixLoader(f) {
+    if (fabricBlock(f) && f.loader === 'fabric' && !f.editing) f.loader = 'vanilla'
     if (harnessBlock(f)) f.harness = false
   }
 
@@ -1473,6 +1628,12 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
   }
 
+  // Segmented buttons: one of `choices` ([value, label, disabled]) is pressed.
+  function segmented(label, choices, value, onpick) {
+    return h('div', { class: 'seg', role: 'group', 'aria-label': label },
+      choices.map(([v, text, disabled]) => h('button', { type: 'button', 'aria-pressed': String(v === value), disabled: Boolean(disabled) && v !== value, onclick: () => onpick(v) }, text)))
+  }
+
   function sheetView() {
     const f = S.sheet
     const p = f.editing ? profileNamed(f.editing) : null
@@ -1481,74 +1642,113 @@
     const machine = v?.machineRefusal ?? S.summary?.machineRefusal ?? null
     const set = (key, rerender = false) => (e) => {
       f[key] = e.target.type === 'checkbox' ? e.target.checked : e.target.value
-      if (key === 'mc' || key === 'loader') fixHarness(f)
+      if (key === 'mc') { fixLoader(f); loadDetails(f.mc) }
       if (rerender) render()
     }
     const toggle = (key) => () => { f[key] = !f[key]; render() }
+    const ro = (label, value, hint) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }), hint && h('small', { class: 'hint', text: hint }))
+    const runningHint = 'Stop the game to change it.'
 
     let versionField
     if (running) {
-      versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }), h('input', { readonly: true, value: f.mc }))
+      versionField = ro('Version', f.mc, runningHint)
     } else {
       const rows = v?.versions ? versionRows(v.versions, S.versionShow) : []
       const options = rows.map((r) => h('option', {
         value: r.id,
         disabled: Boolean(r.refusal || machine),
-        text: `${r.id} (${r.type})${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
+        text: `${r.id}${r === rows[0] && r.type === 'release' ? ' (latest release)' : r.type !== 'release' ? ` (${r.kind ?? r.type})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
       }))
       if (f.mc && !rows.some((r) => r.id === f.mc)) options.unshift(h('option', { value: f.mc, text: f.mc }))
       if (!options.length) options.push(h('option', { value: '', text: v?.loading ? 'Loading versions…' : 'No versions to pick' }))
       const show = (mode, text) => h('button', { type: 'button', class: 'linkbtn', 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; render() } }, text)
+      const facts = versionFacts(versionRow(f.mc), S.details[f.mc])
+      const changed = p && f.mc !== p.mc
       versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }),
         h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
+        changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
         h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint' },
           v?.error ? `The version list could not be read: ${v.error}. ` : v?.offline ? sentence(v.offline) + '. ' : '',
-          S.versionShow === 'release' ? 'Releases only. ' : S.versionShow === 'snapshot' ? 'Snapshots only; pre-releases are not supported yet. ' : 'Everything before 1.13 is untested. ',
+          facts.length ? `${sentence(facts.join(' · '))} · ` : '',
           show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all')))
     }
 
-    const memories = MEMORY_CHOICES.includes(f.memory) ? MEMORY_CHOICES : [f.memory, ...MEMORY_CHOICES]
+    const fabricNo = fabricBlock(f)
+    const loaderField = running ? ro('Loader', loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }), runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Loader' }),
+      segmented('Loader', [['vanilla', 'Vanilla'], ['fabric', 'Fabric', fabricNo]], f.loader, (val) => {
+        f.loader = val
+        if (!f.editing && !f.memoryTouched) { f.memory = defaultMemory(val); f.custom = false }
+        fixLoader(f)
+        render()
+      }),
+      h('small', { class: fabricNo ? 'hint warn' : 'hint', text: fabricNo ?? 'Fabric for mods. Put them in the setup\'s mods folder.' }))
+
+    const machineInfo = S.summary?.machine
+    const totalGb = machineInfo?.totalMemory ? Math.max(2, Math.floor(machineInfo.totalMemory / 1024 ** 3 * 2) / 2) : 16
+    const gb = memoryGb(f.memory) ?? 2
+    const pickMemory = (val) => {
+      f.memoryTouched = true
+      if (val === 'custom') { f.custom = true; f.memory = memoryFromGb(Math.min(gb, totalGb)) } else { f.custom = false; f.memory = val }
+      render()
+      if (val === 'custom') $('fMemory')?.focus()
+    }
+    const memoryField = running ? ro('Memory', memoryText(f.memory), runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', text: 'Memory' }),
+      segmented('Memory', [['2G', '2 GB'], ['4G', '4 GB'], ['8G', '8 GB'], ['custom', 'Custom']], f.custom ? 'custom' : String(f.memory).toUpperCase(), pickMemory),
+      f.custom && h('div', { class: 'slider' },
+        h('input', { type: 'range', id: 'fMemory', min: '1', max: String(Math.max(totalGb, gb)), step: '0.5', value: String(gb), 'aria-label': 'Memory in gigabytes', 'aria-valuetext': memoryText(f.memory),
+          oninput: (e) => { f.memory = memoryFromGb(e.target.value); f.memoryTouched = true; render() } }),
+        h('output', { for: 'fMemory', text: `${gb} GB` })),
+      f.custom && h('small', { class: 'hint', text: machineInfo?.freeMemory ? `You have ${gbText(machineInfo.freeMemory)} free of ${gbText(machineInfo.totalMemory)}.` : 'Most setups need 2 to 4 GB.' }))
+
     const servers = serversNow()
     const def = defaultAccount()
     const block = harnessBlock(f)
-    const ro = (label, value) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }))
+    const taken = profilesNow().map((q) => q.name)
+    const autoPlaceholder = f.mc ? autoName(f.mc, f.loader, taken) : 'Named by its version'
 
     const grid = h('div', { class: 'grid2' },
-      !f.editing && h('label', { class: 'field' }, h('span', { text: 'Name' }),
-        h('input', { id: 'fName', value: f.name, placeholder: 'survival-test', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
-        h('small', { class: 'hint', text: 'Letters, digits, dash and underscore.' })),
       versionField,
-      running ? ro('Loader', loaderText({ loader: f.loader, loaderVersion: f.loaderVersion })) : h('label', { class: 'field' }, h('span', { text: 'Loader' }),
-        h('select', { id: 'fLoader', value: f.loader, onchange: set('loader', true) }, h('option', { value: 'fabric', text: 'Fabric' }), h('option', { value: 'vanilla', text: 'Vanilla' }))),
-      running ? ro('Memory', memoryText(f.memory)) : h('label', { class: 'field' }, h('span', { text: 'Memory' }),
-        h('select', { id: 'fMemory', value: f.memory, onchange: set('memory') }, memories.map((m) => h('option', { value: m, text: memoryText(m) })))),
-      running && ro('Java', f.java || 'Automatic'),
+      loaderField,
+      memoryField,
+      f.editing
+        ? ro('Name', f.name, 'The profile name the command line uses.')
+        : h('label', { class: 'field' }, h('span', { text: 'Name (optional)' }),
+          h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
+          h('small', { class: 'hint', text: 'Shown in the setups menu. Letters, digits, dash and underscore.' })),
+      h('label', { class: 'field' }, h('span', { text: 'Play as' }),
+        h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
+          h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in' }),
+          accountsNow().map((a) => h('option', { value: a.uuid, text: `${a.name} (${a.type === 'offline' ? 'Offline' : 'Microsoft'})` })),
+          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} (Offline)` : `${p?.accountName ?? f.account} (no longer signed in)` }))),
       h('label', { class: 'field' }, h('span', { text: 'Usually joins' }),
         h('select', { id: 'fServer', value: f.server, onchange: set('server') },
           h('option', { value: '', text: 'Title screen only' }),
-          servers.map((s) => h('option', { value: s.name, text: `${s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (other version)' : ''}` })),
-          f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))),
-      h('label', { class: 'field' }, h('span', { text: 'Play as' }),
-        h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
-          h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in (an offline player)' }),
-          accountsNow().map((a) => h('option', { value: a.uuid, text: `${a.name} · ${a.type === 'offline' ? 'Offline' : 'Microsoft'}` })),
-          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} · Offline` : `${p?.accountName ?? f.account} (account missing)` }))),
-      !running && h('div', { class: 'full switchrow' },
-        h('div', { class: 'txt' }, h('b', { text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds the harness mod, for diagnostics and the assistant tools. Off until you need it.' })),
-        h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-label': 'Let SpawnLoft see the game', disabled: Boolean(block), onclick: toggle('harness') })))
+          servers.map((s) => h('option', { value: s.name, text: `${s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (another version)' : ''}` })),
+          f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))))
+
+    const harness = !running && h('div', { class: 'switchrow' },
+      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds the harness mod, for diagnostics and the assistant tools. Off until you need it.' })),
+      h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
 
     if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
+    const msAccount = (() => {
+      const a = f.account ? accountsNow().find((x) => x.uuid === f.account) : def
+      return a?.type === 'microsoft' ? a : null
+    })()
     const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open } },
       h('summary', { text: 'Advanced' }),
       h('div', { class: 'in' },
-        !running && h('div', { class: 'grid2' },
-          h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
-            h('small', { class: 'hint', text: 'A path to java or javaw, checked at launch.' })),
-          f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
-            h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
+        running
+          ? h('div', { class: 'grid2' }, ro('Java', f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric loader version', f.loaderVersion || 'Newest stable'))
+          : h('div', { class: 'grid2' },
+            h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
+              h('small', { class: 'hint', text: 'A path to java or javaw, checked at launch.' })),
+            f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
+              h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
         f.editing
-          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { text: 'Allow an assistant to use my account' }), h('small', { text: 'An AI assistant connected through MCP may play this setup signed in as its Microsoft account.' })),
-            h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-label': 'Allow an assistant to use my account', onclick: toggle('assistantAccount') }))
+          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
+            h('small', { text: msAccount ? `An AI assistant connected through MCP may play this setup signed in as ${msAccount.name}.` : 'An AI assistant connected through MCP may play this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
+          h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-labelledby': 'fAssistLabel', onclick: toggle('assistantAccount') }))
           : h('p', { class: 'hint', text: 'An assistant connected through MCP plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
 
     const given = p && givenName(p)
@@ -1557,22 +1757,23 @@
       h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle', onkeydown: trapTab },
         h('div', {},
           h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
-          h('p', { class: 'sub', text: p ? (running ? 'Running now' : `Profile ${p.name}`) : 'Nothing is downloaded until you press Play.' })),
+          h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : `${memoryText(p.memory)} · ${p.server ? `usually joins ${p.server}` : 'opens on the title screen'}`) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
-        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and harness can\'t change while the game is open. Stop it first to edit them.' }),
+        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the harness can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
         grid,
+        harness,
         advanced,
-        f.removing && p && h('div', { class: 'confirm' },
+        f.removing && p && h('div', { class: 'confirm', role: 'alert' },
           h('span', {}, h('b', { text: `Remove ${setupTitle(p)}?` }), ' Its folder with worlds, options and mods is kept.'),
-          h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete the folder'),
+          h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete its folder'),
           h('span', { class: 'grow' }),
           h('button', { class: 'sm', onclick: () => { f.removing = false; render() } }, 'Keep it'),
-          h('button', { class: 'sm danger', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove setup')),
+          h('button', { class: 'sm danger', id: 'confirmRemove', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove setup')),
         h('div', { class: 'foot' },
           p
             ? [desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
-              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, onclick: () => { f.removing = true; render() } }, 'Remove setup…'),
+              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); $('confirmRemove')?.focus() } }, 'Remove setup…'),
               h('span', { class: 'grow' })]
             : h('span', { class: 'hint', text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
           h('button', { onclick: closeSheet }, 'Cancel'),
@@ -1587,11 +1788,12 @@
     render()
     try {
       if (!f.editing) {
+        const name = f.name.trim() || autoName(f.mc, f.loader, profilesNow().map((q) => q.name))
         const made = await api('client/profiles', {
           method: 'POST',
-          body: { name: f.name.trim(), mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account) },
+          body: { name, mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account) },
         })
-        pickProfile(made?.name ?? f.name.trim())
+        pickProfile(made?.name ?? name)
         S.flash = { tone: 'live', title: `Made ${setupTitle(made ?? f)}`, text: 'Press Play to start it. The first time downloads the game.' }
       } else {
         const before = profileNamed(f.editing)
@@ -1638,7 +1840,7 @@
   async function startLogin() {
     if (S.login) return
     S.acctNotice = null
-    S.menu = 'account'
+    if (S.menu !== 'ask') S.menu = 'account'
     const tab = desktop?.openMicrosoftLogin ? null : window.open('', 'spawnloft-login')
     // cut from this page: Microsoft's page gets no handle on the launcher
     if (tab) try { tab.opener = null } catch { /* already cross-origin */ }
@@ -1738,6 +1940,14 @@
     login.es?.close()
     clearInterval(login.watcher)
     if (S.login === login) S.login = null
+    const thenPlay = S.afterLogin
+    S.afterLogin = null
+    if (ev.status === 'done' && thenPlay && ev.account?.uuid) {
+      // "Who's playing?" was answered: this account plays, now
+      S.menu = null
+      playAs(ev.account.uuid, thenPlay)
+      return
+    }
     if (ev.status === 'done') {
       S.acctNotice = { tone: 'live', title: `Signed in as ${ev.account?.name ?? 'your account'}`, signedIn: ev.account?.uuid ?? null }
     } else if (ev.status === 'cancelled' && login.closedEarly) {
@@ -1747,22 +1957,46 @@
     } else {
       S.acctNotice = { tone: 'fault', title: sentence(ev.message ?? 'the sign-in failed'), text: 'Try again, or play offline on local servers.', retry: 'Try again' }
     }
-    S.menu = 'account'
+    if (S.menu !== 'ask') S.menu = 'account'
     refresh()
   }
 
-  // "Play offline as": the name is added and becomes the one this launcher plays as.
-  async function addOffline() {
-    const o = S.offline
+  // Make an account the one this launcher plays as, then play `profile`.
+  async function playAs(uuid, profile) {
     try {
-      const out = await api('client/accounts/offline', { method: 'POST', body: { name: o.name.trim() } })
-      if (out.defaultAccount !== out.account.uuid) await api('client/accounts/default', { method: 'POST', body: { uuid: out.account.uuid } })
-      S.acctNotice = { tone: 'live', title: `Playing as ${out.account.name}`, text: 'An offline name, for local servers.' }
+      if (S.summary?.defaultAccount !== uuid) await api('client/accounts/default', { method: 'POST', body: { uuid } })
+    } catch (err) {
+      S.flash = { tone: 'fault', title: 'Couldn\'t pick who is playing', text: sentence(err.message) }
+      return refresh()
+    }
+    await refresh()
+    const p = profileNamed(profile)
+    if (p) startLaunch(p)
+  }
+
+  // "Play offline as": the name is added and becomes the one this launcher plays as; from
+  // "Who's playing?" (`thenPlay`, a profile name) the game starts too.
+  async function addOffline(thenPlay = null) {
+    const o = S.offline
+    let out
+    try {
+      out = await api('client/accounts/offline', { method: 'POST', body: { name: o.name.trim() } })
       o.name = ''
       o.error = null
     } catch (err) {
       o.error = err.message
       if (err instanceof PanelDown) S.down = true
+      return refresh()
+    }
+    if (thenPlay) {
+      S.menu = null
+      return playAs(out.account.uuid, thenPlay)
+    }
+    try {
+      if (out.defaultAccount !== out.account.uuid) await api('client/accounts/default', { method: 'POST', body: { uuid: out.account.uuid } })
+      S.acctNotice = { tone: 'live', title: `Playing as ${out.account.name}`, text: 'An offline name, for local servers.' }
+    } catch (err) {
+      S.acctNotice = { tone: 'fault', title: `Added ${out.account.name}, but couldn't play as it`, text: sentence(err.message) }
     }
     refresh()
   }
@@ -1869,7 +2103,7 @@
   // already be out of the page
   document.addEventListener('click', (e) => {
     if (!S.menu || !e.target.isConnected) return
-    if (e.target.closest('[data-menu]')?.dataset.menu !== S.menu) closeMenu()
+    if (!(e.target.closest('[data-menu]')?.dataset.menu ?? '').split(' ').includes(S.menu)) closeMenu()
   })
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return

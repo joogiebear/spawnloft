@@ -858,6 +858,8 @@ function launcherSummary() {
     defaultAccount: accounts.some((a) => a.uuid === wanted) ? wanted : null,
     servers,
     machineRefusal: platformRefusal(null),
+    // the setup sheet's memory slider: up to the machine's memory, saying how much is free
+    machine: { totalMemory: os.totalmem(), freeMemory: os.freemem() },
   }
 }
 
