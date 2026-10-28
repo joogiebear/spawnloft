@@ -68,7 +68,10 @@ test('removeProfile with purge removes the folder', () => {
 
 test('refusals name what is wrong and the way out', () => {
   assert.throws(() => createProfile('bad name!', { mc: '1.21.4' }), /invalid profile name/)
-  assert.throws(() => createProfile('eps', { mc: '1.21.x' }), /invalid Minecraft version/)
+  // the shape only: whether Mojang lists it is checked where a profile is saved from (V1b)
+  for (const bad of ['1.21/x', '../1.21', '1.21.', '1.21 .', '-1.21', '1..21', '', 'a'.repeat(65)]) {
+    assert.throws(() => createProfile('eps', { mc: bad }), /invalid Minecraft version/, bad)
+  }
   assert.throws(() => createProfile('eps', { mc: '1.21.4', memory: 'lots' }), /invalid memory value/)
   assert.throws(() => createProfile('eps', { mc: '1.21.4', loader: 'modrinth' }), /unknown loader/)
   assert.throws(() => createProfile('eps', { mc: '1.21.4', harness: true }), /the harness mod needs the fabric loader/)

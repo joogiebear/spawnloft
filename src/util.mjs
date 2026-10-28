@@ -8,8 +8,11 @@ import { spawnSync, execFile } from 'node:child_process'
 // Prints as a one-line message instead of a stack.
 export class UserError extends Error {}
 
-export function fail(msg) {
-  throw new UserError(msg)
+// code, when given, names the refusal for callers that act on it (the launcher page, MCP).
+export function fail(msg, code = undefined) {
+  const err = new UserError(msg)
+  if (code !== undefined) err.code = code
+  throw err
 }
 
 // Cached pid -> image name table. A pid alone can't say whether a process is the one a state

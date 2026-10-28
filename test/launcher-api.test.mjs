@@ -28,6 +28,9 @@ fs.copyFileSync(path.join(fixtures, `${mc}.json`), clientPaths.versionJson(mc))
 fs.mkdirSync(clientPaths.CLIENT_CACHE_DIR, { recursive: true })
 fs.copyFileSync(path.join(fixtures, 'version_manifest_v2.json'), path.join(clientPaths.CLIENT_CACHE_DIR, 'version_manifest_v2.json'))
 fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'version_manifest_v2.json.fetched-at'), String(Date.now()))
+// Fabric's list too, so a Fabric profile is checked against it without the network
+fs.copyFileSync(path.join(fixtures, 'fabric-game-versions.json'), path.join(clientPaths.CLIENT_CACHE_DIR, 'fabric-game-versions.json'))
+fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'fabric-game-versions.json.fetched-at'), String(Date.now()))
 
 function addServer(name, port, props) {
   const dir = path.join(scratch, 'data', 'instances', name)
@@ -133,22 +136,25 @@ test('every launcher route refuses another origin and a non-loopback Host', asyn
   client.removeProfile('guarded')
 })
 
-test('the version picker reads the shared cache and drops ids a launch would refuse', async () => {
+test('the version picker reads the shared cache and lists every id Mojang does, newest first', async () => {
   // the installed version counts as downloaded once its jar has the size the JSON names
   const json = JSON.parse(fs.readFileSync(clientPaths.versionJson(mc), 'utf8'))
   fs.writeFileSync(clientPaths.versionJar(mc), '')
   let out = await (await call('client/versions')).json()
   assert.equal(out.offline, null)
-  assert.deepEqual(out.versions.map((v) => v.id), ['1.21.11', '26.3'])
-  assert.equal(out.versions[0].downloaded, false)
+  assert.deepEqual(out.versions.map((v) => v.id), ['26.4-snapshot-5', '26.3', '1.21.11'])
+  assert.equal(out.versions[2].downloaded, false)
   fs.truncateSync(clientPaths.versionJar(mc), json.downloads.client.size)
   out = await (await call('client/versions')).json()
-  const [row, newer] = out.versions
-  assert.deepEqual(row, { id: '1.21.11', type: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, harness: true, refusal: platformRefusal(json), note: null })
+  const [snapshot, newer, row] = out.versions
+  assert.deepEqual(row, { id: '1.21.11', type: 'release', kind: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, javaNeedsExact: true, harness: true, fabric: null, refusal: platformRefusal(json), note: null })
   assert.equal(newer.downloaded, false)
   assert.equal(newer.javaNeeds, 25)
+  assert.equal(newer.javaNeedsExact, false, 'a guess from the id until the JSON is read')
   assert.equal(newer.harness, false)
   assert.equal(newer.refusal, null, 'no JSON on disk, so no per-version refusal')
+  assert.equal(snapshot.kind, 'snapshot')
+  assert.equal(snapshot.javaNeeds, null, 'no guess for a snapshot id')
 })
 
 test('the version picker shows the machine refusal once and notes old versions on Windows arm64', async () => {
@@ -178,9 +184,13 @@ test('the version picker shows the machine refusal once and notes old versions o
 })
 
 test('profiles are created, edited and removed through the panel', async () => {
+  // an unknown id asks Mojang again unless the list is under a minute old: it is, here
+  fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'version_manifest_v2.json.fetched-at'), String(Date.now()))
   for (const [body, error] of [
     [{ name: 'bad name', mc }, /invalid profile name/],
-    [{ name: 'p1', mc: '1.21.11-pre1' }, /invalid Minecraft version/],
+    [{ name: 'p1', mc: '1.21.' }, /invalid Minecraft version/],
+    [{ name: 'p1', mc: '../1.21.11' }, /invalid Minecraft version/],
+    [{ name: 'p1', mc: '1.21.11-pre1' }, /Mojang's version list has no "1\.21\.11-pre1".*Did you mean 1\.21\.11\?/],
     [{ name: 'p1', mc, memory: '1.5G' }, /whole number/],
     [{ name: 'p1', mc, harness: true }, /needs the fabric loader/],
     [{ name: 'p1' }, /Minecraft version/],
@@ -478,4 +488,43 @@ test('a launch can join an address SpawnLoft does not run', async () => {
     assert.match(refused.at(-1).message, error)
   }
   assert.equal(client.status('addr').running, false)
+})
+
+test('a version this SpawnLoft cannot launch fails its job with the refusal\'s code (review N-4)', async () => {
+  const future = JSON.parse(fs.readFileSync(path.join(fixtures, 'future.json'), 'utf8'))
+  fs.mkdirSync(clientPaths.versionDir(future.id), { recursive: true })
+  fs.writeFileSync(clientPaths.versionJson(future.id), JSON.stringify(future))
+  client.createProfile('strictver', { mc: future.id })
+  const events = await jobEvents('strict-version-job', () => call('client/profiles/strictver/launch', { method: 'POST', body: { jobId: 'strict-version-job', server: false } }))
+  const last = events.at(-1)
+  assert.equal(last.stage, 'error')
+  assert.equal(last.code, 'unknown-rule-key')
+  assert.match(last.message, /Update SpawnLoft\.$/)
+  client.removeProfile('strictver')
+})
+
+test('one version in full, and the lists read again on request', async () => {
+  for (const file of ['version_manifest_v2.json', 'fabric-game-versions.json']) {
+    fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, `${file}.fetched-at`), String(Date.now()))
+  }
+  const res = await call(`client/versions/${encodeURIComponent(mc)}`)
+  assert.equal(res.status, 200)
+  const d = await res.json()
+  assert.equal(d.id, mc)
+  assert.equal(d.javaNeeds, 21)
+  assert.equal(d.javaNeedsExact, true)
+  assert.equal(d.fabric, true)
+  assert.equal(d.harness, true)
+  const unknown = await call(`client/versions/${encodeURIComponent('1.14.2 Pre-Release 4')}`)
+  assert.equal(unknown.status, 400)
+  assert.match((await unknown.json()).error, /Mojang's version list has no "1\.14\.2 Pre-Release 4"/)
+  assert.equal((await call('client/versions/%E0%A4%A')).status, 400)
+  // under a minute old, so the refresh is answered from the lists as they are
+  const refreshed = await call('client/versions/refresh', { method: 'POST' })
+  assert.equal(refreshed.status, 200)
+  const body = await refreshed.json()
+  assert.deepEqual(body.versions.map((v) => v.id), ['26.4-snapshot-5', '26.3', '1.21.11'])
+  assert.equal(body.versions.find((v) => v.id === '26.3').fabric, true)
+  const fabricRows = await (await call('client/versions?fabric=1')).json()
+  assert.equal(fabricRows.versions.find((v) => v.id === '26.4-snapshot-5').fabric, true)
 })

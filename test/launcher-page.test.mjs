@@ -127,6 +127,14 @@ test('the version picker shows releases, then snapshots too, then everything', (
   assert.deepEqual(versionRows(all, 'all').map((v) => v.id), ['1.21.11', '25w14a', 'b1.7.3'])
 })
 
+test('picker rows name their kind in words', () => {
+  const { kindLabel } = lifted(['KIND_LABELS', 'kindLabel'])
+  assert.equal(kindLabel({ type: 'snapshot', kind: 'release-candidate' }), 'release candidate')
+  assert.equal(kindLabel({ type: 'snapshot', kind: 'pre-release' }), 'pre-release')
+  assert.equal(kindLabel({ type: 'old_beta' }), 'beta', 'a panel without kinds')
+  assert.equal(kindLabel({ type: 'something_new' }), 'something_new')
+})
+
 test('a refused launch says why in the words the launcher uses', () => {
   const { launchNotice } = lifted(['launchNotice', 'sentence'])
   const lock = launchNotice('profile "play" is being launched (pid 4242); wait for it to finish')
@@ -308,6 +316,9 @@ test('the setup sheet\'s memory and facts', () => {
   assert.deepEqual(versionFacts({ id: '26.3', harness: false, fabric: true, javaNeeds: 25 }, { harness: true, emulated: true }), ['Java 25', 'Fabric available', 'harness published', 'runs under emulation'])
   assert.deepEqual(versionFacts(null, { fabric: false }), ['no Fabric'])
   assert.deepEqual(versionFacts(null, null), [])
+  // a Java read from the id is said to be a guess until the version's file says
+  assert.deepEqual(versionFacts({ id: '26.5', javaNeeds: 25, javaNeedsExact: false }, null), ['likely Java 25'])
+  assert.deepEqual(versionFacts({ id: '26.5', javaNeeds: 25, javaNeedsExact: false }, { javaNeeds: 25, javaNeedsExact: true }), ['Java 25'])
 })
 
 test('on a fresh install, Enter in Join plays the way Play does, and a failed version list can be read again', () => {

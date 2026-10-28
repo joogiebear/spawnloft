@@ -238,8 +238,9 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   }
 
   // the timeline and findings reach summarise() and timeline.txt, not only files, so every text field is cleaned
-  // Minecraft's crash reports list every JVM flag, the harness token among them; it dies with the
-  // game, but a bug report should not carry it anyway.
+  // Minecraft's crash reports list every JVM flag, the harness token among them, and the command
+  // line with the access token (--accessToken, or the old versions' token:<access>:<uuid>
+  // session); both die with the game, but a bug report should not carry them anyway.
   // The signed-in Microsoft accounts' names and uuids go too ("Setting user: Wunga_", "Wunga_
   // joined the game", "UUID of player ... is ..."): the bundle is for a bug report, and who plays
   // is not part of the bug. Offline player names stay; they are not identities.
@@ -247,7 +248,7 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   try { identities = microsoftIdentities() } catch { /* no accounts file: nothing to hide */ }
   if (facts.client?.account?.type === 'microsoft' && facts.client.account.name) identities.push(facts.client.account.name)
   const hideIdentities = redactIdentities(identities)
-  const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]') : s)
+  const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]').replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]').replace(/\btoken:[^:\s]+:/g, 'token:[redacted]:') : s)
   if (facts.client?.account?.type === 'microsoft') facts.client.account = { type: 'microsoft', name: MICROSOFT_PLACEHOLDER }
   for (const f of files) f.text = clean(f.text)
   for (const finding of findings.server) {

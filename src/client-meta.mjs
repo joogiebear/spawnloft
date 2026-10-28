@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 
 import { fetchJson, downloadFile } from './download.mjs'
 import { versionJson, versionDir } from './client-paths.mjs'
-import { fail } from './util.mjs'
+import { fail, safeRelativePath } from './util.mjs'
 
 export const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
 export const RESOURCES_URL = 'https://resources.download.minecraft.net'
@@ -58,11 +58,19 @@ function ruleProblem(rule) {
   return null
 }
 
+// A range for every OS is judged against the Darwin version on a Mac, as an osx one would be, so
+// on a Mac it is read as one (review N-1).
+function asOnHost(rule, os) {
+  return rule?.os && rule.os.name === undefined && rule.os.versionRange !== undefined && os.name === 'osx'
+    ? { ...rule, os: { ...rule.os, name: 'osx' } }
+    : rule
+}
+
 export function ruleAllows(rules, { os = currentOs(), features = {} } = {}) {
   if (!rules || rules.length === 0) return true
   let result = false
   for (const rule of rules) {
-    if (ruleProblem(rule) !== null) continue
+    if (ruleProblem(asOnHost(rule, os)) !== null) continue
     let matches = true
     if (rule.os) {
       if (rule.os.name && rule.os.name !== os.name) matches = false
@@ -102,8 +110,7 @@ export function ruleProblems(rules, { os = currentOs() } = {}) {
   for (const rule of rules ?? []) {
     const name = rule?.os?.name
     if (name !== undefined && name !== os.name) continue
-    // a range for every OS is judged against the Darwin version on a Mac, as an osx one would be
-    const problem = ruleProblem(name === undefined && rule?.os?.versionRange !== undefined && os.name === 'osx' ? { ...rule, os: { ...rule.os, name: 'osx' } } : rule)
+    const problem = ruleProblem(asOnHost(rule, os))
     if (problem !== null && !found.includes(problem)) found.push(problem)
   }
   return found
@@ -258,13 +265,21 @@ export function platformRefusal(version = null, os = currentOs(), hostCaps = nul
   return archDecision(version, os, hostCaps).refusal
 }
 
+// A library's path is joined under libraries/, and the Fabric profile it may come from is not
+// hash-pinned: a path that would leave that folder is refused (review N-7).
+function libraryRelPath(name, p) {
+  const safe = safeRelativePath(p)
+  if (safe === null) fail(`library ${String(name).slice(0, 80)} names the path "${String(p).slice(0, 80)}", which leaves the libraries folder`)
+  return safe
+}
+
 export function libraries(version, { os = currentOs() } = {}) {
   const rows = []
   for (const lib of version.libraries ?? []) {
     if (!ruleAllows(lib.rules, { os })) continue
 
     const dl = lib.downloads
-    const p = dl?.artifact?.path ?? libraryPath(lib.name)
+    const p = libraryRelPath(lib.name, dl?.artifact?.path ?? libraryPath(lib.name))
     const u = dl?.artifact?.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + p
     const s1 = dl?.artifact?.sha1 ?? lib.sha1 ?? null
     const sz = dl?.artifact?.size ?? lib.size ?? null
@@ -293,10 +308,11 @@ export function libraries(version, { os = currentOs() } = {}) {
       const resolved = nativesKey.replace('${arch}', archNum)
       const clsDl = dl?.classifiers?.[resolved]
       if (clsDl) {
+        const clsPath = libraryRelPath(lib.name, clsDl.path ?? libraryPath(`${lib.name}:${resolved}`))
         rows.push({
           name: `${lib.name}:${resolved}`,
-          path: clsDl.path ?? libraryPath(`${lib.name}:${resolved}`),
-          url: clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + (clsDl.path ?? libraryPath(`${lib.name}:${resolved}`)),
+          path: clsPath,
+          url: clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + clsPath,
           sha1: clsDl.sha1 ?? null,
           size: clsDl.size ?? null,
           native: { extract: { exclude: lib.extract?.exclude ?? [] } },
@@ -346,9 +362,24 @@ export function assetIndex(version) {
   return { id: ai.id, url: ai.url, sha1: ai.sha1, size: ai.size, totalSize: ai.totalSize }
 }
 
+// How an asset index wants its files laid out: 'objects' (1.7.3 on: the game reads the hashed
+// store itself), 'virtual' (1.6.1 to 1.7.2: a tree under real names in assets/virtual/<index>),
+// 'resources' (before 1.6: a tree in the profile's resources/), or null for an index with a key
+// SpawnLoft does not know, whose files it cannot know where to put.
+const ASSET_INDEX_KEYS = ['objects', 'virtual', 'map_to_resources']
+export function assetLayout(index) {
+  if (!index || typeof index !== 'object' || !index.objects || typeof index.objects !== 'object') return null
+  if (Object.keys(index).some((k) => !ASSET_INDEX_KEYS.includes(k))) return null
+  if (index.map_to_resources === true) return 'resources'
+  if (index.virtual === true) return 'virtual'
+  return 'objects'
+}
+
 export function assetObjects(index) {
   const rows = []
-  for (const [_path, entry] of Object.entries(index.objects ?? {})) {
+  for (const [name, entry] of Object.entries(index.objects ?? {})) {
+    // the hash becomes a path under assets/objects
+    if (!/^[0-9a-f]{40}$/.test(String(entry?.hash))) fail(`the asset index names "${String(name).slice(0, 60)}" with a malformed hash`)
     rows.push({
       hash: entry.hash,
       size: entry.size,
@@ -417,34 +448,42 @@ function flattenArgs(args, ctx) {
   return out
 }
 
-export async function fetchManifest({ cacheDir, maxAgeMs = 3600000, fetchImpl = fetchJson }) {
-  const manifestPath = path.join(cacheDir, 'version_manifest_v2.json')
-  const fetchedAtPath = `${manifestPath}.fetched-at`
+// A small JSON list kept in the cache folder with the time it was fetched: used while younger
+// than maxAgeMs, fetched again after; a failed fetch falls back to the stale copy, since a stale
+// list is better than none. force fetches now, unless the copy is younger than minAgeMs (so a
+// stream of mistyped ids asks the server once a minute at most).
+export async function cachedJson(file, url, { cacheDir, label, maxAgeMs = 3600000, minAgeMs = 60000, force = false, fetchImpl = fetchJson }) {
+  const dest = path.join(cacheDir, file)
+  const fetchedAtPath = `${dest}.fetched-at`
 
   try {
-    const cached = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    const cached = JSON.parse(fs.readFileSync(dest, 'utf8'))
     const fetchedAt = Number(fs.readFileSync(fetchedAtPath, 'utf8'))
-    if (!Number.isNaN(fetchedAt) && Date.now() - fetchedAt < maxAgeMs) return cached
+    const age = Date.now() - fetchedAt
+    if (!Number.isNaN(fetchedAt) && age < (force ? minAgeMs : maxAgeMs)) return cached
   } catch (err) {
     // A missing or corrupt cache file both mean "no usable cache yet".
     if (err.code !== 'ENOENT' && !(err instanceof SyntaxError)) throw err
   }
 
   try {
-    const manifest = await fetchImpl(MANIFEST_URL, { label: 'the Minecraft version list' })
+    const body = await fetchImpl(url, { label })
     fs.mkdirSync(cacheDir, { recursive: true })
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest))
+    fs.writeFileSync(dest, JSON.stringify(body))
     fs.writeFileSync(fetchedAtPath, String(Date.now()))
-    return manifest
+    return body
   } catch (err) {
-    // A stale cache is better than no manifest at all.
     try {
-      return JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+      return JSON.parse(fs.readFileSync(dest, 'utf8'))
     } catch (innerErr) {
       if (innerErr.code !== 'ENOENT' && !(innerErr instanceof SyntaxError)) throw innerErr
       throw err
     }
   }
+}
+
+export async function fetchManifest({ cacheDir, maxAgeMs = 3600000, force = false, fetchImpl = fetchJson }) {
+  return cachedJson('version_manifest_v2.json', MANIFEST_URL, { cacheDir, label: 'the Minecraft version list', maxAgeMs, force, fetchImpl })
 }
 
 export async function fetchVersionJson(id, { manifest, cacheDir, fetchImpl = downloadFile }) {

@@ -2,15 +2,51 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { fetchJson, downloadFile } from './download.mjs'
-import { versionJson, versionDir, profileDir } from './client-paths.mjs'
+import { versionJson, versionDir, profileDir, CLIENT_CACHE_DIR } from './client-paths.mjs'
 import { fail, assertSafeVersion, readJson, writeJson } from './util.mjs'
 import { modrinthRequest, pickVersion, primaryFile, readZipEntry } from './plugins.mjs'
+import { cachedJson } from './client-meta.mjs'
+import { isSafeVersionId } from './client-version.mjs'
 
 export const META_URL = 'https://meta.fabricmc.net/v2'
 
+// The game id goes into Fabric's URLs percent-encoded: Mojang's ids carry spaces
+// ("1.14.2 Pre-Release 4"), which Fabric builds for too (plan S4).
+function gameId(mc) {
+  if (!isSafeVersionId(mc)) fail(`Minecraft version "${String(mc).slice(0, 64)}" is not a valid version`)
+  return mc
+}
+
+// The Minecraft versions Fabric builds for, newest first ({ version, stable }), cached for an
+// hour like Mojang's list.
+export async function fabricGameVersions({ cacheDir = CLIENT_CACHE_DIR, force = false, fetchImpl } = {}) {
+  const list = await cachedJson('fabric-game-versions.json', `${META_URL}/versions/game`, { cacheDir, label: 'Fabric\'s version list', force, ...(fetchImpl ? { fetchImpl } : {}) })
+  if (!Array.isArray(list)) fail('Fabric\'s version list is not a list')
+  return list
+}
+
+export function fabricAvailable(mc, list) {
+  return list.some((e) => e?.version === mc)
+}
+
+// Refuses a Minecraft version Fabric does not build for (everything before 1.14, and a snapshot
+// Fabric has not caught up with), before anything downloads. A list that cannot be read decides
+// nothing: the loader lookup that follows says what is wrong.
+export async function assertFabricAvailable(mc, opts = {}) {
+  let list
+  try {
+    list = await fabricGameVersions(opts)
+  } catch {
+    return
+  }
+  if (!fabricAvailable(mc, list)) {
+    fail(`Fabric has no build for Minecraft ${mc}; use Vanilla for it, or a version Fabric supports`, 'fabric-not-available')
+  }
+}
+
 export async function loaderVersions(mc, { fetchImpl = fetchJson } = {}) {
-  const safe = assertSafeVersion(mc, 'Minecraft version')
-  const list = await fetchImpl(`${META_URL}/versions/loader/${safe}`, { label: `Fabric loaders for ${safe}` })
+  const safe = gameId(mc)
+  const list = await fetchImpl(`${META_URL}/versions/loader/${encodeURIComponent(safe)}`, { label: `Fabric loaders for ${safe}` })
   if (!Array.isArray(list) || list.length === 0) {
     fail('Fabric publishes no loader for Minecraft ' + mc)
   }
@@ -34,12 +70,12 @@ export function fabricVersionId(mc, loader) {
 }
 
 export async function ensureFabricProfile(mc, loader, { fetchImpl = fetchJson } = {}) {
-  const safeMc = assertSafeVersion(mc, 'Minecraft version')
+  const safeMc = gameId(mc)
   const safeLoader = assertSafeVersion(loader, 'Fabric loader version')
   const id = fabricVersionId(safeMc, safeLoader)
   const dest = versionJson(id)
   if (fs.existsSync(dest)) return id
-  const json = await fetchImpl(`${META_URL}/versions/loader/${safeMc}/${safeLoader}/profile/json`, { label: `Fabric profile for ${safeMc} with loader ${safeLoader}` })
+  const json = await fetchImpl(`${META_URL}/versions/loader/${encodeURIComponent(safeMc)}/${encodeURIComponent(safeLoader)}/profile/json`, { label: `Fabric profile for ${safeMc} with loader ${safeLoader}` })
   if (json.id !== id) {
     fail('the Fabric meta answered for a different profile (expected ' + id + ', got ' + json.id + ')')
   }

@@ -721,7 +721,16 @@ async function handleConsole(req, res, name, seg) {
 // rest of the panel, which matters because a profile's `java` is a path launch runs.
 async function handleClient(req, res, seg, url) {
   if (seg[2] === 'versions' && seg.length === 3 && req.method === 'GET') {
-    return json(res, 200, await client.listVersions())
+    return json(res, 200, await client.listVersions({ fabric: ['1', 'true'].includes(url.searchParams.get('fabric') ?? '') }))
+  }
+  // Mojang's and Fabric's lists read again now, for a release out within the hour
+  if (seg[2] === 'versions' && seg[3] === 'refresh' && seg.length === 4 && req.method === 'POST') {
+    return json(res, 200, await client.listVersions({ refresh: true }))
+  }
+  if (seg[2] === 'versions' && seg.length === 4 && req.method === 'GET') {
+    let id
+    try { id = decodeURIComponent(seg[3]) } catch { fail('the version id in the address is not valid') }
+    return json(res, 200, await client.describeVersion(id))
   }
   if (seg[2] === 'launcher' && seg.length === 3 && req.method === 'GET') {
     return json(res, 200, launcherSummary())
@@ -739,6 +748,7 @@ async function handleClient(req, res, seg, url) {
     for (const key of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']) {
       if (body[key] !== undefined) fields[key] = body[key]
     }
+    fields.mc = await client.checkProfileVersion({ mc: fields.mc, loader: fields.loader })
     const made = client.createProfile(body.name, fields)
     return json(res, 200, clientProfileRow(client.getProfile(made.name)))
   }
@@ -749,6 +759,10 @@ async function handleClient(req, res, seg, url) {
       const body = await readBody(req)
       if (!body || typeof body !== 'object' || Array.isArray(body)) fail('send the keys to change as a JSON object')
       const before = client.getProfile(profileName)
+      // a new version, or Fabric turned on, is checked against Mojang's and Fabric's lists
+      const mc = typeof body.mc === 'string' ? body.mc.trim() : before.mc
+      const loader = typeof body.loader === 'string' ? body.loader : before.loader
+      if (mc !== before.mc || loader !== before.loader) await client.checkProfileVersion({ mc, loader })
       client.updateProfile(profileName, body)
       const warnings = []
       if (typeof body.mc === 'string' && body.mc !== before.mc && await hasModJars(profileName)) {

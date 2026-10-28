@@ -16,6 +16,9 @@
   id, `inheritsFrom` and the intermediary coordinate, which are the only parts of a Fabric profile
   that depend on the game version (meta.fabricmc.net could not be reached from where these were
   made).
+- `fabric-game-versions.json`: synthetic, in the shape of Fabric's `/v2/versions/game` list
+  (`{ version, stable }`, newest first), holding the era ids Fabric builds for (1.14 on) and the
+  spaced `1.14.2 Pre-Release 4`; nothing before 1.14.
 - `future.json`: synthetic. `26.4-snapshot-6` turned into `27.1` with one of each thing SpawnLoft
   cannot know: `minimumLauncherVersion` 22, a `${render_backend}` game argument, a rule with an
   `os.kernel` key, an osx rule with a `versionRange`, natives under `${natives_directory}/native/libs`,

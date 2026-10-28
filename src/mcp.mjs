@@ -72,6 +72,11 @@ export function createServer({ info, instructions, tools, notify = () => {}, scr
     } catch (err) {
       // a user mistake and a crash both go back as tool errors the model can read; neither carries a stack trace out
       const message = err instanceof UserError ? err.message : `${tool.name} failed: ${err?.message ?? err}`
+      // a refusal with a code (a version this SpawnLoft cannot launch, Fabric without a build)
+      // names it, so an assistant can tell a version's limits from a passing failure (review N-9)
+      if (err instanceof UserError && typeof err.code === 'string') {
+        return { ...toolError(`${scrub(message)} (code: ${err.code})`), structuredContent: { error: scrub(message), code: err.code } }
+      }
       return toolError(scrub(message))
     }
   }

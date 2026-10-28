@@ -74,6 +74,11 @@ export function buildCommand({ version, profile, profileName, account, java, os 
     clientid: account.clientId,
     auth_xuid: account.xuid,
     user_type: account.userType,
+    // the minecraftArguments era's: the session as Mojang's launcher wrote it (an offline
+    // player's access token is "0"), the assets folder by its old name, and no Twitch properties
+    auth_session: `token:${account.accessToken}:${account.uuid}`,
+    game_assets: ASSETS_DIR,
+    user_properties: '{}',
   }
 
   if (hasServer) {

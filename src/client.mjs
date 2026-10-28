@@ -3,15 +3,15 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
-import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep, UserError } from './util.mjs'
+import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
-import { resolveVersion, resolvedRefusal, launchFeatures } from './client-version.mjs'
+import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
-import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
+import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
 import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 
@@ -22,12 +22,16 @@ const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harnes
 // The keys that make up the running game's command line; the rest only matter at the next launch.
 const RUNNING_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness']
 
+// The shape of a version id; whether Mojang lists it is assertVersionId's question.
 function validateMc(mc) {
-  if (typeof mc !== 'string') fail('the Minecraft version must be text, like 1.21.4')
-  if (!/^\d+(\.\d+){1,2}$/.test(mc) && !/^\d{2}w\d{2}[a-z]$/.test(mc)) {
-    fail(`invalid Minecraft version "${mc}" - use e.g. 1.21.4 or 25w14a`)
+  if (typeof mc !== 'string') fail('the Minecraft version must be text, like 26.3')
+  if (!isSafeVersionId(mc)) {
+    fail(`invalid Minecraft version "${mc.slice(0, 64)}" - versions look like 26.3, 26.4-snapshot-6 or b1.7.3`)
   }
 }
+
+// Typed ids are trimmed: "1.21.11 " is 1.21.11.
+const trimMc = (mc) => (typeof mc === 'string' ? mc.trim() : mc)
 
 function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount }) {
   validateMc(mc)
@@ -170,7 +174,7 @@ export function getProfile(name) {
 }
 
 // assistantAccount starts false for every profile, whoever made it; only `set` turns it on.
-export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
+export function createProfile(name, { mc: typedMc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
   validateProfileName(name)
   const reg = loadProfiles()
   const lower = name.toLowerCase()
@@ -180,6 +184,7 @@ export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = nu
     }
   }
   const assistantAccount = false
+  const mc = trimMc(typedMc)
   validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount })
   fs.mkdirSync(profileDir(name), { recursive: true })
   const optionsFile = path.join(profileDir(name), 'options.txt')
@@ -200,6 +205,7 @@ export function updateProfile(name, patch, { launching = false } = {}) {
       fail(`unknown profile key "${key}" - use ${PROFILE_KEYS.join(', ')}`)
     }
   }
+  if (typeof patch.mc === 'string') patch = { ...patch, mc: trimMc(patch.mc) }
   const existing = getProfile(name)
   const changing = RUNNING_KEYS.filter((k) => Object.hasOwn(patch, k) && patch[k] !== existing[k])
   if (changing.length && status(name).running) {
@@ -244,16 +250,61 @@ function holderText(name) {
   return holder === null || holder === -1 ? '?' : String(holder)
 }
 
+// A version id this machine can get: downloaded already, or in Mojang's list. An id the cached
+// list lacks asks Mojang again once (a release out within the hour), then is refused with the
+// nearest ids. Returns the trimmed id, and the list when it was read.
+export async function assertVersionId(typed, { fetchImpl } = {}) {
+  const mc = trimMc(typed)
+  validateMc(mc)
+  // a vanilla version on disk, not a loader profile's id
+  const onDisk = readJson(versionJson(mc), null)
+  if (onDisk && !onDisk.inheritsFrom) return { mc, manifest: null }
+  const opts = { cacheDir: CLIENT_CACHE_DIR, ...(fetchImpl ? { fetchImpl } : {}) }
+  let manifest
+  try {
+    manifest = await fetchManifest(opts)
+  } catch {
+    fail(`the Minecraft version list is not available offline and "${mc}" is not downloaded`)
+  }
+  const listed = (m) => (m.versions ?? []).some((v) => v.id === mc)
+  if (!listed(manifest)) manifest = await fetchManifest({ ...opts, force: true })
+  if (!listed(manifest)) fail(`Mojang's version list has no "${mc}"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3)${nearIds(mc, manifest)}`, 'unknown-version')
+  return { mc, manifest }
+}
+
+// Up to five listed ids that start like the typed one, ignoring case, newest first.
+function nearIds(mc, manifest) {
+  const ids = (manifest.versions ?? []).map((v) => v.id)
+  let stem = mc.toLowerCase()
+  let near = []
+  while (stem && !near.length) {
+    near = ids.filter((id) => id.toLowerCase().startsWith(stem))
+    stem = stem.replace(/[^.\- ]*[.\- ]?$/, '')
+  }
+  return near.length ? `. Did you mean ${near.slice(0, 5).join(', ')}?` : ''
+}
+
+// What a profile's save checks beyond the shape: the version exists, and Fabric builds for it.
+export async function checkProfileVersion({ mc, loader = 'vanilla' }, { fetchImpl } = {}) {
+  const known = await assertVersionId(mc, { fetchImpl })
+  if (loader === 'fabric') await assertFabricAvailable(known.mc)
+  return known.mc
+}
+
 export async function prepareVersion(name, { onStage = () => {} } = {}) {
   const profile = getProfile(name)
   if (!fs.existsSync(versionJson(profile.mc))) {
     onStage({ stage: 'manifest', message: 'Reading the Minecraft version list' })
-    const manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR })
+    const { manifest } = await assertVersionId(profile.mc)
     onStage({ stage: 'version', message: `Downloading the version file for Minecraft ${profile.mc}` })
     await fetchVersionJson(profile.mc, { manifest, cacheDir: CLIENT_CACHE_DIR })
   }
   if (profile.loader === 'fabric') {
     let loaderVersion = profile.loaderVersion
+    // a loader profile already on disk was made for this version, so Fabric has it
+    if (loaderVersion === null || !fs.existsSync(versionJson(fabricVersionId(profile.mc, loaderVersion)))) {
+      await assertFabricAvailable(profile.mc)
+    }
     if (loaderVersion === null) {
       onStage({ stage: 'fabric', message: `Finding a Fabric loader for Minecraft ${profile.mc}` })
       const list = await loaderVersions(profile.mc)
@@ -292,7 +343,7 @@ export const LAUNCHED_BY = ['launcher', 'panel', 'cli', 'assistant']
 // `onStage` hears { stage, message } as each step starts; `onProgress` keeps the downloads'
 // { phase, done, total, bytes }. `ensureServer(target)` starts a stopped target server and waits
 // for it, just before the game is spawned; without it a stopped server is only a warning.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava) }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null }) {
   const by = assistant ? 'assistant' : (launchedBy ?? 'cli')
   if (!LAUNCHED_BY.includes(by)) throw new Error(`unknown launchedBy "${launchedBy}"`)
   const profile = getProfile(name)
@@ -371,15 +422,13 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     version = mergeInherited(version, JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8')))
   }
   const features = launchFeatures({ hasServer: Boolean(address || target) })
-  // the Rosetta check runs only for a version that has no natives for this arch
-  const needsCaps = !fakeJava && !nativeArches(version, os).has(os.arch)
-  const resolved = resolveVersion(version, { os, features, hostCaps: needsCaps ? await hostCapabilities(os) : null })
+  // the Rosetta check runs only for a version that has no natives for this arch; hostCaps given
+  // is the tests' stand-in for a machine they are not
+  const needsCaps = !nativeArches(version, os).has(os.arch)
+  const caps = hostCaps ?? (needsCaps && !fakeJava ? await hostCapabilities(os) : null)
+  const resolved = resolveVersion(version, { os, features, hostCaps: caps })
   const refused = resolvedRefusal(resolved)
-  if (refused) {
-    const err = new UserError(refused.message)
-    err.code = refused.code
-    throw err
-  }
+  if (refused) fail(refused.message, refused.code)
   // the game runs as this arch: x64 under Rosetta or Windows emulation for a version with no
   // arm64 natives, so its natives, its rules and its Java all follow it
   const runOs = resolved.os
@@ -392,7 +441,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onWarning(picked.warning)
   }
 
-  if (!fakeInstalled) await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
+  const installed = fakeInstalled ? null : await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
   if (!fakeJava) {
     if (profile.loader === 'fabric') {
       onStage({ stage: 'fabric', message: 'Checking Fabric API' })
@@ -416,7 +465,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address })
   onStage({ stage: 'spawn', message: 'Starting the game' })
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
-  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile) } })
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed) } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
 }
@@ -479,13 +528,14 @@ function versionsInUse(except) {
 }
 
 // What this launch was decided from, kept in the run's state for diagnose and the diag bundle.
-function launchFacts(resolved, picked, profile) {
+function launchFacts(resolved, picked, profile, installed) {
   return {
     id: resolved.id,
     java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: profile.java ? 'explicit' : picked.warning ? 'fallback' : 'installed', warning: picked.warning },
     arch: resolved.arch,
     emulated: resolved.emulated,
     nativesDir: resolved.natives.dir,
+    assetsLayout: installed?.assetsLayout ?? null,
     loggingConfig: resolved.logging?.id ?? null,
     minimumLauncherVersion: resolved.format.minimumLauncherVersion,
   }
@@ -761,15 +811,12 @@ export function redactClientLine(line) {
   return line
     .replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]')
     .replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]')
+    // the old versions' ${auth_session}, which some of them print ("Session ID is token:...")
+    .replace(/\btoken:[^:\s]+:/g, 'token:[redacted]:')
 }
 
-// Ids validateMc refuses (pre-releases, release candidates, the new "-snapshot-" ids, the
-// pre-1.0 betas) cannot be launched, so the picker does not offer them.
-function launchableId(id) {
-  try { validateMc(id) } catch { return false }
-  return true
-}
-
+// Whether a row came out before a release: by the manifest's times, or by the numbers when the
+// list could not be read (offline, downloaded versions only).
 function olderThan(row, refTimes, release) {
   const ref = refTimes.get(release)
   if (ref && row.releaseTime) return Date.parse(row.releaseTime) < ref
@@ -785,7 +832,7 @@ async function installedVersions() {
   let ids
   try { ids = await fs.promises.readdir(versionsDir()) } catch { return new Map() }
   const out = new Map()
-  await Promise.all(ids.filter(launchableId).map(async (id) => {
+  await Promise.all(ids.filter(isSafeVersionId).map(async (id) => {
     let json
     try { json = JSON.parse(await fs.promises.readFile(versionJson(id), 'utf8')) } catch { return }
     if (json.inheritsFrom) return
@@ -797,9 +844,17 @@ async function installedVersions() {
   return out
 }
 
-// The version picker's rows. The per-version platform refusal needs the version JSON, so it is
-// given only for versions on disk; the machine-level one comes once, for the whole list.
-export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
+// The Java a version not on disk probably needs, from its id and type alone; the JSON says for sure.
+function javaHint(row) {
+  if (row.type === 'old_alpha' || row.type === 'old_beta') return 8
+  return requiredMajor(row.id)
+}
+
+// The version picker's rows, newest first: every id Mojang lists. The per-version facts that
+// need the JSON (its exact Java, a platform refusal) are given for versions on disk; the rest
+// say so (javaNeedsExact false), and describeVersion answers for one. fabric is whether Fabric
+// builds for it: read when asked for (the list is a fetch of its own), else null.
+export async function listVersions({ os = currentOs(), fetchImpl, fabric = false, refresh = false } = {}) {
   const installed = await installedVersions()
   const machineRefusal = platformRefusal(null, os)
   // asked only when a downloaded version lacks natives for this arch
@@ -808,12 +863,16 @@ export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
   let manifest = null
   let offline = null
   try {
-    manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR, ...(fetchImpl ? { fetchImpl } : {}) })
+    manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) })
   } catch (err) {
     offline = `the Minecraft version list could not be read (${err?.message ?? err}), so only downloaded versions are listed`
   }
+  let fabricList = null
+  if (fabric || refresh) {
+    try { fabricList = await fabricGameVersions({ force: refresh }) } catch { /* unknown: null per row */ }
+  }
   const source = manifest
-    ? manifest.versions.filter((v) => launchableId(v.id))
+    ? manifest.versions.filter((v) => isSafeVersionId(v.id))
     : [...installed.entries()].map(([id, { json }]) => ({ id, type: json.type ?? 'release', releaseTime: json.releaseTime ?? null }))
   const winArm = os.name === 'windows' && os.arch === 'arm64'
   const refTimes = new Map()
@@ -829,15 +888,50 @@ export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
     return {
       id: v.id,
       type: v.type,
+      kind: versionKind(v),
       releaseTime: v.releaseTime ?? null,
       downloaded: Boolean(disk?.downloaded),
-      javaNeeds: requiredMajor(v.id),
+      javaNeeds: disk ? javaRequirement(disk.json).major : javaHint(v),
+      javaNeedsExact: Boolean(disk),
       harness: Boolean(harnessFor(v.id)),
+      fabric: fabricList ? fabricAvailable(v.id, fabricList) : null,
       refusal: disk ? platformRefusal(disk.json, os, hostCaps) : null,
       note: notes.length ? notes.join('; ') : null,
     }
   })
+  // newest first, by release time; a row without one keeps its place at the end
+  versions.sort((a, b) => (Date.parse(b.releaseTime ?? '') || 0) - (Date.parse(a.releaseTime ?? '') || 0))
   return { machineRefusal, offline, versions }
+}
+
+// One version in full, for the form: fetches its JSON (a few KB, kept in versions/) and answers
+// what the launch would decide from it: the exact Java, the arch it runs as, a refusal with its
+// code, and whether Fabric and the harness have it.
+export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) {
+  const { mc, manifest } = await assertVersionId(id, { fetchImpl })
+  let json = readJson(versionJson(mc), null)
+  if (!json) json = await fetchVersionJson(mc, { manifest, cacheDir: CLIENT_CACHE_DIR })
+  const needsCaps = !nativeArches(json, os).has(os.arch)
+  const resolved = resolveVersion(json, { os, hostCaps: needsCaps ? await hostCapabilities(os) : null })
+  const refused = resolvedRefusal(resolved)
+  let fabric = null
+  try { fabric = fabricAvailable(mc, await fabricGameVersions()) } catch { /* unknown */ }
+  return {
+    id: mc,
+    type: json.type ?? 'release',
+    kind: versionKind({ id: mc, type: json.type ?? 'release' }),
+    releaseTime: json.releaseTime ?? null,
+    javaNeeds: resolved.java.major,
+    javaNeedsExact: true,
+    java: resolved.java,
+    arch: resolved.arch,
+    emulated: resolved.emulated,
+    fabric,
+    harness: Boolean(harnessFor(mc)),
+    refusal: refused?.message ?? null,
+    code: refused?.code ?? null,
+    problems: resolved.problems,
+  }
 }
 
 export function profileFolder(name) {
