@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>SpawnLoft Launcher</title>
+
+<script>
+  // Static design (L3a). The theme comes from ?theme=, as setup.html does. ?view=<screen>.<state>
+  // picks what is shown so every state can be opened and photographed; with no ?view the page opens
+  // on Play and the rail works. L3b replaces the view switch with real data.
+  const q = new URLSearchParams(location.search);
+  document.documentElement.dataset.theme = q.get('theme') === 'spawnloft' ? 'spawnloft' : 'classic';
+</script>
+
+<style>
+  /* ==========================================================================
+     Design tokens. Copied from the block at the top of src/ui.html and desktop/setup.html, which
+     are kept identical to each other. This page is the third copy: it is served over http like
+     ui.html but must not depend on a stylesheet the panel does not serve. Change all or none.
+     ========================================================================== */
+  :root {
+    --void:     #0c0e14;
+    --surface:  #141823;
+    --raised:   #1c2130;
+    --sunken:   #0a0c12;
+    /* Between void and surface: wells inside a card - the vitals strip, a chart, a form. */
+    --recess:   #11151f;
+    /* The header, the server tabs and the tool dock: the frame around the work, one step below
+       the page so the work sits forward of it. */
+    --chrome:   #0f121a;
+    /* The border colour a danger control uses, named so it stops being pasted. */
+    --fault-edge: #4a2529;
+    /* Three weights of rule. --line borders a card or a control; --line-soft divides the regions
+       of a screen; --line-faint separates rows inside a list or a form, where a full-strength
+       rule on every row turns the list into a grid. All solid: the planes they sit on are solid
+       too, so there is nothing for a translucent line to adapt to. */
+    --line:       #252b3b;
+    --line-soft:  #1f2433;
+    --line-faint: #191d29;
+    --edge:       #354056;
+
+    --ink:      #e9ecf4;
+    --ink-2:    #9aa4ba;
+    /* Lifted from #6d7589, then from #8089a0, which held 4.5:1 on --surface but not on --raised or
+       the warning wash. #8f98ae is 5.1:1 or better on every plane it sits on. */
+    --ink-3:    #8f98ae;
+    /* The quietest text: console timestamps, line numbers, separators. Quiet, but still text, so
+       it holds 4.5:1 on every plane up to --raised-hi (#545d72 was 2.3:1 there). */
+    --ink-4:    #868fa4;
+
+    --lapis:     #5b84ff;
+    --lapis-dim: #2c3f8f;
+    --lapis-wash: rgba(91, 132, 255, .14);
+
+    --live:  #4ade80;
+    --warn:  #f0b64d;
+    --fault: #f2645c;
+    --idle:  #8f98ae;
+
+    --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    /* Headings and big numbers: the display cut of the same family, drawn for sizes above 20px. */
+    --display: "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, "SF Mono", Menlo, monospace;
+
+    /* Corner radii. Classic keeps the rounder set; SpawnLoft redeclares these four and nothing
+       else that is not a colour, to match the sharper corners of the website it takes its
+       colours from. */
+    --r: 12px;
+    --r-sm: 8px;
+    --r-xs: 6px;
+    --r-lg: 16px;
+
+    /* The lit top edge of a surface, as a colour - what --lift catches, for a gradient stop. */
+    --surface-hi: #171c2b;
+
+    /* A one-pixel light edge along the top of a surface reads as it catching the light. */
+    --lift: inset 0 1px 0 rgba(255, 255, 255, .045);
+    --lift-strong: inset 0 1px 0 rgba(255, 255, 255, .07);
+
+    /* Green at the strength a background can take, behind a player who is connected. */
+    --live-wash:  rgba(74, 222, 128, .09);
+
+    /* The width of a lit edge: a scheduled task Windows has never heard of, a console level. */
+    --spine: 3px;
+
+    /* Type scale. Seven sizes, and every font-size in the panel is one of them. */
+    --t-1: 11px;   /* labels, badges, and the smallest monospace facts */
+    --t-2: 12px;   /* hints, metadata, secondary lines */
+    --t-3: 13px;   /* controls, body text inside panes, the console */
+    --t-4: 14px;   /* the page's base size */
+    --t-5: 16px;   /* pane and dialog titles */
+    --t-6: 22px;   /* a server's name, a big number */
+    --t-7: 32px;   /* the one display heading */
+
+    /* Type roles. A role is size, weight, line height and family together, so a title is one
+       decision rather than four. Use these for new type; a raw --t-* is for the odd fact that is
+       none of them. --track-* is the letter-spacing that goes with a role. */
+    --type-display: 650 var(--t-7)/1.1 var(--display);   /* Overview's one heading */
+    --type-page:    650 var(--t-6)/1.15 var(--display);  /* a page or sheet title */
+    --type-section: 650 var(--t-5)/1.25 var(--display);  /* a pane, tool or dialog title */
+    --type-card:    600 var(--t-4)/1.35 var(--ui);       /* the name on a card or a row */
+    --type-body:    400 var(--t-3)/1.5 var(--ui);        /* running text inside panes */
+    --type-meta:    400 var(--t-2)/1.45 var(--ui);       /* hints, timestamps, secondary lines */
+    --type-label:   650 var(--t-1)/1.3 var(--ui);        /* uppercase field and section labels */
+    --type-mono:    400 var(--t-3)/1.5 var(--mono);      /* paths, addresses, the console */
+    --track-display: -.025em;
+    --track-label: .08em;
+
+    /* Spacing, on a four-pixel grid. Every gap, padding and margin should be one of these; a
+       value between two steps is a sign the layout wants the smaller one. */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 28px;
+    --s-7: 40px;
+
+    /* The smallest thing a pointer is asked to hit. Buttons, tabs, segments and disclosures are at
+       least this tall; an icon-only button is this square. */
+    --hit: 32px;
+
+    /* Cards: one padding, corner, border and shadow for every boxed group in the panel - an
+       Overview server, a backup control, a chart, a scheduled task. */
+    --card-pad: var(--s-5);
+    --card-radius: var(--r-lg);
+
+    /* Focus. One ring for every control, keyboard or not, in the accent colour. */
+    --ring-width: 2px;
+    --ring-offset: 2px;
+    --ring-color: var(--lapis);
+
+    /* Depth. Every plane is solid: the frame is --chrome, a sheet or dialog is --raised, and the
+       one-pixel --lift along the top says which is in front. Glass needs something behind it to
+       be glass, and behind the panel there is only a console and a form, so the blur bought
+       nothing and made small text on it softer. The names stay so a layer can still say what
+       it is. */
+    --glass:        var(--chrome);
+    --glass-strong: var(--raised);
+    --blur: none;
+    --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, .045), 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-md: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .35), 0 12px 32px -18px rgba(0, 0, 0, .7);
+    --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, .07), 0 2px 6px rgba(0, 0, 0, .4), 0 28px 64px -20px rgba(0, 0, 0, .75);
+    /* Every hover in the panel moves at this speed. */
+    --ease: 200ms ease-in-out;
+
+    /* Tones: ink, edge and fill for each state colour, so a pill, a danger button, a notice and a
+       banner draw from one place. A wash is translucent, for text on the page; a fill is solid,
+       for a control that needs an opaque body. */
+    --live-ink:   #9ff0c4;
+    --live-edge:  rgba(74, 222, 128, .3);
+    --live-fill:  rgba(74, 222, 128, .12);
+    --warn-ink:   #f4cd86;
+    --warn-edge:  rgba(240, 182, 77, .32);
+    --warn-wash:  rgba(240, 182, 77, .11);
+    --fault-ink:  #f7a49f;
+    --fault-fill: #2b1719;
+    --fault-wash: rgba(242, 100, 92, .11);
+    --lapis-ink:  #cdd9ff;
+    /* Also the border of a field whose value has been changed and not yet saved. */
+    --lapis-edge: #3d55b8;
+    --lapis-fill: rgba(91, 132, 255, .12);
+
+    --raised-hi: #212737;
+    --hover:     rgba(233, 236, 244, .05);
+    --accent-rgb: 91, 132, 255;
+    --ink-rgb: 233, 236, 244;
+    --scroll-thumb: #2a3145;
+    --scroll-hover: #3a4560;
+    --hover-hi: rgba(233, 236, 244, .08);
+    /* The primary button is one flat colour. Top and bottom stay separate names so a theme can
+       bring a gradient back without touching a component. */
+    --primary-top: #4360d4;
+    --primary-bottom: #4360d4;
+    --primary-edge: #4360d4;
+    --primary-ink: #eef2ff;
+    --primary-hover-top: #4d6ae6;
+    --primary-hover-bottom: #4d6ae6;
+    --setup-primary-fill: #4360d4;
+    --setup-primary-edge: #4360d4;
+    --setup-primary-ink: #eef2ff;
+    --setup-primary-hover: #4d6ae6;
+    --field-focus: #0d1119;
+    --segment-top: #1c2130;
+    --segment-bottom: #1c2130;
+    --door-hover: #212739;
+    --switch-top: #4360d4;
+    --choice-top: #4360d4;
+    --control-mark: #eef2ff;
+    --console-ink: #cfd6e4;
+    --dialog-backdrop: rgba(6, 8, 12, .6);
+    --cube-top: #5f85ef;
+    --cube-left: #3a55b4;
+    --cube-right: #24357a;
+    --cube-cutout: #cfe0ff;
+    --chart-cpu: #7aa2ff;
+  }
+
+  /* The same design in the website's colours. Only colours and the four corner radii may appear
+     in this block. */
+  :root[data-theme="spawnloft"] {
+    --void: #090d0d;
+    --surface: #141b15;
+    --raised: #1e271d;
+    --sunken: #080c09;
+    --recess: #101610;
+    --chrome: #0c110d;
+    --line: #30382e;
+    --line-soft: #252c24;
+    --line-faint: #1d241c;
+    --edge: #485541;
+    --ink: #efeee6;
+    --ink-2: #b5bcac;
+    --ink-3: #9aa48f;
+    --ink-4: #8d9783;
+    --idle: #9aa48f;
+    --lapis: #c4f566;
+    --lapis-dim: #546e2a;
+    --lapis-wash: rgba(196, 245, 102, .12);
+    --lapis-ink: #dbf4b2;
+    --lapis-edge: #7a9a45;
+    --lapis-fill: rgba(196, 245, 102, .1);
+    --surface-hi: #19211a;
+    --raised-hi: #263021;
+    --hover: rgba(239, 238, 230, .05);
+    --accent-rgb: 196, 245, 102;
+    --ink-rgb: 239, 238, 230;
+    --scroll-thumb: #394431;
+    --scroll-hover: #536348;
+    --hover-hi: rgba(239, 238, 230, .08);
+    --primary-top: #c4f566;
+    --primary-bottom: #c4f566;
+    --primary-edge: #c4f566;
+    --primary-ink: #14200b;
+    --primary-hover-top: #d3ff80;
+    --primary-hover-bottom: #d3ff80;
+    --setup-primary-fill: #c4f566;
+    --setup-primary-edge: #c4f566;
+    --setup-primary-ink: #14200b;
+    --setup-primary-hover: #d3ff80;
+    --field-focus: #11180f;
+    --segment-top: #1e271d;
+    --segment-bottom: #1e271d;
+    --door-hover: #293424;
+    --switch-top: #c4f566;
+    --choice-top: #c4f566;
+    --control-mark: #14200b;
+    --console-ink: #dedfd3;
+    --dialog-backdrop: rgba(4, 8, 5, .7);
+    --cube-top: #c4f566;
+    --cube-left: #8bb640;
+    --cube-right: #567c24;
+    --cube-cutout: #efffdc;
+    --chart-cpu: #c4f566;
+    --r: 10px;
+    --r-sm: 6px;
+    --r-xs: 4px;
+    --r-lg: 12px;
+  }
+
+  /* ---- base ------------------------------------------------------------------ */
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border: 3px solid transparent; background-clip: padding-box; border-radius: 999px; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--void); color: var(--ink); font: var(--t-4)/1.5 var(--ui); letter-spacing: .003em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; overflow: hidden; }
+  :root :focus-visible { outline: var(--ring-width) solid var(--ring-color); outline-offset: var(--ring-offset); }
+  .ico { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; stroke-linejoin: miter; }
+  h1, h2, h3, p { margin: 0; }
+  code, .mono { font: var(--type-mono); font-size: var(--t-2); }
+  .grow { flex: 1; }
+  .hint { font: var(--type-meta); color: var(--ink-3); }
+  .label { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
+
+  button, select, input {
+    font: 500 var(--t-3)/1 var(--ui); color: var(--ink); letter-spacing: inherit;
+    min-height: var(--hit); padding: 0 var(--s-3); border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--raised); box-shadow: var(--lift);
+  }
+  button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); cursor: pointer; transition: all var(--ease); white-space: nowrap; }
+  button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--raised-hi); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--primary-top); border-color: var(--primary-edge); color: var(--primary-ink); font-weight: 650; box-shadow: none; }
+  button.primary:where(:hover:not(:disabled)) { background: var(--primary-hover-top); }
+  button.danger { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
+  button.quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); }
+  button.quiet:where(:hover:not(:disabled)) { background: var(--hover); border-color: var(--line); color: var(--ink); }
+  button.sm { min-height: 28px; padding: 0 var(--s-3); font-size: var(--t-2); }
+  select, input { width: 100%; background: var(--recess); box-shadow: none; font-weight: 400; }
+  select { appearance: none; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5l3.5 3.5 3.5-3.5' fill='none' stroke='%239aa4ba' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+  input::placeholder { color: var(--ink-4); }
+  input:focus, select:focus { background-color: var(--field-focus); border-color: var(--lapis-edge); }
+  label.field { display: grid; gap: var(--s-1); min-width: 0; }
+  label.field > span { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
+
+  /* ---- window ---------------------------------------------------------------- */
+  .app { display: grid; grid-template-columns: 196px minmax(0, 1fr); height: 100vh; min-width: 0; }
+  .rail { display: flex; flex-direction: column; background: var(--chrome); border-right: 1px solid var(--line-soft); padding: var(--s-4) var(--s-3) var(--s-3); gap: var(--s-1); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 var(--s-2) var(--s-4); }
+  .brand svg { display: block; }
+  .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
+  .brand small { display: block; font-size: var(--t-1); color: var(--ink-3); margin-top: 3px; font-weight: 400; letter-spacing: .02em; }
+  .nav { display: flex; align-items: center; gap: var(--s-3); width: 100%; justify-content: flex-start; min-height: 36px; background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); font-size: var(--t-4); font-weight: 500; }
+  .nav .ico { font-size: 16px; }
+  .nav:where(:hover:not(:disabled)) { background: var(--hover); border-color: transparent; color: var(--ink); }
+  .nav[aria-current="page"] { background: var(--lapis-wash); color: var(--lapis-ink); border-color: var(--lapis-edge); }
+  .nav .count { margin-left: auto; font-size: var(--t-1); color: var(--ink-3); }
+  .rail .grow { min-height: var(--s-4); }
+
+  .chip { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: 52px; padding: var(--s-2); text-align: left; justify-content: flex-start; background: var(--surface); }
+  .chip .who { min-width: 0; flex: 1; display: grid; gap: 2px; }
+  .chip .who b { font: var(--type-card); font-size: var(--t-3); overflow: hidden; text-overflow: ellipsis; }
+  .chip .who small { font-size: var(--t-1); color: var(--ink-3); font-weight: 400; }
+  .chip .ico { color: var(--ink-3); }
+  .chip.empty { border-style: dashed; color: var(--ink-2); }
+  .tile { width: 32px; height: 32px; border-radius: var(--r-xs); display: grid; place-items: center; font: 650 var(--t-3)/1 var(--display); color: #fff; flex: none; background: var(--tile, var(--lapis-dim)); text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+  .tile.sm { width: 24px; height: 24px; font-size: var(--t-2); }
+  .tile.lg { width: 40px; height: 40px; font-size: var(--t-5); }
+  .t1 { --tile: #3b5bdb; } .t2 { --tile: #2f9e6b; } .t3 { --tile: #b5651d; } .t4 { --tile: #8e4ec6; }
+  :root[data-theme="spawnloft"] .t1 { --tile: #5f7f2a; }
+  :root[data-theme="spawnloft"] .t4 { --tile: #7a4fa0; }
+  .chipwrap { position: relative; }
+
+  /* the popover that opens above the chip */
+  .switcher { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 4; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; }
+  .switcher .row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2); border-radius: var(--r-sm); font-size: var(--t-3); }
+  .switcher .row:hover { background: var(--hover-hi); }
+  .switcher .row .meta { margin-left: auto; font-size: var(--t-1); color: var(--ink-3); }
+  .switcher .row.cur { background: var(--lapis-wash); }
+  .switcher hr { border: 0; border-top: 1px solid var(--line-soft); margin: var(--s-1) 0; }
+  .switcher .act { color: var(--ink-2); }
+
+  .main { min-width: 0; overflow: auto; background: var(--void); }
+  .page { padding: var(--s-6) var(--s-6) var(--s-7); display: grid; gap: var(--s-5); align-content: start; max-width: 1100px; }
+  .page-head { display: flex; align-items: flex-end; gap: var(--s-4); }
+  .page-head h1 { font: var(--type-page); letter-spacing: var(--track-display); }
+  .page-head .hint { margin-top: 2px; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--card-radius); box-shadow: var(--lift); padding: var(--card-pad); min-width: 0; }
+  .card h2 { font: var(--type-section); }
+
+  /* notices */
+  .notice { display: flex; gap: var(--s-3); align-items: flex-start; padding: var(--s-3) var(--s-4); border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--recess); font-size: var(--t-3); color: var(--ink-2); }
+  .notice .ico { margin-top: 3px; font-size: 14px; }
+  .notice b { color: var(--ink); font-weight: 600; }
+  .notice.warn { background: var(--warn-wash); border-color: var(--warn-edge); color: var(--warn-ink); }
+  .notice.fault { background: var(--fault-wash); border-color: var(--fault-edge); color: var(--fault-ink); box-shadow: inset var(--spine) 0 0 var(--fault); }
+  .notice.live { background: var(--live-fill); border-color: var(--live-edge); color: var(--live-ink); }
+  .notice .body { flex: 1; min-width: 0; display: grid; gap: var(--s-1); }
+  .notice .acts { display: flex; gap: var(--s-2); flex: none; align-items: center; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); }
+  .pill.live { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
+  .pill.warn { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
+  .pill.fault { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-wash); }
+  .pill.accent { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* ---- Play ------------------------------------------------------------------ */
+  .play { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--s-5); align-items: start; }
+  .hero { padding: var(--s-7) var(--s-6) var(--s-6); display: grid; gap: var(--s-5); justify-items: start; background: linear-gradient(180deg, var(--surface-hi), var(--surface)); }
+  .hero .eyebrow { display: flex; align-items: center; gap: var(--s-2); }
+  .hero h2 { font: var(--type-display); letter-spacing: var(--track-display); }
+  .launch { min-height: 56px; padding: 0 var(--s-7); font-size: var(--t-5); border-radius: var(--r); }
+  .launch .ico { font-size: 18px; }
+  .hero .does { font: var(--type-body); color: var(--ink-2); margin-top: calc(var(--s-3) * -1); }
+  .pickers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); width: 100%; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
+  .facts { display: grid; gap: var(--s-3); }
+  .facts dl { margin: 0; display: grid; gap: var(--s-3); }
+  .facts dt { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
+  .facts dd { margin: 2px 0 0; font-size: var(--t-3); word-break: break-word; }
+  .facts .mono { color: var(--ink-2); }
+
+  .strip { width: 100%; display: grid; gap: var(--s-3); }
+  .bar { height: 8px; border-radius: 999px; background: var(--recess); border: 1px solid var(--line-soft); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--lapis); border-radius: 999px; }
+  .bar.indet i { width: 30%; margin-left: 20%; opacity: .7; }
+  .strip .line { display: flex; align-items: baseline; gap: var(--s-3); }
+  .strip .line b { font: var(--type-section); }
+  .strip .line .hint { margin-left: auto; }
+  .steps { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+  .step { font-size: var(--t-1); color: var(--ink-4); display: inline-flex; gap: 5px; align-items: center; }
+  .step.done { color: var(--live-ink); }
+  .step.now { color: var(--lapis-ink); font-weight: 650; }
+  .runrow { display: flex; align-items: center; gap: var(--s-4); width: 100%; }
+
+  .logcard { padding: 0; overflow: hidden; }
+  .loghead { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+  .loghead b { font: var(--type-card); font-size: var(--t-3); }
+  pre.log { margin: 0; padding: var(--s-3) var(--s-4); background: var(--sunken); border-top: 1px solid var(--line-soft); font: var(--type-mono); font-size: var(--t-2); color: var(--console-ink); overflow: auto; max-height: 188px; line-height: 1.55; white-space: pre; }
+  pre.log .ts { color: var(--ink-4); } pre.log .w { color: var(--warn-ink); } pre.log .e { color: var(--fault-ink); }
+
+  /* skeletons: loading states */
+  .sk { background: linear-gradient(90deg, var(--raised) 0%, var(--raised-hi) 50%, var(--raised) 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: var(--r-xs); }
+  @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+  /* empty states */
+  .empty-state { display: grid; justify-items: center; text-align: center; gap: var(--s-3); padding: var(--s-7) var(--s-5); }
+  .empty-state .glyph { width: 48px; height: 48px; border-radius: var(--r); border: 1px dashed var(--edge); display: grid; place-items: center; color: var(--ink-3); font-size: 22px; }
+  .empty-state h2 { font: var(--type-section); }
+  .empty-state p { color: var(--ink-2); font-size: var(--t-3); max-width: 46ch; }
+  .empty-state .acts { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+
+  /* ---- Profiles -------------------------------------------------------------- */
+  .list { padding: 0; overflow: hidden; }
+  .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-faint); }
+  .item:first-child { border-top: 0; }
+  .item .name { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .item .name b { font: var(--type-card); }
+  .item .sub { display: flex; gap: var(--s-4); flex-wrap: wrap; margin-top: 4px; font-size: var(--t-2); color: var(--ink-3); }
+  .item .sub span { display: inline-flex; gap: 5px; align-items: center; }
+  .item .acts { display: flex; gap: var(--s-2); align-items: center; }
+  .item.running { box-shadow: inset var(--spine) 0 0 var(--live); background: var(--live-wash); }
+  .item .confirm { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); background: var(--fault-wash); border-radius: var(--r-sm); font-size: var(--t-3); color: var(--fault-ink); }
+  .item .confirm label { display: inline-flex; gap: var(--s-2); align-items: center; color: var(--ink-2); }
+  input[type="checkbox"] { width: 16px; min-height: 16px; height: 16px; padding: 0; accent-color: var(--lapis); }
+  .form { display: grid; gap: var(--s-5); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+  .form-grid .full { grid-column: 1 / -1; }
+  .switchrow { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
+  .switchrow .txt { flex: 1; min-width: 0; font-size: var(--t-3); }
+  .switchrow .txt b { display: block; font-weight: 600; }
+  .switchrow .txt small { color: var(--ink-3); font-size: var(--t-2); }
+  .switch { width: 36px; height: 20px; min-height: 20px; padding: 0; border-radius: 999px; position: relative; background: var(--recess); border-color: var(--edge); flex: none; margin-top: 2px; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-3); transition: all var(--ease); }
+  .switch[aria-checked="true"] { background: var(--switch-top); border-color: var(--switch-top); }
+  .switch[aria-checked="true"]::after { left: 18px; background: var(--control-mark); }
+  .switch:disabled { opacity: .4; }
+  details.adv { border: 1px solid var(--line); border-radius: var(--r-sm); }
+  details.adv summary { cursor: pointer; padding: var(--s-3) var(--s-4); font-size: var(--t-3); color: var(--ink-2); }
+  details.adv .in { padding: 0 var(--s-4) var(--s-4); display: grid; gap: var(--s-4); }
+  .formfoot { display: flex; gap: var(--s-2); justify-content: flex-end; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  .formfoot .hint { margin-right: auto; align-self: center; }
+  input[readonly] { color: var(--ink-3); border-style: dashed; }
+
+  /* ---- Accounts -------------------------------------------------------------- */
+  .acct { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-faint); }
+  .acct:first-child { border-top: 0; }
+  .acct .nm { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .acct .nm b { font: var(--type-card); }
+  .acct .uuid { font: var(--type-mono); font-size: var(--t-1); color: var(--ink-4); margin-top: 3px; }
+  .acct .acts { display: flex; gap: var(--s-2); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-5); align-items: start; }
+  .add h2 { margin-bottom: var(--s-2); }
+  .add .hint { margin-bottom: var(--s-4); }
+  .add .row { display: flex; gap: var(--s-2); align-items: flex-end; }
+  .add .row label { flex: 1; }
+  .waiting { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-radius: var(--r-sm); border: 1px solid var(--lapis-edge); background: var(--lapis-fill); color: var(--lapis-ink); font-size: var(--t-3); }
+  .waiting .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--lapis-edge); border-top-color: var(--lapis); animation: spin 1s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .waiting .spin { animation: none; } }
+  .waiting .grow { min-width: 0; }
+  .waiting a { color: var(--lapis-ink); text-underline-offset: 3px; cursor: pointer; }
+
+  /* narrow windows: 900-1100 */
+  @media (max-width: 1199px) { .play { grid-template-columns: minmax(0, 1fr); } .facts { display: none; } }
+  @media (max-width: 1060px) { .page { padding: var(--s-5) var(--s-5) var(--s-6); } .pickers, .form-grid, .two { grid-template-columns: 1fr; } .hero { padding: var(--s-6) var(--s-5); } }
+
+  /* The state switch used only by this design page: every view lives in the document, one shows. */
+  .view { display: none; }
+  .view.on { display: contents; }
+  .designbar { position: fixed; right: 12px; top: 10px; z-index: 9; display: none; }
+</style>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></symbol>
+  <symbol id="i-profiles" viewBox="0 0 16 16"><path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9H7v4.5H2.5zM9 9h4.5v4.5H9z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.5 14c.4-2.8 2.6-4.5 5.5-4.5s5.1 1.7 5.5 4.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4.5 6.5l3.5 3.5 3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" fill="currentColor"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1.75 3.5h4.5l1.5 1.75h6.5v7.25h-12.5z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16"><path d="M8 1.75l6.5 11.75h-13z"/><path d="M8 6.5v3.25M8 11.5v.5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.25v4M8 4.75v.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3.25 3.25L13 4.75"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16"><path d="M2.5 13.5l.75-3.25L10.5 3l2.5 2.5-7.25 7.25z"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5L7 9M11.5 9.5v4h-9v-9h4"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z" fill="var(--cube-top)"/><path d="M3.5 7.25L12 12v9.5l-8.5-4.75z" fill="var(--cube-left)"/><path d="M20.5 7.25L12 12v9.5l8.5-4.75z" fill="var(--cube-right)"/></symbol>
+</svg>
+
+<div class="app">
+  <nav class="rail" aria-label="Launcher">
+    <div class="brand"><svg width="24" height="24"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Game launcher</small></div></div>
+    <button class="nav" data-go="play"><svg class="ico"><use href="#i-play"/></svg>Play</button>
+    <button class="nav" data-go="profiles"><svg class="ico"><use href="#i-profiles"/></svg>Profiles<span class="count" id="nProfiles">3</span></button>
+    <button class="nav" data-go="accounts"><svg class="ico"><use href="#i-user"/></svg>Accounts<span class="count" id="nAccts">3</span></button>
+    <div class="grow"></div>
+    <div class="chipwrap">
+      <div class="switcher" id="switcher" hidden>
+        <div class="row cur"><span class="tile sm t1">W</span><span>Wunga_</span><span class="meta">Microsoft · default</span></div>
+        <div class="row"><span class="tile sm t2">B</span><span>BuildBot</span><span class="meta">Offline</span></div>
+        <div class="row"><span class="tile sm t3">S</span><span>Steve_dev</span><span class="meta">Microsoft</span></div>
+        <hr>
+        <div class="row act"><svg class="ico"><use href="#i-plus"/></svg>Add account…</div>
+        <div class="row act"><svg class="ico"><use href="#i-x"/></svg>Sign out Wunga_</div>
+      </div>
+      <button class="chip" id="chipMs" data-chip aria-haspopup="menu"><span class="tile t1">W</span><span class="who"><b>Wunga_</b><small>Microsoft</small></span><svg class="ico"><use href="#i-chev"/></svg></button>
+      <button class="chip" id="chipOff" data-chip aria-haspopup="menu" hidden><span class="tile t2">B</span><span class="who"><b>BuildBot</b><small>Offline</small></span><svg class="ico"><use href="#i-chev"/></svg></button>
+      <button class="chip empty" id="chipNone" data-go="accounts" hidden><span class="tile" style="--tile:var(--raised-hi);color:var(--ink-3)"><svg class="ico"><use href="#i-user"/></svg></span><span class="who"><b>No account</b><small>Sign in to play online</small></span></button>
+    </div>
+  </nav>
+
+  <main class="main" id="main">
+
+<!-- ================= PLAY ================= -->
+<section class="view" data-view="play.ready"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Ready</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
+      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins <b>survival</b> · as Wunga_</p>
+      <div class="pickers">
+        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
+        <label class="field"><span>Server</span><select><option>Join survival (running)</option></select></label>
+      </div>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl>
+      <div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div>
+      <div><dt>Harness mod</dt><dd>On</dd></div><div><dt>Data folder</dt><dd class="mono">…/client/survival-test</dd></div></dl>
+      <button class="sm quiet" data-go="profiles">Edit profile</button></aside>
+  </div>
+</div></section>
+
+<section class="view" data-view="play.stopped"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill"><span class="dot"></span>Server stopped</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Start server and launch</button>
+      <p class="does">Starts <b>survival</b> first (up to 2 minutes), then launches Minecraft 1.21.11 · Fabric 0.17.3 as Wunga_ and joins it.</p>
+      <div class="pickers">
+        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
+        <label class="field"><span>Server</span><select><option>Join survival (stopped)</option></select></label>
+      </div>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl>
+      <div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div>
+      <div><dt>Harness mod</dt><dd>On</dd></div><div><dt>Data folder</dt><dd class="mono">…/client/survival-test</dd></div></dl></aside>
+  </div>
+</div></section>
+
+<section class="view" data-view="play.picker"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero" style="min-height:460px">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill warn"><span class="dot"></span>Offline account</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
+      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · as BuildBot (offline)</p>
+      <div class="pickers">
+        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
+        <div class="field" style="position:relative"><span class="label">Server</span>
+          <select style="border-color:var(--lapis-edge)"><option>Choose a server</option></select>
+          <div class="switcher" style="bottom:calc(100% + 4px)">
+            <div class="row cur"><span>Title screen only</span></div>
+            <div class="row"><span>survival</span><span class="meta">running</span></div>
+            <div class="row"><span>lobby</span><span class="meta">stopped</span></div>
+            <div class="row" style="opacity:.5;cursor:not-allowed"><span>public-smp</span><span class="meta">needs a Microsoft account</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
+  </div>
+</div></section>
+
+<section class="view" data-view="play.launching"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill accent"><span class="dot"></span>Launching</span></div>
+      <div class="strip">
+        <div class="line"><b>Downloading Minecraft 1.21.11</b><span class="hint">212 of 1,049 files · 143 MB</span></div>
+        <div class="bar" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"><i style="width:20%"></i></div>
+        <div class="steps"><span class="step done"><svg class="ico"><use href="#i-check"/></svg>Server</span><span class="step done"><svg class="ico"><use href="#i-check"/></svg>Version</span><span class="step now">● Files</span><span class="step">Java</span><span class="step">Start</span></div>
+        <p class="hint">Closing this window does not stop the download. It keeps going and the files are used next time.</p>
+      </div>
+      <button disabled><svg class="ico"><use href="#i-play"/></svg>Launching…</button>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
+  </div>
+  <div class="card logcard"><div class="loghead"><b>Launch log</b><span class="hint">last 20 lines</span><span class="grow"></span><button class="sm quiet"><svg class="ico"><use href="#i-folder"/></svg>Open log folder</button></div>
+<pre class="log"><span class="ts">14:01:58</span> manifest   version_manifest_v2 cached (2 h old)
+<span class="ts">14:01:58</span> version    1.21.11 resolved, Java 21 needed
+<span class="ts">14:02:01</span> files      212 of 1,049 downloaded
+<span class="ts">14:02:04</span> files      340 of 1,049 downloaded</pre></div>
+</div></section>
+
+<section class="view" data-view="play.running"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Running</span></div>
+      <div class="strip"><div class="line"><b>Minecraft is running</b><span class="hint">since 14:02 · pid 1234 · as Wunga_</span></div>
+        <p class="hint">Joined <b style="color:var(--ink-2)">survival</b>. Closing this window does not stop the game.</p></div>
+      <div class="runrow"><button class="danger launch" style="padding:0 var(--s-6)"><svg class="ico"><use href="#i-stop"/></svg>Stop</button><button><svg class="ico"><use href="#i-folder"/></svg>Open folder</button></div>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div><div><dt>Harness mod</dt><dd>On</dd></div></dl></aside>
+  </div>
+  <div class="card logcard"><div class="loghead"><b>Game log</b><span class="hint">last 20 lines</span><span class="grow"></span><button class="sm quiet">Collapse</button></div>
+<pre class="log"><span class="ts">14:02:41</span> [Render thread/INFO]: Setting user: Wunga_
+<span class="ts">14:02:44</span> [Render thread/INFO]: Loaded 1 mod: spawnloft-harness 0.1.0
+<span class="ts">14:02:49</span> [Render thread/INFO]: Reloading ResourceManager
+<span class="ts">14:02:52</span> [Server thread/INFO]: Wunga_ joined the game</pre></div>
+</div></section>
+
+<section class="view" data-view="play.crashed"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>Minecraft closed 18 seconds after it started (exit code 1)</b>
+    <span>Usually a mod, not enough memory, or the wrong Java. The last lines of the game log are below.</span></div>
+    <div class="acts"><button class="sm">Report a problem</button></div></div>
+  <div class="play">
+    <div class="card hero">
+      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill fault"><span class="dot"></span>Crashed</span></div>
+      <h2>Minecraft 1.21.11</h2>
+      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch again</button>
+      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins survival · as Wunga_</p>
+    </div>
+    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Memory</dt><dd>4 GB</dd></div></dl><button class="sm quiet" data-go="profiles">Edit profile</button></aside>
+  </div>
+  <div class="card logcard"><div class="loghead"><b>Game log</b><span class="hint">last 20 lines</span></div>
+<pre class="log"><span class="ts">14:02:41</span> [main/INFO]: Loading Minecraft 1.21.11 with Fabric Loader 0.17.3
+<span class="ts">14:02:42</span> [main/<span class="w">WARN</span>]: Mod 'examplemod' targets 1.20.4, not 1.21.11
+<span class="ts">14:02:43</span> [main/<span class="e">ERROR</span>]: Incompatible mod set!
+<span class="ts">14:02:43</span> [main/<span class="e">ERROR</span>]: Mod 'examplemod' requires fabric-api &gt;=0.90, none found
+<span class="ts">14:02:43</span> Process exited with code 1</pre></div>
+</div></section>
+
+<section class="view" data-view="play.busy"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>Another launch of survival-test is already in progress</b><span>Started from the command line 40 seconds ago. This page checks again every few seconds and unlocks when it finishes.</span></div></div>
+  <div class="play"><div class="card hero"><div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill warn"><span class="dot"></span>Busy</span></div>
+    <h2>Minecraft 1.21.11</h2><button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button></div>
+  <aside class="card facts"><h2>survival-test</h2></aside></div>
+</div></section>
+
+<section class="view" data-view="play.error"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>Can't launch: public-smp needs a Microsoft account (online-mode=true)</b><span>Sign in with a Microsoft account, or pick another server.</span></div>
+    <div class="acts"><button class="sm" data-go="accounts">Go to Accounts</button></div></div>
+  <div class="play"><div class="card hero"><div class="eyebrow"><span class="pill accent">Profile: survival-test</span></div>
+    <h2>Minecraft 1.21.11</h2><button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
+    <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins public-smp · as BuildBot (offline)</p></div>
+  <aside class="card facts"><h2>survival-test</h2></aside></div>
+</div></section>
+
+<section class="view" data-view="play.loading"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Loading your profiles…</p></div></div>
+  <div class="play"><div class="card hero" aria-busy="true">
+    <div class="sk" style="width:180px;height:20px"></div><div class="sk" style="width:320px;height:32px"></div><div class="sk" style="width:240px;height:56px;border-radius:var(--r)"></div>
+    <div class="sk" style="width:380px;height:16px"></div>
+    <div class="pickers"><div class="sk" style="height:48px"></div><div class="sk" style="height:48px"></div></div></div>
+  <aside class="card facts"><div class="sk" style="height:20px;width:120px"></div><div class="sk" style="height:60px"></div><div class="sk" style="height:60px"></div></aside></div>
+</div></section>
+
+<section class="view" data-view="play.unreachable"><div class="page">
+  <div class="page-head"><div><h1>Play</h1></div></div>
+  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-alert"/></svg></div><h2>Can't reach the SpawnLoft panel</h2>
+    <p>The launcher talks to the panel running on this computer, and it is not answering. If you closed SpawnLoft, start it again; this page reconnects by itself.</p>
+    <div class="acts"><button class="primary">Try again</button></div></div></div>
+</div></section>
+
+<section class="view" data-view="play.empty"><div class="page">
+  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
+  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-play"/></svg></div><h2>No game profile yet</h2>
+    <p>A profile is a Minecraft version with its own worlds, options and mods. Make one to start playing; you can add more later.</p>
+    <div class="acts"><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div></div></div>
+</div></section>
+
+<!-- ================= PROFILES ================= -->
+<section class="view" data-view="profiles.list"><div class="page">
+  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div><span class="grow"></span><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div>
+  <div class="card list">
+    <div class="item running"><div><div class="name"><b>survival-test</b><span class="pill live"><span class="dot"></span>Running · pid 1234</span><span class="pill">Harness</span></div>
+      <div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span><span>Joins survival</span><span>Wunga_</span></div></div>
+      <div class="acts"><button class="danger sm"><svg class="ico"><use href="#i-stop"/></svg>Stop</button><button class="sm">Edit</button><button class="sm quiet" disabled>Remove</button></div></div>
+    <div class="item"><div><div class="name"><b>vanilla-1.20</b></div>
+      <div class="sub"><span>1.20.4</span><span>Vanilla</span><span>2 GB</span><span>Title screen only</span><span>Default account</span></div></div>
+      <div class="acts"><button class="sm"><svg class="ico"><use href="#i-play"/></svg>Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
+    <div class="item"><div><div class="name"><b>assistant-sandbox</b><span class="pill accent">Assistant</span><span class="pill">Harness</span><span class="pill warn">Account missing</span></div>
+      <div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span><span>Last launched by an assistant · yesterday</span></div></div>
+      <div class="acts"><button class="sm" disabled><svg class="ico"><use href="#i-play"/></svg>Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="profiles.remove"><div class="page">
+  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div><span class="grow"></span><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div>
+  <div class="card list">
+    <div class="item"><div><div class="name"><b>vanilla-1.20</b></div><div class="sub"><span>1.20.4</span><span>Vanilla</span><span>2 GB</span></div></div>
+      <div class="acts"><button class="sm">Launch</button><button class="sm">Edit</button><button class="sm danger">Remove</button></div>
+      <div class="confirm"><span><b>Remove vanilla-1.20?</b> Its folder with worlds, options and mods is kept.</span><label><input type="checkbox"> Also delete the folder</label><span class="grow"></span><button class="sm">Cancel</button><button class="sm danger">Remove profile</button></div></div>
+    <div class="item"><div><div class="name"><b>survival-test</b></div><div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span></div></div><div class="acts"><button class="sm">Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="profiles.loading"><div class="page">
+  <div class="page-head"><div><h1>Profiles</h1></div></div>
+  <div class="card list" aria-busy="true">
+    <div class="item"><div style="display:grid;gap:8px"><div class="sk" style="width:160px;height:16px"></div><div class="sk" style="width:340px;height:12px"></div></div><div class="sk" style="width:200px;height:28px"></div></div>
+    <div class="item"><div style="display:grid;gap:8px"><div class="sk" style="width:120px;height:16px"></div><div class="sk" style="width:300px;height:12px"></div></div><div class="sk" style="width:200px;height:28px"></div></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="profiles.empty"><div class="page">
+  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div></div>
+  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-profiles"/></svg></div><h2>No profiles</h2>
+    <p>Create one to pick a Minecraft version, a loader and an account. Nothing is downloaded until the first launch.</p>
+    <div class="acts"><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div></div></div>
+</div></section>
+
+<section class="view" data-view="profiles.new"><div class="page">
+  <div class="page-head"><div><h1>New profile</h1><p class="hint">Nothing is downloaded until you launch it.</p></div></div>
+  <div class="card form">
+    <div class="form-grid">
+      <label class="field"><span>Name</span><input value="survival-test" aria-describedby="n1"><small class="hint" id="n1">Letters, digits, dash and underscore.</small></label>
+      <label class="field"><span>Version</span><select><option>1.21.11 (release)</option></select><small class="hint">Releases only. <a style="color:var(--lapis-ink)">Show snapshots</a> · <a style="color:var(--lapis-ink)">Show all</a></small></label>
+      <label class="field"><span>Loader</span><select><option>Fabric</option><option>Vanilla</option></select></label>
+      <label class="field"><span>Memory</span><select><option>4 GB</option></select></label>
+      <label class="field"><span>Default server</span><select><option>survival</option></select></label>
+      <label class="field"><span>Account</span><select><option>Default (Wunga_)</option></select></label>
+      <div class="full switchrow"><div class="txt"><b>Harness mod</b><small>Lets SpawnLoft read what the game is doing, for diagnostics and the assistant tools.</small></div><button class="switch" role="switch" aria-checked="true" aria-label="Harness mod"></button></div>
+    </div>
+    <details class="adv"><summary>Advanced</summary><div class="in">
+      <div class="form-grid"><label class="field"><span>Java</span><input placeholder="Automatic (recommended)"></label><label class="field"><span>Fabric loader version</span><select><option>Pick automatically (0.17.3)</option></select></label></div>
+      <div class="switchrow"><div class="txt"><b>Allow an assistant to use my account</b><small>An AI assistant connected through MCP may launch this profile signed in as its Microsoft account.</small></div><button class="switch" role="switch" aria-checked="false" aria-label="Allow assistant account"></button></div>
+    </div></details>
+    <div class="formfoot"><span class="hint">Will be created at <code>…/client/survival-test</code></span><button>Cancel</button><button class="primary">Create profile</button></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="profiles.newerror"><div class="page">
+  <div class="page-head"><div><h1>New profile</h1></div></div>
+  <div class="card form">
+    <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>A profile named “survival-test” already exists</b><span>Pick a different name, or edit the existing one.</span></div></div>
+    <div class="form-grid">
+      <label class="field"><span>Name</span><input value="survival-test" style="border-color:var(--fault)"></label>
+      <label class="field"><span>Version</span><select><option>1.21.11 (release)</option></select></label>
+      <label class="field"><span>Loader</span><select><option>Fabric</option></select></label>
+      <label class="field"><span>Memory</span><select><option>4 GB</option></select></label>
+      <div class="full switchrow"><div class="txt"><b>Harness mod</b><small style="color:var(--warn-ink)">Not published for 1.21.4 yet, so it stays off for this version.</small></div><button class="switch" role="switch" aria-checked="false" disabled aria-label="Harness mod"></button></div>
+    </div>
+    <div class="formfoot"><button>Cancel</button><button class="primary">Create profile</button></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="profiles.edit"><div class="page">
+  <div class="page-head"><div><h1>Edit survival-test</h1></div><span class="pill live"><span class="dot"></span>Running</span></div>
+  <div class="card form">
+    <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>This profile is running</b><span>The version, loader, Java, memory and harness can't change while the game is open. Stop it first to edit them.</span></div></div>
+    <div class="form-grid">
+      <label class="field"><span>Version</span><input readonly value="1.21.11"></label>
+      <label class="field"><span>Loader</span><input readonly value="Fabric 0.17.3"></label>
+      <label class="field"><span>Memory</span><input readonly value="4 GB"></label>
+      <label class="field"><span>Java</span><input readonly value="Automatic"></label>
+      <label class="field"><span>Default server</span><select><option>survival</option></select></label>
+      <label class="field"><span>Account</span><select><option>Default (Wunga_)</option></select></label>
+    </div>
+    <div class="formfoot"><button>Cancel</button><button class="primary">Save changes</button></div>
+  </div>
+</div></section>
+
+<!-- ================= ACCOUNTS ================= -->
+<section class="view" data-view="accounts.list"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="card list">
+    <div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div>
+    <div class="acct"><span class="tile lg t3">S</span><div><div class="nm"><b>Steve_dev</b><span class="pill">Microsoft</span><span class="pill warn"><span class="dot"></span>Sign in again</span></div><div class="uuid">853c80ef-3c37-49fd-aa49-938b674adae6</div></div><div class="acts"><button class="sm">Sign in again</button><button class="sm quiet">Sign out</button></div></div>
+    <div class="acct"><span class="tile lg t2">B</span><div><div class="nm"><b>BuildBot</b><span class="pill">Offline</span></div><div class="uuid">offline · 2b2c9f3a-9e27-3a53-8c10-0d7ad1b0e5aa</div></div><div class="acts"><button class="sm">Make default</button><button class="sm quiet">Remove</button></div></div>
+  </div>
+  <div class="two">
+    <div class="card add"><h2>Add Microsoft account</h2><p class="hint">Opens Microsoft's own sign-in page. SpawnLoft never sees your password.</p><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>Add Microsoft account</button></div>
+    <div class="card add"><h2>Add offline account</h2><p class="hint">Works on servers with online-mode=false, such as the ones SpawnLoft makes by default. Online servers need a Microsoft account.</p>
+      <div class="row"><label class="field"><span>Name</span><input placeholder="3 to 16 letters, digits, underscore"></label><button>Add</button></div></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="accounts.loading"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1></div></div>
+  <div class="card list" aria-busy="true">
+    <div class="acct"><div class="sk" style="width:40px;height:40px"></div><div style="display:grid;gap:8px"><div class="sk" style="width:140px;height:16px"></div><div class="sk" style="width:260px;height:10px"></div></div><div class="sk" style="width:80px;height:28px"></div></div>
+    <div class="acct"><div class="sk" style="width:40px;height:40px"></div><div style="display:grid;gap:8px"><div class="sk" style="width:110px;height:16px"></div><div class="sk" style="width:240px;height:10px"></div></div><div class="sk" style="width:80px;height:28px"></div></div>
+  </div>
+</div></section>
+
+<section class="view" data-view="accounts.empty"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-user"/></svg></div><h2>No accounts yet</h2>
+    <p>Sign in with Microsoft to play on online servers, or add an offline name for local servers.</p>
+    <div class="acts"><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>Add Microsoft account</button><button>Add offline account</button></div></div></div>
+</div></section>
+
+<section class="view" data-view="accounts.waiting"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="waiting"><span class="spin"></span><span class="grow"><b>Waiting for Microsoft…</b> Finish signing in in the window that opened. It closes itself.</span><a>Sign in in your browser instead</a><button class="sm">Cancel</button></div>
+  <div class="card list"><div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div></div>
+  <div class="two"><div class="card add"><h2>Add Microsoft account</h2><p class="hint">Opens Microsoft's own sign-in page.</p><button class="primary" disabled>Add Microsoft account</button></div>
+  <div class="card add"><h2>Add offline account</h2><div class="row"><label class="field"><span>Name</span><input placeholder="3 to 16 letters, digits, underscore"></label><button>Add</button></div></div></div>
+</div></section>
+
+<section class="view" data-view="accounts.done"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="notice live"><svg class="ico"><use href="#i-check"/></svg><div class="body"><b>Signed in as Wunga_</b><span>It is your default account, so new launches use it.</span></div></div>
+  <div class="card list"><div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div></div>
+</div></section>
+
+<section class="view" data-view="accounts.cancelled"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="notice"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>Sign-in cancelled</b><span>Nothing was saved.</span></div><div class="acts"><button class="sm">Add Microsoft account</button></div></div>
+  <div class="card"><div class="empty-state" style="padding:var(--s-6)"><p>No accounts yet.</p></div></div>
+</div></section>
+
+<section class="view" data-view="accounts.failed"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
+  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>This Microsoft account doesn't own Minecraft: Java Edition</b><span>Sign in with the account that bought the game, or add an offline account for local servers.</span></div><div class="acts"><button class="sm">Try again</button></div></div>
+  <div class="card"><div class="empty-state" style="padding:var(--s-6)"><p>No accounts yet.</p></div></div>
+</div></section>
+
+<section class="view" data-view="accounts.busy"><div class="page">
+  <div class="page-head"><div><h1>Accounts</h1></div></div>
+  <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>A sign-in is already open in another window</b><span>Finish it there, or close that window and try again.</span></div></div>
+</div></section>
+
+  </main>
+</div>
+
+<script>
+  // Design-page behaviour only: show one view, mark the rail, set the account chip.
+  const VIEWS = [...document.querySelectorAll('.view')];
+  function show(name) {
+    if (!VIEWS.some((v) => v.dataset.view === name)) name = VIEWS.find((v) => v.dataset.view.startsWith(name + '.'))?.dataset.view || 'play.ready';
+    VIEWS.forEach((v) => v.classList.toggle('on', v.dataset.view === name));
+    const screen = name.split('.')[0];
+    document.querySelectorAll('.nav').forEach((n) => n.toggleAttribute('aria-current', false) || (n.dataset.go === screen && n.setAttribute('aria-current', 'page')));
+    document.getElementById('main').scrollTop = 0;
+  }
+  document.addEventListener('click', (e) => {
+    const go = e.target.closest('[data-go]'); if (go) show(go.dataset.go);
+    if (e.target.closest('[data-chip]')) { const s = document.getElementById('switcher'); s.hidden = !s.hidden; }
+  });
+  const acct = q.get('acct') || 'ms';
+  chipMs.hidden = acct !== 'ms'; chipOff.hidden = acct !== 'off'; chipNone.hidden = acct !== 'none';
+  if (q.get('switcher')) switcher.hidden = false;
+  show(q.get('view') || 'play.ready');
+</script>
