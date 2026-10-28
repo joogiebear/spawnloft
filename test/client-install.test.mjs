@@ -162,7 +162,7 @@ test('extractNatives skips META-INF and excluded prefixes', async () => {
   assert.ok(!entries.includes('META-INF'), 'META-INF skipped')
   assert.ok(!entries.includes('skip'), 'skip/ prefix excluded')
   assert.equal(result.files, 1)
-  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64 natives-v3`)
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64 natives-v4`)
 })
 
 test('ensureVersion refuses natives this machine cannot load before the first download', async () => {
@@ -179,4 +179,52 @@ test('ensureVersion refuses natives this machine cannot load before the first do
     { message: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })
   assert.deepEqual(calls, [])
   assert.equal(fs.existsSync(versionJar(older.id)), false)
+})
+
+test('26.x natives go to the java/ folder its java.library.path names, and old installs are redone', async () => {
+  // a real natives jar laid out like LWJGL's: windows/x64/org/lwjgl/lwjgl.dll
+  const cwd = fs.mkdtempSync(path.join(scratch, 'zip-src-'))
+  fs.mkdirSync(path.join(cwd, 'windows', 'x64', 'org', 'lwjgl'), { recursive: true })
+  fs.writeFileSync(path.join(cwd, 'windows', 'x64', 'org', 'lwjgl', 'lwjgl.dll'), 'lwjgl dll')
+  const libPath = 'org/lwjgl/lwjgl/3.4.3/lwjgl-3.4.3-natives-windows.jar'
+  const libDest = path.join(LIBRARIES_DIR, libPath)
+  fs.mkdirSync(path.dirname(libDest), { recursive: true })
+  await createZip(libDest, cwd, ['windows/x64/org/lwjgl/lwjgl.dll'])
+  const jar = fs.readFileSync(libDest)
+
+  const v26 = JSON.parse(JSON.stringify(fixture))
+  v26.id = '26.3-test'
+  v26.libraries = [{
+    name: 'org.lwjgl:lwjgl:3.4.3:natives-windows',
+    downloads: { artifact: {
+      path: libPath,
+      url: `https://libraries.minecraft.net/${libPath}`,
+      sha1: crypto.createHash('sha1').update(jar).digest('hex'),
+      size: jar.length,
+    } },
+    rules: [{ action: 'allow', os: { name: 'windows' } }],
+  }]
+  v26.arguments.jvm = [
+    '-Djava.library.path=${natives_directory}/java',
+    '-Djna.tmpdir=${natives_directory}/jna',
+    '-Dorg.lwjgl.system.SharedLibraryExtractPath=${natives_directory}/lwjgl',
+    '-Dio.netty.native.workdir=${natives_directory}/netty',
+    '-cp',
+    '${classpath}',
+  ]
+  fs.mkdirSync(versionDir(v26.id), { recursive: true })
+  fs.writeFileSync(versionJson(v26.id), JSON.stringify(v26))
+
+  // what 1.6.0-beta.2 left behind: the jar extracted to the top of the folder, stamped v3
+  const nDir = nativesDir(v26.id)
+  fs.mkdirSync(path.join(nDir, 'windows', 'x64', 'org', 'lwjgl'), { recursive: true })
+  fs.writeFileSync(path.join(nDir, 'windows', 'x64', 'org', 'lwjgl', 'lwjgl.dll'), 'lwjgl dll')
+  fs.writeFileSync(path.join(nDir, '.complete'), `${v26.id} windows x64 natives-v3`)
+
+  const { calls, fetchImpl } = makeStub()
+  await ensureVersion(v26.id, { os: winOs, fetchImpl })
+  assert.ok(!calls.some(u => u.endsWith(libPath)), 'the natives jar was already in place')
+  assert.equal(fs.readFileSync(path.join(nDir, 'java', 'windows', 'x64', 'org', 'lwjgl', 'lwjgl.dll'), 'utf8'), 'lwjgl dll')
+  assert.equal(fs.existsSync(path.join(nDir, 'windows')), false, 'the old top-level copy is gone')
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${v26.id} windows x64 natives-v4`)
 })

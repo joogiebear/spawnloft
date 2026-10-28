@@ -25,6 +25,7 @@ const {
   assetObjects,
   gameArguments,
   jvmArguments,
+  nativesLibrarySubdir,
   fetchManifest,
   fetchVersionJson,
 } = await import('../src/client-meta.mjs')
@@ -262,4 +263,16 @@ test('a macOS native library is marked native although the rules say osx', () =>
   const rows = libraries({ libraries: [lib] }, { os: { name: 'osx', arch: 'x64', version: '14' } })
   assert.equal(rows.length, 1)
   assert.ok(rows[0].native)
+})
+
+test('nativesLibrarySubdir follows the java.library.path argument', () => {
+  const win = { name: 'windows', arch: 'x64', version: '10' }
+  const withJvm = (jvm) => ({ arguments: { game: [], jvm } })
+  assert.equal(nativesLibrarySubdir(versionFixture, { os: win }), '')
+  assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}/java']), { os: win }), 'java')
+  assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}\\a\\b']), { os: win }), 'a/b')
+  assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}/../x']), { os: win }), '')
+  assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}x']), { os: win }), '')
+  assert.equal(nativesLibrarySubdir(withJvm([]), { os: win }), '')
+  assert.equal(nativesLibrarySubdir({}, { os: win }), '')
 })

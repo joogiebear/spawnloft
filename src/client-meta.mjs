@@ -228,6 +228,21 @@ export function jvmArguments(version, { os = currentOs(), features = {} } = {}) 
   return ['-Djava.library.path=${natives_directory}', '-cp', '${classpath}']
 }
 
+// Where in the natives directory the game looks for its libraries: 26.x points java.library.path
+// at ${natives_directory}/java (with jna, lwjgl and netty beside it), older versions at the
+// directory itself. '' for the directory itself, or when the argument is missing or odd.
+export function nativesLibrarySubdir(version, { os = currentOs() } = {}) {
+  const prefix = '-Djava.library.path=${natives_directory}'
+  const arg = jvmArguments(version, { os }).find(a => typeof a === 'string' && a.startsWith(prefix))
+  if (!arg) return ''
+  const rest = arg.slice(prefix.length)
+  if (rest === '') return ''
+  if (!/^[\\/][\w.-]+(?:[\\/][\w.-]+)*[\\/]?$/.test(rest)) return ''
+  const parts = rest.split(/[\\/]/).filter(Boolean)
+  if (parts.some(p => p === '.' || p === '..')) return ''
+  return parts.join('/')
+}
+
 function flattenArgs(args, ctx) {
   const out = []
   for (const arg of args ?? []) {
