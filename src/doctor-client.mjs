@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import { listProfiles, status } from './client.mjs'
 import { profileDir, versionJson, versionJar } from './client-paths.mjs'
 import { harnessFor, HARNESS_FILE, readHarnessFile, removeHarnessFile } from './client-harness.mjs'
+import { fabricApiJars } from './client-fabric.mjs'
 import { requiredMajor, DOWNLOAD_URL } from './java.mjs'
 import { readJson } from './util.mjs'
 
@@ -42,10 +43,11 @@ export function checkClientProfiles({ repair = false, javas = [] } = {}) {
           if (hash !== row.sha256) {
             problems.push(`${prefix}mods/${harnessFile} is not the published harness mod ${row.version}; delete it and launch again`)
           }
+          // launch uses a Fabric API someone put in mods/ by hand, so the doctor counts one too
           const modsJson = readJson(path.join(modsDir, '.spawnloft-mods.json'), null)
-          const hasFabricApi = modsJson && modsJson.managed && Object.entries(modsJson.managed).some(
+          const hasFabricApi = (modsJson && modsJson.managed && Object.entries(modsJson.managed).some(
             ([filename, entry]) => entry.project === 'fabric-api' && fs.existsSync(path.join(modsDir, filename)),
-          )
+          )) || fabricApiJars(modsDir).length > 0
           if (!hasFabricApi) {
             problems.push(`${prefix}the harness mod is installed but Fabric API is not; launch again to install it`)
           }

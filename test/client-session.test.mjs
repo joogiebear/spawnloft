@@ -75,8 +75,29 @@ test('chat sends and messages reflect it', async () => {
   assert.ok(m.messages[0].text.endsWith(' hello'))
 })
 
-test('join refuses an online-mode server', async () => {
-  await assert.rejects(join('harn', 'online'), /online mode/)
+test('join refuses an online-mode server in client wording, not the bots\' wording', async () => {
+  await assert.rejects(join('harn', 'online'), (err) => {
+    assert.match(err.message, /server "online" runs in online mode and .+ is an offline player.*spawnloft client login/)
+    assert.doesNotMatch(err.message, /bots/)
+    return true
+  })
+})
+
+test('harness calls refuse a profile name that is not one, before any path is built from it', async () => {
+  // run/<name> sits two levels under the data root, so this name reaches <data root>/x
+  const outside = path.join(process.env.MCCTL_DATA_ROOT, 'x')
+  fs.mkdirSync(outside, { recursive: true })
+  // a state file there, with this process as its live pid
+  writeJson(path.join(outside, 'state.json'), { pid: process.pid, startedAt: new Date().toISOString(), harness: { token: 't', port: 1 } })
+  const bad = '../../x'
+  for (const call of [() => session(bad), () => messages(bad), () => chat(bad, 'hi'), () => screenshot(bad), () => disconnect(bad), () => join(bad, 'offline')]) {
+    await assert.rejects(call(), (err) => {
+      assert.doesNotMatch(err.message, /not running|harness/)
+      assert.match(err.message, /name/)
+      return true
+    })
+  }
+  await assert.rejects(session('nosuch'), /nosuch/)
 })
 
 test('join succeeds on an offline server, once the world has loaded', async () => {

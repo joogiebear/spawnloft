@@ -52,7 +52,7 @@ export async function ensureFabricProfile(mc, loader, { fetchImpl = fetchJson } 
 }
 
 // Jars in mods/ whose fabric.mod.json says id "fabric-api", whatever the file is called.
-function fabricApiJars(modsDir) {
+export function fabricApiJars(modsDir) {
   let names = []
   try { names = fs.readdirSync(modsDir) } catch (err) { if (err.code !== 'ENOENT') throw err }
   return names.filter((n) => /\.jar$/i.test(n)).filter((n) => {

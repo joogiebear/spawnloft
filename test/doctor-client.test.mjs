@@ -104,6 +104,26 @@ test('a harness jar that is not the published one is a problem, and a missing Fa
   }
 })
 
+test('a Fabric API put in mods/ by hand counts as installed', async () => {
+  const { createZip } = await import('../src/zip.mjs')
+  client.createProfile('h', { mc, loader: 'fabric', harness: true })
+  try {
+    const modsDir = path.join(profileDir('h'), 'mods')
+    fs.mkdirSync(modsDir, { recursive: true })
+    fs.writeFileSync(path.join(modsDir, `spawnloft-harness-0.1.0+${mc}.jar`), 'not a jar')
+    const src = path.join(scratch, 'fapi-src')
+    fs.mkdirSync(src, { recursive: true })
+    fs.writeFileSync(path.join(src, 'fabric.mod.json'), JSON.stringify({ id: 'fabric-api', version: '0.140.0' }))
+    // no .spawnloft-mods.json, and a name that does not say what it is
+    await createZip(path.join(modsDir, 'my-api.jar'), src, ['fabric.mod.json'])
+
+    const r = checkClientProfiles({ javas: javas21 })
+    assert.ok(!r.problems.some(p => p.includes('Fabric API is not')), r.problems.join('\n'))
+  } finally {
+    client.removeProfile('h', { purge: true })
+  }
+})
+
 test('a stale harness file is reported, and removed with repair', () => {
   client.createProfile('h', { mc, loader: 'fabric', harness: true })
   try {

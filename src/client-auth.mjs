@@ -118,6 +118,9 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
   }
 }
 
+// unreadable token-endpoint answers in a row before the poll gives up
+const TOKEN_POLL_HICCUPS = 5
+
 export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = sleep, now = Date.now } = {}) {
   const dcBody = new URLSearchParams({ client_id: MSA_CLIENT_ID, scope: SCOPES }).toString()
   const dcRes = await fetchImpl(DEVICECODE_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: dcBody })
@@ -126,15 +129,35 @@ export async function deviceCodeLogin({ onCode, fetchImpl = fetch, sleepImpl = s
   if (!dc.device_code || !dc.user_code) fail('Microsoft did not start the sign-in; try again in a minute')
   onCode({ verificationUri: dc.verification_uri, userCode: dc.user_code, expiresIn: dc.expires_in })
 
+  // The code's own lifetime bounds the wait, so a token endpoint that stops answering cannot
+  // keep the poll going. A few unreadable answers in a row (a 5xx, an HTML error page, a dropped
+  // connection, temporarily_unavailable) are taken as a hiccup and polled through, since a new
+  // code means starting over.
+  const deadline = now() + (Number.isFinite(dc.expires_in) ? dc.expires_in : 900) * 1000
   let interval = dc.interval ?? 5
+  let hiccups = 0
   for (;;) {
     await sleepImpl(interval * 1000)
+    if (now() >= deadline) fail('the code expired before it was entered; run spawnloft client login again')
     const tBody = new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: MSA_CLIENT_ID, device_code: dc.device_code }).toString()
-    const tRes = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: tBody })
-    const t = await bodyOf(tRes)
+    let tRes = null
+    let t = {}
+    let lost = null
+    try {
+      tRes = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: tBody })
+      t = await bodyOf(tRes)
+    } catch (err) {
+      lost = String(err?.message ?? err)
+    }
     if (t.access_token) {
       return minecraftFromMicrosoft(t.access_token, t.refresh_token, { fetchImpl, now })
     }
+    if (!t.error || t.error === 'temporarily_unavailable') {
+      if (++hiccups < TOKEN_POLL_HICCUPS) continue
+      const why = lost ? `the connection failed: ${lost}` : t.error ?? `HTTP ${tRes.status}`
+      fail(`Microsoft's sign-in server stopped answering (${why}); run spawnloft client login again in a few minutes`)
+    }
+    hiccups = 0
     if (t.error === 'authorization_pending') continue
     if (t.error === 'slow_down') {
       interval += 5

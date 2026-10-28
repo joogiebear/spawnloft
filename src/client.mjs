@@ -271,9 +271,13 @@ function serverWarnings(server, account) {
     warnings.push(`server "${server}" is not running, so the game will show "Connection refused"; start it first: spawnloft start ${server}`)
   }
   if (account.type !== 'microsoft' && check.problems.some((p) => /runs in online mode/.test(p))) {
-    warnings.push(`server "${server}" runs in online mode and ${account.name} is an offline player, so the server will refuse the join; sign in (spawnloft client login) or set online-mode=false on a test server`)
+    warnings.push(onlineModeRefusal(server, account.name))
   }
   return warnings
+}
+
+function onlineModeRefusal(server, playerName) {
+  return `server "${server}" runs in online mode and ${playerName} is an offline player, so the server will refuse the join; sign in (spawnloft client login) or set online-mode=false on a test server`
 }
 
 // MCCTL_FAKE_CLIENT points launch at a script run by this Node instead of Java (the test suite's
@@ -304,6 +308,8 @@ export function status(name) {
 const sessions = new Map()
 
 export async function session(name) {
+  // the name becomes part of the state and harness file paths
+  getProfile(name)
   const st = readClientState(name)
   if (!st) {
     fail('profile "' + name + '" is not running; launch it first: spawnloft client launch ' + name)
@@ -349,10 +355,17 @@ async function waitInWorld(name, server, waitMs) {
 }
 
 export async function join(name, server, { loadWaitMs = 60000 } = {}) {
+  // the account decides the online-mode rule below, and a stopped client has none to go by
+  const { running, account } = status(name)
+  if (!running) fail('profile "' + name + '" is not running; launch it first: spawnloft client launch ' + name)
   const check = checkInstance(server)
-  // The offline-mode rule is for players without an account; a signed-in one may join an online server.
-  const signedIn = status(name).account?.type === 'microsoft'
-  const problems = check.problems.filter((p) => !(signedIn && /runs in online mode/.test(p)))
+  // The offline-mode rule is for players without an account; a signed-in one may join an online
+  // server. checkInstance words it for bots, so an offline client gets the launch warning's wording.
+  const problems = check.problems.flatMap((p) => {
+    if (!/runs in online mode/.test(p)) return [p]
+    if (account?.type === 'microsoft') return []
+    return [onlineModeRefusal(server, account?.name) + '.']
+  })
   if (problems.length) fail(problems.join(' '))
   const host = check.host
   const port = check.inst.port

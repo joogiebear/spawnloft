@@ -153,6 +153,71 @@ test('an expired code says to run login again', async () => {
   )
 })
 
+test('a few unreadable token answers in a row are polled through', async () => {
+  resetSleep()
+  const steps = [
+    { match(url) { assert.equal(url, DEVICECODE_URL) }, reply: { status: 200, json: dcReply } },
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 502, json: undefined } },
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 503, json: { error: 'temporarily_unavailable' } } },
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 400, json: { error: 'authorization_pending' } } },
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 500, json: {} } },
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 200, json: tokenReply } },
+    { match(url) { assert.equal(url, XBL_URL) }, reply: { status: 200, json: xblReply } },
+    { match(url) { assert.equal(url, XSTS_URL) }, reply: { status: 200, json: xstsReply } },
+    { match(url) { assert.equal(url, MC_LOGIN_URL) }, reply: { status: 200, json: mcLoginReply } },
+    { match(url) { assert.equal(url, MC_PROFILE_URL) }, reply: { status: 200, json: profileReply } },
+  ]
+  // a body that is not JSON, as an HTML error page would be
+  const fetchImpl = scripted(steps)
+  const withHtml = async (url, init) => {
+    const res = await fetchImpl(url, init)
+    return res.status === 502 ? { ...res, json: async () => { throw new SyntaxError('Unexpected token <') } } : res
+  }
+  const account = await deviceCodeLogin({ onCode: () => {}, fetchImpl: withHtml, sleepImpl, now })
+  assert.equal(account.name, 'Joogiebear')
+})
+
+test('a token endpoint that keeps failing ends the poll with what it answered, not "undefined"', async () => {
+  resetSleep()
+  const steps = [{ match(url) { assert.equal(url, DEVICECODE_URL) }, reply: { status: 200, json: dcReply } }]
+  for (let i = 0; i < 5; i++) steps.push({ match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 503, json: {} } })
+  await assert.rejects(
+    deviceCodeLogin({ onCode: () => {}, fetchImpl: scripted(steps), sleepImpl, now }),
+    (err) => {
+      assert.match(err.message, /stopped answering \(HTTP 503\).*client login again/)
+      assert.doesNotMatch(err.message, /undefined/)
+      return true
+    },
+  )
+  // a dropped connection counts the same way and is named
+  let calls = 0
+  const dropping = async (url) => {
+    if (calls++ === 0) return { ok: true, status: 200, json: async () => dcReply }
+    throw new TypeError('fetch failed')
+  }
+  await assert.rejects(deviceCodeLogin({ onCode: () => {}, fetchImpl: dropping, sleepImpl, now }), /connection failed: fetch failed/)
+  assert.equal(calls, 6)
+})
+
+test('the poll stops at the code\'s own expiry even while Microsoft keeps saying pending', async () => {
+  resetSleep()
+  let clock = 1_700_000_000_000
+  const ticking = () => clock
+  const sleepTick = (ms) => { clock += ms; return Promise.resolve() }
+  let polls = 0
+  const pendingForever = async (url) => {
+    if (url === DEVICECODE_URL) return { ok: true, status: 200, json: async () => ({ ...dcReply, expires_in: 10, interval: 2 }) }
+    polls++
+    return { ok: false, status: 400, json: async () => ({ error: 'authorization_pending' }) }
+  }
+  await assert.rejects(
+    deviceCodeLogin({ onCode: () => {}, fetchImpl: pendingForever, sleepImpl: sleepTick, now: ticking }),
+    /expired before it was entered/,
+  )
+  // polls at 2, 4, 6 and 8 s; the wake at 10 s is the deadline
+  assert.equal(polls, 4)
+})
+
 test('a child account and a missing Xbox profile are named', async () => {
   resetSleep()
   const stepsChild = [
