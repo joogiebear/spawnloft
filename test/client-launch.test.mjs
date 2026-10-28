@@ -12,7 +12,7 @@ after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 const { offlineUuid, assertPlayerName, offlineAccount, defaultPlayerName } = await import('../src/client-auth.mjs')
 const { buildCommand, substitute } = await import('../src/client-launch.mjs')
 const { mergeInherited, libraries } = await import('../src/client-meta.mjs')
-const { versionJar, nativesDir, LIBRARIES_DIR, logConfigPath } = await import('../src/client-paths.mjs')
+const { versionJar, nativesDir, LIBRARIES_DIR, ASSETS_DIR, logConfigPath } = await import('../src/client-paths.mjs')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixtureDir = path.join(here, 'fixtures', 'client')
@@ -165,4 +165,33 @@ test('Log4Shell: 1.21.11 gets its log config as Mojang\'s launcher passes it, an
   assert.ok(jvm.includes(`-Dlog4j.configurationFile=${logConfigPath('client-1.21.2.xml')}`), 'log config argument')
   assert.ok(!cmd.args.includes('-Dlog4j2.formatMsgNoLookups=true'), 'no switch for log4j 2.16+')
   assert.deepEqual(cmd.args.filter((a) => a.startsWith('-Dlog4j')).length, 1)
+})
+
+test('the minecraftArguments era: every era fills every variable, with the session as Mojang wrote it', () => {
+  const ids = ['rd-132211', 'a1.2.6', 'b1.7.3', '1.5.2', '1.6.4', '1.7.2', '1.7.10', '1.12.2', '1.14.4', '1.16.5', '1.17.1', '1.18.2', '1.20.4', '1.21.11', '26.1', '26.3', '26.4-snapshot-6']
+  for (const id of ids) {
+    const version = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', `${id}.json`), 'utf8'))
+    const cmd = buildCommand({ version, profile: { mc: id, loader: 'vanilla', memory: '2G', server: null }, profileName: 'old', account, java, os: testOs })
+    assert.deepEqual(cmd.args.filter((a) => a.includes('${')), [], `${id}: nothing left unsubstituted`)
+  }
+  const at = (args, flag) => args[args.indexOf(flag) + 1]
+  // 1.6.4: --session token:<access>:<uuid>, the offline player's access token being "0"
+  const v164 = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.6.4.json'), 'utf8'))
+  const old = buildCommand({ version: v164, profile: { mc: '1.6.4', loader: 'vanilla', memory: '2G', server: null }, profileName: 'old', account, java, os: testOs })
+  assert.equal(at(old.args, '--session'), `token:0:${account.uuid}`)
+  assert.equal(at(old.args, '--assetsDir'), ASSETS_DIR)
+  // a signed-in player's own token
+  const signedIn = { ...account, type: 'microsoft', accessToken: 'abc.def', userType: 'msa' }
+  const msa = buildCommand({ version: v164, profile: { mc: '1.6.4', loader: 'vanilla', memory: '2G', server: null }, profileName: 'old', account: signedIn, java, os: testOs })
+  assert.equal(at(msa.args, '--session'), `token:abc.def:${account.uuid}`)
+  // 1.7.10: no Twitch properties
+  const v1710 = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.7.10.json'), 'utf8'))
+  const mid = buildCommand({ version: v1710, profile: { mc: '1.7.10', loader: 'vanilla', memory: '2G', server: null }, profileName: 'old', account, java, os: testOs })
+  assert.equal(at(mid.args, '--userProperties'), '{}')
+})
+
+test('the old versions\' session text is redacted in the log lines the panel shows', async () => {
+  const { redactClientLine } = await import('../src/client.mjs')
+  assert.equal(redactClientLine('(Session ID is token:eyJhbGciOi.abc:40f5db53a47a33eeb1f6db0e20deded4)'), '(Session ID is token:[redacted]:40f5db53a47a33eeb1f6db0e20deded4)')
+  assert.equal(redactClientLine('--accessToken secret --version 1.21.11'), '--accessToken [redacted] --version 1.21.11')
 })

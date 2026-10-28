@@ -2095,7 +2095,9 @@ async function cmdClient(positional, flags) {
     checkFlags(flags, ['mc', 'loader', 'memory', 'java', 'server', 'harness', 'account', 'json'])
     if (rest.length !== 1) throw new UsageError(usage)
     if (!flags.mc) throw new UsageError(usage)
-    const profile = client.createProfile(rest[0], { mc: flags.mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true, account: flags.account ?? null })
+    // the version Mojang lists (and Fabric builds for, with Fabric) before anything is saved
+    const mc = await client.checkProfileVersion({ mc: flags.mc, loader: flags.loader ?? 'vanilla' })
+    const profile = client.createProfile(rest[0], { mc, loader: flags.loader ?? 'vanilla', memory: flags.memory ?? client.DEFAULT_MEMORY, java: flags.java ?? null, server: flags.server ?? null, harness: flags.harness === true, account: flags.account ?? null })
     if (quiet) process.stdout.write(jsonLine('client', { profile }))
     else out(`Created profile "${rest[0]}" (Minecraft ${profile.mc}, ${profile.loader}). Launch it: spawnloft client launch ${rest[0]}`)
     return
@@ -2120,6 +2122,12 @@ async function cmdClient(positional, flags) {
         value = null
       }
       patch[key] = value
+    }
+    if (patch.mc !== undefined || patch.loader !== undefined) {
+      const before = client.getProfile(name)
+      const mc = patch.mc ?? before.mc
+      const loader = patch.loader ?? before.loader
+      if (mc.trim() !== before.mc || loader !== before.loader) await client.checkProfileVersion({ mc, loader })
     }
     const profile = client.updateProfile(name, patch)
     if (quiet) process.stdout.write(jsonLine('client', { profile }))

@@ -9,12 +9,16 @@ process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
 const F = await import('./fixtures/client-fixtures.mjs')
-const { resolveVersion, resolvedRefusal, javaRequirement, collectVariables, launchFeatures, LAUNCH_VARIABLES } = await import('../src/client-version.mjs')
+const { resolveVersion, resolvedRefusal, javaRequirement, collectVariables, launchFeatures, LAUNCH_VARIABLES, isSafeVersionId, versionKind } = await import('../src/client-version.mjs')
 const { ruleAllows, ruleProblems, archDecision, nativeArches, mergeInherited } = await import('../src/client-meta.mjs')
 const { chooseClientJava, pickClientJava, parseArch } = await import('../src/java.mjs')
 const { launch, createProfile } = await import('../src/client.mjs')
 const { versionDir, versionJson } = await import('../src/client-paths.mjs')
 const { platformRefusal } = await import('../src/client-meta.mjs')
+
+// Before the first test(): a top-level await between tests lets the ones above it finish and the
+// file's after() remove scratch before the ones below it run (review V1b S-1).
+const realJava = await import('../src/java.mjs').then((m) => m.probe('java'))
 
 const pair = (name, arch) => F.OS_PAIRS.find((o) => o.name === name && o.arch === arch)
 const codes = (r) => r.problems.map((p) => p.code)
@@ -41,9 +45,6 @@ const JAVA = {
   '26.4-snapshot-6': [25, 'java-runtime-epsilon', 25, null, 25],
 }
 
-// The variables V1b adds; until then the versions using them are refused, not launched with the
-// literal text on the command line.
-const LEGACY_VARIABLE_ERAS = ['rd-132211', 'a1.2.6', 'b1.7.3', '1.5.2', '1.6.4', '1.7.2', '1.7.10']
 const MAP_FORM = ['rd-132211', 'a1.2.6', 'b1.7.3', '1.5.2', '1.6.4', '1.7.2', '1.7.10', '1.12.2', '1.14.4', '1.16.5', '1.17.1', '1.18.2']
 
 test('resolver: the Java of every era comes from its JSON', () => {
@@ -80,7 +81,6 @@ test('resolver: every era on every machine, with and without x64 emulation', () 
         } else if (os.name === 'windows' && os.arch === 'x86' && ['26.3', '26.4-snapshot-6'].includes(id)) {
           expected.push('no-natives-for-this-machine')
         }
-        if (LEGACY_VARIABLE_ERAS.includes(id)) expected.push('unknown-variable')
         assert.deepEqual(codes(r), expected, where)
         assert.equal(r.arch, arch, where)
         assert.equal(r.emulated, arch !== os.arch, where)
@@ -107,7 +107,8 @@ test('resolver: emulated x64 takes the x64 natives, the arm64 Java is not wanted
 
 test('resolver: the variables after rules are all known, with every launch feature on too', () => {
   const allOn = { ...launchFeatures({ hasServer: true }), has_custom_resolution: true, is_quick_play_singleplayer: true, is_quick_play_realms: true }
-  for (const id of F.ERA_IDS.filter((e) => !LEGACY_VARIABLE_ERAS.includes(e))) {
+  // the minecraftArguments era's auth_session, game_assets and user_properties included (V1b)
+  for (const id of F.ERA_IDS) {
     for (const features of [launchFeatures(), launchFeatures({ hasServer: true }), allOn]) {
       const r = resolveVersion(F.loadVersion(id), { os: pair('windows', 'x64'), features })
       for (const v of r.variables) assert.ok(LAUNCH_VARIABLES.includes(v), `${id}: \${${v}}`)
@@ -241,7 +242,7 @@ test('Java: the refusals name the Java the version needs; a newer one runs with 
   assert.deepEqual(await pickClientJava({ requirement: req, found: javas([25], [21]) }), { path: '/jvm/25-x64/bin/java', warning: null })
 })
 
-test('Java: probe() reports the arch of a real Java', { skip: !(await import('../src/java.mjs').then((m) => m.probe('java'))).found && 'no Java on PATH' }, async () => {
+test('Java: probe() reports the arch of a real Java', { skip: !realJava.found && 'no Java on PATH' }, async () => {
   const { probe } = await import('../src/java.mjs')
   const state = await probe('java')
   assert.ok(['x64', 'arm64', 'x86'].includes(state.arch), `arch ${state.arch}`)
@@ -276,4 +277,85 @@ test('launch: a version with a problem is refused after its JSON and before Java
 test('mergeInherited keeps the parent javaVersion for the resolver', () => {
   const merged = mergeInherited(F.loadFabricProfile('26.3'), F.loadVersion('26.3'))
   assert.equal(resolveVersion(merged, { os: pair('linux', 'x64') }).java.major, 25)
+})
+
+test('ids: every id shape Mojang has used is safe, nothing that would leave its folder is', () => {
+  for (const row of F.loadErasManifest().versions) assert.ok(isSafeVersionId(row.id), row.id)
+  for (const ok of ['26.4-snapshot-6', '1.14.2 Pre-Release 4', 'rd-132211', 'c0.0.11a', 'inf-20100618', '3D Shareware v1.34']) assert.ok(isSafeVersionId(ok), ok)
+  for (const bad of ['', ' 1.21', '1.21 ', '1.21.', '-1.21', '.1', '1..21', '../x', 'a/b', 'a\\b', '1.21:x', 'x'.repeat(65), 42, null]) {
+    assert.equal(isSafeVersionId(bad), false, String(bad))
+  }
+})
+
+test('ids: the picker kind of every shape', () => {
+  const kinds = Object.fromEntries(F.loadErasManifest().versions.map((v) => [v.id, versionKind(v)]))
+  assert.equal(kinds['26.3'], 'release')
+  assert.equal(kinds['26.4-snapshot-6'], 'snapshot')
+  assert.equal(kinds['25w46a'], 'snapshot')
+  assert.equal(kinds['1.21.11-rc3'], 'release-candidate')
+  assert.equal(kinds['1.14.2 Pre-Release 4'], 'pre-release')
+  assert.equal(kinds['3D Shareware v1.34'], 'snapshot')
+  assert.equal(kinds['b1.7.3'], 'beta')
+  assert.equal(kinds['a1.2.6'], 'alpha')
+  assert.equal(kinds['rd-132211'], 'alpha')
+  assert.equal(versionKind({ id: '1.21.11-pre1', type: 'snapshot' }), 'pre-release')
+  assert.equal(versionKind({ id: '26.1-pre-2', type: 'snapshot' }), 'pre-release')
+  assert.equal(versionKind({ id: '26.1-rc-1', type: 'snapshot' }), 'release-candidate')
+})
+
+test('rules: a versionRange with no OS name never matches on a Mac, at launch or in the picker (review N-1)', () => {
+  const mac = pair('osx', 'arm64')
+  const rules = [{ action: 'allow', os: { versionRange: { min: '1.0' } } }]
+  assert.equal(ruleAllows(rules, { os: mac }), false)
+  assert.equal(ruleAllows(rules, { os: pair('windows', 'x64') }), true)
+  assert.equal(ruleAllows([{ action: 'allow' }, { action: 'disallow', os: { versionRange: { min: '1.0' } } }], { os: mac }), true)
+})
+
+// A stand-in Java: a shell script answering -version (and -XshowSettings unless told to refuse it).
+// Each in a folder of its own, made here: nothing else in the run can have removed it.
+function stubJava(name, { major, arch = 'x86_64', refuseSettings = false }) {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sl-stub-java-')), name)
+  const version = major === 8 ? '1.8.0_402' : `${major}.0.1`
+  fs.writeFileSync(file, [
+    '#!/bin/sh',
+    'for a in "$@"; do',
+    `  if [ "$a" = "-XshowSettings:properties" ]; then ${refuseSettings ? 'echo "Unrecognized option: -XshowSettings:properties" >&2; exit 1' : `echo "    os.arch = ${arch}" >&2`}; fi`,
+    'done',
+    `echo 'openjdk version "${version}" 2024-10-15' >&2`,
+    'exit 0',
+    '',
+  ].join('\n'))
+  fs.chmodSync(file, 0o755)
+  return file
+}
+
+const posixOnly = process.platform === 'win32' && 'the stand-in Java is a shell script'
+
+test('Java: an explicit Java of the wrong arch, too old, or newer with a warning (review N-4)', { skip: posixOnly }, async () => {
+  const req = javaRequirement(F.loadVersion('1.16.5'))
+  const arm = stubJava('java-arm', { major: 8, arch: 'aarch64' })
+  await assert.rejects(pickClientJava({ explicit: arm, requirement: req, arch: 'x64', what: 'Minecraft 1.16.5' }), {
+    code: 'java-wrong-arch',
+    message: `Minecraft 1.16.5 runs as x64 on this machine, and ${arm} is an arm64 Java. Pick an x64 Java for the profile, or clear it to let SpawnLoft choose.`,
+  })
+  const old = stubJava('java-old', { major: 17 })
+  await assert.rejects(pickClientJava({ explicit: old, requirement: javaRequirement(F.loadVersion('26.3')), arch: 'x64', what: 'Minecraft 26.3' }), {
+    code: 'java-too-old',
+    message: `Minecraft 26.3 needs Java 25 or newer, and ${old} is Java 17. Pick another Java for the profile, or clear it to let SpawnLoft choose.`,
+  })
+  const newer = stubJava('java-new', { major: 21 })
+  const picked = await pickClientJava({ explicit: newer, requirement: req, arch: 'x64', what: 'Minecraft 1.16.5' })
+  assert.equal(picked.path, newer)
+  assert.match(picked.warning, /^Minecraft 1\.16\.5 wants Java 8 to 17; using Java 21 at .*, which is newer, so the game may not start\./)
+  const eight = stubJava('java-8', { major: 8 })
+  assert.deepEqual(await pickClientJava({ explicit: eight, requirement: req, arch: 'x64' }), { path: eight, warning: null })
+})
+
+test('Java: probe() asks again with -version when a Java refuses -XshowSettings (review N-4)', { skip: posixOnly }, async () => {
+  const { probe } = await import('../src/java.mjs')
+  const state = await probe(stubJava('java-plain', { major: 8, refuseSettings: true }))
+  assert.equal(state.found, true)
+  assert.equal(state.major, 8)
+  assert.equal(state.arch, null, 'its arch stays unknown')
+  assert.equal((await probe(stubJava('java-props', { major: 21, arch: 'aarch64' }))).arch, 'arm64')
 })

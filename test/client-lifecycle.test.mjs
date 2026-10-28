@@ -248,3 +248,22 @@ test('MCCTL_FAKE_CLIENT is honoured only under NODE_ENV=test', async () => {
   assert.equal(fakeClientJava({ MCCTL_FAKE_CLIENT: '/x/fake.mjs', NODE_ENV: 'test' }), '/x/fake.mjs')
   assert.equal(fakeClientJava({ NODE_ENV: 'test' }), null)
 })
+
+test('a version with no arm64 natives runs as x64 on an arm64 machine that can emulate it (review N-4)', async () => {
+  const old = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'client', 'versions', '1.16.5.json'), 'utf8'))
+  fs.mkdirSync(versionDir(old.id), { recursive: true })
+  fs.writeFileSync(versionJson(old.id), JSON.stringify(old))
+  createProfile('emu', { mc: old.id })
+  try {
+    const mac = { name: 'osx', arch: 'arm64', version: '23.6.0' }
+    await assert.rejects(launch('emu', { fakeJava, os: mac, hostCaps: { x64: false } }), { code: 'no-natives-for-this-machine', message: /install Rosetta/ })
+    await launch('emu', { fakeJava, os: mac, hostCaps: { x64: true } })
+    const facts = readClientState('emu').launch
+    assert.equal(facts.arch, 'x64')
+    assert.equal(facts.emulated, true)
+    assert.equal(facts.java.major, 8)
+  } finally {
+    try { await stop('emu') } catch { /* not running */ }
+    removeProfile('emu')
+  }
+})

@@ -22,11 +22,36 @@ export const LAUNCH_VARIABLES = [
   'launcher_name', 'launcher_version',
   'auth_player_name', 'auth_uuid', 'auth_access_token', 'clientid', 'auth_xuid', 'user_type',
   'quickPlayMultiplayer', 'quickPlayPath',
+  // the minecraftArguments era's (1.12.2 and older)
+  'auth_session', 'game_assets', 'user_properties',
   // behind features a launch never sets; listed so a run with them on sees no problem
   'resolution_width', 'resolution_height', 'quickPlaySingleplayer', 'quickPlayRealms',
   // the logging argument's own
   'path',
 ]
+
+// A version id as it may reach a folder name, a URL and the game's command line. Mojang's ids
+// carry spaces ("1.14.2 Pre-Release 4") and every shape over the years (rd-132211, b1.7.3,
+// 26.4-snapshot-6), so the shape is loose and the manifest decides what exists. A trailing dot
+// or space is refused: Windows drops them from folder names, so versions/<id>/ would not be the
+// id's own folder.
+export function isSafeVersionId(id) {
+  return typeof id === 'string'
+    && /^[A-Za-z0-9][A-Za-z0-9._ -]{0,63}$/.test(id)
+    && !id.includes('..')
+    && !/[. ]$/.test(id)
+}
+
+// What a manifest row is, for the picker: the type Mojang gives it, with pre-releases and release
+// candidates (type "snapshot" in the manifest) told apart by their ids.
+export function versionKind({ id, type }) {
+  if (type === 'release') return 'release'
+  if (type === 'old_beta') return 'beta'
+  if (type === 'old_alpha') return 'alpha'
+  if (/-pre-?\d| Pre-Release \d/.test(id)) return 'pre-release'
+  if (/-rc-?\d/.test(id)) return 'release-candidate'
+  return 'snapshot'
+}
 
 // What the game is run with on a normal launch; a server to join turns on quick play.
 export function launchFeatures({ hasServer = false } = {}) {

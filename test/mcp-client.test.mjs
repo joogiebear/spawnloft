@@ -293,3 +293,14 @@ test('client_launch ignores the launcher\'s default account: a profile without a
   setDefaultAccount(null)
   saveAccounts([])
 })
+
+test('client_launch names the code of a refusal for the version itself (review N-9)', async () => {
+  const future = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'client', 'future.json'), 'utf8'))
+  fs.mkdirSync(versionDir(future.id), { recursive: true })
+  fs.writeFileSync(versionJson(future.id), JSON.stringify(future))
+  createProfile('futr', { mc: future.id })
+  const r = await one('client_launch', { profile: 'futr', wait: false })
+  assert.equal(r.isError, true)
+  assert.match(r.content[0].text, /^Minecraft 27\.1 uses a platform rule SpawnLoft does not know .*Update SpawnLoft\. \(code: unknown-rule-key\)$/)
+  assert.equal(r.structuredContent.code, 'unknown-rule-key')
+})

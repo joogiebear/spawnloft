@@ -71,7 +71,7 @@ A profile is a few keys, all changeable with `set`:
 
 | Key | Meaning |
 | --- | --- |
-| `mc` | The Minecraft version, such as `1.21.11`. |
+| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with Fabric only for a version Fabric builds for (1.14 and newer); a mistyped id is refused with the nearest ones. |
 | `loader` | `vanilla` or `fabric`. Fabric is needed for mods, and for the harness. |
 | `loaderVersion` | The Fabric loader version. Left empty, the newest stable one is picked at the first launch and recorded. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
@@ -123,7 +123,8 @@ On a fresh install with no setup, Play makes one for the latest release (Vanilla
 who is playing, and plays. Nothing downloads before that is answered.
 
 The setup sheet (New setup, or the gear) has the version (releases, or with snapshots, or
-everything, from Mojang's version list, cached so it works offline once fetched), Vanilla or
+everything, from Mojang's version list, cached for an hour so it works offline once fetched;
+**Refresh** reads it again, for a version out within the hour), Vanilla or
 Fabric, memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory that says how much is
 free), an optional name (else it is named by its version), who it plays as, the server it usually
 joins, **Let SpawnLoft see the game** (the harness mod), and under Advanced the Java path, the

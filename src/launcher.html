@@ -619,6 +619,13 @@
     }))
   }
 
+  // How a picker row names what it is: the panel's kind, else Mojang's type.
+  const KIND_LABELS = { 'pre-release': 'pre-release', 'release-candidate': 'release candidate', snapshot: 'snapshot', beta: 'beta', alpha: 'alpha', old_beta: 'beta', old_alpha: 'alpha' }
+  function kindLabel(row) {
+    const kind = row.kind ?? row.type
+    return KIND_LABELS[kind] ?? kind
+  }
+
   // The version picker's rows: releases, then snapshots too, then everything.
   function versionRows(versions, show) {
     if (show === 'all') return versions
@@ -796,7 +803,8 @@
   function versionFacts(row, details) {
     const d = { ...(row ?? {}), ...(details ?? {}) }
     const out = []
-    if (d.javaNeeds) out.push(`Java ${d.javaNeeds}`)
+    // a guess from the id until the version's file has been read
+    if (d.javaNeeds) out.push(d.javaNeedsExact === false ? `likely Java ${d.javaNeeds}` : `Java ${d.javaNeeds}`)
     if (d.fabric === true) out.push('Fabric available')
     else if (d.fabric === false) out.push('no Fabric')
     if (d.harness === true) out.push('harness published')
@@ -1570,10 +1578,14 @@
     $('play')?.focus({ preventScroll: true })
   }
 
-  async function loadVersions() {
+  // fabric=1: the rows say where Fabric builds; refresh asks Mojang and Fabric again now, for a
+  // version out within the hour
+  async function loadVersions({ refresh = false } = {}) {
     S.versions = { loading: true }
+    // what a version's details said may be older than the lists now read
+    if (refresh) S.details = {}
     try {
-      S.versions = await api('client/versions')
+      S.versions = await (refresh ? api('client/versions/refresh', { method: 'POST' }) : api('client/versions?fabric=1'))
     } catch (err) {
       S.versions = { error: err.message }
     }
@@ -1673,23 +1685,27 @@
       versionField = ro('Version', f.mc, runningHint)
     } else {
       const rows = v?.versions ? versionRows(v.versions, S.versionShow) : []
+      const latest = rows.find((r) => r.type === 'release')
       const options = rows.map((r) => h('option', {
         value: r.id,
         disabled: Boolean(r.refusal || machine),
-        text: `${r.id}${r === rows[0] && r.type === 'release' ? ' (latest release)' : r.type !== 'release' ? ` (${r.kind ?? r.type})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
+        text: `${r.id}${r === latest ? ' (latest release)' : r.type !== 'release' ? ` (${kindLabel(r)})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
       }))
       if (f.mc && !rows.some((r) => r.id === f.mc)) options.unshift(h('option', { value: f.mc, text: f.mc }))
       if (!options.length) options.push(h('option', { value: '', text: v?.loading ? 'Loading versions…' : 'No versions to pick' }))
       const show = (mode, text) => h('button', { type: 'button', class: 'linkbtn', 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; render() } }, text)
       const facts = versionFacts(versionRow(f.mc), S.details[f.mc])
+      const refused = S.details[f.mc]?.refusal ?? null
       const changed = p && f.mc !== p.mc
       versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }),
         h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
         changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
+        refused && h('small', { class: 'hint warn', text: sentence(refused) }),
         h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint' },
           v?.error ? `The version list could not be read: ${v.error}. ` : v?.offline ? sentence(v.offline) + '. ' : '',
           facts.length ? `${sentence(facts.join(' · '))} · ` : '',
-          show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all')))
+          show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all'), ' · ',
+          h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), onclick: () => loadVersions({ refresh: true }) }, 'Refresh')))
     }
 
     const fabricNo = fabricBlock(f)

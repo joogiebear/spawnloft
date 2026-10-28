@@ -3,7 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } from './client-paths.mjs'
-import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal, nativesLibrarySubdir, nativesExtraDirs, loggingConfig } from './client-meta.mjs'
+import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, assetLayout, platformRefusal, nativesLibrarySubdir, nativesExtraDirs, loggingConfig } from './client-meta.mjs'
 import { nativesStamp } from './client-version.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
@@ -134,6 +134,30 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   const refusal = platformRefusal(version, os)
   if (refusal) fail(refusal)
 
+  // The asset index first, small as it is: an index laid out in a way this SpawnLoft does not set
+  // up is refused before the jar and the libraries download (review R4, S-5).
+  const plan = planInstall(version, { os })
+  const ai = plan.assetIndex
+  const indexDest = path.join(ASSETS_DIR, 'indexes', `${ai.id}.json`)
+  let indexBytes = 0
+  if (needsDownload(indexDest, { sha1: ai.sha1, size: ai.size })) {
+    fs.mkdirSync(path.dirname(indexDest), { recursive: true })
+    try {
+      await fetchImpl(ai.url, indexDest, { hash: 'sha1', expected: ai.sha1, label: `asset index ${ai.id}` })
+    } catch (err) {
+      fail(`could not download asset index ${ai.id} from ${ai.url}: ${err.message}`)
+    }
+    indexBytes = ai.size ?? 0
+  }
+  const indexJson = JSON.parse(fs.readFileSync(indexDest, 'utf8'))
+  const layout = assetLayout(indexJson)
+  if (layout === null) {
+    fail(`Minecraft ${id}'s asset index (${ai.id}) is laid out in a way SpawnLoft does not know. Update SpawnLoft.`, 'unknown-asset-layout')
+  }
+  if (layout !== 'objects') {
+    fail(`Minecraft ${id} keeps its sounds and language files in an older layout (asset index ${ai.id}) that this SpawnLoft does not set up yet. Update SpawnLoft.`, 'unknown-asset-layout')
+  }
+
   const jarPath = versionJar(id)
 
   let downloaded = 0
@@ -195,7 +219,11 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     emitEnd('log config', 1, 1, needs ? (logCfg.size ?? 0) : 0)
   }
 
-  const plan = planInstall(version, { os })
+  if (indexBytes) {
+    downloaded++
+    totalBytes += indexBytes
+  }
+
   const nativeRows = plan.natives
   let libBytes = 0
   let libDone = 0
@@ -227,26 +255,8 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   emitEnd('libraries', libDone, libDownloads.length, libBytes)
 
   // two index entries can share a hash, so key the queue by destination path
-  const ai = plan.assetIndex
-  const indexDest = path.join(ASSETS_DIR, 'indexes', `${ai.id}.json`)
-  let assetDone = 0
-  let assetBytes = 0
-
-  const indexNeeds = needsDownload(indexDest, { sha1: ai.sha1, size: ai.size })
-  if (indexNeeds) {
-    fs.mkdirSync(path.dirname(indexDest), { recursive: true })
-    try {
-      await fetchImpl(ai.url, indexDest, { hash: 'sha1', expected: ai.sha1, label: `asset index ${ai.id}` })
-    } catch (err) {
-      fail(`could not download asset index ${ai.id} from ${ai.url}: ${err.message}`)
-    }
-    assetBytes += ai.size ?? 0
-    downloaded++
-    totalBytes += ai.size ?? 0
-  }
-  assetDone++
-
-  const indexJson = JSON.parse(fs.readFileSync(indexDest, 'utf8'))
+  let assetDone = 1
+  let assetBytes = indexBytes
   const objRows = assetObjects(indexJson)
 
   const assetByPath = new Map()
@@ -288,6 +298,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     id,
     jar: jarPath,
     logConfig: logCfg?.id ?? null,
+    assetsLayout: layout,
     libraries: plan.libraryRows,
     natives: nativeRows.length,
     assets: objRows.length,

@@ -284,7 +284,7 @@ test('a log config that cannot be fetched refuses the version instead of leaving
     calls.push(url)
     if (url === old.logging.client.file.url) throw new Error('HTTP 503')
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, BODY)
+    fs.writeFileSync(dest, url === old.assetIndex.url ? INDEX : BODY)
   }
   await assert.rejects(ensureVersion(old.id, { os: winOs, fetchImpl }), {
     message: `could not download the log config client-1.12.xml from ${old.logging.client.file.url}: HTTP 503; without it 1.12.2 would run open to Log4Shell, so it is not launched`,
@@ -324,4 +324,49 @@ test('1.7.10 installs: every download is a URL the JSON names, and the natives-o
   assert.equal(result.natives, 4)
   assert.equal(result.logConfig, 'client-1.7.xml')
   assert.ok(fs.existsSync(path.join(nativesDir(old.id), '.complete')), 'natives extracted')
+})
+
+test('an asset index laid out in a way SpawnLoft does not set up is refused before the jar and the libraries (review S-5)', async () => {
+  const base = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.12.2.json'), 'utf8'))
+  const cases = [
+    ['legacy.json', /older layout \(asset index legacy-test\)/],
+    ['pre-1.6.json', /older layout \(asset index pre-1\.6-test\)/],
+    ['bad.json', /older layout/],
+    ['future-pack.json', /laid out in a way SpawnLoft does not know/],
+  ]
+  for (const [file, message] of cases) {
+    const version = JSON.parse(JSON.stringify(base))
+    version.id = `layout-${file.replace('.json', '')}`
+    const indexText = fs.readFileSync(path.join(fixtureDir, 'assets', file))
+    version.assetIndex = { id: file.replace('.json', '-test'), url: `https://example.invalid/indexes/${file}`, sha1: crypto.createHash('sha1').update(indexText).digest('hex'), size: indexText.length }
+    fs.mkdirSync(versionDir(version.id), { recursive: true })
+    fs.writeFileSync(versionJson(version.id), JSON.stringify(version))
+    const calls = []
+    const fetchImpl = async (url, dest) => {
+      calls.push(url)
+      fs.mkdirSync(path.dirname(dest), { recursive: true })
+      fs.writeFileSync(dest, url === version.assetIndex.url ? indexText : BODY)
+    }
+    await assert.rejects(ensureVersion(version.id, { os: winOs, fetchImpl }), (err) => {
+      assert.equal(err.code, 'unknown-asset-layout', file)
+      assert.match(err.message, message, file)
+      assert.match(err.message, /Update SpawnLoft\.$/, file)
+      return true
+    })
+    assert.deepEqual(calls, [version.assetIndex.url], `${file}: only the index was fetched`)
+  }
+})
+
+test('a library path that would leave the libraries folder is refused (review N-7)', () => {
+  const os = { name: 'linux', arch: 'x64', version: '6' }
+  const lib = (p) => ({ libraries: [{ name: 'a:b:1', downloads: { artifact: { path: p, url: 'https://x/y.jar', sha1: null, size: 1 } } }] })
+  for (const bad of ['../../evil.jar', '/etc/x.jar', 'C:/x.jar', 'a/../../x.jar']) {
+    assert.throws(() => libraries(lib(bad), { os }), /leaves the libraries folder/, bad)
+  }
+  assert.throws(() => libraries({ libraries: [{ name: 'a:..:1' }] }, { os }), /leaves the libraries folder/)
+  assert.equal(libraries(lib('a/b/1/b-1.jar'), { os })[0].path, 'a/b/1/b-1.jar')
+})
+
+test('an asset hash that is not a sha1 is refused before it becomes a path', () => {
+  assert.throws(() => assetObjects({ objects: { 'a.ogg': { hash: '../../../x', size: 1 } } }), /malformed hash/)
 })
