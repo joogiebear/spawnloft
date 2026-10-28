@@ -58,6 +58,9 @@ export function mergeInherited(child, parent) {
     }
   }
   delete result.inheritsFrom
+  // A loader profile with an empty logging block (Forge's and NeoForge's carry one) must not
+  // drop the parent's Log4Shell config (see loggingConfig)
+  if (!result.logging?.client && parent.logging?.client) result.logging = parent.logging
   result.mainClass = child.mainClass
   result.libraries = [...(child.libraries ?? []), ...(parent.libraries ?? [])]
 
@@ -212,7 +215,9 @@ export function loggingConfig(version) {
   const id = version.id ?? 'this version'
   const bad = (what) => fail(`the logging config of ${id} ${what}; SpawnLoft cannot launch it safely`)
   if (client.type !== 'log4j2-xml') bad(`has the unknown type "${client.type}"`)
-  if (typeof client.argument !== 'string' || !client.argument.includes('${path}')) bad('has no ${path} in its argument')
+  // Mojang has only ever shipped this one argument; anything else would name a property log4j
+  // never reads, and the game would start reported as mitigated.
+  if (client.argument !== '-Dlog4j.configurationFile=${path}') bad(`has the unknown argument "${client.argument}"`)
   const file = client.file
   if (!file || typeof file.id !== 'string' || !/^[\w.-]+$/.test(file.id) || /^\.+$/.test(file.id)) bad('names a file outside log_configs')
   if (typeof file.sha1 !== 'string' || !/^[0-9a-f]{40}$/i.test(file.sha1)) bad('has no sha1 to check the file against')

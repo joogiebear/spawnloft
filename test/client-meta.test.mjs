@@ -308,7 +308,18 @@ test('loggingConfig refuses a config it cannot fetch and place safely', () => {
   assert.throws(() => loggingConfig(withFile({ sha1: undefined })), /has no sha1/)
   assert.throws(() => loggingConfig(withFile({ url: 'http://piston-data.mojang.com/client-1.12.xml' })), /has no https URL/)
   assert.throws(() => loggingConfig(withFile({}, { type: 'log4j-properties' })), /unknown type "log4j-properties"/)
-  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=client.xml' })), /has no \$\{path\} in its argument/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=client.xml' })), /has the unknown argument/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dfoo=${path}' })), /has the unknown argument/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=${path} ${other}' })), /has the unknown argument/)
+})
+
+test('mergeInherited: a loader profile with an empty logging block keeps the parent\'s Log4Shell config', () => {
+  const parent = era('1.12.2')
+  const child = { id: '1.12.2-forge', inheritsFrom: '1.12.2', mainClass: 'x', libraries: [], logging: {} }
+  assert.equal(loggingConfig(mergeInherited(child, parent)).id, 'client-1.12.xml')
+  const own = { ...child, logging: { client: { ...parent.logging.client, file: { ...parent.logging.client.file, id: 'client-other.xml' } } } }
+  assert.equal(loggingConfig(mergeInherited(own, parent)).id, 'client-other.xml')
+  assert.equal(loggingConfig(mergeInherited({ ...child, logging: undefined }, { ...parent, logging: undefined })), null)
 })
 
 test('log4jNoLookupsNeeded: log4j-core 2.0-beta9, 2.8.1 and 2.14.1 need the switch, newer and no log4j do not', () => {
