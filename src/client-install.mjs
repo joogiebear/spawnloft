@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir } from './client-paths.mjs'
-import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal, nativesLibrarySubdir } from './client-meta.mjs'
+import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } from './client-paths.mjs'
+import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal, nativesLibrarySubdir, loggingConfig } from './client-meta.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
 import { fail } from './util.mjs'
@@ -157,6 +157,25 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     emitEnd('client', 0, 0, 0)
   }
 
+  // Before the libraries, so a version that cannot be made safe is refused early: without
+  // this file 1.7 to 1.18.0 would run open to Log4Shell (see loggingConfig).
+  const logCfg = loggingConfig(version)
+  if (logCfg) {
+    const dest = logConfigPath(logCfg.id)
+    const needs = needsDownload(dest, { sha1: logCfg.sha1, size: logCfg.size })
+    if (needs) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true })
+      try {
+        await fetchImpl(logCfg.url, dest, { hash: 'sha1', expected: logCfg.sha1, label: `the log config ${logCfg.id}` })
+      } catch (err) {
+        fail(`could not download the log config ${logCfg.id} from ${logCfg.url}: ${err.message}; without it ${id} would run open to Log4Shell, so it is not launched`)
+      }
+      downloaded++
+      totalBytes += logCfg.size ?? 0
+    }
+    emitEnd('log config', 1, 1, needs ? (logCfg.size ?? 0) : 0)
+  }
+
   // Mojang JSONs can list one jar under two rows; two workers on one file would race
   const libRows = libraries(version, { os })
   const nativeRows = libRows.filter(r => r.native !== false)
@@ -252,6 +271,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   return {
     id,
     jar: jarPath,
+    logConfig: logCfg?.id ?? null,
     libraries: libRows.length,
     natives: nativeRows.length,
     assets: objRows.length,

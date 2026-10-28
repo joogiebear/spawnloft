@@ -390,7 +390,8 @@ client/
                              screenshots/, saves/, crash-reports/, spawnloft-harness.json (while the harness runs)
   versions/<id>/             the client jar and its version JSON, one folder per version
   libraries/                 shared by every version
-  assets/                    shared by every version
+  assets/                    shared by every version; log_configs/ holds the log4j configs Mojang names
+                             for each version (its Log4Shell mitigation, passed to the game at launch)
   natives/<id>/              the native libraries, per version
   run/<name>/state.json      what is running: pid, start time, player, server, harness token and port (owner-only)
   run/<name>/launch.lock     held while a launch is under way, so two Play clicks cannot start two games
