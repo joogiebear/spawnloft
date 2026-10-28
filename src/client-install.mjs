@@ -3,7 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir } from './client-paths.mjs'
-import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal } from './client-meta.mjs'
+import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, platformRefusal, nativesLibrarySubdir } from './client-meta.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
 import { fail } from './util.mjs'
@@ -58,13 +58,17 @@ async function inBatches(items, limit, worker) {
 // says whose natives are extracted, so a switch re-extracts them.
 // v2: natives are now chosen per arch, so a folder extracted with every arch's jars is redone
 // v3: Apple Silicon no longer takes natives-macos-patch (x64 freetype), so its macos/x64 goes
+// v4: natives go where java.library.path points (26.x: the java/ subfolder), so 26.x installs
+// extracted to the top of the folder are redone
 function nativesStamp(id, os) {
-  return `${id} ${os.name} ${os.arch} natives-v3`
+  return `${id} ${os.name} ${os.arch} natives-v4`
 }
 
-export async function extractNatives(id, nativeRows, { os }) {
-  const dir = nativesDir(id)
-  fs.rmSync(dir, { recursive: true, force: true })
+// subdir: the folder under natives/<id> the version's java.library.path names ('' for natives/<id>)
+export async function extractNatives(id, nativeRows, { os, subdir = '' }) {
+  const root = nativesDir(id)
+  fs.rmSync(root, { recursive: true, force: true })
+  const dir = path.join(root, subdir)
   fs.mkdirSync(dir, { recursive: true })
 
   // a jar listed under two rows is extracted once
@@ -86,7 +90,7 @@ export async function extractNatives(id, nativeRows, { os }) {
     files += written.length
   }
 
-  fs.writeFileSync(path.join(dir, '.complete'), nativesStamp(id, os))
+  fs.writeFileSync(path.join(root, '.complete'), nativesStamp(id, os))
   return { files }
 }
 
@@ -241,7 +245,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   const completeFile = path.join(nativesDir(id), '.complete')
   const stamped = fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === nativesStamp(id, os)
   if (nativeRows.length > 0 && (nativeWasDownloaded || !stamped)) {
-    await extractNatives(id, nativeRows, { os })
+    await extractNatives(id, nativeRows, { os, subdir: nativesLibrarySubdir(version, { os }) })
   }
   emitEnd('natives', nativeRows.length, nativeRows.length, 0)
 
