@@ -27,6 +27,7 @@ const { PARALLEL, needsDownload, ensureVersion, extractNatives } = await import(
 const { versionJson, versionDir, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } = await import('../src/client-paths.mjs')
 const { libraries, assetObjects } = await import('../src/client-meta.mjs')
 const { createZip } = await import('../src/zip.mjs')
+const { nativesStamp } = await import('../src/client-version.mjs')
 
 const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${mc}.json`), 'utf8'))
 fixture.downloads.client.sha1 = bodySha
@@ -159,7 +160,7 @@ test('extractNatives skips META-INF and excluded prefixes', async () => {
   }]
 
   // the same jar listed twice (plain row and natives classifier) is extracted once
-  const result = await extractNatives(mc, [...nativeRows, ...nativeRows], { os: winOs })
+  const result = await extractNatives(mc, [...nativeRows, ...nativeRows], { stamp: 'the stamp' })
 
   const nDir = nativesDir(mc)
   const entries = fs.readdirSync(nDir)
@@ -168,7 +169,7 @@ test('extractNatives skips META-INF and excluded prefixes', async () => {
   assert.ok(!entries.includes('META-INF'), 'META-INF skipped')
   assert.ok(!entries.includes('skip'), 'skip/ prefix excluded')
   assert.equal(result.files, 1)
-  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${mc} windows x64 natives-v4`)
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), 'the stamp')
 })
 
 test('ensureVersion refuses natives this machine cannot load before the first download', async () => {
@@ -232,7 +233,45 @@ test('26.x natives go to the java/ folder its java.library.path names, and old i
   assert.ok(!calls.some(u => u.endsWith(libPath)), 'the natives jar was already in place')
   assert.equal(fs.readFileSync(path.join(nDir, 'java', 'windows', 'x64', 'org', 'lwjgl', 'lwjgl.dll'), 'utf8'), 'lwjgl dll')
   assert.equal(fs.existsSync(path.join(nDir, 'windows')), false, 'the old top-level copy is gone')
-  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), `${v26.id} windows x64 natives-v4`)
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), nativesStamp(v26, winOs))
+  // the other folders the arguments name are made beside java/
+  for (const dir of ['jna', 'lwjgl', 'netty']) assert.ok(fs.statSync(path.join(nDir, dir)).isDirectory(), dir)
+})
+
+test('keepNatives: a folder a running game has loaded is not re-extracted, its Fabric parent\'s included', async () => {
+  const id = '26.3-test'
+  const nDir = nativesDir(id)
+  const { fetchImpl } = makeStub()
+  // a stale stamp, as every install has after an upgrade, and a file the extraction would remove
+  fs.writeFileSync(path.join(nDir, '.complete'), 'stale')
+  fs.writeFileSync(path.join(nDir, 'loaded-by-a-running-game'), 'x')
+
+  const child = { id: 'fabric-keep-test', inheritsFrom: id, mainClass: 'x', arguments: { game: [], jvm: [] }, libraries: [] }
+  fs.mkdirSync(versionDir(child.id), { recursive: true })
+  fs.writeFileSync(versionJson(child.id), JSON.stringify(child))
+  await ensureVersion(child.id, { os: winOs, fetchImpl, keepNatives: new Set([child.id, id]) })
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), 'stale', 'the parent was kept')
+  assert.ok(fs.existsSync(path.join(nDir, 'loaded-by-a-running-game')))
+
+  await ensureVersion(id, { os: winOs, fetchImpl })
+  assert.notEqual(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), 'stale', 'redone once nothing holds it')
+  assert.equal(fs.existsSync(path.join(nDir, 'loaded-by-a-running-game')), false)
+})
+
+test('natives stamp: a hash of the rows and the arguments that place them, so a change re-extracts by itself', () => {
+  const winOs2 = { name: 'windows', arch: 'x64', version: '10.0' }
+  const base = JSON.parse(JSON.stringify(fixture))
+  const stamp = nativesStamp(base, winOs2)
+  assert.match(stamp, new RegExp(`^${base.id.replace(/\./g, '\\.')} windows x64 [0-9a-f]{40}$`))
+  assert.equal(nativesStamp(JSON.parse(JSON.stringify(fixture)), winOs2), stamp, 'stable for the same JSON')
+  assert.notEqual(nativesStamp(base, { ...winOs2, arch: 'arm64' }), stamp, 'arch')
+  assert.notEqual(nativesStamp(base, { ...winOs2, name: 'linux' }), stamp, 'OS')
+  const moved = JSON.parse(JSON.stringify(fixture))
+  moved.arguments.jvm = moved.arguments.jvm.map((a) => (typeof a === 'string' ? a.replace('-Djava.library.path=${natives_directory}', '-Djava.library.path=${natives_directory}/java') : a))
+  assert.notEqual(nativesStamp(moved, winOs2), stamp, 'natives folder moved')
+  const unrelated = JSON.parse(JSON.stringify(fixture))
+  unrelated.libraries.push({ name: 'com.example:plain:1', downloads: { artifact: { path: 'p.jar', url: 'https://x/p.jar', sha1: null, size: 1 } } })
+  assert.equal(nativesStamp(unrelated, winOs2), stamp, 'a plain library does not touch the natives')
 })
 
 test('a log config that cannot be fetched refuses the version instead of leaving it open to Log4Shell', async () => {

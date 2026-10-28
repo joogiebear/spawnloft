@@ -142,9 +142,12 @@ export async function collectClient(name, { lines = TAIL_LINES } = {}) {
   const processLines = (await readLines(clientLog(name), lines)).filter((l) => !inLatest.has(l))
 
   let anchor = null
+  let launch = null
   try {
     const state = JSON.parse(await fs.promises.readFile(clientStateFile(name), 'utf8'))
     anchor = state.startedAt ?? null
+    // the Java, arch and folders this run was launched with (client-version)
+    launch = state.launch ?? null
   } catch { /* no state file: the mtime dates the lines */ }
 
   // each log is dated by its own mtime: the process log keeps growing after latest.log stops
@@ -178,6 +181,7 @@ export async function collectClient(name, { lines = TAIL_LINES } = {}) {
     running: st.running,
     startedAt: st.startedAt,
     account: st.account,
+    launch,
   }
 
   const files = []

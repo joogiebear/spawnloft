@@ -1,12 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { execFile } from 'node:child_process'
 import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
-import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
+import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep, UserError } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
-import { pickJava, requiredMajor } from './java.mjs'
+import { pickClientJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
-import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
+import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
+import { resolveVersion, resolvedRefusal, launchFeatures } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
@@ -343,10 +345,12 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   }
   for (const w of warnings) onWarning(w)
 
-  onStage({ stage: 'java', message: 'Finding Java' })
-  const java = fakeJava ?? await pickJava({ explicit: profile.java, needs: requiredMajor(profile.mc), what: 'Minecraft ' + profile.mc })
-
+  // The version file comes first: what the game needs (its Java, the arch it runs as, anything
+  // this SpawnLoft cannot launch) is read from it before Java is looked for or anything else
+  // downloads (review B3).
   let versionId
+  // the fake game runs a version already on disk as it is, without installing it
+  let fakeInstalled = false
   if (fakeJava) {
     if (profile.loader === 'fabric') {
       if (profile.loaderVersion === null) {
@@ -356,13 +360,40 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     } else {
       versionId = profile.mc
     }
-    if (!fs.existsSync(versionJson(versionId))) {
-      versionId = await prepareVersion(name, { onStage })
-      await ensureVersion(versionId, { os, onProgress })
-    }
+    fakeInstalled = fs.existsSync(versionJson(versionId))
+    if (!fakeInstalled) versionId = await prepareVersion(name, { onStage })
   } else {
     versionId = await prepareVersion(name, { onStage })
-    await ensureVersion(versionId, { os, onProgress })
+  }
+
+  let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
+  if (version.inheritsFrom) {
+    version = mergeInherited(version, JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8')))
+  }
+  const features = launchFeatures({ hasServer: Boolean(address || target) })
+  // the Rosetta check runs only for a version that has no natives for this arch
+  const needsCaps = !fakeJava && !nativeArches(version, os).has(os.arch)
+  const resolved = resolveVersion(version, { os, features, hostCaps: needsCaps ? await hostCapabilities(os) : null })
+  const refused = resolvedRefusal(resolved)
+  if (refused) {
+    const err = new UserError(refused.message)
+    err.code = refused.code
+    throw err
+  }
+  // the game runs as this arch: x64 under Rosetta or Windows emulation for a version with no
+  // arm64 natives, so its natives, its rules and its Java all follow it
+  const runOs = resolved.os
+
+  onStage({ stage: 'java', message: 'Finding Java' })
+  const picked = fakeJava ? { path: fakeJava, warning: null } : await pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc })
+  const java = picked.path
+  if (picked.warning) {
+    warnings.push(picked.warning)
+    onWarning(picked.warning)
+  }
+
+  if (!fakeInstalled) await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
+  if (!fakeJava) {
     if (profile.loader === 'fabric') {
       onStage({ stage: 'fabric', message: 'Checking Fabric API' })
       await ensureFabricApi(name, profile.mc, { onProgress })
@@ -373,15 +404,6 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     }
   }
 
-  let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
-  if (version.inheritsFrom) {
-    const parentJson = JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8'))
-    version = mergeInherited(version, parentJson)
-  }
-  // ensureVersion refuses too, but an installed version can skip it (the fakeJava path)
-  const versionRefusal = platformRefusal(version, os)
-  if (versionRefusal) fail(versionRefusal)
-
   const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
   // last before the game, so a failed download or sign-in does not leave a server started for nothing
   if (stopped && ensureServer) {
@@ -391,10 +413,10 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
-  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os, harnessToken, address })
+  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address })
   onStage({ stage: 'spawn', message: 'Starting the game' })
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
-  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by } })
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile) } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
 }
@@ -435,6 +457,55 @@ export function parseServerAddress(text) {
 
 function formatAddress({ host, port }) {
   return host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`
+}
+
+// The version ids whose natives a running game (of another profile) has loaded: each game's
+// own and every parent it inherits from, since a Fabric game loads its vanilla parent's natives.
+// A re-extraction (a new stamp, an arch switch) would pull them from under it, or fail on
+// Windows, so those folders wait for a later launch.
+function versionsInUse(except) {
+  const ids = new Set()
+  for (const p of listProfiles()) {
+    if (p.name === except) continue
+    const state = readClientState(p.name)
+    if (!state) continue
+    let id = state.launch?.id ?? p.mc
+    while (typeof id === 'string' && !ids.has(id)) {
+      ids.add(id)
+      id = readJson(versionJson(id), null)?.inheritsFrom ?? null
+    }
+  }
+  return ids
+}
+
+// What this launch was decided from, kept in the run's state for diagnose and the diag bundle.
+function launchFacts(resolved, picked, profile) {
+  return {
+    id: resolved.id,
+    java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: profile.java ? 'explicit' : picked.warning ? 'fallback' : 'installed', warning: picked.warning },
+    arch: resolved.arch,
+    emulated: resolved.emulated,
+    nativesDir: resolved.natives.dir,
+    loggingConfig: resolved.logging?.id ?? null,
+    minimumLauncherVersion: resolved.format.minimumLauncherVersion,
+  }
+}
+
+// Whether this machine runs x64 code, for the versions with no arm64 natives (everything before
+// 1.19): Apple Silicon with Rosetta installed, Windows 11 on arm64 (build 22000 on). Linux arm64
+// cannot. A Mac's answer is kept only once it is yes, so a Rosetta installed after a refusal is
+// seen on the next launch without a restart (review R6).
+let rosettaSeen = false
+export async function hostCapabilities(os = currentOs()) {
+  if (os.arch !== 'arm64') return { x64: os.arch === 'x64' }
+  if (os.name === 'windows') return { x64: Number(String(os.version).split('.')[2]) >= 22000 }
+  if (os.name !== 'osx') return { x64: false }
+  if (!rosettaSeen) {
+    rosettaSeen = await new Promise((resolve) => {
+      execFile('/usr/bin/arch', ['-x86_64', '/usr/bin/true'], { timeout: 10000 }, (err) => resolve(!err))
+    })
+  }
+  return { x64: rosettaSeen }
 }
 
 // The fake game is a Node script, so it runs where Mojang's client cannot (the Linux arm64 CI
@@ -731,6 +802,9 @@ async function installedVersions() {
 export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
   const installed = await installedVersions()
   const machineRefusal = platformRefusal(null, os)
+  // asked only when a downloaded version lacks natives for this arch
+  const needsCaps = [...installed.values()].some(({ json }) => !nativeArches(json, os).has(os.arch))
+  const hostCaps = needsCaps ? await hostCapabilities(os) : null
   let manifest = null
   let offline = null
   try {
@@ -759,7 +833,7 @@ export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
       downloaded: Boolean(disk?.downloaded),
       javaNeeds: requiredMajor(v.id),
       harness: Boolean(harnessFor(v.id)),
-      refusal: disk ? platformRefusal(disk.json, os) : null,
+      refusal: disk ? platformRefusal(disk.json, os, hostCaps) : null,
       note: notes.length ? notes.join('; ') : null,
     }
   })

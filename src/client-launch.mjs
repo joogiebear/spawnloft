@@ -3,6 +3,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 import { currentOs, jvmArguments, gameArguments, libraries, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
+import { launchFeatures } from './client-version.mjs'
 import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
@@ -35,14 +36,7 @@ export function buildCommand({ version, profile, profileName, account, java, os 
     port = inst.port
   }
 
-  const features = {
-    is_demo_user: false,
-    has_custom_resolution: false,
-    has_quick_plays_support: hasServer,
-    is_quick_play_singleplayer: false,
-    is_quick_play_multiplayer: hasServer,
-    is_quick_play_realms: false,
-  }
+  const features = launchFeatures({ hasServer })
 
   // ensureVersion puts every version's jar under its own id, a loader profile's included
   const clientJar = versionJar(version.id)
@@ -169,6 +163,8 @@ export async function spawnClient(command, { name, state }) {
         address: state.address ?? null,
         // who asked for this run: launcher, panel, cli or assistant
         launchedBy: state.launchedBy ?? null,
+        // the version's Java, arch and folders as launch decided them (client-version)
+        launch: state.launch ?? null,
       }, { mode: PRIVATE_FILE_MODE })
       child.unref()
       resolve({ pid: child.pid, child })
