@@ -26,6 +26,8 @@ const {
   gameArguments,
   jvmArguments,
   nativesLibrarySubdir,
+  loggingConfig,
+  log4jNoLookupsNeeded,
   fetchManifest,
   fetchVersionJson,
 } = await import('../src/client-meta.mjs')
@@ -35,6 +37,8 @@ const manifestFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versio
 const mcVersion = manifestFixture.latest.release
 const versionFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${mcVersion}.json`), 'utf8'))
 const fabricFixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'fabric-profile.json'), 'utf8'))
+// Mojang's own JSONs for the older eras, as published (not trimmed)
+const era = (id) => JSON.parse(fs.readFileSync(path.join(fixtureDir, `${id}.json`), 'utf8'))
 
 test('ruleAllows: last matching rule wins, no-match is disallow', () => {
   const rules = [
@@ -275,4 +279,45 @@ test('nativesLibrarySubdir follows the java.library.path argument', () => {
   assert.equal(nativesLibrarySubdir(withJvm(['-Djava.library.path=${natives_directory}x']), { os: win }), '')
   assert.equal(nativesLibrarySubdir(withJvm([]), { os: win }), '')
   assert.equal(nativesLibrarySubdir({}, { os: win }), '')
+})
+
+test('loggingConfig: the Log4Shell config of each era, none before 1.7, and a loader profile inherits it', () => {
+  assert.deepEqual(loggingConfig(era('1.7.10')), {
+    id: 'client-1.7.xml',
+    url: 'https://launcher.mojang.com/v1/objects/50c9cc4af6d853d9fc137c84bcd153e2bd3a9a82/client-1.7.xml',
+    sha1: '50c9cc4af6d853d9fc137c84bcd153e2bd3a9a82',
+    size: 966,
+    argument: '-Dlog4j.configurationFile=${path}',
+  })
+  for (const id of ['1.12.2', '1.17.1']) assert.equal(loggingConfig(era(id)).id, 'client-1.12.xml', id)
+  assert.equal(loggingConfig(versionFixture).id, 'client-1.21.2.xml')
+  assert.equal(loggingConfig({ id: '1.5.2', libraries: [] }), null)
+  assert.equal(loggingConfig(mergeInherited(fabricFixture, versionFixture)).id, 'client-1.21.2.xml')
+})
+
+test('loggingConfig refuses a config it cannot fetch and place safely', () => {
+  const withFile = (file, rest = {}) => ({
+    id: 'x',
+    logging: { client: { type: 'log4j2-xml', argument: '-Dlog4j.configurationFile=${path}', file: { id: 'client-1.12.xml', sha1: 'bd65e7d2e3c237be76cfbef4c2405033d7f91521', size: 888, url: 'https://piston-data.mojang.com/v1/objects/x/client-1.12.xml', ...file }, ...rest } },
+  })
+  assert.equal(loggingConfig(withFile({})).id, 'client-1.12.xml')
+  for (const id of ['../client.xml', 'a/b.xml', 'a\\b.xml', '..', '', 'c:d.xml']) {
+    assert.throws(() => loggingConfig(withFile({ id })), /names a file outside log_configs/, id)
+  }
+  assert.throws(() => loggingConfig(withFile({ sha1: 'abc' })), /has no sha1/)
+  assert.throws(() => loggingConfig(withFile({ sha1: undefined })), /has no sha1/)
+  assert.throws(() => loggingConfig(withFile({ url: 'http://piston-data.mojang.com/client-1.12.xml' })), /has no https URL/)
+  assert.throws(() => loggingConfig(withFile({}, { type: 'log4j-properties' })), /unknown type "log4j-properties"/)
+  assert.throws(() => loggingConfig(withFile({}, { argument: '-Dlog4j.configurationFile=client.xml' })), /has no \$\{path\} in its argument/)
+})
+
+test('log4jNoLookupsNeeded: log4j-core 2.0-beta9, 2.8.1 and 2.14.1 need the switch, newer and no log4j do not', () => {
+  for (const id of ['1.7.10', '1.12.2', '1.17.1']) assert.equal(log4jNoLookupsNeeded(era(id)), true, id)
+  assert.equal(log4jNoLookupsNeeded(versionFixture), false)
+  assert.equal(log4jNoLookupsNeeded({ libraries: [] }), false)
+  const core = (v) => ({ libraries: [{ name: `org.apache.logging.log4j:log4j-core:${v}` }, { name: 'org.apache.logging.log4j:log4j-api:2.14.1' }] })
+  assert.equal(log4jNoLookupsNeeded(core('2.15.0')), true)
+  assert.equal(log4jNoLookupsNeeded(core('2.16.0')), false)
+  assert.equal(log4jNoLookupsNeeded(core('2.17.0')), false)
+  assert.equal(log4jNoLookupsNeeded(core('3.0.0')), false)
 })

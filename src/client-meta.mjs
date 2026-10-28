@@ -198,6 +198,38 @@ export function libraries(version, { os = currentOs() } = {}) {
   return rows
 }
 
+// Mojang's Log4Shell (CVE-2021-44228) mitigation. 1.7 through 1.18.0 ship a log4j that resolves
+// ${jndi:...} in logged text, so a chat line or a server's MOTD can run code on this machine;
+// the launcher is expected to pass `logging.client`: a log4j config without lookups, named by
+// -Dlog4j.configurationFile. The file id becomes a file name under assets/log_configs, so it is
+// held to one path segment.
+export function loggingConfig(version) {
+  const client = version.logging?.client
+  if (!client) return null
+  const id = version.id ?? 'this version'
+  const bad = (what) => fail(`the logging config of ${id} ${what}; SpawnLoft cannot launch it safely`)
+  if (client.type !== 'log4j2-xml') bad(`has the unknown type "${client.type}"`)
+  if (typeof client.argument !== 'string' || !client.argument.includes('${path}')) bad('has no ${path} in its argument')
+  const file = client.file
+  if (!file || typeof file.id !== 'string' || !/^[\w.-]+$/.test(file.id) || /^\.+$/.test(file.id)) bad('names a file outside log_configs')
+  if (typeof file.sha1 !== 'string' || !/^[0-9a-f]{40}$/i.test(file.sha1)) bad('has no sha1 to check the file against')
+  if (typeof file.url !== 'string' || !/^https:\/\//.test(file.url)) bad('has no https URL')
+  return { id: file.id, url: file.url, sha1: file.sha1.toLowerCase(), size: Number.isInteger(file.size) ? file.size : null, argument: client.argument }
+}
+
+// Whether to pass -Dlog4j2.formatMsgNoLookups=true as well: log4j-core 2.0 to 2.15 resolve
+// lookups in messages, and 2.10 and newer honour the property (older ones ignore it, and 2.16+
+// have no lookups to turn off). A second guard beside the config file, as Mojang's launcher.
+export function log4jNoLookupsNeeded(version) {
+  for (const lib of version.libraries ?? []) {
+    const parts = String(lib.name ?? '').split(':')
+    if (parts[0] !== 'org.apache.logging.log4j' || parts[1] !== 'log4j-core') continue
+    const m = /^(\d+)\.(\d+)/.exec(parts[2] ?? '')
+    if (m && Number(m[1]) === 2 && Number(m[2]) < 16) return true
+  }
+  return false
+}
+
 export function assetIndex(version) {
   const ai = version.assetIndex
   return { id: ai.id, url: ai.url, sha1: ai.sha1, size: ai.size, totalSize: ai.totalSize }

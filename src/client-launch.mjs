@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 
-import { currentOs, jvmArguments, gameArguments, libraries, assetIndex } from './client-meta.mjs'
-import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog } from './client-paths.mjs'
+import { currentOs, jvmArguments, gameArguments, libraries, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
+import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
 import { writeJson, readJson, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
@@ -89,6 +89,11 @@ export function buildCommand({ version, profile, profileName, account, java, os 
   }
 
   const jvmArgs = jvmArguments(version, { os, features }).map((a) => substitute(a, vars).text)
+  // Log4Shell: the config file ensureVersion fetched, and the lookup switch for the log4j
+  // versions that honour it (see loggingConfig). ${path} is this argument's own variable.
+  const logCfg = loggingConfig(version)
+  if (logCfg) jvmArgs.push(substitute(logCfg.argument, { path: logConfigPath(logCfg.id) }).text)
+  if (log4jNoLookupsNeeded(version)) jvmArgs.push('-Dlog4j2.formatMsgNoLookups=true')
   const gameArgs = gameArguments(version, { os, features }).map((a) => substitute(a, vars).text)
 
   // Pre-1.20 versions have no ${quickPlayMultiplayer} rule, so the join target goes the old way.
