@@ -96,6 +96,9 @@ test('a manifest is checked whole before anything is written', () => {
   const odd = structuredClone(win)
   odd.files.weird = { type: 'socket' }
   assert.throws(() => runtimePlan(odd, { platform: 'windows-x64' }), { code: 'runtime-format' })
+  const notExec = structuredClone(mac)
+  notExec.files['jre.bundle/Contents/Home/bin/java'].executable = false
+  assert.throws(() => runtimePlan(notExec, { platform: 'mac-os' }), { code: 'runtime-format', message: /does not mark jre\.bundle\/Contents\/Home\/bin\/java executable/ })
   const noJava = structuredClone(win)
   delete noJava.files['bin/java.exe']
   assert.throws(() => runtimePlan(noJava, { platform: 'windows-x64' }), /has no bin\/java\.exe/)
@@ -148,7 +151,7 @@ test('a file whose sha1 does not match refuses the runtime and records nothing',
   const { fetchImpl } = stubFetch({ wrong: new Set(['jre.bundle/Contents/Home/lib/rt.jar']) })
   await assert.rejects(ensureRuntime('jre-legacy', 'mac-os', { entry, fetchImpl }), /sha1 mismatch/)
   assert.equal(installedRuntimes().some((r) => r.component === 'jre-legacy'), false)
-  await assert.rejects(ensureRuntime('jre-legacy', 'linux', { entry: null, fetchImpl }), /could not be read, and jre-legacy for Linux x64 is not downloaded yet/)
+  await assert.rejects(ensureRuntime('jre-legacy', 'linux', { entry: null, fetchImpl }), { code: 'runtime-offline', message: /could not be read, and jre-legacy for Linux x64 is not downloaded yet/ })
 })
 
 test('the macOS runtime: java inside jre.bundle, its link made inside the folder', { skip: process.platform === 'win32' && 'links are not made on Windows' }, async () => {
@@ -190,16 +193,40 @@ test('the picker: installed first, then Mojang, then a newer Java with a warning
   // java: "mojang" takes it even with a fitting Java installed
   assert.equal((await pickClientJava({ explicit: 'mojang', requirement: req, arch: 'x64', found: javas([8]), runtime })).source, 'mojang-runtime')
 
-  const offline = async () => { const e = new (await import('../src/util.mjs')).UserError("Mojang's Java runtime list could not be read"); throw e }
+  const { fail } = await import('../src/util.mjs')
+  const offline = async () => fail("Mojang's Java runtime list could not be read", 'runtime-offline')
   const fell = await pickClientJava({ requirement: req, arch: 'x64', what: 'Minecraft 1.12.2', found: javas([21]), runtime: offline })
   assert.equal(fell.source, 'fallback')
   assert.match(fell.warning, /^Minecraft 1\.12\.2 wants Java 8; using Java 21 at \/jvm\/21-x64\/bin\/java, which is newer, so the game may not start\. Mojang's Java could not be had: Mojang's Java runtime list could not be read\. Install Java 8/)
   await assert.rejects(pickClientJava({ requirement: req, arch: 'x64', found: [], runtime: offline }), { code: 'java-missing', message: /no Java was found on this machine\. Mojang's Java could not be had either/ })
   await assert.rejects(pickClientJava({ explicit: 'mojang', requirement: req, arch: 'x64', found: javas([21]), runtime: offline }), /could not be read/)
 
-  const none = async () => { const { fail } = await import('../src/util.mjs'); fail('Mojang publishes no Java 21 (java-runtime-delta) for Windows x86', 'no-runtime-for-this-machine') }
+  // a runtime that came down wrong refuses the launch instead of falling back (V2 review S-1)
+  for (const code of ['checksum-mismatch', 'runtime-format', undefined]) {
+    const broken = async () => fail('checksum mismatch for java-runtime-delta bin/java', code)
+    await assert.rejects(pickClientJava({ requirement: req, arch: 'x64', found: javas([21]), runtime: broken }), { message: /^checksum mismatch/ }, String(code))
+  }
+  const down = async () => fail('download of jre-legacy bin/java failed: getaddrinfo ENOTFOUND', 'download-failed')
+  assert.equal((await pickClientJava({ requirement: req, arch: 'x64', found: javas([21]), runtime: down })).source, 'fallback')
+
+  const none = async () => { fail('Mojang publishes no Java 21 (java-runtime-delta) for Windows x86', 'no-runtime-for-this-machine') }
   await assert.rejects(pickClientJava({ requirement: javaRequirement(F.loadVersion('1.21.11')), arch: 'x86', what: 'Minecraft 1.21.11', found: javas([17, 'x86']), runtime: none }), {
     code: 'no-runtime-for-this-machine',
     message: 'Mojang publishes no Java 21 (java-runtime-delta) for Windows x86. Minecraft 1.21.11 needs Java 21 or newer. Install Java 21 from https://adoptium.net/temurin/releases/?version=21, or point the profile at one.',
   })
+})
+
+test('two runtimes finishing together both keep their record (V2 review S-3)', async () => {
+  fs.rmSync(RUNTIME_DIR, { recursive: true, force: true })
+  const { fetchImpl } = stubFetch()
+  const slow = async (url, dest, opts) => { await new Promise((r) => setTimeout(r, 5)); return fetchImpl(url, dest, opts) }
+  await Promise.all([
+    ensureRuntime('java-runtime-epsilon', 'windows-x64', { entry: runtimeEntry(ALL, 'java-runtime-epsilon', 'windows-x64'), fetchImpl: slow }),
+    ensureRuntime('jre-legacy', 'mac-os', { entry: runtimeEntry(ALL, 'jre-legacy', 'mac-os'), fetchImpl: slow }).catch((err) => {
+      // the macOS runtime's link is not made on Windows, where its count check cannot pass
+      if (process.platform !== 'win32') throw err
+    }),
+  ])
+  const keys = installedRuntimes().map((r) => `${r.component}/${r.platform}`).sort()
+  assert.deepEqual(keys, process.platform === 'win32' ? ['java-runtime-epsilon/windows-x64'] : ['java-runtime-epsilon/windows-x64', 'jre-legacy/mac-os'])
 })

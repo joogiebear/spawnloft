@@ -301,6 +301,10 @@ function boundsText({ min, max }) {
   return min === max ? `Java ${min}` : `Java ${min} to ${max}`
 }
 
+// Why Mojang's runtime could not be had that still lets an installed Java stand in: none
+// published for this machine, its list unreadable with nothing downloaded, the network down.
+const FALLBACK_CODES = ['no-runtime-for-this-machine', 'runtime-offline', 'download-failed']
+
 // The Java a game client gets, decided from its version JSON before anything but that JSON is
 // downloaded: { path, warning, source }. An explicit Java is probed and refused when it certainly
 // cannot run the version (too old, or the wrong arch); one newer than the version's bounds is used
@@ -341,8 +345,9 @@ export async function pickClientJava({ explicit = null, requirement, arch = null
       const r = await runtime()
       return { path: r.path, warning: null, source: 'mojang-runtime' }
     } catch (err) {
-      if (!(err instanceof UserError)) throw err
-      // no runtime for this machine is the whole answer when nothing installed can stand in
+      // only "there is none to be had" falls back; a runtime that came down wrong (a checksum, a
+      // size, a manifest SpawnLoft cannot honour) refuses, as every other damaged download does
+      if (!FALLBACK_CODES.includes(err?.code)) throw err
       why = err
     }
   }

@@ -7,7 +7,8 @@ import { harnessFor, HARNESS_FILE, readHarnessFile, removeHarnessFile } from './
 import { fabricApiJars } from './client-fabric.mjs'
 import { requiredMajor, DOWNLOAD_URL } from './java.mjs'
 import { readJson } from './util.mjs'
-import { installedRuntimes, runtimeDamage } from './client-java.mjs'
+import { installedRuntimes, runtimeDamage, platformKey } from './client-java.mjs'
+import { currentOs } from './client-meta.mjs'
 
 // `javas` is what the doctor's Java probe found: [{ path, major, version }]. Nothing here probes
 // Java or touches the network; `repair` only removes a stale harness file.
@@ -26,6 +27,8 @@ export function checkClientProfiles({ repair = false, javas = [] } = {}) {
       if (!fs.existsSync(p.java)) {
         problems.push(`${prefix}pinned Java ${p.java} does not exist; spawnloft client set ${p.name} java=<path>, or java= to let SpawnLoft pick`)
       }
+    } else if (needs !== null && !javas.some((j) => j.major >= needs) && !platformKey(currentOs().name, currentOs().arch)) {
+      problems.push(`${prefix}Minecraft ${p.mc} needs Java ${needs} or newer and none was found. ${DOWNLOAD_URL}`)
     } else if (needs !== null && !javas.some((j) => j.major >= needs)) {
       // the launch downloads Mojang's own runtime when nothing installed fits
       notes.push(`${prefix}Minecraft ${p.mc} needs Java ${needs} or newer and none is installed; the first launch downloads Mojang's (or install one: ${DOWNLOAD_URL})`)

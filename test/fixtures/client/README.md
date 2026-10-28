@@ -31,7 +31,9 @@
   the eight platforms and every component, with the gaps the real file has (nothing for
   `jre-legacy` or `java-runtime-alpha` on `mac-os-arm64`, no `delta` or `epsilon` on
   `windows-x86`, only `jre-legacy` on `linux-i386`) plus `gamecore` and `minecraft-java-exe`,
-  which SpawnLoft ignores. Version names and every hash but two are made up; the
+  which SpawnLoft ignores. Two rows differ from the real file and are read by no code: the real
+  `windows-arm64` has no `java-runtime-beta`, and the real `windows-x86` has
+  `java-runtime-gamma-snapshot`. Version names and every hash but two are made up; the
   `java-runtime-epsilon`/`windows-x64` and `jre-legacy`/`mac-os` rows point at the two manifests
   below by their real sha1.
 - `java-runtime-epsilon-windows-x64.json`, `jre-legacy-mac-os.json`: synthetic component

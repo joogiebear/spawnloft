@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { fetchJson, downloadFile } from './download.mjs'
 import { cachedJson } from './client-meta.mjs'
 import { CLIENT_CACHE_DIR, RUNTIME_DIR } from './client-paths.mjs'
-import { fail, safeRelativePath, isInside, renameOver, acquireLockAsync, readJson } from './util.mjs'
+import { fail, safeRelativePath, isInside, renameOver, acquireLock, acquireLockAsync, readJson } from './util.mjs'
 
 // Mojang's index of its Java runtimes. The URL carries the file's hash and is what the official
 // launcher reads; it can rotate, which the drift job (V4) notices.
@@ -101,7 +101,15 @@ export function runtimePlan(manifest, { platform }) {
   const exe = platform.startsWith('windows') ? 'bin/java.exe' : 'bin/java'
   const java = downloads.map((d) => d.rel).filter((r) => r === exe || r.endsWith(`/${exe}`)).sort((a, b) => a.length - b.length)[0]
   if (!java) fail(`the Java runtime manifest for ${platform} has no ${exe}`)
+  if (!platform.startsWith('windows') && !downloads.find((d) => d.rel === java).executable) fail(`the Java runtime manifest for ${platform} does not mark ${java} executable`, 'runtime-format')
   return { dirs, downloads, links, java, count: Object.keys(files).length }
+}
+
+// streamed: lib/modules is over 100 MB on the newer runtimes
+async function fileSha1(file) {
+  const hash = crypto.createHash('sha1')
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
+  return hash.digest('hex')
 }
 
 function readRuntimeIndex() {
@@ -109,8 +117,20 @@ function readRuntimeIndex() {
   return index && typeof index === 'object' && index.runtimes && typeof index.runtimes === 'object' ? index : { runtimes: {} }
 }
 
-function writeRuntimeIndex(index) {
+// index.json is shared by every runtime, whose own locks do not cover it: each change is a
+// read-modify-write under a lock of its own, so two runtimes finishing together keep both records
+function updateRuntimeIndex(change) {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true })
+  const release = acquireLock(path.join(RUNTIME_DIR, 'index.lock'))
+  try {
+    const index = readRuntimeIndex()
+    if (change(index) !== false) writeRuntimeIndex(index)
+  } finally {
+    release()
+  }
+}
+
+function writeRuntimeIndex(index) {
   const tmp = `${RUNTIME_INDEX_FILE}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(index, null, 2))
   renameOver(tmp, RUNTIME_INDEX_FILE)
@@ -155,7 +175,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
   try {
     const recorded = readRuntimeIndex().runtimes[key] ?? null
     const mFile = manifestFile(component, platform)
-    if (!entry && !recorded) fail(`Mojang's Java runtime list could not be read, and ${component} for ${platformText[platform] ?? platform} is not downloaded yet`)
+    if (!entry && !recorded) fail(`Mojang's Java runtime list could not be read, and ${component} for ${platformText[platform] ?? platform} is not downloaded yet`, 'runtime-offline')
     const want = entry?.manifest.sha1 ?? recorded.manifestSha1
     let manifestText = null
     try {
@@ -163,7 +183,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
       if (crypto.createHash('sha1').update(text).digest('hex') === want) manifestText = text
     } catch { /* not fetched yet */ }
     if (!manifestText) {
-      if (!entry) fail(`the Java runtime ${component} for ${platformText[platform] ?? platform} is damaged, and Mojang's runtime list could not be read to repair it`)
+      if (!entry) fail(`the Java runtime ${component} for ${platformText[platform] ?? platform} is damaged, and Mojang's runtime list could not be read to repair it`, 'runtime-offline')
       await fetchImpl(entry.manifest.url, mFile, { hash: 'sha1', expected: entry.manifest.sha1, label: `the ${component} manifest` })
       manifestText = fs.readFileSync(mFile)
     }
@@ -171,9 +191,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
 
     // a new manifest replaces the record before any file changes, so the old one is not trusted
     if (recorded && recorded.manifestSha1 !== want) {
-      const index = readRuntimeIndex()
-      delete index.runtimes[key]
-      writeRuntimeIndex(index)
+      updateRuntimeIndex((index) => { delete index.runtimes[key] })
     }
     fs.mkdirSync(dir, { recursive: true })
     for (const rel of plan.dirs) fs.mkdirSync(path.join(dir, rel), { recursive: true })
@@ -181,14 +199,14 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
     // a launch checks sizes; a new manifest (or a first one) checks every file's sha1, since a
     // file Mojang changed can keep its size
     const thorough = recorded?.manifestSha1 !== want
-    const todo = plan.downloads.filter((d) => {
+    const todo = []
+    for (const d of plan.downloads) {
       const dest = path.join(dir, d.rel)
       if (!isInside(dir, dest)) fail(`the Java runtime manifest names "${d.rel}", which would land outside its folder`)
       let st = null
       try { st = fs.lstatSync(dest) } catch { /* missing */ }
-      if (!st || !st.isFile() || (d.size != null && st.size !== d.size)) return true
-      return thorough && crypto.createHash('sha1').update(fs.readFileSync(dest)).digest('hex') !== d.sha1
-    })
+      if (!st || !st.isFile() || (d.size != null && st.size !== d.size) || (thorough && (await fileSha1(dest)) !== d.sha1)) todo.push(d)
+    }
     let done = 0
     let bytes = 0
     const total = todo.length
@@ -239,11 +257,10 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
 
     const javaPath = path.join(dir, plan.java)
     const record = { component, platform, version: entry?.version ?? recorded?.version ?? '', javaPath: plan.java, manifestSha1: want }
-    const idx = readRuntimeIndex()
-    if (JSON.stringify(idx.runtimes[key]) !== JSON.stringify(record)) {
-      idx.runtimes[key] = record
-      writeRuntimeIndex(idx)
-    }
+    updateRuntimeIndex((index) => {
+      if (JSON.stringify(index.runtimes[key]) === JSON.stringify(record)) return false
+      index.runtimes[key] = record
+    })
     return { javaPath, version: record.version, downloaded: total }
   } finally {
     release()
