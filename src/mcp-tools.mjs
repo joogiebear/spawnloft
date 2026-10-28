@@ -9,17 +9,22 @@ import * as pluginActions from './plugin-actions.mjs'
 import * as upgrade from './upgrade.mjs'
 import { listPlayers, onlineNow } from './players.mjs'
 import { diagnose } from './diagnose.mjs'
+import { loadAccounts } from './client-auth.mjs'
+import { listProfiles as listClientProfiles } from './client.mjs'
+import { clientStateFile } from './client-paths.mjs'
 import { query, statusRecord } from './cli-query.mjs'
 import { readMetrics } from './cli-metrics.mjs'
 import { runDoctor } from './doctor.mjs'
 import { mcpNotice } from './private-copy.mjs'
 import { readState, activeBlock } from './control.mjs'
-import { fail, humanBytes, humanDuration } from './util.mjs'
-import { DATA_ROOT } from './paths.mjs'
+import { fail, humanBytes, humanDuration, readJson } from './util.mjs'
+import { DATA_ROOT, BACKUPS_DIR } from './paths.mjs'
+import { buildBundle, writeBundle, collectClient } from './diag-bundle.mjs'
 import { describeServersElsewhere, serversElsewhere } from './settings.mjs'
 import * as configFiles from './config-files.mjs'
 import * as activity from './activity.mjs'
 import * as bots from './bots.mjs'
+import { clientReadTools, clientActionTools } from './mcp-client-tools.mjs'
 
 // Tiers: read tools are always offered; undoable actions are offered but marked as writes;
 // destructive tools exist only with `--allow-destructive` and need `confirm: true` after a preview.
@@ -120,9 +125,9 @@ const readTools = [
   },
   {
     name: 'diagnostics', title: 'Why did it fail?', annotations: READ,
-    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries.',
-    inputSchema: object({ name }, ['name']),
-    run({ name: n }) {
+    description: 'Known failure shapes found in the recent console (port taken, EULA, wrong Java, out of memory, missing dependencies, corrupt world...) with the fix for each, plus recent crash report summaries. With bundle: true, also writes a zip for attaching to a bug report. A client profile name in "client" adds the game client\'s logs and findings, on the same timeline when a bundle is written.',
+    inputSchema: object({ name, bundle: { type: 'boolean', description: 'Write a zip with the console, daemon log, crash reports and findings for attaching to a bug report' }, client: { type: 'string', description: 'A game client profile (spawnloft client list) whose logs and findings go in too' } }, ['name']),
+    async run({ name: n, bundle: doBundle, client }) {
       const d = query('diagnostics', [n], {})
       const out = [`${n} is ${d.status.status}.`]
       if (d.findings.length) {
@@ -136,7 +141,25 @@ const readTools = [
         out.push(`Crash reports (${reports.length}, newest first):`)
         for (const r of reports) out.push(`- ${r.file}: ${r.description ?? 'no description line'}`)
       }
-      return { data: d, text: out.join('\n') }
+      let data = d
+      if (client) {
+        const c = await collectClient(client, { lines: 400 })
+        out.push(`Client ${client} is ${c.facts.running ? 'running' : 'stopped'}.`)
+        if (c.findings.length) {
+          out.push('Known problems in the client logs, oldest first:')
+          for (const f of c.findings) out.push(`- ${f.title}. ${f.advice}\n  From: ${f.line.trim()}`)
+        } else {
+          out.push('No known failure causes in the client logs.')
+        }
+        data = { ...data, client: { name: client, facts: c.facts, findings: c.findings, crashes: c.crashes } }
+      }
+      if (doBundle) {
+        const b = await buildBundle({ server: n, client: client ?? null, scrub: scrubber() })
+        const { file, size } = await writeBundle(b, { outDir: path.join(BACKUPS_DIR, n, 'exports') })
+        data = { ...data, bundle: { file, size, findings: b.findings } }
+        out.push(`Bundle written to ${file}`)
+      }
+      return { data, text: out.join('\n') }
     },
   },
   {
@@ -610,14 +633,16 @@ const destructiveTools = [
 ]
 
 export function toolsFor({ allowDestructive = false } = {}) {
-  return [...readTools, ...actionTools, ...(allowDestructive ? destructiveTools : [])]
+  return [...readTools, ...clientReadTools, ...actionTools, ...clientActionTools, ...(allowDestructive ? destructiveTools : [])]
 }
 
 export const INSTRUCTIONS = `SpawnLoft runs Minecraft servers on this computer. Start with list_servers to learn the server names.
 Changes to plugins and the server software take effect when the server next restarts. install_plugin and update_plugin take a plugins snapshot first; take a backup yourself before anything else risky.
 To change a plugin's settings, find the file with list_config_files, read it with read_config_file, and change it with write_config_file using old_text and new_text; each change is snapshotted first. Then reload the plugin with run_command, or restart.
 When a server will not start, read diagnostics before get_logs. For get_logs, prefer level "warn" over reading everything.
-Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.`
+When a person reports a bug, diagnostics with bundle: true writes a zip they can attach.
+Destructive tools (restore, kill, upgrade_minecraft), when present, describe what they would do unless called with confirm: true; show that description to the user before confirming.
+Test players: bot_run_scenario joins up to five scripted players for plugin tests. client_launch starts the real game for one player when what matters is what a player sees; use client_profiles to find a profile, client_join to connect it to a server, client_chat and client_messages to talk, client_screenshot for evidence, client_quit when done.`
 
 // Everything that leaves goes through this as a net under the per-tool projections, for secrets
 // that turn up unexpectedly (a plugin echoing its database URL into the console). Secrets are read
@@ -650,6 +675,14 @@ function collectSecrets() {
     }
   }
   try { walk(loadRegistry()) } catch { /* no registry yet: nothing to hide */ }
+  try { walk(loadAccounts()) } catch { /* no accounts file: nothing to hide */ }
+  // A running client's state file carries its harness token. One unreadable file must not hide
+  // the others' tokens from the scrubber.
+  let clientProfiles = []
+  try { clientProfiles = listClientProfiles() } catch { /* no client registry: nothing to hide */ }
+  for (const p of clientProfiles) {
+    try { walk(readJson(clientStateFile(p.name), null)) } catch { /* damaged state file */ }
+  }
   // Longest first, so a secret containing another is not half-replaced.
   return [...found].sort((a, b) => b.length - a.length)
 }

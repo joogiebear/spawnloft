@@ -7,7 +7,7 @@ import path from 'node:path'
 import { humanBytes } from './util.mjs'
 
 // class-file major version to Java release
-const CLASS_VERSION_TO_JAVA = (major) => major - 44
+export const CLASS_VERSION_TO_JAVA = (major) => major - 44
 
 // ordered from more specific/actionable to less
 export const SHAPES = [
@@ -112,11 +112,16 @@ export const SHAPES = [
 
 // Scans from the end so the newest evidence wins; each shape reports once, at most three findings.
 export function diagnose(lines, ctx = {}) {
+  return scanShapes(SHAPES, lines, ctx)
+}
+
+// Shared with client-diagnose.mjs, whose shapes differ but whose rules are the same.
+export function scanShapes(shapes, lines, ctx = {}) {
   const findings = []
   const seen = new Set()
   for (let i = lines.length - 1; i >= 0 && findings.length < 3; i--) {
     const line = lines[i]
-    for (const shape of SHAPES) {
+    for (const shape of shapes) {
       if (seen.has(shape.id)) continue
       const m = shape.test.exec(line)
       if (!m) continue

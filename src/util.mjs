@@ -1,6 +1,7 @@
 import net from 'node:net'
 import fs from 'node:fs'
 import path from 'node:path'
+import { writePrivateFile } from './private-files.mjs'
 import crypto from 'node:crypto'
 import { spawnSync, execFile } from 'node:child_process'
 
@@ -134,37 +135,52 @@ export function readJson(file, fallback = null) {
   }
 }
 
-// Owner-only mode for files holding secrets (RCON and database passwords, webhook URL, tokens).
-// Windows ignores it.
+// Owner-only mode for files holding secrets (RCON and database passwords, webhook URLs, tokens).
+// Windows ignores the mode, so there the file gets an explicit ACL (see private-files.mjs).
 export const PRIVATE_FILE_MODE = 0o600
 
 // The mode passed to a write only applies when it creates the file, so chmod covers a leftover
-// temp file or an older, wider one.
+// temp file or an older, wider one; on Windows the file is protected before the data goes in.
+// Returns { ok } or { ok: false, reason }; a mode that is not owner-only needs no Windows ACL.
 export function writeFileWithMode(file, data, mode) {
-  fs.writeFileSync(file, data, { mode })
-  if (process.platform !== 'win32') fs.chmodSync(file, mode)
+  return writePrivateFile(file, data, mode)
 }
 
 // Writes through a temp file and a rename so a crash leaves the old file whole. `mode` is for
-// secrets (PRIVATE_FILE_MODE); each write replaces the file, so wider permissions get tightened.
-export function writeJson(file, data, { mode } = {}) {
+// secrets (PRIVATE_FILE_MODE); each write replaces the file, so wider permissions get tightened,
+// and the temp file is protected before the rename, so the file is never there with wide
+// permissions. With `strict`, a file that could not be protected is not written at all (the
+// accounts file: a refresh token readable by every local user is worse than a failed sign-in).
+export function writeJson(file, data, { mode, strict = false } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
   const text = `${JSON.stringify(data, null, 2)}\n`
+  let protection = { ok: true }
   if (mode === undefined) fs.writeFileSync(tmp, text)
-  else writeFileWithMode(tmp, text, mode)
+  else protection = writeFileWithMode(tmp, text, mode)
+  if (strict && !protection.ok) {
+    fs.rmSync(tmp, { force: true })
+    throw new UserError(`could not make ${file} readable by you alone (${protection.reason}), so it was not written; it needs a drive with file permissions (NTFS on Windows), see spawnloft config set-root`)
+  }
   renameOver(tmp, file)
+  return protection
 }
 
-// Windows: a just-written file is often held by a virus scanner or sync client, so renaming over
-// it fails with EPERM/EBUSY/EACCES. Retry with short waits (about 350 ms in total).
+// Windows: a just-written file is often held by a virus scanner, indexer or sync client, so
+// renaming over it fails with EPERM/EBUSY/EACCES. Retry with growing waits (about 1.5 s in
+// total); a file still held after that is reported as a one-line error, not a stack trace.
+export const RENAME_RETRIES = 5
+
 export function renameOver(from, to) {
   for (let attempt = 0; ; attempt++) {
     try {
       fs.renameSync(from, to)
       return
     } catch (err) {
-      if (attempt >= 3 || !['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(err.code)) throw err
+      if (attempt >= RENAME_RETRIES) {
+        throw Object.assign(new UserError(`could not replace ${to}: another program (a virus scanner, indexer or sync client) is holding it (${err.code}); try again in a moment`), { code: err.code, cause: err })
+      }
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * 2 ** attempt)
     }
   }

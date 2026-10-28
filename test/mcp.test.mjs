@@ -278,6 +278,16 @@ test('results read as sentences, with the structured data beside them', async ()
   assert.match(s.byId.get(3).result.content[0].text, /has not installed any plugins/)
 })
 
+test('diagnostics with bundle: true writes a zip and the secret is absent', async () => {
+  const s = await session([call(1, 'diagnostics', { name: 'royalplugins', bundle: true })])
+  const r = s.byId.get(1).result
+  assert.equal(r.isError, undefined, r.content[0].text)
+  assert.ok(r.structuredContent.bundle.file, 'bundle.file must be present')
+  assert.ok(fs.existsSync(r.structuredContent.bundle.file), 'the zip file must exist')
+  assert.match(r.content[0].text, /Bundle written to /)
+  assert.ok(!s.stdout.includes(secret), 'secret must not appear in the response')
+})
+
 test('hideIps masks socket addresses and leaves versions and times alone', () => {
   assert.equal(hideIps('Steve[/10.0.0.2:5000] logged in'), 'Steve[/[ip hidden]:5000] logged in')
   assert.equal(hideIps('/0:0:0:0:0:0:0:1:25565 lost connection'), '/[ip hidden]:25565 lost connection')

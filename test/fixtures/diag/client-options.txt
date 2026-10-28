@@ -1,0 +1,3 @@
+lang:en_us
+lastServer:127.0.0.1:25565
+fov:0.0

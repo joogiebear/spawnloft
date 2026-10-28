@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import { writeFileWithMode, PRIVATE_FILE_MODE } from './util.mjs'
+import { writeFileWithMode, renameOver, PRIVATE_FILE_MODE } from './util.mjs'
 
 // Minimal server.properties reader/writer that keeps comments and key order, so diffs stay useful.
 export function parseProps(text) {
@@ -53,7 +53,7 @@ export function writeProps(file, updates) {
   const tmp = `${file}.tmp-${process.pid}`
   // owner-only: it contains rcon.password
   writeFileWithMode(tmp, out.join('\n'), PRIVATE_FILE_MODE)
-  fs.renameSync(tmp, file)
+  renameOver(tmp, file)
 }
 
 export function worldDirs(props) {

@@ -9,6 +9,13 @@ alias for existing scripts and scheduled tasks. See [the CLI guide](CLI.md) for 
 launchers, structured JSON output, live performance readings, and CSV export, and
 [the MCP guide](MCP.md) to let an AI assistant you choose check on and run your servers.
 
+It also launches the game itself. `spawnloft client new play --mc 1.21.11 --server survival` then
+`spawnloft client launch play` installs the real Minecraft client from Mojang and starts it
+pointed at your server, as an offline player. With the harness mod on a profile, an AI assistant
+can join, chat, take a screenshot and read the client's logs as a real player, where scripted
+bots only see packets. Windows, Apple Silicon Macs and Linux x64 are supported (not Linux arm64).
+See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
+
 Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
 GNU tar, which cannot read or write a zip, world import and export use a zip reader and
 writer of SpawnLoft's own.
@@ -281,6 +288,8 @@ tasks with it, and deleting one takes them away.
 | `data move <folder> [--yes]` | Move the whole data folder to another place or drive and leave a link where it was, so nothing stored needs changing. Shows the plan unless `--yes`; `data status`, `data finish` (deletes the parked original) and `data rollback` (puts an interrupted move back). See below |
 | `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
 | `bot setup` / `bot check <inst>` / `bot run <scenario.json>` | Scripted test players for plugin testing. See [BOTS.md](BOTS.md) |
+| `client new <name> --mc <v>` / `client launch <name>` / `client list` | A launcher for the real Minecraft client, pointed at your servers; with `--harness`, an AI can drive it. See [CLIENT.md](CLIENT.md) |
+| `diag <server> [--client <profile>]` | One zip with the console, daemon log, crash reports and known-problem findings, with the game client's logs on the same timeline. For bug reports |
 
 ### Moving the data folder
 

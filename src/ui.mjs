@@ -9,7 +9,7 @@ import * as supervisor from './supervisor.mjs'
 import * as registry from './registry.mjs'
 import * as create from './create.mjs'
 import * as manage from './manage.mjs'
-import { LAYOUT } from './paths.mjs'
+import { LAYOUT, BACKUPS_DIR } from './paths.mjs'
 import * as java from './java.mjs'
 import * as backup from './backup.mjs'
 import * as schedule from './schedule.mjs'
@@ -34,10 +34,13 @@ import * as mclogs from './mclogs.mjs'
 import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
+import * as client from './client.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
+import { buildBundle, writeBundle } from './diag-bundle.mjs'
+import { scrubber } from './mcp-tools.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
-import { fail, refreshProcessTable, UserError, cleanLabel, slugFor } from './util.mjs'
+import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside } from './util.mjs'
 import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -702,6 +705,41 @@ async function handleConsole(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
+async function handleDiag(req, res, name, seg, url) {
+  registry.getInstance(name)
+  const outDir = path.join(BACKUPS_DIR, name, 'exports')
+
+  const verb = seg[4] ?? null
+  if (req.method === 'POST' && !verb) {
+    const bundle = await buildBundle({ server: name, scrub: scrubber() })
+    const result = await writeBundle(bundle, { outDir })
+    return json(res, 200, { file: result.file, size: result.size, sizeHuman: result.sizeHuman, findings: bundle.findings })
+  }
+  if (req.method !== 'GET' || verb !== 'download') return json(res, 404, { error: 'not found' })
+
+  const rel = safeRelativePath(url.searchParams.get('file'))
+  if (rel === null) return json(res, 400, { error: 'file must be a basename' })
+  if (rel.includes('/')) return json(res, 400, { error: 'file must be a basename' })
+  if (!rel.endsWith('.zip')) return json(res, 400, { error: 'file must end in .zip' })
+  if (!isInside(outDir, path.resolve(outDir, rel))) return json(res, 400, { error: 'file is not inside the exports folder' })
+
+  const file = path.resolve(outDir, rel)
+  let size
+  try {
+    size = (await fs.promises.stat(file)).size
+  } catch {
+    return json(res, 404, { error: 'not found' })
+  }
+
+  res.writeHead(200, {
+    'content-type': 'application/zip',
+    'content-length': size,
+    'content-disposition': 'attachment; filename="' + rel + '"',
+    'cache-control': 'no-store',
+  })
+  fs.createReadStream(file).pipe(res)
+}
+
 // Thin layer; the running-server gates live in worlds.mjs.
 async function handleWorlds(req, res, name, seg) {
   const inst = registry.getInstance(name)
@@ -1092,6 +1130,27 @@ async function route(req, res) {
       args: [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
     })
+  }
+
+  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, client.listProfiles().map((p) => ({ name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, running: client.status(p.name).running })))
+  }
+
+  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 5) {
+    const profileName = seg[3]
+    if (seg[4] === 'status' && req.method === 'GET') {
+      return json(res, 200, client.status(profileName))
+    }
+    if (seg[4] === 'launch' && req.method === 'POST') {
+      const body = await readBody(req)
+      const fakeJava = client.fakeClientJava()
+      const res2 = await client.launch(profileName, { server: typeof body?.server === 'string' && body.server ? body.server : null, fakeJava })
+      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account, warnings: res2.warnings })
+    }
+    if (seg[4] === 'stop' && req.method === 'POST') {
+      return json(res, 200, await client.stop(profileName))
+    }
+    return json(res, 405, { error: 'method not allowed' })
   }
 
   if (seg[1] === 'health' && req.method === 'GET') {
@@ -1520,6 +1579,7 @@ async function route(req, res) {
   if (seg[3] === 'activity') return handleActivity(req, res, name, seg, url)
   if (seg[3] === 'icon') return handleIcon(req, res, name, seg)
   if (seg[3] === 'console') return handleConsole(req, res, name, seg)
+  if (seg[3] === 'diag') return handleDiag(req, res, name, seg, url)
 
   if (seg[3] === 'diagnose' && req.method === 'GET') {
     const inst = registry.getInstance(name)

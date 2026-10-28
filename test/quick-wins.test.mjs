@@ -8,9 +8,13 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-quick-'))
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
+process.env.MCCTL_FAKE_CLIENT = path.resolve(process.cwd(), 'test', 'fixtures', 'fake-client.mjs')
+process.env.NODE_ENV = 'test'
 const { serve } = await import('../src/ui.mjs')
 const registry = await import('../src/registry.mjs')
 const { UserError } = await import('../src/util.mjs')
+const client = await import('../src/client.mjs')
+const clientPaths = await import('../src/client-paths.mjs')
 
 const dir = path.join(scratch, 'data', 'instances', 'quick')
 fs.mkdirSync(dir, { recursive: true })
@@ -72,4 +76,102 @@ test('the server icon must be a 64 by 64 PNG, and can be taken away again', asyn
   assert.ok(fs.existsSync(path.join(dir, 'server-icon.png')))
   assert.equal((await api('instances/quick/icon/remove', {})).status, 200)
   assert.ok(!fs.existsSync(path.join(dir, 'server-icon.png')))
+})
+
+test('diagnostics: POST writes the zip, GET streams it with attachment', async () => {
+  const res = await api('instances/quick/diag', {})
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.ok(body.file.endsWith('.zip'))
+  assert.ok(fs.existsSync(body.file))
+  assert.ok(body.sizeHuman)
+  assert.ok(Array.isArray(body.findings.server))
+  assert.ok(Array.isArray(body.findings.client))
+
+  const basename = body.file.split(/[\\/]/).pop()
+  const dl = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent(basename))
+  assert.equal(dl.status, 200)
+  assert.match(dl.headers.get('content-disposition'), /^attachment/)
+})
+
+test('diagnostics download refuses path traversal', async () => {
+  const r1 = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent('../instances.json'))
+  assert.equal(r1.status, 400)
+
+  const r2 = await fetch(panel.url + 'api/instances/quick/diag/download?file=' + encodeURIComponent('..\\instances.json'))
+  assert.equal(r2.status, 400)
+})
+
+test('the panel lists, launches, reports and stops a client profile', async () => {
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'test', 'fixtures', 'client', 'version_manifest_v2.json'), 'utf8'))
+  const mc = manifest.latest.release
+  fs.mkdirSync(clientPaths.versionDir(mc), { recursive: true })
+  fs.copyFileSync(path.resolve(process.cwd(), 'test', 'fixtures', 'client', `${mc}.json`), clientPaths.versionJson(mc))
+  client.createProfile('pp', { mc, server: 'quick' })
+
+  const listRes = await fetch(panel.url + 'api/client/profiles')
+  assert.equal(listRes.status, 200)
+  const listData = await listRes.json()
+  assert.equal(listData.length, 1)
+  assert.equal(listData[0].name, 'pp')
+  assert.equal(listData[0].mc, mc)
+  assert.equal(listData[0].server, 'quick')
+  assert.equal(listData[0].running, false)
+
+  // "quick" has no online-mode line, so it runs in online mode: an offline player is refused before the game opens
+  const refused = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(refused.status, 400)
+  assert.match((await refused.json()).error, /server "quick" runs in online mode and pp_ is an offline player, so the server would refuse the join/)
+  assert.equal(client.status('pp').running, false)
+  fs.appendFileSync(path.join(dir, 'server.properties'), 'online-mode=false\n')
+
+  const launchRes = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(launchRes.status, 200)
+  const launchData = await launchRes.json()
+  assert.equal(typeof launchData.pid, 'number')
+  // "quick" is not running here, and the panel says so instead of a silent "is running"
+  assert.ok(launchData.warnings.some((w) => /server "quick" is not running/.test(w)), JSON.stringify(launchData.warnings))
+
+  const statusRes = await fetch(panel.url + 'api/client/profiles/pp/status')
+  assert.equal(statusRes.status, 200)
+  const statusData = await statusRes.json()
+  assert.equal(statusData.running, true)
+
+  const stopRes = await fetch(panel.url + 'api/client/profiles/pp/stop', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(stopRes.status, 200)
+  const stopData = await stopRes.json()
+  assert.equal(stopData.stopped, true)
+
+  const statusRes2 = await fetch(panel.url + 'api/client/profiles/pp/status')
+  assert.equal(statusRes2.status, 200)
+  const statusData2 = await statusRes2.json()
+  assert.equal(statusData2.running, false)
+
+  const badStatus = await fetch(panel.url + 'api/client/profiles/nosuch/status')
+  assert.equal(badStatus.status, 400)
+
+  const stopRes2 = await fetch(panel.url + 'api/client/profiles/pp/stop', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(stopRes2.status, 200)
+  const stopData2 = await stopRes2.json()
+  assert.equal(stopData2.stopped, false)
+})
+
+test('the panel shows the Linux arm64 refusal as the launch error', async () => {
+  // currentOs() reads these on every call; the refusal comes before anything else is touched.
+  // The fake game is launched as if on Linux x64, so this launch goes the real game's way.
+  const real = { platform: process.platform, arch: process.arch, fake: process.env.MCCTL_FAKE_CLIENT }
+  delete process.env.MCCTL_FAKE_CLIENT
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+  Object.defineProperty(process, 'arch', { value: 'arm64', configurable: true })
+  let res
+  try {
+    res = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  } finally {
+    Object.defineProperty(process, 'platform', { value: real.platform, configurable: true })
+    Object.defineProperty(process, 'arch', { value: real.arch, configurable: true })
+    process.env.MCCTL_FAKE_CLIENT = real.fake
+  }
+  assert.equal(res.status, 400)
+  assert.deepEqual(await res.json(), { error: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })
+  assert.equal(client.status('pp').running, false)
 })
