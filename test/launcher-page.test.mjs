@@ -97,7 +97,7 @@ test('Play names the account a launch uses, the profile\'s own before the defaul
   assert.deepEqual(playAccount({ account: null }, accounts, 'no-such-uuid'), { name: null, type: 'offline' })
 })
 
-test('the server picker offers the profile\'s version and blocks online servers for offline players', () => {
+test('the Join menu lists every server, notes another version and blocks online servers for offline players', () => {
   const { serverChoices } = lifted(['STOPPED', 'serverChoices'])
   const servers = [
     { name: 'survival', label: null, mc: '1.21.11', status: 'running', onlineMode: false },
@@ -106,10 +106,11 @@ test('the server picker offers the profile\'s version and blocks online servers 
     { name: 'mine', label: null, mc: '1.20.1', status: 'stale', onlineMode: null },
   ]
   const offline = serverChoices({ mc: '1.21.11', server: 'mine' }, servers, 'offline')
-  assert.deepEqual(offline.map((c) => c.name), ['survival', 'public-smp', 'mine'])
+  assert.deepEqual(offline.map((c) => c.name), ['survival', 'public-smp', 'old', 'mine'])
   assert.equal(offline.find((c) => c.name === 'public-smp').blocked, 'needs a Microsoft account')
   assert.equal(offline.find((c) => c.name === 'survival').blocked, null)
-  assert.equal(offline.find((c) => c.name === 'mine').otherVersion, '1.20.1')
+  assert.equal(offline.find((c) => c.name === 'survival').otherVersion, null)
+  assert.equal(offline.find((c) => c.name === 'old').otherVersion, '1.20.4')
   assert.equal(offline.find((c) => c.name === 'mine').stopped, true)
   assert.equal(offline.find((c) => c.name === 'survival').stopped, false)
   const signedIn = serverChoices({ mc: '1.21.11', server: null }, servers, 'microsoft')
@@ -132,9 +133,9 @@ test('a refused launch says why in the words the launcher uses', () => {
   assert.equal(lock.tone, 'warn')
   assert.equal(lock.busy, true)
   const online = launchNotice('strict requires a Microsoft account (online-mode=true); sign in or pick another server')
-  assert.equal(online.title, 'Can\'t launch: strict requires a Microsoft account (online-mode=true)')
-  assert.equal(online.go, 'accounts')
-  assert.deepEqual(launchNotice('no Java 21 found'), { tone: 'fault', title: 'Can\'t launch', text: 'No Java 21 found' })
+  assert.equal(online.title, 'Can\'t play: strict requires a Microsoft account (online-mode=true)')
+  assert.equal(online.fix, 'sign-in')
+  assert.deepEqual(launchNotice('no Java 21 found'), { tone: 'fault', title: 'Can\'t play', text: 'No Java 21 found' })
 })
 
 test('small display helpers', () => {
@@ -180,4 +181,170 @@ test('the Edit form sends only what changed, and nothing a running game cannot c
   assert.deepEqual(profilePatch(before, { ...same, mc: '1.21.4', loaderVersion: '0.16.9' }), { mc: '1.21.4', loaderVersion: '0.16.9' })
   // running: only the next-launch keys go
   assert.deepEqual(profilePatch({ ...before, running: true }, { ...same, memory: '8G', harness: false, account: 'u2', assistantAccount: true }), { account: 'u2', assistantAccount: true })
+})
+
+test('a setup is named by its version unless someone gave it a name', () => {
+  const { nameBase, autoName, givenName, setupTitle } = lifted(['nameBase', 'autoName', 'givenName', 'setupTitle'])
+  assert.equal(autoName('1.21.11', 'vanilla', []), '1-21-11')
+  assert.equal(autoName('1.21.11', 'fabric', []), '1-21-11-fabric')
+  assert.equal(autoName('1.21.11', 'vanilla', ['1-21-11', '1-21-11-2']), '1-21-11-3')
+  assert.equal(autoName('1.21.11', 'vanilla', ['1-21-11-FABRIC', '1-21-11'.toUpperCase()]), '1-21-11-2')
+  // spaced and odd ids still make a profile name the panel accepts
+  const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i
+  for (const mc of ['1.14.2 Pre-Release 4', 'b1.7.3', '25w44a', 'rd-132211', '...', '1.21.11-rc1 '.repeat(4)]) {
+    for (const loader of ['vanilla', 'fabric']) {
+      const name = autoName(mc, loader, [nameBase(mc, loader)])
+      assert.match(name, NAME_RE, `${mc} / ${loader} -> ${name}`)
+    }
+  }
+  assert.equal(givenName({ name: '1-21-11', mc: '1.21.11', loader: 'vanilla' }), null)
+  assert.equal(givenName({ name: '1-21-11-3', mc: '1.21.11', loader: 'vanilla' }), null)
+  assert.equal(givenName({ name: '1-21-11-fabric', mc: '1.21.11', loader: 'fabric' }), null)
+  assert.equal(givenName({ name: 'modded', mc: '1.21.1', loader: 'fabric' }), 'modded')
+  // a setup whose version changed keeps the old name, which is now worth showing
+  assert.equal(givenName({ name: '1-21-11', mc: '1.21.4', loader: 'vanilla' }), '1-21-11')
+  assert.equal(setupTitle({ mc: '1.21.11', loader: 'vanilla' }), '1.21.11 · Vanilla')
+  assert.equal(setupTitle({ mc: '1.21.1', loader: 'fabric' }), '1.21.1 · Fabric')
+})
+
+test('the sentence under Play says what will happen', () => {
+  const { playSentence } = lifted(['playSentence'])
+  const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : `*${x.b}*`)).join('')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: 'Joogiebear', server: 'survival' })), 'Opens *Minecraft 1.21.11* and joins *survival* as *Joogiebear*.')
+  assert.equal(text(playSentence({ mc: '1.21.1', fabric: true, who: 'Wunga_' })), 'Opens *Minecraft 1.21.1 (Fabric)* on the title screen as *Wunga_*.')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: null, address: 'mc.example.net:25566' })), 'Opens *Minecraft 1.21.11* and joins *mc.example.net:25566* as *an offline player*.')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: 'Joogiebear', server: 'creative', startsServer: true })),
+    'Starts *creative* first (up to 2 minutes), then opens *Minecraft 1.21.11* and joins it as *Joogiebear*.')
+})
+
+test('the one screen keeps the old screens\' links and the card\'s pre-fill', () => {
+  // #profiles and #accounts were screens; they now open the setups and the account menu
+  assert.match(html, /hash === 'profiles' \? 'version' : hash === 'accounts' \? 'account'/)
+  // the storage keys the page and the panel's server cards share are unchanged
+  for (const key of ['spawnloft.launcher.newProfile', 'spawnloft.launcher.job', 'spawnloft.launcher.profile']) assert.ok(html.includes(`'${key}'`), key)
+  // no sidebar, no screens
+  assert.doesNotMatch(html, /class="rail"|data-go=/)
+})
+
+// The states of the one screen, forced from the summaries the launcher route answers.
+test('the Play screen picks one state from what the panel says', () => {
+  const { playState, playAccount } = lifted(['STRICT_CODES', 'sentence', 'blockReason', 'playState', 'playAccount'])
+  const ms = { name: 'Joogiebear', uuid: 'u1', type: 'microsoft', refreshFailedAt: null }
+  const off = { name: 'Wunga_', uuid: 'u2', type: 'offline', refreshFailedAt: null }
+  const setup = { name: '1-21-11', mc: '1.21.11', loader: 'vanilla', account: null, running: false }
+  const ctx = (over = {}) => {
+    const profile = over.profile ?? setup
+    const accounts = over.accounts ?? [ms]
+    return { down: false, loaded: true, profile, job: null, acct: playAccount(profile, accounts, over.defaultAccount ?? 'u1'), picked: null, machineRefusal: null, busy: false, otherJob: false, refusal: null, crashed: false, ...over }
+  }
+  const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : x.b)).join('')
+
+  assert.equal(playState({ down: true }).kind, 'unreachable')
+  assert.equal(playState({ down: false, loaded: false }).kind, 'loading')
+  assert.equal(playState(ctx({ profile: null })).kind, 'first-run')
+  assert.equal(playState(ctx()).kind, 'ready')
+  assert.equal(playState(ctx({ job: { profile: '1-21-11' } })).kind, 'launching')
+  assert.equal(playState(ctx({ profile: { ...setup, running: true } })).kind, 'running')
+  assert.equal(playState(ctx({ crashed: true })).kind, 'closed-early')
+
+  // blocked: the machine
+  const machine = playState(ctx({ machineRefusal: 'Minecraft has no client for Linux on arm64 (aarch64)' }))
+  assert.equal(machine.kind, 'blocked')
+  assert.equal(text(machine.reason), 'Minecraft can\'t be launched on this computer: Minecraft has no client for Linux on arm64 (aarch64).')
+  assert.deepEqual(machine.fix, [])
+  // blocked: the setup's own account was signed out
+  const gone = { ...setup, account: 'gone', accountName: 'OldName', accountType: null }
+  const missing = playState(ctx({ profile: gone }))
+  assert.equal(text(missing.reason), 'This setup plays as OldName, who is no longer signed in.')
+  assert.deepEqual(missing.fix, ['pick-account', 'sign-in'])
+  // blocked: the default account's refresh failed, and a setup's own account's
+  const stale = { ...ms, refreshFailedAt: '2026-10-28T00:00:00Z' }
+  const expiredDefault = playState(ctx({ accounts: [stale] }))
+  assert.equal(text(expiredDefault.reason), 'You play as Joogiebear, whose saved sign-in no longer works.')
+  assert.deepEqual(expiredDefault.fix, ['sign-in-again', 'switch-account'])
+  const ownStale = { ...setup, account: 'u1', accountName: 'Joogiebear', accountType: 'microsoft', accountUuid: 'u1' }
+  assert.deepEqual(playState(ctx({ profile: ownStale, accounts: [stale] })).fix, ['sign-in-again', 'pick-account'])
+  // blocked: an online-mode server for an offline player
+  const online = playState(ctx({ accounts: [off], defaultAccount: 'u2', picked: { name: 'public-smp', blocked: 'needs a Microsoft account' } }))
+  assert.equal(text(online.reason), 'public-smp needs a Microsoft account, and this setup plays as Wunga_.')
+  assert.deepEqual(online.fix, ['sign-in', 'title-screen'])
+  // blocked: another launch of it, or of another setup
+  assert.equal(playState(ctx({ busy: true })).kind, 'blocked')
+  assert.match(text(playState(ctx({ otherJob: true })).reason), /Another setup is launching/)
+  // blocked: the version itself was refused (strict mode); there is no "launch anyway"
+  const strict = playState(ctx({ refusal: 'Minecraft 26.5 needs launcher format 22; this SpawnLoft knows 21. Update SpawnLoft.' }))
+  assert.equal(strict.kind, 'blocked')
+  assert.deepEqual(strict.fix, ['edit'])
+  // the machine outranks everything else; a crash shown under a block stays a block
+  assert.deepEqual(playState(ctx({ machineRefusal: 'x', profile: gone })).fix, [])
+  assert.equal(playState(ctx({ crashed: true, busy: true })).kind, 'blocked')
+})
+
+test('a version the panel refuses outright is told apart from a launch that failed', () => {
+  const { versionRefusal } = lifted(['STRICT_CODES', 'versionRefusal'])
+  assert.equal(versionRefusal({ code: 'newer-launcher-format', message: 'x' }), true)
+  assert.equal(versionRefusal({ code: 'unknown-variable', message: 'x' }), true)
+  assert.equal(versionRefusal({ message: 'Minecraft X stores its assets in a way SpawnLoft does not know. Update SpawnLoft.' }), true)
+  assert.equal(versionRefusal({ message: 'no Java 21 found' }), false)
+  assert.equal(versionRefusal({ code: 'java-missing', message: 'no Java 21 found' }), false)
+  assert.equal(versionRefusal(null), false)
+})
+
+test('the setup sheet\'s memory and facts', () => {
+  const { memoryGb, memoryFromGb, defaultMemory, versionFacts } = lifted(['memoryGb', 'memoryFromGb', 'defaultMemory', 'versionFacts'])
+  assert.equal(memoryGb('4G'), 4)
+  assert.equal(memoryGb('1536M'), 1.5)
+  assert.equal(memoryGb('4096m'), 4)
+  assert.equal(memoryGb('lots'), null)
+  assert.equal(memoryFromGb(4), '4G')
+  assert.equal(memoryFromGb('2.5'), '2560M')
+  assert.equal(memoryFromGb(0.2), '1G')
+  // the slider and the panel agree on every half step
+  for (let gb = 1; gb <= 64; gb += 0.5) assert.equal(memoryGb(memoryFromGb(gb)), gb)
+  assert.equal(defaultMemory('vanilla'), '2G')
+  assert.equal(defaultMemory('fabric'), '4G')
+  // today's picker rows carry only the harness; the all-versions plan adds the rest
+  assert.deepEqual(versionFacts({ id: '1.21.1', harness: false }, null), ['harness not published'])
+  assert.deepEqual(versionFacts({ id: '26.3', harness: false, fabric: true, javaNeeds: 25 }, { harness: true, emulated: true }), ['Java 25', 'Fabric available', 'harness published', 'runs under emulation'])
+  assert.deepEqual(versionFacts(null, { fabric: false }), ['no Fabric'])
+  assert.deepEqual(versionFacts(null, null), [])
+})
+
+test('on a fresh install, Enter in Join plays the way Play does, and a failed version list can be read again', () => {
+  // the first-run draft is not a setup the panel knows: it must never be launched by name
+  assert.match(fnSource('startLaunch'), /if \(p\.name === FIRST\) return firstPlay\(\)/)
+  assert.match(fnSource('firstRunView'), /joinField\(draft, plan, false\)/)
+  assert.match(fnSource('firstRunView'), /id: 'versionsAgain', onclick: loadVersions/)
+})
+
+test('a re-render keeps focus on the same row of an open menu', () => {
+  const src = fnSource('render')
+  assert.match(src, /closest\?\.\('\.menu\[id\]'\)/)
+  assert.match(src, /menuItems\(menu\)/)
+  for (const id of ['menuAccount', 'menuVersion', 'menuJoin', 'menuAsk']) assert.ok(html.includes(`id: '${id}'`), id)
+})
+
+test('an offline account a setup names by key is listed once in Play as', () => {
+  const { accountValue } = lifted(['accountValue'])
+  const steve = { uuid: 'u-steve', name: 'Steve', type: 'offline' }
+  const alex = { uuid: 'u-alex', name: 'Alex', type: 'microsoft' }
+  assert.equal(accountValue(steve, 'offline:Steve'), 'offline:Steve')
+  assert.equal(accountValue(steve, 'u-steve'), 'u-steve')
+  assert.equal(accountValue(steve, 'offline:Alex'), 'u-steve')
+  assert.equal(accountValue(alex, 'offline:Alex'), 'u-alex')
+  assert.equal(accountValue(steve, ''), 'u-steve')
+})
+
+test('a server card\'s pre-fill picks the setup that fits, running or not', () => {
+  const { prefillPick } = lifted(['prefillPick'])
+  const profiles = [
+    { name: 'a', mc: '1.21.11', server: null, running: false },
+    { name: 'b', mc: '1.21.11', server: 'survival', running: true },
+    { name: 'c', mc: '1.20.1', server: null },
+  ]
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'survival' }, profiles).profile.name, 'b')
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'creative' }, profiles).profile.name, 'a')
+  assert.equal(prefillPick({ mc: '1.19.4', server: 'x' }, profiles).profile, null)
+  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0] })
+  assert.doesNotMatch(fnSource('takePrefill'), /!p\.running/)
 })

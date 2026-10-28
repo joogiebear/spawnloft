@@ -6,8 +6,9 @@ pointed at one of your SpawnLoft servers. Nothing is drawn or patched by SpawnLo
 the client Mojang ships from Mojang's own servers, the way Prism and MultiMC do, and runs it.
 
 There are two ways to drive it. The command line (`spawnloft client ...`) is below; for a person
-who would rather click, the [game launcher](#the-game-launcher) is a window with Play, Profiles
-and Accounts, a Microsoft sign-in in the browser and a version picker.
+who would rather click, the [game launcher](#the-game-launcher) is a window with one Play
+screen: a Play button with the setup it plays, a Join field, an account menu with the Microsoft
+sign-in, and a version picker.
 
 The same client can be driven by an AI assistant or a script. A small Fabric mod, the *harness*,
 opens a control channel on this machine only, and through it `spawnloft mcp`'s `client_*` tools
@@ -93,52 +94,61 @@ way you would in any launcher.
 
 The game launcher is a window for the same profiles and accounts the command line uses (nothing
 is kept twice: a profile made in one shows in the other). It is a dev tool that goes with
-SpawnLoft, not a separate product, and it has three screens.
+SpawnLoft, not a separate product, and it is one screen. On it a profile is called a **setup**,
+named by what it is (`1.21.11 · Vanilla`, `1.21.1 · Fabric (modded)`); the command line, the API
+and the files keep "profile".
 
-**Play** is the one most people stay on. Pick a profile, pick where it should go, press
-**Launch game**. A line under the button says what will happen ("Minecraft 1.21.11 · joins
-survival · as Wunga_"). The first launch of a version downloads the game (progress shows on the
-page; closing the window does not stop the download, and the files are used next time). Under
-the button:
+- **Play** is a split button. The big half plays; the small half shows the setup's version and
+  opens the setups menu: pick another setup, edit one (the gear), or make a **New setup**. A line
+  under the button says what will happen ("Opens Minecraft 1.21.11 and joins survival as
+  Wunga_."). The first launch of a version downloads the game (progress shows in the button's
+  place; closing the window does not stop the download, and the files are used next time).
+- **Join** is one field. Its menu lists the SpawnLoft servers with their state (and a note when one
+  runs another version than the setup), plus *Title screen only*. A stopped server is started
+  first: the button then reads **Start server and play**, waits up to two minutes for it, launches
+  the game and joins it. Typing into the field instead joins any other server, `host` or
+  `host:port` (a bracketed IPv6 address works). An address is only checked for shape; whether the
+  server is reachable, and which accounts it lets in, is between the game and that server. The
+  field remembers where each setup went last, in the page's local storage; a typed address does
+  not become a saved server. Assistant control (the harness) works on your own SpawnLoft servers
+  only.
+- **The account chip** (top right) opens the account menu: who plays (click one to make it the
+  default), **Add Microsoft account** (see [Signing in from the launcher](#signing-in-from-the-launcher)),
+  an offline name for servers with `online-mode=false`, and sign out. A setup plays as its own
+  account, else the default account (see [Default account and precedence](#default-account-and-precedence)).
+  When a setup has neither, Play first asks **Who's playing?**: sign in with Microsoft, or type an
+  offline name and play.
 
-- **Profile**: every profile, with its version and loader.
-- **Server**: *Your servers* lists the SpawnLoft servers (with their state, and a note when one
-  runs a different version than the profile), plus *Title screen only*. A stopped server is
-  started first: the button then reads **Start server and launch**, waits up to two minutes for
-  it, launches the game and joins it. *Other server* takes an address instead, `host` or
-  `host:port` (a bracketed IPv6 address works), so the same launcher plays on servers SpawnLoft
-  does not run. An address is only checked for shape; whether the server is reachable, and which
-  accounts it lets in, is between the game and that server. Online servers need a Microsoft
-  account. Assistant control (the harness) works on your own SpawnLoft servers only.
-- The account is the profile's own, else the default account, else offline (see
-  [Default account and precedence](#default-account-and-precedence)).
+On a fresh install with no setup, Play makes one for the latest release (Vanilla, 2 GB), asks
+who is playing, and plays. Nothing downloads before that is answered.
+
+The setup sheet (New setup, or the gear) has the version (releases, or with snapshots, or
+everything, from Mojang's version list, cached so it works offline once fetched), Vanilla or
+Fabric, memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory that says how much is
+free), an optional name (else it is named by its version), who it plays as, the server it usually
+joins, **Let SpawnLoft see the game** (the harness mod), and under Advanced the Java path, the
+Fabric loader version and, once the setup exists, the switch that lets an assistant use its
+Microsoft account. Changing the version, loader, Java, memory or harness is refused while the game
+is running. Changing the version of a setup that has mods in its folder warns that they may not
+load. **Remove setup** keeps its folder unless you tick the box.
 
 While a game runs the button turns into **Stop**, with **Open folder** (desktop app only; a
-browser tab shows the path instead). If the game closes within a minute of starting without a Stop
-from the page, a callout says so, shows the last lines of the game log, and offers **Report a
-problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The page refuses
-to launch, and says why, when another launch of that profile is under way, when the account the
-profile names is no longer signed in, or when the machine cannot run the client (Linux arm64, for
-one).
-
-**Profiles** lists them with their state, and makes, edits and removes them: name, Minecraft
-version (from Mojang's version list, cached, so it works offline once fetched), Vanilla or Fabric,
-memory, Java, Fabric loader version, the harness, and the account to play as. Changing the
-version, loader, Java, memory or harness is refused while the game is running. Changing the
-version of a profile that has mods in its folder warns that they may not load. Removing keeps the
-profile's folder unless you tick the box. A profile made here starts with `assistantAccount` off;
-the switch to allow an assistant appears once the profile exists and plays as a signed-in account.
-
-**Accounts** lists the signed-in and offline accounts, adds either kind, sets the default and
-signs out. See [Signing in from the launcher](#signing-in-from-the-launcher). An offline account
-is a name only, for servers with `online-mode=false`.
+browser tab shows the folder's path instead). If the game closes within a minute of starting
+without a Stop from the page, a notice says so, shows the last lines of the game log, and offers
+**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. When
+Play cannot work it is greyed with the reason where the line under it was, and a link that fixes
+it: the account the setup names is no longer signed in or its sign-in expired, an online-mode
+server was picked for an offline player, another launch is under way, the machine cannot run the
+client (Linux arm64, for one), or the panel refused the version itself. The old `#profiles` and
+`#accounts` links open the setups menu and the account menu.
 
 Everything the page does goes through the panel's `/api/client/...` routes (profiles, versions,
 launch, stop, log, diag, accounts), behind the panel's localhost Host and Origin check. A launch
 is a job: the page posts it with a job id, opens `/api/jobs/<id>/stream` and shows the download
 and start-up lines, which end in `running` or an `error`. `GET /api/client/launcher` is the one
 read the page polls (profiles with their running state, accounts, the default account, the
-servers a profile can join, and a refusal when the machine cannot run the client). The log tail is
+servers a profile can join, a refusal when the machine cannot run the client, and the machine's
+total and free memory for the memory slider). The log tail is
 scrubbed of the harness token, the game's access token and every secret the registry or the
 accounts file holds (it keeps player names: the page is the account owner's own; only the
 diagnostics bundle hides them). No route returns a token.
