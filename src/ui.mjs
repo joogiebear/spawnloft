@@ -816,8 +816,10 @@ function clientProfileRow(p) {
   return {
     name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, java: p.java,
     // the key may be a uuid; the page shows the name and tells offline from Microsoft by the type
-    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, assistantAccount: p.assistantAccount,
-    running: st.running, pid: st.pid, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
+    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, accountUuid: client.accountUuid(p.account), assistantAccount: p.assistantAccount,
+    running: st.running, pid: st.pid, startedAt: st.startedAt, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
+    // shown on the launcher's facts card; a browser tab cannot open it, so it shows the path
+    folder: client.profileFolder(p.name),
   }
 }
 
@@ -1290,7 +1292,7 @@ async function handleAccounts(req, res, seg, url) {
           res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
         }
         res.write(`data: ${JSON.stringify(event)}\n\n`)
-        if (event.status !== 'pending') res.end()
+        if (event.status !== 'pending' && event.status !== 'finishing') res.end()
       })
       if (!detach) return json(res, 404, { error: 'no such sign-in; start it again' })
       const beat = setInterval(() => { if (!res.writableEnded) res.write(': ping\n\n') }, 20000)
@@ -1394,7 +1396,14 @@ async function route(req, res) {
   if (url.pathname === '/launcher') {
     const html = readFileSync(path.join(HERE, 'launcher.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    // Launch, sign out and remove are one click each, so no other site may put the page in a
+    // frame and steer those clicks; a meta CSP cannot say frame-ancestors, a header can.
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-frame-options': 'DENY',
+      'content-security-policy': "frame-ancestors 'none'",
+    })
     res.end(html)
     return
   }

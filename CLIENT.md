@@ -153,8 +153,9 @@ How it runs, in the panel process (`src/client-login.mjs`):
 2. The page opens `GET /api/client/accounts/login/<loginId>/stream` (server-sent events; the
    first event is `{ status: "pending" }`), then opens `authorizeUrl` in a window.
 3. Microsoft redirects the window to `GET /api/client/accounts/login/callback?code=…&state=…`.
-   A `state` that names the one live record is consumed at once and the window gets a short
-   static page ("Finishing the sign-in in SpawnLoft. You can close this window."); anything
+   A `state` that names the one live record is consumed at once, the stream says
+   `{ status: "finishing" }` (from then on closing the window is not a cancel), and the window
+   gets a short static page ("Finishing the sign-in in SpawnLoft. You can close this window."); anything
    else, including a replay, is a 400 that changes nothing. The code is exchanged and the chain
    runs after that answer, in the background.
 4. The outcome reaches the page on the stream only: `{ status: "done", account }` (name, uuid,

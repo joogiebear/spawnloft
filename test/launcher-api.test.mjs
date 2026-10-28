@@ -265,6 +265,18 @@ test('a launch with a job id answers at once and reports its stages on the job s
   assert.equal(listed.running, true)
   assert.equal(listed.launchedBy, 'launcher')
   assert.deepEqual(listed.runningAccount, { type: 'offline', name: 'job' })
+  // the launcher's "since 14:02" and its data folder line
+  assert.equal(listed.startedAt, client.status('job').startedAt)
+  assert.equal(listed.folder, clientPaths.profileDir('job'))
+  assert.equal(listed.accountUuid, null, 'an offline selector has no uuid')
+  // a key an older CLI wrote as a name still resolves to the account's uuid for the page's picker
+  const reg = client.loadProfiles()
+  reg.profiles.named = { ...reg.profiles.job, account: 'Wunga_', server: null }
+  client.saveProfiles(reg)
+  const named = (await (await call('client/profiles')).json()).find((p) => p.name === 'named')
+  assert.equal(named.accountUuid, '11111111-2222-3333-4444-555555555555')
+  assert.equal(named.accountName, 'Wunga_')
+  client.removeProfile('named')
 
   const again = await jobEvents('launch-job-2', () => call('client/profiles/job/launch', { method: 'POST', body: { jobId: 'launch-job-2', server: false } }))
   assert.equal(again.at(-1).stage, 'error')
@@ -418,6 +430,9 @@ test('/launcher is served with the saved theme and no-store', async () => {
   assert.equal(res.headers.get('cache-control'), 'no-store')
   assert.match(res.headers.get('content-type'), /text\/html/)
   assert.match(await res.text(), /<html lang="en" data-theme="spawnloft">/)
+  // no other site may frame it
+  assert.equal(res.headers.get('x-frame-options'), 'DENY')
+  assert.equal(res.headers.get('content-security-policy'), "frame-ancestors 'none'")
 })
 
 test('a server address outside SpawnLoft is parsed strictly', () => {

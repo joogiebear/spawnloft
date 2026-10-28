@@ -200,6 +200,11 @@ test('the website palette stays consistent between the panel and setup wizard', 
   assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../desktop/setup.html', true))
 })
 
+test('the game launcher carries the same token block as the panel, both palettes', () => {
+  assert.deepEqual(tokensOf('../src/launcher.html'), tokensOf('../src/ui.html'))
+  assert.deepEqual(tokensOf('../src/launcher.html', true), tokensOf('../src/ui.html', true))
+})
+
 test('the overview feed folds a run of the same thing into one line, and only a run', () => {
   const { groupActivity } = lifted(['FEED_RUN_GAP_MS', 'actorKey', 'groupActivity'])
   const you = { kind: 'panel' }

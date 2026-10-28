@@ -4,12 +4,13 @@
 <meta name="color-scheme" content="dark">
 <title>SpawnLoft Launcher</title>
 
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+
 <script>
-  // Static design (L3a). The theme comes from ?theme=, as setup.html does. ?view=<screen>.<state>
-  // picks what is shown so every state can be opened and photographed; with no ?view the page opens
-  // on Play and the rail works. L3b replaces the view switch with real data.
-  const q = new URLSearchParams(location.search);
-  document.documentElement.dataset.theme = q.get('theme') === 'spawnloft' ? 'spawnloft' : 'classic';
+  // The panel serves this page with the saved theme already in <html data-theme>; ?theme= still
+  // overrides it, for screenshots.
+  const themeAsked = new URLSearchParams(location.search).get('theme')
+  if (themeAsked) document.documentElement.dataset.theme = themeAsked === 'spawnloft' ? 'spawnloft' : 'classic'
 </script>
 
 <style>
@@ -467,10 +468,21 @@
   @media (max-width: 1199px) { .play { grid-template-columns: minmax(0, 1fr); } .facts { display: none; } }
   @media (max-width: 1060px) { .page { padding: var(--s-5) var(--s-5) var(--s-6); } .pickers, .form-grid, .two { grid-template-columns: 1fr; } .hero { padding: var(--s-6) var(--s-5); } }
 
-  /* The state switch used only by this design page: every view lives in the document, one shows. */
-  .view { display: none; }
-  .view.on { display: contents; }
-  .designbar { position: fixed; right: 12px; top: 10px; z-index: 9; display: none; }
+  /* ---- wiring (L3b) ------------------------------------------------------------ */
+  .linkbtn { display: inline; min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; font: inherit; color: var(--lapis-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .linkbtn:where(:hover:not(:disabled)) { background: none; border: 0; color: var(--ink); }
+  .linkbtn[aria-pressed="true"] { color: var(--ink); text-decoration: none; font-weight: 600; cursor: default; }
+  input.bad, select.bad { border-color: var(--fault); }
+  small.hint.bad { color: var(--fault-ink); }
+  small.hint.warn { color: var(--warn-ink); }
+  .switcher button.row { width: 100%; min-height: 0; justify-content: flex-start; background: transparent; border-color: transparent; box-shadow: none; font-weight: 400; color: var(--ink); text-align: left; }
+  .switcher button.row.act { color: var(--ink-2); }
+  .switcher button.row:where(:hover:not(:disabled)) { background: var(--hover-hi); border-color: transparent; }
+  .switcher button.row.cur { background: var(--lapis-wash); }
+  .logcard.closed pre.log { display: none; }
+  .notice .close { margin-left: var(--s-1); }
+  .waiting .acts { display: flex; gap: var(--s-3); align-items: center; flex: none; }
+  .hero .warnline { color: var(--warn-ink); }
 </style>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -494,406 +506,1302 @@
   <nav class="rail" aria-label="Launcher">
     <div class="brand"><svg width="24" height="24"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Game launcher</small></div></div>
     <button class="nav" data-go="play"><svg class="ico"><use href="#i-play"/></svg>Play</button>
-    <button class="nav" data-go="profiles"><svg class="ico"><use href="#i-profiles"/></svg>Profiles<span class="count" id="nProfiles">3</span></button>
-    <button class="nav" data-go="accounts"><svg class="ico"><use href="#i-user"/></svg>Accounts<span class="count" id="nAccts">3</span></button>
+    <button class="nav" data-go="profiles"><svg class="ico"><use href="#i-profiles"/></svg>Profiles<span class="count" id="nProfiles"></span></button>
+    <button class="nav" data-go="accounts"><svg class="ico"><use href="#i-user"/></svg>Accounts<span class="count" id="nAccts"></span></button>
     <div class="grow"></div>
-    <div class="chipwrap">
-      <div class="switcher" id="switcher" hidden>
-        <div class="row cur"><span class="tile sm t1">W</span><span>Wunga_</span><span class="meta">Microsoft · default</span></div>
-        <div class="row"><span class="tile sm t2">B</span><span>BuildBot</span><span class="meta">Offline</span></div>
-        <div class="row"><span class="tile sm t3">S</span><span>Steve_dev</span><span class="meta">Microsoft</span></div>
-        <hr>
-        <div class="row act"><svg class="ico"><use href="#i-plus"/></svg>Add account…</div>
-        <div class="row act"><svg class="ico"><use href="#i-x"/></svg>Sign out Wunga_</div>
-      </div>
-      <button class="chip" id="chipMs" data-chip aria-haspopup="menu"><span class="tile t1">W</span><span class="who"><b>Wunga_</b><small>Microsoft</small></span><svg class="ico"><use href="#i-chev"/></svg></button>
-      <button class="chip" id="chipOff" data-chip aria-haspopup="menu" hidden><span class="tile t2">B</span><span class="who"><b>BuildBot</b><small>Offline</small></span><svg class="ico"><use href="#i-chev"/></svg></button>
-      <button class="chip empty" id="chipNone" data-go="accounts" hidden><span class="tile" style="--tile:var(--raised-hi);color:var(--ink-3)"><svg class="ico"><use href="#i-user"/></svg></span><span class="who"><b>No account</b><small>Sign in to play online</small></span></button>
-    </div>
+    <div class="chipwrap" id="chipwrap"></div>
   </nav>
-
-  <main class="main" id="main">
-
-<!-- ================= PLAY ================= -->
-<section class="view" data-view="play.ready"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Ready</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
-      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins <b>survival</b> · as Wunga_</p>
-      <div class="pickers">
-        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button class="on" aria-pressed="true">Your servers</button><button aria-pressed="false">Other server</button></div><select aria-label="Your servers"><option>Join survival (running)</option></select></div>
-      </div>
-      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl>
-      <div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div>
-      <div><dt>Harness mod</dt><dd>On</dd></div><div><dt>Data folder</dt><dd class="mono">…/client/survival-test</dd></div></dl>
-      <button class="sm quiet" data-go="profiles">Edit profile</button></aside>
-  </div>
-</div></section>
-
-<section class="view" data-view="play.stopped"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill"><span class="dot"></span>Server stopped</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Start server and launch</button>
-      <p class="does">Starts <b>survival</b> first (up to 2 minutes), then launches Minecraft 1.21.11 · Fabric 0.17.3 as Wunga_ and joins it.</p>
-      <div class="pickers">
-        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button class="on" aria-pressed="true">Your servers</button><button aria-pressed="false">Other server</button></div><select aria-label="Your servers"><option>Join survival (stopped)</option></select></div>
-      </div>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl>
-      <div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div>
-      <div><dt>Harness mod</dt><dd>On</dd></div><div><dt>Data folder</dt><dd class="mono">…/client/survival-test</dd></div></dl></aside>
-  </div>
-</div></section>
-
-<section class="view" data-view="play.picker"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero" style="min-height:460px">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill warn"><span class="dot"></span>Offline account</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
-      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · as BuildBot (offline)</p>
-      <div class="pickers">
-        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <div class="field" style="position:relative"><span class="label">Server</span>
-          <select style="border-color:var(--lapis-edge)"><option>Choose a server</option></select>
-          <div class="switcher" style="bottom:calc(100% + 4px)">
-            <div class="row cur"><span>Title screen only</span></div>
-            <div class="row"><span>survival</span><span class="meta">running</span></div>
-            <div class="row"><span>lobby</span><span class="meta">stopped</span></div>
-            <div class="row" style="opacity:.5;cursor:not-allowed"><span>public-smp</span><span class="meta">needs a Microsoft account</span></div>
-            <hr><div class="row act"><span>Other server…</span><span class="meta">type an address</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
-  </div>
-</div></section>
-
-<section class="view" data-view="play.address"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Ready</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
-      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins play.example.net · as Wunga_</p>
-      <div class="pickers">
-        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button aria-pressed="false">Your servers</button><button class="on" aria-pressed="true">Other server</button></div>
-          <input aria-label="Server address" value="play.example.net:25565"><small class="hint">Host, or host:port. Plays like any Minecraft server; online servers need a Microsoft account (you are signed in as Wunga_).</small></div>
-      </div>
-      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
-  </div>
-</div></section>
-
-<section class="view" data-view="play.addresserror"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill fault"><span class="dot"></span>Check address</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
-      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins an address · as Wunga_</p>
-      <div class="pickers">
-        <label class="field"><span>Profile</span><select><option>survival-test — 1.21.11 · Fabric</option></select></label>
-        <div class="field"><span class="label">Server</span><div class="seg" role="group" aria-label="Server type"><button aria-pressed="false">Your servers</button><button class="on" aria-pressed="true">Other server</button></div>
-          <input aria-label="Server address" value="play example net" style="border-color:var(--fault)"><small class="hint" style="color:var(--fault-ink)">That doesn't look like a server address. Use a host name or IP, optionally with :port.</small></div>
-      </div>
-      <p class="hint note-line"><svg class="ico"><use href="#i-info"/></svg>Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.</p>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
-  </div>
-</div></section>
-
-<section class="view" data-view="play.launching"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill accent"><span class="dot"></span>Launching</span></div>
-      <div class="strip">
-        <div class="line"><b>Downloading Minecraft 1.21.11</b><span class="hint">212 of 1,049 files · 143 MB</span></div>
-        <div class="bar" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"><i style="width:20%"></i></div>
-        <div class="steps"><span class="step done"><svg class="ico"><use href="#i-check"/></svg>Server</span><span class="step done"><svg class="ico"><use href="#i-check"/></svg>Version</span><span class="step now">● Files</span><span class="step">Java</span><span class="step">Start</span></div>
-        <p class="hint">Closing this window does not stop the download. It keeps going and the files are used next time.</p>
-      </div>
-      <button disabled><svg class="ico"><use href="#i-play"/></svg>Launching…</button>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div></dl></aside>
-  </div>
-  <div class="card logcard"><div class="loghead"><b>Launch log</b><span class="hint">last 20 lines</span><span class="grow"></span><button class="sm quiet"><svg class="ico"><use href="#i-folder"/></svg>Open log folder</button></div>
-<pre class="log"><span class="ts">14:01:58</span> manifest   version_manifest_v2 cached (2 h old)
-<span class="ts">14:01:58</span> version    1.21.11 resolved, Java 21 needed
-<span class="ts">14:02:01</span> files      212 of 1,049 downloaded
-<span class="ts">14:02:04</span> files      340 of 1,049 downloaded</pre></div>
-</div></section>
-
-<section class="view" data-view="play.running"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill live"><span class="dot"></span>Running</span></div>
-      <div class="strip"><div class="line"><b>Minecraft is running</b><span class="hint">since 14:02 · pid 1234 · as Wunga_</span></div>
-        <p class="hint">Joined <b style="color:var(--ink-2)">survival</b>. Closing this window does not stop the game.</p></div>
-      <div class="runrow"><button class="danger launch" style="padding:0 var(--s-6)"><svg class="ico"><use href="#i-stop"/></svg>Stop</button><button><svg class="ico"><use href="#i-folder"/></svg>Open folder</button></div>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Java</dt><dd>Temurin 21.0.5</dd></div><div><dt>Memory</dt><dd>4 GB</dd></div><div><dt>Harness mod</dt><dd>On</dd></div></dl></aside>
-  </div>
-  <div class="card logcard"><div class="loghead"><b>Game log</b><span class="hint">last 20 lines</span><span class="grow"></span><button class="sm quiet">Collapse</button></div>
-<pre class="log"><span class="ts">14:02:41</span> [Render thread/INFO]: Setting user: Wunga_
-<span class="ts">14:02:44</span> [Render thread/INFO]: Loaded 1 mod: spawnloft-harness 0.1.0
-<span class="ts">14:02:49</span> [Render thread/INFO]: Reloading ResourceManager
-<span class="ts">14:02:52</span> [Server thread/INFO]: Wunga_ joined the game</pre></div>
-</div></section>
-
-<section class="view" data-view="play.crashed"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>Minecraft closed 18 seconds after it started (exit code 1)</b>
-    <span>Usually a mod, not enough memory, or the wrong Java. The last lines of the game log are below.</span></div>
-    <div class="acts"><button class="sm">Report a problem</button></div></div>
-  <div class="play">
-    <div class="card hero">
-      <div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill fault"><span class="dot"></span>Crashed</span></div>
-      <h2>Minecraft 1.21.11</h2>
-      <button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch again</button>
-      <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins survival · as Wunga_</p>
-    </div>
-    <aside class="card facts"><h2>survival-test</h2><dl><div><dt>Memory</dt><dd>4 GB</dd></div></dl><button class="sm quiet" data-go="profiles">Edit profile</button></aside>
-  </div>
-  <div class="card logcard"><div class="loghead"><b>Game log</b><span class="hint">last 20 lines</span></div>
-<pre class="log"><span class="ts">14:02:41</span> [main/INFO]: Loading Minecraft 1.21.11 with Fabric Loader 0.17.3
-<span class="ts">14:02:42</span> [main/<span class="w">WARN</span>]: Mod 'examplemod' targets 1.20.4, not 1.21.11
-<span class="ts">14:02:43</span> [main/<span class="e">ERROR</span>]: Incompatible mod set!
-<span class="ts">14:02:43</span> [main/<span class="e">ERROR</span>]: Mod 'examplemod' requires fabric-api &gt;=0.90, none found
-<span class="ts">14:02:43</span> Process exited with code 1</pre></div>
-</div></section>
-
-<section class="view" data-view="play.busy"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>Another launch of survival-test is already in progress</b><span>Started from the command line 40 seconds ago. This page checks again every few seconds and unlocks when it finishes.</span></div></div>
-  <div class="play"><div class="card hero"><div class="eyebrow"><span class="pill accent">Profile: survival-test</span><span class="pill warn"><span class="dot"></span>Busy</span></div>
-    <h2>Minecraft 1.21.11</h2><button class="primary launch" disabled><svg class="ico"><use href="#i-play"/></svg>Launch game</button></div>
-  <aside class="card facts"><h2>survival-test</h2></aside></div>
-</div></section>
-
-<section class="view" data-view="play.error"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>Can't launch: public-smp needs a Microsoft account (online-mode=true)</b><span>Sign in with a Microsoft account, or pick another server.</span></div>
-    <div class="acts"><button class="sm" data-go="accounts">Go to Accounts</button></div></div>
-  <div class="play"><div class="card hero"><div class="eyebrow"><span class="pill accent">Profile: survival-test</span></div>
-    <h2>Minecraft 1.21.11</h2><button class="primary launch"><svg class="ico"><use href="#i-play"/></svg>Launch game</button>
-    <p class="does">Minecraft 1.21.11 · Fabric 0.17.3 · joins public-smp · as BuildBot (offline)</p></div>
-  <aside class="card facts"><h2>survival-test</h2></aside></div>
-</div></section>
-
-<section class="view" data-view="play.loading"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Loading your profiles…</p></div></div>
-  <div class="play"><div class="card hero" aria-busy="true">
-    <div class="sk" style="width:180px;height:20px"></div><div class="sk" style="width:320px;height:32px"></div><div class="sk" style="width:240px;height:56px;border-radius:var(--r)"></div>
-    <div class="sk" style="width:380px;height:16px"></div>
-    <div class="pickers"><div class="sk" style="height:48px"></div><div class="sk" style="height:48px"></div></div></div>
-  <aside class="card facts"><div class="sk" style="height:20px;width:120px"></div><div class="sk" style="height:60px"></div><div class="sk" style="height:60px"></div></aside></div>
-</div></section>
-
-<section class="view" data-view="play.unreachable"><div class="page">
-  <div class="page-head"><div><h1>Play</h1></div></div>
-  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-alert"/></svg></div><h2>Can't reach the SpawnLoft panel</h2>
-    <p>The launcher talks to the panel running on this computer, and it is not answering. If you closed SpawnLoft, start it again; this page reconnects by itself.</p>
-    <div class="acts"><button class="primary">Try again</button></div></div></div>
-</div></section>
-
-<section class="view" data-view="play.empty"><div class="page">
-  <div class="page-head"><div><h1>Play</h1><p class="hint">Launch Minecraft with a SpawnLoft profile.</p></div></div>
-  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-play"/></svg></div><h2>No game profile yet</h2>
-    <p>A profile is a Minecraft version with its own worlds, options and mods. Make one to start playing; you can add more later.</p>
-    <div class="acts"><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div></div></div>
-</div></section>
-
-<!-- ================= PROFILES ================= -->
-<section class="view" data-view="profiles.list"><div class="page">
-  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div><span class="grow"></span><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div>
-  <div class="card list">
-    <div class="item running"><div><div class="name"><b>survival-test</b><span class="pill live"><span class="dot"></span>Running · pid 1234</span><span class="pill">Harness</span></div>
-      <div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span><span>Joins survival</span><span>Wunga_</span></div></div>
-      <div class="acts"><button class="danger sm"><svg class="ico"><use href="#i-stop"/></svg>Stop</button><button class="sm">Edit</button><button class="sm quiet" disabled>Remove</button></div></div>
-    <div class="item"><div><div class="name"><b>vanilla-1.20</b></div>
-      <div class="sub"><span>1.20.4</span><span>Vanilla</span><span>2 GB</span><span>Title screen only</span><span>Default account</span></div></div>
-      <div class="acts"><button class="sm"><svg class="ico"><use href="#i-play"/></svg>Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
-    <div class="item"><div><div class="name"><b>assistant-sandbox</b><span class="pill accent">Assistant</span><span class="pill">Harness</span><span class="pill warn">Account missing</span></div>
-      <div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span><span>Last launched by an assistant · yesterday</span></div></div>
-      <div class="acts"><button class="sm" disabled><svg class="ico"><use href="#i-play"/></svg>Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="profiles.remove"><div class="page">
-  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div><span class="grow"></span><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div>
-  <div class="card list">
-    <div class="item"><div><div class="name"><b>vanilla-1.20</b></div><div class="sub"><span>1.20.4</span><span>Vanilla</span><span>2 GB</span></div></div>
-      <div class="acts"><button class="sm">Launch</button><button class="sm">Edit</button><button class="sm danger">Remove</button></div>
-      <div class="confirm"><span><b>Remove vanilla-1.20?</b> Its folder with worlds, options and mods is kept.</span><label><input type="checkbox"> Also delete the folder</label><span class="grow"></span><button class="sm">Cancel</button><button class="sm danger">Remove profile</button></div></div>
-    <div class="item"><div><div class="name"><b>survival-test</b></div><div class="sub"><span>1.21.11</span><span>Fabric 0.17.3</span><span>4 GB</span></div></div><div class="acts"><button class="sm">Launch</button><button class="sm">Edit</button><button class="sm quiet">Remove</button></div></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="profiles.loading"><div class="page">
-  <div class="page-head"><div><h1>Profiles</h1></div></div>
-  <div class="card list" aria-busy="true">
-    <div class="item"><div style="display:grid;gap:8px"><div class="sk" style="width:160px;height:16px"></div><div class="sk" style="width:340px;height:12px"></div></div><div class="sk" style="width:200px;height:28px"></div></div>
-    <div class="item"><div style="display:grid;gap:8px"><div class="sk" style="width:120px;height:16px"></div><div class="sk" style="width:300px;height:12px"></div></div><div class="sk" style="width:200px;height:28px"></div></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="profiles.empty"><div class="page">
-  <div class="page-head"><div><h1>Profiles</h1><p class="hint">Each profile keeps its own version, worlds, options and mods.</p></div></div>
-  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-profiles"/></svg></div><h2>No profiles</h2>
-    <p>Create one to pick a Minecraft version, a loader and an account. Nothing is downloaded until the first launch.</p>
-    <div class="acts"><button class="primary" data-go="profiles.new"><svg class="ico"><use href="#i-plus"/></svg>New profile</button></div></div></div>
-</div></section>
-
-<section class="view" data-view="profiles.new"><div class="page">
-  <div class="page-head"><div><h1>New profile</h1><p class="hint">Nothing is downloaded until you launch it.</p></div></div>
-  <div class="card form">
-    <div class="form-grid">
-      <label class="field"><span>Name</span><input value="survival-test" aria-describedby="n1"><small class="hint" id="n1">Letters, digits, dash and underscore.</small></label>
-      <label class="field"><span>Version</span><select><option>1.21.11 (release)</option></select><small class="hint">Releases only. <a style="color:var(--lapis-ink)">Show snapshots</a> · <a style="color:var(--lapis-ink)">Show all</a></small></label>
-      <label class="field"><span>Loader</span><select><option>Fabric</option><option>Vanilla</option></select></label>
-      <label class="field"><span>Memory</span><select><option>4 GB</option></select></label>
-      <label class="field"><span>Default server</span><select><option>survival</option></select></label>
-      <label class="field"><span>Account</span><select><option>Default (Wunga_)</option></select></label>
-      <div class="full switchrow"><div class="txt"><b>Harness mod</b><small>Lets SpawnLoft read what the game is doing, for diagnostics and the assistant tools.</small></div><button class="switch" role="switch" aria-checked="true" aria-label="Harness mod"></button></div>
-    </div>
-    <details class="adv"><summary>Advanced</summary><div class="in">
-      <div class="form-grid"><label class="field"><span>Java</span><input placeholder="Automatic (recommended)"></label><label class="field"><span>Fabric loader version</span><select><option>Pick automatically (0.17.3)</option></select></label></div>
-      <div class="switchrow"><div class="txt"><b>Allow an assistant to use my account</b><small>An AI assistant connected through MCP may launch this profile signed in as its Microsoft account.</small></div><button class="switch" role="switch" aria-checked="false" aria-label="Allow assistant account"></button></div>
-    </div></details>
-    <div class="formfoot"><span class="hint">Will be created at <code>…/client/survival-test</code></span><button>Cancel</button><button class="primary">Create profile</button></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="profiles.newerror"><div class="page">
-  <div class="page-head"><div><h1>New profile</h1></div></div>
-  <div class="card form">
-    <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>A profile named “survival-test” already exists</b><span>Pick a different name, or edit the existing one.</span></div></div>
-    <div class="form-grid">
-      <label class="field"><span>Name</span><input value="survival-test" style="border-color:var(--fault)"></label>
-      <label class="field"><span>Version</span><select><option>1.21.11 (release)</option></select></label>
-      <label class="field"><span>Loader</span><select><option>Fabric</option></select></label>
-      <label class="field"><span>Memory</span><select><option>4 GB</option></select></label>
-      <div class="full switchrow"><div class="txt"><b>Harness mod</b><small style="color:var(--warn-ink)">Not published for 1.21.4 yet, so it stays off for this version.</small></div><button class="switch" role="switch" aria-checked="false" disabled aria-label="Harness mod"></button></div>
-    </div>
-    <div class="formfoot"><button>Cancel</button><button class="primary">Create profile</button></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="profiles.edit"><div class="page">
-  <div class="page-head"><div><h1>Edit survival-test</h1></div><span class="pill live"><span class="dot"></span>Running</span></div>
-  <div class="card form">
-    <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>This profile is running</b><span>The version, loader, Java, memory and harness can't change while the game is open. Stop it first to edit them.</span></div></div>
-    <div class="form-grid">
-      <label class="field"><span>Version</span><input readonly value="1.21.11"></label>
-      <label class="field"><span>Loader</span><input readonly value="Fabric 0.17.3"></label>
-      <label class="field"><span>Memory</span><input readonly value="4 GB"></label>
-      <label class="field"><span>Java</span><input readonly value="Automatic"></label>
-      <label class="field"><span>Default server</span><select><option>survival</option></select></label>
-      <label class="field"><span>Account</span><select><option>Default (Wunga_)</option></select></label>
-    </div>
-    <div class="formfoot"><button>Cancel</button><button class="primary">Save changes</button></div>
-  </div>
-</div></section>
-
-<!-- ================= ACCOUNTS ================= -->
-<section class="view" data-view="accounts.list"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="card list">
-    <div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div>
-    <div class="acct"><span class="tile lg t3">S</span><div><div class="nm"><b>Steve_dev</b><span class="pill">Microsoft</span><span class="pill warn"><span class="dot"></span>Sign in again</span></div><div class="uuid">853c80ef-3c37-49fd-aa49-938b674adae6</div></div><div class="acts"><button class="sm">Sign in again</button><button class="sm quiet">Sign out</button></div></div>
-    <div class="acct"><span class="tile lg t2">B</span><div><div class="nm"><b>BuildBot</b><span class="pill">Offline</span></div><div class="uuid">offline · 2b2c9f3a-9e27-3a53-8c10-0d7ad1b0e5aa</div></div><div class="acts"><button class="sm">Make default</button><button class="sm quiet">Remove</button></div></div>
-  </div>
-  <div class="two">
-    <div class="card add"><h2>Add Microsoft account</h2><p class="hint">Opens Microsoft's own sign-in page. SpawnLoft never sees your password.</p><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>Add Microsoft account</button></div>
-    <div class="card add"><h2>Add offline account</h2><p class="hint">Works on servers with online-mode=false, such as the ones SpawnLoft makes by default. Online servers need a Microsoft account.</p>
-      <div class="row"><label class="field"><span>Name</span><input placeholder="3 to 16 letters, digits, underscore"></label><button>Add</button></div></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="accounts.loading"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1></div></div>
-  <div class="card list" aria-busy="true">
-    <div class="acct"><div class="sk" style="width:40px;height:40px"></div><div style="display:grid;gap:8px"><div class="sk" style="width:140px;height:16px"></div><div class="sk" style="width:260px;height:10px"></div></div><div class="sk" style="width:80px;height:28px"></div></div>
-    <div class="acct"><div class="sk" style="width:40px;height:40px"></div><div style="display:grid;gap:8px"><div class="sk" style="width:110px;height:16px"></div><div class="sk" style="width:240px;height:10px"></div></div><div class="sk" style="width:80px;height:28px"></div></div>
-  </div>
-</div></section>
-
-<section class="view" data-view="accounts.empty"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="card"><div class="empty-state"><div class="glyph"><svg class="ico"><use href="#i-user"/></svg></div><h2>No accounts yet</h2>
-    <p>Sign in with Microsoft to play on online servers, or add an offline name for local servers.</p>
-    <div class="acts"><button class="primary"><svg class="ico"><use href="#i-plus"/></svg>Add Microsoft account</button><button>Add offline account</button></div></div></div>
-</div></section>
-
-<section class="view" data-view="accounts.waiting"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="waiting"><span class="spin"></span><span class="grow"><b>Waiting for Microsoft…</b> Finish signing in in the window that opened. It closes itself.</span><a>Sign in in your browser instead</a><button class="sm">Cancel</button></div>
-  <div class="card list"><div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div></div>
-  <div class="two"><div class="card add"><h2>Add Microsoft account</h2><p class="hint">Opens Microsoft's own sign-in page.</p><button class="primary" disabled>Add Microsoft account</button></div>
-  <div class="card add"><h2>Add offline account</h2><div class="row"><label class="field"><span>Name</span><input placeholder="3 to 16 letters, digits, underscore"></label><button>Add</button></div></div></div>
-</div></section>
-
-<section class="view" data-view="accounts.done"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="notice live"><svg class="ico"><use href="#i-check"/></svg><div class="body"><b>Signed in as Wunga_</b><span>It is your default account, so new launches use it.</span></div></div>
-  <div class="card list"><div class="acct"><span class="tile lg t1">W</span><div><div class="nm"><b>Wunga_</b><span class="pill">Microsoft</span><span class="pill accent">Default</span><span class="pill live"><span class="dot"></span>Signed in</span></div><div class="uuid">069a79f4-44e9-4726-a5be-fca90e38aaf5</div></div><div class="acts"><button class="sm">Sign out</button></div></div></div>
-</div></section>
-
-<section class="view" data-view="accounts.cancelled"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="notice"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>Sign-in cancelled</b><span>Nothing was saved.</span></div><div class="acts"><button class="sm">Add Microsoft account</button></div></div>
-  <div class="card"><div class="empty-state" style="padding:var(--s-6)"><p>No accounts yet.</p></div></div>
-</div></section>
-
-<section class="view" data-view="accounts.failed"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1><p class="hint">Sign-ins are stored on this computer only.</p></div></div>
-  <div class="notice fault"><svg class="ico"><use href="#i-alert"/></svg><div class="body"><b>This Microsoft account doesn't own Minecraft: Java Edition</b><span>Sign in with the account that bought the game, or add an offline account for local servers.</span></div><div class="acts"><button class="sm">Try again</button></div></div>
-  <div class="card"><div class="empty-state" style="padding:var(--s-6)"><p>No accounts yet.</p></div></div>
-</div></section>
-
-<section class="view" data-view="accounts.busy"><div class="page">
-  <div class="page-head"><div><h1>Accounts</h1></div></div>
-  <div class="notice warn"><svg class="ico"><use href="#i-info"/></svg><div class="body"><b>A sign-in is already open in another window</b><span>Finish it there, or close that window and try again.</span></div></div>
-</div></section>
-
-  </main>
+  <main class="main" id="main"></main>
 </div>
 
 <script>
-  // Design-page behaviour only: show one view, mark the rail, set the account chip.
-  const VIEWS = [...document.querySelectorAll('.view')];
-  function show(name) {
-    if (!VIEWS.some((v) => v.dataset.view === name)) name = VIEWS.find((v) => v.dataset.view.startsWith(name + '.'))?.dataset.view || 'play.ready';
-    VIEWS.forEach((v) => v.classList.toggle('on', v.dataset.view === name));
-    const screen = name.split('.')[0];
-    document.querySelectorAll('.nav').forEach((n) => n.toggleAttribute('aria-current', false) || (n.dataset.go === screen && n.setAttribute('aria-current', 'page')));
-    document.getElementById('main').scrollTop = 0;
+  // The launcher: Play, Profiles and Accounts on the panel's client routes (CLIENT.md). Everything
+  // shown here that came from the panel - account, profile and server names, version ids, log
+  // lines, error messages - goes into the page as text: h() is the only way this script builds
+  // DOM, and it never parses markup.
+  'use strict'
+
+  const POLL_MS = 3000
+  // a game that ends this soon after it started gets the crash callout
+  const CRASH_WINDOW_MS = 60000
+  const LOG_LINES = 20
+  const MEMORY_CHOICES = ['1G', '2G', '3G', '4G', '6G', '8G']
+  const STOPPED = new Set(['stopped', 'stale'])
+  const NEW_PROFILE_KEY = 'spawnloft.launcher.newProfile'
+  const JOB_KEY = 'spawnloft.launcher.job'
+  const PICK_KEY = 'spawnloft.launcher.profile'
+  const CALLBACK_URI = 'http://localhost/api/client/accounts/login/callback'
+  const STEPS = ['Java', 'Version', 'Files', 'Server', 'Start']
+  const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
+  const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
+  // the desktop app's bridge; null in a browser tab
+  const desktop = window.mcctlDesktop ?? null
+
+  // ---- pure helpers (test/launcher-page.test.mjs lifts these by name) ----------------------
+
+  // Which step of the strip a job stage belongs to; -1 is "Preparing…".
+  function stepOf(stage) {
+    if (stage === 'java') return 0
+    if (stage === 'manifest' || stage === 'version') return 1
+    if (['client', 'libraries', 'assets', 'natives', 'fabric', 'harness'].includes(stage)) return 2
+    if (stage === 'server') return 3
+    if (stage === 'spawn' || stage === 'running') return 4
+    return -1
   }
+
+  // "Downloading libraries · 212 of 1,049 files · 143 MB" -> the headline and the facts after it.
+  function splitMessage(message) {
+    const text = String(message ?? '')
+    const at = text.indexOf(' · ')
+    return at === -1 ? [text, ''] : [text.slice(0, at), text.slice(at + 3)]
+  }
+
+  // The panel's parseServerAddress, as a hint while typing; the launch checks it again.
+  function addressProblem(text) {
+    const raw = String(text ?? '').trim()
+    if (!raw) return 'Type the address of the server to join.'
+    const bad = 'That doesn\'t look like a server address. Use a host name or IP, optionally with :port.'
+    if (raw.length > 260) return bad
+    let host
+    let port = null
+    const v6 = /^\[([^\]]+)\](?::([^:]*))?$/.exec(raw)
+    if (v6) {
+      host = v6[1]
+      port = v6[2] ?? null
+      if (!/^[0-9A-Fa-f:.]+$/.test(host) || !host.includes(':')) return bad
+    } else {
+      const parts = raw.split(':')
+      if (parts.length > 2) return bad
+      host = parts[0]
+      port = parts[1] ?? null
+      if (host.length > 253 || !HOSTNAME_RE.test(host)) return bad
+    }
+    if (port !== null && (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535)) return 'The port must be a number from 1 to 65535.'
+    return null
+  }
+
+  // Who a launch from here plays as: the profile's own account beats the default account
+  // (CLIENT.md, account precedence); with neither it is an offline player named by the panel.
+  function playAccount(profile, accounts, defaultAccount) {
+    if (profile.account) {
+      if (!profile.accountType) return { name: profile.accountName ?? profile.account, type: null, missing: true }
+      const stored = accounts.find((a) => a.uuid === profile.accountUuid)
+      return { name: profile.accountName, type: profile.accountType, expired: Boolean(stored?.refreshFailedAt) }
+    }
+    const def = accounts.find((a) => a.uuid === defaultAccount)
+    if (def) return { name: def.name, type: def.type, expired: Boolean(def.refreshFailedAt) }
+    return { name: null, type: 'offline' }
+  }
+
+  // The servers the Server picker offers a profile: the ones on its version, and the one the
+  // profile names even when it is on another. An online-mode server is listed but blocked for an
+  // offline player.
+  function serverChoices(profile, servers, accountType) {
+    return servers
+      .filter((s) => s.mc === profile.mc || s.name === profile.server)
+      .map((s) => ({
+        name: s.name,
+        label: s.label,
+        status: s.status,
+        stopped: STOPPED.has(s.status),
+        otherVersion: s.mc === profile.mc ? null : s.mc,
+        blocked: s.onlineMode === true && accountType !== 'microsoft' ? 'needs a Microsoft account' : null,
+      }))
+  }
+
+  // The version picker's rows: releases, then snapshots too, then everything.
+  function versionRows(versions, show) {
+    if (show === 'all') return versions
+    if (show === 'snapshot') return versions.filter((v) => v.type === 'release' || v.type === 'snapshot')
+    return versions.filter((v) => v.type === 'release')
+  }
+
+  // What a failed launch looks like on the Play screen.
+  function launchNotice(message) {
+    const text = String(message ?? 'the launch failed')
+    if (/is being launched/.test(text)) {
+      return { tone: 'warn', title: `Another launch is already in progress: ${text}`, text: 'This page checks again every few seconds and unlocks when it finishes.', busy: true }
+    }
+    if (/requires a Microsoft account/.test(text)) {
+      return { tone: 'fault', title: `Can't launch: ${text.replace(/; sign in or pick another server$/, '')}`, text: 'Sign in with a Microsoft account, or pick another server.', go: 'accounts' }
+    }
+    return { tone: 'fault', title: 'Can\'t launch', text: sentence(text) }
+  }
+
+  // Which watched games ended within CRASH_WINDOW_MS of starting without a Stop from this page.
+  // `watch` is { name: { since, stopping } }; answers [{ name, seconds }] and changes `watch`:
+  // running games join it, ended ones leave it.
+  function earlyExits(watch, profiles, now) {
+    const out = []
+    for (const row of profiles) {
+      if (row.running && !watch[row.name]) watch[row.name] = { since: Date.parse(row.startedAt) || now, stopping: false }
+    }
+    for (const [name, w] of Object.entries(watch)) {
+      const row = profiles.find((p) => p.name === name)
+      if (row?.running) continue
+      delete watch[name]
+      const lived = now - w.since
+      if (row && !w.stopping && lived < CRASH_WINDOW_MS) out.push({ name, seconds: Math.max(1, Math.round(lived / 1000)) })
+    }
+    return out
+  }
+
+  // The keys the Edit form changed, as PATCH sends them. A running profile keeps the keys that
+  // make up its command line (the panel refuses them too); a new version alone lets the panel
+  // pick a loader build for it.
+  function profilePatch(before, next) {
+    const patch = {}
+    for (const [k, val] of Object.entries(next)) {
+      if ((before[k] ?? null) !== val) patch[k] = val
+    }
+    if (patch.mc !== undefined && patch.loaderVersion === undefined) delete patch.loaderVersion
+    if (before.running) for (const k of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness']) delete patch[k]
+    return patch
+  }
+
+  function sentence(text) {
+    const s = String(text ?? '').trim()
+    return s ? s[0].toUpperCase() + s.slice(1) : s
+  }
+
+  function initials(name) {
+    return String(name ?? '?').replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase() || '?'
+  }
+
+  // One of the four tile colours, the same for an account every time.
+  function tileClass(key) {
+    let n = 0
+    for (const ch of String(key ?? '')) n = (n * 31 + ch.charCodeAt(0)) >>> 0
+    return 't' + ((n % 4) + 1)
+  }
+
+  function memoryText(memory) {
+    const m = /^(\d+)([MG])$/i.exec(String(memory ?? ''))
+    if (!m) return String(memory ?? '')
+    return m[2].toUpperCase() === 'G' ? `${m[1]} GB` : `${m[1]} MB`
+  }
+
+  function loaderText(profile) {
+    if (profile.loader !== 'fabric') return 'Vanilla'
+    return profile.loaderVersion ? `Fabric ${profile.loaderVersion}` : 'Fabric'
+  }
+
+  function clockTime(iso) {
+    const t = new Date(iso)
+    return Number.isNaN(t.getTime()) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  // ---- DOM ----------------------------------------------------------------------------------
+
+  const $ = (id) => document.getElementById(id)
+
+  // h('button', { class, text, onclick, disabled: true, value }, ...children). Children are
+  // nodes or strings; strings become text nodes. `value` is set after the children, so a select
+  // can pick one of its options.
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag)
+    let value
+    for (const [k, v] of Object.entries(attrs ?? {})) {
+      if (v === null || v === undefined || v === false) continue
+      if (k === 'class') el.className = v
+      else if (k === 'text') el.textContent = v
+      else if (k === 'style') el.style.cssText = v
+      else if (k === 'value') value = v
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v)
+      else el.setAttribute(k, v === true ? '' : String(v))
+    }
+    for (const kid of kids.flat(Infinity)) {
+      if (kid === null || kid === undefined || kid === false) continue
+      el.append(typeof kid === 'object' ? kid : document.createTextNode(String(kid)))
+    }
+    if (value !== undefined) el.value = value
+    return el
+  }
+
+  function ico(name) {
+    const ns = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(ns, 'svg')
+    svg.setAttribute('class', 'ico')
+    svg.setAttribute('aria-hidden', 'true')
+    const use = document.createElementNS(ns, 'use')
+    use.setAttribute('href', '#i-' + name)
+    svg.append(use)
+    return svg
+  }
+
+  const page = (...kids) => h('div', { class: 'page' }, ...kids)
+  const pill = (tone, text, dot = false) => h('span', { class: tone ? `pill ${tone}` : 'pill' }, dot && h('span', { class: 'dot' }), text)
+  const tile = (account, size = '') => h('span', { class: `tile ${size} ${tileClass(account.uuid ?? account.name)}`.replace(/\s+/g, ' ') }, initials(account.name))
+
+  function head(title, hint, ...right) {
+    return h('div', { class: 'page-head' }, h('div', {}, h('h1', { text: title }), hint && h('p', { class: 'hint', text: hint })), right.length ? [h('span', { class: 'grow' }), ...right] : null)
+  }
+
+  // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose }
+  function notice({ tone = '', title, text, acts = [], onclose }) {
+    const icon = tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'info'
+    return h('div', { class: `notice ${tone}`.trim(), role: tone === 'fault' ? 'alert' : 'status' }, ico(icon),
+      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text })),
+      (acts.length || onclose) && h('div', { class: 'acts' }, acts,
+        onclose && h('button', { class: 'sm quiet close', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))))
+  }
+
+  function emptyState(glyph, title, text, ...acts) {
+    return h('div', { class: 'card' }, h('div', { class: 'empty-state' }, h('div', { class: 'glyph' }, ico(glyph)), h('h2', { text: title }), text && h('p', { text }), acts.length && h('div', { class: 'acts' }, acts)))
+  }
+
+  const sk = (style) => h('div', { class: 'sk', style })
+
+  // ---- the panel -----------------------------------------------------------------------------
+
+  class PanelDown extends Error {}
+
+  async function api(route, { method = 'GET', body } = {}) {
+    let res
+    try {
+      res = await fetch('/api/' + route, {
+        method,
+        headers: body === undefined ? {} : { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    } catch {
+      throw new PanelDown('the SpawnLoft panel is not answering')
+    }
+    let data = null
+    try { data = await res.json() } catch { /* an empty or non-JSON answer */ }
+    if (!res.ok) {
+      const err = new Error(data?.error || `the panel answered ${res.status}`)
+      err.status = res.status
+      throw err
+    }
+    return data
+  }
+
+  const enc = encodeURIComponent
+
+  function newId() {
+    const bytes = new Uint8Array(12)
+    crypto.getRandomValues(bytes)
+    return 'launch-' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  function stored(kind, key, value) {
+    const box = kind === 'session' ? 'sessionStorage' : 'localStorage'
+    try {
+      if (value === undefined) return window[box].getItem(key)
+      if (value === null) window[box].removeItem(key)
+      else window[box].setItem(key, value)
+    } catch { /* storage off: the page works, it just forgets */ }
+    return null
+  }
+
+  // ---- state ---------------------------------------------------------------------------------
+
+  const S = {
+    summary: null,
+    down: false,
+    screen: 'play',
+    pick: stored('local', PICK_KEY),
+    // per profile: { mode: 'yours' | 'other', server: '' (title screen) or a name, address }
+    targets: {},
+    job: null,
+    // profile -> { since, stopping }: games this page watches for an early exit
+    watch: {},
+    crash: null,
+    notice: null,
+    log: { profile: null, lines: [] },
+    logOpen: true,
+    stopping: null,
+    // Profiles: 'list' | 'form'; the form's values live in S.form so a re-render keeps them
+    profiles: 'list',
+    form: null,
+    removing: null,
+    profNotice: null,
+    versions: null,
+    versionShow: 'release',
+    login: null,
+    acctNotice: null,
+    offline: { name: '', error: null },
+    switcher: false,
+  }
+
+  const profilesNow = () => S.summary?.profiles ?? []
+  const accountsNow = () => S.summary?.accounts ?? []
+  const serversNow = () => S.summary?.servers ?? []
+  const profileNamed = (name) => profilesNow().find((p) => p.name === name) ?? null
+
+  function currentProfile() {
+    const list = profilesNow()
+    return profileNamed(S.pick) ?? list.find((p) => p.running) ?? list[0] ?? null
+  }
+
+  function targetFor(p) {
+    if (!S.targets[p.name]) S.targets[p.name] = { mode: 'yours', server: p.server ?? '', address: '' }
+    return S.targets[p.name]
+  }
+
+  function go(screen) {
+    S.screen = screen
+    S.switcher = false
+    if (screen === 'profiles' && S.profiles === 'form' && !S.form) S.profiles = 'list'
+    try { history.replaceState(null, '', '#' + screen) } catch { /* file: or a sandbox */ }
+    render()
+    $('main').scrollTop = 0
+  }
+
+  // ---- render --------------------------------------------------------------------------------
+
+  let lastKey = ''
+
+  function render() {
+    renderRail()
+    // a re-render (a poll, a keystroke that changes a hint) keeps the focused field and caret
+    const active = document.activeElement
+    const keep = active?.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null
+    let body
+    if (S.down) body = unreachablePage()
+    else if (S.screen === 'profiles') body = profilesPage()
+    else if (S.screen === 'accounts') body = accountsPage()
+    else body = playPage()
+    $('main').replaceChildren(body)
+    if (keep) {
+      const el = $(keep.id)
+      if (el) {
+        el.focus({ preventScroll: true })
+        try { if (keep.start !== null && keep.start !== undefined) el.setSelectionRange(keep.start, keep.end) } catch { /* not a text field */ }
+      }
+    }
+  }
+
+  function renderRail() {
+    document.querySelectorAll('.nav').forEach((n) => {
+      if (n.dataset.go === S.screen) n.setAttribute('aria-current', 'page')
+      else n.removeAttribute('aria-current')
+    })
+    $('nProfiles').textContent = S.summary ? String(profilesNow().length) : ''
+    $('nAccts').textContent = S.summary ? String(accountsNow().length) : ''
+    const accounts = accountsNow()
+    const def = accounts.find((a) => a.uuid === S.summary?.defaultAccount) ?? null
+    const kids = []
+    if (S.switcher && accounts.length) kids.push(switcher(accounts, def))
+    if (def) {
+      kids.push(h('button', { class: 'chip', 'aria-haspopup': 'menu', 'aria-expanded': String(S.switcher), onclick: toggleSwitcher },
+        tile(def), h('span', { class: 'who' }, h('b', { text: def.name }), h('small', { text: def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev')))
+    } else {
+      kids.push(h('button', { class: 'chip empty', onclick: accounts.length ? toggleSwitcher : () => go('accounts') },
+        h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
+        h('span', { class: 'who' }, h('b', { text: 'No account' }), h('small', { text: accounts.length ? 'Pick a default account' : 'Sign in to play online' }))))
+    }
+    $('chipwrap').replaceChildren(...kids)
+  }
+
+  function switcher(accounts, def) {
+    return h('div', { class: 'switcher', role: 'menu' },
+      accounts.map((a) => h('button', { class: a === def ? 'row cur' : 'row', role: 'menuitem', onclick: () => setDefault(a.uuid) },
+        tile(a, 'sm'), h('span', { text: a.name }), h('span', { class: 'meta', text: (a.type === 'offline' ? 'Offline' : 'Microsoft') + (a === def ? ' · default' : '') }))),
+      h('hr'),
+      h('button', { class: 'row act', role: 'menuitem', onclick: () => go('accounts') }, ico('plus'), 'Add account…'),
+      def && h('button', { class: 'row act', role: 'menuitem', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`))
+  }
+
+  function toggleSwitcher() {
+    S.switcher = !S.switcher
+    renderRail()
+  }
+
+  function unreachablePage() {
+    return page(head(S.screen === 'profiles' ? 'Profiles' : S.screen === 'accounts' ? 'Accounts' : 'Play'),
+      emptyState('alert', 'Can\'t reach the SpawnLoft panel',
+        'The launcher talks to the panel running on this computer, and it is not answering. If you closed SpawnLoft, start it again; this page reconnects by itself.',
+        h('button', { class: 'primary', onclick: () => poll() }, 'Try again')))
+  }
+
+  // ---- Play ----------------------------------------------------------------------------------
+
+  function playPage() {
+    const sum = S.summary
+    const title = head('Play', sum ? 'Launch Minecraft with a SpawnLoft profile.' : 'Loading your profiles…')
+    if (!sum) {
+      return page(title, h('div', { class: 'play' },
+        h('div', { class: 'card hero', 'aria-busy': 'true' }, sk('width:180px;height:20px'), sk('width:320px;height:32px'), sk('width:240px;height:56px;border-radius:var(--r)'), sk('width:380px;height:16px'),
+          h('div', { class: 'pickers' }, sk('height:48px'), sk('height:48px'))),
+        h('aside', { class: 'card facts' }, sk('height:20px;width:120px'), sk('height:60px'), sk('height:60px'))))
+    }
+    const p = currentProfile()
+    if (!p) {
+      return page(title, emptyState('play', 'No game profile yet',
+        'A profile is a Minecraft version with its own worlds, options and mods. Make one to start playing; you can add more later.',
+        h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')))
+    }
+    const job = S.job?.profile === p.name ? S.job : null
+    const parts = [title]
+    if (sum.machineRefusal) parts.push(notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(sum.machineRefusal) }))
+    if (S.crash?.profile === p.name && !p.running && !job) parts.push(crashNotice(S.crash))
+    if (S.notice?.profile === p.name && !job) {
+      const n = S.notice
+      parts.push(notice({ ...n, acts: n.go ? [h('button', { class: 'sm', onclick: () => go(n.go) }, 'Go to Accounts')] : [], onclose: () => { S.notice = null; render() } }))
+    }
+    parts.push(h('div', { class: 'play' }, heroCard(p, job), factsCard(p)))
+    const log = logCard(p, job)
+    if (log) parts.push(log)
+    return page(...parts)
+  }
+
+  function heroCard(p, job) {
+    const sum = S.summary
+    const acct = playAccount(p, accountsNow(), sum.defaultAccount)
+    const profilePill = pill('accent', `Profile: ${p.name}`)
+    if (job) {
+      const [headline, facts] = splitMessage(job.message || 'Preparing…')
+      const shown = STEPS.map((name, i) => ({ name, i })).filter((s) => s.name !== 'Server' || job.startsServer)
+      return h('div', { class: 'card hero' },
+        h('div', { class: 'eyebrow' }, profilePill, pill('accent', 'Launching', true)),
+        h('div', { class: 'strip' },
+          h('div', { class: 'line' }, h('b', { text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: 'hint', text: facts })),
+          h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null },
+            h('i', { style: job.percent === null || job.percent === undefined ? null : `width:${Math.max(2, job.percent)}%` })),
+          h('div', { class: 'steps' }, shown.map((s) => {
+            const now = stepOf(job.stage)
+            if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done' }, ico('check'), s.name)
+            if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
+            return h('span', { class: 'step' }, s.name)
+          })),
+          h('p', { class: 'hint', text: 'Closing this window does not stop the download. It keeps going and the files are used next time.' })),
+        h('button', { disabled: true }, ico('play'), 'Launching…'))
+    }
+    if (p.running) {
+      const who = p.runningAccount?.name ? ` · as ${p.runningAccount.name}` : ''
+      const target = p.launchTarget
+      return h('div', { class: 'card hero' },
+        h('div', { class: 'eyebrow' }, profilePill, pill('live', 'Running', true), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
+        h('div', { class: 'strip' },
+          h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint', text: `since ${clockTime(p.startedAt)} · pid ${p.pid}${who}` })),
+          h('p', { class: 'hint' }, target ? ['Joined ', h('b', { style: 'color:var(--ink-2)', text: target }), '. '] : 'On the title screen. ', 'Closing this window does not stop the game.')),
+        h('div', { class: 'runrow' },
+          h('button', { class: 'danger launch', style: 'padding:0 var(--s-6)', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop'),
+          desktop?.openProfileFolder && h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder')))
+    }
+
+    const { t, choices, picked, addrProblem, busy, crashed, startsServer, blocked } = launchPlan(p)
+
+    let state
+    if (acct.missing) state = pill('warn', 'Account missing', true)
+    else if (picked?.blocked) state = pill('fault', 'Needs a Microsoft account', true)
+    else if (t.mode === 'other' && addrProblem && t.address.trim()) state = pill('fault', 'Check address', true)
+    else if (busy) state = pill('warn', 'Busy', true)
+    else if (crashed) state = pill('fault', 'Crashed', true)
+    else if (startsServer) state = pill('', 'Server stopped', true)
+    else if (acct.type === 'offline') state = pill('warn', 'Offline account', true)
+    else state = pill('live', 'Ready', true)
+
+    const as = acct.missing ? `${acct.name} (account missing)` : acct.type === 'offline' ? `${acct.name ?? 'an offline player'} (offline)` : acct.name
+    const what = `Minecraft ${p.mc} · ${loaderText(p)}`
+    let does
+    if (startsServer) does = ['Starts ', h('b', { text: picked.name }), ` first (up to 2 minutes), then launches ${what} as ${as} and joins it.`]
+    else if (picked) does = [`${what} · joins `, h('b', { text: picked.name }), ` · as ${as}`]
+    else if (t.mode === 'other') does = [`${what} · joins ${addrProblem ? 'an address' : t.address.trim()} · as ${as}`]
+    else does = [`${what} · title screen · as ${as}`]
+
+    const label = startsServer ? 'Start server and launch' : crashed ? 'Launch again' : 'Launch game'
+    return h('div', { class: 'card hero' },
+      h('div', { class: 'eyebrow' }, profilePill, state),
+      h('h2', { text: `Minecraft ${p.mc}` }),
+      h('button', { class: 'primary launch', disabled: blocked, onclick: () => startLaunch(p) }, ico('play'), label),
+      h('p', { class: 'does' }, does),
+      acct.missing && h('p', { class: 'hint note-line warnline' }, ico('alert'), `This profile plays as ${acct.name}, who is no longer signed in. Pick another account for it, or sign in again. `,
+        h('button', { class: 'linkbtn', onclick: () => openForm(p) }, 'Pick an account')),
+      !acct.missing && acct.expired && h('p', { class: 'hint note-line warnline' }, ico('alert'), `The saved sign-in for ${acct.name} no longer works; sign in again on Accounts before launching.`),
+      h('div', { class: 'pickers' },
+        h('label', { class: 'field' }, h('span', { text: 'Profile' }),
+          h('select', { id: 'pickProfile', value: p.name, onchange: (e) => pickProfile(e.target.value) },
+            profilesNow().map((q) => h('option', { value: q.name, text: `${q.name} — ${q.mc} · ${q.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${q.running ? ' · running' : ''}` })))),
+        h('div', { class: 'field' }, h('span', { class: 'label', text: 'Server' }),
+          h('div', { class: 'seg', role: 'group', 'aria-label': 'Server type' },
+            h('button', { class: t.mode === 'yours' ? 'on' : null, 'aria-pressed': String(t.mode === 'yours'), onclick: () => { t.mode = 'yours'; render() } }, 'Your servers'),
+            h('button', { class: t.mode === 'other' ? 'on' : null, 'aria-pressed': String(t.mode === 'other'), onclick: () => { t.mode = 'other'; render(); $('pickAddress')?.focus() } }, 'Other server')),
+          t.mode === 'yours'
+            ? h('select', { id: 'pickServer', 'aria-label': 'Your servers', value: t.server, onchange: (e) => { t.server = e.target.value; render() } },
+              h('option', { value: '', text: 'Title screen only' }),
+              choices.map((c) => h('option', {
+                value: c.name,
+                disabled: Boolean(c.blocked) && c.name !== t.server,
+                text: `Join ${c.name}${c.label && c.label !== c.name ? ` (${c.label})` : ''} (${c.status})${c.otherVersion ? ` · runs ${c.otherVersion}` : ''}${c.blocked ? ` · ${c.blocked}` : ''}`,
+              })))
+            : [h('input', { id: 'pickAddress', 'aria-label': 'Server address', placeholder: 'play.example.net or 192.168.1.20:25566', class: addrProblem && t.address.trim() ? 'bad' : null, value: t.address, oninput: (e) => { t.address = e.target.value; render() }, onkeydown: (e) => { if (e.key === 'Enter' && !blocked) startLaunch(p) } }),
+              h('small', { class: addrProblem && t.address.trim() ? 'hint bad' : 'hint', text: addrProblem && t.address.trim() ? addrProblem : `Host, or host:port. Plays like any Minecraft server; online servers need a Microsoft account${acct.type === 'microsoft' ? ` (you are signed in as ${acct.name})` : ''}.` })])),
+      p.harness && h('p', { class: 'hint note-line' }, ico('info'), 'Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.'))
+  }
+
+  // What Launch would do for a profile right now, and whether it may: shared by the hero and
+  // the Profiles list, so a launch from either is held back for the same reasons.
+  function launchPlan(p) {
+    const acct = playAccount(p, accountsNow(), S.summary.defaultAccount)
+    const t = targetFor(p)
+    const choices = serverChoices(p, serversNow(), acct.type)
+    if (t.mode === 'yours' && t.server && !choices.some((c) => c.name === t.server)) t.server = ''
+    const picked = t.mode === 'yours' && t.server ? choices.find((c) => c.name === t.server) : null
+    const addrProblem = t.mode === 'other' ? addressProblem(t.address) : null
+    const busy = Boolean(S.notice?.busy && S.notice.profile === p.name)
+    const crashed = S.crash?.profile === p.name
+    const startsServer = Boolean(picked?.stopped)
+    const blocked = Boolean(picked?.blocked) || Boolean(acct.missing) || Boolean(S.summary.machineRefusal) || (t.mode === 'other' && addrProblem !== null) || busy || Boolean(S.job) || p.running
+    return { acct, t, choices, picked, addrProblem, busy, crashed, startsServer, blocked }
+  }
+
+  function factsCard(p) {
+    const acct = playAccount(p, accountsNow(), S.summary.defaultAccount)
+    return h('aside', { class: 'card facts' }, h('h2', { text: p.name }),
+      h('dl', {},
+        h('div', {}, h('dt', { text: 'Java' }), h('dd', { class: p.java ? 'mono' : null, text: p.java ?? 'Automatic' })),
+        h('div', {}, h('dt', { text: 'Memory' }), h('dd', { text: memoryText(p.memory) })),
+        h('div', {}, h('dt', { text: 'Harness mod' }), h('dd', { text: p.harness ? 'On' : 'Off' })),
+        h('div', {}, h('dt', { text: 'Account' }), h('dd', { text: p.account ? acct.name : `Default${acct.name ? ` (${acct.name})` : ''}` })),
+        p.folder && h('div', {}, h('dt', { text: 'Data folder' }), h('dd', { class: 'mono', title: p.folder, text: p.folder }))),
+      h('button', { class: 'sm quiet', onclick: () => openForm(p) }, 'Edit profile'))
+  }
+
+  function crashNotice(crash) {
+    const acts = [h('button', { class: 'sm', disabled: crash.report === 'busy', onclick: () => reportProblem(crash) }, crash.report === 'busy' ? 'Collecting…' : 'Report a problem')]
+    let text = 'Usually a mod, not enough memory, or the wrong Java. The last lines of the game log are below.'
+    if (crash.report && typeof crash.report === 'object') {
+      text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
+    }
+    return notice({ tone: 'fault', title: `Minecraft closed ${crash.seconds} second${crash.seconds === 1 ? '' : 's'} after it started`, text, acts, onclose: () => { S.crash = null; render() } })
+  }
+
+  function logCard(p, job) {
+    let title
+    let lines
+    if (job) {
+      title = 'Launch log'
+      lines = job.lines
+    } else if (p.running || S.crash?.profile === p.name) {
+      title = 'Game log'
+      lines = S.log.profile === p.name ? S.log.lines : []
+    } else {
+      return null
+    }
+    const pre = h('pre', { class: 'log' })
+    lines.forEach((line, i) => {
+      if (i) pre.append('\n')
+      const m = LEVEL_RE.exec(line)
+      if (!m) {
+        pre.append(line)
+        return
+      }
+      pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'w' : 'e', text: m[1] }), line.slice(m.index + m[1].length))
+    })
+    if (!lines.length) pre.append(job ? 'Waiting for the first step…' : 'Nothing in the log yet.')
+    return h('div', { class: S.logOpen ? 'card logcard' : 'card logcard closed' },
+      h('div', { class: 'loghead' }, h('b', { text: title }), h('span', { class: 'hint', text: `last ${LOG_LINES} lines` }), h('span', { class: 'grow' }),
+        desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
+        h('button', { class: 'sm quiet', 'aria-expanded': String(S.logOpen), onclick: () => { S.logOpen = !S.logOpen; render() } }, S.logOpen ? 'Collapse' : 'Expand')),
+      pre)
+  }
+
+  function pickProfile(name) {
+    S.pick = name
+    stored('local', PICK_KEY, name)
+    render()
+  }
+
+  // ---- launching -----------------------------------------------------------------------------
+
+  async function startLaunch(p) {
+    if (!S.summary || launchPlan(p).blocked) return render()
+    const t = targetFor(p)
+    const body = { jobId: newId() }
+    let startsServer = false
+    if (t.mode === 'other') {
+      if (addressProblem(t.address)) return render()
+      body.address = t.address.trim()
+    } else if (t.server) {
+      body.server = t.server
+      const s = serversNow().find((x) => x.name === t.server)
+      if (s && STOPPED.has(s.status)) {
+        body.startServer = true
+        startsServer = true
+      }
+    } else {
+      body.server = false
+    }
+    S.crash = null
+    S.notice = null
+    S.pick = p.name
+    const job = { id: body.jobId, profile: p.name, stage: 'start', message: '', percent: null, reached: -1, startsServer, lines: [], done: false }
+    S.job = job
+    stored('session', JOB_KEY, JSON.stringify({ id: job.id, profile: p.name, startsServer }))
+    followJob(job, () => api(`client/profiles/${enc(p.name)}/launch`, { method: 'POST', body }))
+    render()
+  }
+
+  // The stream first, then the POST: the stream replays the job's state when it opens, so the
+  // page hears every event of a launch it started. `start` is null when picking up a launch this
+  // tab started before a reload.
+  function followJob(job, start) {
+    const es = new EventSource(`/api/jobs/${enc(job.id)}/stream`)
+    job.es = es
+    let first = true
+    es.onmessage = (e) => {
+      let ev
+      try { ev = JSON.parse(e.data) } catch { return }
+      if (S.job !== job) return es.close()
+      // The panel answers a job id it does not know with a blank start: after a restart (the
+      // stream reconnects by itself) or for a launch picked up after a reload.
+      const blank = ev.stage === 'start' && !ev.message
+      if (first) {
+        first = false
+        if (start) {
+          start().catch((err) => finishJob(job, { stage: 'error', done: true, message: err.message }))
+        } else if (blank) {
+          finishJob(job, null)
+          return
+        }
+      } else if (blank && job.message) {
+        finishJob(job, { stage: 'error', done: true, message: 'the panel restarted during the launch; check Profiles, then launch again' })
+        return
+      }
+      if (ev.message && ev.message !== job.message) {
+        job.lines.push(`${new Date().toLocaleTimeString([], { hour12: false })}  ${ev.message}`)
+        if (job.lines.length > LOG_LINES) job.lines.shift()
+      }
+      job.stage = ev.stage
+      job.message = ev.message
+      job.percent = ev.percent ?? null
+      job.reached = Math.max(job.reached, stepOf(ev.stage))
+      if (ev.done) finishJob(job, ev)
+      else render()
+    }
+    es.onerror = () => {
+      if (!job.done && es.readyState === EventSource.CLOSED) finishJob(job, { stage: 'error', done: true, message: 'lost the connection to the panel; the launch may still be running' })
+    }
+  }
+
+  function finishJob(job, ev) {
+    if (job.done) return
+    job.done = true
+    job.es?.close()
+    stored('session', JOB_KEY, null)
+    if (S.job === job) S.job = null
+    if (ev?.stage === 'running') {
+      S.watch[job.profile] = { since: Date.now(), stopping: false }
+      if (ev.warnings?.length) S.notice = { profile: job.profile, tone: 'warn', title: 'Launched, with a warning', text: ev.warnings.map(sentence).join(' ') }
+    } else if (ev) {
+      S.notice = { profile: job.profile, ...launchNotice(ev.message), at: Date.now() }
+    }
+    refresh()
+  }
+
+  async function stopProfile(p) {
+    S.stopping = p.name
+    if (S.watch[p.name]) S.watch[p.name].stopping = true
+    render()
+    try {
+      await api(`client/profiles/${enc(p.name)}/stop`, { method: 'POST' })
+    } catch (err) {
+      S.notice = { profile: p.name, tone: 'fault', title: `Couldn't stop ${p.name}`, text: sentence(err.message) }
+      if (S.watch[p.name]) S.watch[p.name].stopping = false
+    }
+    S.stopping = null
+    refresh()
+  }
+
+  async function openFolder(p) {
+    let out = null
+    try { out = await desktop.openProfileFolder(p.name) } catch { /* refused */ }
+    if (!out?.ok) {
+      S.notice = { profile: p.name, tone: 'warn', title: 'The folder could not be opened', text: p.folder ? `It is ${p.folder}` : '' }
+      render()
+    }
+  }
+
+  async function reportProblem(crash) {
+    crash.report = 'busy'
+    render()
+    try {
+      crash.report = await api(`client/profiles/${enc(crash.profile)}/diag`, { method: 'POST' })
+    } catch (err) {
+      crash.report = { error: err.message }
+    }
+    render()
+  }
+
+  // ---- Profiles ------------------------------------------------------------------------------
+
+  function profilesPage() {
+    if (S.profiles === 'form' && S.form) return formPage()
+    const sum = S.summary
+    const newBtn = h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')
+    if (!sum) {
+      return page(head('Profiles'), h('div', { class: 'card list', 'aria-busy': 'true' },
+        [160, 120].map((w) => h('div', { class: 'item' }, h('div', { style: 'display:grid;gap:8px' }, sk(`width:${w}px;height:16px`), sk('width:320px;height:12px')), sk('width:200px;height:28px')))))
+    }
+    const hint = 'Each profile keeps its own version, worlds, options and mods.'
+    const n = S.profNotice
+    const top = n && notice({ ...n, onclose: () => { S.profNotice = null; render() } })
+    if (!sum.profiles.length) {
+      return page(head('Profiles', hint), top, emptyState('profiles', 'No profiles', 'Create one to pick a Minecraft version, a loader and an account. Nothing is downloaded until the first launch.',
+        h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')))
+    }
+    return page(head('Profiles', hint, newBtn), top, h('div', { class: 'card list' }, sum.profiles.map(profileRow)))
+  }
+
+  function profileRow(p) {
+    const busyHere = S.job?.profile === p.name
+    const acctText = p.account ? (p.accountName ?? p.account) : 'Default account'
+    const target = p.server ? `Joins ${p.server}` : 'Title screen only'
+    return h('div', { class: p.running ? 'item running' : 'item' },
+      h('div', {},
+        h('div', { class: 'name' }, h('b', { text: p.name }),
+          p.running && pill('live', `Running · pid ${p.pid}`, true),
+          busyHere && pill('accent', 'Launching', true),
+          p.harness && pill('', 'Harness'),
+          p.assistantAccount && pill('accent', 'Assistant'),
+          p.account && !p.accountType && pill('warn', 'Account missing')),
+        h('div', { class: 'sub' },
+          h('span', { text: p.mc }), h('span', { text: loaderText(p) }), h('span', { text: memoryText(p.memory) }), h('span', { text: target }), h('span', { text: acctText }),
+          p.running && p.launchedBy === 'assistant' && h('span', { text: 'Launched by an assistant' }))),
+      h('div', { class: 'acts' },
+        p.running
+          ? h('button', { class: 'danger sm', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop')
+          : h('button', { class: 'sm', disabled: launchPlan(p).blocked, onclick: () => { S.pick = p.name; stored('local', PICK_KEY, p.name); go('play'); startLaunch(p) } }, ico('play'), 'Launch'),
+        h('button', { class: 'sm', onclick: () => openForm(p) }, 'Edit'),
+        h('button', { class: S.removing === p.name ? 'sm danger' : 'sm quiet', disabled: p.running || busyHere, onclick: () => { S.removing = S.removing === p.name ? null : p.name; render() } }, 'Remove')),
+      S.removing === p.name && !p.running && h('div', { class: 'confirm' },
+        h('span', {}, h('b', { text: `Remove ${p.name}?` }), ' Its folder with worlds, options and mods is kept.'),
+        h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete the folder'),
+        h('span', { class: 'grow' }),
+        h('button', { class: 'sm', onclick: () => { S.removing = null; render() } }, 'Cancel'),
+        h('button', { class: 'sm danger', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove profile')))
+  }
+
+  async function removeProfile(p, purge) {
+    try {
+      await api(`client/profiles/${enc(p.name)}${purge ? '?purge=1' : ''}`, { method: 'DELETE' })
+      S.profNotice = { tone: 'live', title: `Removed ${p.name}`, text: purge ? 'Its folder was deleted too.' : 'Its folder was kept.' }
+      if (S.pick === p.name) S.pick = null
+      delete S.targets[p.name]
+    } catch (err) {
+      S.profNotice = { tone: 'fault', title: `Couldn't remove ${p.name}`, text: sentence(err.message) }
+    }
+    S.removing = null
+    refresh()
+  }
+
+  // The New and Edit form. `p` is the profile to edit; with none it is a new profile, prefilled
+  // from `prefill` ({ mc, server }, what a server card's Play leaves when no profile fits).
+  function openForm(p = null, prefill = null) {
+    const servers = serversNow()
+    S.form = p
+      ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false }
+      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'fabric', loaderVersion: '', memory: '4G', java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false }
+    if (!p && prefill?.server && !S.form.server) S.form.server = prefill.server
+    S.profiles = 'form'
+    if (!S.versions || S.versions.error) loadVersions()
+    else defaultVersion(S.form)
+    go('profiles')
+    $('fName')?.focus()
+  }
+
+  async function loadVersions() {
+    S.versions = { loading: true }
+    try {
+      S.versions = await api('client/versions')
+    } catch (err) {
+      S.versions = { error: err.message }
+    }
+    if (S.form) defaultVersion(S.form)
+    render()
+  }
+
+  // a new profile starts on the newest release this machine can run
+  function defaultVersion(f) {
+    if (!f.editing && !f.mc) {
+      const first = (S.versions?.versions ?? []).find((v) => v.type === 'release' && !v.refusal)
+      if (first) f.mc = first.id
+    }
+    fixHarness(f)
+  }
+
+  const versionRow = (id) => (S.versions?.versions ?? []).find((v) => v.id === id) ?? null
+
+  // The harness needs Fabric and a published mod for the version; when either goes, it goes off.
+  function harnessBlock(f) {
+    if (f.loader !== 'fabric') return 'Needs the Fabric loader.'
+    const row = versionRow(f.mc)
+    if (row && !row.harness) return `Not published for ${f.mc} yet, so it stays off for this version.`
+    if (!row && S.versions?.versions) return `Not published for ${f.mc || 'this version'} yet.`
+    return null
+  }
+
+  function fixHarness(f) {
+    if (harnessBlock(f)) f.harness = false
+  }
+
+  function formPage() {
+    const f = S.form
+    const running = f.editing ? Boolean(profileNamed(f.editing)?.running) : false
+    const v = S.versions
+    const machine = v?.machineRefusal ?? S.summary?.machineRefusal ?? null
+    const set = (key, rerender = false) => (e) => {
+      f[key] = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+      if (key === 'mc' || key === 'loader') fixHarness(f)
+      if (rerender) render()
+    }
+    const toggle = (key) => () => { f[key] = !f[key]; render() }
+
+    let versionField
+    if (running) {
+      versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }), h('input', { readonly: true, value: f.mc }))
+    } else {
+      const rows = v?.versions ? versionRows(v.versions, S.versionShow) : []
+      const options = rows.map((r) => h('option', {
+        value: r.id,
+        disabled: Boolean(r.refusal || machine),
+        text: `${r.id} (${r.type})${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
+      }))
+      if (f.mc && !rows.some((r) => r.id === f.mc)) options.unshift(h('option', { value: f.mc, text: f.mc }))
+      if (!options.length) options.push(h('option', { value: '', text: v?.loading ? 'Loading versions…' : 'No versions to pick' }))
+      const show = (mode, text) => h('button', { type: 'button', class: 'linkbtn', 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; render() } }, text)
+      versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }),
+        h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
+        h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint' },
+          v?.error ? `The version list could not be read: ${v.error}. ` : v?.offline ? sentence(v.offline) + '. ' : '',
+          S.versionShow === 'release' ? 'Releases only. ' : S.versionShow === 'snapshot' ? 'Snapshots only; pre-releases are not supported yet. ' : 'Everything before 1.13 is untested. ',
+          show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all')))
+    }
+
+    const memories = MEMORY_CHOICES.includes(f.memory) ? MEMORY_CHOICES : [f.memory, ...MEMORY_CHOICES]
+    const servers = serversNow()
+    const def = accountsNow().find((a) => a.uuid === S.summary?.defaultAccount)
+    const block = harnessBlock(f)
+    const ro = (label, value) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }))
+
+    const grid = h('div', { class: 'form-grid' },
+      !f.editing && h('label', { class: 'field' }, h('span', { text: 'Name' }),
+        h('input', { id: 'fName', value: f.name, placeholder: 'survival-test', 'aria-describedby': 'fNameHint', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
+        h('small', { class: 'hint', id: 'fNameHint', text: 'Letters, digits, dash and underscore.' })),
+      versionField,
+      running ? ro('Loader', loaderText({ loader: f.loader, loaderVersion: f.loaderVersion })) : h('label', { class: 'field' }, h('span', { text: 'Loader' }),
+        h('select', { id: 'fLoader', value: f.loader, onchange: set('loader', true) }, h('option', { value: 'fabric', text: 'Fabric' }), h('option', { value: 'vanilla', text: 'Vanilla' }))),
+      running ? ro('Memory', memoryText(f.memory)) : h('label', { class: 'field' }, h('span', { text: 'Memory' }),
+        h('select', { id: 'fMemory', value: f.memory, onchange: set('memory') }, memories.map((m) => h('option', { value: m, text: memoryText(m) })))),
+      running && ro('Java', f.java || 'Automatic'),
+      h('label', { class: 'field' }, h('span', { text: 'Default server' }),
+        h('select', { id: 'fServer', value: f.server, onchange: set('server') },
+          h('option', { value: '', text: 'None (title screen)' }),
+          servers.map((s) => h('option', { value: s.name, text: `${s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (other version)' : ''}` })),
+          f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))),
+      h('label', { class: 'field' }, h('span', { text: 'Account' }),
+        h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
+          h('option', { value: '', text: def ? `Default (${def.name})` : 'Default (offline player)' }),
+          accountsNow().map((a) => h('option', { value: a.uuid, text: `${a.name} · ${a.type === 'offline' ? 'Offline' : 'Microsoft'}` })),
+          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: profileNamed(f.editing)?.accountType === 'offline' ? `${profileNamed(f.editing).accountName} · Offline` : `${profileNamed(f.editing)?.accountName ?? f.account} (account missing)` }))),
+      !running && h('div', { class: 'full switchrow' },
+        h('div', { class: 'txt' }, h('b', { text: 'Harness mod' }), h('small', { class: block ? 'warn' : null, style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Lets SpawnLoft read what the game is doing, for diagnostics and the assistant tools.' })),
+        h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-label': 'Harness mod', disabled: Boolean(block), onclick: toggle('harness') })))
+
+    if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
+    const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open } },
+      h('summary', { text: 'Advanced' }),
+      h('div', { class: 'in' },
+        !running && h('div', { class: 'form-grid' },
+          h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
+            h('small', { class: 'hint', text: 'A path to java or javaw, checked at launch.' })),
+          f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Pick automatically', oninput: set('loaderVersion') }),
+            h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
+        f.editing
+          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { text: 'Allow an assistant to use my account' }), h('small', { text: 'An AI assistant connected through MCP may launch this profile signed in as its Microsoft account.' })),
+            h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-label': 'Allow assistant account', onclick: toggle('assistantAccount') }))
+          : h('p', { class: 'hint', text: 'An assistant connected through MCP plays a new profile as an offline player. To let it use a Microsoft account, turn that on after the profile exists.' })))
+
+    return page(
+      head(f.editing ? `Edit ${f.editing}` : 'New profile', f.editing ? null : 'Nothing is downloaded until you launch it.', running && pill('live', 'Running', true)),
+      h('div', { class: 'card form' },
+        f.error && notice({ tone: 'fault', title: sentence(f.error) }),
+        running && notice({ tone: 'warn', title: 'This profile is running', text: 'The version, loader, Java, memory and harness can\'t change while the game is open. Stop it first to edit them.' }),
+        machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
+        grid,
+        advanced,
+        h('div', { class: 'formfoot' },
+          !f.editing && h('span', { class: 'hint', text: 'Kept in its own folder under the SpawnLoft data folder.' }),
+          h('button', { onclick: () => { S.form = null; S.profiles = 'list'; render() } }, 'Cancel'),
+          h('button', { class: 'primary', disabled: f.saving || !f.mc, onclick: saveForm }, f.saving ? 'Saving…' : f.editing ? 'Save changes' : 'Create profile'))))
+  }
+
+  async function saveForm() {
+    const f = S.form
+    const text = (s) => (String(s ?? '').trim() || null)
+    f.saving = true
+    f.error = null
+    render()
+    try {
+      if (!f.editing) {
+        await api('client/profiles', {
+          method: 'POST',
+          body: { name: f.name.trim(), mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account) },
+        })
+        S.pick = f.name.trim()
+        stored('local', PICK_KEY, S.pick)
+        S.profNotice = { tone: 'live', title: `Created ${S.pick}`, text: 'Launch it from Play. The first launch downloads the game.' }
+      } else {
+        const before = profileNamed(f.editing)
+        const next = { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account), assistantAccount: f.assistantAccount }
+        const patch = profilePatch(before ?? {}, next)
+        const out = Object.keys(patch).length ? await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch }) : { warnings: [] }
+        S.profNotice = out.warnings?.length
+          ? { tone: 'warn', title: `Saved ${f.editing}`, text: out.warnings.map(sentence).join(' ') }
+          : { tone: 'live', title: `Saved ${f.editing}`, text: Object.keys(patch).length ? '' : 'Nothing had changed.' }
+      }
+      S.form = null
+      S.profiles = 'list'
+    } catch (err) {
+      if (err instanceof PanelDown) S.down = true
+      f.error = err.message
+      f.saving = false
+    }
+    refresh()
+  }
+
+  // ---- Accounts ------------------------------------------------------------------------------
+
+  function accountsPage() {
+    const sum = S.summary
+    const hint = 'Sign-ins are stored on this computer only.'
+    if (!sum) {
+      return page(head('Accounts'), h('div', { class: 'card list', 'aria-busy': 'true' },
+        [140, 110].map((w) => h('div', { class: 'acct' }, sk('width:40px;height:40px'), h('div', { style: 'display:grid;gap:8px' }, sk(`width:${w}px;height:16px`), sk('width:250px;height:10px')), sk('width:80px;height:28px')))))
+    }
+    const parts = [head('Accounts', hint)]
+    if (S.login) parts.push(waitingStrip(S.login))
+    if (S.acctNotice) parts.push(acctNotice(S.acctNotice))
+    const accounts = sum.accounts
+    if (accounts.length) {
+      parts.push(h('div', { class: 'card list' }, accounts.map((a) => accountRow(a, a.uuid === sum.defaultAccount))))
+    } else if (!S.login) {
+      parts.push(emptyState('user', 'No accounts yet', 'Sign in with Microsoft to play on online servers, or add an offline name for local servers.',
+        h('button', { class: 'primary', onclick: startLogin }, ico('plus'), 'Add Microsoft account'),
+        h('button', { onclick: () => $('offName')?.focus() }, 'Add offline account')))
+    }
+    const o = S.offline
+    parts.push(h('div', { class: 'two' },
+      h('div', { class: 'card add' }, h('h2', { text: 'Add Microsoft account' }), h('p', { class: 'hint', text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password.' }),
+        h('button', { class: 'primary', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account')),
+      h('div', { class: 'card add' }, h('h2', { text: 'Add offline account' }),
+        h('p', { class: 'hint', text: 'Works on servers with online-mode=false, such as the ones SpawnLoft makes by default. Online servers need a Microsoft account.' }),
+        h('div', { class: 'row' },
+          h('label', { class: 'field' }, h('span', { text: 'Name' }),
+            h('input', { id: 'offName', value: o.name, maxlength: '16', placeholder: '3 to 16 letters, digits, underscore', class: o.error ? 'bad' : null, oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline() } })),
+          h('button', { onclick: addOffline }, 'Add')),
+        o.error && h('small', { class: 'hint bad', text: sentence(o.error) }))))
+    return page(...parts)
+  }
+
+  function accountRow(a, isDefault) {
+    const offline = a.type === 'offline'
+    return h('div', { class: 'acct' }, tile(a, 'lg'),
+      h('div', {},
+        h('div', { class: 'nm' }, h('b', { text: a.name }), pill('', offline ? 'Offline' : 'Microsoft'),
+          isDefault && pill('accent', 'Default'),
+          !offline && (a.refreshFailedAt ? pill('warn', 'Sign in again', true) : pill('live', 'Signed in', true))),
+        h('div', { class: 'uuid', text: offline ? `offline · ${a.uuid}` : a.uuid })),
+      h('div', { class: 'acts' },
+        !offline && a.refreshFailedAt && h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, 'Sign in again'),
+        !isDefault && h('button', { class: 'sm', onclick: () => setDefault(a.uuid) }, 'Make default'),
+        h('button', { class: offline || a.refreshFailedAt || !isDefault ? 'sm quiet' : 'sm', onclick: () => removeAccount(a) }, offline ? 'Remove' : 'Sign out')))
+  }
+
+  function acctNotice(n) {
+    const acts = []
+    if (n.retry) acts.push(h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, n.retry))
+    let text = n.text
+    // the default can only be read once the list has been fetched again
+    if (n.signedIn) text = S.summary?.defaultAccount === n.signedIn ? 'It is your default account, so new launches use it.' : 'Make it the default to launch with it, or pick it in a profile.'
+    return notice({ tone: n.tone, title: n.title, text, acts, onclose: () => { S.acctNotice = null; render() } })
+  }
+
+  function waitingStrip(login) {
+    const where = desktop?.openMicrosoftLogin ? 'the window that opened. It closes itself.' : 'the tab that opened, then come back here.'
+    return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
+      h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
+        login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in window did not open, maybe because of a pop-up blocker. ' : `Finish signing in in ${where}`,
+        login.blocked && h('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open Microsoft\'s sign-in page')),
+      h('span', { class: 'acts' },
+        desktop?.openExternal && !login.blocked && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
+        login.status !== 'finishing' && h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
+  }
+
+  // The Login button (CLIENT.md, "Signing in from the launcher"): ask the panel for a sign-in,
+  // listen on its stream, and only once the stream has said "pending" open Microsoft's page, so
+  // the sign-in always has a listener while the person is on Microsoft's page. In a browser tab
+  // the window is opened here, inside the click, while a pop-up is still allowed; it stays blank
+  // until the stream answers.
+  async function startLogin() {
+    if (S.login) return
+    S.acctNotice = null
+    const tab = desktop?.openMicrosoftLogin ? null : window.open('', 'spawnloft-login')
+    // cut from this page: Microsoft's page gets no handle on the launcher
+    if (tab) try { tab.opener = null } catch { /* already cross-origin */ }
+    let made
+    try {
+      made = await api('client/accounts/login', { method: 'POST' })
+    } catch (err) {
+      tab?.close()
+      S.acctNotice = err.status === 409
+        ? { tone: 'warn', title: 'A sign-in is already open in another window', text: 'Finish it there, or close that window and try again.', retry: 'Try again' }
+        : { tone: 'fault', title: 'Couldn\'t start the sign-in', text: sentence(err.message), retry: 'Try again' }
+      if (err instanceof PanelDown) S.down = true
+      return render()
+    }
+    if (!/^https:\/\/login\.microsoftonline\.com\//.test(String(made?.authorizeUrl ?? ''))) {
+      tab?.close()
+      S.acctNotice = { tone: 'fault', title: 'Couldn\'t start the sign-in', text: 'The panel answered with a sign-in address that is not Microsoft\'s.' }
+      return render()
+    }
+    // status: what the stream said last; 'finishing' once Microsoft's part is over
+    const login = { id: made.loginId, url: made.authorizeUrl, status: null, opened: false, blocked: false, done: false, tab, watcher: null }
+    S.login = login
+    if (S.screen !== 'accounts') go('accounts')
+    const es = new EventSource(`/api/client/accounts/login/${enc(login.id)}/stream`)
+    login.es = es
+    es.onmessage = (e) => {
+      let ev
+      try { ev = JSON.parse(e.data) } catch { return }
+      if (S.login !== login) return es.close()
+      login.status = ev.status
+      if (ev.status === 'pending') {
+        if (!login.opened) {
+          login.opened = true
+          openMicrosoft(login)
+        }
+        return
+      }
+      if (ev.status === 'finishing') return render()
+      endLogin(login, ev)
+    }
+    es.onerror = () => {
+      if (!login.done && es.readyState === EventSource.CLOSED) endLogin(login, { status: 'failed', message: 'lost the connection to the panel during the sign-in; start it again' })
+    }
+    render()
+  }
+
+  // A window closed while the stream still says "pending" was closed by the person: nothing is
+  // coming, so the sign-in is cancelled. Once it says "finishing" the panel has Microsoft's code
+  // and a DELETE would throw the account away, so closing the window then changes nothing.
+  function windowClosed(login) {
+    if (S.login === login && login.status === 'pending') cancelLogin(login)
+  }
+
+  async function openMicrosoft(login) {
+    if (desktop?.openMicrosoftLogin) {
+      let out = null
+      try { out = await desktop.openMicrosoftLogin(login.url) } catch { /* refused */ }
+      if (S.login !== login) return
+      if (!out?.ok) {
+        login.blocked = true
+        return render()
+      }
+      // resolves when the window has closed; a moment for a "finishing" already on its way
+      setTimeout(() => windowClosed(login), 500)
+      return
+    }
+    const w = login.tab
+    if (!w || w.closed) {
+      login.blocked = true
+      return render()
+    }
+    w.location.href = login.url
+    login.watcher = setInterval(() => {
+      if (login.done) return clearInterval(login.watcher)
+      if (w.closed) {
+        clearInterval(login.watcher)
+        windowClosed(login)
+      }
+    }, 1000)
+  }
+
+  async function cancelLogin(login) {
+    if (login.done) return
+    try {
+      await api(`client/accounts/login/${enc(login.id)}`, { method: 'DELETE' })
+    } catch { /* gone already */ }
+    // the stream normally says "cancelled" first; this covers a stream that is already closed
+    endLogin(login, { status: 'cancelled' })
+  }
+
+  function endLogin(login, ev) {
+    if (login.done) return
+    login.done = true
+    login.es?.close()
+    clearInterval(login.watcher)
+    if (S.login === login) S.login = null
+    if (ev.status === 'done') {
+      S.acctNotice = { tone: 'live', title: `Signed in as ${ev.account?.name ?? 'your account'}`, signedIn: ev.account?.uuid ?? null }
+    } else if (ev.status === 'cancelled') {
+      S.acctNotice = { tone: '', title: 'Sign-in cancelled', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Add Microsoft account' }
+    } else {
+      S.acctNotice = { tone: 'fault', title: sentence(ev.message ?? 'the sign-in failed'), text: 'Try again, or add an offline account for local servers.', retry: 'Try again' }
+    }
+    refresh()
+  }
+
+  async function addOffline() {
+    const o = S.offline
+    try {
+      const out = await api('client/accounts/offline', { method: 'POST', body: { name: o.name.trim() } })
+      S.acctNotice = { tone: 'live', title: `Added ${out.account.name}`, text: out.defaultAccount === out.account.uuid ? 'It is your default account, so new launches use it.' : 'An offline player for local servers.' }
+      o.name = ''
+      o.error = null
+    } catch (err) {
+      o.error = err.message
+      if (err instanceof PanelDown) S.down = true
+    }
+    refresh()
+  }
+
+  async function setDefault(uuid) {
+    S.switcher = false
+    try {
+      await api('client/accounts/default', { method: 'POST', body: { uuid } })
+    } catch (err) {
+      S.acctNotice = { tone: 'fault', title: 'Couldn\'t change the default account', text: sentence(err.message) }
+    }
+    refresh()
+  }
+
+  async function removeAccount(a) {
+    S.switcher = false
+    try {
+      await api(`client/accounts/${enc(a.uuid)}`, { method: 'DELETE' })
+      S.acctNotice = { tone: '', title: a.type === 'offline' ? `Removed ${a.name}` : `Signed out ${a.name}`, text: 'A profile that named this account shows "account missing" until you pick another.' }
+    } catch (err) {
+      S.acctNotice = { tone: 'fault', title: `Couldn't remove ${a.name}`, text: sentence(err.message) }
+    }
+    refresh()
+  }
+
+  // ---- the poll ------------------------------------------------------------------------------
+
+  // after something this page did: show it now, then read the panel again
+  function refresh() {
+    render()
+    return poll()
+  }
+
+  let pollTimer = null
+  let polling = null
+
+  // One read of the launcher summary every few seconds (and right after anything this page
+  // changes), plus the log of the profile on screen while it runs. Re-renders only on a change,
+  // so a field being typed in is not rebuilt for nothing.
+  // A call while a read is under way gets one more read after it: that read began before
+  // whatever the caller just changed.
+  let pollAgain = false
+  function poll() {
+    clearTimeout(pollTimer)
+    if (polling) {
+      pollAgain = true
+      return polling
+    }
+    polling = (async () => {
+      do {
+        pollAgain = false
+        await pollOnce()
+      } while (pollAgain)
+    })().finally(() => {
+      polling = null
+      clearTimeout(pollTimer)
+      pollTimer = setTimeout(poll, POLL_MS)
+    })
+    return polling
+  }
+
+  async function pollOnce() {
+    try {
+      const next = await api('client/launcher')
+      noticeExits(next)
+      S.summary = next
+      S.down = false
+    } catch (err) {
+      if (err instanceof PanelDown) S.down = true
+    }
+    await readLog()
+    if (S.notice?.busy && Date.now() - (S.notice.at ?? 0) > 30000) S.notice = null
+    const key = JSON.stringify([S.summary, S.down, S.log, S.notice, S.crash && { ...S.crash }])
+    if (key !== lastKey) {
+      lastKey = key
+      render()
+    }
+  }
+
+  // A game this page saw running that is gone within a minute of starting, not stopped from
+  // here, crashed (or was closed at once): the crash callout, with the log as it ended.
+  function noticeExits(next) {
+    // a game running again is no longer the crash being shown
+    if (S.crash && next.profiles.some((p) => p.name === S.crash.profile && p.running)) S.crash = null
+    for (const { name, seconds } of earlyExits(S.watch, next.profiles, Date.now())) {
+      S.crash = { profile: name, seconds, report: null }
+      S.log = { profile: name, lines: [] }
+    }
+  }
+
+  async function readLog() {
+    if (S.screen !== 'play' || !S.summary) return
+    const p = currentProfile()
+    if (!p || S.job?.profile === p.name) return
+    // a crash's log is read once; it does not change after the game has gone
+    const crashed = S.crash?.profile === p.name && !p.running
+    if (!p.running && !(crashed && !(S.log.profile === p.name && S.log.lines.length))) return
+    try {
+      const out = await api(`client/profiles/${enc(p.name)}/log?lines=${LOG_LINES}`)
+      S.log = { profile: p.name, lines: out.lines ?? [] }
+    } catch { /* the next poll tries again */ }
+  }
+
+  // ---- start ---------------------------------------------------------------------------------
+
   document.addEventListener('click', (e) => {
-    const go = e.target.closest('[data-go]'); if (go) show(go.dataset.go);
-    if (e.target.closest('[data-chip]')) { const s = document.getElementById('switcher'); s.hidden = !s.hidden; }
-  });
-  const acct = q.get('acct') || 'ms';
-  chipMs.hidden = acct !== 'ms'; chipOff.hidden = acct !== 'off'; chipNone.hidden = acct !== 'none';
-  if (q.get('switcher')) switcher.hidden = false;
-  show(q.get('view') || 'play.ready');
+    const nav = e.target.closest('.nav[data-go]')
+    if (nav) {
+      if (nav.dataset.go === 'profiles') { S.profiles = S.form ? S.profiles : 'list' }
+      go(nav.dataset.go)
+    }
+    // a click inside the chip rebuilds it, so its target may already be out of the page
+    if (S.switcher && e.target.isConnected && !e.target.closest('#chipwrap')) {
+      S.switcher = false
+      renderRail()
+    }
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && S.switcher) {
+      S.switcher = false
+      renderRail()
+    }
+  })
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll() })
+  window.addEventListener('hashchange', () => {
+    const hash = location.hash.slice(1)
+    if (['play', 'profiles', 'accounts'].includes(hash) && hash !== S.screen) go(hash)
+  })
+
+  {
+    const hash = location.hash.slice(1)
+    if (['play', 'profiles', 'accounts'].includes(hash)) S.screen = hash
+    // a launch this tab started before a reload: follow it again
+    try {
+      const was = JSON.parse(stored('session', JOB_KEY) ?? 'null')
+      if (was?.id && was.profile) {
+        S.job = { id: String(was.id), profile: String(was.profile), stage: 'start', message: '', percent: null, reached: -1, startsServer: Boolean(was.startsServer), lines: [], done: false }
+        followJob(S.job, null)
+      }
+    } catch { stored('session', JOB_KEY, null) }
+    // a server card's Play with no fitting profile leaves { mc, server } for the New profile form
+    let prefill = null
+    try { prefill = JSON.parse(stored('local', NEW_PROFILE_KEY) ?? 'null') } catch { /* ignored */ }
+    stored('local', NEW_PROFILE_KEY, null)
+    render()
+    poll().then(() => {
+      if (prefill && typeof prefill === 'object') openForm(null, { mc: typeof prefill.mc === 'string' ? prefill.mc : '', server: typeof prefill.server === 'string' ? prefill.server : '' })
+    })
+  }
 </script>

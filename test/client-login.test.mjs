@@ -255,7 +255,8 @@ test('a full sign-in: stream first, authorize URL, callback answered before Micr
   assert.match(page, /Finishing the sign-in in SpawnLoft/)
   assert.ok(!/<script/i.test(page))
   assert.ok(!page.includes('the-code') && !page.includes(state))
-  assert.equal(stream.events.length, 1, 'nothing on the stream yet')
+  for (let i = 0; i < 100 && stream.events.length < 2; i++) await new Promise((r) => setTimeout(r, 20))
+  assert.deepEqual(stream.events, [{ status: 'pending' }, { status: 'finishing' }], 'only that the state was used')
   // the exchange was started, not finished
   for (let i = 0; i < 100 && !tokenAsked; i++) await new Promise((r) => setTimeout(r, 20))
   assert.equal(tokenAsked, true)
@@ -270,6 +271,7 @@ test('a full sign-in: stream first, authorize URL, callback answered before Micr
   const events = await stream.done
   assert.deepEqual(events, [
     { status: 'pending' },
+    { status: 'finishing' },
     { status: 'done', account: { name: 'Joogiebear', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', type: 'microsoft', expiresAt: new Date(fakeNow + 86400 * 1000).toISOString(), refreshFailedAt: null } },
   ])
   const saved = auth.loadAccounts()
@@ -304,8 +306,8 @@ test('a chain that fails after the callback reaches the stream as failed, with t
   const cb = await callback({ code: 'c', state: stateOf(authorizeUrl) })
   assert.equal(cb.status, 200)
   const events = await stream.done
-  assert.equal(events[1].status, 'failed')
-  assert.match(events[1].message, /child account/)
+  assert.deepEqual(events.map((e) => e.status), ['pending', 'finishing', 'failed'])
+  assert.match(events[2].message, /child account/)
   assert.equal(auth.loadAccounts().length, 1, 'the earlier account is untouched')
   assert.equal(login.liveLoginCount(), 0)
 
@@ -315,14 +317,14 @@ test('a chain that fails after the callback reaches the stream as failed, with t
   const s2 = await openStream(second.loginId)
   await s2.first
   await callback({ code: 'c', state: stateOf(second.authorizeUrl) })
-  assert.match((await s2.done)[1].message, /the sign-in expired; try again/)
+  assert.match((await s2.done)[2].message, /the sign-in expired; try again/)
 
   scriptedFetch([async () => { throw new TypeError('fetch failed') }])
   const third = await (await post('accounts/login')).json()
   const s3 = await openStream(third.loginId)
   await s3.first
   await callback({ code: 'c', state: stateOf(third.authorizeUrl) })
-  assert.match((await s3.done)[1].message, /lost the connection to Microsoft/)
+  assert.match((await s3.done)[2].message, /lost the connection to Microsoft/)
 })
 
 test('a wrong, missing or foreign state is a 400 that leaves the live sign-in untouched; Microsoft errors are mapped', async () => {
@@ -382,7 +384,7 @@ test('a cancel while Microsoft is still answering keeps the account out of the f
   await stream.first
   assert.equal((await callback({ code: 'c', state: stateOf(authorizeUrl) })).status, 200)
   assert.deepEqual(await (await api(`accounts/login/${loginId}`, { method: 'DELETE' })).json(), { cancelled: true })
-  assert.equal((await stream.done)[1].status, 'cancelled')
+  assert.deepEqual((await stream.done).map((e) => e.status), ['pending', 'finishing', 'cancelled'])
   release()
   await new Promise((r) => setTimeout(r, 50))
   assert.ok(!auth.loadAccounts().some((a) => a.name === 'LateComer'))

@@ -146,6 +146,9 @@ export function handleCallback(query) {
     drop(record, { status: 'failed', message: callbackError(query) })
     return { ok: true }
   }
+  // The launcher hears that Microsoft's part is over, so a window closed from here on is not a
+  // cancel: a DELETE now would throw away the sign-in the chain is finishing.
+  emit(record, { status: 'finishing' })
   const code = query.get('code')
   finish(record, code).catch((err) => hooks.log(`sign-in chain: ${err?.stack ?? err}`))
   return { ok: true }

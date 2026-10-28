@@ -130,6 +130,16 @@ export function accountInfo(value) {
   return idx === -1 ? { name: value, type: null } : { name: list[idx].name, type: list[idx].type ?? 'microsoft' }
 }
 
+// The uuid a profile's account key resolves to (a key written as a name by an older CLI
+// included), or null for an offline selector or a name no longer in the list.
+export function accountUuid(value) {
+  if (typeof value !== 'string' || value.startsWith('offline:')) return null
+  const list = accountsOrNull()
+  if (list === null) return null
+  const idx = findAccount(list, value)
+  return idx === -1 ? null : list[idx].uuid
+}
+
 // Profiles written before the key existed read as false: an assistant may not play as a
 // Microsoft account unless someone said so for that profile.
 function withDefaults(cfg) {
