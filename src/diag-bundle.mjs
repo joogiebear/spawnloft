@@ -11,6 +11,7 @@ import { diagnose, crashReports } from './diagnose.mjs'
 import { health } from './java.mjs'
 import { parseLog, mergeTimelines, formatTimeline } from './log-timeline.mjs'
 import { redactAccountName } from './mclogs.mjs'
+import { microsoftIdentities } from './client-auth.mjs'
 import { humanBytes, stamp, fail } from './util.mjs'
 import { createZip, zipEntries } from './zip.mjs'
 import { getProfile, status, latestLogPath } from './client.mjs'
@@ -235,7 +236,15 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   // the timeline and findings reach summarise() and timeline.txt, not only files, so every text field is cleaned
   // Minecraft's crash reports list every JVM flag, the harness token among them; it dies with the
   // game, but a bug report should not carry it anyway.
-  const clean = (s) => (typeof s === 'string' ? scrub(redactAccountName(s)).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]') : s)
+  // The signed-in Microsoft accounts' names and uuids go too ("Setting user: Wunga_", "Wunga_
+  // joined the game", "UUID of player ... is ..."): the bundle is for a bug report, and who plays
+  // is not part of the bug. Offline player names stay; they are not identities.
+  let identities = []
+  try { identities = microsoftIdentities() } catch { /* no accounts file: nothing to hide */ }
+  if (facts.client?.account?.type === 'microsoft' && facts.client.account.name) identities.push(facts.client.account.name)
+  const hideIdentities = redactIdentities(identities)
+  const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]') : s)
+  if (facts.client?.account?.type === 'microsoft') facts.client.account = { type: 'microsoft', name: MICROSOFT_PLACEHOLDER }
   for (const f of files) f.text = clean(f.text)
   for (const finding of findings.server) {
     finding.title = clean(finding.title)
@@ -250,6 +259,17 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   if (facts.client?.java) facts.client.java = clean(facts.client.java)
 
   return { facts, timeline, findings, files }
+}
+
+export const MICROSOFT_PLACEHOLDER = '[microsoft account]'
+
+// Replaces each identity wherever it stands on its own (not inside a longer word), longest
+// first so a bare uuid is not left half-replaced by its dashed form.
+export function redactIdentities(identities) {
+  const list = [...new Set(identities.filter((s) => typeof s === 'string' && s.length >= 3))].sort((a, b) => b.length - a.length)
+  if (!list.length) return (s) => s
+  const re = new RegExp(`(?<![A-Za-z0-9_])(?:${list.map((s) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')).join('|')})(?![A-Za-z0-9_])`, 'gi')
+  return (s) => s.replace(re, MICROSOFT_PLACEHOLDER)
 }
 
 // The bundle without the timeline and without the files' text: the logs are in the zip as

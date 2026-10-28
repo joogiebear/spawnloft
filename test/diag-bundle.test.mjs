@@ -80,7 +80,7 @@ fs.utimesSync(path.join(runDir, 'console.log'), t, t)
 
 process.env.MCCTL_DATA_ROOT = data
 
-const { collectServer, buildBundle, writeBundle, summarise, collectClient } = await import('../src/diag-bundle.mjs')
+const { collectServer, buildBundle, writeBundle, summarise, collectClient, summarySection } = await import('../src/diag-bundle.mjs')
 const { extractZip, zipEntries } = await import('../src/zip.mjs')
 const { formatTimeline } = await import('../src/log-timeline.mjs')
 
@@ -313,6 +313,25 @@ test('buildBundle with neither server nor client rejects', async () => {
 
 test('buildBundle with an unknown client profile rejects', async () => {
   await assert.rejects(buildBundle({ client: 'nosuch' }))
+})
+
+test('a signed-in Microsoft account\'s name and uuid are replaced wherever they stand; offline names stay', async () => {
+  const accounts = path.join(clientRoot, 'accounts.json')
+  fs.writeFileSync(accounts, JSON.stringify({ version: 1, accounts: [
+    { type: 'microsoft', name: 'Steve', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', accessToken: 'mc-token-1234', refreshToken: 'msa-refresh-1234', expiresAt: '2099-01-01T00:00:00Z' },
+  ] }))
+  try {
+    const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 100 })
+    const everything = [summarise(bundle), JSON.stringify(summarySection(bundle)), ...bundle.files.map(f => f.text), ...bundle.timeline.map(e => `${e.text} ${e.raw}`)].join('\n')
+    assert.ok(!/Steve/.test(everything), 'the Microsoft account name is gone everywhere')
+    assert.ok(!/069a79f4/i.test(everything), 'the uuid is gone')
+    assert.ok(!/mc-token-1234|msa-refresh-1234/.test(everything), 'tokens are gone (scrubber)')
+    assert.match(bundle.files.find(f => f.name === 'client-latest.log').text, /Setting user: \[microsoft account\]/)
+    assert.match(bundle.files.find(f => f.name === 'server-console.log').text, /\[microsoft account\]\[\/192\.168\.1\.10:51234\] logged in/)
+    assert.ok(everything.includes('Alex'), 'another player\'s name stays')
+  } finally {
+    fs.rmSync(accounts, { force: true })
+  }
 })
 
 test('the harness token in a crash report never reaches the bundle', async () => {

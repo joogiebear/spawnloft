@@ -143,6 +143,26 @@ test('a stale harness file is reported, and removed with repair', () => {
   }
 })
 
+test('runDoctor reports a secret-bearing file other users can read, and makes it owner-only when asked', { skip: process.platform === 'win32' }, async () => {
+  const { ACCOUNTS_FILE } = await import('../src/client-paths.mjs')
+  fs.mkdirSync(path.dirname(ACCOUNTS_FILE), { recursive: true })
+  fs.writeFileSync(ACCOUNTS_FILE, '{"version":1,"accounts":[]}\n')
+  fs.chmodSync(ACCOUNTS_FILE, 0o644)
+  try {
+    const seen = await runDoctor()
+    const problem = seen.problems.find(p => p.startsWith('accounts file (Microsoft sign-in tokens): other users on this computer can read '))
+    assert.ok(problem, 'the doctor names the file and who can read it: ' + JSON.stringify(seen.problems))
+    assert.match(problem, /\(its permissions are 644, not 600\); run doctor without --json to make it owner-only$/)
+    const fixed = await runDoctor({ repair: true })
+    assert.ok(fixed.notes.some(n => n.startsWith('accounts file (Microsoft sign-in tokens): made owner-only')))
+    assert.equal(fs.statSync(ACCOUNTS_FILE).mode & 0o777, 0o600)
+    const clean = await runDoctor()
+    assert.ok(!clean.problems.some(p => p.includes('accounts file')))
+  } finally {
+    fs.rmSync(ACCOUNTS_FILE, { force: true })
+  }
+})
+
 test('runDoctor carries the client lines', async () => {
   client.createProfile('v', { mc, loader: 'vanilla' })
   try {

@@ -2055,7 +2055,7 @@ async function cmdClient(positional, flags) {
     const profiles = client.listProfiles().map(p => ({ ...p, running: client.status(p.name).running }))
     if (quiet) process.stdout.write(jsonLine('client', { profiles }))
     else if (!profiles.length) out('No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11')
-    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.running ? 'running' : 'stopped'}`)
+    else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.account ? `account ${p.account}` : 'offline'}  ${p.running ? 'running' : 'stopped'}`)
     return
   }
 
@@ -2091,7 +2091,7 @@ async function cmdClient(positional, flags) {
     }
     const profile = client.updateProfile(name, patch)
     if (quiet) process.stdout.write(jsonLine('client', { profile }))
-    else out(`Updated "${name}": ` + Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(' '))
+    else out(`Updated "${name}": ` + Object.entries(patch).map(([k, v]) => (v === null ? `${k} cleared` : `${k}=${v}`)).join(' '))
     return
   }
 
@@ -2121,7 +2121,9 @@ async function cmdClient(positional, flags) {
     if (flags.account !== undefined && typeof flags.account !== 'string') throw new UsageError('--account needs "offline:<player name>" or a signed-in account name')
     if (flags.server !== undefined && typeof flags.server !== 'string') throw new UsageError('--server needs a server name')
     const fakeJava = client.fakeClientJava()
-    const res = await client.launch(rest[0], { playerName: flags.as ?? null, account: flags.account ?? null, server: flags.server ?? null, onProgress, fakeJava })
+    // a warning (the target server is stopped) is printed before the game starts, not under the launch line
+    const onWarning = quiet ? () => {} : (w) => process.stderr.write(`warning: ${w}\n`)
+    const res = await client.launch(rest[0], { playerName: flags.as ?? null, account: flags.account ?? null, server: flags.server ?? null, onProgress, onWarning, fakeJava })
     if (flags.wait === true) {
       const deadline = Date.now() + 5000
       while (Date.now() < deadline) {
@@ -2130,10 +2132,7 @@ async function cmdClient(positional, flags) {
       }
     }
     if (quiet) process.stdout.write(jsonLine('client', { pid: res.pid, version: res.version, account: res.account, profile: res.profile, warnings: res.warnings }))
-    else {
-      out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
-      for (const w of res.warnings) process.stderr.write(`warning: ${w}\n`)
-    }
+    else out(`Launched "${rest[0]}" as ${res.account.name} (pid ${res.pid})`)
     return
   }
 

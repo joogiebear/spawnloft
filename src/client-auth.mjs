@@ -184,8 +184,22 @@ export function loadAccounts() {
   return readJson(ACCOUNTS_FILE, null)?.accounts ?? []
 }
 
+// Owner-only on every platform (an explicit ACL on Windows), and not written at all when that
+// cannot be done: the refresh token in it stays valid for months.
 export function saveAccounts(list) {
-  writeJson(ACCOUNTS_FILE, { version: 1, accounts: list }, { mode: PRIVATE_FILE_MODE })
+  writeJson(ACCOUNTS_FILE, { version: 1, accounts: list }, { mode: PRIVATE_FILE_MODE, strict: true })
+}
+
+// What a diagnostics bundle must not carry: the names and uuids (dashed and bare) of the
+// signed-in Microsoft accounts. Offline player names are not identities and stay.
+export function microsoftIdentities(list = loadAccounts()) {
+  const out = []
+  for (const a of list) {
+    if (a?.type !== 'microsoft') continue
+    if (typeof a.name === 'string' && a.name.length >= 3) out.push(a.name)
+    if (typeof a.uuid === 'string' && a.uuid.length >= 32) out.push(a.uuid, a.uuid.replace(/-/g, ''))
+  }
+  return out
 }
 
 // Accounts are keyed by uuid; the name is what people type, and it can change at Mojang. A login

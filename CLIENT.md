@@ -35,11 +35,14 @@ play as a signed-in Microsoft account, `--server <name>` to point at a different
 fails if the game died in that time. It does not wait for the game to load or join; the
 assistant's `client_launch` does (see [The harness](#the-harness)). Everything else goes through `status`, `stop` and `logs`.
 
-If the profile's server is stopped, or is in online mode while the player is offline, `launch`
-still starts the game but prints a `warning:` (and `--json` carries it in `warnings`), because the
-game would only show "Connection refused" or a login refusal. Start the server, sign in, or set
-`online-mode=false` on a test server. A profile whose `server` is a database target is refused
-before anything downloads.
+If the profile's server is stopped, `launch` prints a `warning:` before the game starts (and
+`--json` carries it in `warnings`), because the game will show "Connection refused" until the
+server is up; start it, the game can wait on its connect screen. An offline player against a
+server in online mode is refused before anything downloads or opens, with exit code 1, since the
+server would refuse the join for sure: sign in and play as that account (`--account <name>`, or
+`account=<name>` on the profile), or set `online-mode=false` on a test server. The panel's Play
+and the assistant's `client_launch` refuse with the same words. A profile whose `server` is a
+database target is refused before anything downloads.
 
 **Platforms.** Windows x64, macOS on Apple Silicon (tested on an arm64 Mac with arm64 Java) and
 Linux x64 are supported. Linux arm64 is not: Mojang ships no arm64 Linux natives, so `launch` and
@@ -122,7 +125,26 @@ spawnloft client set play assistantAccount=true
 `client_launch` refuses such a profile with that command in the message, and `client_profiles`
 marks it "not for assistants". Launching from the command line or the panel is never affected, and
 an offline profile needs no permission. The tokens never appear in a tool result, the activity log
-or a diagnostics bundle.
+or a diagnostics bundle, and a bundle also replaces the signed-in accounts' names and uuids with
+`[microsoft account]` wherever the logs carry them ("Setting user", "joined the game"); offline
+player names stay, they are not identities.
+
+**Where the tokens live.** `client/accounts.json` under the data folder holds the accounts with
+their access and refresh tokens, and `client/run/<name>/state.json` holds a running game's harness
+token. Both are written for this user alone: mode 0600 on macOS and Linux, and on Windows, where
+a mode means nothing and a file would inherit its folder's permissions (a data folder on a second
+drive often lets every account on the machine read it), an explicit ACL set with `icacls`,
+inheritance removed and one entry for the account running SpawnLoft. The accounts file is not
+written at all when that cannot be done (a drive without permissions, such as FAT), and the
+sign-in says so. `spawnloft doctor` checks these files, the registry (RCON and database
+passwords) and every server's `server.properties`, reports one that other users could read, and
+makes it owner-only when run without `--json`. The game itself gets the access token on its
+command line, as every launcher does, where anyone who can list this user's processes can see it;
+it expires within a day, and the refresh token never leaves the accounts file.
+
+The whole sign-in has been run end to end on Windows: device code, Xbox Live, Minecraft login,
+profile, an online-mode join, a token refresh, and sign-out. On macOS and Linux the same code runs
+but has not been tried against Microsoft yet.
 
 ## The harness
 
@@ -194,6 +216,7 @@ Everything client-side sits under the data folder, beside the servers, in `clien
 ```
 client/
   profiles.json              the profiles
+  accounts.json              the signed-in Microsoft accounts with their tokens (owner-only, see Accounts)
   profiles/<name>/           one profile's game folder: options.txt, mods/, logs/latest.log,
                              screenshots/, saves/, crash-reports/, spawnloft-harness.json (while the harness runs)
   versions/<id>/             the client jar and its version JSON, one folder per version

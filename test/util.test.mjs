@@ -77,11 +77,12 @@ test('writeJson still fails on a file that stays held, and on errors that are no
   const file = path.join(scratch(), 'state.json')
   let code = 'EBUSY'
   t.mock.method(fs, 'renameSync', () => { throw Object.assign(new Error(code), { code }) })
-  assert.throws(() => writeJson(file, { n: 1 }), { code: 'EBUSY' })
-  assert.equal(fs.renameSync.mock.callCount(), 4, 'three retries after the first refusal')
+  // a file still held after the retries is a one-line error that names the file and keeps the code
+  assert.throws(() => writeJson(file, { n: 1 }), (err) => err instanceof UserError && err.code === 'EBUSY' && /could not replace .*state\.json: another program .* is holding it \(EBUSY\); try again in a moment/.test(err.message))
+  assert.equal(fs.renameSync.mock.callCount(), 6, 'five retries after the first refusal')
   code = 'ENOENT'
-  assert.throws(() => writeJson(file, { n: 1 }), { code: 'ENOENT' })
-  assert.equal(fs.renameSync.mock.callCount(), 5, 'no retry for an error that is not a lock')
+  assert.throws(() => writeJson(file, { n: 1 }), (err) => err.code === 'ENOENT' && !(err instanceof UserError))
+  assert.equal(fs.renameSync.mock.callCount(), 7, 'no retry for an error that is not a lock')
 })
 
 test('withLock serializes two read-modify-writes that would otherwise clobber each other', () => {

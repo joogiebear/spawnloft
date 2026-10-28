@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { BACKUPS_DIR, RUN_DIR, consoleLog } from './paths.mjs'
-import { fail, humanBytes, stamp, writeFileWithMode, PRIVATE_FILE_MODE } from './util.mjs'
+import { fail, humanBytes, stamp, writeJson, PRIVATE_FILE_MODE } from './util.mjs'
 
 export const MAX_LINES = 25000
 export const MAX_BYTES = 10 * 1024 * 1024
@@ -85,9 +85,8 @@ function rememberToken(tokenFile, entry) {
   } catch {}
   kept.push(entry)
   try {
-    fs.mkdirSync(path.dirname(tokenFile), { recursive: true })
     // whoever holds a deletion token can delete the uploaded log, so the file is owner-only
-    writeFileWithMode(tokenFile, JSON.stringify(kept, null, 2), PRIVATE_FILE_MODE)
+    writeJson(tokenFile, kept, { mode: PRIVATE_FILE_MODE })
   } catch {}
 }
 

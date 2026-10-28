@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { UserError, PRIVATE_FILE_MODE, renameOver } from './util.mjs'
+import { protectPrivateFile } from './private-files.mjs'
 
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -88,6 +89,9 @@ export function save(patch, { replaceUnreadable = false, onSetAside = null } = {
     } finally {
       fs.closeSync(fd)
     }
+    // Windows: the mode above did nothing, so the temp file gets its explicit ACL before it
+    // becomes the settings file. Not fatal: the file names folders, not secrets.
+    protectPrivateFile(tmp, { mode: PRIVATE_FILE_MODE })
     if (damaged) {
       aside = `${file}.unreadable-${new Date().toISOString().replace(/[:.]/g, '-')}`
       fs.copyFileSync(file, aside, fs.constants.COPYFILE_EXCL)

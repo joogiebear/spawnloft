@@ -134,19 +134,25 @@ test('join says the world is still loading when it outlasts the wait', async () 
   await disconnect('harn')
 })
 
-test('launch warns when the server it points at is stopped or will refuse an offline player', async () => {
+test('launch warns before the game starts when the server is stopped, and refuses an offline player against an online-mode server', async () => {
   makeServer('down', 45635, 'online-mode=false\nserver-ip=127.0.0.1\n')
   fs.rmSync(stateFile('down'), { force: true })
   createProfile('warn', { mc: '1.21.11' })
   try {
-    const res = await launch('warn', { fakeJava, server: 'down', playerName: 'tester' })
+    const early = []
+    const res = await launch('warn', { fakeJava, server: 'down', playerName: 'tester', onWarning: (w) => early.push({ w, running: status('warn').running }) })
     assert.equal(res.warnings.length, 1)
     assert.match(res.warnings[0], /server "down" is not running.*spawnloft start down/)
+    // told before the game was started, so a terminal shows it above the launch line
+    assert.deepEqual(early, [{ w: res.warnings[0], running: false }])
     await stop('warn')
-    const online = await launch('warn', { fakeJava, server: 'online', playerName: 'tester' })
-    assert.equal(online.warnings.length, 1)
-    assert.match(online.warnings[0], /online mode and tester is an offline player/)
-    await stop('warn')
+    // refused before anything runs: the server would refuse the join for sure
+    await assert.rejects(launch('warn', { fakeJava, server: 'online', playerName: 'tester' }), /server "online" runs in online mode and tester is an offline player, so the server would refuse the join; sign in \(spawnloft client login\)/)
+    assert.equal(status('warn').running, false)
+    // a profile-level account selector counts as offline when it says so, and the player name is the one after the colon
+    await assert.rejects(launch('warn', { fakeJava, server: 'online', account: 'offline:Bob' }), /online mode and Bob is an offline player/)
+    // a signed-in account is not refused for online mode (the sign-in itself is not on file here, so the account lookup fails instead)
+    await assert.rejects(launch('warn', { fakeJava, server: 'online', account: 'Wunga_' }), /no Microsoft account named "Wunga_" is signed in/)
     const fine = await launch('warn', { fakeJava, server: 'offline', playerName: 'tester' })
     assert.deepEqual(fine.warnings, [])
     await stop('warn')

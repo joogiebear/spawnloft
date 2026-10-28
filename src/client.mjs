@@ -8,7 +8,7 @@ import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
-import { offlineAccount, defaultPlayerName, accountFor } from './client-auth.mjs'
+import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
 import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
@@ -192,7 +192,9 @@ export async function launch(name, opts = {}) {
 
 // `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
 // Microsoft account is then allowed only on a profile whose assistantAccount key says so.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false, os = launchOs(fakeJava) }) {
+// `onWarning` is told about a stopped target server before the game starts, so the warning comes
+// out before (not under) the launch line. The warnings are also in the result.
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, onWarning = () => {}, fakeJava = null, assistant = false, os = launchOs(fakeJava) }) {
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
@@ -207,6 +209,26 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   if (profile.harness && !harnessFor(profile.mc)) {
     fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
   }
+
+  // --as names an offline player; a signed-in account brings its own name. Both at once is a
+  // contradiction, not a preference.
+  const selector = accountSelector ?? profile.account ?? null
+  if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
+  if (assistant && selector && !selector.startsWith('offline:') && !profile.assistantAccount) {
+    fail(assistantAccountRefusal(name))
+  }
+  // An offline player against an online-mode server is refused here, before Java is looked for
+  // or anything downloads, with the words join() uses: the server would refuse the join for
+  // sure, so a launch would only show a kick screen. A stopped server is a warning, told to the
+  // caller now (before the launch line, not under it) and carried in the result, since it can be
+  // started while the game loads. The account itself is resolved later (a refresh needs the
+  // network); its type and name are known from the selector.
+  const provisional = selector
+    ? (selector.startsWith('offline:') ? { type: 'offline', name: assertPlayerName(selector.slice('offline:'.length)) } : { type: 'microsoft', name: selector })
+    : { type: 'offline', name: playerName ? assertPlayerName(playerName) : defaultPlayerName(name) }
+  const { refusal, warnings } = target ? serverCheck(target, provisional) : { refusal: null, warnings: [] }
+  if (refusal) fail(refusal)
+  for (const w of warnings) onWarning(w)
 
   const java = fakeJava ?? await pickJava({ explicit: profile.java, needs: requiredMajor(profile.mc), what: 'Minecraft ' + profile.mc })
 
@@ -240,19 +262,11 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const versionRefusal = platformRefusal(version, os)
   if (versionRefusal) fail(versionRefusal)
 
-  // --as names an offline player; a signed-in account brings its own name. Both at once is a
-  // contradiction, not a preference.
-  const selector = accountSelector ?? profile.account ?? null
-  if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
-  if (assistant && selector && !selector.startsWith('offline:') && !profile.assistantAccount) {
-    fail(assistantAccountRefusal(name))
-  }
   const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, os, harnessToken })
-  const warnings = target ? serverWarnings(target, account) : []
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null } })
 
@@ -266,25 +280,26 @@ function launchOs(fakeJava) {
   return fakeJava && platformRefusal(null, os) ? { ...os, name: 'linux', arch: 'x64' } : os
 }
 
-// The game opens either way; these say why it will stop at "Connection refused" or a kick
-// screen, so nobody waits on a join that cannot happen.
-function serverWarnings(server, account) {
+// What the target server means for this launch: a refusal (the join cannot happen: an offline
+// player against an online-mode server) and warnings (the game will show "Connection refused"
+// until the server is started), so nobody waits on a join that cannot happen.
+function serverCheck(server, account) {
   let check
   // advisory only: an unreadable server.properties must not stop a launch that got this far
-  try { check = checkInstance(server) } catch { return [] }
+  try { check = checkInstance(server) } catch { return { refusal: null, warnings: [] } }
   const warnings = []
-  if (!check.problems.length) return warnings
+  let refusal = null
   if (check.problems.some((p) => /is not running/.test(p))) {
     warnings.push(`server "${server}" is not running, so the game will show "Connection refused"; start it first: spawnloft start ${server}`)
   }
   if (account.type !== 'microsoft' && check.problems.some((p) => /runs in online mode/.test(p))) {
-    warnings.push(onlineModeRefusal(server, account.name))
+    refusal = onlineModeRefusal(server, account.name)
   }
-  return warnings
+  return { refusal, warnings }
 }
 
 function onlineModeRefusal(server, playerName) {
-  return `server "${server}" runs in online mode and ${playerName} is an offline player, so the server will refuse the join; sign in (spawnloft client login) or set online-mode=false on a test server`
+  return `server "${server}" runs in online mode and ${playerName} is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server`
 }
 
 // MCCTL_FAKE_CLIENT points launch at a script run by this Node instead of Java (the test suite's

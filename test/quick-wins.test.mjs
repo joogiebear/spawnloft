@@ -118,6 +118,13 @@ test('the panel lists, launches, reports and stops a client profile', async () =
   assert.equal(listData[0].server, 'quick')
   assert.equal(listData[0].running, false)
 
+  // "quick" has no online-mode line, so it runs in online mode: an offline player is refused before the game opens
+  const refused = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(refused.status, 400)
+  assert.match((await refused.json()).error, /server "quick" runs in online mode and pp_ is an offline player, so the server would refuse the join/)
+  assert.equal(client.status('pp').running, false)
+  fs.appendFileSync(path.join(dir, 'server.properties'), 'online-mode=false\n')
+
   const launchRes = await fetch(panel.url + 'api/client/profiles/pp/launch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
   assert.equal(launchRes.status, 200)
   const launchData = await launchRes.json()

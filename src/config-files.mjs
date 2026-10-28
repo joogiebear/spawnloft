@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseProps, readProps, worldDirs } from './props.mjs'
-import { fail, isInside } from './util.mjs'
+import { fail, isInside, writeFileWithMode, renameOver, PRIVATE_FILE_MODE } from './util.mjs'
 
 // The text configuration an AI assistant may see and change: plugin configs, Paper's and
 // Bukkit's files, server.properties. Confined to the server folder, to hand-edited text formats,
@@ -341,9 +341,11 @@ export function unchangedSince(plan) {
 export function applyConfigWrite(plan) {
   fs.mkdirSync(path.dirname(plan.full), { recursive: true })
   const tmp = `${plan.full}.spawnloft-${process.pid}.tmp`
-  fs.writeFileSync(tmp, plan.after)
+  // server.properties carries rcon.password: an edit keeps it owner-only, as writeProps writes it
+  if (path.basename(plan.full).toLowerCase() === 'server.properties') writeFileWithMode(tmp, plan.after, PRIVATE_FILE_MODE)
+  else fs.writeFileSync(tmp, plan.after)
   try {
-    fs.renameSync(tmp, plan.full)
+    renameOver(tmp, plan.full)
   } catch (err) {
     fs.rmSync(tmp, { force: true })
     throw err

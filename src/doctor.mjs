@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { DATA_ROOT, LAYOUT, ROOT } from './paths.mjs'
+import { DATA_ROOT, LAYOUT, ROOT, REGISTRY_FILE, RUN_DIR } from './paths.mjs'
 import { describeServersElsewhere, inspect as inspectSettings } from './settings.mjs'
 import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
@@ -9,7 +9,27 @@ import { readState, clearState } from './control.mjs'
 import { rconExposure } from './exposure.mjs'
 import * as java from './java.mjs'
 import { checkClientProfiles } from './doctor-client.mjs'
+import { checkPrivateFiles } from './private-files.mjs'
+import { ACCOUNTS_FILE, clientStateFile } from './client-paths.mjs'
+import { listProfiles as listClientProfiles } from './client.mjs'
 import { humanBytes, dirSize, isPortFree } from './util.mjs'
+
+// Every file that holds a secret: a refresh token, an RCON or database password, a harness or
+// mclo.gs token. Files that do not exist are skipped by the check.
+export function privateFiles() {
+  const files = [
+    { file: ACCOUNTS_FILE, what: 'accounts file (Microsoft sign-in tokens)' },
+    { file: REGISTRY_FILE, what: 'registry (RCON and database passwords)' },
+    { file: path.join(RUN_DIR, 'mclogs.json'), what: 'mclo.gs tokens' },
+  ]
+  for (const inst of listInstances()) {
+    files.push({ file: path.join(inst.dir, 'server.properties'), what: `${inst.name}: server.properties (RCON password)` })
+  }
+  let profiles = []
+  try { profiles = listClientProfiles() } catch { /* no client registry: nothing to check */ }
+  for (const p of profiles) files.push({ file: clientStateFile(p.name), what: `client ${p.name}: state file (harness token)` })
+  return files
+}
 
 // Read-only unless `repair` is set, which only clears stale state files. Automation (--json, the
 // MCP server) never repairs.
@@ -87,6 +107,10 @@ export async function runDoctor({ repair = false } = {}) {
   const client = checkClientProfiles({ repair, javas: javaCheck.others ?? [] })
   problems.push(...client.problems)
   notes.push(...client.notes)
+
+  const secrets = checkPrivateFiles(privateFiles(), { repair })
+  problems.push(...secrets.problems)
+  notes.push(...secrets.notes)
 
   // `privateCopies` is for the MCP tool; the CLI's JSON names its fields so its shape is unchanged
   return { healthy: problems.length === 0, notes, problems, privateCopies }
