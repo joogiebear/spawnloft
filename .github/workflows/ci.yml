@@ -45,8 +45,8 @@ jobs:
   test:
     # Windows has its own scheduler (schtasks), control channel (a named pipe), paths (drive
     # letters) and process table, none of which the Linux job below exercises.
-    # A draft pull request runs only the self-hosted tests, so a long-running branch does not
-    # spend hosted minutes until it is marked ready for review.
+    # A draft pull request runs only the Linux tests, so a long-running branch gets a quick check
+    # without the Windows job until it is marked ready for review.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: windows-latest
     steps:
@@ -67,8 +67,9 @@ jobs:
   # jobs count; neither stands in for the other. The job keeps its name because branch
   # protection on main requires a check called test-linux.
   test-linux:
-    # Runs on the gh-runners VM (a single runner, so Node 22 and 24 never overlap on ports and sockets).
-    runs-on: [self-hosted, linux, x64]
+    # GitHub-hosted: the repository is public, so hosted minutes are free. Node 22 and 24 run as
+    # steps of one job, so they never overlap on ports and sockets.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
