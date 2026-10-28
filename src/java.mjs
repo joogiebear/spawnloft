@@ -302,17 +302,22 @@ function boundsText({ min, max }) {
 }
 
 // The Java a game client gets, decided from its version JSON before anything but that JSON is
-// downloaded: { path, warning }. An explicit Java is probed and refused when it certainly cannot
-// run the version (too old, or the wrong arch); one newer than the version's bounds is used with
-// a warning, as the person chose it. Otherwise chooseClientJava over every Java on the machine;
-// when only newer ones than the bounds are installed, the closest of them runs the game with a
-// warning (until SpawnLoft downloads Mojang's own runtime, plan step V2), since a refusal would
-// stop versions that mostly run on it. `found` replaces discovery (tests).
-export async function pickClientJava({ explicit = null, requirement, arch = null, what = 'this version', found = null } = {}) {
+// downloaded: { path, warning, source }. An explicit Java is probed and refused when it certainly
+// cannot run the version (too old, or the wrong arch); one newer than the version's bounds is used
+// with a warning, as the person chose it. "mojang" always takes Mojang's runtime. Otherwise
+// chooseClientJava over every Java on the machine, then Mojang's runtime for the version's
+// component (`runtime`, which downloads it when needed), and when that cannot be had (offline,
+// or none for this machine) the closest newer installed Java with a warning, since a refusal
+// would stop versions that mostly run on it. `found` replaces discovery (tests).
+export async function pickClientJava({ explicit = null, requirement, arch = null, what = 'this version', found = null, runtime = null } = {}) {
   const need = boundsText(requirement)
   const install = requirement.prefer ?? requirement.min
   const get = `Install Java ${install} from ${temurinUrl(install)}, or point the profile at one.`
-  const tooNew = (j) => `${what} wants ${need}; using Java ${j.major}${j.path === 'java' ? '' : ` at ${j.path}`}, which is newer, so the game may not start. ${get}`
+  if (explicit === 'mojang') {
+    if (!runtime) fail(`${what} is set to Mojang's Java, which this launch cannot download`)
+    const r = await runtime()
+    return { path: r.path, warning: null, source: 'mojang-runtime' }
+  }
   if (explicit) {
     const state = await probe(explicit)
     if (!state.found) fail(`${explicit} could not be run: ${state.message}`)
@@ -323,22 +328,43 @@ export async function pickClientJava({ explicit = null, requirement, arch = null
       throw clientJavaError('java-too-old', `${what} needs ${need}, and ${explicit} is Java ${state.major}. Pick another Java for the profile, or clear it to let SpawnLoft choose.`, { needs: install, have: state.major })
     }
     const over = state.major != null && requirement.max != null && state.major > requirement.max
-    return { path: explicit, warning: over ? tooNew({ major: state.major, path: explicit }) : null }
+    const warning = over ? `${what} wants ${need}; using Java ${state.major} at ${explicit}, which is newer, so the game may not start.` : null
+    return { path: explicit, warning, source: 'explicit' }
   }
   const all = found ?? (await discover()).all
   const choice = chooseClientJava(all, requirement, arch)
-  if (choice) return { path: choice.path, warning: null }
+  if (choice) return { path: choice.path, warning: null, source: 'installed' }
+
+  let why = null
+  if (runtime) {
+    try {
+      const r = await runtime()
+      return { path: r.path, warning: null, source: 'mojang-runtime' }
+    } catch (err) {
+      if (!(err instanceof UserError)) throw err
+      // no runtime for this machine is the whole answer when nothing installed can stand in
+      why = err
+    }
+  }
   const right = all.filter((j) => j.major != null && (arch == null || j.arch == null || j.arch === arch))
+  const newer = right.filter((j) => j.major > (requirement.max ?? Infinity)).sort((a, b) => a.major - b.major)
+  if (newer.length) {
+    const j = newer[0]
+    const missed = why ? ` Mojang's Java could not be had: ${why.message.replace(/\.$/, '')}.` : ''
+    return { path: j.path, warning: `${what} wants ${need}; using Java ${j.major}${j.path === 'java' ? '' : ` at ${j.path}`}, which is newer, so the game may not start.${missed} ${get}`, source: 'fallback' }
+  }
+  if (why?.code === 'no-runtime-for-this-machine') {
+    throw clientJavaError('no-runtime-for-this-machine', `${why.message}. ${what} needs ${need}. ${get}`, { needs: install, have: null })
+  }
+  const after = why ? ` Mojang's Java could not be had either: ${why.message}` : ''
   if (all.length === 0) {
-    throw clientJavaError('java-missing', `${what} needs ${need}, and no Java was found on this machine. ${get}`, { needs: install, have: null })
+    throw clientJavaError('java-missing', `${what} needs ${need}, and no Java was found on this machine.${after} ${get}`, { needs: install, have: null })
   }
   if (right.length === 0) {
-    throw clientJavaError('java-wrong-arch', `${what} runs as ${arch} on this machine and needs an ${arch} ${need}; the Javas found are ${[...new Set(all.map((j) => j.arch ?? '?'))].join(', ')}. ${get}`, { needs: install, have: null })
+    throw clientJavaError('java-wrong-arch', `${what} runs as ${arch} on this machine and needs an ${arch} ${need}; the Javas found are ${[...new Set(all.map((j) => j.arch ?? '?'))].join(', ')}.${after} ${get}`, { needs: install, have: null })
   }
-  const newer = right.filter((j) => j.major > (requirement.max ?? Infinity)).sort((a, b) => a.major - b.major)
-  if (newer.length) return { path: newer[0].path, warning: tooNew(newer[0]) }
   const newest = [...right].sort((a, b) => b.major - a.major)[0]
-  throw clientJavaError('java-too-old', `${what} needs ${need}. The newest Java on this machine is ${newest.major}${newest.path === 'java' ? '' : ` (${newest.path})`}. ${get}`, { needs: install, have: newest.major })
+  throw clientJavaError('java-too-old', `${what} needs ${need}. The newest Java on this machine is ${newest.major}${newest.path === 'java' ? '' : ` (${newest.path})`}.${after} ${get}`, { needs: install, have: newest.major })
 }
 
 function clientJavaError(code, message, { needs, have }) {

@@ -27,6 +27,19 @@
   `objects.json` (no flag), `legacy.json` (`virtual: true`, the 1.6.1 to 1.7.2 index),
   `pre-1.6.json` (`map_to_resources: true`), plus `bad.json` (a `../x` entry) and
   `future-pack.json`. The flags match Mojang's files; the entries and hashes are made up.
+- `java-runtime-all.json`: synthetic, in the shape of Mojang's Java runtime list (`all.json`):
+  the eight platforms and every component, with the gaps the real file has (nothing for
+  `jre-legacy` or `java-runtime-alpha` on `mac-os-arm64`, no `delta` or `epsilon` on
+  `windows-x86`, only `jre-legacy` on `linux-i386`) plus `gamecore` and `minecraft-java-exe`,
+  which SpawnLoft ignores. Version names and every hash but two are made up; the
+  `java-runtime-epsilon`/`windows-x64` and `jre-legacy`/`mac-os` rows point at the two manifests
+  below by their real sha1.
+- `java-runtime-epsilon-windows-x64.json`, `jre-legacy-mac-os.json`: synthetic component
+  manifests (directories, files with `raw` and `lzma`, one file without `lzma`, executables, and
+  on macOS the `jre.bundle` layout with one link inside it). Each file's body is
+  `runtime file <path>\n`, which is what its sha1 and size are of. The tests make the bad
+  variants (lzma only, links out of the folder or on Windows, `..`) from them.
+  Made by a one-off script, since piston-meta could not be reached from where these were made.
 
 `../client-fixtures.mjs` loads all of these and lists the seven OS/arch pairs. It imports the
 client code, so a test sets `MCCTL_DATA_ROOT` before it imports the loader.

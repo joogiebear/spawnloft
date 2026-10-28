@@ -6,6 +6,7 @@ import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, client
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
+import { mojangJava } from './client-java.mjs'
 import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
@@ -345,7 +346,7 @@ export const LAUNCHED_BY = ['launcher', 'panel', 'cli', 'assistant']
 // `onStage` hears { stage, message } as each step starts; `onProgress` keeps the downloads'
 // { phase, done, total, bytes }. `ensureServer(target)` starts a stopped target server and waits
 // for it, just before the game is spawned; without it a stopped server is only a warning.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null, fetchImpl = null }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null, fetchImpl = null, listFetchImpl = null, foundJavas = null }) {
   const by = assistant ? 'assistant' : (launchedBy ?? 'cli')
   if (!LAUNCHED_BY.includes(by)) throw new Error(`unknown launchedBy "${launchedBy}"`)
   const profile = getProfile(name)
@@ -438,7 +439,12 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const runOs = resolved.os
 
   onStage({ stage: 'java', message: 'Finding Java' })
-  const picked = fakeJava ? { path: fakeJava, warning: null } : await pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc })
+  // Mojang's runtime for the version's component, for the arch the game runs as (plan step V2)
+  const runtime = () => {
+    onStage({ stage: 'java', message: `Getting Mojang's Java ${resolved.java.major}` })
+    return mojangJava({ component: resolved.java.component, major: resolved.java.major, osName: runOs.name, arch: resolved.arch, onProgress, ...(fetchImpl ? { fetchImpl } : {}), ...(listFetchImpl ? { listFetchImpl } : {}) })
+  }
+  const picked = fakeJava ? { path: fakeJava, warning: null, source: 'installed' } : await pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
   const java = picked.path
   if (picked.warning) {
     warnings.push(picked.warning)
@@ -548,7 +554,7 @@ function versionsInUse(except) {
 function launchFacts(resolved, picked, profile, installed, assetsDir) {
   return {
     id: resolved.id,
-    java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: profile.java ? 'explicit' : picked.warning ? 'fallback' : 'installed', warning: picked.warning },
+    java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: picked.source, warning: picked.warning },
     arch: resolved.arch,
     emulated: resolved.emulated,
     nativesDir: resolved.natives.dir,

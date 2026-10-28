@@ -75,7 +75,7 @@ A profile is a few keys, all changeable with `set`:
 | `loader` | `vanilla` or `fabric`. Fabric is needed for mods, and for the harness. |
 | `loaderVersion` | The Fabric loader version. Left empty, the newest stable one is picked at the first launch and recorded. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
-| `java` | A specific Java to use, or empty to let SpawnLoft pick. |
+| `java` | A specific Java to use, `mojang` for Mojang's own runtime for the version, or empty to let SpawnLoft pick (an installed Java that fits, else Mojang's runtime, downloaded once into `client/runtime/`). |
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
 | `account` | A signed-in Microsoft account to play as (see [Accounts](#accounts)), or empty to play offline. |
 | `assistantAccount` | `true` lets an AI assistant launch this profile when it plays as a signed-in Microsoft account (`account=`). `false` by default for every profile, however it was made; only `set` turns it on. Offline profiles are not affected. |

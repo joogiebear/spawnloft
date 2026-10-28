@@ -1,0 +1,69 @@
+{
+  "files": {
+    "bin": {
+      "type": "directory"
+    },
+    "bin/java.exe": {
+      "type": "file",
+      "executable": true,
+      "downloads": {
+        "raw": {
+          "sha1": "6f52b4ec94576bddded074d6ab984a3ae924f542",
+          "size": 26,
+          "url": "https://piston-data.mojang.com/v1/objects/6f52b4ec94576bddded074d6ab984a3ae924f542/java.exe"
+        },
+        "lzma": {
+          "sha1": "8ce42aa31fae70e44f3ebbc0f27bf7d02ee22f23",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/8ce42aa31fae70e44f3ebbc0f27bf7d02ee22f23/java.exe"
+        }
+      }
+    },
+    "bin/javaw.exe": {
+      "type": "file",
+      "executable": true,
+      "downloads": {
+        "raw": {
+          "sha1": "0e81faf6d1fcb5af6fb145865eff143f8c01996e",
+          "size": 27,
+          "url": "https://piston-data.mojang.com/v1/objects/0e81faf6d1fcb5af6fb145865eff143f8c01996e/javaw.exe"
+        },
+        "lzma": {
+          "sha1": "a295a102232bf0d9e36453cd8fe495185746ba61",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/a295a102232bf0d9e36453cd8fe495185746ba61/javaw.exe"
+        }
+      }
+    },
+    "lib": {
+      "type": "directory"
+    },
+    "lib/modules": {
+      "type": "file",
+      "executable": false,
+      "downloads": {
+        "raw": {
+          "sha1": "1b82f1b01edc2ab7c23cbe2b86cd8d347936610a",
+          "size": 25,
+          "url": "https://piston-data.mojang.com/v1/objects/1b82f1b01edc2ab7c23cbe2b86cd8d347936610a/modules"
+        },
+        "lzma": {
+          "sha1": "2c5d37da0143aad22bda5191bb37754fd13cc1cf",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/2c5d37da0143aad22bda5191bb37754fd13cc1cf/modules"
+        }
+      }
+    },
+    "release": {
+      "type": "file",
+      "executable": false,
+      "downloads": {
+        "raw": {
+          "sha1": "46fa91860bad7352459782603aa41685f7e409c9",
+          "size": 21,
+          "url": "https://piston-data.mojang.com/v1/objects/46fa91860bad7352459782603aa41685f7e409c9/release"
+        }
+      }
+    }
+  }
+}
