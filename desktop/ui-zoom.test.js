@@ -23,15 +23,46 @@ check('garbage values mean 100%, and no file means Auto', () => {
 
 check('Auto picks a step from the display in device-independent pixels', () => {
   const d = (width, height) => ({ size: { width, height }, scaleFactor: 1 })
-  assert.strictEqual(z.autoStep(d(1920, 1080)), 1)
-  assert.strictEqual(z.autoStep(d(2560, 1440)), 1)
-  assert.strictEqual(z.autoStep(d(3840, 2160)), 1.5)
-  assert.strictEqual(z.autoStep(d(3072, 1728)), 1.25)
-  assert.strictEqual(z.autoStep(d(1366, 768)), 0.9)
+  // [width, height, expected]: each threshold, the pixel either side of it, and the screens people own
+  const table = [
+    [1920, 1080, 1],
+    [1920, 1200, 1],
+    [2399, 1440, 1],
+    [2400, 1350, 1.25],
+    [2560, 1440, 1.25], // QHD at OS 100%
+    [2560, 1080, 1.25], // ultrawide 1080p
+    [2799, 1600, 1.25],
+    [2800, 1575, 1.5],
+    [3072, 1728, 1.5], // 4K at OS 125%
+    [3399, 1912, 1.5],
+    [3400, 1440, 1.75], // ultrawide 1440p
+    [3440, 1440, 1.75],
+    [3840, 2160, 1.75], // 4K at OS 100%
+    [5120, 2880, 1.75],
+    [1366, 768, 0.9],
+    [1280, 720, 0.9],
+    [1440, 799, 0.9],
+    [1440, 800, 1],
+    [1280, 800, 1],
+    [2560, 720, 1.25], // width wins over a short height
+  ]
+  for (const [w, h, want] of table) assert.strictEqual(z.autoStep(d(w, h)), want, w + 'x' + h)
+  // a 4K monitor the OS scales to 150% reports 2560x1440 and is treated as the QHD screen it acts like
+  assert.strictEqual(z.autoStep({ size: { width: 2560, height: 1440 }, scaleFactor: 1.5 }), 1.25)
   assert.strictEqual(z.autoStep(undefined), 1)
-  assert.strictEqual(z.resolve('auto', d(3840, 2160)), 1.5)
+  assert.strictEqual(z.autoStep({ size: { width: 'wide' } }), 1)
+  assert.strictEqual(z.resolve('auto', d(3840, 2160)), 1.75)
+  assert.strictEqual(z.resolve('auto', d(2560, 1440)), 1.25)
   assert.strictEqual(z.resolve(1.25, d(3840, 2160)), 1.25)
   assert.strictEqual(z.resolve('nonsense', d(3840, 2160)), 1)
+})
+
+check('every Auto choice is a step, so Ctrl and + or - moves from it by one', () => {
+  for (const row of z.AUTO_TABLE) assert.ok(z.STEPS.includes(row.zoom), String(row.zoom))
+  const widths = z.AUTO_TABLE.map((r) => r.minWidth)
+  assert.deepStrictEqual(widths, [...widths].sort((a, b) => b - a), 'widest first')
+  assert.strictEqual(z.step(1.75, 1), 2)
+  assert.strictEqual(z.step(1.75, -1), 1.5)
 })
 
 check('an off-step value snaps to the nearest step and the ends hold', () => {
@@ -68,4 +99,4 @@ check('only Ctrl/Cmd zoom keys on key-down are claimed', () => {
 })
 
 fs.rmSync(tmp, { recursive: true, force: true })
-console.log('\n  ' + pass + '/5 passed')
+console.log('\n  ' + pass + '/6 passed')

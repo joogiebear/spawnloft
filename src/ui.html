@@ -1203,7 +1203,9 @@
   /*
     One thing at a time: the console, or the tool that took its place. While a tool is open the
     console is one line along the bottom rather than gone - its newest line and its error count
-    stay in view. From 2000px there is room for both, and the console keeps a column on the right.
+    stay in view. From 1600px there is room for both, and the console keeps a column on the right:
+    a 1440p screen at the desktop app's Auto size (125%) is about 2050px wide, a 4K one at 175% about
+    2190px, and both show the console beside the tool.
   */
   .work {
     position: relative;
@@ -1224,7 +1226,7 @@
     min-width: 0;
     background: var(--surface);
   }
-  @media (min-width: 2000px) {
+  @media (min-width: 1600px) {
     /* The console's share grows with the window: a log line is the one thing in the panel that
        is better for every extra pixel, so a 4K window gives it about 1400px. */
     .work[data-tool] { grid-template-columns: minmax(0, 1fr) clamp(520px, 38%, 1400px); grid-template-rows: minmax(0, 1fr); }
