@@ -150,8 +150,10 @@ test('the panel lists, launches, reports and stops a client profile', async () =
 })
 
 test('the panel shows the Linux arm64 refusal as the launch error', async () => {
-  // currentOs() reads these on every call; the refusal comes before anything else is touched
-  const real = { platform: process.platform, arch: process.arch }
+  // currentOs() reads these on every call; the refusal comes before anything else is touched.
+  // The fake game is launched as if on Linux x64, so this launch goes the real game's way.
+  const real = { platform: process.platform, arch: process.arch, fake: process.env.MCCTL_FAKE_CLIENT }
+  delete process.env.MCCTL_FAKE_CLIENT
   Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
   Object.defineProperty(process, 'arch', { value: 'arm64', configurable: true })
   let res
@@ -160,6 +162,7 @@ test('the panel shows the Linux arm64 refusal as the launch error', async () => 
   } finally {
     Object.defineProperty(process, 'platform', { value: real.platform, configurable: true })
     Object.defineProperty(process, 'arch', { value: real.arch, configurable: true })
+    process.env.MCCTL_FAKE_CLIENT = real.fake
   }
   assert.equal(res.status, 400)
   assert.deepEqual(await res.json(), { error: 'the Minecraft client has no Linux arm64 build; use bots on this machine' })

@@ -192,7 +192,7 @@ export async function launch(name, opts = {}) {
 
 // `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
 // Microsoft account is then allowed only on a profile whose assistantAccount key says so.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false, os = currentOs() }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, fakeJava = null, assistant = false, os = launchOs(fakeJava) }) {
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
@@ -257,6 +257,13 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
+}
+
+// The fake game is a Node script, so it runs where Mojang's client cannot (the Linux arm64 CI
+// runner); there it is launched as if on Linux x64 instead of being refused.
+function launchOs(fakeJava) {
+  const os = currentOs()
+  return fakeJava && platformRefusal(null, os) ? { ...os, name: 'linux', arch: 'x64' } : os
 }
 
 // The game opens either way; these say why it will stop at "Connection refused" or a kick
