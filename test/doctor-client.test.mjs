@@ -15,6 +15,8 @@ process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 const client = await import('../src/client.mjs')
 const { profileDir, versionDir, versionJson, versionJar } = await import('../src/client-paths.mjs')
 const { checkClientProfiles } = await import('../src/doctor-client.mjs')
+const { platformKey } = await import('../src/client-java.mjs')
+const { currentOs } = await import('../src/client-meta.mjs')
 const { runDoctor } = await import('../src/doctor.mjs')
 
 const mc = '1.21.11'
@@ -51,11 +53,15 @@ test('a Java too old for the profile is a note: the launch downloads Mojang\'s (
   client.createProfile('v', { mc, loader: 'vanilla' })
   try {
     const r1 = checkClientProfiles({ javas: [{ path: 'java', major: 17, version: '17.0.2' }] })
-    assert.equal(r1.problems.length, 0)
-    const note = r1.notes.find((n) => /Java 21/.test(n))
-    assert.match(note, /client v:/)
-    assert.match(note, /first launch downloads Mojang's/)
-    assert.match(note, /adoptium/)
+    // where Mojang publishes no runtime (Linux arm64) it stays a problem (V2 review N-6)
+    const host = currentOs()
+    const downloads = platformKey(host.name, host.arch) !== null
+    assert.equal(r1.problems.length, downloads ? 0 : 1)
+    const line = downloads ? r1.notes.find((n) => /Java 21/.test(n)) : r1.problems[0]
+    assert.match(line, /client v:/)
+    assert.match(line, /Java 21/)
+    if (downloads) assert.match(line, /first launch downloads Mojang's/)
+    assert.match(line, /adoptium/)
 
     const r2 = checkClientProfiles({ javas: javas21 })
     assert.equal(r2.problems.length, 0)
