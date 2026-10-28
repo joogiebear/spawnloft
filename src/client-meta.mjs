@@ -176,7 +176,10 @@ export function libraries(version, { os = currentOs() } = {}) {
       continue
     }
 
-    rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
+    // Before 1.13 the natives rows (lwjgl-platform, jinput-platform, twitch-platform) carry
+    // classifiers only: there is no plain jar of them to put on the classpath, and the URL
+    // libraryPath would make up for one is a 404.
+    if (!dl || dl.artifact) rows.push({ name: lib.name, path: p, url: u, sha1: s1, size: sz, native: false })
 
     const nativesKey = lib.natives?.[os.name]
     if (nativesKey) {

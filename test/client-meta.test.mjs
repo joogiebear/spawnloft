@@ -321,3 +321,75 @@ test('log4jNoLookupsNeeded: log4j-core 2.0-beta9, 2.8.1 and 2.14.1 need the swit
   assert.equal(log4jNoLookupsNeeded(core('2.17.0')), false)
   assert.equal(log4jNoLookupsNeeded(core('3.0.0')), false)
 })
+
+const ERA_OS = {
+  windows: { name: 'windows', arch: 'x64', version: '10' },
+  linux: { name: 'linux', arch: 'x64', version: '6' },
+  osx: { name: 'osx', arch: 'x64', version: '24.0' },
+}
+
+test('libraries(): before 1.13 the natives-only rows (lwjgl-platform, jinput-platform, twitch) are extracted, never put on the classpath', () => {
+  const expectedNatives = {
+    '1.5.2': {
+      windows: ['lwjgl-platform:2.9.0:natives-windows', 'jinput-platform:2.0.5:natives-windows'],
+      linux: ['lwjgl-platform:2.9.0:natives-linux', 'jinput-platform:2.0.5:natives-linux'],
+      osx: ['lwjgl-platform:2.9.0:natives-osx', 'jinput-platform:2.0.5:natives-osx'],
+    },
+    '1.7.10': {
+      windows: ['lwjgl-platform:2.9.1:natives-windows', 'jinput-platform:2.0.5:natives-windows', 'twitch-platform:5.16:natives-windows-64', 'twitch-external-platform:4.5:natives-windows-64'],
+      linux: ['lwjgl-platform:2.9.1:natives-linux', 'jinput-platform:2.0.5:natives-linux'],
+      osx: ['lwjgl-platform:2.9.1:natives-osx', 'jinput-platform:2.0.5:natives-osx', 'twitch-platform:5.16:natives-osx'],
+    },
+    '1.12.2': {
+      windows: ['lwjgl-platform:2.9.4-nightly-20150209:natives-windows', 'jinput-platform:2.0.5:natives-windows', 'text2speech:1.10.3:natives-windows'],
+      linux: ['lwjgl-platform:2.9.4-nightly-20150209:natives-linux', 'jinput-platform:2.0.5:natives-linux', 'text2speech:1.10.3:natives-linux'],
+      osx: ['lwjgl-platform:2.9.2-nightly-20140822:natives-osx', 'jinput-platform:2.0.5:natives-osx', 'java-objc-bridge:1.0.0:natives-osx'],
+    },
+  }
+  for (const [id, perOs] of Object.entries(expectedNatives)) {
+    const version = era(id)
+    const artifactUrls = new Set()
+    const classifierUrls = new Set()
+    for (const lib of version.libraries) {
+      if (lib.downloads?.artifact) artifactUrls.add(lib.downloads.artifact.url)
+      for (const c of Object.values(lib.downloads?.classifiers ?? {})) classifierUrls.add(c.url)
+    }
+    for (const [osName, os] of Object.entries(ERA_OS)) {
+      const rows = libraries(version, { os })
+      const label = `${id} on ${osName}`
+      for (const row of rows.filter(r => r.native === false)) {
+        assert.ok(artifactUrls.has(row.url), `${label}: classpath row ${row.name} has the JSON's artifact URL, not ${row.url}`)
+        assert.ok(row.sha1, `${label}: classpath row ${row.name} is hash-checked`)
+      }
+      for (const row of rows.filter(r => r.native !== false)) {
+        assert.ok(classifierUrls.has(row.url), `${label}: natives row ${row.name} has the JSON's classifier URL`)
+      }
+      // one natives jar per row; 1.5.2 lists jinput-platform twice and both rows are kept, as before
+      const natives = rows.filter(r => r.native !== false).map(r => r.name.split(':').slice(1).join(':'))
+      assert.deepEqual([...new Set(natives)], perOs[osName], label)
+      assert.ok(rows.filter(r => r.native === false).length >= 7, `${label}: the real jars are still on the classpath`)
+    }
+  }
+})
+
+test('libraries(): a row with downloads but no artifact and no natives for this OS is left out altogether', () => {
+  // twitch-external-platform has Windows natives only; its rules allow Linux
+  const version = era('1.7.10')
+  const linux = libraries(version, { os: ERA_OS.linux }).map(r => r.name)
+  assert.ok(!linux.some(n => n.includes('twitch-platform') || n.includes('twitch-external')), `no twitch natives row on Linux: ${linux.filter(n => n.includes('twitch'))}`)
+  assert.ok(linux.includes('tv.twitch:twitch:5.16'), 'the plain twitch jar stays')
+  // a legacy row with no downloads block at all (a loader profile's) still gets its Maven URL
+  const legacy = libraries({ libraries: [{ name: 'net.fabricmc:fabric-loader:0.16.0', url: 'https://maven.fabricmc.net/' }] }, { os: ERA_OS.linux })
+  assert.deepEqual(legacy.map(r => r.url), ['https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.16.0/fabric-loader-0.16.0.jar'])
+})
+
+test('libraries(): 1.13+ rows that carry both an artifact and natives keep the jar on the classpath (1.17.1, 1.21.11 unchanged)', () => {
+  const v17 = era('1.17.1')
+  const rows = libraries(v17, { os: ERA_OS.windows })
+  // 1.17.1 lists org.lwjgl:lwjgl:3.2.2 twice: a plain row and one with an artifact plus natives
+  const lwjgl = rows.filter(r => r.name.startsWith('org.lwjgl:lwjgl:3.2.2'))
+  assert.deepEqual([...new Set(lwjgl.map(r => `${r.name} ${r.native !== false}`))], ['org.lwjgl:lwjgl:3.2.2 false', 'org.lwjgl:lwjgl:3.2.2:natives-windows true'])
+  for (const row of rows) assert.ok(row.url.startsWith('https://libraries.minecraft.net/') && row.sha1, row.name)
+  const latest = libraries(versionFixture, { os: ERA_OS.windows })
+  assert.equal(latest.filter(r => r.native === false).length, versionFixture.libraries.filter(l => ruleAllows(l.rules, { os: ERA_OS.windows }) && !l.name.includes(':natives-')).length)
+})

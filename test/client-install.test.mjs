@@ -253,3 +253,36 @@ test('a log config that cannot be fetched refuses the version instead of leaving
   assert.ok(!calls.some(u => u.includes('/org/')), 'no library was fetched before the refusal')
   assert.equal(fs.existsSync(logConfigPath('client-1.12.xml')), false)
 })
+
+test('1.7.10 installs: every download is a URL the JSON names, and the natives-only jars are extracted', async () => {
+  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, '1.7.10.json'), 'utf8'))
+  const named = new Set([old.downloads.client.url, old.logging.client.file.url, old.assetIndex.url])
+  for (const lib of old.libraries) {
+    if (lib.downloads?.artifact) { lib.downloads.artifact.sha1 = bodySha; lib.downloads.artifact.size = bodySize; named.add(lib.downloads.artifact.url) }
+    for (const cls of Object.values(lib.downloads?.classifiers ?? {})) { cls.sha1 = bodySha; cls.size = bodySize; named.add(cls.url) }
+  }
+  old.downloads.client.sha1 = bodySha
+  old.downloads.client.size = bodySize
+  old.logging.client.file.sha1 = bodySha
+  old.logging.client.file.size = bodySize
+  old.assetIndex.sha1 = indexSha
+  old.assetIndex.size = indexSize
+  fs.mkdirSync(versionDir(old.id), { recursive: true })
+  fs.writeFileSync(versionJson(old.id), JSON.stringify(old))
+
+  const calls = []
+  const fetchImpl = async (url, dest) => {
+    calls.push(url)
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, url === old.assetIndex.url ? INDEX : BODY)
+  }
+  const result = await ensureVersion(old.id, { os: winOs, fetchImpl })
+  const unnamed = calls.filter(u => !named.has(u))
+  assert.deepEqual(unnamed, [], 'no made-up URL was fetched')
+  assert.ok(!calls.some(u => u.endsWith('/lwjgl-platform-2.9.1.jar')), 'no plain lwjgl-platform jar')
+  assert.ok(calls.some(u => u.endsWith('/lwjgl-platform-2.9.1-natives-windows.jar')), 'the Windows natives jar')
+  assert.ok(calls.some(u => u.endsWith('/twitch-platform-5.16-natives-windows-64.jar')), 'the ${arch} natives key is resolved')
+  assert.equal(result.natives, 4)
+  assert.equal(result.logConfig, 'client-1.7.xml')
+  assert.ok(fs.existsSync(path.join(nativesDir(old.id), '.complete')), 'natives extracted')
+})
