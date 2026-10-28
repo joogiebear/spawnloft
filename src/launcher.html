@@ -1589,7 +1589,10 @@
   // coming, so the sign-in is cancelled. Once it says "finishing" the panel has Microsoft's code
   // and a DELETE would throw the account away, so closing the window then changes nothing.
   function windowClosed(login) {
-    if (S.login === login && login.status === 'pending') cancelLogin(login)
+    if (S.login !== login || login.status !== 'pending') return
+    // not a Cancel press: the notice says the window closed, not that the person cancelled
+    login.closedEarly = true
+    cancelLogin(login)
   }
 
   async function openMicrosoft(login) {
@@ -1637,6 +1640,8 @@
     if (S.login === login) S.login = null
     if (ev.status === 'done') {
       S.acctNotice = { tone: 'live', title: `Signed in as ${ev.account?.name ?? 'your account'}`, signedIn: ev.account?.uuid ?? null }
+    } else if (ev.status === 'cancelled' && login.closedEarly) {
+      S.acctNotice = { tone: 'warn', title: 'The sign-in window closed before the sign-in finished', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Try again' }
     } else if (ev.status === 'cancelled') {
       S.acctNotice = { tone: '', title: 'Sign-in cancelled', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Add Microsoft account' }
     } else {

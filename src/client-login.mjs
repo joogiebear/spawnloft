@@ -10,8 +10,10 @@ import { UserError } from './util.mjs'
 // outcome goes to accounts.json and to the listening stream as a name and a uuid.
 //
 // Lifetimes: a record nobody listens to is dropped after ORPHAN_MS (the launcher opens its
-// stream before it opens Microsoft's page, so a live sign-in always has a listener); every record
-// is dropped EXPIRY_MS after it was made. A new sign-in replaces an orphaned one and is refused
+// stream before it opens Microsoft's page, so a live sign-in always has a listener), except once
+// the callback has consumed it: from then on the chain is finishing a sign-in the person
+// completed, and a launcher window closed meanwhile must not throw it away. Every record is
+// dropped EXPIRY_MS after it was made. A new sign-in replaces an orphaned one and is refused
 // (409) while the old one's stream is still open. The callback consumes the state at the first
 // request and answers at once; the token exchange and the Xbox chain run afterwards, and only the
 // stream hears how they ended, so a replayed callback is a 400 from that moment on.
@@ -110,7 +112,8 @@ export function listenLogin(loginId, send) {
   send(record.last)
   return () => {
     record.listeners.delete(send)
-    if (record.listeners.size === 0 && records.has(record.id)) armOrphanTimer(record)
+    // a consumed record outlives its listeners: the account is saved whether or not anyone hears it
+    if (record.listeners.size === 0 && !record.consumed && records.has(record.id)) armOrphanTimer(record)
   }
 }
 
@@ -165,8 +168,8 @@ async function finish(record, code) {
     drop(record, { status: 'failed', message })
     return
   }
-  // Cancelled or expired while Microsoft was slow: the stream has already said so, and the
-  // person pressed Cancel, so the account is not kept.
+  // Cancelled, expired or replaced while Microsoft was slow: the stream has already said so (or
+  // the person pressed Cancel), so the account is not kept.
   if (!records.has(record.id)) {
     hooks.log('sign-in finished after it was cancelled; the account was not saved')
     return

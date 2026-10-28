@@ -403,6 +403,38 @@ test('a cancel while Microsoft is still answering keeps the account out of the f
   assert.ok(!log.includes('signed in LateComer'))
 })
 
+test('a launcher closed after the callback does not lose the sign-in: a consumed record outlives its stream', async () => {
+  let release
+  const held = new Promise((r) => { release = r })
+  scriptedFetch([
+    async () => { await held; return { status: 200, json: tokenReply } },
+    { status: 200, json: xblReply },
+    { status: 200, json: xstsReply },
+    { status: 200, json: mcLoginReply },
+    { status: 200, json: { ...profileReply, id: 'e'.repeat(32), name: 'Patient' } },
+  ])
+  const { loginId, authorizeUrl } = await (await post('accounts/login')).json()
+  const stream = await openStream(loginId)
+  await stream.first
+  assert.equal((await callback({ code: 'c', state: stateOf(authorizeUrl) })).status, 200)
+  // the window closes while the chain is still waiting on Microsoft: the orphan rule must not apply
+  await stream.close()
+  await new Promise((r) => setTimeout(r, 30))
+  advance(login.ORPHAN_MS + 1_000)
+  assert.equal(login.liveLoginCount(), 1, 'a consumed sign-in is kept without a listener')
+  release()
+  let saved = false
+  for (let i = 0; i < 100 && !saved; i++) {
+    saved = auth.loadAccounts().some((a) => a.name === 'Patient')
+    if (!saved) await new Promise((r) => setTimeout(r, 20))
+  }
+  assert.ok(saved, 'the account was saved although nobody was listening')
+  assert.equal(login.liveLoginCount(), 0)
+  // a stream opened after the fact finds nothing (the outcome is in the accounts list)
+  assert.equal((await fetch(url + `api/client/accounts/login/${loginId}/stream`, { headers: { origin: origin() } })).status, 404)
+  await api('accounts/' + 'e'.repeat(32), { method: 'DELETE' })
+})
+
 test('a second sign-in is refused while the first has a listener, and replaces an orphan', async () => {
   const first = await (await post('accounts/login')).json()
   const stream = await openStream(first.loginId)

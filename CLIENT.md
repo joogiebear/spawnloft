@@ -139,8 +139,9 @@ is a job: the page posts it with a job id, opens `/api/jobs/<id>/stream` and sho
 and start-up lines, which end in `running` or an `error`. `GET /api/client/launcher` is the one
 read the page polls (profiles with their running state, accounts, the default account, the
 servers a profile can join, and a refusal when the machine cannot run the client). The log tail is
-redacted like a diagnostics bundle, so the harness token and signed-in names never reach the page.
-No route returns a token.
+scrubbed of the harness token, the game's access token and every secret the registry or the
+accounts file holds (it keeps player names: the page is the account owner's own; only the
+diagnostics bundle hides them). No route returns a token.
 
 ### Opening it
 
@@ -237,7 +238,9 @@ How it runs, in the panel process (`src/client-login.mjs`):
 `DELETE /api/client/accounts/login/<loginId>` cancels (the stream ends with `cancelled`). One
 sign-in runs at a time: a second `POST` is a 409 while the first still has an open stream, and
 replaces it when nobody is listening. A record whose stream has been gone for 10 seconds is
-dropped, and every record expires 10 minutes after it was made. The callback is the one route a
+dropped, unless the callback has already consumed it (the chain then finishes and saves the
+account even if the launcher window was closed meanwhile), and every record expires 10 minutes
+after it was made. The callback is the one route a
 page cannot reach by itself (it has no Origin header, being a top-level navigation), and it is
 useless without the state that exists only in the panel's memory. Nothing from the callback (the
 code, the state, Microsoft's error text) is written to `panel.log`; the log line is "signed in
