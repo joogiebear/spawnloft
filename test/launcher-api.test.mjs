@@ -17,6 +17,7 @@ const client = await import('../src/client.mjs')
 const clientPaths = await import('../src/client-paths.mjs')
 const { saveAccounts } = await import('../src/client-auth.mjs')
 const { acquireLock } = await import('../src/util.mjs')
+const { platformRefusal } = await import('../src/client-meta.mjs')
 
 const fixtures = path.resolve(process.cwd(), 'test', 'fixtures', 'client')
 const manifest = JSON.parse(fs.readFileSync(path.join(fixtures, 'version_manifest_v2.json'), 'utf8'))
@@ -143,7 +144,7 @@ test('the version picker reads the shared cache and drops ids a launch would ref
   fs.truncateSync(clientPaths.versionJar(mc), json.downloads.client.size)
   out = await (await call('client/versions')).json()
   const [row, newer] = out.versions
-  assert.deepEqual(row, { id: '1.21.11', type: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, harness: true, refusal: null, note: null })
+  assert.deepEqual(row, { id: '1.21.11', type: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, harness: true, refusal: platformRefusal(json), note: null })
   assert.equal(newer.downloaded, false)
   assert.equal(newer.javaNeeds, 25)
   assert.equal(newer.harness, false)
