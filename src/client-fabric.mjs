@@ -13,7 +13,7 @@ export const META_URL = 'https://meta.fabricmc.net/v2'
 // The game id goes into Fabric's URLs percent-encoded: Mojang's ids carry spaces
 // ("1.14.2 Pre-Release 4"), which Fabric builds for too (plan S4).
 function gameId(mc) {
-  if (!isSafeVersionId(mc)) fail(`Minecraft version "${String(mc).slice(0, 64)}" is not a valid version`)
+  if (!isSafeVersionId(mc)) fail(`Minecraft version ${JSON.stringify(String(mc).slice(0, 64))} is not a valid version`)
   return mc
 }
 
@@ -30,18 +30,23 @@ export function fabricAvailable(mc, list) {
 }
 
 // Refuses a Minecraft version Fabric does not build for (everything before 1.14, and a snapshot
-// Fabric has not caught up with), before anything downloads. A list that cannot be read decides
-// nothing: the loader lookup that follows says what is wrong.
-export async function assertFabricAvailable(mc, opts = {}) {
+// Fabric has not caught up with), before anything downloads. An id the cached list lacks asks
+// Fabric once more, as a new snapshot may be minutes old (review V1b S-4). A list that cannot be
+// read decides nothing: the loader lookup that follows says what is wrong. kind is the picker's
+// (versionKind): a release Fabric lacks is old, anything else is new.
+export async function assertFabricAvailable(mc, { kind = 'release', ...opts } = {}) {
   let list
   try {
     list = await fabricGameVersions(opts)
+    if (!fabricAvailable(mc, list)) list = await fabricGameVersions({ ...opts, force: true })
   } catch {
     return
   }
-  if (!fabricAvailable(mc, list)) {
+  if (fabricAvailable(mc, list)) return
+  if (['release', 'beta', 'alpha'].includes(kind)) {
     fail(`Fabric has no build for Minecraft ${mc}; use Vanilla for it, or a version Fabric supports`, 'fabric-not-available')
   }
+  fail(`Fabric has no loader for Minecraft ${mc} yet; Fabric usually follows a new ${kind} within a day, or use Vanilla for it`, 'fabric-not-available')
 }
 
 export async function loaderVersions(mc, { fetchImpl = fetchJson } = {}) {

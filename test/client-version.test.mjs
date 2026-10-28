@@ -16,6 +16,10 @@ const { launch, createProfile } = await import('../src/client.mjs')
 const { versionDir, versionJson } = await import('../src/client-paths.mjs')
 const { platformRefusal } = await import('../src/client-meta.mjs')
 
+// Before the first test(): a top-level await between tests lets the ones above it finish and the
+// file's after() remove scratch before the ones below it run (review V1b S-1).
+const realJava = await import('../src/java.mjs').then((m) => m.probe('java'))
+
 const pair = (name, arch) => F.OS_PAIRS.find((o) => o.name === name && o.arch === arch)
 const codes = (r) => r.problems.map((p) => p.code)
 
@@ -238,7 +242,7 @@ test('Java: the refusals name the Java the version needs; a newer one runs with 
   assert.deepEqual(await pickClientJava({ requirement: req, found: javas([25], [21]) }), { path: '/jvm/25-x64/bin/java', warning: null })
 })
 
-test('Java: probe() reports the arch of a real Java', { skip: !(await import('../src/java.mjs').then((m) => m.probe('java'))).found && 'no Java on PATH' }, async () => {
+test('Java: probe() reports the arch of a real Java', { skip: !realJava.found && 'no Java on PATH' }, async () => {
   const { probe } = await import('../src/java.mjs')
   const state = await probe('java')
   assert.ok(['x64', 'arm64', 'x86'].includes(state.arch), `arch ${state.arch}`)

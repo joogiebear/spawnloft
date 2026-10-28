@@ -137,3 +137,42 @@ test('describeVersion answers what a launch would decide, from the version\'s ow
   const arm = await client.describeVersion('1.20.4', { os: { name: 'linux', arch: 'arm64', version: '6' }, fetchImpl: noNetwork })
   assert.equal(arm.code, 'no-natives-for-this-machine')
 })
+
+test('offline, a stale list goes to the network once a minute, forced or not (review V1b S-2)', async () => {
+  const { fetchManifest } = await import('../src/client-meta.mjs')
+  const cacheDir = fs.mkdtempSync(path.join(scratch, 'stale-cache-'))
+  fs.writeFileSync(path.join(cacheDir, 'version_manifest_v2.json'), JSON.stringify(eras))
+  fs.writeFileSync(path.join(cacheDir, 'version_manifest_v2.json.fetched-at'), String(Date.now() - 2 * 3600000))
+  let tries = 0
+  const down = async () => { tries++; throw new Error('getaddrinfo ENOTFOUND') }
+  assert.deepEqual(await fetchManifest({ cacheDir, fetchImpl: down }), eras, 'the stale copy answers')
+  assert.equal(tries, 1)
+  // what assertVersionId does for an id the list lacks, and the picker's next load
+  assert.deepEqual(await fetchManifest({ cacheDir, force: true, fetchImpl: down }), eras)
+  assert.deepEqual(await fetchManifest({ cacheDir, fetchImpl: down }), eras)
+  assert.equal(tries, 1, 'not again within the minute')
+})
+
+test('a snapshot Fabric added within the hour is found by asking Fabric once more (review V1b S-4)', async () => {
+  seed('version_manifest_v2.json', eras)
+  // a cache folder of its own: the tests above tried the network for the shared one this minute
+  const cacheDir = fs.mkdtempSync(path.join(scratch, 'fabric-cache-'))
+  fs.writeFileSync(path.join(cacheDir, 'fabric-game-versions.json'), JSON.stringify(fabricList))
+  fs.writeFileSync(path.join(cacheDir, 'fabric-game-versions.json.fetched-at'), String(Date.now() - 2 * 60000))
+  let asked = 0
+  const withNew = async () => { asked++; return [{ version: '26.4-snapshot-7', stable: false }, ...fabricList] }
+  await assertFabricAvailable('26.4-snapshot-7', { kind: 'snapshot', cacheDir, fetchImpl: withNew })
+  assert.equal(asked, 1)
+  // a snapshot Fabric has not caught up with is worded as one
+  await assert.rejects(assertFabricAvailable('26.4-snapshot-8', { kind: 'snapshot', cacheDir, fetchImpl: noNetwork }), {
+    code: 'fabric-not-available',
+    message: 'Fabric has no loader for Minecraft 26.4-snapshot-8 yet; Fabric usually follows a new snapshot within a day, or use Vanilla for it',
+  })
+})
+
+test('a downloaded version is taken offline only under its own id, whatever the disk\'s case rules (review V1b N-1)', async () => {
+  fs.rmSync(path.join(CLIENT_CACHE_DIR, 'version_manifest_v2.json'), { force: true })
+  fs.mkdirSync(versionDir('B1.7.3'), { recursive: true })
+  fs.writeFileSync(versionJson('B1.7.3'), JSON.stringify({ ...F.loadVersion('b1.7.3') }))
+  await assert.rejects(client.assertVersionId('B1.7.3', { fetchImpl: noNetwork }), /not available offline/)
+})

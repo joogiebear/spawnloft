@@ -30,3 +30,7 @@
 
 `../client-fixtures.mjs` loads all of these and lists the seven OS/arch pairs. It imports the
 client code, so a test sets `MCCTL_DATA_ROOT` before it imports the loader.
+
+A test file that removes its scratch folder in `after()` does every top-level `await` before its
+first `test()`: an await between tests lets the tests above it finish, and `after()` runs, before
+the tests below it are registered, which then run against a folder that is gone.

@@ -26,7 +26,7 @@ const RUNNING_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harnes
 function validateMc(mc) {
   if (typeof mc !== 'string') fail('the Minecraft version must be text, like 26.3')
   if (!isSafeVersionId(mc)) {
-    fail(`invalid Minecraft version "${mc.slice(0, 64)}" - versions look like 26.3, 26.4-snapshot-6 or b1.7.3`)
+    fail(`invalid Minecraft version ${JSON.stringify(mc.slice(0, 64))} - versions look like 26.3, 26.4-snapshot-6 or b1.7.3`)
   }
 }
 
@@ -258,7 +258,8 @@ export async function assertVersionId(typed, { fetchImpl } = {}) {
   validateMc(mc)
   // a vanilla version on disk, not a loader profile's id
   const onDisk = readJson(versionJson(mc), null)
-  if (onDisk && !onDisk.inheritsFrom) return { mc, manifest: null }
+  // its own id too: on a case-insensitive disk B1.7.3 would find b1.7.3's file (review V1b N-1)
+  if (onDisk && !onDisk.inheritsFrom && onDisk.id === mc) return { mc, manifest: null, type: onDisk.type ?? 'release' }
   const opts = { cacheDir: CLIENT_CACHE_DIR, ...(fetchImpl ? { fetchImpl } : {}) }
   let manifest
   try {
@@ -269,7 +270,7 @@ export async function assertVersionId(typed, { fetchImpl } = {}) {
   const listed = (m) => (m.versions ?? []).some((v) => v.id === mc)
   if (!listed(manifest)) manifest = await fetchManifest({ ...opts, force: true })
   if (!listed(manifest)) fail(`Mojang's version list has no "${mc}"; check the id (releases look like 26.3, snapshots like 26.4-snapshot-6, old versions like b1.7.3)${nearIds(mc, manifest)}`, 'unknown-version')
-  return { mc, manifest }
+  return { mc, manifest, type: manifest.versions.find((v) => v.id === mc).type }
 }
 
 // Up to five listed ids that start like the typed one, ignoring case, newest first.
@@ -287,7 +288,7 @@ function nearIds(mc, manifest) {
 // What a profile's save checks beyond the shape: the version exists, and Fabric builds for it.
 export async function checkProfileVersion({ mc, loader = 'vanilla' }, { fetchImpl } = {}) {
   const known = await assertVersionId(mc, { fetchImpl })
-  if (loader === 'fabric') await assertFabricAvailable(known.mc)
+  if (loader === 'fabric') await assertFabricAvailable(known.mc, { kind: versionKind({ id: known.mc, type: known.type }) })
   return known.mc
 }
 
@@ -303,7 +304,8 @@ export async function prepareVersion(name, { onStage = () => {} } = {}) {
     let loaderVersion = profile.loaderVersion
     // a loader profile already on disk was made for this version, so Fabric has it
     if (loaderVersion === null || !fs.existsSync(versionJson(fabricVersionId(profile.mc, loaderVersion)))) {
-      await assertFabricAvailable(profile.mc)
+      const type = readJson(versionJson(profile.mc), null)?.type ?? 'release'
+      await assertFabricAvailable(profile.mc, { kind: versionKind({ id: profile.mc, type }) })
     }
     if (loaderVersion === null) {
       onStage({ stage: 'fabric', message: `Finding a Fabric loader for Minecraft ${profile.mc}` })
@@ -543,17 +545,20 @@ function launchFacts(resolved, picked, profile, installed) {
 
 // Whether this machine runs x64 code, for the versions with no arm64 natives (everything before
 // 1.19): Apple Silicon with Rosetta installed, Windows 11 on arm64 (build 22000 on). Linux arm64
-// cannot. A Mac's answer is kept only once it is yes, so a Rosetta installed after a refusal is
-// seen on the next launch without a restart (review R6).
+// cannot. A Mac's yes is kept; a no for half a minute only, so a Rosetta installed after a
+// refusal is seen on the next launch without a restart (review R6), while the picker asking for
+// every old version it shows does not start a process each time (review V1b N-2).
 let rosettaSeen = false
+let rosettaNoUntil = 0
 export async function hostCapabilities(os = currentOs()) {
   if (os.arch !== 'arm64') return { x64: os.arch === 'x64' }
   if (os.name === 'windows') return { x64: Number(String(os.version).split('.')[2]) >= 22000 }
   if (os.name !== 'osx') return { x64: false }
-  if (!rosettaSeen) {
+  if (!rosettaSeen && Date.now() >= rosettaNoUntil) {
     rosettaSeen = await new Promise((resolve) => {
       execFile('/usr/bin/arch', ['-x86_64', '/usr/bin/true'], { timeout: 10000 }, (err) => resolve(!err))
     })
+    if (!rosettaSeen) rosettaNoUntil = Date.now() + 30000
   }
   return { x64: rosettaSeen }
 }
@@ -862,15 +867,13 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
   const hostCaps = needsCaps ? await hostCapabilities(os) : null
   let manifest = null
   let offline = null
-  try {
-    manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) })
-  } catch (err) {
-    offline = `the Minecraft version list could not be read (${err?.message ?? err}), so only downloaded versions are listed`
-  }
-  let fabricList = null
-  if (fabric || refresh) {
-    try { fabricList = await fabricGameVersions({ force: refresh }) } catch { /* unknown: null per row */ }
-  }
+  // the two lists side by side: each fetch may take its full timeout on a slow network
+  const [mojang, fabricList] = await Promise.all([
+    fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) }).then((m) => ({ m }), (err) => ({ err })),
+    fabric || refresh ? fabricGameVersions({ force: refresh }).catch(() => null) : null,
+  ])
+  if (mojang.err) offline = `the Minecraft version list could not be read (${mojang.err?.message ?? mojang.err}), so only downloaded versions are listed`
+  else manifest = mojang.m
   const source = manifest
     ? manifest.versions.filter((v) => isSafeVersionId(v.id))
     : [...installed.entries()].map(([id, { json }]) => ({ id, type: json.type ?? 'release', releaseTime: json.releaseTime ?? null }))

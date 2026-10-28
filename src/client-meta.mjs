@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 
 import { fetchJson, downloadFile } from './download.mjs'
 import { versionJson, versionDir } from './client-paths.mjs'
-import { fail, safeRelativePath } from './util.mjs'
+import { fail, safeRelativePath, renameOver } from './util.mjs'
 
 export const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
 export const RESOURCES_URL = 'https://resources.download.minecraft.net'
@@ -448,10 +448,28 @@ function flattenArgs(args, ctx) {
   return out
 }
 
+// When this process last went to the network for each cached list, whatever came of it: offline,
+// another fetch within the minute (forced, or of a list past its hour) would only wait for the
+// same timeout again, so the copy on disk answers.
+const lastTried = new Map()
+
+// Written beside the file and renamed over it, so a reader never sees half a list (review V1b S-3).
+function writeAtomic(file, text) {
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+  fs.writeFileSync(tmp, text)
+  try {
+    renameOver(tmp, file)
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+}
+
 // A small JSON list kept in the cache folder with the time it was fetched: used while younger
 // than maxAgeMs, fetched again after; a failed fetch falls back to the stale copy, since a stale
-// list is better than none. force fetches now, unless the copy is younger than minAgeMs (so a
-// stream of mistyped ids asks the server once a minute at most).
+// list is better than none. force fetches now, unless the copy is younger than minAgeMs or the
+// network was tried that recently (so a stream of mistyped ids asks the server once a minute at
+// most, online or not).
 export async function cachedJson(file, url, { cacheDir, label, maxAgeMs = 3600000, minAgeMs = 60000, force = false, fetchImpl = fetchJson }) {
   const dest = path.join(cacheDir, file)
   const fetchedAtPath = `${dest}.fetched-at`
@@ -461,16 +479,18 @@ export async function cachedJson(file, url, { cacheDir, label, maxAgeMs = 360000
     const fetchedAt = Number(fs.readFileSync(fetchedAtPath, 'utf8'))
     const age = Date.now() - fetchedAt
     if (!Number.isNaN(fetchedAt) && age < (force ? minAgeMs : maxAgeMs)) return cached
+    if (Date.now() - (lastTried.get(dest) ?? -Infinity) < minAgeMs) return cached
   } catch (err) {
     // A missing or corrupt cache file both mean "no usable cache yet".
     if (err.code !== 'ENOENT' && !(err instanceof SyntaxError)) throw err
   }
 
   try {
+    lastTried.set(dest, Date.now())
     const body = await fetchImpl(url, { label })
     fs.mkdirSync(cacheDir, { recursive: true })
-    fs.writeFileSync(dest, JSON.stringify(body))
-    fs.writeFileSync(fetchedAtPath, String(Date.now()))
+    writeAtomic(dest, JSON.stringify(body))
+    writeAtomic(fetchedAtPath, String(Date.now()))
     return body
   } catch (err) {
     try {

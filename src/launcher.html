@@ -1582,6 +1582,8 @@
   // version out within the hour
   async function loadVersions({ refresh = false } = {}) {
     S.versions = { loading: true }
+    // what a version's details said may be older than the lists now read
+    if (refresh) S.details = {}
     try {
       S.versions = await (refresh ? api('client/versions/refresh', { method: 'POST' }) : api('client/versions?fabric=1'))
     } catch (err) {
@@ -1683,10 +1685,11 @@
       versionField = ro('Version', f.mc, runningHint)
     } else {
       const rows = v?.versions ? versionRows(v.versions, S.versionShow) : []
+      const latest = rows.find((r) => r.type === 'release')
       const options = rows.map((r) => h('option', {
         value: r.id,
         disabled: Boolean(r.refusal || machine),
-        text: `${r.id}${r === rows[0] && r.type === 'release' ? ' (latest release)' : r.type !== 'release' ? ` (${kindLabel(r)})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
+        text: `${r.id}${r === latest ? ' (latest release)' : r.type !== 'release' ? ` (${kindLabel(r)})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
       }))
       if (f.mc && !rows.some((r) => r.id === f.mc)) options.unshift(h('option', { value: f.mc, text: f.mc }))
       if (!options.length) options.push(h('option', { value: '', text: v?.loading ? 'Loading versions…' : 'No versions to pick' }))
