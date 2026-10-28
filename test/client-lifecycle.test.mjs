@@ -299,7 +299,7 @@ test('an older asset layout is laid out by launch and handed to the game (V1c re
       assert.equal(fs.readFileSync(path.join(tree, '.complete'), 'utf8'), version.assetIndex.sha1)
       const [name, entry] = Object.entries(JSON.parse(indexText).objects)[0]
       const object = path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash)
-      assert.equal(fs.statSync(path.join(tree, name)).ino === fs.statSync(object).ino, layout === 'virtual', `${layout}: ${layout === 'virtual' ? 'linked' : 'copied'}`)
+      assert.equal(fs.statSync(path.join(tree, name), { bigint: true }).ino === fs.statSync(object, { bigint: true }).ino, layout === 'virtual', `${layout}: ${layout === 'virtual' ? 'linked' : 'copied'}`)
     } finally {
       try { await stop(layout) } catch { /* not running */ }
       removeProfile(layout)

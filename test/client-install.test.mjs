@@ -370,7 +370,7 @@ test('the older asset layouts are laid out under real names, once per index (V1c
       const object = path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash)
       assert.equal(fs.readFileSync(laid, 'utf8'), fs.readFileSync(object, 'utf8'), name)
       // the profile's tree is copied, so a write there cannot reach the shared store (review S-1)
-      assert.equal(fs.statSync(laid).ino === fs.statSync(object).ino, !copy, `${name}: ${copy ? 'a copy' : 'a link'}`)
+      assert.equal(fs.statSync(laid, { bigint: true }).ino === fs.statSync(object, { bigint: true }).ino, !copy, `${name}: ${copy ? 'a copy' : 'a link'}`)
     }
     assert.equal(fs.readFileSync(path.join(dest, '.complete'), 'utf8'), version.assetIndex.sha1)
     assert.deepEqual(await materialiseAssets(res.assetIndex, dest, { copy }), { files: 0 }, 'stamped: nothing to do')

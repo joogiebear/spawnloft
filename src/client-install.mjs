@@ -37,7 +37,8 @@ function linkOrCopy(from, to) {
 
 function sameFile(a, b) {
   try {
-    const [x, y] = [fs.statSync(a), fs.statSync(b)]
+    // bigint: an NTFS file id is 64 bits, and as a Number two files can share one
+    const [x, y] = [fs.statSync(a, { bigint: true }), fs.statSync(b, { bigint: true })]
     return x.ino === y.ino && x.dev === y.dev
   } catch {
     return false
