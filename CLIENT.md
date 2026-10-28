@@ -5,6 +5,10 @@ version, a loader, how much memory), press Play, and the real Minecraft client s
 pointed at one of your SpawnLoft servers. Nothing is drawn or patched by SpawnLoft: it downloads
 the client Mojang ships from Mojang's own servers, the way Prism and MultiMC do, and runs it.
 
+There are two ways to drive it. The command line (`spawnloft client ...`) is below; for a person
+who would rather click, the [game launcher](#the-game-launcher) is a window with Play, Profiles
+and Accounts, a Microsoft sign-in in the browser and a version picker.
+
 The same client can be driven by an AI assistant or a script. A small Fabric mod, the *harness*,
 opens a control channel on this machine only, and through it `spawnloft mcp`'s `client_*` tools
 can join a server, chat, read what came back, take a screenshot and quit. Scripted test players
@@ -84,6 +88,73 @@ being launched cannot be removed.
 Each profile has its own game folder, so its `options.txt`, resource packs, mods and
 screenshots are its own. Put mods in `client/profiles/<name>/mods/` (see the layout below) the
 way you would in any launcher.
+
+## The game launcher
+
+The game launcher is a window for the same profiles and accounts the command line uses (nothing
+is kept twice: a profile made in one shows in the other). It is a dev tool that goes with
+SpawnLoft, not a separate product, and it has three screens.
+
+**Play** is the one most people stay on. Pick a profile, pick where it should go, press
+**Launch game**. A line under the button says what will happen ("Minecraft 1.21.11 · joins
+survival · as Wunga_"). The first launch of a version downloads the game (progress shows on the
+page; closing the window does not stop the download, and the files are used next time). Under
+the button:
+
+- **Profile**: every profile, with its version and loader.
+- **Server**: *Your servers* lists the SpawnLoft servers (with their state, and a note when one
+  runs a different version than the profile), plus *Title screen only*. A stopped server is
+  started first: the button then reads **Start server and launch**, waits up to two minutes for
+  it, launches the game and joins it. *Other server* takes an address instead, `host` or
+  `host:port` (a bracketed IPv6 address works), so the same launcher plays on servers SpawnLoft
+  does not run. An address is only checked for shape; whether the server is reachable, and which
+  accounts it lets in, is between the game and that server. Online servers need a Microsoft
+  account. Assistant control (the harness) works on your own SpawnLoft servers only.
+- The account is the profile's own, else the default account, else offline (see
+  [Default account and precedence](#default-account-and-precedence)).
+
+While a game runs the button turns into **Stop**, with **Open folder** (desktop app only; a
+browser tab shows the path instead). If the game closes within a minute of starting without a Stop
+from the page, a callout says so, shows the last lines of the game log, and offers **Report a
+problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The page refuses
+to launch, and says why, when another launch of that profile is under way, when the account the
+profile names is no longer signed in, or when the machine cannot run the client (Linux arm64, for
+one).
+
+**Profiles** lists them with their state, and makes, edits and removes them: name, Minecraft
+version (from Mojang's version list, cached, so it works offline once fetched), Vanilla or Fabric,
+memory, Java, Fabric loader version, the harness, and the account to play as. Changing the
+version, loader, Java, memory or harness is refused while the game is running. Changing the
+version of a profile that has mods in its folder warns that they may not load. Removing keeps the
+profile's folder unless you tick the box. A profile made here starts with `assistantAccount` off;
+the switch to allow an assistant appears once the profile exists and plays as a signed-in account.
+
+**Accounts** lists the signed-in and offline accounts, adds either kind, sets the default and
+signs out. See [Signing in from the launcher](#signing-in-from-the-launcher). An offline account
+is a name only, for servers with `online-mode=false`.
+
+Everything the page does goes through the panel's `/api/client/...` routes (profiles, versions,
+launch, stop, log, diag, accounts), behind the panel's localhost Host and Origin check. A launch
+is a job: the page posts it with a job id, opens `/api/jobs/<id>/stream` and shows the download
+and start-up lines, which end in `running` or an `error`. `GET /api/client/launcher` is the one
+read the page polls (profiles with their running state, accounts, the default account, the
+servers a profile can join, and a refusal when the machine cannot run the client). The log tail is
+redacted like a diagnostics bundle, so the harness token and signed-in names never reach the page.
+No route returns a token.
+
+### Opening it
+
+| From | How |
+| --- | --- |
+| The desktop app | The **Play** button at the bottom of the sidebar opens the launcher in a window of its own, which remembers its size and place. A second press brings the open one forward. |
+| macOS | **Window → Game launcher** in the menu bar does the same. (Windows and Linux have no app menu bar; use the sidebar button.) |
+| The command line | `spawnloft ui --launcher` starts the panel and opens `/launcher` in the browser. If a panel is already running on the port, it opens that panel's launcher instead of failing. `--no-open` prints the address (`http://127.0.0.1:8770/launcher`) without opening it. |
+| A browser | Go to `/launcher` on a running panel. The sidebar button works there too, as a tab. |
+| A server card | The **Play** on a server card (and its ⋯ menu) opens the launcher with that server and its Minecraft version pre-filled. |
+
+In the desktop app the Microsoft sign-in opens in a small window of its own (not your browser)
+that closes by itself when the sign-in is done; in a browser it is a new tab. The launcher page
+refuses to be framed by other pages.
 
 ## Accounts
 
@@ -221,9 +292,15 @@ makes it owner-only when run without `--json`. The game itself gets the access t
 command line, as every launcher does, where anyone who can list this user's processes can see it;
 it expires within a day, and the refresh token never leaves the accounts file.
 
-The whole sign-in has been run end to end on Windows: device code, Xbox Live, Minecraft login,
-profile, an online-mode join, a token refresh, and sign-out. On macOS and Linux the same code runs
-but has not been tried against Microsoft yet.
+**What has been tried.** The device-code sign-in has been run end to end on Windows: Xbox Live,
+Minecraft login, profile, an online-mode join, a token refresh, and sign-out. Games have launched
+on Windows, Linux x64 and Apple Silicon. The launcher's browser sign-in is covered by tests and its
+window by a run of the desktop shell on Linux, but **not yet verified**: the redirect through
+Microsoft's real sign-in page, signing in on macOS or Linux, the sign-in and the Play button inside
+the *packaged* Windows desktop app, and the macOS **Window** menu entry. One known unknown: on
+Windows `localhost` can resolve to `::1` before `127.0.0.1`, and the panel listens on `127.0.0.1`
+only; if the sign-in window ends on "can't reach this page", use `client login` meanwhile and
+report it.
 
 ## The harness
 
@@ -334,7 +411,8 @@ that would not load, a crash, and a Java too old for the version.
 
 ## What it does not do
 
-- Sign in for an AI assistant. A person signs in on the command line; offline players join offline-mode servers only.
+- Sign in for an AI assistant. A person signs in, on the command line or in the launcher; offline players join offline-mode servers only.
+- Be a modpack launcher, news feed or store. The launcher starts profiles you made; mods go in the profile's `mods/` folder.
 - Download Java. Install Java 21 or newer yourself, as for a server.
 - Bundle mods or tweaks of its own. The only mod it ever installs is the harness, and only when a profile asks for it.
 - Run on Linux arm64, or on a machine with no display. The client needs a graphics driver; use bots there.
