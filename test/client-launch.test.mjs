@@ -144,7 +144,7 @@ test('quick play supplies the log path as well as the server', () => {
 
 test('Log4Shell: the log config argument and the lookup switch are JVM arguments for 1.12.2 and 1.17.1', () => {
   for (const id of ['1.12.2', '1.17.1']) {
-    const version = JSON.parse(fs.readFileSync(path.join(fixtureDir, `${id}.json`), 'utf8'))
+    const version = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', `${id}.json`), 'utf8'))
     const profile = { mc: id, loader: 'vanilla', memory: '2G', server: null }
     const cmd = buildCommand({ version, profile, profileName: 'old', account, java, os: testOs })
     const mainIdx = cmd.args.indexOf(version.mainClass)

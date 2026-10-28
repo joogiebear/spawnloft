@@ -1,0 +1,17 @@
+{
+  "virtual": true,
+  "objects": {
+    "lang/de_DE.lang": {
+      "hash": "3f678cf9bbee911e77caca65a432283b483d80b6",
+      "size": 15
+    },
+    "sound/ambient/cave/cave1.ogg": {
+      "hash": "40acb368fa5a93a80d709effd0618d6343e4832b",
+      "size": 28
+    },
+    "music/calm1.ogg": {
+      "hash": "5f4305636c9f636719f9213886e413fc384d12af",
+      "size": 15
+    }
+  }
+}

@@ -236,7 +236,7 @@ test('26.x natives go to the java/ folder its java.library.path names, and old i
 })
 
 test('a log config that cannot be fetched refuses the version instead of leaving it open to Log4Shell', async () => {
-  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, '1.12.2.json'), 'utf8'))
+  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.12.2.json'), 'utf8'))
   fs.mkdirSync(versionDir(old.id), { recursive: true })
   fs.writeFileSync(versionJson(old.id), JSON.stringify(old))
 
@@ -255,7 +255,7 @@ test('a log config that cannot be fetched refuses the version instead of leaving
 })
 
 test('1.7.10 installs: every download is a URL the JSON names, and the natives-only jars are extracted', async () => {
-  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, '1.7.10.json'), 'utf8'))
+  const old = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'versions', '1.7.10.json'), 'utf8'))
   const named = new Set([old.downloads.client.url, old.logging.client.file.url, old.assetIndex.url])
   for (const lib of old.libraries) {
     if (lib.downloads?.artifact) { lib.downloads.artifact.sha1 = bodySha; lib.downloads.artifact.size = bodySize; named.add(lib.downloads.artifact.url) }
