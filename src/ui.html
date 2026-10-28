@@ -421,7 +421,7 @@
 
   .side {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
     min-height: 0;
     background: var(--chrome);
     border-right: 1px solid var(--line-soft);
@@ -486,6 +486,8 @@
   .side-new { display: flex; justify-content: center; margin: 0 var(--s-2) var(--s-3); }
   .side-new .ico { width: 14px; height: 14px; flex: none; }
   .side-new[aria-current="page"] { background: var(--lapis-wash); border-color: var(--lapis-edge); color: var(--ink); }
+  /* Play, under it: opens the game launcher, a window of its own (a tab in a browser). */
+  .side-play { margin-top: calc(var(--s-1) - var(--s-3)); }
 
   /*
     Java, when it is missing or too old: a chip rather than a banner across the page. It is a
@@ -2599,6 +2601,7 @@
     .dock button .ico { width: 17px; height: 17px; }
     .dock-badge { position: absolute; top: 3px; right: 5px; }
     .side-new { margin: 0 6px var(--s-2); }
+    .side-play { margin-top: calc(var(--s-1) - var(--s-2)); }
     .srv-strip { padding-left: var(--s-5); }
   }
   /* Header chrome: the wordmark goes when the window itself is narrow. Everything inside the
@@ -2767,6 +2770,9 @@
     </nav>
     <button type="button" class="side-new" id="bNew" title="New server">
       <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">New server</span>
+    </button>
+    <button type="button" class="side-new side-play" id="bLauncher" title="Game launcher">
+      <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span class="nm">Play</span>
     </button>
   </aside>
   <section class="stage">
@@ -4346,7 +4352,7 @@ function moreItems(row) {
   const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
-    ...(play ? [{ label: 'Play', hint: play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) }] : []),
+    { label: 'Play', hint: !play ? 'Opens the game launcher to make a profile for this server.' : play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) },
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -5698,9 +5704,8 @@ function updateHomeCard(card, row) {
   setVerb(restart, 'Restart', acting === 'restart' ? 'restart' : null, blocked, name);
   const play = card.querySelector('.sc-play');
   const pp = playProfileFor(row);
-  play.hidden = !pp;
   play.textContent = pp && pp.running ? 'Playing' : 'Play';
-  if (pp) play.title = pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
+  play.title = !pp ? 'Opens the game launcher to make a profile for this server' : pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
   play.disabled = Boolean(pp && launching.has(pp.name));
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
@@ -5871,9 +5876,31 @@ function setPlayDisabled(name, disabled) {
     if (pp && pp.name === name) btn.disabled = disabled;
   }
 }
+// The game launcher: its own window in the desktop app, a tab in a browser. One of each: the fixed
+// name brings an open one forward. The desktop app does that itself (it refuses the window.open and
+// focuses the window it has, so null is not a failure there). A browser would reload a named tab on
+// window.open('/launcher', name), so it is looked up by name first and only pointed at /launcher
+// while it is still blank. False when a pop-up blocker refused it.
+function openLauncher() {
+  if (window.mcctlDesktop) { window.open('/launcher', 'spawnloft-launcher'); return true; }
+  const tab = window.open('', 'spawnloft-launcher');
+  if (!tab) return false;
+  let blank = true;
+  try { blank = tab.location.pathname !== '/launcher'; } catch {}
+  if (blank) tab.location.href = '/launcher';
+  try { tab.focus(); } catch {}
+  return true;
+}
+// No profile fits the server: the launcher opens with its New profile form filled in for it (an
+// open launcher hears about it through the storage event).
+function openLauncherFor(row) {
+  try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify({ mc: row.mcVersion || null, server: row.name })) } catch {}
+  // a refused window still leaves a way there
+  if (!openLauncher()) toast('Your browser blocked the game launcher. Open ' + location.origin + '/launcher to make a profile for ' + (row.label || row.name) + '.');
+}
 async function playClient(row) {
   const p = playProfileFor(row);
-  if (!p) return;
+  if (!p) { openLauncherFor(row); return; }
   if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
   // An acknowledgement, not an error: the game is already open, which is what Play is for.
   if (p.running) { toast(p.name + ' is already running. Stop it under Preferences \u203a Game client.'); return; }
@@ -12756,6 +12783,7 @@ async function loadDbVersions() {
 
 for (const b of $$('.tabs [data-tab]')) b.onclick = () => selectTab(b.dataset.tab);
 $('#bNew').onclick = () => openAdd('new');
+$('#bLauncher').onclick = () => { if (!openLauncher()) toast('Your browser blocked the game launcher. Open ' + location.origin + '/launcher instead.'); };
 $('#dNew').onclick = () => openAdd('new');
 $('#dAdopt').onclick = () => openAdd('adopt');
 $('#bAddClose').onclick = back;

@@ -35,12 +35,15 @@ import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
 import * as client from './client.mjs'
+import { platformRefusal } from './client-meta.mjs'
+import * as clientAuth from './client-auth.mjs'
+import * as clientLogin from './client-login.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { scrubber } from './mcp-tools.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
-import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside } from './util.mjs'
+import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
 import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -83,16 +86,24 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
     }
   })
 
-  return new Promise((resolve) => {
+  clientLogin.setLoginHooks({ log: panelLog })
+  return new Promise((resolve, reject) => {
+    // a port already taken (another panel, usually) rejects instead of crashing the process
+    server.once('error', reject)
     server.listen(port, host, () => {
+      server.off('error', reject)
       // the desktop app passes port 0, so report the port actually bound
       const bound = server.address().port
+      // the sign-in callback's redirect URI carries this port (Microsoft matches localhost on any port)
+      panelPort = bound
       const url = `http://${host}:${bound}/`
       if (open) openBrowser(url)
       resolve({ server, url, port: bound })
     })
   })
 }
+
+let panelPort = null
 
 // The panel process's own log. Never rotated: it only gets a line when something is wrong.
 export function panelLog(msg) {
@@ -705,6 +716,180 @@ async function handleConsole(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
+// The game client: profiles, the version picker, launches and their logs. The launcher page and
+// the server cards' Play use these; everything here is behind the same loopback checks as the
+// rest of the panel, which matters because a profile's `java` is a path launch runs.
+async function handleClient(req, res, seg, url) {
+  if (seg[2] === 'versions' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, await client.listVersions())
+  }
+  if (seg[2] === 'launcher' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, launcherSummary())
+  }
+  if (seg[2] !== 'profiles') return json(res, 404, { error: 'not found' })
+
+  if (seg.length === 3) {
+    if (req.method === 'GET') return json(res, 200, client.listProfiles().map(clientProfileRow))
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = (await readBody(req)) ?? {}
+    if (typeof body.name !== 'string') fail('a profile needs a name')
+    if (typeof body.mc !== 'string') fail('a profile needs a Minecraft version')
+    // assistantAccount is not taken here: a new profile starts with it off, whoever makes it
+    const fields = {}
+    for (const key of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']) {
+      if (body[key] !== undefined) fields[key] = body[key]
+    }
+    const made = client.createProfile(body.name, fields)
+    return json(res, 200, clientProfileRow(client.getProfile(made.name)))
+  }
+
+  const profileName = seg[3]
+  if (seg.length === 4) {
+    if (req.method === 'PATCH') {
+      const body = await readBody(req)
+      if (!body || typeof body !== 'object' || Array.isArray(body)) fail('send the keys to change as a JSON object')
+      const before = client.getProfile(profileName)
+      client.updateProfile(profileName, body)
+      const warnings = []
+      if (typeof body.mc === 'string' && body.mc !== before.mc && await hasModJars(profileName)) {
+        warnings.push(`Mods in this profile's folder were installed for ${before.mc} and may not load`)
+      }
+      return json(res, 200, { profile: clientProfileRow(client.getProfile(profileName)), warnings })
+    }
+    if (req.method === 'DELETE') {
+      const purge = ['1', 'true'].includes(url.searchParams.get('purge') ?? '')
+      client.removeProfile(profileName, { purge })
+      return json(res, 200, { removed: profileName, purged: purge })
+    }
+    return json(res, 405, { error: 'method not allowed' })
+  }
+  if (seg.length !== 5) return json(res, 404, { error: 'not found' })
+
+  const verb = seg[4]
+  if (verb === 'status' && req.method === 'GET') {
+    return json(res, 200, client.status(profileName))
+  }
+  if (verb === 'log' && req.method === 'GET') {
+    client.getProfile(profileName)
+    const asked = Number(url.searchParams.get('lines') ?? 20)
+    const count = Number.isInteger(asked) && asked > 0 ? Math.min(asked, LOG_LINES_MAX) : 20
+    const scrub = scrubber()
+    return json(res, 200, { lines: client.tailClientLog(profileName, count).map((l) => scrub(client.redactClientLine(l))) })
+  }
+  if (verb === 'diag' && req.method === 'POST') {
+    client.getProfile(profileName)
+    const bundle = await buildBundle({ client: profileName, scrub: scrubber() })
+    const result = await writeBundle(bundle, { outDir: path.join(BACKUPS_DIR, 'client', 'exports') })
+    return json(res, 200, { file: result.file, size: result.size, sizeHuman: result.sizeHuman, findings: bundle.findings })
+  }
+  if (verb === 'launch' && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    const opts = {
+      server: body.server === false ? false : (typeof body.server === 'string' && body.server ? body.server : null),
+      account: typeof body.account === 'string' && body.account ? body.account : null,
+      // a server SpawnLoft does not run, host[:port]; launch checks it
+      address: typeof body.address === 'string' ? body.address : null,
+      fakeJava: client.fakeClientJava(),
+    }
+    if (body.jobId === undefined || body.jobId === null) {
+      const out = await client.launch(profileName, { ...opts, launchedBy: 'panel' })
+      return json(res, 200, { pid: out.pid, version: out.version, account: out.account, warnings: out.warnings })
+    }
+    const jobId = String(body.jobId)
+    if (!JOB_ID.test(jobId)) fail('jobId must be 1 to 64 letters, digits, dashes or underscores')
+    client.getProfile(profileName)
+    // Answered now: the page has opened the job stream, and every refusal from here on (the
+    // launch lock among them) arrives there as the job's error.
+    launchJob(jobId, profileName, { ...opts, startServer: body.startServer === true })
+    return json(res, 202, { jobId })
+  }
+  if (verb === 'stop' && req.method === 'POST') {
+    return json(res, 200, await client.stop(profileName))
+  }
+  return json(res, 405, { error: 'method not allowed' })
+}
+
+const LOG_LINES_MAX = 500
+const JOB_ID = /^[A-Za-z0-9_-]{1,64}$/
+// how long "Start server and launch" waits for the server before giving up on the launch
+const LAUNCH_SERVER_WAIT_MS = 120000
+
+function clientProfileRow(p) {
+  const st = client.status(p.name)
+  return {
+    name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, java: p.java,
+    // the key may be a uuid; the page shows the name and tells offline from Microsoft by the type
+    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, accountUuid: client.accountUuid(p.account), assistantAccount: p.assistantAccount,
+    running: st.running, pid: st.pid, startedAt: st.startedAt, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
+    // shown on the launcher's facts card; a browser tab cannot open it, so it shows the path
+    folder: client.profileFolder(p.name),
+  }
+}
+
+async function hasModJars(profileName) {
+  try {
+    return (await fs.promises.readdir(path.join(client.profileFolder(profileName), 'mods'))).some((f) => /\.jar$/i.test(f))
+  } catch {
+    return false
+  }
+}
+
+// Names, uuids and the two dates only: no route hands a token to a page.
+function publicAccounts() {
+  let list = []
+  try { list = clientAuth.loadAccounts() } catch { /* an unreadable file lists nothing; sign-in rewrites it */ }
+  return list.filter((a) => a && typeof a.name === 'string').map(clientAuth.publicAccount)
+}
+
+// One read for the launcher's poll: profiles with their running state (from state.json and the
+// cached process table, no fresh tasklist), accounts, and the servers a profile can join.
+function launcherSummary() {
+  const accounts = publicAccounts()
+  const wanted = client.loadProfiles().defaultAccount ?? null
+  const servers = registry.listInstances().map((inst) => {
+    let row
+    try { row = safeInstance(supervisor.statusOf(inst.name)) } catch { row = { ...inst, status: 'unknown', onlineMode: null } }
+    return { name: row.name, label: row.label ?? null, mc: plugins.mcVersionOf(row) ?? null, status: row.status, onlineMode: row.onlineMode }
+  })
+  return {
+    profiles: client.listProfiles().map(clientProfileRow),
+    accounts,
+    // a uuid no longer signed in is no default at all
+    defaultAccount: accounts.some((a) => a.uuid === wanted) ? wanted : null,
+    servers,
+    machineRefusal: platformRefusal(null),
+  }
+}
+
+async function startServerForLaunch(name) {
+  const out = await supervisor.start(name, { timeout: LAUNCH_SERVER_WAIT_MS })
+  if (out.failed) fail(`server "${name}" started but stopped again: ${out.reason}; the game was not launched`)
+  if (out.timedOut) fail(`server "${name}" had not finished starting after about 2 minutes, so the game was not launched; watch its console, then launch again`)
+}
+
+// `startServer` is the page's "Start server and launch": without it a stopped server is a warning.
+function launchJob(jobId, profileName, { startServer, ...opts }) {
+  // a reused id must not carry the last run's outcome into this one
+  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined })
+  client.launch(profileName, {
+    ...opts,
+    launchedBy: 'launcher',
+    ensureServer: startServer ? startServerForLaunch : null,
+    onStage: ({ stage, message }) => jobUpdate(jobId, { stage, message, percent: null }),
+    onProgress: ({ phase, done, total, bytes }) => jobUpdate(jobId, {
+      stage: phase === 'harness mod' ? 'harness' : phase,
+      message: `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files · ${humanBytes(bytes)}`,
+      percent: total ? Math.min(100, Math.round((done / total) * 100)) : null,
+    }),
+  }).then(
+    (out) => jobUpdate(jobId, {
+      stage: 'running', percent: 100, message: `Running · pid ${out.pid}`, done: true,
+      pid: out.pid, version: out.version, account: out.account, warnings: out.warnings,
+    }),
+    (err) => jobUpdate(jobId, { stage: 'error', percent: null, message: err?.message ?? String(err), done: true }),
+  )
+}
+
 async function handleDiag(req, res, name, seg, url) {
   registry.getInstance(name)
   const outDir = path.join(BACKUPS_DIR, name, 'exports')
@@ -1056,6 +1241,108 @@ function safeInstance(row) {
   }
 }
 
+// The launcher's accounts: the list, offline accounts, the default, sign-out, and the Microsoft
+// sign-in (CLIENT.md, "Signing in from the launcher"). Everything here is behind the Host and
+// Origin check like every other route, and no answer carries a token: an account is its name,
+// uuid, type and two times. The one exception to the Origin rule is the callback, a top-level
+// navigation Microsoft's page makes (so it has no Origin header and passes on the Host check);
+// it is useless without the state of the one live sign-in, which exists only in this process.
+async function handleAccounts(req, res, seg, url) {
+  if (seg.length === 3) {
+    if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+    return json(res, 200, { accounts: publicAccounts(), defaultAccount: client.getDefaultAccount() })
+  }
+  if (seg[3] === 'offline' && seg.length === 4) {
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    const account = clientAuth.addOfflineAccount(String(body?.name ?? ''))
+    if (client.getDefaultAccount() === null) client.setDefaultAccount(account.uuid)
+    return json(res, 200, { account: clientAuth.publicAccount(account), defaultAccount: client.getDefaultAccount() })
+  }
+  if (seg[3] === 'default' && seg.length === 4) {
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = await readBody(req)
+    const uuid = body?.uuid === null || body?.uuid === undefined || body?.uuid === '' ? null : String(body.uuid)
+    if (uuid !== null && !/^[0-9a-f-]{32,36}$/i.test(uuid)) return json(res, 400, { error: 'uuid must be the account\'s uuid' })
+    return json(res, 200, { defaultAccount: client.setDefaultAccount(uuid) })
+  }
+  if (seg[3] === 'login') {
+    if (seg.length === 4) {
+      if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+      try {
+        return json(res, 200, clientLogin.startLogin({ redirectUri: callbackUri() }))
+      } catch (err) {
+        if (err instanceof clientLogin.LoginInProgress) return json(res, 409, { error: err.message })
+        throw err
+      }
+    }
+    if (seg[4] === 'callback' && seg.length === 5) {
+      if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+      // Answered before the exchange starts: the desktop closes this window as soon as it has
+      // loaded, and the outcome goes to the launcher through the stream. Nothing from the query
+      // is echoed or logged.
+      const { ok } = clientLogin.handleCallback(url.searchParams)
+      return callbackPage(res, ok)
+    }
+    const loginId = seg[4]
+    if (typeof loginId !== 'string' || !/^[0-9a-f]{32}$/.test(loginId)) return json(res, 404, { error: 'no such sign-in' })
+    if (seg.length === 5 && req.method === 'DELETE') {
+      return json(res, 200, { cancelled: clientLogin.cancelLogin(loginId) })
+    }
+    if (seg.length === 6 && seg[5] === 'stream' && req.method === 'GET') {
+      const detach = clientLogin.listenLogin(loginId, (event) => {
+        if (!res.headersSent) {
+          res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+        }
+        res.write(`data: ${JSON.stringify(event)}\n\n`)
+        if (event.status !== 'pending' && event.status !== 'finishing') res.end()
+      })
+      if (!detach) return json(res, 404, { error: 'no such sign-in; start it again' })
+      const beat = setInterval(() => { if (!res.writableEnded) res.write(': ping\n\n') }, 20000)
+      req.on('close', () => {
+        clearInterval(beat)
+        detach()
+      })
+      return
+    }
+    return json(res, 405, { error: 'method not allowed' })
+  }
+  if (seg.length === 4 && req.method === 'DELETE') {
+    const gone = clientAuth.removeAccount(seg[3])
+    if (!gone) return json(res, 404, { error: 'no such account' })
+    // the registry drops a default that no longer exists on its next save; do it now so the
+    // answer is right
+    if (client.loadProfiles().defaultAccount !== undefined) client.saveProfiles(client.loadProfiles())
+    return json(res, 200, { removed: gone, defaultAccount: client.getDefaultAccount() })
+  }
+  return json(res, 405, { error: 'method not allowed' })
+}
+
+function callbackUri() {
+  if (!panelPort) fail('the panel has no port yet; try again')
+  return `http://localhost:${panelPort}/api/client/accounts/login/callback`
+}
+
+// What Microsoft's window shows after the redirect: a few words and no script. The window is
+// closed by the desktop app within a second; in a browser the tab stays until the person closes
+// it. The outcome of the sign-in is never shown here (the stream carries it), so a replayed or
+// forged callback learns nothing but "not valid".
+function callbackPage(res, ok) {
+  const title = ok ? 'Finishing sign-in' : 'This sign-in link is not valid any more'
+  const body = ok
+    ? 'Finishing the sign-in in SpawnLoft. You can close this window.'
+    : 'Start the sign-in again from the SpawnLoft launcher.'
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center}h1{font-size:20px;margin:0 0 8px}p{margin:0;color:#bbb}</style></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`
+  res.writeHead(ok ? 200 : 400, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+    'referrer-policy': 'no-referrer',
+    'x-content-type-options': 'nosniff',
+  })
+  res.end(html)
+}
+
 // Binding to 127.0.0.1 doesn't stop web pages in the local browser from calling this, and DNS
 // rebinding lets a page reach it under its own origin. So: the Host header must be loopback
 // (defeats rebinding), and any Origin must match Host exactly, port included. Plugin web UIs
@@ -1108,6 +1395,22 @@ async function route(req, res) {
     return
   }
 
+  // the game launcher's own page, opened as a window of its own; same theme injection as /
+  if (url.pathname === '/launcher') {
+    const html = readFileSync(path.join(HERE, 'launcher.html'), 'utf8')
+      .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
+    // Launch, sign out and remove are one click each, so no other site may put the page in a
+    // frame and steer those clicks; a meta CSP cannot say frame-ancestors, a header can.
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-frame-options': 'DENY',
+      'content-security-policy': "frame-ancestors 'none'",
+    })
+    res.end(html)
+    return
+  }
+
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
 
   // separate from /settings so a palette change can't touch data locations
@@ -1132,26 +1435,8 @@ async function route(req, res) {
     })
   }
 
-  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 3 && req.method === 'GET') {
-    return json(res, 200, client.listProfiles().map((p) => ({ name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, running: client.status(p.name).running })))
-  }
-
-  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 5) {
-    const profileName = seg[3]
-    if (seg[4] === 'status' && req.method === 'GET') {
-      return json(res, 200, client.status(profileName))
-    }
-    if (seg[4] === 'launch' && req.method === 'POST') {
-      const body = await readBody(req)
-      const fakeJava = client.fakeClientJava()
-      const res2 = await client.launch(profileName, { server: typeof body?.server === 'string' && body.server ? body.server : null, fakeJava })
-      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account, warnings: res2.warnings })
-    }
-    if (seg[4] === 'stop' && req.method === 'POST') {
-      return json(res, 200, await client.stop(profileName))
-    }
-    return json(res, 405, { error: 'method not allowed' })
-  }
+  if (seg[1] === 'client' && seg[2] === 'accounts') return handleAccounts(req, res, seg, url)
+  if (seg[1] === 'client') return handleClient(req, res, seg, url)
 
   if (seg[1] === 'health' && req.method === 'GET') {
     return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })
@@ -1730,7 +2015,7 @@ async function route(req, res) {
   return json(res, 404, { error: 'not found' })
 }
 
-function openBrowser(url) {
+export function openBrowser(url) {
   import('node:child_process').then(({ spawn }) => {
     const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
       : process.platform === 'darwin' ? ['open', [url]]

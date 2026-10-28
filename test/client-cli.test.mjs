@@ -116,7 +116,7 @@ test('launch --account offline:<name> plays offline under that name, and --as wi
 test('accounts lists nothing before a login, and logout of an unknown name says so', () => {
   const list = cli(['client', 'accounts', '--json'])
   assert.equal(list.code, 0)
-  assert.deepEqual(JSON.parse(list.stdout.trim()).data, { accounts: [] })
+  assert.deepEqual(JSON.parse(list.stdout.trim()).data, { accounts: [], defaultAccount: null })
   const out = cli(['client', 'logout', 'nobody'])
   assert.equal(out.code, 1)
   assert.match(out.stderr + out.stdout, /no signed-in account named "nobody"/)

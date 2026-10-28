@@ -47,8 +47,11 @@ export function clientLaunchLock(name) {
   return path.join(clientRunDir(name), 'launch.lock')
 }
 
-export function clientCacheDir(name) {
-  return path.join(clientRunDir(name), 'cache')
+// Shared by every profile and by the version picker, which has no profile yet.
+export const CLIENT_CACHE_DIR = path.join(CLIENT_ROOT, 'cache')
+
+export function versionsDir() {
+  return path.join(CLIENT_ROOT, 'versions')
 }
 
 export function ensureClientDirs() {

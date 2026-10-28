@@ -25,9 +25,10 @@ export const clientReadTools = [
       }
       const rows = profiles.map((p) => {
         const st = client.status(p.name)
-        return { name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, account: p.account, assistantAccount: p.assistantAccount, running: st.running }
+        // the account key may be a uuid; the assistant gets the name, the one thing it can act on
+        return { name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, account: p.account ? client.accountInfo(p.account).name : p.account, accountType: p.account ? client.accountInfo(p.account).type : null, assistantAccount: p.assistantAccount, running: st.running }
       })
-      const text = rows.map((r) => `${r.name}: Minecraft ${r.mc}, ${r.loader}${r.loaderVersion ? ' ' + r.loaderVersion : ''}${r.harness ? ', harness' : ''}${r.account ? `, Microsoft account ${r.account}${r.assistantAccount ? '' : ' (not for assistants)'}` : ''}, ${r.running ? 'running' : 'stopped'}`).join('\n')
+      const text = rows.map((r) => `${r.name}: Minecraft ${r.mc}, ${r.loader}${r.loaderVersion ? ' ' + r.loaderVersion : ''}${r.harness ? ', harness' : ''}${r.account ? `, ${r.accountType === 'offline' ? 'offline account' : 'Microsoft account'} ${r.account}${r.assistantAccount || r.accountType === 'offline' ? '' : ' (not for assistants)'}` : ''}, ${r.running ? 'running' : 'stopped'}`).join('\n')
       return { data: { profiles: rows }, text }
     },
   },
@@ -117,7 +118,9 @@ export const clientActionTools = [
       // Playing as a real Microsoft account on any server is the person's call, per profile. The
       // early check gives the message before any download; launch() enforces it again under its lock.
       const prof = client.getProfile(p)
-      if (prof.account && !prof.assistantAccount) fail(client.assistantAccountRefusal(p))
+      // an offline account on the profile needs no permission; a name no longer in the list is
+      // refused here as launch() would refuse it
+      if (prof.account && client.accountInfo(prof.account).type !== 'offline' && !prof.assistantAccount) fail(client.assistantAccountRefusal(p))
       const res = await client.launch(p, { playerName: playerName ?? null, server: srv ?? null, onProgress: (x) => progress(`${x.phase} ${x.done}/${x.total}`), fakeJava, assistant: true })
       const warn = res.warnings.length ? '\n' + res.warnings.map((w) => 'Warning: ' + w + '.').join('\n') : ''
       if (!wait) {

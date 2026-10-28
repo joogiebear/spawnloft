@@ -93,13 +93,17 @@ function readOsRelease() {
 // (Alpine) no package fixes that ABI mismatch, and musl's ldd output doesn't match parseLdd, so
 // missingLibraries() would report nothing missing for an engine that can't run. Checked by name so the
 // refusal says what is actually wrong.
-export function isMusl(run = spawnSync) {
+export function isMusl(run = spawnSync, exists = fs.existsSync) {
   try {
     const res = run('ldd', ['--version'], { encoding: 'utf8', timeout: 5000 })
-    if (/musl/i.test(res.stdout || '') || /musl/i.test(res.stderr || '')) return true
+    const said = `${res.stdout || ''}\n${res.stderr || ''}`
+    if (/musl/i.test(said)) return true
+    // ldd ran and named glibc: that is the system's C library, whatever else is under /lib (a
+    // musl loader left by a static toolchain or a container image does not make the box Alpine)
+    if (!res.error && /glibc|gnu libc|gnu c library/i.test(said)) return false
   } catch { /* fall through to the loader check */ }
   return ['ld-musl-x86_64.so.1', 'ld-musl-aarch64.so.1', 'ld-musl-armhf.so.1'].some(
-    (f) => fs.existsSync(path.join('/lib', f)),
+    (f) => exists(path.join('/lib', f)),
   )
 }
 

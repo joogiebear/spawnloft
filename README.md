@@ -14,6 +14,8 @@ It also launches the game itself. `spawnloft client new play --mc 1.21.11 --serv
 pointed at your server, as an offline player. With the harness mod on a profile, an AI assistant
 can join, chat, take a screenshot and read the client's logs as a real player, where scripted
 bots only see packets. Windows, Apple Silicon Macs and Linux x64 are supported (not Linux arm64).
+`spawnloft ui --launcher` (or **Play** in the desktop app's sidebar) opens a game launcher window
+with profiles, Microsoft sign-in and a Play button, including for servers SpawnLoft does not run.
 See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
 
 Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is
@@ -289,6 +291,7 @@ tasks with it, and deleting one takes them away.
 | `mcp [--allow-destructive] [--show-ips]` | MCP server on stdio, for an AI app to launch. See [MCP.md](MCP.md) |
 | `bot setup` / `bot check <inst>` / `bot run <scenario.json>` | Scripted test players for plugin testing. See [BOTS.md](BOTS.md) |
 | `client new <name> --mc <v>` / `client launch <name>` / `client list` | A launcher for the real Minecraft client, pointed at your servers; with `--harness`, an AI can drive it. See [CLIENT.md](CLIENT.md) |
+| `ui [--no-open] [--launcher]` | The panel in your browser; `--launcher` opens the game launcher instead. See [CLIENT.md](CLIENT.md#the-game-launcher) |
 | `diag <server> [--client <profile>]` | One zip with the console, daemon log, crash reports and known-problem findings, with the game client's logs on the same timeline. For bug reports |
 
 ### Moving the data folder

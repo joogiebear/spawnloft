@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld('mcctlDesktop', {
   // https only
   openExternal: (url) => ipcRenderer.invoke('mcctl:openExternal', url),
 
+  // the game launcher: a profile's folder in the file manager ({ ok }), and Microsoft's sign-in
+  // page in a window of its own, for the panel's authorize URL only; resolves { ok } once it closes
+  openProfileFolder: (name) => ipcRenderer.invoke('mcctl:openProfileFolder', String(name ?? '')),
+
+  openMicrosoftLogin: (url) => ipcRenderer.invoke('mcctl:openMicrosoftLogin', String(url ?? '')),
+
   saveSetup: (choice) => ipcRenderer.invoke('mcctl:saveSetup', choice),
 
   appInfo: () => ipcRenderer.invoke('mcctl:appInfo'),

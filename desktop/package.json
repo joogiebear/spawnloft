@@ -13,7 +13,7 @@
     "dist": "electron-builder",
     "release": "node release.mjs",
     "verify": "node verify-build.mjs",
-    "test": "node window-state.test.js && node ui-zoom.test.js && node --test update-channel.test.js",
+    "test": "node window-state.test.js && node ui-zoom.test.js && node --test update-channel.test.js launcher-window.test.js login-window.test.js",
     "release:publish": "node finish-release.mjs",
     "release:stable": "node release-stable.mjs"
   },
@@ -31,6 +31,8 @@
       "window-state.js",
       "ui-zoom.js",
       "update-channel.js",
+      "launcher-window.js",
+      "login-window.js",
       "package.json"
     ],
     "extraResources": [

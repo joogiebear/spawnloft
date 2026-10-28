@@ -1,14 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { PROFILES_FILE, profileDir, versionJson, clientLog, clientRunDir, clientCacheDir, clientLaunchLock } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickJava, requiredMajor } from './java.mjs'
 import { ensureVersion } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal } from './client-meta.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
-import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName } from './client-auth.mjs'
+import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi } from './client-fabric.mjs'
 import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
@@ -17,8 +17,11 @@ export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
 
 const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'assistantAccount']
+// The keys that make up the running game's command line; the rest only matter at the next launch.
+const RUNNING_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness']
 
 function validateMc(mc) {
+  if (typeof mc !== 'string') fail('the Minecraft version must be text, like 1.21.4')
   if (!/^\d+(\.\d+){1,2}$/.test(mc) && !/^\d{2}w\d{2}[a-z]$/.test(mc)) {
     fail(`invalid Minecraft version "${mc}" - use e.g. 1.21.4 or 25w14a`)
   }
@@ -62,7 +65,79 @@ export function loadProfiles() {
 }
 
 export function saveProfiles(data) {
+  // a default account that was signed out is dropped on the next save, not an error
+  if (data.defaultAccount != null && !accountExists(data.defaultAccount)) delete data.defaultAccount
   writeJson(PROFILES_FILE, data)
+}
+
+// A damaged accounts.json must not take the profiles with it: the launch that needs it fails
+// on its own, everything else treats the list as unknown (null).
+function accountsOrNull() {
+  try { return loadAccounts() } catch { return null }
+}
+
+function accountExists(uuid) {
+  const list = accountsOrNull()
+  return list === null ? true : list.some((a) => sameUuid(a.uuid, uuid))
+}
+
+// The launcher's default account (a uuid from accounts.json, top-level in profiles.json): what a
+// launch from the CLI, the panel or the launcher plays as when neither the command line nor the
+// profile names an account. Assistant launches never use it (see launchLocked). Null when none
+// is set or the account is gone.
+export function getDefaultAccount() {
+  const uuid = loadProfiles().defaultAccount
+  const list = accountsOrNull()
+  return typeof uuid === 'string' && list !== null && list.some((a) => sameUuid(a.uuid, uuid)) ? uuid : null
+}
+
+export function setDefaultAccount(uuid) {
+  const reg = loadProfiles()
+  if (uuid === null) {
+    delete reg.defaultAccount
+  } else {
+    const idx = findAccount(loadAccounts(), String(uuid))
+    if (idx === -1) fail(`no account with uuid "${uuid}" is in the list; sign in or add an offline account first`)
+    reg.defaultAccount = loadAccounts()[idx].uuid
+  }
+  saveProfiles(reg)
+  return reg.defaultAccount ?? null
+}
+
+// A profile's account key written as a name keeps working (resolved by name at launch); from now
+// on the uuid is stored when the account is in the list, so a Mojang name change cannot detach
+// the profile. "offline:<name>" and an unknown name are stored as typed.
+function accountKeyFor(value) {
+  if (typeof value !== 'string' || value.startsWith('offline:')) return value
+  const list = accountsOrNull()
+  if (list === null) return value
+  const idx = findAccount(list, value)
+  return idx === -1 ? value : list[idx].uuid
+}
+
+// The name to show for a profile's account key (a uuid, a name, or offline:<name>), and its
+// type: 'microsoft', 'offline', or null for a name no longer in the list.
+export function accountLabel(value) {
+  return accountInfo(value).name
+}
+
+export function accountInfo(value) {
+  if (typeof value !== 'string') return { name: value, type: null }
+  if (value.startsWith('offline:')) return { name: value.slice('offline:'.length), type: 'offline' }
+  const list = accountsOrNull()
+  if (list === null) return { name: value, type: null }
+  const idx = findAccount(list, value)
+  return idx === -1 ? { name: value, type: null } : { name: list[idx].name, type: list[idx].type ?? 'microsoft' }
+}
+
+// The uuid a profile's account key resolves to (a key written as a name by an older CLI
+// included), or null for an offline selector or a name no longer in the list.
+export function accountUuid(value) {
+  if (typeof value !== 'string' || value.startsWith('offline:')) return null
+  const list = accountsOrNull()
+  if (list === null) return null
+  const idx = findAccount(list, value)
+  return idx === -1 ? null : list[idx].uuid
 }
 
 // Profiles written before the key existed read as false: an assistant may not play as a
@@ -109,13 +184,14 @@ export function createProfile(name, { mc, loader = 'vanilla', loaderVersion = nu
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
-  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, createdAt: new Date().toISOString() }
+  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account: accountKeyFor(account), assistantAccount, createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
   return { name, ...profile }
 }
 
-export function updateProfile(name, patch) {
+// `launching: true` is launch's own write of the loader it picked, made while it holds the lock.
+export function updateProfile(name, patch, { launching = false } = {}) {
   validateProfileName(name)
   for (const key of Object.keys(patch)) {
     if (!PROFILE_KEYS.includes(key)) {
@@ -123,10 +199,22 @@ export function updateProfile(name, patch) {
     }
   }
   const existing = getProfile(name)
+  const changing = RUNNING_KEYS.filter((k) => Object.hasOwn(patch, k) && patch[k] !== existing[k])
+  if (changing.length && status(name).running) {
+    fail(`profile "${name}" is running; stop it before changing ${changing.join(', ')}: spawnloft client stop ${name}`)
+  }
+  // a launch under way read the profile at its start and reads it again while it downloads
+  if (changing.length && !launching && lockHolder(clientLaunchLock(name)) !== null) {
+    fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it before changing ${changing.join(', ')}`)
+  }
+  // a loader build is made for one Minecraft version; the next launch picks one for the new version
+  if (Object.hasOwn(patch, 'mc') && patch.mc !== existing.mc && (!Object.hasOwn(patch, 'loaderVersion') || patch.loaderVersion === existing.loaderVersion)) {
+    patch = { ...patch, loaderVersion: null }
+  }
   const merged = { ...existing, ...patch }
   validateFields(merged)
   const reg = loadProfiles()
-  reg.profiles[name] = { ...reg.profiles[name], ...patch }
+  reg.profiles[name] = { ...reg.profiles[name], ...patch, ...(Object.hasOwn(patch, 'account') ? { account: accountKeyFor(patch.account) } : {}) }
   saveProfiles(reg)
   return { name, ...withDefaults(reg.profiles[name]) }
 }
@@ -154,19 +242,21 @@ function holderText(name) {
   return holder === null || holder === -1 ? '?' : String(holder)
 }
 
-export async function prepareVersion(name, { onProgress = () => {} } = {}) {
+export async function prepareVersion(name, { onStage = () => {} } = {}) {
   const profile = getProfile(name)
   if (!fs.existsSync(versionJson(profile.mc))) {
-    const cacheDir = clientCacheDir(name)
-    const manifest = await fetchManifest({ cacheDir })
-    await fetchVersionJson(profile.mc, { manifest, cacheDir })
+    onStage({ stage: 'manifest', message: 'Reading the Minecraft version list' })
+    const manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR })
+    onStage({ stage: 'version', message: `Downloading the version file for Minecraft ${profile.mc}` })
+    await fetchVersionJson(profile.mc, { manifest, cacheDir: CLIENT_CACHE_DIR })
   }
   if (profile.loader === 'fabric') {
     let loaderVersion = profile.loaderVersion
     if (loaderVersion === null) {
+      onStage({ stage: 'fabric', message: `Finding a Fabric loader for Minecraft ${profile.mc}` })
       const list = await loaderVersions(profile.mc)
       loaderVersion = pickLoader(list).version
-      updateProfile(name, { loaderVersion })
+      updateProfile(name, { loaderVersion }, { launching: true })
     }
     await ensureFabricProfile(profile.mc, loaderVersion)
     return fabricVersionId(profile.mc, loaderVersion)
@@ -190,11 +280,19 @@ export async function launch(name, opts = {}) {
   }
 }
 
+export const LAUNCHED_BY = ['launcher', 'panel', 'cli', 'assistant']
+
 // `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
 // Microsoft account is then allowed only on a profile whose assistantAccount key says so.
 // `onWarning` is told about a stopped target server before the game starts, so the warning comes
 // out before (not under) the launch line. The warnings are also in the result.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, onProgress = () => {}, onWarning = () => {}, fakeJava = null, assistant = false, os = launchOs(fakeJava) }) {
+// `server: false` launches to the title screen even when the profile names a server.
+// `onStage` hears { stage, message } as each step starts; `onProgress` keeps the downloads'
+// { phase, done, total, bytes }. `ensureServer(target)` starts a stopped target server and waits
+// for it, just before the game is spawned; without it a stopped server is only a warning.
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava) }) {
+  const by = assistant ? 'assistant' : (launchedBy ?? 'cli')
+  if (!LAUNCHED_BY.includes(by)) throw new Error(`unknown launchedBy "${launchedBy}"`)
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
@@ -204,32 +302,48 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const machineRefusal = platformRefusal(null, os)
   if (machineRefusal) fail(machineRefusal)
   // before any download: a database is a registered instance but nothing a game can join
-  const target = server ?? profile.server
+  if (addressText !== null && typeof server === 'string') fail('join either a SpawnLoft server or an address, not both')
+  const address = addressText === null ? null : parseServerAddress(addressText)
+  const target = address || server === false ? null : (server ?? profile.server)
   if (target && isDatabase(getInstance(target))) fail(`"${target}" is a database, not a Minecraft server; point the profile at a server`)
   if (profile.harness && !harnessFor(profile.mc)) {
     fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
   }
 
   // --as names an offline player; a signed-in account brings its own name. Both at once is a
-  // contradiction, not a preference.
-  const selector = accountSelector ?? profile.account ?? null
-  if (playerName && selector) fail('use either --as <player name> or --account <account>, not both')
-  if (assistant && selector && !selector.startsWith('offline:') && !profile.assistantAccount) {
-    fail(assistantAccountRefusal(name))
-  }
+  // contradiction, not a preference. The launcher's default account is only a preference: it
+  // applies when neither the caller nor the profile names an account, never to an assistant
+  // launch (which would otherwise play as a Microsoft account the assistantAccount rule never
+  // allowed), and --as beats it.
+  const named = accountSelector ?? profile.account ?? null
+  if (playerName && named) fail('use either --as <player name> or --account <account>, not both')
+  const selector = named ?? (assistant || playerName ? null : getDefaultAccount())
   // An offline player against an online-mode server is refused here, before Java is looked for
   // or anything downloads, with the words join() uses: the server would refuse the join for
   // sure, so a launch would only show a kick screen. A stopped server is a warning, told to the
   // caller now (before the launch line, not under it) and carried in the result, since it can be
   // started while the game loads. The account itself is resolved later (a refresh needs the
-  // network); its type and name are known from the selector.
-  const provisional = selector
-    ? (selector.startsWith('offline:') ? { type: 'offline', name: assertPlayerName(selector.slice('offline:'.length)) } : { type: 'microsoft', name: selector })
+  // network); its type and name are read from the list now, which also refuses an unknown
+  // account before anything downloads.
+  const stored = selector ? peekAccount(selector) : null
+  const provisional = stored
+    ? { type: stored.type, name: stored.name }
     : { type: 'offline', name: playerName ? assertPlayerName(playerName) : defaultPlayerName(name) }
-  const { refusal, warnings } = target ? serverCheck(target, provisional) : { refusal: null, warnings: [] }
-  if (refusal) fail(refusal)
+  if (assistant && provisional.type !== 'offline' && !profile.assistantAccount) {
+    fail(assistantAccountRefusal(name))
+  }
+  const { refusal, warnings: found, stopped } = target ? serverCheck(target, provisional) : { refusal: null, warnings: [], stopped: false }
+  // the launcher has no --account flag to point at; it has an account picker
+  if (refusal) fail(by === 'launcher' ? `${target} requires a Microsoft account (online-mode=true); sign in or pick another server` : refusal)
+  // a server this launch will start is not worth a warning
+  const warnings = stopped && ensureServer ? found.filter((w) => !/is not running/.test(w)) : found
+  // SpawnLoft cannot read another machine's server.properties, so this is a warning, not a refusal
+  if (address && provisional.type === 'offline') {
+    warnings.push(`${provisional.name} is an offline player, so ${addressText} will refuse the join unless it runs with online-mode=false; sign in to play on public servers`)
+  }
   for (const w of warnings) onWarning(w)
 
+  onStage({ stage: 'java', message: 'Finding Java' })
   const java = fakeJava ?? await pickJava({ explicit: profile.java, needs: requiredMajor(profile.mc), what: 'Minecraft ' + profile.mc })
 
   let versionId
@@ -243,14 +357,20 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
       versionId = profile.mc
     }
     if (!fs.existsSync(versionJson(versionId))) {
-      versionId = await prepareVersion(name, { onProgress })
+      versionId = await prepareVersion(name, { onStage })
       await ensureVersion(versionId, { os, onProgress })
     }
   } else {
-    versionId = await prepareVersion(name, { onProgress })
+    versionId = await prepareVersion(name, { onStage })
     await ensureVersion(versionId, { os, onProgress })
-    if (profile.loader === 'fabric') await ensureFabricApi(name, profile.mc, { onProgress })
-    if (profile.harness) await ensureHarnessJar(name, profile.mc, { onProgress })
+    if (profile.loader === 'fabric') {
+      onStage({ stage: 'fabric', message: 'Checking Fabric API' })
+      await ensureFabricApi(name, profile.mc, { onProgress })
+    }
+    if (profile.harness) {
+      onStage({ stage: 'harness', message: 'Checking the harness mod' })
+      await ensureHarnessJar(name, profile.mc, { onProgress })
+    }
   }
 
   let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
@@ -263,14 +383,58 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   if (versionRefusal) fail(versionRefusal)
 
   const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
+  // last before the game, so a failed download or sign-in does not leave a server started for nothing
+  if (stopped && ensureServer) {
+    onStage({ stage: 'server', message: `Starting ${target}` })
+    await ensureServer(target)
+  }
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
-  const command = buildCommand({ version, profile: { ...profile, server: server ?? profile.server }, profileName: name, account, java, os, harnessToken })
+  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os, harnessToken, address })
+  onStage({ stage: 'spawn', message: 'Starting the game' })
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
-  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null } })
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
+}
+
+const HOSTNAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
+const IPV6 = /^[0-9A-Fa-f:.]+$/
+
+// A server outside SpawnLoft to join at launch: host[:port], a name, an IPv4 address or a
+// bracketed IPv6 one. Strict because the host lands on the game's command line: it can never
+// start with a dash or carry a space, a scheme or a path.
+export function parseServerAddress(text) {
+  const bad = () => fail(`"${text}" is not a server address; use host or host:port, like play.example.net or 192.168.1.20:25566`)
+  if (typeof text !== 'string') bad()
+  const raw = text.trim()
+  if (!raw || raw.length > 260) bad()
+  let host
+  let portText = null
+  const v6 = /^\[([^\]]+)\](?::([^:]*))?$/.exec(raw)
+  if (v6) {
+    host = v6[1]
+    portText = v6[2] ?? null
+    if (!IPV6.test(host) || !host.includes(':')) bad()
+  } else {
+    const parts = raw.split(':')
+    if (parts.length > 2) bad()
+    host = parts[0]
+    portText = parts[1] ?? null
+    if (host.length > 253 || !HOSTNAME.test(host)) bad()
+  }
+  let port = 25565
+  if (portText !== null) {
+    if (!/^\d{1,5}$/.test(portText)) bad()
+    port = Number(portText)
+    if (port < 1 || port > 65535) bad()
+  }
+  return { host, port }
+}
+
+function formatAddress({ host, port }) {
+  return host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`
 }
 
 // The fake game is a Node script, so it runs where Mojang's client cannot (the Linux arm64 CI
@@ -286,16 +450,17 @@ function launchOs(fakeJava) {
 function serverCheck(server, account) {
   let check
   // advisory only: an unreadable server.properties must not stop a launch that got this far
-  try { check = checkInstance(server) } catch { return { refusal: null, warnings: [] } }
+  try { check = checkInstance(server) } catch { return { refusal: null, warnings: [], stopped: false } }
   const warnings = []
   let refusal = null
-  if (check.problems.some((p) => /is not running/.test(p))) {
+  const stopped = check.problems.some((p) => /is not running/.test(p))
+  if (stopped) {
     warnings.push(`server "${server}" is not running, so the game will show "Connection refused"; start it first: spawnloft start ${server}`)
   }
   if (account.type !== 'microsoft' && check.problems.some((p) => /runs in online mode/.test(p))) {
     refusal = onlineModeRefusal(server, account.name)
   }
-  return { refusal, warnings }
+  return { refusal, warnings, stopped }
 }
 
 function onlineModeRefusal(server, playerName) {
@@ -323,6 +488,9 @@ export function status(name) {
     startedAt: st?.startedAt ?? null,
     uptimeMs: st ? Date.now() - Date.parse(st.startedAt) : null,
     account: st?.account ?? null,
+    launchedBy: st?.launchedBy ?? null,
+    server: st?.server ?? null,
+    address: st?.address ?? null,
     harness: st?.harness ? { port: readHarnessFile(name, { pid: st.pid })?.port ?? null } : null,
   }
 }
@@ -514,4 +682,91 @@ export function tailClientLog(name, count = 100) {
 
 export function latestLogPath(name) {
   return path.join(profileDir(name), 'logs', 'latest.log')
+}
+
+// A crash report prints the game's whole command line, the harness token and the Minecraft
+// access token among it; the diag bundle redacts the first the same way.
+export function redactClientLine(line) {
+  return line
+    .replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]')
+    .replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]')
+}
+
+// Ids validateMc refuses (pre-releases, release candidates, the new "-snapshot-" ids, the
+// pre-1.0 betas) cannot be launched, so the picker does not offer them.
+function launchableId(id) {
+  try { validateMc(id) } catch { return false }
+  return true
+}
+
+function olderThan(row, refTimes, release) {
+  const ref = refTimes.get(release)
+  if (ref && row.releaseTime) return Date.parse(row.releaseTime) < ref
+  const m = /^(\d+)\.(\d+)/.exec(row.id)
+  const r = /^(\d+)\.(\d+)/.exec(release)
+  if (!m) return false
+  return Number(m[1]) < Number(r[1]) || (Number(m[1]) === Number(r[1]) && Number(m[2]) < Number(r[2]))
+}
+
+// What is on disk for each installed vanilla version: its JSON when the client jar beside it has
+// the size the JSON names (a size check only; the launch checks sha1).
+async function installedVersions() {
+  let ids
+  try { ids = await fs.promises.readdir(versionsDir()) } catch { return new Map() }
+  const out = new Map()
+  await Promise.all(ids.filter(launchableId).map(async (id) => {
+    let json
+    try { json = JSON.parse(await fs.promises.readFile(versionJson(id), 'utf8')) } catch { return }
+    if (json.inheritsFrom) return
+    let jarSize = null
+    try { jarSize = (await fs.promises.stat(versionJar(id))).size } catch { /* no jar yet */ }
+    const want = json.downloads?.client?.size
+    out.set(id, { json, downloaded: jarSize !== null && (want === undefined || jarSize === want) })
+  }))
+  return out
+}
+
+// The version picker's rows. The per-version platform refusal needs the version JSON, so it is
+// given only for versions on disk; the machine-level one comes once, for the whole list.
+export async function listVersions({ os = currentOs(), fetchImpl } = {}) {
+  const installed = await installedVersions()
+  const machineRefusal = platformRefusal(null, os)
+  let manifest = null
+  let offline = null
+  try {
+    manifest = await fetchManifest({ cacheDir: CLIENT_CACHE_DIR, ...(fetchImpl ? { fetchImpl } : {}) })
+  } catch (err) {
+    offline = `the Minecraft version list could not be read (${err?.message ?? err}), so only downloaded versions are listed`
+  }
+  const source = manifest
+    ? manifest.versions.filter((v) => launchableId(v.id))
+    : [...installed.entries()].map(([id, { json }]) => ({ id, type: json.type ?? 'release', releaseTime: json.releaseTime ?? null }))
+  const winArm = os.name === 'windows' && os.arch === 'arm64'
+  const refTimes = new Map()
+  for (const id of ['1.13', '1.21']) {
+    const t = Date.parse(manifest?.versions?.find((v) => v.id === id)?.releaseTime ?? '')
+    if (!Number.isNaN(t)) refTimes.set(id, t)
+  }
+  const versions = source.map((v) => {
+    const disk = installed.get(v.id)
+    const notes = []
+    if (olderThan(v, refTimes, '1.13')) notes.push('old launcher arguments; untested')
+    if (winArm && olderThan(v, refTimes, '1.21')) notes.push('may not run on this machine; checked at launch')
+    return {
+      id: v.id,
+      type: v.type,
+      releaseTime: v.releaseTime ?? null,
+      downloaded: Boolean(disk?.downloaded),
+      javaNeeds: requiredMajor(v.id),
+      harness: Boolean(harnessFor(v.id)),
+      refusal: disk ? platformRefusal(disk.json, os) : null,
+      note: notes.length ? notes.join('; ') : null,
+    }
+  })
+  return { machineRefusal, offline, versions }
+}
+
+export function profileFolder(name) {
+  getProfile(name)
+  return profileDir(name)
 }

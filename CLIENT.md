@@ -5,6 +5,10 @@ version, a loader, how much memory), press Play, and the real Minecraft client s
 pointed at one of your SpawnLoft servers. Nothing is drawn or patched by SpawnLoft: it downloads
 the client Mojang ships from Mojang's own servers, the way Prism and MultiMC do, and runs it.
 
+There are two ways to drive it. The command line (`spawnloft client ...`) is below; for a person
+who would rather click, the [game launcher](#the-game-launcher) is a window with Play, Profiles
+and Accounts, a Microsoft sign-in in the browser and a version picker.
+
 The same client can be driven by an AI assistant or a script. A small Fabric mod, the *harness*,
 opens a control channel on this machine only, and through it `spawnloft mcp`'s `client_*` tools
 can join a server, chat, read what came back, take a screenshot and quit. Scripted test players
@@ -85,6 +89,74 @@ Each profile has its own game folder, so its `options.txt`, resource packs, mods
 screenshots are its own. Put mods in `client/profiles/<name>/mods/` (see the layout below) the
 way you would in any launcher.
 
+## The game launcher
+
+The game launcher is a window for the same profiles and accounts the command line uses (nothing
+is kept twice: a profile made in one shows in the other). It is a dev tool that goes with
+SpawnLoft, not a separate product, and it has three screens.
+
+**Play** is the one most people stay on. Pick a profile, pick where it should go, press
+**Launch game**. A line under the button says what will happen ("Minecraft 1.21.11 · joins
+survival · as Wunga_"). The first launch of a version downloads the game (progress shows on the
+page; closing the window does not stop the download, and the files are used next time). Under
+the button:
+
+- **Profile**: every profile, with its version and loader.
+- **Server**: *Your servers* lists the SpawnLoft servers (with their state, and a note when one
+  runs a different version than the profile), plus *Title screen only*. A stopped server is
+  started first: the button then reads **Start server and launch**, waits up to two minutes for
+  it, launches the game and joins it. *Other server* takes an address instead, `host` or
+  `host:port` (a bracketed IPv6 address works), so the same launcher plays on servers SpawnLoft
+  does not run. An address is only checked for shape; whether the server is reachable, and which
+  accounts it lets in, is between the game and that server. Online servers need a Microsoft
+  account. Assistant control (the harness) works on your own SpawnLoft servers only.
+- The account is the profile's own, else the default account, else offline (see
+  [Default account and precedence](#default-account-and-precedence)).
+
+While a game runs the button turns into **Stop**, with **Open folder** (desktop app only; a
+browser tab shows the path instead). If the game closes within a minute of starting without a Stop
+from the page, a callout says so, shows the last lines of the game log, and offers **Report a
+problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The page refuses
+to launch, and says why, when another launch of that profile is under way, when the account the
+profile names is no longer signed in, or when the machine cannot run the client (Linux arm64, for
+one).
+
+**Profiles** lists them with their state, and makes, edits and removes them: name, Minecraft
+version (from Mojang's version list, cached, so it works offline once fetched), Vanilla or Fabric,
+memory, Java, Fabric loader version, the harness, and the account to play as. Changing the
+version, loader, Java, memory or harness is refused while the game is running. Changing the
+version of a profile that has mods in its folder warns that they may not load. Removing keeps the
+profile's folder unless you tick the box. A profile made here starts with `assistantAccount` off;
+the switch to allow an assistant appears once the profile exists and plays as a signed-in account.
+
+**Accounts** lists the signed-in and offline accounts, adds either kind, sets the default and
+signs out. See [Signing in from the launcher](#signing-in-from-the-launcher). An offline account
+is a name only, for servers with `online-mode=false`.
+
+Everything the page does goes through the panel's `/api/client/...` routes (profiles, versions,
+launch, stop, log, diag, accounts), behind the panel's localhost Host and Origin check. A launch
+is a job: the page posts it with a job id, opens `/api/jobs/<id>/stream` and shows the download
+and start-up lines, which end in `running` or an `error`. `GET /api/client/launcher` is the one
+read the page polls (profiles with their running state, accounts, the default account, the
+servers a profile can join, and a refusal when the machine cannot run the client). The log tail is
+scrubbed of the harness token, the game's access token and every secret the registry or the
+accounts file holds (it keeps player names: the page is the account owner's own; only the
+diagnostics bundle hides them). No route returns a token.
+
+### Opening it
+
+| From | How |
+| --- | --- |
+| The desktop app | The **Play** button at the bottom of the sidebar opens the launcher in a window of its own, which remembers its size and place. A second press brings the open one forward. |
+| macOS | **Window → Game launcher** in the menu bar does the same. (Windows and Linux have no app menu bar; use the sidebar button.) |
+| The command line | `spawnloft ui --launcher` starts the panel and opens `/launcher` in the browser. If a panel is already running on the port, it opens that panel's launcher instead of failing. `--no-open` prints the address (`http://127.0.0.1:8770/launcher`) without opening it. |
+| A browser | Go to `/launcher` on a running panel. The sidebar button works there too, as a tab. |
+| A server card | The **Play** on a server card (and its ⋯ menu) opens the launcher with that server and its Minecraft version pre-filled. |
+
+In the desktop app the Microsoft sign-in opens in a small window of its own (not your browser)
+that closes by itself when the sign-in is done; in a browser it is a new tab. The launcher page
+refuses to be framed by other pages.
+
 ## Accounts
 
 By default the client plays **offline**: the player has a name and nothing else, exactly like a
@@ -102,13 +174,94 @@ spawnloft client set play account=Joogiebear
 ```
 
 `login` prints a code and a Microsoft address; you enter the code in your browser, on
-Microsoft's own page, and the command finishes when you have. No password passes through
-SpawnLoft. What it keeps is a refresh token, in `client/accounts.json`, a file only your user can
-read; the game gets a short-lived session token at each launch, and a token that is about to
-expire is refreshed before the launch. `client accounts` lists who is signed in, `client logout
-<name>` forgets one. An account on a profile (`account=<name>`) is used by every launch of it;
-`--account offline:<player name>` plays offline again for one run. `--as` and `--account` do not
-mix: a signed-in account brings its own name.
+Microsoft's own page, and the command finishes when you have (Ctrl-C gives up on it). No password
+passes through SpawnLoft. What it keeps is a refresh token, in `client/accounts.json`, a file only
+your user can read; the game gets a short-lived session token at each launch, and a token that is
+about to expire is refreshed before the launch. `client accounts` lists who is signed in, `client
+logout <name>` forgets one. An account on a profile (`account=<name>`) is used by every launch of
+it; `--account offline:<player name>` plays offline again for one run. `--as` and `--account` do
+not mix: a signed-in account brings its own name.
+
+Accounts are told apart by uuid; the name is what you type and what Mojang may let the person
+change. A profile's `account` key is stored as the uuid when the account is in the list (a key
+written as a name by an older SpawnLoft keeps working), and the CLI, the panel and the assistant
+show it as the name. The game launcher's offline accounts (below) are in the same file, as a name
+and the uuid an offline-mode server derives from it, with no tokens; `client logout <name>`
+removes one of those too.
+
+### Default account and precedence
+
+The game launcher keeps a **default account** (`defaultAccount` in `client/profiles.json`, a
+uuid): the first account added through the launcher, or whichever one you make the default
+there. It is only a preference. A launch plays as, in this order: `--as <player name>` (offline),
+then `--account <account>`, then the profile's own `account` key, then the default account, then
+offline under the profile's name. So an existing profile with no `account` plays as your
+Microsoft account the moment you sign in through the launcher and make it the default, which is
+right for a person and harmless on offline-mode servers. **An assistant launch never uses the
+default account**: `client_launch` plays offline unless the profile itself names an account and
+`assistantAccount` allows it. A default that points at an account you have since signed out is
+dropped, not an error; the launch falls through to offline.
+
+A running game's `state.json` says who started it (`launchedBy`: `cli`, `panel`, `launcher` or
+`assistant`), and `client status --json` and `client_status` show it.
+
+### Signing in from the launcher
+
+The game launcher (the panel's `/launcher` page, in the desktop app or a browser) signs in through
+Microsoft's own sign-in page instead of a code: OAuth authorization code with PKCE and a loopback
+redirect, the flow every launcher uses. The Azure registration (client id
+`946097b5-241d-4f83-9981-c6d0778e5507`, a public client, no secret anywhere) has exactly one
+redirect URI, `http://localhost/api/client/accounts/login/callback`; Microsoft matches localhost
+redirects on any port, so it covers the desktop app's per-launch port and the CLI panel's 8770,
+and the path has to match exactly. The chain after the Microsoft token (Xbox Live, XSTS,
+Minecraft, profile) is the one the device code runs, so Mojang's approval of the app id applies
+to both.
+
+How it runs, in the panel process (`src/client-login.mjs`):
+
+1. The page asks `POST /api/client/accounts/login`. The panel makes an in-memory record (a
+   random `state`, a PKCE verifier, the time) and answers `{ loginId, authorizeUrl }`. The
+   verifier and the state never leave the process except inside that URL.
+2. The page opens `GET /api/client/accounts/login/<loginId>/stream` (server-sent events; the
+   first event is `{ status: "pending" }`), then opens `authorizeUrl` in a window.
+3. Microsoft redirects the window to `GET /api/client/accounts/login/callback?code=…&state=…`.
+   A `state` that names the one live record is consumed at once, the stream says
+   `{ status: "finishing" }` (from then on closing the window is not a cancel), and the window
+   gets a short static page ("Finishing the sign-in in SpawnLoft. You can close this window."); anything
+   else, including a replay, is a 400 that changes nothing. The code is exchanged and the chain
+   runs after that answer, in the background.
+4. The outcome reaches the page on the stream only: `{ status: "done", account }` (name, uuid,
+   type, expiry) or `{ status: "failed", message }` with Microsoft's `access_denied`, an expired
+   code, the Xbox errors and a lost connection each mapped to one line. The first account that
+   signs in this way becomes the default account.
+
+`DELETE /api/client/accounts/login/<loginId>` cancels (the stream ends with `cancelled`). One
+sign-in runs at a time: a second `POST` is a 409 while the first still has an open stream, and
+replaces it when nobody is listening. A record whose stream has been gone for 10 seconds is
+dropped, unless the callback has already consumed it (the chain then finishes and saves the
+account even if the launcher window was closed meanwhile), and every record expires 10 minutes
+after it was made. The callback is the one route a
+page cannot reach by itself (it has no Origin header, being a top-level navigation), and it is
+useless without the state that exists only in the panel's memory. Nothing from the callback (the
+code, the state, Microsoft's error text) is written to `panel.log`; the log line is "signed in
+<name>".
+
+The accounts routes, all behind the panel's localhost Host and Origin check and none of them ever
+carrying a token:
+
+| Route | Does |
+| --- | --- |
+| `GET /api/client/accounts` | `{ accounts: [{ name, uuid, type, expiresAt, refreshFailedAt }], defaultAccount }` |
+| `POST /api/client/accounts/offline` `{ name }` | Adds an offline account (3 to 16 letters, digits, underscore) |
+| `POST /api/client/accounts/default` `{ uuid }` | Sets the default account (`null` clears it) |
+| `DELETE /api/client/accounts/<uuid>` | Signs out a Microsoft account or removes an offline one |
+
+`refreshFailedAt` is set on a Microsoft account when a refresh at launch fails (the launch itself
+fails with "sign in again"); a new sign-in clears it. `expiresAt` is the day-long game token and
+means nothing about whether the account still works, which is why the launcher shows "sign in
+again" from `refreshFailedAt` and not from the expiry. Every write to `accounts.json` re-reads
+the file and changes only its own entry, so a sign-in in the launcher and a `client login` or
+`client logout` in a terminal at the same time cannot lose each other.
 
 The account needs Minecraft: Java Edition and an Xbox profile; a child account must be allowed by
 an adult in its Microsoft family first. The sign-in itself goes through Microsoft's and Mojang's
@@ -142,9 +295,15 @@ makes it owner-only when run without `--json`. The game itself gets the access t
 command line, as every launcher does, where anyone who can list this user's processes can see it;
 it expires within a day, and the refresh token never leaves the accounts file.
 
-The whole sign-in has been run end to end on Windows: device code, Xbox Live, Minecraft login,
-profile, an online-mode join, a token refresh, and sign-out. On macOS and Linux the same code runs
-but has not been tried against Microsoft yet.
+**What has been tried.** The device-code sign-in has been run end to end on Windows: Xbox Live,
+Minecraft login, profile, an online-mode join, a token refresh, and sign-out. Games have launched
+on Windows, Linux x64 and Apple Silicon. The launcher's browser sign-in is covered by tests and its
+window by a run of the desktop shell on Linux, but **not yet verified**: the redirect through
+Microsoft's real sign-in page, signing in on macOS or Linux, the sign-in and the Play button inside
+the *packaged* Windows desktop app, and the macOS **Window** menu entry. One known unknown: on
+Windows `localhost` can resolve to `::1` before `127.0.0.1`, and the panel listens on `127.0.0.1`
+only; if the sign-in window ends on "can't reach this page", use `client login` meanwhile and
+report it.
 
 ## The harness
 
@@ -216,7 +375,7 @@ Everything client-side sits under the data folder, beside the servers, in `clien
 ```
 client/
   profiles.json              the profiles
-  accounts.json              the signed-in Microsoft accounts with their tokens (owner-only, see Accounts)
+  accounts.json              the signed-in Microsoft accounts with their tokens, and the launcher's offline accounts (owner-only, see Accounts)
   profiles/<name>/           one profile's game folder: options.txt, mods/, logs/latest.log,
                              screenshots/, saves/, crash-reports/, spawnloft-harness.json (while the harness runs)
   versions/<id>/             the client jar and its version JSON, one folder per version
@@ -255,7 +414,8 @@ that would not load, a crash, and a Java too old for the version.
 
 ## What it does not do
 
-- Sign in for an AI assistant. A person signs in on the command line; offline players join offline-mode servers only.
+- Sign in for an AI assistant. A person signs in, on the command line or in the launcher; offline players join offline-mode servers only.
+- Be a modpack launcher, news feed or store. The launcher starts profiles you made; mods go in the profile's `mods/` folder.
 - Download Java. Install Java 21 or newer yourself, as for a server.
 - Bundle mods or tweaks of its own. The only mod it ever installs is the harness, and only when a profile asks for it.
 - Run on Linux arm64, or on a machine with no display. The client needs a graphics driver; use bots there.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parseLdd, parseLdconfig, packageFamily, installHint, libraryEnv, libsDirFor, ensureLibraries, LIBS_FOLDER, fetchWithDnf, dnfPackagesFor, RPM_ARCH } from '../src/linux-libs.mjs'
+import { parseLdd, parseLdconfig, packageFamily, installHint, libraryEnv, libsDirFor, ensureLibraries, isMusl, LIBS_FOLDER, fetchWithDnf, dnfPackagesFor, RPM_ARCH } from '../src/linux-libs.mjs'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-libs-test-'))
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
@@ -72,6 +72,19 @@ test('an engine runs with its private libraries first, and only where it has any
   assert.equal(libraryEnv(tool, { LD_LIBRARY_PATH: '/opt/lib' }, 'linux').LD_LIBRARY_PATH, `${path.join(engine, LIBS_FOLDER)}:/opt/lib`)
   assert.equal(libraryEnv(tool, env, 'darwin'), env)
   assert.equal(libraryEnv(tool, env, 'win32'), env)
+})
+
+test('musl is read from ldd when ldd answers, and from the loader under /lib only when it does not', () => {
+  const ldd = (out, extra = {}) => () => ({ stdout: out, stderr: '', status: 0, ...extra })
+  const loader = (there) => (f) => there && /ld-musl-x86_64\.so\.1$/.test(f)
+  assert.equal(isMusl(ldd('musl libc (x86_64)\nVersion 1.2.4'), loader(false)), true)
+  assert.equal(isMusl(ldd('ldd (Ubuntu GLIBC 2.39-0ubuntu8) 2.39'), loader(false)), false)
+  // a glibc box with a stray musl loader (a static toolchain, an image's leftovers) is still glibc
+  assert.equal(isMusl(ldd('ldd (GNU libc) 2.38'), loader(true)), false)
+  // no ldd at all: the loader decides
+  assert.equal(isMusl(ldd('', { error: new Error('ENOENT'), status: null }), loader(true)), true)
+  assert.equal(isMusl(ldd('', { error: new Error('ENOENT'), status: null }), loader(false)), false)
+  assert.equal(isMusl(() => { throw new Error('spawn failed') }, loader(true)), true)
 })
 
 test('a binary with nothing missing needs no private folder', { skip: process.platform !== 'linux' }, () => {

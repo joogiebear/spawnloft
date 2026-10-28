@@ -8,6 +8,8 @@ const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
 const uiZoom = require('./ui-zoom')
 const updateChannel = require('./update-channel')
+const launcherWindow = require('./launcher-window')
+const loginWindow = require('./login-window')
 // ad-hoc packages can't take Squirrel.Mac updates; signed betas use the normal updater,
 // and missing provenance fails closed on mac
 const manualUpdates = process.platform === 'darwin' && (!app.isPackaged || buildInfo()?.macSigningMode !== 'signed')
@@ -38,6 +40,8 @@ function loadCore(rel) {
 
 let panelUrl = null
 let win = null
+// the game launcher's window while it is open; one at a time
+let launcher = null
 
 async function startPanel() {
   const ui = await loadCore('src/ui.mjs')
@@ -66,6 +70,10 @@ const ICON = process.platform === 'linux'
 // kept in Electron's userData, not the core's settings
 function windowStateFile() {
   return path.join(app.getPath('userData'), 'window-state.json')
+}
+
+function launcherStateFile() {
+  return path.join(app.getPath('userData'), 'launcher-window-state.json')
 }
 
 function uiZoomFile() {
@@ -191,10 +199,19 @@ function createWindow(loadUrl, theme = 'classic') {
     if (typeof url === 'string' && url.startsWith('https://')) shell.openExternal(url)
     return { action: 'deny' }
   }
-  // the one window the panel may open itself: a server console at ?console=<name>
+  // the windows the panel may open itself: a server console at ?console=<name>, and the game
+  // launcher at exactly /launcher (launcher-window.js)
+  const childPrefs = {
+    preload: path.join(__dirname, 'preload.js'),
+    nodeIntegration: false,
+    contextIsolation: true,
+    sandbox: true,
+  }
+  const launcherUrl = loadUrl + 'launcher'
+  let launcherState = null
   win.webContents.setWindowOpenHandler((details) => {
-    const { url } = details
-    if (typeof url === 'string' && url.startsWith(loadUrl) && /^\?console=[^&#]+$/.test(url.slice(loadUrl.length))) {
+    const kind = launcherWindow.windowKind(details.url, loadUrl)
+    if (kind === 'console') {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
@@ -205,25 +222,54 @@ function createWindow(loadUrl, theme = 'classic') {
           backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
           icon: fs.existsSync(ICON) ? ICON : undefined,
           autoHideMenuBar: true,
-          webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: false,
-            contextIsolation: true,
-            sandbox: true,
-            zoomFactor: zoom,
-          },
+          webPreferences: { ...childPrefs, zoomFactor: zoom },
+        },
+      }
+    }
+    if (kind === 'launcher') {
+      // Chromium hands a second window.open with the same name to the open window itself (see
+      // will-navigate below); this catches the cases where it cannot find it by name
+      if (focusLauncher()) return { action: 'deny' }
+      launcherState = windowState.load(launcherStateFile(), displayAreas(), launcherWindow.LAUNCHER_BOUNDS)
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: launcherState.width,
+          height: launcherState.height,
+          x: launcherState.x,
+          y: launcherState.y,
+          minWidth: windowState.MIN_WIDTH,
+          minHeight: windowState.MIN_HEIGHT,
+          title: launcherWindow.LAUNCHER_TITLE,
+          backgroundColor: theme === 'spawnloft' ? '#090d0d' : '#0c0e14',
+          icon: fs.existsSync(ICON) ? ICON : undefined,
+          autoHideMenuBar: true,
+          webPreferences: { ...childPrefs, zoomFactor: zoom },
         },
       }
     }
     return external(details)
   })
-  // console windows follow the same rules as the main window
-  win.webContents.on('did-create-window', (child) => {
+  // child windows follow the same rules as the main window; the launcher also remembers its place
+  win.webContents.on('did-create-window', (child, details) => {
     child.webContents.setWindowOpenHandler(external)
     trackZoom(child.webContents)
+    const isLauncher = details?.url === launcherUrl
     child.webContents.on('will-navigate', (e, url) => {
-      if (!url.startsWith(loadUrl)) e.preventDefault()
+      if (!url.startsWith(loadUrl)) return e.preventDefault()
+      // the panel opening the launcher again by name: bring it forward instead of reloading it,
+      // which would drop a sign-in or a form in progress. Not the window's first load, which comes
+      // through here too.
+      if (isLauncher && url === launcherUrl && child.webContents.getURL().startsWith(launcherUrl)) {
+        e.preventDefault()
+        focusLauncher()
+      }
     })
+    if (!isLauncher) return
+    launcher = child
+    child.on('closed', () => { if (launcher === child) launcher = null })
+    if (launcherState?.maximized) child.maximize()
+    windowState.track(child, launcherStateFile())
   })
   // the top frame must stay on the loopback URL it was opened at
   win.webContents.on('will-navigate', (e, url) => {
@@ -231,6 +277,56 @@ function createWindow(loadUrl, theme = 'classic') {
   })
   return win
 }
+
+function focusLauncher() {
+  if (!launcher || launcher.isDestroyed()) return false
+  if (launcher.isMinimized()) launcher.restore()
+  launcher.show()
+  launcher.focus()
+  return true
+}
+
+// The macOS menu item: the same window.open the sidebar's Play makes, so there is one way the
+// launcher window comes into being. Nothing to do while the setup wizard is up.
+function openLauncher() {
+  if (focusLauncher()) return
+  if (!panelUrl || !win || win.isDestroyed() || !win.webContents.getURL().startsWith(panelUrl)) return
+  win.webContents.executeJavaScript("void window.open('/launcher', 'spawnloft-launcher')", true).catch(() => {})
+}
+
+// The calls below are for the panel's own pages. The login window has no preload, so it cannot
+// make them; this also refuses a frame that has navigated off the panel.
+function fromPanel(e) {
+  const url = e.senderFrame?.url
+  return Boolean(panelUrl) && typeof url === 'string' && url.startsWith(panelUrl)
+}
+
+// Opens a launcher profile's folder in the file manager. The page gets { ok } and nothing else.
+ipcMain.handle('mcctl:openProfileFolder', async (e, name) => {
+  if (!fromPanel(e)) return { ok: false }
+  try {
+    const client = await loadCore('src/client.mjs')
+    const paths = await loadCore('src/client-paths.mjs')
+    return await launcherWindow.openProfileFolder(name, { getProfile: client.getProfile, profileDir: paths.profileDir, openPath: (dir) => shell.openPath(dir) })
+  } catch {
+    return { ok: false }
+  }
+})
+
+// Microsoft's sign-in page in its own window (login-window.js). Only the authorize URL the panel
+// made for this app and this panel's callback is accepted. Resolves once the window has closed.
+ipcMain.handle('mcctl:openMicrosoftLogin', async (e, url) => {
+  if (!fromPanel(e)) return { ok: false }
+  const auth = await loadCore('src/client-auth.mjs')
+  const port = Number(new URL(panelUrl).port)
+  if (!loginWindow.isAuthorizeUrl(url, { authorizeUrl: auth.AUTHORIZE_URL, clientId: auth.MSA_CLIENT_ID, port })) return { ok: false }
+  await loginWindow.open(url, {
+    port,
+    near: BrowserWindow.fromWebContents(e.sender),
+    icon: fs.existsSync(ICON) ? ICON : undefined,
+  })
+  return { ok: true }
+})
 
 ipcMain.handle('mcctl:pickFolder', async (_e, { title } = {}) => {
   const res = await dialog.showOpenDialog(win, {
@@ -444,10 +540,22 @@ if (process.platform === 'win32') app.setAppUserModelId('io.github.joogiebear.mc
 
 // no menu bar elsewhere: the default one is for a text editor, and copy/paste still work without
 // it. macOS routes editing shortcuts and Quit through the application menu.
+// The game launcher's entry on macOS is also Window > Game launcher; elsewhere it is the sidebar's
+// Play, which every platform has.
 Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
   { role: 'appMenu' },
   { role: 'editMenu' },
-  { role: 'windowMenu' },
+  {
+    role: 'windowMenu',
+    submenu: [
+      { role: 'minimize' },
+      { role: 'zoom' },
+      { type: 'separator' },
+      { label: 'Game launcher', click: () => openLauncher() },
+      { type: 'separator' },
+      { role: 'front' },
+    ],
+  },
 ]) : null)
 
 // two copies would bind two panels, and two supervisors could race the same instance's control pipe

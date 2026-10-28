@@ -16,7 +16,7 @@ const env = { ...process.env, MCCTL_DATA_ROOT: data, APPDATA: path.join(scratch,
   NODE_ENV: 'test', MCCTL_FAKE_CLIENT: path.join(root, 'test', 'fixtures', 'fake-client.mjs') }
 const secret = 'fixture-secret-never-leaves'
 
-const { createProfile, updateProfile, stop, status, launch } = await import('../src/client.mjs')
+const { createProfile, updateProfile, stop, status, launch, setDefaultAccount, getDefaultAccount } = await import('../src/client.mjs')
 const { saveAccounts } = await import('../src/client-auth.mjs')
 const { extractZip } = await import('../src/zip.mjs')
 const { putInstance } = await import('../src/registry.mjs')
@@ -44,6 +44,7 @@ createProfile('harn', { mc: '1.21.11', loader: 'fabric', loaderVersion: '0.19.5'
 after(async () => {
   try { await stop('harn') } catch {}
   try { await stop('acct') } catch {}
+  try { await stop('dflt') } catch {}
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
@@ -271,5 +272,24 @@ test('client_launch refuses a Microsoft-account profile until assistantAccount i
   const both = await one('client_launch', { profile: 'acct', player_name: 'x', wait: false })
   assert.equal(both.isError, true)
   assert.match(both.content[0].text, /not both/)
+  saveAccounts([])
+})
+
+test('client_launch ignores the launcher\'s default account: a profile without an account plays offline', async () => {
+  const far = new Date(Date.now() + 86400000).toISOString()
+  saveAccounts([{ type: 'microsoft', name: 'Fake', uuid: '12345678-1234-1234-1234-123456789abc', accessToken: secret, refreshToken: 'refresh-' + secret, expiresAt: far, xuid: '1', userType: 'msa', clientId: 'c' }])
+  setDefaultAccount('12345678-1234-1234-1234-123456789abc')
+  assert.equal(getDefaultAccount(), '12345678-1234-1234-1234-123456789abc')
+  createProfile('dflt', { mc: '1.21.11' })
+  const res = await one('client_launch', { profile: 'dflt', wait: false })
+  assert.equal(res.isError, undefined, res.content[0].text)
+  assert.deepEqual(res.structuredContent.account, { type: 'offline', name: 'dflt' })
+  assert.equal(readJson(clientStateFile('dflt')).launchedBy, 'assistant')
+  await one('client_quit', { profile: 'dflt' })
+  // the same launch from the command line plays as the default
+  const cli = await launch('dflt', { fakeJava: env.MCCTL_FAKE_CLIENT })
+  assert.deepEqual(cli.account, { type: 'microsoft', name: 'Fake' })
+  await stop('dflt')
+  setDefaultAccount(null)
   saveAccounts([])
 })
