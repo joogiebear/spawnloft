@@ -259,6 +259,7 @@
     --r-lg: 12px;
   }
 
+
   /* ---- base ------------------------------------------------------------------ */
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -289,146 +290,169 @@
   button.quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); }
   button.quiet:where(:hover:not(:disabled)) { background: var(--hover); border-color: var(--line); color: var(--ink); }
   button.sm { min-height: 28px; padding: 0 var(--s-3); font-size: var(--t-2); }
+  button.icon { width: 28px; padding: 0; }
   select, input { width: 100%; background: var(--recess); box-shadow: none; font-weight: 400; }
   select { appearance: none; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 6.5l3.5 3.5 3.5-3.5' fill='none' stroke='%239aa4ba' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
   input::placeholder { color: var(--ink-4); }
   input:focus, select:focus { background-color: var(--field-focus); border-color: var(--lapis-edge); }
+  input[type="checkbox"] { width: 16px; min-height: 16px; height: 16px; padding: 0; accent-color: var(--lapis); }
+  input[readonly] { color: var(--ink-3); border-style: dashed; }
+  input.bad, select.bad { border-color: var(--fault); }
   .field { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
-  .field > .label { margin-bottom: 0; }
   label.field > span, .field > span.label { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
+  .field > small.hint { font: var(--type-meta); }
+  small.hint.bad { color: var(--fault-ink); }
+  small.hint.warn { color: var(--warn-ink); }
+  .linkbtn { display: inline; min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; font: inherit; color: var(--lapis-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .linkbtn:where(:hover:not(:disabled)) { background: none; border: 0; color: var(--ink); }
+  .linkbtn[aria-pressed="true"] { color: var(--ink); text-decoration: none; font-weight: 600; cursor: default; }
 
-  /* ---- window ---------------------------------------------------------------- */
-  .app { display: grid; grid-template-columns: 196px minmax(0, 1fr); height: 100vh; min-width: 0; }
-  .rail { display: flex; flex-direction: column; background: var(--chrome); border-right: 1px solid var(--line-soft); padding: var(--s-4) var(--s-3) var(--s-3); gap: var(--s-1); }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 0 var(--s-2) var(--s-4); }
-  .brand svg { display: block; }
-  .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
-  .brand small { display: block; font-size: var(--t-1); color: var(--ink-3); margin-top: 3px; font-weight: 400; letter-spacing: .02em; }
-  .nav { display: flex; align-items: center; gap: var(--s-3); width: 100%; justify-content: flex-start; min-height: 36px; background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); font-size: var(--t-4); font-weight: 500; }
-  .nav .ico { font-size: 16px; }
-  .nav:where(:hover:not(:disabled)) { background: var(--hover); border-color: transparent; color: var(--ink); }
-  .nav[aria-current="page"] { background: var(--lapis-wash); color: var(--lapis-ink); border-color: var(--lapis-edge); }
-  .nav .count { margin-left: auto; font-size: var(--t-1); color: var(--ink-3); }
-  .rail .grow { min-height: var(--s-4); }
-
-  .chip { display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: 52px; padding: var(--s-2); text-align: left; justify-content: flex-start; background: var(--surface); }
-  .chip .who { min-width: 0; flex: 1; display: grid; gap: 2px; }
-  .chip .who b { font: var(--type-card); font-size: var(--t-3); overflow: hidden; text-overflow: ellipsis; }
-  .chip .who small { font-size: var(--t-1); color: var(--ink-3); font-weight: 400; }
-  .chip .ico { color: var(--ink-3); }
-  .chip.empty { border-style: dashed; color: var(--ink-2); }
-  .tile { width: 32px; height: 32px; border-radius: var(--r-xs); display: grid; place-items: center; font: 650 var(--t-3)/1 var(--display); color: #fff; flex: none; background: var(--tile, var(--lapis-dim)); text-shadow: 0 1px 0 rgba(0,0,0,.25); }
-  .tile.sm { width: 24px; height: 24px; font-size: var(--t-2); }
-  .tile.lg { width: 40px; height: 40px; font-size: var(--t-5); }
+  .tile { width: 28px; height: 28px; border-radius: var(--r-xs); display: grid; place-items: center; font: 650 var(--t-2)/1 var(--display); color: #fff; flex: none; background: var(--tile, var(--lapis-dim)); text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+  .tile.sm { width: 22px; height: 22px; font-size: var(--t-1); }
   .t1 { --tile: #3b5bdb; } .t2 { --tile: #2f9e6b; } .t3 { --tile: #b5651d; } .t4 { --tile: #8e4ec6; }
   :root[data-theme="spawnloft"] .t1 { --tile: #5f7f2a; }
   :root[data-theme="spawnloft"] .t4 { --tile: #7a4fa0; }
-  .chipwrap { position: relative; }
 
-  /* the popover that opens above the chip */
-  .switcher { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 4; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; }
-  .switcher .row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2); border-radius: var(--r-sm); font-size: var(--t-3); }
-  .switcher .row:hover { background: var(--hover-hi); }
-  .switcher .row .meta { margin-left: auto; font-size: var(--t-1); color: var(--ink-3); }
-  .switcher .row.cur { background: var(--lapis-wash); }
-  .switcher hr { border: 0; border-top: 1px solid var(--line-soft); margin: var(--s-1) 0; }
-  .switcher .act { color: var(--ink-2); }
-
-  .main { min-width: 0; overflow: auto; background: var(--void); }
-  .page { padding: var(--s-6) var(--s-6) var(--s-7); display: grid; gap: var(--s-5); align-content: start; max-width: 1100px; }
-  .page-head { display: flex; align-items: flex-end; gap: var(--s-4); }
-  .page-head h1 { font: var(--type-page); letter-spacing: var(--track-display); }
-  .page-head .hint { margin-top: 2px; }
-
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--card-radius); box-shadow: var(--lift); padding: var(--card-pad); min-width: 0; }
-  .card h2 { font: var(--type-section); }
-
-  /* notices */
   .notice { display: flex; gap: var(--s-3); align-items: flex-start; padding: var(--s-3) var(--s-4); border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--recess); font-size: var(--t-3); color: var(--ink-2); }
   .notice .ico { margin-top: 3px; font-size: 14px; }
   .notice b { color: var(--ink); font-weight: 600; }
   .notice.warn { background: var(--warn-wash); border-color: var(--warn-edge); color: var(--warn-ink); }
+  .notice.warn b { color: var(--warn-ink); }
   .notice.fault { background: var(--fault-wash); border-color: var(--fault-edge); color: var(--fault-ink); box-shadow: inset var(--spine) 0 0 var(--fault); }
+  .notice.fault b { color: var(--fault-ink); }
   .notice.live { background: var(--live-fill); border-color: var(--live-edge); color: var(--live-ink); }
   .notice .body { flex: 1; min-width: 0; display: grid; gap: var(--s-1); }
   .notice .acts { display: flex; gap: var(--s-2); flex: none; align-items: center; }
 
-  .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); white-space: nowrap; }
   .pill.live { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
   .pill.warn { color: var(--warn-ink); border-color: var(--warn-edge); background: var(--warn-wash); }
   .pill.fault { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-wash); }
   .pill.accent { color: var(--lapis-ink); border-color: var(--lapis-edge); background: var(--lapis-fill); }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+  .dot.live { color: var(--live); } .dot.idle { color: var(--idle); } .dot.warn { color: var(--warn); }
 
-  .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); width: max-content; margin-bottom: var(--s-1); }
-  .seg button { min-height: 26px; padding: 0 var(--s-3); font-size: var(--t-2); background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); border-radius: var(--r-xs); }
-  .seg button.on { background: var(--raised-hi); color: var(--ink); border-color: var(--line); }
-  .note-line { display: flex; gap: var(--s-2); align-items: flex-start; width: 100%; }
-  .note-line .ico { margin-top: 3px; flex: none; }
-  .field > small.hint { font: var(--type-meta); }
+  .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); width: max-content; max-width: 100%; flex-wrap: wrap; }
+  .seg button { min-height: 28px; padding: 0 var(--s-3); font-size: var(--t-2); font-weight: 600; background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); border-radius: var(--r-xs); }
+  .seg button[aria-pressed="true"] { background: var(--raised-hi); color: var(--ink); border-color: var(--line); }
 
-  /* ---- Play ------------------------------------------------------------------ */
-  .play { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--s-5); align-items: start; }
-  .hero { padding: var(--s-7) var(--s-6) var(--s-6); display: grid; gap: var(--s-5); justify-items: start; background: linear-gradient(180deg, var(--surface-hi), var(--surface)); }
-  .hero .eyebrow { display: flex; align-items: center; gap: var(--s-2); }
-  .hero h2 { font: var(--type-display); letter-spacing: var(--track-display); }
-  .launch { min-height: 56px; padding: 0 var(--s-7); font-size: var(--t-5); border-radius: var(--r); }
-  .launch .ico { font-size: 18px; }
-  .hero .does { font: var(--type-body); color: var(--ink-2); margin-top: calc(var(--s-3) * -1); }
-  .pickers { align-items: start; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); width: 100%; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
-  .facts { display: grid; gap: var(--s-3); }
-  .facts dl { margin: 0; display: grid; gap: var(--s-3); }
-  .facts dt { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
-  .facts dd { margin: 2px 0 0; font-size: var(--t-3); word-break: break-word; }
-  .facts .mono { color: var(--ink-2); }
+  .sk { background: linear-gradient(90deg, var(--raised) 0%, var(--raised-hi) 50%, var(--raised) 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: var(--r-xs); }
+  @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
-  .strip { width: 100%; display: grid; gap: var(--s-3); }
+  /* ---- window: a top bar and one stage ---------------------------------------- */
+  .app { display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+  .top { height: 56px; flex: none; display: flex; align-items: center; gap: var(--s-3); padding: 0 var(--s-5); background: var(--chrome); border-bottom: 1px solid var(--line-soft); position: relative; z-index: 3; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { display: block; }
+  .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
+  .brand small { display: block; font-size: var(--t-1); color: var(--ink-3); margin-top: 3px; font-weight: 400; letter-spacing: .02em; }
+  .menuhost { position: relative; min-width: 0; }
+
+  .chip { gap: var(--s-2); min-height: 40px; padding: 0 var(--s-2) 0 var(--s-1); background: var(--surface); max-width: 260px; }
+  .chip .who { display: grid; line-height: 1.2; text-align: left; min-width: 0; }
+  .chip .who b { font-size: var(--t-3); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .chip .who small { font-size: var(--t-1); color: var(--ink-3); font-weight: 400; }
+  .chip > .ico { color: var(--ink-3); }
+  .chip.empty { border-style: dashed; color: var(--ink-2); }
+  .chip[aria-expanded="true"] { border-color: var(--lapis-edge); background: var(--lapis-wash); }
+
+  .stage { flex: 1; min-height: 0; overflow: auto; position: relative; display: grid; justify-items: center; align-content: start; padding: 64px var(--s-6) var(--s-7);
+    background: radial-gradient(900px 420px at 50% 115%, var(--lapis-wash), transparent 70%), var(--void); }
+  .playbox { width: clamp(560px, 46vw, 820px); max-width: 100%; display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+
+  /* the split button: Play, and the setup it plays */
+  .split { display: flex; width: max-content; max-width: 100%; }
+  .split .play { min-height: 64px; padding: 0 var(--s-7); font: 650 clamp(var(--t-6), 1.6vw, 28px)/1 var(--display); letter-spacing: -.01em; border-radius: var(--r) 0 0 var(--r); gap: var(--s-3); }
+  .split .play .ico { font-size: 22px; }
+  .split .ver { min-height: 64px; padding: 0 var(--s-4); border-radius: 0 var(--r) var(--r) 0; border: 1px solid var(--primary-edge); border-left: 1px solid rgba(0,0,0,.28); background: color-mix(in srgb, var(--primary-top) 78%, black); color: var(--primary-ink); box-shadow: none; gap: var(--s-3); text-align: left; max-width: 260px; }
+  .split .ver:where(:hover:not(:disabled)) { background: color-mix(in srgb, var(--primary-top) 88%, black); border-color: var(--primary-edge); }
+  .split .ver .vt { display: grid; gap: 3px; min-width: 0; }
+  .split .ver .vt b { font-size: var(--t-3); font-weight: 650; }
+  .split .ver .vt small { font-size: var(--t-1); font-weight: 500; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+  .split .ver .ico { font-size: 14px; }
+  .does { font: var(--type-body); font-size: clamp(var(--t-3), .95vw, var(--t-5)); color: var(--ink-2); }
+  .does b { color: var(--ink); font-weight: 600; }
+  .why { display: flex; gap: var(--s-2); align-items: flex-start; font: var(--type-body); font-size: clamp(var(--t-3), .95vw, var(--t-5)); color: var(--warn-ink); }
+  .why .ico { margin-top: .3em; }
+  .why b { font-weight: 600; }
+
+  /* the Join field: a picked server, a typed address, or the title screen */
+  .join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-1) var(--s-3); align-items: center; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  .join > .hint { grid-column: 2; }
+  .joinbox { display: flex; align-items: center; gap: var(--s-2); min-height: 40px; padding: 0 var(--s-1) 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
+  .joinbox:focus-within { border-color: var(--lapis-edge); background: var(--field-focus); }
+  .joinbox.bad { border-color: var(--fault); }
+  .joinbox input { width: auto; border: 0; background: transparent; min-height: 38px; padding: 0; flex: 1; min-width: 4ch; font-size: var(--t-3); }
+  .joinbox input:focus { background: transparent; }
+  .joinbox input:focus-visible { outline: none; }
+  .joinbox input.picked { flex: 0 1 auto; field-sizing: content; font-weight: 650; }
+  .joinbox .hint { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .joinbox .chev { margin-left: auto; color: var(--ink-3); }
+
+  /* menus: under their button; a bottom sheet on a narrow window */
+  .menu { position: absolute; z-index: 6; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
+  .menu.vmenu { top: calc(100% + 6px); left: 0; }
+  .menu.who { top: calc(100% + 6px); right: 0; }
+  .menu.srv { top: calc(100% + 6px); left: 0; right: 0; width: auto; }
+  .menu.ask { top: calc(100% + 6px); left: 0; width: 400px; }
+  .menu .mhead { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); padding: var(--s-2) var(--s-2) var(--s-1); }
+  .menu .row { display: flex; align-items: center; gap: var(--s-2); border-radius: var(--r-sm); font-size: var(--t-3); min-height: 36px; }
+  .menu .row.cur { background: var(--lapis-wash); }
+  .menu button.row, .menu .row > button.pick { flex: 1; min-width: 0; min-height: 36px; justify-content: flex-start; gap: var(--s-3); padding: var(--s-1) var(--s-2); background: transparent; border-color: transparent; box-shadow: none; font-weight: 400; text-align: left; color: var(--ink); white-space: normal; }
+  .menu button.row:where(:hover:not(:disabled)), .menu .row > button.pick:where(:hover:not(:disabled)) { background: var(--hover-hi); border-color: transparent; }
+  .menu button.row.act { color: var(--ink-2); }
+  .menu .meta { margin-left: auto; font-size: var(--t-1); color: var(--ink-3); white-space: nowrap; }
+  .menu .meta.warn { color: var(--warn-ink); }
+  .menu .sub { display: grid; line-height: 1.25; min-width: 0; }
+  .menu .sub b { font-weight: 600; }
+  .menu .sub small { font-size: var(--t-1); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+  .menu hr { border: 0; border-top: 1px solid var(--line-soft); margin: var(--s-1) 0; width: 100%; }
+  .menu .inline { display: grid; grid-template-columns: 1fr auto; gap: var(--s-2); padding: var(--s-1) var(--s-2) var(--s-2); }
+  .menu .note { padding: var(--s-1) var(--s-2) var(--s-2); font: var(--type-meta); color: var(--ink-3); }
+  .menu .notice { margin: var(--s-1) 0; }
+  .menu > small.hint { padding: 0 var(--s-2) var(--s-2); }
+
+  .waiting { display: flex; align-items: flex-start; flex-wrap: wrap; gap: var(--s-2) var(--s-3); padding: var(--s-3); margin: var(--s-1) 0; border-radius: var(--r-sm); border: 1px solid var(--lapis-edge); background: var(--lapis-fill); color: var(--lapis-ink); font-size: var(--t-3); }
+  .waiting .spin { width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; border: 2px solid var(--lapis-edge); border-top-color: var(--lapis); animation: spin 1s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .waiting .grow { min-width: 0; flex: 1 1 200px; }
+  .waiting a { color: var(--lapis-ink); text-underline-offset: 3px; cursor: pointer; }
+  .waiting .acts { display: flex; gap: var(--s-3); align-items: center; margin-left: auto; }
+
+  /* a launch under way, or a game running: a card in the button's place */
+  .prog { display: grid; gap: var(--s-3); padding: var(--s-4) var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--lift); }
+  .prog .line { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+  .prog .line b { font: var(--type-section); }
+  .prog .line .hint { margin-left: auto; }
   .bar { height: 8px; border-radius: 999px; background: var(--recess); border: 1px solid var(--line-soft); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--lapis); border-radius: 999px; }
   .bar.indet i { width: 30%; margin-left: 20%; opacity: .7; }
-  .strip .line { display: flex; align-items: baseline; gap: var(--s-3); }
-  .strip .line b { font: var(--type-section); }
-  .strip .line .hint { margin-left: auto; }
-  .steps { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+  .steps { display: flex; gap: var(--s-3); flex-wrap: wrap; }
   .step { font-size: var(--t-1); color: var(--ink-4); display: inline-flex; gap: 5px; align-items: center; }
   .step.done { color: var(--live-ink); }
   .step.now { color: var(--lapis-ink); font-weight: 650; }
-  .runrow { display: flex; align-items: center; gap: var(--s-4); width: 100%; }
+  .runrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .runrow .stop { min-height: 48px; padding: 0 var(--s-6); font-size: var(--t-5); border-radius: var(--r); }
+  .path { font: var(--type-mono); font-size: var(--t-2); color: var(--ink-3); word-break: break-all; }
 
-  .logcard { padding: 0; overflow: hidden; }
-  .loghead { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
-  .loghead b { font: var(--type-card); font-size: var(--t-3); }
-  pre.log { margin: 0; padding: var(--s-3) var(--s-4); background: var(--sunken); border-top: 1px solid var(--line-soft); font: var(--type-mono); font-size: var(--t-2); color: var(--console-ink); overflow: auto; max-height: 188px; line-height: 1.55; white-space: pre; }
-  pre.log .ts { color: var(--ink-4); } pre.log .w { color: var(--warn-ink); } pre.log .e { color: var(--fault-ink); }
+  pre.log { margin: 0; width: 100%; padding: var(--s-2) var(--s-3); background: var(--sunken); border: 1px solid var(--line-soft); border-radius: var(--r-xs); font: var(--type-mono); font-size: var(--t-2); color: var(--console-ink); line-height: 1.55; white-space: pre; overflow: auto; max-height: 220px; }
+  pre.log .w { color: var(--warn-ink); } pre.log .e { color: var(--fault-ink); }
 
-  /* skeletons: loading states */
-  .sk { background: linear-gradient(90deg, var(--raised) 0%, var(--raised-hi) 50%, var(--raised) 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: var(--r-xs); }
-  @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-  @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+  /* the one full-stage block: the panel is not answering */
+  .nothing { display: grid; justify-items: center; text-align: center; gap: var(--s-3); max-width: 420px; margin-top: var(--s-7); }
+  .nothing .glyph { width: 48px; height: 48px; border-radius: var(--r-sm); border: 1px dashed var(--edge); display: grid; place-items: center; color: var(--ink-3); font-size: 20px; }
+  .nothing h2 { font: var(--type-section); }
+  .nothing p { color: var(--ink-2); font-size: var(--t-3); }
 
-  /* empty states */
-  .empty-state { display: grid; justify-items: center; text-align: center; gap: var(--s-3); padding: var(--s-7) var(--s-5); }
-  .empty-state .glyph { width: 48px; height: 48px; border-radius: var(--r); border: 1px dashed var(--edge); display: grid; place-items: center; color: var(--ink-3); font-size: 22px; }
-  .empty-state h2 { font: var(--type-section); }
-  .empty-state p { color: var(--ink-2); font-size: var(--t-3); max-width: 46ch; }
-  .empty-state .acts { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
-
-  /* ---- Profiles -------------------------------------------------------------- */
-  .list { padding: 0; overflow: hidden; }
-  .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-faint); }
-  .item:first-child { border-top: 0; }
-  .item .name { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-  .item .name b { font: var(--type-card); }
-  .item .sub { display: flex; gap: var(--s-4); flex-wrap: wrap; margin-top: 4px; font-size: var(--t-2); color: var(--ink-3); }
-  .item .sub span { display: inline-flex; gap: 5px; align-items: center; }
-  .item .acts { display: flex; gap: var(--s-2); align-items: center; }
-  .item.running { box-shadow: inset var(--spine) 0 0 var(--live); background: var(--live-wash); }
-  .item .confirm { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); background: var(--fault-wash); border-radius: var(--r-sm); font-size: var(--t-3); color: var(--fault-ink); }
-  .item .confirm label { display: inline-flex; gap: var(--s-2); align-items: center; color: var(--ink-2); }
-  input[type="checkbox"] { width: 16px; min-height: 16px; height: 16px; padding: 0; accent-color: var(--lapis); }
-  .form { display: grid; gap: var(--s-5); }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
-  .form-grid .full { grid-column: 1 / -1; }
+  /* the setup sheet */
+  .backdrop { position: fixed; inset: 0; background: var(--dialog-backdrop); z-index: 8; display: grid; place-items: start center; padding: var(--s-6) var(--s-5); overflow: auto; }
+  .sheet { width: 640px; max-width: 100%; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); display: grid; gap: var(--s-4); padding: var(--s-5) var(--s-6); }
+  .sheet h2 { font: var(--type-page); letter-spacing: var(--track-display); }
+  .sheet h2 span { color: var(--ink-3); font-weight: 500; }
+  .sheet .sub { font: var(--type-meta); color: var(--ink-3); margin-top: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3) var(--s-4); }
+  .grid2 .full { grid-column: 1 / -1; }
   .switchrow { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
   .switchrow .txt { flex: 1; min-width: 0; font-size: var(--t-3); }
   .switchrow .txt b { display: block; font-weight: 600; }
@@ -438,56 +462,33 @@
   .switch[aria-checked="true"] { background: var(--switch-top); border-color: var(--switch-top); }
   .switch[aria-checked="true"]::after { left: 18px; background: var(--control-mark); }
   .switch:disabled { opacity: .4; }
-  details.adv { border: 1px solid var(--line); border-radius: var(--r-sm); }
-  details.adv summary { cursor: pointer; padding: var(--s-3) var(--s-4); font-size: var(--t-3); color: var(--ink-2); }
+  details.adv { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
+  details.adv summary { cursor: pointer; padding: var(--s-3) var(--s-4); font-size: var(--t-3); font-weight: 600; color: var(--ink-2); }
   details.adv .in { padding: 0 var(--s-4) var(--s-4); display: grid; gap: var(--s-4); }
-  .formfoot { display: flex; gap: var(--s-2); justify-content: flex-end; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
-  .formfoot .hint { margin-right: auto; align-self: center; }
-  input[readonly] { color: var(--ink-3); border-style: dashed; }
+  .sheet .foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2); padding-top: var(--s-3); border-top: 1px solid var(--line-soft); }
+  .sheet .foot .hint { margin-right: auto; }
+  .confirm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--fault-edge); background: var(--fault-wash); border-radius: var(--r-sm); font-size: var(--t-3); color: var(--fault-ink); }
+  .confirm b { font-weight: 600; }
+  .confirm label { display: inline-flex; gap: var(--s-2); align-items: center; color: var(--ink-2); }
 
-  /* ---- Accounts -------------------------------------------------------------- */
-  .acct { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-5); border-top: 1px solid var(--line-faint); }
-  .acct:first-child { border-top: 0; }
-  .acct .nm { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-  .acct .nm b { font: var(--type-card); }
-  .acct .uuid { font: var(--type-mono); font-size: var(--t-1); color: var(--ink-4); margin-top: 3px; }
-  .acct .acts { display: flex; gap: var(--s-2); }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-5); align-items: start; }
-  .add h2 { margin-bottom: var(--s-2); }
-  .add .hint { margin-bottom: var(--s-4); }
-  .add .row { display: flex; gap: var(--s-2); align-items: flex-end; }
-  .add .row label { flex: 1; }
-  .waiting { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-radius: var(--r-sm); border: 1px solid var(--lapis-edge); background: var(--lapis-fill); color: var(--lapis-ink); font-size: var(--t-3); }
-  .waiting .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--lapis-edge); border-top-color: var(--lapis); animation: spin 1s linear infinite; flex: none; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .waiting .spin { animation: none; } }
-  .waiting .grow { min-width: 0; }
-  .waiting a { color: var(--lapis-ink); text-underline-offset: 3px; cursor: pointer; }
-
-  /* narrow windows: 900-1100 */
-  @media (max-width: 1199px) { .play { grid-template-columns: minmax(0, 1fr); } .facts { display: none; } }
-  @media (max-width: 1060px) { .page { padding: var(--s-5) var(--s-5) var(--s-6); } .pickers, .form-grid, .two { grid-template-columns: 1fr; } .hero { padding: var(--s-6) var(--s-5); } }
-
-  /* ---- wiring (L3b) ------------------------------------------------------------ */
-  .linkbtn { display: inline; min-height: 0; padding: 0; border: 0; background: none; box-shadow: none; font: inherit; color: var(--lapis-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-  .linkbtn:where(:hover:not(:disabled)) { background: none; border: 0; color: var(--ink); }
-  .linkbtn[aria-pressed="true"] { color: var(--ink); text-decoration: none; font-weight: 600; cursor: default; }
-  input.bad, select.bad { border-color: var(--fault); }
-  small.hint.bad { color: var(--fault-ink); }
-  small.hint.warn { color: var(--warn-ink); }
-  .switcher button.row { width: 100%; min-height: 0; justify-content: flex-start; background: transparent; border-color: transparent; box-shadow: none; font-weight: 400; color: var(--ink); text-align: left; }
-  .switcher button.row.act { color: var(--ink-2); }
-  .switcher button.row:where(:hover:not(:disabled)) { background: var(--hover-hi); border-color: transparent; }
-  .switcher button.row.cur { background: var(--lapis-wash); }
-  .logcard.closed pre.log { display: none; }
-  .notice .close { margin-left: var(--s-1); }
-  .waiting .acts { display: flex; gap: var(--s-3); align-items: center; flex: none; }
-  .hero .warnline { color: var(--warn-ink); }
+  /* narrow windows: the column fills, the Join label sits above, menus come up from the bottom */
+  @media (max-width: 699px) {
+    .top { padding: 0 var(--s-4); }
+    .stage { padding: var(--s-5) var(--s-4) var(--s-6); }
+    .playbox { width: 100%; }
+    .split { width: 100%; }
+    .split .play { flex: 1; padding: 0 var(--s-5); }
+    .join { grid-template-columns: minmax(0, 1fr); }
+    .join > .hint { grid-column: 1; }
+    .menu, .menu.vmenu, .menu.who, .menu.srv, .menu.ask { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 75vh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding: var(--s-3) var(--s-3) var(--s-5); }
+    .grid2 { grid-template-columns: minmax(0, 1fr); }
+    .sheet { padding: var(--s-4); }
+  }
+  @media (prefers-reduced-motion: reduce) { .sk, .waiting .spin { animation: none; } button, .switch::after { transition: none; } }
 </style>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z" fill="currentColor"/></symbol>
-  <symbol id="i-profiles" viewBox="0 0 16 16"><path d="M2.5 2.5h4.5v4.5H2.5zM9 2.5h4.5v4.5H9zM2.5 9H7v4.5H2.5zM9 9h4.5v4.5H9z"/></symbol>
   <symbol id="i-user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.75"/><path d="M2.5 14c.4-2.8 2.6-4.5 5.5-4.5s5.1 1.7 5.5 4.5"/></symbol>
   <symbol id="i-chev" viewBox="0 0 16 16"><path d="M4.5 6.5l3.5 3.5 3.5-3.5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
@@ -497,28 +498,27 @@
   <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.25v4M8 4.75v.5"/></symbol>
   <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3.25 3.25L13 4.75"/></symbol>
   <symbol id="i-x" viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></symbol>
-  <symbol id="i-edit" viewBox="0 0 16 16"><path d="M2.5 13.5l.75-3.25L10.5 3l2.5 2.5-7.25 7.25z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.25"/><path d="M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4L5 11M11 5l1.4-1.4"/></symbol>
   <symbol id="i-ext" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5L7 9M11.5 9.5v4h-9v-9h4"/></symbol>
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z" fill="var(--cube-top)"/><path d="M3.5 7.25L12 12v9.5l-8.5-4.75z" fill="var(--cube-left)"/><path d="M20.5 7.25L12 12v9.5l8.5-4.75z" fill="var(--cube-right)"/></symbol>
 </svg>
 
 <div class="app">
-  <nav class="rail" aria-label="Launcher">
-    <div class="brand"><svg width="24" height="24"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Game launcher</small></div></div>
-    <button class="nav" data-go="play"><svg class="ico"><use href="#i-play"/></svg>Play</button>
-    <button class="nav" data-go="profiles"><svg class="ico"><use href="#i-profiles"/></svg>Profiles<span class="count" id="nProfiles"></span></button>
-    <button class="nav" data-go="accounts"><svg class="ico"><use href="#i-user"/></svg>Accounts<span class="count" id="nAccts"></span></button>
-    <div class="grow"></div>
-    <div class="chipwrap" id="chipwrap"></div>
-  </nav>
-  <main class="main" id="main"></main>
+  <header class="top">
+    <div class="brand"><svg width="24" height="24" aria-hidden="true"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Launcher</small></div></div>
+    <span class="grow"></span>
+    <div class="menuhost" data-menu="account" id="chipwrap"></div>
+  </header>
+  <main class="stage" id="stage"></main>
+  <div id="sheet"></div>
 </div>
 
 <script>
-  // The launcher: Play, Profiles and Accounts on the panel's client routes (CLIENT.md). Everything
-  // shown here that came from the panel - account, profile and server names, version ids, log
-  // lines, error messages - goes into the page as text: h() is the only way this script builds
-  // DOM, and it never parses markup.
+  // The launcher: one Play screen on the panel's client routes (CLIENT.md). The account, the setup
+  // (a profile, in the API) and where to join are each one control on it, and each opens in place.
+  // Everything shown here that came from the panel - account, profile and server names, version
+  // ids, log lines, error messages - goes into the page as text: h() is the only way this script
+  // builds DOM, and it never parses markup.
   'use strict'
 
   const POLL_MS = 3000
@@ -530,6 +530,8 @@
   const NEW_PROFILE_KEY = 'spawnloft.launcher.newProfile'
   const JOB_KEY = 'spawnloft.launcher.job'
   const PICK_KEY = 'spawnloft.launcher.profile'
+  // per profile, where Join pointed last: { server } or { address }; nothing is the title screen
+  const JOIN_KEY = 'spawnloft.launcher.join'
   const CALLBACK_URI = 'http://localhost/api/client/accounts/login/callback'
   const STEPS = ['Java', 'Version', 'Files', 'Server', 'Start']
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
@@ -593,20 +595,18 @@
     return { name: null, type: 'offline' }
   }
 
-  // The servers the Server picker offers a profile: the ones on its version, and the one the
-  // profile names even when it is on another. An online-mode server is listed but blocked for an
-  // offline player.
+  // The servers the Join menu offers a profile: every SpawnLoft server, with a note on the ones
+  // that run another version. An online-mode server is listed but blocked for an offline player.
   function serverChoices(profile, servers, accountType) {
-    return servers
-      .filter((s) => s.mc === profile.mc || s.name === profile.server)
-      .map((s) => ({
-        name: s.name,
-        label: s.label,
-        status: s.status,
-        stopped: STOPPED.has(s.status),
-        otherVersion: s.mc === profile.mc ? null : s.mc,
-        blocked: s.onlineMode === true && accountType !== 'microsoft' ? 'needs a Microsoft account' : null,
-      }))
+    return servers.map((s) => ({
+      name: s.name,
+      label: s.label,
+      mc: s.mc,
+      status: s.status,
+      stopped: STOPPED.has(s.status),
+      otherVersion: s.mc && s.mc !== profile.mc ? s.mc : null,
+      blocked: s.onlineMode === true && accountType !== 'microsoft' ? 'needs a Microsoft account' : null,
+    }))
   }
 
   // The version picker's rows: releases, then snapshots too, then everything.
@@ -616,16 +616,16 @@
     return versions.filter((v) => v.type === 'release')
   }
 
-  // What a failed launch looks like on the Play screen.
+  // What a failed launch looks like on the Play screen. `fix` names the one control that helps.
   function launchNotice(message) {
     const text = String(message ?? 'the launch failed')
     if (/is being launched/.test(text)) {
       return { tone: 'warn', title: `Another launch is already in progress: ${text}`, text: 'This page checks again every few seconds and unlocks when it finishes.', busy: true }
     }
     if (/requires a Microsoft account/.test(text)) {
-      return { tone: 'fault', title: `Can't launch: ${text.replace(/; sign in or pick another server$/, '')}`, text: 'Sign in with a Microsoft account, or pick another server.', go: 'accounts' }
+      return { tone: 'fault', title: `Can't play: ${text.replace(/; sign in or pick another server$/, '')}`, text: 'Sign in with a Microsoft account, or join another server.', fix: 'sign-in' }
     }
-    return { tone: 'fault', title: 'Can\'t launch', text: sentence(text) }
+    return { tone: 'fault', title: 'Can\'t play', text: sentence(text) }
   }
 
   // Which watched games ended within CRASH_WINDOW_MS of starting without a Stop from this page.
@@ -646,7 +646,7 @@
     return out
   }
 
-  // The keys the Edit form changed, as PATCH sends them. A running profile keeps the keys that
+  // The keys the Edit sheet changed, as PATCH sends them. A running profile keeps the keys that
   // make up its command line (the panel refuses them too); a new version alone lets the panel
   // pick a loader build for it.
   function profilePatch(before, next) {
@@ -657,6 +657,46 @@
     if (patch.mc !== undefined && patch.loaderVersion === undefined) delete patch.loaderVersion
     if (before.running) for (const k of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness']) delete patch[k]
     return patch
+  }
+
+  // The name a setup gets when nobody gives it one: its version, made into a profile name
+  // ("1.21.11" -> "1-21-11", "-fabric" for Fabric), then -2, -3... past the names already taken.
+  function nameBase(mc, loader) {
+    let base = String(mc ?? '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^[-_]+|-+$/g, '').slice(0, 21)
+    if (!base) base = 'setup'
+    return loader === 'fabric' ? `${base}-fabric` : base
+  }
+
+  function autoName(mc, loader, taken) {
+    const base = nameBase(mc, loader)
+    const used = new Set(taken.map((n) => n.toLowerCase()))
+    if (!used.has(base.toLowerCase())) return base
+    for (let i = 2; ; i++) if (!used.has(`${base}-${i}`.toLowerCase())) return `${base}-${i}`
+  }
+
+  // The name a person gave a setup, or null when it is the one autoName made for it.
+  function givenName(p) {
+    const base = nameBase(p.mc, p.loader).toLowerCase()
+    const name = String(p.name ?? '')
+    const low = name.toLowerCase()
+    return low === base || (low.startsWith(base) && /^-\d+$/.test(low.slice(base.length))) ? null : name
+  }
+
+  // A setup by what it is: "1.21.11 · Vanilla", "1.21.1 · Fabric".
+  function setupTitle(p) {
+    return `${p.mc} · ${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}`
+  }
+
+  // The line under the Play button, as text and bold parts: [ 'Opens ', { b: 'Minecraft 1.21.11' }, ... ].
+  // `o` is { mc, fabric, who, server, address, startsServer }.
+  function playSentence(o) {
+    const { mc, fabric, who, server, address, startsServer } = o
+    const what = { b: `Minecraft ${mc}${fabric ? ' (Fabric)' : ''}` }
+    const as = { b: who ?? 'an offline player' }
+    if (server && startsServer) return ['Starts ', { b: server }, ' first (up to 2 minutes), then opens ', what, ' and joins it as ', as, '.']
+    if (server) return ['Opens ', what, ' and joins ', { b: server }, ' as ', as, '.']
+    if (address) return ['Opens ', what, ' and joins ', { b: address }, ' as ', as, '.']
+    return ['Opens ', what, ' on the title screen as ', as, '.']
   }
 
   function sentence(text) {
@@ -684,6 +724,10 @@
   function loaderText(profile) {
     if (profile.loader !== 'fabric') return 'Vanilla'
     return profile.loaderVersion ? `Fabric ${profile.loaderVersion}` : 'Fabric'
+  }
+
+  function statusText(status) {
+    return sentence(String(status ?? 'unknown'))
   }
 
   function clockTime(iso) {
@@ -729,25 +773,18 @@
     return svg
   }
 
-  const page = (...kids) => h('div', { class: 'page' }, ...kids)
   const pill = (tone, text, dot = false) => h('span', { class: tone ? `pill ${tone}` : 'pill' }, dot && h('span', { class: 'dot' }), text)
   const tile = (account, size = '') => h('span', { class: `tile ${size} ${tileClass(account.uuid ?? account.name)}`.replace(/\s+/g, ' ') }, initials(account.name))
+  // playSentence's parts as nodes
+  const parts = (list) => list.map((x) => (typeof x === 'string' ? x : h('b', { text: x.b })))
 
-  function head(title, hint, ...right) {
-    return h('div', { class: 'page-head' }, h('div', {}, h('h1', { text: title }), hint && h('p', { class: 'hint', text: hint })), right.length ? [h('span', { class: 'grow' }), ...right] : null)
-  }
-
-  // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose }
-  function notice({ tone = '', title, text, acts = [], onclose }) {
+  // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose, extra: node }
+  function notice({ tone = '', title, text, acts = [], onclose, extra }) {
     const icon = tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'info'
     return h('div', { class: `notice ${tone}`.trim(), role: tone === 'fault' ? 'alert' : 'status' }, ico(icon),
-      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text })),
+      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text }), extra),
       (acts.length || onclose) && h('div', { class: 'acts' }, acts,
-        onclose && h('button', { class: 'sm quiet close', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))))
-  }
-
-  function emptyState(glyph, title, text, ...acts) {
-    return h('div', { class: 'card' }, h('div', { class: 'empty-state' }, h('div', { class: 'glyph' }, ico(glyph)), h('h2', { text: title }), text && h('p', { text }), acts.length && h('div', { class: 'acts' }, acts)))
+        onclose && h('button', { class: 'sm quiet icon', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))))
   }
 
   const sk = (style) => h('div', { class: 'sk', style })
@@ -800,53 +837,109 @@
   const S = {
     summary: null,
     down: false,
-    screen: 'play',
     pick: stored('local', PICK_KEY),
-    // per profile: { mode: 'yours' | 'other', server: '' (title screen) or a name, address }
-    targets: {},
+    // per profile: { server: a name or null, address: what was typed }; neither is the title screen
+    targets: loadTargets(),
     job: null,
     // profile -> { since, stopping }: games this page watches for an early exit
     watch: {},
     crash: null,
     notice: null,
+    // the outcome of a change made in the sheet or a menu, above the button until dismissed
+    flash: null,
     log: { profile: null, lines: [] },
-    logOpen: true,
     stopping: null,
-    // Profiles: 'list' | 'form'; the form's values live in S.form so a re-render keeps them
-    profiles: 'list',
-    form: null,
-    removing: null,
-    profNotice: null,
+    // the open menu: 'account' | 'version' | 'join' | null
+    menu: null,
+    // the setup sheet's values while it is open, so a re-render keeps them
+    sheet: null,
     versions: null,
     versionShow: 'release',
     login: null,
     acctNotice: null,
     offline: { name: '', error: null },
-    switcher: false,
+  }
+
+  function loadTargets() {
+    const out = {}
+    let saved = null
+    try { saved = JSON.parse(stored('local', JOIN_KEY) ?? 'null') } catch { /* ignored */ }
+    if (saved && typeof saved === 'object') {
+      for (const [name, t] of Object.entries(saved)) {
+        if (!t || typeof t !== 'object') continue
+        out[name] = { server: typeof t.server === 'string' && t.server ? t.server : null, address: typeof t.address === 'string' ? t.address.slice(0, 260) : '' }
+      }
+    }
+    return out
+  }
+
+  function saveTargets() {
+    const out = {}
+    for (const [name, t] of Object.entries(S.targets)) {
+      if (t.server) out[name] = { server: t.server }
+      else if (t.address.trim()) out[name] = { address: t.address.trim() }
+      else out[name] = {}
+    }
+    stored('local', JOIN_KEY, JSON.stringify(out))
   }
 
   const profilesNow = () => S.summary?.profiles ?? []
   const accountsNow = () => S.summary?.accounts ?? []
   const serversNow = () => S.summary?.servers ?? []
   const profileNamed = (name) => profilesNow().find((p) => p.name === name) ?? null
+  const defaultAccount = () => accountsNow().find((a) => a.uuid === S.summary?.defaultAccount) ?? null
 
   function currentProfile() {
     const list = profilesNow()
     return profileNamed(S.pick) ?? list.find((p) => p.running) ?? list[0] ?? null
   }
 
+  // A profile seen for the first time joins the server it names, if any.
   function targetFor(p) {
-    if (!S.targets[p.name]) S.targets[p.name] = { mode: 'yours', server: p.server ?? '', address: '' }
+    if (!S.targets[p.name]) S.targets[p.name] = { server: p.server ?? null, address: '' }
     return S.targets[p.name]
   }
 
-  function go(screen) {
-    S.screen = screen
-    S.switcher = false
-    if (screen === 'profiles' && S.profiles === 'form' && !S.form) S.profiles = 'list'
-    try { history.replaceState(null, '', '#' + screen) } catch { /* file: or a sandbox */ }
+  function setTarget(p, { server = null, address = '' }) {
+    S.targets[p.name] = { server, address }
+    saveTargets()
+  }
+
+  function pickProfile(name) {
+    S.pick = name
+    stored('local', PICK_KEY, name)
+  }
+
+  // ---- menus ---------------------------------------------------------------------------------
+
+  function openMenu(which, { focus = true } = {}) {
+    S.menu = which
     render()
-    $('main').scrollTop = 0
+    if (focus) {
+      const first = document.querySelector('.menu button:not(:disabled), .menu input')
+      first?.focus({ preventScroll: true })
+    }
+  }
+
+  function closeMenu({ refocus = false } = {}) {
+    const was = S.menu
+    if (!was) return
+    S.menu = null
+    render()
+    if (refocus) $({ account: 'chip', version: 'verBtn', join: 'join' }[was])?.focus({ preventScroll: true })
+  }
+
+  const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
+
+  // Up and down move through a menu's buttons, as in any menu.
+  function menuKeys(e) {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const items = [...e.currentTarget.querySelectorAll('button:not(:disabled), input')]
+    if (!items.length) return
+    e.preventDefault()
+    const at = items.indexOf(document.activeElement)
+    const next = e.key === 'ArrowDown' ? (at + 1) % items.length : (at <= 0 ? items.length - 1 : at - 1)
+    items[next].focus()
   }
 
   // ---- render --------------------------------------------------------------------------------
@@ -854,210 +947,251 @@
   let lastKey = ''
 
   function render() {
-    renderRail()
     // a re-render (a poll, a keystroke that changes a hint) keeps the focused field and caret
     const active = document.activeElement
     const keep = active?.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null
-    let body
-    if (S.down) body = unreachablePage()
-    else if (S.screen === 'profiles') body = profilesPage()
-    else if (S.screen === 'accounts') body = accountsPage()
-    else body = playPage()
-    $('main').replaceChildren(body)
+    $('chipwrap').replaceChildren(...accountChip())
+    $('stage').replaceChildren(S.down ? unreachableView() : playView())
+    $('sheet').replaceChildren(...(S.sheet && !S.down ? [sheetView()] : []))
     if (keep) {
       const el = $(keep.id)
-      if (el) {
+      if (el && el !== document.activeElement) {
         el.focus({ preventScroll: true })
         try { if (keep.start !== null && keep.start !== undefined) el.setSelectionRange(keep.start, keep.end) } catch { /* not a text field */ }
       }
     }
   }
 
-  function renderRail() {
-    document.querySelectorAll('.nav').forEach((n) => {
-      if (n.dataset.go === S.screen) n.setAttribute('aria-current', 'page')
-      else n.removeAttribute('aria-current')
-    })
-    $('nProfiles').textContent = S.summary ? String(profilesNow().length) : ''
-    $('nAccts').textContent = S.summary ? String(accountsNow().length) : ''
+  // ---- the account chip and its menu -----------------------------------------------------------
+
+  function accountChip() {
+    const def = defaultAccount()
+    const open = S.menu === 'account'
+    const attrs = { id: 'chip', 'aria-haspopup': 'menu', 'aria-expanded': String(open), 'aria-controls': 'menuAccount', onclick: toggleMenu('account') }
+    const chip = def
+      ? h('button', { ...attrs, class: 'chip' }, tile(def), h('span', { class: 'who' }, h('b', { text: def.name }),
+        h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev'))
+      : h('button', { ...attrs, class: 'chip empty' }, h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
+        h('span', { class: 'who' }, h('b', { text: 'Not signed in' }), h('small', { text: S.login ? 'Signing in…' : 'Sign in or play offline' })), ico('chev'))
+    return [chip, open && accountMenu(def)].filter(Boolean)
+  }
+
+  function accountMenu(def) {
     const accounts = accountsNow()
-    const def = accounts.find((a) => a.uuid === S.summary?.defaultAccount) ?? null
-    const kids = []
-    if (S.switcher && accounts.length) kids.push(switcher(accounts, def))
-    if (def) {
-      kids.push(h('button', { class: 'chip', 'aria-haspopup': 'menu', 'aria-expanded': String(S.switcher), onclick: toggleSwitcher },
-        tile(def), h('span', { class: 'who' }, h('b', { text: def.name }), h('small', { text: def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev')))
-    } else {
-      kids.push(h('button', { class: 'chip empty', onclick: accounts.length ? toggleSwitcher : () => go('accounts') },
-        h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
-        h('span', { class: 'who' }, h('b', { text: 'No account' }), h('small', { text: accounts.length ? 'Pick a default account' : 'Sign in to play online' }))))
-    }
-    $('chipwrap').replaceChildren(...kids)
+    const o = S.offline
+    return h('div', { class: 'menu who', id: 'menuAccount', role: 'menu', 'aria-label': 'Accounts', onkeydown: menuKeys },
+      S.acctNotice && acctNotice(S.acctNotice),
+      S.login && waitingStrip(S.login),
+      accounts.length > 0 && [
+        h('div', { class: 'mhead', text: 'Playing as' }),
+        accounts.map((a) => {
+          const offline = a.type === 'offline'
+          const meta = `${offline ? 'Offline' : 'Microsoft'}${a === def ? ' · default' : ''}`
+          return h('div', { class: a === def ? 'row cur' : 'row' },
+            h('button', { class: 'pick', role: 'menuitemradio', 'aria-checked': String(a === def), onclick: () => setDefault(a.uuid) },
+              tile(a, 'sm'), h('span', { text: a.name }), h('span', { class: a.refreshFailedAt ? 'meta warn' : 'meta', text: !offline && a.refreshFailedAt ? 'sign in again' : meta })),
+            !offline && a.refreshFailedAt && h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, 'Sign in again'),
+            a !== def && h('button', { class: 'sm quiet icon', role: 'menuitem', title: `${offline ? 'Remove' : 'Sign out'} ${a.name}`, 'aria-label': `${offline ? 'Remove' : 'Sign out'} ${a.name}`, onclick: () => removeAccount(a) }, ico('x')))
+        }),
+        h('hr'),
+      ],
+      h('button', { class: 'row act', role: 'menuitem', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account', h('span', { class: 'meta', text: 'opens Microsoft\'s page' })),
+      h('div', { class: 'mhead', text: 'Play offline on local servers' }),
+      h('div', { class: 'inline' },
+        h('input', { id: 'offName', 'aria-label': 'Offline name', value: o.name, maxlength: '16', placeholder: 'Name, 3 to 16 characters', class: o.error ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
+          oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline() } }),
+        h('button', { class: 'sm', onclick: () => addOffline() }, 'Add')),
+      o.error && h('small', { class: 'hint bad', text: sentence(o.error) }),
+      h('p', { class: 'note', text: 'An offline name plays on servers with online-mode=false, like the ones SpawnLoft makes. Online servers need a Microsoft account.' }),
+      def && [h('hr'), h('button', { class: 'row act', role: 'menuitem', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`)])
   }
 
-  function switcher(accounts, def) {
-    return h('div', { class: 'switcher', role: 'menu' },
-      accounts.map((a) => h('button', { class: a === def ? 'row cur' : 'row', role: 'menuitem', onclick: () => setDefault(a.uuid) },
-        tile(a, 'sm'), h('span', { text: a.name }), h('span', { class: 'meta', text: (a.type === 'offline' ? 'Offline' : 'Microsoft') + (a === def ? ' · default' : '') }))),
-      h('hr'),
-      h('button', { class: 'row act', role: 'menuitem', onclick: () => go('accounts') }, ico('plus'), 'Add account…'),
-      def && h('button', { class: 'row act', role: 'menuitem', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`))
+  function acctNotice(n) {
+    const acts = []
+    if (n.retry) acts.push(h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, n.retry))
+    let text = n.text
+    // the default can only be read once the list has been fetched again
+    if (n.signedIn) text = S.summary?.defaultAccount === n.signedIn ? 'You play as this account from now on.' : 'Pick it here to play as it.'
+    return notice({ tone: n.tone, title: n.title, text, acts, onclose: () => { S.acctNotice = null; render() } })
   }
 
-  function toggleSwitcher() {
-    S.switcher = !S.switcher
-    renderRail()
-  }
-
-  function unreachablePage() {
-    return page(head(S.screen === 'profiles' ? 'Profiles' : S.screen === 'accounts' ? 'Accounts' : 'Play'),
-      emptyState('alert', 'Can\'t reach the SpawnLoft panel',
-        'The launcher talks to the panel running on this computer, and it is not answering. If you closed SpawnLoft, start it again; this page reconnects by itself.',
-        h('button', { class: 'primary', onclick: () => poll() }, 'Try again')))
+  function waitingStrip(login) {
+    const where = desktop?.openMicrosoftLogin ? 'the window that opened. It closes itself.' : 'the tab that opened, then come back here.'
+    return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
+      h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
+        login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in window did not open, maybe because of a pop-up blocker. ' : `Finish signing in in ${where}`,
+        login.blocked && h('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open Microsoft\'s sign-in page')),
+      h('span', { class: 'acts' },
+        desktop?.openExternal && !login.blocked && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
+        login.status !== 'finishing' && h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
   }
 
   // ---- Play ----------------------------------------------------------------------------------
 
-  function playPage() {
+  function unreachableView() {
+    return h('div', { class: 'nothing', role: 'alert' }, h('div', { class: 'glyph' }, ico('alert')),
+      h('h2', { text: 'Can\'t reach SpawnLoft' }),
+      h('p', { text: 'The panel that runs the launcher is not answering. If you closed the SpawnLoft app, open it again; this page reconnects by itself.' }),
+      h('button', { class: 'primary', onclick: () => poll() }, 'Try again'))
+  }
+
+  function playView() {
     const sum = S.summary
-    const title = head('Play', sum ? 'Launch Minecraft with a SpawnLoft profile.' : 'Loading your profiles…')
     if (!sum) {
-      return page(title, h('div', { class: 'play' },
-        h('div', { class: 'card hero', 'aria-busy': 'true' }, sk('width:180px;height:20px'), sk('width:320px;height:32px'), sk('width:240px;height:56px;border-radius:var(--r)'), sk('width:380px;height:16px'),
-          h('div', { class: 'pickers' }, sk('height:48px'), sk('height:48px'))),
-        h('aside', { class: 'card facts' }, sk('height:20px;width:120px'), sk('height:60px'), sk('height:60px'))))
+      return h('div', { class: 'playbox', 'aria-busy': 'true' }, sk('width:320px;height:64px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
     }
     const p = currentProfile()
     if (!p) {
-      return page(title, emptyState('play', 'No game profile yet',
-        'A profile is a Minecraft version with its own worlds, options and mods. Make one to start playing; you can add more later.',
-        h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')))
+      return h('div', { class: 'playbox' }, flashNotice(),
+        h('div', { class: 'split' }, h('button', { class: 'primary play', id: 'play', onclick: () => openSheet() }, ico('plus'), 'New setup')),
+        h('p', { class: 'does', text: 'A setup is a Minecraft version with its own worlds, options and mods. Make one to start playing.' }))
     }
     const job = S.job?.profile === p.name ? S.job : null
-    const parts = [title]
-    if (sum.machineRefusal) parts.push(notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(sum.machineRefusal) }))
-    if (S.crash?.profile === p.name && !p.running && !job) parts.push(crashNotice(S.crash))
+    const plan = launchPlan(p)
+    const kids = [flashNotice()]
+    if (sum.machineRefusal) kids.push(notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(sum.machineRefusal) }))
+    if (S.crash?.profile === p.name && !p.running && !job) kids.push(crashNotice(S.crash))
     if (S.notice?.profile === p.name && !job) {
       const n = S.notice
-      parts.push(notice({ ...n, acts: n.go ? [h('button', { class: 'sm', onclick: () => go(n.go) }, 'Go to Accounts')] : [], onclose: () => { S.notice = null; render() } }))
+      kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: 'sm', onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
     }
-    parts.push(h('div', { class: 'play' }, heroCard(p, job), factsCard(p)))
-    const log = logCard(p, job)
-    if (log) parts.push(log)
-    return page(...parts)
+    if (job) kids.push(launchingCard(p, job))
+    else if (p.running) kids.push(runningCard(p))
+    else kids.push(playButton(p, plan), h('p', { class: 'does' }, parts(plan.sentence)), plan.warning && h('p', { class: 'why' }, ico('alert'), h('span', {}, plan.warning)))
+    kids.push(joinField(p, plan, Boolean(job || p.running)))
+    return h('div', { class: 'playbox' }, kids)
   }
 
-  function heroCard(p, job) {
-    const sum = S.summary
-    const acct = playAccount(p, accountsNow(), sum.defaultAccount)
-    const profilePill = pill('accent', `Profile: ${p.name}`)
-    if (job) {
-      const [headline, facts] = splitMessage(job.message || 'Preparing…')
-      const shown = STEPS.map((name, i) => ({ name, i })).filter((s) => s.name !== 'Server' || job.startsServer)
-      return h('div', { class: 'card hero' },
-        h('div', { class: 'eyebrow' }, profilePill, pill('accent', 'Launching', true)),
-        h('div', { class: 'strip' },
-          h('div', { class: 'line' }, h('b', { text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: 'hint', text: facts })),
-          h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null },
-            h('i', { style: job.percent === null || job.percent === undefined ? null : `width:${Math.max(2, job.percent)}%` })),
-          h('div', { class: 'steps' }, shown.map((s) => {
-            const now = stepOf(job.stage)
-            if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done' }, ico('check'), s.name)
-            if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
-            return h('span', { class: 'step' }, s.name)
-          })),
-          h('p', { class: 'hint', text: 'Closing this window does not stop the download. It keeps going and the files are used next time.' })),
-        h('button', { disabled: true }, ico('play'), 'Launching…'))
-    }
-    if (p.running) {
-      const who = p.runningAccount?.name ? ` · as ${p.runningAccount.name}` : ''
-      const target = p.launchTarget
-      return h('div', { class: 'card hero' },
-        h('div', { class: 'eyebrow' }, profilePill, pill('live', 'Running', true), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
-        h('div', { class: 'strip' },
-          h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint', text: `since ${clockTime(p.startedAt)} · pid ${p.pid}${who}` })),
-          h('p', { class: 'hint' }, target ? ['Joined ', h('b', { style: 'color:var(--ink-2)', text: target }), '. '] : 'On the title screen. ', 'Closing this window does not stop the game.')),
-        h('div', { class: 'runrow' },
-          h('button', { class: 'danger launch', style: 'padding:0 var(--s-6)', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop'),
-          desktop?.openProfileFolder && h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder')))
-    }
-
-    const { t, choices, picked, addrProblem, busy, crashed, startsServer, blocked } = launchPlan(p)
-
-    let state
-    if (acct.missing) state = pill('warn', 'Account missing', true)
-    else if (picked?.blocked) state = pill('fault', 'Needs a Microsoft account', true)
-    else if (t.mode === 'other' && addrProblem && t.address.trim()) state = pill('fault', 'Check address', true)
-    else if (busy) state = pill('warn', 'Busy', true)
-    else if (crashed) state = pill('fault', 'Crashed', true)
-    else if (startsServer) state = pill('', 'Server stopped', true)
-    else if (acct.type === 'offline') state = pill('warn', 'Offline account', true)
-    else state = pill('live', 'Ready', true)
-
-    const as = acct.missing ? `${acct.name} (account missing)` : acct.type === 'offline' ? `${acct.name ?? 'an offline player'} (offline)` : acct.name
-    const what = `Minecraft ${p.mc} · ${loaderText(p)}`
-    let does
-    if (startsServer) does = ['Starts ', h('b', { text: picked.name }), ` first (up to 2 minutes), then launches ${what} as ${as} and joins it.`]
-    else if (picked) does = [`${what} · joins `, h('b', { text: picked.name }), ` · as ${as}`]
-    else if (t.mode === 'other') does = [`${what} · joins ${addrProblem ? 'an address' : t.address.trim()} · as ${as}`]
-    else does = [`${what} · title screen · as ${as}`]
-
-    const label = startsServer ? 'Start server and launch' : crashed ? 'Launch again' : 'Launch game'
-    return h('div', { class: 'card hero' },
-      h('div', { class: 'eyebrow' }, profilePill, state),
-      h('h2', { text: `Minecraft ${p.mc}` }),
-      h('button', { class: 'primary launch', disabled: blocked, onclick: () => startLaunch(p) }, ico('play'), label),
-      h('p', { class: 'does' }, does),
-      acct.missing && h('p', { class: 'hint note-line warnline' }, ico('alert'), `This profile plays as ${acct.name}, who is no longer signed in. Pick another account for it, or sign in again. `,
-        h('button', { class: 'linkbtn', onclick: () => openForm(p) }, 'Pick an account')),
-      !acct.missing && acct.expired && h('p', { class: 'hint note-line warnline' }, ico('alert'), `The saved sign-in for ${acct.name} no longer works; sign in again on Accounts before launching.`),
-      h('div', { class: 'pickers' },
-        h('label', { class: 'field' }, h('span', { text: 'Profile' }),
-          h('select', { id: 'pickProfile', value: p.name, onchange: (e) => pickProfile(e.target.value) },
-            profilesNow().map((q) => h('option', { value: q.name, text: `${q.name} — ${q.mc} · ${q.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${q.running ? ' · running' : ''}` })))),
-        h('div', { class: 'field' }, h('span', { class: 'label', text: 'Server' }),
-          h('div', { class: 'seg', role: 'group', 'aria-label': 'Server type' },
-            h('button', { class: t.mode === 'yours' ? 'on' : null, 'aria-pressed': String(t.mode === 'yours'), onclick: () => { t.mode = 'yours'; render() } }, 'Your servers'),
-            h('button', { class: t.mode === 'other' ? 'on' : null, 'aria-pressed': String(t.mode === 'other'), onclick: () => { t.mode = 'other'; render(); $('pickAddress')?.focus() } }, 'Other server')),
-          t.mode === 'yours'
-            ? h('select', { id: 'pickServer', 'aria-label': 'Your servers', value: t.server, onchange: (e) => { t.server = e.target.value; render() } },
-              h('option', { value: '', text: 'Title screen only' }),
-              choices.map((c) => h('option', {
-                value: c.name,
-                disabled: Boolean(c.blocked) && c.name !== t.server,
-                text: `Join ${c.name}${c.label && c.label !== c.name ? ` (${c.label})` : ''} (${c.status})${c.otherVersion ? ` · runs ${c.otherVersion}` : ''}${c.blocked ? ` · ${c.blocked}` : ''}`,
-              })))
-            : [h('input', { id: 'pickAddress', 'aria-label': 'Server address', placeholder: 'play.example.net or 192.168.1.20:25566', class: addrProblem && t.address.trim() ? 'bad' : null, value: t.address, oninput: (e) => { t.address = e.target.value; render() }, onkeydown: (e) => { if (e.key === 'Enter' && !blocked) startLaunch(p) } }),
-              h('small', { class: addrProblem && t.address.trim() ? 'hint bad' : 'hint', text: addrProblem && t.address.trim() ? addrProblem : `Host, or host:port. Plays like any Minecraft server; online servers need a Microsoft account${acct.type === 'microsoft' ? ` (you are signed in as ${acct.name})` : ''}.` })])),
-      p.harness && h('p', { class: 'hint note-line' }, ico('info'), 'Assistant control tools (status, chat, screenshots) only work on your own local SpawnLoft servers, not on other servers.'))
+  function flashNotice() {
+    return S.flash && notice({ ...S.flash, onclose: () => { S.flash = null; render() } })
   }
 
-  // What Launch would do for a profile right now, and whether it may: shared by the hero and
-  // the Profiles list, so a launch from either is held back for the same reasons.
+  // What Play would do for a profile right now, and whether it may.
   function launchPlan(p) {
     const acct = playAccount(p, accountsNow(), S.summary.defaultAccount)
     const t = targetFor(p)
     const choices = serverChoices(p, serversNow(), acct.type)
-    if (t.mode === 'yours' && t.server && !choices.some((c) => c.name === t.server)) t.server = ''
-    const picked = t.mode === 'yours' && t.server ? choices.find((c) => c.name === t.server) : null
-    const addrProblem = t.mode === 'other' ? addressProblem(t.address) : null
+    const picked = t.server ? choices.find((c) => c.name === t.server) ?? null : null
+    // a server that is gone falls back to the title screen
+    if (t.server && !picked) t.server = null
+    const address = picked ? '' : t.address.trim()
+    const addrProblem = address ? addressProblem(address) : null
     const busy = Boolean(S.notice?.busy && S.notice.profile === p.name)
     const crashed = S.crash?.profile === p.name
     const startsServer = Boolean(picked?.stopped)
-    const blocked = Boolean(picked?.blocked) || Boolean(acct.missing) || Boolean(S.summary.machineRefusal) || (t.mode === 'other' && addrProblem !== null) || busy || Boolean(S.job) || p.running
-    return { acct, t, choices, picked, addrProblem, busy, crashed, startsServer, blocked }
+    const blocked = Boolean(picked?.blocked) || Boolean(acct.missing) || Boolean(S.summary.machineRefusal) || busy || Boolean(S.job) || p.running
+    const who = acct.missing ? `${acct.name} (no longer signed in)` : acct.name
+    const sentenceParts = playSentence({ mc: p.mc, fabric: p.loader === 'fabric', who, server: picked?.name, address: addrProblem ? null : address, startsServer })
+    let warning = null
+    if (acct.missing) warning = `This setup plays as ${acct.name}, who is no longer signed in. Pick another account for it in the setup, or sign in again.`
+    else if (acct.expired) warning = `The saved sign-in for ${acct.name} no longer works; sign in again from the account menu before playing.`
+    else if (picked?.blocked) warning = `${picked.name} ${picked.blocked}.`
+    return { acct, t, choices, picked, address, addrProblem, busy, crashed, startsServer, blocked, sentence: sentenceParts, warning }
   }
 
-  function factsCard(p) {
-    const acct = playAccount(p, accountsNow(), S.summary.defaultAccount)
-    return h('aside', { class: 'card facts' }, h('h2', { text: p.name }),
-      h('dl', {},
-        h('div', {}, h('dt', { text: 'Java' }), h('dd', { class: p.java ? 'mono' : null, text: p.java ?? 'Automatic' })),
-        h('div', {}, h('dt', { text: 'Memory' }), h('dd', { text: memoryText(p.memory) })),
-        h('div', {}, h('dt', { text: 'Harness mod' }), h('dd', { text: p.harness ? 'On' : 'Off' })),
-        h('div', {}, h('dt', { text: 'Account' }), h('dd', { text: p.account ? acct.name : `Default${acct.name ? ` (${acct.name})` : ''}` })),
-        p.folder && h('div', {}, h('dt', { text: 'Data folder' }), h('dd', { class: 'mono', title: p.folder, text: p.folder }))),
-      h('button', { class: 'sm quiet', onclick: () => openForm(p) }, 'Edit profile'))
+  function playButton(p, plan) {
+    const label = plan.startsServer ? 'Start server and play' : plan.crashed ? 'Play again' : 'Play'
+    const given = givenName(p)
+    return h('div', { class: 'split menuhost', 'data-menu': 'version' },
+      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, onclick: () => startLaunch(p) }, ico('play'), label),
+      h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
+        h('span', { class: 'vt' }, h('b', { text: p.mc }), h('small', { text: `${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${given ? ` · ${given}` : ''}` })), ico('chev')),
+      S.menu === 'version' && versionMenu(p))
+  }
+
+  function setupSub(q) {
+    return [givenName(q), memoryText(q.memory), q.server ? `usually joins ${q.server}` : null].filter(Boolean).join(' · ')
+  }
+
+  function versionMenu(p) {
+    return h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'menu', 'aria-label': 'Setups', onkeydown: menuKeys },
+      h('div', { class: 'mhead', text: 'Play with' }),
+      profilesNow().map((q) => h('div', { class: q === p ? 'row cur' : 'row' },
+        h('button', { class: 'pick', role: 'menuitemradio', 'aria-checked': String(q === p), onclick: () => { pickProfile(q.name); closeMenu({ refocus: true }) } },
+          h('span', { class: 'sub' }, h('b', { text: setupTitle(q) }), h('small', { text: setupSub(q) })),
+          q.running ? h('span', { class: 'meta' }, pill('live', 'running', true)) : S.job?.profile === q.name ? h('span', { class: 'meta' }, pill('accent', 'launching', true)) : null),
+        h('button', { class: 'sm quiet icon', role: 'menuitem', title: `Edit ${setupTitle(q)}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear')))),
+      h('hr'),
+      h('button', { class: 'row act', role: 'menuitem', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })),
+      h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits memory, Java and the rest.' }))
+  }
+
+  function joinField(p, plan, inert) {
+    const { t, picked, address, addrProblem, acct } = plan
+    const open = S.menu === 'join' && !inert
+    const dot = picked && h('span', { class: `dot ${picked.status === 'running' ? 'live' : picked.stopped ? 'idle' : 'warn'}` })
+    return h('div', { class: 'join' },
+      h('label', { class: 'label', for: 'join', text: 'Join' }),
+      h('div', { class: 'menuhost', 'data-menu': 'join' },
+        h('div', { class: address && addrProblem ? 'joinbox bad' : 'joinbox' }, dot,
+          h('input', {
+            id: 'join', role: 'combobox', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-autocomplete': 'none', autocomplete: 'off', spellcheck: 'false',
+            class: picked ? 'picked' : null, size: picked ? String(Math.max(4, picked.name.length + 1)) : null, disabled: inert,
+            placeholder: 'Pick a server or type an address', value: picked ? picked.name : t.address,
+            onclick: () => { if (!open) openMenu('join', { focus: false }) },
+            oninput: (e) => { setTarget(p, { address: e.target.value }); S.menu = null; render() },
+            onkeydown: (e) => {
+              if (e.key === 'Enter' && !plan.blocked) { e.preventDefault(); startLaunch(p) }
+              if (e.key === 'ArrowDown') { e.preventDefault(); openMenu('join') }
+            },
+          }),
+          picked && h('span', { class: 'hint', text: `${statusText(picked.status)}${picked.mc ? ` · ${picked.mc}` : ''}` }),
+          h('button', { class: 'sm quiet icon chev', tabindex: '-1', 'aria-label': 'Your servers', disabled: inert, onclick: toggleMenu('join') }, ico('chev'))),
+        open && joinMenu(p, plan)),
+      address && h('small', { class: addrProblem ? 'hint bad' : 'hint', text: addrProblem ?? `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` }))
+  }
+
+  function joinMenu(p, plan) {
+    const { t, choices } = plan
+    const title = !t.server && !t.address.trim()
+    const pickServer = (c) => () => { setTarget(p, { server: c.name }); closeMenu({ refocus: true }) }
+    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'listbox', 'aria-label': 'Where to join', onkeydown: menuKeys },
+      choices.length ? h('div', { class: 'mhead', text: 'Your servers' }) : h('p', { class: 'note', text: 'No SpawnLoft servers yet.' }),
+      choices.map((c) => {
+        let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
+        let warn = false
+        if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion) { meta = 'runs a different version'; warn = true }
+        return h('button', { class: c.name === t.server ? 'row cur' : 'row', role: 'option', 'aria-selected': String(c.name === t.server), disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
+          h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
+          h('span', { class: 'sub' }, h('b', { text: c.label && c.label !== c.name ? `${c.name} (${c.label})` : c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` · ${c.mc}` : ''}` })),
+          h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
+      }),
+      h('hr'),
+      h('button', { class: title ? 'row act cur' : 'row act', role: 'option', 'aria-selected': String(title), onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen only'),
+      h('p', { class: 'note', text: 'Or type an address above: play.example.net or 192.168.1.20:25566. Online servers need a Microsoft account.' }))
+  }
+
+  function launchingCard(p, job) {
+    const [headline, facts] = splitMessage(job.message || 'Preparing…')
+    const shown = STEPS.map((name, i) => ({ name, i })).filter((s) => s.name !== 'Server' || job.startsServer)
+    return [
+      h('div', { class: 'eyebrow' }, pill('accent', 'Launching', true), h('span', { class: 'hint', text: setupTitle(p) })),
+      h('div', { class: 'prog', 'aria-live': 'polite' },
+        h('div', { class: 'line' }, h('b', { text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: 'hint', text: facts })),
+        h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null },
+          h('i', { style: job.percent === null || job.percent === undefined ? null : `width:${Math.max(2, job.percent)}%` })),
+        h('div', { class: 'steps' }, shown.map((s) => {
+          const now = stepOf(job.stage)
+          if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done' }, ico('check'), s.name)
+          if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
+          return h('span', { class: 'step' }, s.name)
+        })),
+        h('p', { class: 'hint', text: 'Closing this window does not stop the download. It keeps going and the files are used next time.' })),
+    ]
+  }
+
+  function runningCard(p) {
+    const who = p.runningAccount?.name ? ` · as ${p.runningAccount.name}` : ''
+    const target = p.launchTarget
+    return [
+      h('div', { class: 'eyebrow' }, pill('live', 'Running', true), h('span', { class: 'hint', text: setupTitle(p) }), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
+      h('div', { class: 'prog' },
+        h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint', text: `since ${clockTime(p.startedAt)} · pid ${p.pid}${who}` })),
+        h('p', { class: 'hint' }, target ? ['Joined ', h('b', { style: 'color:var(--ink-2)', text: target }), '. '] : 'On the title screen. ', 'Closing this window does not stop the game.'),
+        h('div', { class: 'runrow' },
+          h('button', { class: 'danger stop', id: 'stop', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop'),
+          desktop?.openProfileFolder ? h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder') : p.folder && h('span', { class: 'path', title: 'This setup\'s folder', text: p.folder }))),
+    ]
   }
 
   function crashNotice(crash) {
@@ -1066,22 +1200,12 @@
     if (crash.report && typeof crash.report === 'object') {
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
-    return notice({ tone: 'fault', title: `Minecraft closed ${crash.seconds} second${crash.seconds === 1 ? '' : 's'} after it started`, text, acts, onclose: () => { S.crash = null; render() } })
+    const lines = S.log.profile === crash.profile ? S.log.lines : []
+    return notice({ tone: 'fault', title: `Minecraft closed ${crash.seconds} second${crash.seconds === 1 ? '' : 's'} after it started`, text, acts, extra: logBlock(lines), onclose: () => { S.crash = null; render() } })
   }
 
-  function logCard(p, job) {
-    let title
-    let lines
-    if (job) {
-      title = 'Launch log'
-      lines = job.lines
-    } else if (p.running || S.crash?.profile === p.name) {
-      title = 'Game log'
-      lines = S.log.profile === p.name ? S.log.lines : []
-    } else {
-      return null
-    }
-    const pre = h('pre', { class: 'log' })
+  function logBlock(lines) {
+    const pre = h('pre', { class: 'log', tabindex: '0', 'aria-label': 'The last lines of the game log' })
     lines.forEach((line, i) => {
       if (i) pre.append('\n')
       const m = LEVEL_RE.exec(line)
@@ -1091,46 +1215,37 @@
       }
       pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'w' : 'e', text: m[1] }), line.slice(m.index + m[1].length))
     })
-    if (!lines.length) pre.append(job ? 'Waiting for the first step…' : 'Nothing in the log yet.')
-    return h('div', { class: S.logOpen ? 'card logcard' : 'card logcard closed' },
-      h('div', { class: 'loghead' }, h('b', { text: title }), h('span', { class: 'hint', text: `last ${LOG_LINES} lines` }), h('span', { class: 'grow' }),
-        desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
-        h('button', { class: 'sm quiet', 'aria-expanded': String(S.logOpen), onclick: () => { S.logOpen = !S.logOpen; render() } }, S.logOpen ? 'Collapse' : 'Expand')),
-      pre)
-  }
-
-  function pickProfile(name) {
-    S.pick = name
-    stored('local', PICK_KEY, name)
-    render()
+    if (!lines.length) pre.append('Reading the log…')
+    return pre
   }
 
   // ---- launching -----------------------------------------------------------------------------
 
   async function startLaunch(p) {
-    if (!S.summary || launchPlan(p).blocked) return render()
-    const t = targetFor(p)
+    if (!S.summary) return render()
+    const plan = launchPlan(p)
+    if (plan.blocked) return render()
+    if (plan.addrProblem) {
+      render()
+      return $('join')?.focus()
+    }
     const body = { jobId: newId() }
-    let startsServer = false
-    if (t.mode === 'other') {
-      if (addressProblem(t.address)) return render()
-      body.address = t.address.trim()
-    } else if (t.server) {
-      body.server = t.server
-      const s = serversNow().find((x) => x.name === t.server)
-      if (s && STOPPED.has(s.status)) {
-        body.startServer = true
-        startsServer = true
-      }
+    if (plan.picked) {
+      body.server = plan.picked.name
+      if (plan.startsServer) body.startServer = true
+    } else if (plan.address) {
+      body.address = plan.address
     } else {
       body.server = false
     }
     S.crash = null
     S.notice = null
-    S.pick = p.name
-    const job = { id: body.jobId, profile: p.name, stage: 'start', message: '', percent: null, reached: -1, startsServer, lines: [], done: false }
+    S.flash = null
+    S.menu = null
+    pickProfile(p.name)
+    const job = { id: body.jobId, profile: p.name, stage: 'start', message: '', percent: null, reached: -1, startsServer: plan.startsServer, done: false }
     S.job = job
-    stored('session', JOB_KEY, JSON.stringify({ id: job.id, profile: p.name, startsServer }))
+    stored('session', JOB_KEY, JSON.stringify({ id: job.id, profile: p.name, startsServer: plan.startsServer }))
     followJob(job, () => api(`client/profiles/${enc(p.name)}/launch`, { method: 'POST', body }))
     render()
   }
@@ -1158,12 +1273,8 @@
           return
         }
       } else if (blank && job.message) {
-        finishJob(job, { stage: 'error', done: true, message: 'the panel restarted during the launch; check Profiles, then launch again' })
+        finishJob(job, { stage: 'error', done: true, message: 'the panel restarted during the launch; check the setup, then play again' })
         return
-      }
-      if (ev.message && ev.message !== job.message) {
-        job.lines.push(`${new Date().toLocaleTimeString([], { hour12: false })}  ${ev.message}`)
-        if (job.lines.length > LOG_LINES) job.lines.shift()
       }
       job.stage = ev.stage
       job.message = ev.message
@@ -1185,7 +1296,7 @@
     if (S.job === job) S.job = null
     if (ev?.stage === 'running') {
       S.watch[job.profile] = { since: Date.now(), stopping: false }
-      if (ev.warnings?.length) S.notice = { profile: job.profile, tone: 'warn', title: 'Launched, with a warning', text: ev.warnings.map(sentence).join(' ') }
+      if (ev.warnings?.length) S.notice = { profile: job.profile, tone: 'warn', title: 'Playing, with a warning', text: ev.warnings.map(sentence).join(' ') }
     } else if (ev) {
       S.notice = { profile: job.profile, ...launchNotice(ev.message), at: Date.now() }
     }
@@ -1199,7 +1310,7 @@
     try {
       await api(`client/profiles/${enc(p.name)}/stop`, { method: 'POST' })
     } catch (err) {
-      S.notice = { profile: p.name, tone: 'fault', title: `Couldn't stop ${p.name}`, text: sentence(err.message) }
+      S.notice = { profile: p.name, tone: 'fault', title: `Couldn't stop ${setupTitle(p)}`, text: sentence(err.message) }
       if (S.watch[p.name]) S.watch[p.name].stopping = false
     }
     S.stopping = null
@@ -1210,7 +1321,7 @@
     let out = null
     try { out = await desktop.openProfileFolder(p.name) } catch { /* refused */ }
     if (!out?.ok) {
-      S.notice = { profile: p.name, tone: 'warn', title: 'The folder could not be opened', text: p.folder ? `It is ${p.folder}` : '' }
+      S.flash = { tone: 'warn', title: 'The folder could not be opened', text: p.folder ? `It is ${p.folder}` : '' }
       render()
     }
   }
@@ -1226,81 +1337,27 @@
     render()
   }
 
-  // ---- Profiles ------------------------------------------------------------------------------
+  // ---- the setup sheet -----------------------------------------------------------------------
 
-  function profilesPage() {
-    if (S.profiles === 'form' && S.form) return formPage()
-    const sum = S.summary
-    const newBtn = h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')
-    if (!sum) {
-      return page(head('Profiles'), h('div', { class: 'card list', 'aria-busy': 'true' },
-        [160, 120].map((w) => h('div', { class: 'item' }, h('div', { style: 'display:grid;gap:8px' }, sk(`width:${w}px;height:16px`), sk('width:320px;height:12px')), sk('width:200px;height:28px')))))
-    }
-    const hint = 'Each profile keeps its own version, worlds, options and mods.'
-    const n = S.profNotice
-    const top = n && notice({ ...n, onclose: () => { S.profNotice = null; render() } })
-    if (!sum.profiles.length) {
-      return page(head('Profiles', hint), top, emptyState('profiles', 'No profiles', 'Create one to pick a Minecraft version, a loader and an account. Nothing is downloaded until the first launch.',
-        h('button', { class: 'primary', onclick: () => openForm() }, ico('plus'), 'New profile')))
-    }
-    return page(head('Profiles', hint, newBtn), top, h('div', { class: 'card list' }, sum.profiles.map(profileRow)))
-  }
-
-  function profileRow(p) {
-    const busyHere = S.job?.profile === p.name
-    const acctText = p.account ? (p.accountName ?? p.account) : 'Default account'
-    const target = p.server ? `Joins ${p.server}` : 'Title screen only'
-    return h('div', { class: p.running ? 'item running' : 'item' },
-      h('div', {},
-        h('div', { class: 'name' }, h('b', { text: p.name }),
-          p.running && pill('live', `Running · pid ${p.pid}`, true),
-          busyHere && pill('accent', 'Launching', true),
-          p.harness && pill('', 'Harness'),
-          p.assistantAccount && pill('accent', 'Assistant'),
-          p.account && !p.accountType && pill('warn', 'Account missing')),
-        h('div', { class: 'sub' },
-          h('span', { text: p.mc }), h('span', { text: loaderText(p) }), h('span', { text: memoryText(p.memory) }), h('span', { text: target }), h('span', { text: acctText }),
-          p.running && p.launchedBy === 'assistant' && h('span', { text: 'Launched by an assistant' }))),
-      h('div', { class: 'acts' },
-        p.running
-          ? h('button', { class: 'danger sm', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop')
-          : h('button', { class: 'sm', disabled: launchPlan(p).blocked, onclick: () => { S.pick = p.name; stored('local', PICK_KEY, p.name); go('play'); startLaunch(p) } }, ico('play'), 'Launch'),
-        h('button', { class: 'sm', onclick: () => openForm(p) }, 'Edit'),
-        h('button', { class: S.removing === p.name ? 'sm danger' : 'sm quiet', disabled: p.running || busyHere, onclick: () => { S.removing = S.removing === p.name ? null : p.name; render() } }, 'Remove')),
-      S.removing === p.name && !p.running && h('div', { class: 'confirm' },
-        h('span', {}, h('b', { text: `Remove ${p.name}?` }), ' Its folder with worlds, options and mods is kept.'),
-        h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete the folder'),
-        h('span', { class: 'grow' }),
-        h('button', { class: 'sm', onclick: () => { S.removing = null; render() } }, 'Cancel'),
-        h('button', { class: 'sm danger', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove profile')))
-  }
-
-  async function removeProfile(p, purge) {
-    try {
-      await api(`client/profiles/${enc(p.name)}${purge ? '?purge=1' : ''}`, { method: 'DELETE' })
-      S.profNotice = { tone: 'live', title: `Removed ${p.name}`, text: purge ? 'Its folder was deleted too.' : 'Its folder was kept.' }
-      if (S.pick === p.name) S.pick = null
-      delete S.targets[p.name]
-    } catch (err) {
-      S.profNotice = { tone: 'fault', title: `Couldn't remove ${p.name}`, text: sentence(err.message) }
-    }
-    S.removing = null
-    refresh()
-  }
-
-  // The New and Edit form. `p` is the profile to edit; with none it is a new profile, prefilled
-  // from `prefill` ({ mc, server }, what a server card's Play leaves when no profile fits).
-  function openForm(p = null, prefill = null) {
+  // New and Edit. `p` is the profile to edit; with none it is a new setup, prefilled from
+  // `prefill` ({ mc, server }, what a server card's Play leaves when no setup fits).
+  function openSheet(p = null, prefill = null) {
     const servers = serversNow()
-    S.form = p
-      ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false }
-      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'fabric', loaderVersion: '', memory: '4G', java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false }
-    if (!p && prefill?.server && !S.form.server) S.form.server = prefill.server
-    S.profiles = 'form'
+    S.menu = null
+    S.sheet = p
+      ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false, removing: false }
+      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'fabric', loaderVersion: '', memory: '4G', java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false, removing: false }
+    if (!p && prefill?.server && !S.sheet.server) S.sheet.server = prefill.server
     if (!S.versions || S.versions.error) loadVersions()
-    else defaultVersion(S.form)
-    go('profiles')
-    $('fName')?.focus()
+    else defaultVersion(S.sheet)
+    render()
+    $(p ? 'fMc' : 'fName')?.focus()
+  }
+
+  function closeSheet() {
+    S.sheet = null
+    render()
+    $('play')?.focus({ preventScroll: true })
   }
 
   async function loadVersions() {
@@ -1310,11 +1367,11 @@
     } catch (err) {
       S.versions = { error: err.message }
     }
-    if (S.form) defaultVersion(S.form)
+    if (S.sheet) defaultVersion(S.sheet)
     render()
   }
 
-  // a new profile starts on the newest release this machine can run
+  // a new setup starts on the newest release this machine can run
   function defaultVersion(f) {
     if (!f.editing && !f.mc) {
       const first = (S.versions?.versions ?? []).find((v) => v.type === 'release' && !v.refusal)
@@ -1338,9 +1395,21 @@
     if (harnessBlock(f)) f.harness = false
   }
 
-  function formPage() {
-    const f = S.form
-    const running = f.editing ? Boolean(profileNamed(f.editing)?.running) : false
+  // Tab stays inside the sheet while it is open.
+  function trapTab(e) {
+    if (e.key !== 'Tab') return
+    const items = [...e.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [tabindex="0"]')]
+    if (!items.length) return
+    const first = items[0]
+    const last = items[items.length - 1]
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+  }
+
+  function sheetView() {
+    const f = S.sheet
+    const p = f.editing ? profileNamed(f.editing) : null
+    const running = Boolean(p?.running)
     const v = S.versions
     const machine = v?.machineRefusal ?? S.summary?.machineRefusal ?? null
     const set = (key, rerender = false) => (e) => {
@@ -1373,88 +1442,101 @@
 
     const memories = MEMORY_CHOICES.includes(f.memory) ? MEMORY_CHOICES : [f.memory, ...MEMORY_CHOICES]
     const servers = serversNow()
-    const def = accountsNow().find((a) => a.uuid === S.summary?.defaultAccount)
+    const def = defaultAccount()
     const block = harnessBlock(f)
     const ro = (label, value) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }))
 
-    const grid = h('div', { class: 'form-grid' },
+    const grid = h('div', { class: 'grid2' },
       !f.editing && h('label', { class: 'field' }, h('span', { text: 'Name' }),
-        h('input', { id: 'fName', value: f.name, placeholder: 'survival-test', 'aria-describedby': 'fNameHint', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
-        h('small', { class: 'hint', id: 'fNameHint', text: 'Letters, digits, dash and underscore.' })),
+        h('input', { id: 'fName', value: f.name, placeholder: 'survival-test', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
+        h('small', { class: 'hint', text: 'Letters, digits, dash and underscore.' })),
       versionField,
       running ? ro('Loader', loaderText({ loader: f.loader, loaderVersion: f.loaderVersion })) : h('label', { class: 'field' }, h('span', { text: 'Loader' }),
         h('select', { id: 'fLoader', value: f.loader, onchange: set('loader', true) }, h('option', { value: 'fabric', text: 'Fabric' }), h('option', { value: 'vanilla', text: 'Vanilla' }))),
       running ? ro('Memory', memoryText(f.memory)) : h('label', { class: 'field' }, h('span', { text: 'Memory' }),
         h('select', { id: 'fMemory', value: f.memory, onchange: set('memory') }, memories.map((m) => h('option', { value: m, text: memoryText(m) })))),
       running && ro('Java', f.java || 'Automatic'),
-      h('label', { class: 'field' }, h('span', { text: 'Default server' }),
+      h('label', { class: 'field' }, h('span', { text: 'Usually joins' }),
         h('select', { id: 'fServer', value: f.server, onchange: set('server') },
-          h('option', { value: '', text: 'None (title screen)' }),
+          h('option', { value: '', text: 'Title screen only' }),
           servers.map((s) => h('option', { value: s.name, text: `${s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (other version)' : ''}` })),
           f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))),
-      h('label', { class: 'field' }, h('span', { text: 'Account' }),
+      h('label', { class: 'field' }, h('span', { text: 'Play as' }),
         h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
-          h('option', { value: '', text: def ? `Default (${def.name})` : 'Default (offline player)' }),
+          h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in (an offline player)' }),
           accountsNow().map((a) => h('option', { value: a.uuid, text: `${a.name} · ${a.type === 'offline' ? 'Offline' : 'Microsoft'}` })),
-          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: profileNamed(f.editing)?.accountType === 'offline' ? `${profileNamed(f.editing).accountName} · Offline` : `${profileNamed(f.editing)?.accountName ?? f.account} (account missing)` }))),
+          f.account && !accountsNow().some((a) => a.uuid === f.account) && h('option', { value: f.account, text: p?.accountType === 'offline' ? `${p.accountName} · Offline` : `${p?.accountName ?? f.account} (account missing)` }))),
       !running && h('div', { class: 'full switchrow' },
-        h('div', { class: 'txt' }, h('b', { text: 'Harness mod' }), h('small', { class: block ? 'warn' : null, style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Lets SpawnLoft read what the game is doing, for diagnostics and the assistant tools.' })),
-        h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-label': 'Harness mod', disabled: Boolean(block), onclick: toggle('harness') })))
+        h('div', { class: 'txt' }, h('b', { text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds the harness mod, for diagnostics and the assistant tools. Off until you need it.' })),
+        h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-label': 'Let SpawnLoft see the game', disabled: Boolean(block), onclick: toggle('harness') })))
 
     if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
     const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open } },
       h('summary', { text: 'Advanced' }),
       h('div', { class: 'in' },
-        !running && h('div', { class: 'form-grid' },
+        !running && h('div', { class: 'grid2' },
           h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
             h('small', { class: 'hint', text: 'A path to java or javaw, checked at launch.' })),
-          f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Pick automatically', oninput: set('loaderVersion') }),
+          f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
             h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
         f.editing
-          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { text: 'Allow an assistant to use my account' }), h('small', { text: 'An AI assistant connected through MCP may launch this profile signed in as its Microsoft account.' })),
-            h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-label': 'Allow assistant account', onclick: toggle('assistantAccount') }))
-          : h('p', { class: 'hint', text: 'An assistant connected through MCP plays a new profile as an offline player. To let it use a Microsoft account, turn that on after the profile exists.' })))
+          ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { text: 'Allow an assistant to use my account' }), h('small', { text: 'An AI assistant connected through MCP may play this setup signed in as its Microsoft account.' })),
+            h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-label': 'Allow an assistant to use my account', onclick: toggle('assistantAccount') }))
+          : h('p', { class: 'hint', text: 'An assistant connected through MCP plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
 
-    return page(
-      head(f.editing ? `Edit ${f.editing}` : 'New profile', f.editing ? null : 'Nothing is downloaded until you launch it.', running && pill('live', 'Running', true)),
-      h('div', { class: 'card form' },
+    const given = p && givenName(p)
+    const busyHere = Boolean(p && S.job?.profile === p.name)
+    return h('div', { class: 'backdrop', onclick: (e) => { if (e.target === e.currentTarget) closeSheet() } },
+      h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle', onkeydown: trapTab },
+        h('div', {},
+          h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
+          h('p', { class: 'sub', text: p ? (running ? 'Running now' : `Profile ${p.name}`) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
-        running && notice({ tone: 'warn', title: 'This profile is running', text: 'The version, loader, Java, memory and harness can\'t change while the game is open. Stop it first to edit them.' }),
+        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and harness can\'t change while the game is open. Stop it first to edit them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
         grid,
         advanced,
-        h('div', { class: 'formfoot' },
-          !f.editing && h('span', { class: 'hint', text: 'Kept in its own folder under the SpawnLoft data folder.' }),
-          h('button', { onclick: () => { S.form = null; S.profiles = 'list'; render() } }, 'Cancel'),
-          h('button', { class: 'primary', disabled: f.saving || !f.mc, onclick: saveForm }, f.saving ? 'Saving…' : f.editing ? 'Save changes' : 'Create profile'))))
+        f.removing && p && h('div', { class: 'confirm' },
+          h('span', {}, h('b', { text: `Remove ${setupTitle(p)}?` }), ' Its folder with worlds, options and mods is kept.'),
+          h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete the folder'),
+          h('span', { class: 'grow' }),
+          h('button', { class: 'sm', onclick: () => { f.removing = false; render() } }, 'Keep it'),
+          h('button', { class: 'sm danger', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove setup')),
+        h('div', { class: 'foot' },
+          p
+            ? [desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
+              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, onclick: () => { f.removing = true; render() } }, 'Remove setup…'),
+              h('span', { class: 'grow' })]
+            : h('span', { class: 'hint', text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
+          h('button', { onclick: closeSheet }, 'Cancel'),
+          h('button', { class: 'primary', disabled: f.saving || !f.mc, onclick: saveSheet }, f.saving ? 'Saving…' : f.editing ? 'Save' : 'Create'))))
   }
 
-  async function saveForm() {
-    const f = S.form
+  async function saveSheet() {
+    const f = S.sheet
     const text = (s) => (String(s ?? '').trim() || null)
     f.saving = true
     f.error = null
     render()
     try {
       if (!f.editing) {
-        await api('client/profiles', {
+        const made = await api('client/profiles', {
           method: 'POST',
           body: { name: f.name.trim(), mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account) },
         })
-        S.pick = f.name.trim()
-        stored('local', PICK_KEY, S.pick)
-        S.profNotice = { tone: 'live', title: `Created ${S.pick}`, text: 'Launch it from Play. The first launch downloads the game.' }
+        pickProfile(made?.name ?? f.name.trim())
+        S.flash = { tone: 'live', title: `Made ${setupTitle(made ?? f)}`, text: 'Press Play to start it. The first time downloads the game.' }
       } else {
         const before = profileNamed(f.editing)
         const next = { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account), assistantAccount: f.assistantAccount }
         const patch = profilePatch(before ?? {}, next)
         const out = Object.keys(patch).length ? await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch }) : { warnings: [] }
-        S.profNotice = out.warnings?.length
-          ? { tone: 'warn', title: `Saved ${f.editing}`, text: out.warnings.map(sentence).join(' ') }
-          : { tone: 'live', title: `Saved ${f.editing}`, text: Object.keys(patch).length ? '' : 'Nothing had changed.' }
+        const label = setupTitle(out.profile ?? before ?? f)
+        S.flash = out.warnings?.length
+          ? { tone: 'warn', title: `Saved ${label}`, text: out.warnings.map(sentence).join(' ') }
+          : Object.keys(patch).length ? { tone: 'live', title: `Saved ${label}` } : null
       }
-      S.form = null
-      S.profiles = 'list'
+      S.sheet = null
     } catch (err) {
       if (err instanceof PanelDown) S.down = true
       f.error = err.message
@@ -1463,73 +1545,22 @@
     refresh()
   }
 
-  // ---- Accounts ------------------------------------------------------------------------------
-
-  function accountsPage() {
-    const sum = S.summary
-    const hint = 'Sign-ins are stored on this computer only.'
-    if (!sum) {
-      return page(head('Accounts'), h('div', { class: 'card list', 'aria-busy': 'true' },
-        [140, 110].map((w) => h('div', { class: 'acct' }, sk('width:40px;height:40px'), h('div', { style: 'display:grid;gap:8px' }, sk(`width:${w}px;height:16px`), sk('width:250px;height:10px')), sk('width:80px;height:28px')))))
+  async function removeProfile(p, purge) {
+    try {
+      await api(`client/profiles/${enc(p.name)}${purge ? '?purge=1' : ''}`, { method: 'DELETE' })
+      S.flash = { tone: 'live', title: `Removed ${setupTitle(p)}`, text: purge ? 'Its folder was deleted too.' : 'Its folder was kept.' }
+      if (S.pick === p.name) pickProfile(null)
+      delete S.targets[p.name]
+      saveTargets()
+      S.sheet = null
+    } catch (err) {
+      S.sheet.error = err.message
+      S.sheet.removing = false
     }
-    const parts = [head('Accounts', hint)]
-    if (S.login) parts.push(waitingStrip(S.login))
-    if (S.acctNotice) parts.push(acctNotice(S.acctNotice))
-    const accounts = sum.accounts
-    if (accounts.length) {
-      parts.push(h('div', { class: 'card list' }, accounts.map((a) => accountRow(a, a.uuid === sum.defaultAccount))))
-    } else if (!S.login) {
-      parts.push(emptyState('user', 'No accounts yet', 'Sign in with Microsoft to play on online servers, or add an offline name for local servers.',
-        h('button', { class: 'primary', onclick: startLogin }, ico('plus'), 'Add Microsoft account'),
-        h('button', { onclick: () => $('offName')?.focus() }, 'Add offline account')))
-    }
-    const o = S.offline
-    parts.push(h('div', { class: 'two' },
-      h('div', { class: 'card add' }, h('h2', { text: 'Add Microsoft account' }), h('p', { class: 'hint', text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password.' }),
-        h('button', { class: 'primary', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account')),
-      h('div', { class: 'card add' }, h('h2', { text: 'Add offline account' }),
-        h('p', { class: 'hint', text: 'Works on servers with online-mode=false, such as the ones SpawnLoft makes by default. Online servers need a Microsoft account.' }),
-        h('div', { class: 'row' },
-          h('label', { class: 'field' }, h('span', { text: 'Name' }),
-            h('input', { id: 'offName', value: o.name, maxlength: '16', placeholder: '3 to 16 letters, digits, underscore', class: o.error ? 'bad' : null, oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline() } })),
-          h('button', { onclick: addOffline }, 'Add')),
-        o.error && h('small', { class: 'hint bad', text: sentence(o.error) }))))
-    return page(...parts)
+    refresh()
   }
 
-  function accountRow(a, isDefault) {
-    const offline = a.type === 'offline'
-    return h('div', { class: 'acct' }, tile(a, 'lg'),
-      h('div', {},
-        h('div', { class: 'nm' }, h('b', { text: a.name }), pill('', offline ? 'Offline' : 'Microsoft'),
-          isDefault && pill('accent', 'Default'),
-          !offline && (a.refreshFailedAt ? pill('warn', 'Sign in again', true) : pill('live', 'Signed in', true))),
-        h('div', { class: 'uuid', text: offline ? `offline · ${a.uuid}` : a.uuid })),
-      h('div', { class: 'acts' },
-        !offline && a.refreshFailedAt && h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, 'Sign in again'),
-        !isDefault && h('button', { class: 'sm', onclick: () => setDefault(a.uuid) }, 'Make default'),
-        h('button', { class: offline || a.refreshFailedAt || !isDefault ? 'sm quiet' : 'sm', onclick: () => removeAccount(a) }, offline ? 'Remove' : 'Sign out')))
-  }
-
-  function acctNotice(n) {
-    const acts = []
-    if (n.retry) acts.push(h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, n.retry))
-    let text = n.text
-    // the default can only be read once the list has been fetched again
-    if (n.signedIn) text = S.summary?.defaultAccount === n.signedIn ? 'It is your default account, so new launches use it.' : 'Make it the default to launch with it, or pick it in a profile.'
-    return notice({ tone: n.tone, title: n.title, text, acts, onclose: () => { S.acctNotice = null; render() } })
-  }
-
-  function waitingStrip(login) {
-    const where = desktop?.openMicrosoftLogin ? 'the window that opened. It closes itself.' : 'the tab that opened, then come back here.'
-    return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
-      h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
-        login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in window did not open, maybe because of a pop-up blocker. ' : `Finish signing in in ${where}`,
-        login.blocked && h('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open Microsoft\'s sign-in page')),
-      h('span', { class: 'acts' },
-        desktop?.openExternal && !login.blocked && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
-        login.status !== 'finishing' && h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
-  }
+  // ---- accounts ------------------------------------------------------------------------------
 
   // The Login button (CLIENT.md, "Signing in from the launcher"): ask the panel for a sign-in,
   // listen on its stream, and only once the stream has said "pending" open Microsoft's page, so
@@ -1539,6 +1570,7 @@
   async function startLogin() {
     if (S.login) return
     S.acctNotice = null
+    S.menu = 'account'
     const tab = desktop?.openMicrosoftLogin ? null : window.open('', 'spawnloft-login')
     // cut from this page: Microsoft's page gets no handle on the launcher
     if (tab) try { tab.opener = null } catch { /* already cross-origin */ }
@@ -1561,7 +1593,6 @@
     // status: what the stream said last; 'finishing' once Microsoft's part is over
     const login = { id: made.loginId, url: made.authorizeUrl, status: null, opened: false, blocked: false, done: false, tab, watcher: null }
     S.login = login
-    if (S.screen !== 'accounts') go('accounts')
     const es = new EventSource(`/api/client/accounts/login/${enc(login.id)}/stream`)
     login.es = es
     es.onmessage = (e) => {
@@ -1632,6 +1663,7 @@
     endLogin(login, { status: 'cancelled' })
   }
 
+  // The outcome shows in the account menu, which opens for it.
   function endLogin(login, ev) {
     if (login.done) return
     login.done = true
@@ -1645,16 +1677,19 @@
     } else if (ev.status === 'cancelled') {
       S.acctNotice = { tone: '', title: 'Sign-in cancelled', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Add Microsoft account' }
     } else {
-      S.acctNotice = { tone: 'fault', title: sentence(ev.message ?? 'the sign-in failed'), text: 'Try again, or add an offline account for local servers.', retry: 'Try again' }
+      S.acctNotice = { tone: 'fault', title: sentence(ev.message ?? 'the sign-in failed'), text: 'Try again, or play offline on local servers.', retry: 'Try again' }
     }
+    S.menu = 'account'
     refresh()
   }
 
+  // "Play offline as": the name is added and becomes the one this launcher plays as.
   async function addOffline() {
     const o = S.offline
     try {
       const out = await api('client/accounts/offline', { method: 'POST', body: { name: o.name.trim() } })
-      S.acctNotice = { tone: 'live', title: `Added ${out.account.name}`, text: out.defaultAccount === out.account.uuid ? 'It is your default account, so new launches use it.' : 'An offline player for local servers.' }
+      if (out.defaultAccount !== out.account.uuid) await api('client/accounts/default', { method: 'POST', body: { uuid: out.account.uuid } })
+      S.acctNotice = { tone: 'live', title: `Playing as ${out.account.name}`, text: 'An offline name, for local servers.' }
       o.name = ''
       o.error = null
     } catch (err) {
@@ -1665,20 +1700,20 @@
   }
 
   async function setDefault(uuid) {
-    S.switcher = false
+    S.acctNotice = null
     try {
       await api('client/accounts/default', { method: 'POST', body: { uuid } })
+      S.menu = null
     } catch (err) {
-      S.acctNotice = { tone: 'fault', title: 'Couldn\'t change the default account', text: sentence(err.message) }
+      S.acctNotice = { tone: 'fault', title: 'Couldn\'t change who is playing', text: sentence(err.message) }
     }
     refresh()
   }
 
   async function removeAccount(a) {
-    S.switcher = false
     try {
       await api(`client/accounts/${enc(a.uuid)}`, { method: 'DELETE' })
-      S.acctNotice = { tone: '', title: a.type === 'offline' ? `Removed ${a.name}` : `Signed out ${a.name}`, text: 'A profile that named this account shows "account missing" until you pick another.' }
+      S.acctNotice = { tone: '', title: a.type === 'offline' ? `Removed ${a.name}` : `Signed out ${a.name}`, text: 'A setup that named this account asks for another one before it plays.' }
     } catch (err) {
       S.acctNotice = { tone: 'fault', title: `Couldn't remove ${a.name}`, text: sentence(err.message) }
     }
@@ -1697,8 +1732,8 @@
   let polling = null
 
   // One read of the launcher summary every few seconds (and right after anything this page
-  // changes), plus the log of the profile on screen while it runs. Re-renders only on a change,
-  // so a field being typed in is not rebuilt for nothing.
+  // changes), plus the log of a game that closed early. Re-renders only on a change, so a field
+  // being typed in is not rebuilt for nothing.
   // A call while a read is under way gets one more read after it: that read began before
   // whatever the caller just changed.
   let pollAgain = false
@@ -1750,75 +1785,89 @@
     }
   }
 
+  // The log is read once, for a game that closed early; it does not change after the game has gone.
   async function readLog() {
-    if (S.screen !== 'play' || !S.summary) return
-    const p = currentProfile()
-    if (!p || S.job?.profile === p.name) return
-    // a crash's log is read once; it does not change after the game has gone
-    const crashed = S.crash?.profile === p.name && !p.running
-    if (!p.running && !(crashed && !(S.log.profile === p.name && S.log.lines.length))) return
+    const c = S.crash
+    if (!c || (S.log.profile === c.profile && S.log.lines.length) || profileNamed(c.profile)?.running) return
     try {
-      const out = await api(`client/profiles/${enc(p.name)}/log?lines=${LOG_LINES}`)
-      S.log = { profile: p.name, lines: out.lines ?? [] }
+      const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_LINES}`)
+      S.log = { profile: c.profile, lines: out.lines ?? [] }
     } catch { /* the next poll tries again */ }
   }
 
   // ---- start ---------------------------------------------------------------------------------
 
+  // a click outside the open menu closes it; a click inside one rebuilds it, so its target may
+  // already be out of the page
   document.addEventListener('click', (e) => {
-    const nav = e.target.closest('.nav[data-go]')
-    if (nav) {
-      if (nav.dataset.go === 'profiles') { S.profiles = S.form ? S.profiles : 'list' }
-      go(nav.dataset.go)
-    }
-    // a click inside the chip rebuilds it, so its target may already be out of the page
-    if (S.switcher && e.target.isConnected && !e.target.closest('#chipwrap')) {
-      S.switcher = false
-      renderRail()
-    }
+    if (!S.menu || !e.target.isConnected) return
+    if (e.target.closest('[data-menu]')?.dataset.menu !== S.menu) closeMenu()
   })
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && S.switcher) {
-      S.switcher = false
-      renderRail()
-    }
+    if (e.key !== 'Escape') return
+    if (S.menu) closeMenu({ refocus: true })
+    else if (S.sheet) closeSheet()
   })
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll() })
-  window.addEventListener('hashchange', () => {
+
+  // The old screens' links still land somewhere: #profiles opens the setups, #accounts the
+  // account menu. The address is put back to #play so the same link works twice.
+  function followHash() {
     const hash = location.hash.slice(1)
-    if (['play', 'profiles', 'accounts'].includes(hash) && hash !== S.screen) go(hash)
+    const menu = hash === 'profiles' ? 'version' : hash === 'accounts' ? 'account' : null
+    if (hash && hash !== 'play') try { history.replaceState(null, '', '#play') } catch { /* file: or a sandbox */ }
+    return menu
+  }
+  window.addEventListener('hashchange', () => {
+    const menu = followHash()
+    if (menu && S.summary && !S.sheet) openMenu(menu)
   })
 
+  // A server card's Play with no fitting setup leaves { mc, server }: a setup of that version is
+  // picked and joins the server, or the New setup sheet opens filled in for it.
+  function takePrefill(prefill) {
+    if (!prefill || typeof prefill !== 'object' || S.sheet) return
+    const mc = typeof prefill.mc === 'string' ? prefill.mc : ''
+    const server = typeof prefill.server === 'string' ? prefill.server : ''
+    const fits = profilesNow().filter((p) => !mc || p.mc === mc)
+    const p = fits.find((q) => q.server === server) ?? fits[0]
+    if (p && !p.running && S.job?.profile !== p.name) {
+      pickProfile(p.name)
+      if (server && serversNow().some((s) => s.name === server)) setTarget(p, { server })
+      render()
+    } else if (!p) {
+      openSheet(null, { mc, server })
+    }
+  }
+
   {
-    const hash = location.hash.slice(1)
-    if (['play', 'profiles', 'accounts'].includes(hash)) S.screen = hash
+    const menu = followHash()
     // a launch this tab started before a reload: follow it again
     try {
       const was = JSON.parse(stored('session', JOB_KEY) ?? 'null')
       if (was?.id && was.profile) {
-        S.job = { id: String(was.id), profile: String(was.profile), stage: 'start', message: '', percent: null, reached: -1, startsServer: Boolean(was.startsServer), lines: [], done: false }
+        S.job = { id: String(was.id), profile: String(was.profile), stage: 'start', message: '', percent: null, reached: -1, startsServer: Boolean(was.startsServer), done: false }
         followJob(S.job, null)
       }
     } catch { stored('session', JOB_KEY, null) }
-    // a server card's Play with no fitting profile leaves { mc, server } for the New profile form
     let prefill = null
     try { prefill = JSON.parse(stored('local', NEW_PROFILE_KEY) ?? 'null') } catch { /* ignored */ }
     stored('local', NEW_PROFILE_KEY, null)
     render()
     poll().then(() => {
-      if (prefill && typeof prefill === 'object') openForm(null, { mc: typeof prefill.mc === 'string' ? prefill.mc : '', server: typeof prefill.server === 'string' ? prefill.server : '' })
+      if (prefill) takePrefill(prefill)
+      else if (menu && !S.down) openMenu(menu)
     })
   }
 
   // The same, for a launcher that was already open: the panel brings this window forward rather
-  // than reloading it, and the storage event is how the card's choice arrives. A form already open
-  // keeps what was typed into it.
+  // than reloading it, and the storage event is how the card's choice arrives. A sheet already
+  // open keeps what was typed into it.
   window.addEventListener('storage', (e) => {
     if (e.key !== NEW_PROFILE_KEY || !e.newValue) return
     let prefill = null
     try { prefill = JSON.parse(e.newValue) } catch { /* ignored */ }
     stored('local', NEW_PROFILE_KEY, null)
-    if (!prefill || typeof prefill !== 'object' || S.form) return
-    openForm(null, { mc: typeof prefill.mc === 'string' ? prefill.mc : '', server: typeof prefill.server === 'string' ? prefill.server : '' })
+    takePrefill(prefill)
   })
 </script>

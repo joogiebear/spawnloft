@@ -97,7 +97,7 @@ test('Play names the account a launch uses, the profile\'s own before the defaul
   assert.deepEqual(playAccount({ account: null }, accounts, 'no-such-uuid'), { name: null, type: 'offline' })
 })
 
-test('the server picker offers the profile\'s version and blocks online servers for offline players', () => {
+test('the Join menu lists every server, notes another version and blocks online servers for offline players', () => {
   const { serverChoices } = lifted(['STOPPED', 'serverChoices'])
   const servers = [
     { name: 'survival', label: null, mc: '1.21.11', status: 'running', onlineMode: false },
@@ -106,10 +106,11 @@ test('the server picker offers the profile\'s version and blocks online servers 
     { name: 'mine', label: null, mc: '1.20.1', status: 'stale', onlineMode: null },
   ]
   const offline = serverChoices({ mc: '1.21.11', server: 'mine' }, servers, 'offline')
-  assert.deepEqual(offline.map((c) => c.name), ['survival', 'public-smp', 'mine'])
+  assert.deepEqual(offline.map((c) => c.name), ['survival', 'public-smp', 'old', 'mine'])
   assert.equal(offline.find((c) => c.name === 'public-smp').blocked, 'needs a Microsoft account')
   assert.equal(offline.find((c) => c.name === 'survival').blocked, null)
-  assert.equal(offline.find((c) => c.name === 'mine').otherVersion, '1.20.1')
+  assert.equal(offline.find((c) => c.name === 'survival').otherVersion, null)
+  assert.equal(offline.find((c) => c.name === 'old').otherVersion, '1.20.4')
   assert.equal(offline.find((c) => c.name === 'mine').stopped, true)
   assert.equal(offline.find((c) => c.name === 'survival').stopped, false)
   const signedIn = serverChoices({ mc: '1.21.11', server: null }, servers, 'microsoft')
@@ -132,9 +133,9 @@ test('a refused launch says why in the words the launcher uses', () => {
   assert.equal(lock.tone, 'warn')
   assert.equal(lock.busy, true)
   const online = launchNotice('strict requires a Microsoft account (online-mode=true); sign in or pick another server')
-  assert.equal(online.title, 'Can\'t launch: strict requires a Microsoft account (online-mode=true)')
-  assert.equal(online.go, 'accounts')
-  assert.deepEqual(launchNotice('no Java 21 found'), { tone: 'fault', title: 'Can\'t launch', text: 'No Java 21 found' })
+  assert.equal(online.title, 'Can\'t play: strict requires a Microsoft account (online-mode=true)')
+  assert.equal(online.fix, 'sign-in')
+  assert.deepEqual(launchNotice('no Java 21 found'), { tone: 'fault', title: 'Can\'t play', text: 'No Java 21 found' })
 })
 
 test('small display helpers', () => {
@@ -180,4 +181,47 @@ test('the Edit form sends only what changed, and nothing a running game cannot c
   assert.deepEqual(profilePatch(before, { ...same, mc: '1.21.4', loaderVersion: '0.16.9' }), { mc: '1.21.4', loaderVersion: '0.16.9' })
   // running: only the next-launch keys go
   assert.deepEqual(profilePatch({ ...before, running: true }, { ...same, memory: '8G', harness: false, account: 'u2', assistantAccount: true }), { account: 'u2', assistantAccount: true })
+})
+
+test('a setup is named by its version unless someone gave it a name', () => {
+  const { nameBase, autoName, givenName, setupTitle } = lifted(['nameBase', 'autoName', 'givenName', 'setupTitle'])
+  assert.equal(autoName('1.21.11', 'vanilla', []), '1-21-11')
+  assert.equal(autoName('1.21.11', 'fabric', []), '1-21-11-fabric')
+  assert.equal(autoName('1.21.11', 'vanilla', ['1-21-11', '1-21-11-2']), '1-21-11-3')
+  assert.equal(autoName('1.21.11', 'vanilla', ['1-21-11-FABRIC', '1-21-11'.toUpperCase()]), '1-21-11-2')
+  // spaced and odd ids still make a profile name the panel accepts
+  const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/i
+  for (const mc of ['1.14.2 Pre-Release 4', 'b1.7.3', '25w44a', 'rd-132211', '...', '1.21.11-rc1 '.repeat(4)]) {
+    for (const loader of ['vanilla', 'fabric']) {
+      const name = autoName(mc, loader, [nameBase(mc, loader)])
+      assert.match(name, NAME_RE, `${mc} / ${loader} -> ${name}`)
+    }
+  }
+  assert.equal(givenName({ name: '1-21-11', mc: '1.21.11', loader: 'vanilla' }), null)
+  assert.equal(givenName({ name: '1-21-11-3', mc: '1.21.11', loader: 'vanilla' }), null)
+  assert.equal(givenName({ name: '1-21-11-fabric', mc: '1.21.11', loader: 'fabric' }), null)
+  assert.equal(givenName({ name: 'modded', mc: '1.21.1', loader: 'fabric' }), 'modded')
+  // a setup whose version changed keeps the old name, which is now worth showing
+  assert.equal(givenName({ name: '1-21-11', mc: '1.21.4', loader: 'vanilla' }), '1-21-11')
+  assert.equal(setupTitle({ mc: '1.21.11', loader: 'vanilla' }), '1.21.11 · Vanilla')
+  assert.equal(setupTitle({ mc: '1.21.1', loader: 'fabric' }), '1.21.1 · Fabric')
+})
+
+test('the sentence under Play says what will happen', () => {
+  const { playSentence } = lifted(['playSentence'])
+  const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : `*${x.b}*`)).join('')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: 'Joogiebear', server: 'survival' })), 'Opens *Minecraft 1.21.11* and joins *survival* as *Joogiebear*.')
+  assert.equal(text(playSentence({ mc: '1.21.1', fabric: true, who: 'Wunga_' })), 'Opens *Minecraft 1.21.1 (Fabric)* on the title screen as *Wunga_*.')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: null, address: 'mc.example.net:25566' })), 'Opens *Minecraft 1.21.11* and joins *mc.example.net:25566* as *an offline player*.')
+  assert.equal(text(playSentence({ mc: '1.21.11', who: 'Joogiebear', server: 'creative', startsServer: true })),
+    'Starts *creative* first (up to 2 minutes), then opens *Minecraft 1.21.11* and joins it as *Joogiebear*.')
+})
+
+test('the one screen keeps the old screens\' links and the card\'s pre-fill', () => {
+  // #profiles and #accounts were screens; they now open the setups and the account menu
+  assert.match(html, /hash === 'profiles' \? 'version' : hash === 'accounts' \? 'account'/)
+  // the storage keys the page and the panel's server cards share are unchanged
+  for (const key of ['spawnloft.launcher.newProfile', 'spawnloft.launcher.job', 'spawnloft.launcher.profile']) assert.ok(html.includes(`'${key}'`), key)
+  // no sidebar, no screens
+  assert.doesNotMatch(html, /class="rail"|data-go=/)
 })
