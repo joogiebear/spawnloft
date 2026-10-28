@@ -34,6 +34,13 @@ test('launch, status, log, stop', async () => {
   const st = status('life')
   assert.equal(st.running, true)
   assert.equal(st.pid, res.pid)
+  // what the launch was decided from, for diagnose
+  const facts = JSON.parse(fs.readFileSync(clientStateFile('life'), 'utf8')).launch
+  assert.equal(facts.id, mc)
+  assert.equal(facts.java.major, 21)
+  assert.equal(facts.java.chosenPath, fakeJava)
+  assert.equal(facts.emulated, false)
+  assert.equal(facts.loggingConfig, 'client-1.21.2.xml')
 
   const deadline = Date.now() + 3000
   let found = false

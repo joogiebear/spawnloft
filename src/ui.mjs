@@ -872,7 +872,7 @@ async function startServerForLaunch(name) {
 // `startServer` is the page's "Start server and launch": without it a stopped server is a warning.
 function launchJob(jobId, profileName, { startServer, ...opts }) {
   // a reused id must not carry the last run's outcome into this one
-  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined })
+  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined, code: undefined })
   client.launch(profileName, {
     ...opts,
     launchedBy: 'launcher',
@@ -888,7 +888,8 @@ function launchJob(jobId, profileName, { startServer, ...opts }) {
       stage: 'running', percent: 100, message: `Running · pid ${out.pid}`, done: true,
       pid: out.pid, version: out.version, account: out.account, warnings: out.warnings,
     }),
-    (err) => jobUpdate(jobId, { stage: 'error', percent: null, message: err?.message ?? String(err), done: true }),
+    // the code (unknown-variable, java-too-old, ...) lets a page or an assistant tell refusals apart
+    (err) => jobUpdate(jobId, { stage: 'error', percent: null, message: err?.message ?? String(err), done: true, code: err?.code }),
   )
 }
 

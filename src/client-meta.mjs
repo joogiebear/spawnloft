@@ -16,10 +16,53 @@ export function currentOs() {
   return { name, arch, version: os.release() }
 }
 
+// The rule grammar Mojang's JSONs use. A rule with anything else in it is not understood: it never
+// matches (so it cannot switch on a row meant for another machine), and ruleProblems reports it.
+const RULE_KEYS = ['action', 'os', 'features']
+const OS_RULE_KEYS = ['name', 'arch', 'version', 'versionRange']
+
+// Dotted numbers compared numerically, as far as both have them: Windows' 10.0.22631, or the
+// 6.8.0 of Linux's 6.8.0-45-generic.
+function compareDotted(a, b) {
+  const nums = (v) => (/^\d+(?:\.\d+)*/.exec(String(v))?.[0] ?? '').split('.').filter(Boolean).map(Number)
+  const x = nums(a)
+  const y = nums(b)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0)
+    if (d !== 0) return d < 0 ? -1 : 1
+  }
+  return 0
+}
+
+const DOTTED = /^\d+(?:\.\d+)*$/
+
+// Why SpawnLoft cannot judge this rule, or null when it can.
+function ruleProblem(rule) {
+  if (!rule || typeof rule !== 'object') return 'a rule that is not an object'
+  const extra = Object.keys(rule).find((k) => !RULE_KEYS.includes(k))
+  if (extra) return `"${extra}"`
+  if (rule.action !== 'allow' && rule.action !== 'disallow') return '"action"'
+  if (rule.os !== undefined) {
+    if (!rule.os || typeof rule.os !== 'object') return '"os"'
+    const extraOs = Object.keys(rule.os).find((k) => !OS_RULE_KEYS.includes(k))
+    if (extraOs) return `"os.${extraOs}"`
+    const range = rule.os.versionRange
+    if (range !== undefined) {
+      // os.release() on macOS is the Darwin kernel version, not the macOS one a range would name
+      if (rule.os.name === 'osx') return '"os.versionRange" on macOS'
+      if (!range || typeof range !== 'object' || Object.keys(range).some((k) => k !== 'min' && k !== 'max')
+        || [range.min, range.max].some((v) => v !== undefined && !DOTTED.test(String(v)))) return '"os.versionRange"'
+    }
+  }
+  if (rule.features !== undefined && (!rule.features || typeof rule.features !== 'object' || Array.isArray(rule.features))) return '"features"'
+  return null
+}
+
 export function ruleAllows(rules, { os = currentOs(), features = {} } = {}) {
   if (!rules || rules.length === 0) return true
   let result = false
   for (const rule of rules) {
+    if (ruleProblem(rule) !== null) continue
     let matches = true
     if (rule.os) {
       if (rule.os.name && rule.os.name !== os.name) matches = false
@@ -30,6 +73,13 @@ export function ruleAllows(rules, { os = currentOs(), features = {} } = {}) {
         } catch {
           matches = false
         }
+      }
+      const range = rule.os.versionRange
+      if (range) {
+        if (range.min !== undefined && compareDotted(os.version, range.min) < 0) matches = false
+        // max is exclusive: only then do Mojang's own pair (ZGC from 10.0.17134 on, the G1 flags
+        // below it) split the Windows builds between them instead of both matching 10.0.17134
+        if (range.max !== undefined && compareDotted(os.version, range.max) >= 0) matches = false
       }
     }
     if (matches && rule.features) {
@@ -43,6 +93,20 @@ export function ruleAllows(rules, { os = currentOs(), features = {} } = {}) {
     if (matches) result = rule.action === 'allow'
   }
   return result
+}
+
+// What in these rules SpawnLoft does not understand, for the rules that concern this OS (a rule
+// for another OS name cannot change what this machine runs).
+export function ruleProblems(rules, { os = currentOs() } = {}) {
+  const found = []
+  for (const rule of rules ?? []) {
+    const name = rule?.os?.name
+    if (name !== undefined && name !== os.name) continue
+    // a range for every OS is judged against the Darwin version on a Mac, as an osx one would be
+    const problem = ruleProblem(name === undefined && rule?.os?.versionRange !== undefined && os.name === 'osx' ? { ...rule, os: { ...rule.os, name: 'osx' } } : rule)
+    if (problem !== null && !found.includes(problem)) found.push(problem)
+  }
+  return found
 }
 
 export function mergeInherited(child, parent) {
@@ -138,21 +202,60 @@ function archMatch(classifier, os) {
 
 const OS_LABEL = { windows: 'Windows', osx: 'macOS', linux: 'Linux' }
 
-// Why this machine cannot run the client, or null. Without a version only the machine is
-// judged (Linux arm64 and other arches Mojang has never built for, refused before anything
-// downloads); with one, a version whose natives rows have arch builds for this OS but not for
-// this arch is refused too (Windows arm64 before 1.21), rather than starting without natives.
-export function platformRefusal(version = null, os = currentOs()) {
+function machineRefusal(os) {
   if (nativesClassifier(os) === null || (os.name === 'linux' && os.arch === 'arm64')) {
     return `the Minecraft client has no ${OS_LABEL[os.name] ?? os.name} ${os.arch} build; use bots on this machine`
   }
-  if (!version) return null
-  const matches = (version.libraries ?? [])
-    .filter(lib => ruleAllows(lib.rules, { os }))
-    .map(lib => archMatch(classifierOf(lib.name), os))
-    .filter(m => m !== null)
-  if (matches.length === 0 || matches.includes(true)) return null
-  return `${version.id ?? 'this version'} ships no ${OS_LABEL[os.name] ?? os.name} ${os.arch} natives; use a newer Minecraft version on this machine`
+  return null
+}
+
+// The arches a version ships natives for on this OS. The classifier form (1.19 on) names each
+// arch; the older map form (natives.<os>, LWJGL 2 to 3.2) only ever had x64 and x86 builds. Empty
+// when no natives row names an arch at all.
+export function nativeArches(version, os = currentOs()) {
+  const arches = new Set()
+  for (const arch of ['x64', 'arm64', 'x86']) {
+    const asArch = { ...os, arch }
+    for (const lib of version.libraries ?? []) {
+      if (!ruleAllows(lib.rules, { os: asArch })) continue
+      if (archMatch(classifierOf(lib.name), asArch) === true) arches.add(arch)
+      if (lib.natives?.[os.name] && arch !== 'arm64') arches.add(arch)
+    }
+  }
+  return arches
+}
+
+// The arch this version runs as on this machine: its own, or x64 under emulation when the
+// version has no arm64 natives (everything before 1.19) and the machine can run x64 code
+// (Rosetta on Apple Silicon, Windows 11 on arm64). hostCaps.x64 says whether it can; null when
+// that is not known, which judges as before emulation existed.
+export function archDecision(version = null, os = currentOs(), hostCaps = null) {
+  const refused = machineRefusal(os)
+  if (refused) return { refusal: refused, arch: os.arch, emulated: false }
+  const native = { refusal: null, arch: os.arch, emulated: false }
+  if (!version) return native
+  const arches = nativeArches(version, os)
+  if (arches.size === 0 || arches.has(os.arch)) return native
+  const id = version.id ?? 'this version'
+  if (os.arch === 'arm64' && arches.has('x64') && hostCaps !== null) {
+    if (hostCaps.x64) return { refusal: null, arch: 'x64', emulated: true }
+    if (os.name === 'osx') {
+      return { ...native, refusal: `Minecraft ${id} has no Apple Silicon build; install Rosetta to run it: softwareupdate --install-rosetta --agree-to-license` }
+    }
+    if (os.name === 'windows') {
+      const build = String(os.version).split('.')[2] ?? '?'
+      return { ...native, refusal: `Minecraft ${id} has no Windows arm64 build, and Windows 10 arm64 (build ${build}) cannot run the x64 one; Windows 11 can` }
+    }
+  }
+  return { ...native, refusal: `${id} ships no ${OS_LABEL[os.name] ?? os.name} ${os.arch} natives; use a newer Minecraft version on this machine` }
+}
+
+// Why this machine cannot run the client, or null. Without a version only the machine is
+// judged (Linux arm64 and other arches Mojang has never built for, refused before anything
+// downloads); with one, a version with no natives for this arch is refused too, unless hostCaps
+// says the machine runs it as x64 (archDecision).
+export function platformRefusal(version = null, os = currentOs(), hostCaps = null) {
+  return archDecision(version, os, hostCaps).refusal
 }
 
 export function libraries(version, { os = currentOs() } = {}) {
@@ -281,6 +384,22 @@ export function nativesLibrarySubdir(version, { os = currentOs() } = {}) {
   const parts = rest.split(/[\\/]/).filter(Boolean)
   if (parts.some(p => p === '.' || p === '..')) return ''
   return parts.join('/')
+}
+
+// The other folders the JVM arguments name under the natives directory (26.2 on: jna, lwjgl and
+// netty beside java). They are made, empty, with the natives, so nothing starts without them.
+export function nativesExtraDirs(version, { os = currentOs() } = {}) {
+  const lib = nativesLibrarySubdir(version, { os })
+  const dirs = []
+  for (const arg of jvmArguments(version, { os })) {
+    const m = typeof arg === 'string' && /^-D[\w.]+=\$\{natives_directory\}((?:[\\/][\w.-]+)+)[\\/]?$/.exec(arg)
+    if (!m) continue
+    const parts = m[1].split(/[\\/]/).filter(Boolean)
+    if (parts.some((p) => p === '.' || p === '..')) continue
+    const dir = parts.join('/')
+    if (dir !== lib && !dirs.includes(dir)) dirs.push(dir)
+  }
+  return dirs
 }
 
 function flattenArgs(args, ctx) {

@@ -23,6 +23,18 @@ export function parseMajor(text) {
   return first
 }
 
+// The os.arch line of -XshowSettings:properties, in the arch names the client uses; null when
+// the Java printed none.
+export function parseArch(text) {
+  const m = /^\s*os\.arch\s*=\s*(\S+)/m.exec(text)
+  if (!m) return null
+  const raw = m[1].toLowerCase()
+  if (raw === 'amd64' || raw === 'x86_64') return 'x64'
+  if (raw === 'aarch64' || raw === 'arm64') return 'arm64'
+  if (raw === 'x86' || /^i[3-6]86$/.test(raw)) return 'x86'
+  return raw
+}
+
 const PROBE_TIMEOUT_MS = 8000
 
 // execFile's timeout kills the child and reports it as a signal, never an exit code
@@ -33,8 +45,10 @@ function timedOut(error) {
 // Returns a plain object rather than throwing, since callers want to report it. Async because the
 // panel asks as it opens, alongside the first poll and console stream, and a JVM takes a few hundred ms.
 export async function probe(bin = 'java') {
-  const run = () => new Promise((resolve) => {
-    execFile(bin, ['-version'], { encoding: 'utf8', windowsHide: true, timeout: PROBE_TIMEOUT_MS },
+  // the properties name the arch this Java runs as (Java 7 on), which the game client needs: an
+  // x64 Java under Rosetta or Windows emulation says x86_64/amd64, as it should
+  const run = (args = ['-XshowSettings:properties', '-version']) => new Promise((resolve) => {
+    execFile(bin, args, { encoding: 'utf8', windowsHide: true, timeout: PROBE_TIMEOUT_MS },
       (error, stdout, stderr) => resolve({ error, stdout, stderr }))
   })
   let res = await run()
@@ -42,6 +56,9 @@ export async function probe(bin = 'java') {
   // on a loaded machine, which flipped the default Java between calls. Retry a timeout once before
   // counting it against the binary.
   if (timedOut(res.error)) res = await run()
+  // a JVM that refuses the option (Java 6, or a vendor build without it) is still a Java: ask
+  // the plain question, and its arch stays unknown
+  if (res.error && res.error.code !== 'ENOENT' && !timedOut(res.error)) res = await run(['-version'])
   if (res.error) {
     // ENOENT is the common case; execFile also puts a numeric exit status in code
     const missing = res.error.code === 'ENOENT'
@@ -64,9 +81,10 @@ export async function probe(bin = 'java') {
   // the version line, not the first line: JAVA_TOOL_OPTIONS makes the JVM print a "Picked up" notice first
   const version = (text.split('\n').find((l) => /version "/.test(l)) ?? text.split('\n')[0]).trim()
   const major = parseMajor(text)
+  const arch = parseArch(text)
 
   if (major == null) {
-    return { ok: true, found: true, major: null, version, reason: 'unknown-version', message: `Found ${version}.` }
+    return { ok: true, found: true, major: null, version, arch, reason: 'unknown-version', message: `Found ${version}.` }
   }
   if (major < MINIMUM_MAJOR) {
     return {
@@ -74,6 +92,7 @@ export async function probe(bin = 'java') {
       found: true,
       major,
       version,
+      arch,
       reason: 'too-old',
       message: `Java ${major} is too old to run a modern Minecraft server. Version ${RECOMMENDED_MAJOR} is what current Paper needs.`,
     }
@@ -84,11 +103,12 @@ export async function probe(bin = 'java') {
       found: true,
       major,
       version,
+      arch,
       reason: 'old',
       message: `Java ${major} will run older Minecraft versions, but current Paper needs ${RECOMMENDED_MAJOR}.`,
     }
   }
-  return { ok: true, found: true, major, version, reason: 'ok', message: `Java ${major} is installed.` }
+  return { ok: true, found: true, major, version, arch, reason: 'ok', message: `Java ${major} is installed.` }
 }
 
 // Every Java on the machine, not just PATH: Temurin's add-to-PATH box is optional, a running desktop
@@ -154,7 +174,8 @@ export async function discover() {
   // dedupe a PATH java that is also in a scanned folder (same version string)
   const seen = new Set()
   const unique = all.filter((r) => {
-    const key = r.version
+    // an x64 and an arm64 build of one release print the same version line
+    const key = `${r.version} ${r.arch ?? ''}`
     if (seen.has(key)) return false
     seen.add(key)
     return true
@@ -260,6 +281,69 @@ export async function pickJava({ explicit = null, needs = null, force = false, w
 function tooOld(message, { needs, have }) {
   const err = new UserError(message)
   err.code = 'java-too-old'
+  err.needs = needs
+  err.have = have
+  return err
+}
+
+const temurinUrl = (major) => `https://adoptium.net/temurin/releases/?version=${major}`
+
+// Which installed Java a game client runs on (requirement: client-version's javaRequirement):
+// one of the arch the game runs as, inside the bounds, the preferred major first and otherwise
+// the newest. null when none fits. A Java whose arch could not be read is taken as fitting.
+export function chooseClientJava(candidates, { min, max = null, prefer = null }, arch = null) {
+  const fits = candidates.filter((j) => j.major != null && j.major >= min && (max == null || j.major <= max) && (arch == null || j.arch == null || j.arch === arch))
+  return fits.find((j) => j.major === prefer) ?? [...fits].sort((a, b) => b.major - a.major)[0] ?? null
+}
+
+function boundsText({ min, max }) {
+  if (max == null) return `Java ${min} or newer`
+  return min === max ? `Java ${min}` : `Java ${min} to ${max}`
+}
+
+// The Java a game client gets, decided from its version JSON before anything but that JSON is
+// downloaded: { path, warning }. An explicit Java is probed and refused when it certainly cannot
+// run the version (too old, or the wrong arch); one newer than the version's bounds is used with
+// a warning, as the person chose it. Otherwise chooseClientJava over every Java on the machine;
+// when only newer ones than the bounds are installed, the closest of them runs the game with a
+// warning (until SpawnLoft downloads Mojang's own runtime, plan step V2), since a refusal would
+// stop versions that mostly run on it. `found` replaces discovery (tests).
+export async function pickClientJava({ explicit = null, requirement, arch = null, what = 'this version', found = null } = {}) {
+  const need = boundsText(requirement)
+  const install = requirement.prefer ?? requirement.min
+  const get = `Install Java ${install} from ${temurinUrl(install)}, or point the profile at one.`
+  const tooNew = (j) => `${what} wants ${need}; using Java ${j.major}${j.path === 'java' ? '' : ` at ${j.path}`}, which is newer, so the game may not start. ${get}`
+  if (explicit) {
+    const state = await probe(explicit)
+    if (!state.found) fail(`${explicit} could not be run: ${state.message}`)
+    if (arch && state.arch && state.arch !== arch) {
+      throw clientJavaError('java-wrong-arch', `${what} runs as ${arch} on this machine, and ${explicit} is an ${state.arch} Java. Pick an ${arch} Java for the profile, or clear it to let SpawnLoft choose.`, { needs: install, have: state.major })
+    }
+    if (state.major != null && state.major < requirement.min) {
+      throw clientJavaError('java-too-old', `${what} needs ${need}, and ${explicit} is Java ${state.major}. Pick another Java for the profile, or clear it to let SpawnLoft choose.`, { needs: install, have: state.major })
+    }
+    const over = state.major != null && requirement.max != null && state.major > requirement.max
+    return { path: explicit, warning: over ? tooNew({ major: state.major, path: explicit }) : null }
+  }
+  const all = found ?? (await discover()).all
+  const choice = chooseClientJava(all, requirement, arch)
+  if (choice) return { path: choice.path, warning: null }
+  const right = all.filter((j) => j.major != null && (arch == null || j.arch == null || j.arch === arch))
+  if (all.length === 0) {
+    throw clientJavaError('java-missing', `${what} needs ${need}, and no Java was found on this machine. ${get}`, { needs: install, have: null })
+  }
+  if (right.length === 0) {
+    throw clientJavaError('java-wrong-arch', `${what} runs as ${arch} on this machine and needs an ${arch} ${need}; the Javas found are ${[...new Set(all.map((j) => j.arch ?? '?'))].join(', ')}. ${get}`, { needs: install, have: null })
+  }
+  const newer = right.filter((j) => j.major > (requirement.max ?? Infinity)).sort((a, b) => a.major - b.major)
+  if (newer.length) return { path: newer[0].path, warning: tooNew(newer[0]) }
+  const newest = [...right].sort((a, b) => b.major - a.major)[0]
+  throw clientJavaError('java-too-old', `${what} needs ${need}. The newest Java on this machine is ${newest.major}${newest.path === 'java' ? '' : ` (${newest.path})`}. ${get}`, { needs: install, have: newest.major })
+}
+
+function clientJavaError(code, message, { needs, have }) {
+  const err = new UserError(message)
+  err.code = code
   err.needs = needs
   err.have = have
   return err

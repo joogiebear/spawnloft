@@ -123,10 +123,11 @@ test('platformRefusal: Linux arm64 always, Windows arm64 only without arm64 nati
   const older = { ...versionFixture, id: '1.20.4', libraries: versionFixture.libraries.filter(l => !l.name.endsWith(':natives-windows-arm64')) }
   assert.equal(platformRefusal(older, winArm), '1.20.4 ships no Windows arm64 natives; use a newer Minecraft version on this machine')
   assert.equal(platformRefusal(older, { name: 'windows', arch: 'x64', version: '10.0' }), null)
-  // a version without arch builds of natives (none at all, or only the old per-OS map) is not judged
+  // a version with no natives rows at all is not judged
   assert.equal(platformRefusal({ id: 'x', libraries: [] }, winArm), null)
+  // the old per-OS map never had arm64 builds: refused unless the machine runs x64 (archDecision)
   const legacy = { id: '1.18.2', libraries: [{ name: 'org.lwjgl:lwjgl:3.2.1', natives: { osx: 'natives-macos' } }] }
-  assert.equal(platformRefusal(legacy, { name: 'osx', arch: 'arm64', version: '24.0' }), null)
+  assert.equal(platformRefusal(legacy, { name: 'osx', arch: 'arm64', version: '24.0' }), '1.18.2 ships no macOS arm64 natives; use a newer Minecraft version on this machine')
   // an arch Mojang names no natives for at all is refused like Linux arm64
   assert.equal(platformRefusal(null, { name: 'linux', arch: 'arm', version: '6.1' }), 'the Minecraft client has no Linux arm build; use bots on this machine')
   assert.equal(platformRefusal(null, { name: 'windows', arch: 'x86', version: '10.0' }), null)
