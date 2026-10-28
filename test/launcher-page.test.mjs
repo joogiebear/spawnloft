@@ -225,3 +225,67 @@ test('the one screen keeps the old screens\' links and the card\'s pre-fill', ()
   // no sidebar, no screens
   assert.doesNotMatch(html, /class="rail"|data-go=/)
 })
+
+// The states of the one screen, forced from the summaries the launcher route answers.
+test('the Play screen picks one state from what the panel says', () => {
+  const { playState, playAccount } = lifted(['STRICT_CODES', 'sentence', 'blockReason', 'playState', 'playAccount'])
+  const ms = { name: 'Joogiebear', uuid: 'u1', type: 'microsoft', refreshFailedAt: null }
+  const off = { name: 'Wunga_', uuid: 'u2', type: 'offline', refreshFailedAt: null }
+  const setup = { name: '1-21-11', mc: '1.21.11', loader: 'vanilla', account: null, running: false }
+  const ctx = (over = {}) => {
+    const profile = over.profile ?? setup
+    const accounts = over.accounts ?? [ms]
+    return { down: false, loaded: true, profile, job: null, acct: playAccount(profile, accounts, over.defaultAccount ?? 'u1'), picked: null, machineRefusal: null, busy: false, otherJob: false, refusal: null, crashed: false, ...over }
+  }
+  const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : x.b)).join('')
+
+  assert.equal(playState({ down: true }).kind, 'unreachable')
+  assert.equal(playState({ down: false, loaded: false }).kind, 'loading')
+  assert.equal(playState(ctx({ profile: null })).kind, 'first-run')
+  assert.equal(playState(ctx()).kind, 'ready')
+  assert.equal(playState(ctx({ job: { profile: '1-21-11' } })).kind, 'launching')
+  assert.equal(playState(ctx({ profile: { ...setup, running: true } })).kind, 'running')
+  assert.equal(playState(ctx({ crashed: true })).kind, 'closed-early')
+
+  // blocked: the machine
+  const machine = playState(ctx({ machineRefusal: 'Minecraft has no client for Linux on arm64 (aarch64)' }))
+  assert.equal(machine.kind, 'blocked')
+  assert.equal(text(machine.reason), 'Minecraft can\'t be launched on this computer: Minecraft has no client for Linux on arm64 (aarch64).')
+  assert.deepEqual(machine.fix, [])
+  // blocked: the setup's own account was signed out
+  const gone = { ...setup, account: 'gone', accountName: 'OldName', accountType: null }
+  const missing = playState(ctx({ profile: gone }))
+  assert.equal(text(missing.reason), 'This setup plays as OldName, who is no longer signed in.')
+  assert.deepEqual(missing.fix, ['pick-account', 'sign-in'])
+  // blocked: the default account's refresh failed, and a setup's own account's
+  const stale = { ...ms, refreshFailedAt: '2026-10-28T00:00:00Z' }
+  const expiredDefault = playState(ctx({ accounts: [stale] }))
+  assert.equal(text(expiredDefault.reason), 'You play as Joogiebear, whose saved sign-in no longer works.')
+  assert.deepEqual(expiredDefault.fix, ['sign-in-again', 'switch-account'])
+  const ownStale = { ...setup, account: 'u1', accountName: 'Joogiebear', accountType: 'microsoft', accountUuid: 'u1' }
+  assert.deepEqual(playState(ctx({ profile: ownStale, accounts: [stale] })).fix, ['sign-in-again', 'pick-account'])
+  // blocked: an online-mode server for an offline player
+  const online = playState(ctx({ accounts: [off], defaultAccount: 'u2', picked: { name: 'public-smp', blocked: 'needs a Microsoft account' } }))
+  assert.equal(text(online.reason), 'public-smp needs a Microsoft account, and this setup plays as Wunga_.')
+  assert.deepEqual(online.fix, ['sign-in', 'title-screen'])
+  // blocked: another launch of it, or of another setup
+  assert.equal(playState(ctx({ busy: true })).kind, 'blocked')
+  assert.match(text(playState(ctx({ otherJob: true })).reason), /Another setup is launching/)
+  // blocked: the version itself was refused (strict mode); there is no "launch anyway"
+  const strict = playState(ctx({ refusal: 'Minecraft 26.5 needs launcher format 22; this SpawnLoft knows 21. Update SpawnLoft.' }))
+  assert.equal(strict.kind, 'blocked')
+  assert.deepEqual(strict.fix, ['edit'])
+  // the machine outranks everything else; a crash shown under a block stays a block
+  assert.deepEqual(playState(ctx({ machineRefusal: 'x', profile: gone })).fix, [])
+  assert.equal(playState(ctx({ crashed: true, busy: true })).kind, 'blocked')
+})
+
+test('a version the panel refuses outright is told apart from a launch that failed', () => {
+  const { versionRefusal } = lifted(['STRICT_CODES', 'versionRefusal'])
+  assert.equal(versionRefusal({ code: 'newer-launcher-format', message: 'x' }), true)
+  assert.equal(versionRefusal({ code: 'unknown-variable', message: 'x' }), true)
+  assert.equal(versionRefusal({ message: 'Minecraft X stores its assets in a way SpawnLoft does not know. Update SpawnLoft.' }), true)
+  assert.equal(versionRefusal({ message: 'no Java 21 found' }), false)
+  assert.equal(versionRefusal({ code: 'java-missing', message: 'no Java 21 found' }), false)
+  assert.equal(versionRefusal(null), false)
+})

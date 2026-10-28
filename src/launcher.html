@@ -323,6 +323,9 @@
   .notice.live { background: var(--live-fill); border-color: var(--live-edge); color: var(--live-ink); }
   .notice .body { flex: 1; min-width: 0; display: grid; gap: var(--s-1); }
   .notice .acts { display: flex; gap: var(--s-2); flex: none; align-items: center; }
+  /* a log under a notice spans it, lined up with the text */
+  .notice { flex-wrap: wrap; }
+  .notice > pre.log { flex-basis: 100%; margin-left: calc(14px + var(--s-3)); width: calc(100% - 14px - var(--s-3)); }
 
   .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); white-space: nowrap; }
   .pill.live { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
@@ -534,6 +537,8 @@
   const JOIN_KEY = 'spawnloft.launcher.join'
   const CALLBACK_URI = 'http://localhost/api/client/accounts/login/callback'
   const STEPS = ['Java', 'Version', 'Files', 'Server', 'Start']
+  // the all-versions plan's strict-mode codes: the version itself is refused, not this launch
+  const STRICT_CODES = ['unknown-variable', 'unknown-rule-key', 'newer-launcher-format', 'unknown-asset-layout', 'no-natives-for-this-machine']
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
   const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
   // the desktop app's bridge; null in a browser tab
@@ -626,6 +631,42 @@
       return { tone: 'fault', title: `Can't play: ${text.replace(/; sign in or pick another server$/, '')}`, text: 'Sign in with a Microsoft account, or join another server.', fix: 'sign-in' }
     }
     return { tone: 'fault', title: 'Can\'t play', text: sentence(text) }
+  }
+
+  // A launch refused for the version itself (the all-versions plan's strict mode: a launcher
+  // format, rule or setting this SpawnLoft does not know) stays refused until the setup changes,
+  // so Play is greyed with the panel's own words rather than offered again.
+  function versionRefusal(ev) {
+    if (STRICT_CODES.includes(ev?.code)) return true
+    return /\bUpdate SpawnLoft\.?$/.test(String(ev?.message ?? ''))
+  }
+
+  // Why Play is greyed for a setup, or null. `c` is { profile, acct, picked, machineRefusal,
+  // busy, otherJob, refusal }. The reason is sentence parts, like playSentence's; `fix` names
+  // the controls that help, in order.
+  function blockReason(c) {
+    if (c.machineRefusal) return { reason: ['Minecraft can\'t be launched on this computer: ', sentence(c.machineRefusal).replace(/\.?$/, '.')], fix: [] }
+    if (c.refusal) return { reason: [sentence(c.refusal).replace(/\.?$/, '.')], fix: ['edit'] }
+    if (c.busy) return { reason: ['Another launch of this setup is already under way. Play unlocks when it finishes.'], fix: [] }
+    if (c.otherJob) return { reason: ['Another setup is launching. Play unlocks when it finishes.'], fix: [] }
+    const own = Boolean(c.profile.account)
+    if (c.acct.missing) return { reason: ['This setup plays as ', { b: c.acct.name }, ', who is no longer signed in.'], fix: ['pick-account', 'sign-in'] }
+    if (c.acct.expired) return { reason: [own ? 'This setup plays as ' : 'You play as ', { b: c.acct.name }, ', whose saved sign-in no longer works.'], fix: ['sign-in-again', own ? 'pick-account' : 'switch-account'] }
+    if (c.picked?.blocked) return { reason: [{ b: c.picked.name }, ' needs a Microsoft account, and this setup plays as ', { b: c.acct.name ?? 'an offline player' }, '.'], fix: ['sign-in', 'title-screen'] }
+    return null
+  }
+
+  // What the Play screen shows: 'unreachable', 'loading', 'first-run', 'launching', 'running',
+  // 'blocked' (with blockReason's reason and fix), 'closed-early' or 'ready'.
+  function playState(c) {
+    if (c.down) return { kind: 'unreachable' }
+    if (!c.loaded) return { kind: 'loading' }
+    if (!c.profile) return { kind: 'first-run' }
+    if (c.job) return { kind: 'launching' }
+    if (c.profile.running) return { kind: 'running' }
+    const blocked = blockReason(c)
+    if (blocked) return { kind: 'blocked', ...blocked }
+    return { kind: c.crashed ? 'closed-early' : 'ready' }
   }
 
   // Which watched games ended within CRASH_WINDOW_MS of starting without a Stop from this page.
@@ -782,9 +823,10 @@
   function notice({ tone = '', title, text, acts = [], onclose, extra }) {
     const icon = tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'info'
     return h('div', { class: `notice ${tone}`.trim(), role: tone === 'fault' ? 'alert' : 'status' }, ico(icon),
-      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text }), extra),
+      h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text })),
       (acts.length || onclose) && h('div', { class: 'acts' }, acts,
-        onclose && h('button', { class: 'sm quiet icon', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))))
+        onclose && h('button', { class: 'sm quiet icon', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))),
+      extra)
   }
 
   const sk = (style) => h('div', { class: 'sk', style })
@@ -847,6 +889,8 @@
     notice: null,
     // the outcome of a change made in the sheet or a menu, above the button until dismissed
     flash: null,
+    // profile -> { mc, message }: the panel refused this version itself; cleared when it changes
+    refusals: {},
     log: { profile: null, lines: [] },
     stopping: null,
     // the open menu: 'account' | 'version' | 'join' | null
@@ -950,7 +994,7 @@
     // a re-render (a poll, a keystroke that changes a hint) keeps the focused field and caret
     const active = document.activeElement
     const keep = active?.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null
-    $('chipwrap').replaceChildren(...accountChip())
+    $('chipwrap').replaceChildren(...(S.down ? [] : accountChip()))
     $('stage').replaceChildren(S.down ? unreachableView() : playView())
     $('sheet').replaceChildren(...(S.sheet && !S.down ? [sheetView()] : []))
     if (keep) {
@@ -1038,7 +1082,7 @@
   function playView() {
     const sum = S.summary
     if (!sum) {
-      return h('div', { class: 'playbox', 'aria-busy': 'true' }, sk('width:320px;height:64px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
+      return h('div', { class: 'playbox', 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('width:320px;height:64px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
     }
     const p = currentProfile()
     if (!p) {
@@ -1046,20 +1090,36 @@
         h('div', { class: 'split' }, h('button', { class: 'primary play', id: 'play', onclick: () => openSheet() }, ico('plus'), 'New setup')),
         h('p', { class: 'does', text: 'A setup is a Minecraft version with its own worlds, options and mods. Make one to start playing.' }))
     }
-    const job = S.job?.profile === p.name ? S.job : null
     const plan = launchPlan(p)
+    const { state } = plan
     const kids = [flashNotice()]
-    if (sum.machineRefusal) kids.push(notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(sum.machineRefusal) }))
-    if (S.crash?.profile === p.name && !p.running && !job) kids.push(crashNotice(S.crash))
-    if (S.notice?.profile === p.name && !job) {
+    if (S.crash?.profile === p.name && state.kind !== 'running' && state.kind !== 'launching') kids.push(crashNotice(S.crash))
+    if (S.notice?.profile === p.name && state.kind !== 'launching' && !(S.notice.busy && state.kind === 'blocked')) {
       const n = S.notice
       kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: 'sm', onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
     }
-    if (job) kids.push(launchingCard(p, job))
-    else if (p.running) kids.push(runningCard(p))
-    else kids.push(playButton(p, plan), h('p', { class: 'does' }, parts(plan.sentence)), plan.warning && h('p', { class: 'why' }, ico('alert'), h('span', {}, plan.warning)))
-    kids.push(joinField(p, plan, Boolean(job || p.running)))
+    if (state.kind === 'launching') kids.push(launchingCard(p, S.job))
+    else if (state.kind === 'running') kids.push(runningCard(p))
+    else {
+      kids.push(playButton(p, plan))
+      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why', role: 'status' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [i ? ' or ' : ' ', fixButton(f, p, i === 0)]), state.fix.length ? '.' : null)))
+      else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
+    }
+    kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
     return h('div', { class: 'playbox' }, kids)
+  }
+
+  // The one control that clears a blocked Play, as a link in the reason.
+  function fixButton(fix, p, first) {
+    const cap = (text) => (first ? sentence(text) : text)
+    const link = (text, onclick) => h('button', { class: 'linkbtn', onclick }, cap(text))
+    if (fix === 'sign-in') return link('sign in with Microsoft', () => openMenu('account'))
+    if (fix === 'sign-in-again') return link('sign in again', startLogin)
+    if (fix === 'pick-account') return link('pick another account', () => openSheet(p, null, 'fAccount'))
+    if (fix === 'switch-account') return link('pick another account', () => openMenu('account'))
+    if (fix === 'title-screen') return link('play on the title screen', () => { setTarget(p, {}); render() })
+    if (fix === 'edit') return link('pick another version', () => openSheet(p, null, 'fMc'))
+    return null
   }
 
   function flashNotice() {
@@ -1076,24 +1136,28 @@
     if (t.server && !picked) t.server = null
     const address = picked ? '' : t.address.trim()
     const addrProblem = address ? addressProblem(address) : null
-    const busy = Boolean(S.notice?.busy && S.notice.profile === p.name)
-    const crashed = S.crash?.profile === p.name
+    const job = S.job?.profile === p.name ? S.job : null
+    const refused = S.refusals[p.name]
+    if (refused && refused.mc !== p.mc) delete S.refusals[p.name]
+    const state = playState({
+      down: S.down, loaded: true, profile: p, job, acct, picked,
+      machineRefusal: S.summary.machineRefusal,
+      busy: Boolean(S.notice?.busy && S.notice.profile === p.name),
+      otherJob: Boolean(S.job && !job),
+      refusal: S.refusals[p.name]?.message ?? null,
+      crashed: S.crash?.profile === p.name,
+    })
     const startsServer = Boolean(picked?.stopped)
-    const blocked = Boolean(picked?.blocked) || Boolean(acct.missing) || Boolean(S.summary.machineRefusal) || busy || Boolean(S.job) || p.running
     const who = acct.missing ? `${acct.name} (no longer signed in)` : acct.name
     const sentenceParts = playSentence({ mc: p.mc, fabric: p.loader === 'fabric', who, server: picked?.name, address: addrProblem ? null : address, startsServer })
-    let warning = null
-    if (acct.missing) warning = `This setup plays as ${acct.name}, who is no longer signed in. Pick another account for it in the setup, or sign in again.`
-    else if (acct.expired) warning = `The saved sign-in for ${acct.name} no longer works; sign in again from the account menu before playing.`
-    else if (picked?.blocked) warning = `${picked.name} ${picked.blocked}.`
-    return { acct, t, choices, picked, address, addrProblem, busy, crashed, startsServer, blocked, sentence: sentenceParts, warning }
+    return { state, acct, t, choices, picked, address, addrProblem, startsServer, blocked: state.kind !== 'ready' && state.kind !== 'closed-early', sentence: sentenceParts }
   }
 
   function playButton(p, plan) {
-    const label = plan.startsServer ? 'Start server and play' : plan.crashed ? 'Play again' : 'Play'
+    const label = plan.startsServer ? 'Start server and play' : plan.state.kind === 'closed-early' ? 'Play again' : 'Play'
     const given = givenName(p)
     return h('div', { class: 'split menuhost', 'data-menu': 'version' },
-      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, onclick: () => startLaunch(p) }, ico('play'), label),
+      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => startLaunch(p) }, ico('play'), label),
       h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
         h('span', { class: 'vt' }, h('b', { text: p.mc }), h('small', { text: `${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${given ? ` · ${given}` : ''}` })), ico('chev')),
       S.menu === 'version' && versionMenu(p))
@@ -1196,7 +1260,7 @@
 
   function crashNotice(crash) {
     const acts = [h('button', { class: 'sm', disabled: crash.report === 'busy', onclick: () => reportProblem(crash) }, crash.report === 'busy' ? 'Collecting…' : 'Report a problem')]
-    let text = 'Usually a mod, not enough memory, or the wrong Java. The last lines of the game log are below.'
+    let text = 'It was not stopped from here. Usually a mod, not enough memory, or the wrong Java. The last lines of its log:'
     if (crash.report && typeof crash.report === 'object') {
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
@@ -1297,6 +1361,9 @@
     if (ev?.stage === 'running') {
       S.watch[job.profile] = { since: Date.now(), stopping: false }
       if (ev.warnings?.length) S.notice = { profile: job.profile, tone: 'warn', title: 'Playing, with a warning', text: ev.warnings.map(sentence).join(' ') }
+    } else if (ev && versionRefusal(ev)) {
+      const p = profileNamed(job.profile)
+      if (p) S.refusals[job.profile] = { mc: p.mc, message: ev.message }
     } else if (ev) {
       S.notice = { profile: job.profile, ...launchNotice(ev.message), at: Date.now() }
     }
@@ -1341,7 +1408,7 @@
 
   // New and Edit. `p` is the profile to edit; with none it is a new setup, prefilled from
   // `prefill` ({ mc, server }, what a server card's Play leaves when no setup fits).
-  function openSheet(p = null, prefill = null) {
+  function openSheet(p = null, prefill = null, focus = null) {
     const servers = serversNow()
     S.menu = null
     S.sheet = p
@@ -1351,7 +1418,7 @@
     if (!S.versions || S.versions.error) loadVersions()
     else defaultVersion(S.sheet)
     render()
-    $(p ? 'fMc' : 'fName')?.focus()
+    $(focus ?? (p ? 'fMc' : 'fName'))?.focus()
   }
 
   function closeSheet() {
@@ -1532,6 +1599,7 @@
         const patch = profilePatch(before ?? {}, next)
         const out = Object.keys(patch).length ? await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch }) : { warnings: [] }
         const label = setupTitle(out.profile ?? before ?? f)
+        if (patch.mc !== undefined) delete S.refusals[f.editing]
         S.flash = out.warnings?.length
           ? { tone: 'warn', title: `Saved ${label}`, text: out.warnings.map(sentence).join(' ') }
           : Object.keys(patch).length ? { tone: 'live', title: `Saved ${label}` } : null
