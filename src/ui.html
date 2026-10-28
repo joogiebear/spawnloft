@@ -4346,7 +4346,7 @@ function moreItems(row) {
   const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
-    ...(play ? [{ label: 'Play', hint: play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) }] : []),
+    { label: 'Play', hint: !play ? 'Opens the game launcher to make a profile for this server.' : play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) },
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -5698,9 +5698,8 @@ function updateHomeCard(card, row) {
   setVerb(restart, 'Restart', acting === 'restart' ? 'restart' : null, blocked, name);
   const play = card.querySelector('.sc-play');
   const pp = playProfileFor(row);
-  play.hidden = !pp;
   play.textContent = pp && pp.running ? 'Playing' : 'Play';
-  if (pp) play.title = pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
+  play.title = !pp ? 'Opens the game launcher to make a profile for this server' : pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
   play.disabled = Boolean(pp && launching.has(pp.name));
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
@@ -5871,9 +5870,15 @@ function setPlayDisabled(name, disabled) {
     if (pp && pp.name === name) btn.disabled = disabled;
   }
 }
+// No profile fits the server: the launcher opens with its New profile form filled in for it.
+function openLauncherFor(row) {
+  try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify({ mc: row.mcVersion || null, server: row.name })) } catch {}
+  // a refused window (a pop-up blocker, or a desktop app that does not allow it) still leaves a way there
+  if (!window.open('/launcher', 'spawnloft-launcher')) toast('Make a game profile for ' + (row.label || row.name) + ' under Preferences \u203a Game client.');
+}
 async function playClient(row) {
   const p = playProfileFor(row);
-  if (!p) return;
+  if (!p) { openLauncherFor(row); return; }
   if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
   // An acknowledgement, not an error: the game is already open, which is what Play is for.
   if (p.running) { toast(p.name + ' is already running. Stop it under Preferences \u203a Game client.'); return; }

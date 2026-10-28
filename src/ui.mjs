@@ -35,12 +35,14 @@ import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
 import * as client from './client.mjs'
+import { loadAccounts } from './client-auth.mjs'
+import { platformRefusal } from './client-meta.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { scrubber } from './mcp-tools.mjs'
 import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
-import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside } from './util.mjs'
+import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
 import { activeBlock } from './control.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -705,6 +707,183 @@ async function handleConsole(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
+// The game client: profiles, the version picker, launches and their logs. The launcher page and
+// the server cards' Play use these; everything here is behind the same loopback checks as the
+// rest of the panel, which matters because a profile's `java` is a path launch runs.
+async function handleClient(req, res, seg, url) {
+  if (seg[2] === 'versions' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, await client.listVersions())
+  }
+  if (seg[2] === 'launcher' && seg.length === 3 && req.method === 'GET') {
+    return json(res, 200, launcherSummary())
+  }
+  if (seg[2] !== 'profiles') return json(res, 404, { error: 'not found' })
+
+  if (seg.length === 3) {
+    if (req.method === 'GET') return json(res, 200, client.listProfiles().map(clientProfileRow))
+    if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+    const body = (await readBody(req)) ?? {}
+    if (typeof body.name !== 'string') fail('a profile needs a name')
+    if (typeof body.mc !== 'string') fail('a profile needs a Minecraft version')
+    // assistantAccount is not taken here: a new profile starts with it off, whoever makes it
+    const fields = {}
+    for (const key of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']) {
+      if (body[key] !== undefined) fields[key] = body[key]
+    }
+    const made = client.createProfile(body.name, fields)
+    return json(res, 200, clientProfileRow(client.getProfile(made.name)))
+  }
+
+  const profileName = seg[3]
+  if (seg.length === 4) {
+    if (req.method === 'PATCH') {
+      const body = await readBody(req)
+      if (!body || typeof body !== 'object' || Array.isArray(body)) fail('send the keys to change as a JSON object')
+      const before = client.getProfile(profileName)
+      client.updateProfile(profileName, body)
+      const warnings = []
+      if (typeof body.mc === 'string' && body.mc !== before.mc && await hasModJars(profileName)) {
+        warnings.push(`Mods in this profile's folder were installed for ${before.mc} and may not load`)
+      }
+      return json(res, 200, { profile: clientProfileRow(client.getProfile(profileName)), warnings })
+    }
+    if (req.method === 'DELETE') {
+      const purge = ['1', 'true'].includes(url.searchParams.get('purge') ?? '')
+      client.removeProfile(profileName, { purge })
+      return json(res, 200, { removed: profileName, purged: purge })
+    }
+    return json(res, 405, { error: 'method not allowed' })
+  }
+  if (seg.length !== 5) return json(res, 404, { error: 'not found' })
+
+  const verb = seg[4]
+  if (verb === 'status' && req.method === 'GET') {
+    return json(res, 200, client.status(profileName))
+  }
+  if (verb === 'log' && req.method === 'GET') {
+    client.getProfile(profileName)
+    const asked = Number(url.searchParams.get('lines') ?? 20)
+    const count = Number.isInteger(asked) && asked > 0 ? Math.min(asked, LOG_LINES_MAX) : 20
+    const scrub = scrubber()
+    return json(res, 200, { lines: client.tailClientLog(profileName, count).map((l) => scrub(client.redactClientLine(l))) })
+  }
+  if (verb === 'diag' && req.method === 'POST') {
+    client.getProfile(profileName)
+    const bundle = await buildBundle({ client: profileName, scrub: scrubber() })
+    const result = await writeBundle(bundle, { outDir: path.join(BACKUPS_DIR, 'client', 'exports') })
+    return json(res, 200, { file: result.file, size: result.size, sizeHuman: result.sizeHuman, findings: bundle.findings })
+  }
+  if (verb === 'launch' && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    const opts = {
+      server: body.server === false ? false : (typeof body.server === 'string' && body.server ? body.server : null),
+      account: typeof body.account === 'string' && body.account ? body.account : null,
+      // a server SpawnLoft does not run, host[:port]; launch checks it
+      address: typeof body.address === 'string' ? body.address : null,
+      fakeJava: client.fakeClientJava(),
+    }
+    if (body.jobId === undefined || body.jobId === null) {
+      const out = await client.launch(profileName, { ...opts, launchedBy: 'panel' })
+      return json(res, 200, { pid: out.pid, version: out.version, account: out.account, warnings: out.warnings })
+    }
+    const jobId = String(body.jobId)
+    if (!JOB_ID.test(jobId)) fail('jobId must be 1 to 64 letters, digits, dashes or underscores')
+    client.getProfile(profileName)
+    // Answered now: the page has opened the job stream, and every refusal from here on (the
+    // launch lock among them) arrives there as the job's error.
+    launchJob(jobId, profileName, { ...opts, startServer: body.startServer === true })
+    return json(res, 202, { jobId })
+  }
+  if (verb === 'stop' && req.method === 'POST') {
+    return json(res, 200, await client.stop(profileName))
+  }
+  return json(res, 405, { error: 'method not allowed' })
+}
+
+const LOG_LINES_MAX = 500
+const JOB_ID = /^[A-Za-z0-9_-]{1,64}$/
+// how long "Start server and launch" waits for the server before giving up on the launch
+const LAUNCH_SERVER_WAIT_MS = 120000
+
+function clientProfileRow(p) {
+  const st = client.status(p.name)
+  return {
+    name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, java: p.java,
+    harness: p.harness, server: p.server, account: p.account, assistantAccount: p.assistantAccount,
+    running: st.running, pid: st.pid, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
+  }
+}
+
+async function hasModJars(profileName) {
+  try {
+    return (await fs.promises.readdir(path.join(client.profileFolder(profileName), 'mods'))).some((f) => /\.jar$/i.test(f))
+  } catch {
+    return false
+  }
+}
+
+// Names, uuids and the two dates only: no route hands a token to a page.
+function publicAccounts() {
+  let list = []
+  try { list = loadAccounts() } catch { /* an unreadable file lists nothing; sign-in rewrites it */ }
+  return list.filter((a) => a && typeof a.name === 'string').map((a) => ({
+    name: a.name,
+    uuid: a.uuid ?? null,
+    type: a.type === 'offline' ? 'offline' : 'microsoft',
+    expiresAt: a.expiresAt ?? null,
+    refreshFailedAt: a.refreshFailedAt ?? null,
+  }))
+}
+
+// One read for the launcher's poll: profiles with their running state (from state.json and the
+// cached process table, no fresh tasklist), accounts, and the servers a profile can join.
+function launcherSummary() {
+  const accounts = publicAccounts()
+  const wanted = client.loadProfiles().defaultAccount ?? null
+  const servers = registry.listInstances().map((inst) => {
+    let row
+    try { row = safeInstance(supervisor.statusOf(inst.name)) } catch { row = { ...inst, status: 'unknown', onlineMode: null } }
+    return { name: row.name, label: row.label ?? null, mc: plugins.mcVersionOf(row) ?? null, status: row.status, onlineMode: row.onlineMode }
+  })
+  return {
+    profiles: client.listProfiles().map(clientProfileRow),
+    accounts,
+    // a uuid no longer signed in is no default at all
+    defaultAccount: accounts.some((a) => a.uuid === wanted) ? wanted : null,
+    servers,
+    machineRefusal: platformRefusal(null),
+  }
+}
+
+async function startServerForLaunch(name) {
+  const out = await supervisor.start(name, { timeout: LAUNCH_SERVER_WAIT_MS })
+  if (out.failed) fail(`server "${name}" started but stopped again: ${out.reason}; the game was not launched`)
+  if (out.timedOut) fail(`server "${name}" had not finished starting after about 2 minutes, so the game was not launched; watch its console, then launch again`)
+}
+
+// `startServer` is the page's "Start server and launch": without it a stopped server is a warning.
+function launchJob(jobId, profileName, { startServer, ...opts }) {
+  // a reused id must not carry the last run's outcome into this one
+  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined })
+  client.launch(profileName, {
+    ...opts,
+    launchedBy: 'launcher',
+    ensureServer: startServer ? startServerForLaunch : null,
+    onStage: ({ stage, message }) => jobUpdate(jobId, { stage, message, percent: null }),
+    onProgress: ({ phase, done, total, bytes }) => jobUpdate(jobId, {
+      stage: phase === 'harness mod' ? 'harness' : phase,
+      message: `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files · ${humanBytes(bytes)}`,
+      percent: total ? Math.min(100, Math.round((done / total) * 100)) : null,
+    }),
+  }).then(
+    (out) => jobUpdate(jobId, {
+      stage: 'running', percent: 100, message: `Running · pid ${out.pid}`, done: true,
+      pid: out.pid, version: out.version, account: out.account, warnings: out.warnings,
+    }),
+    (err) => jobUpdate(jobId, { stage: 'error', percent: null, message: err?.message ?? String(err), done: true }),
+  )
+}
+
 async function handleDiag(req, res, name, seg, url) {
   registry.getInstance(name)
   const outDir = path.join(BACKUPS_DIR, name, 'exports')
@@ -1108,6 +1287,15 @@ async function route(req, res) {
     return
   }
 
+  // the game launcher's own page, opened as a window of its own; same theme injection as /
+  if (url.pathname === '/launcher') {
+    const html = readFileSync(path.join(HERE, 'launcher.html'), 'utf8')
+      .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    res.end(html)
+    return
+  }
+
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
 
   // separate from /settings so a palette change can't touch data locations
@@ -1132,26 +1320,7 @@ async function route(req, res) {
     })
   }
 
-  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 3 && req.method === 'GET') {
-    return json(res, 200, client.listProfiles().map((p) => ({ name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, harness: p.harness, server: p.server, running: client.status(p.name).running })))
-  }
-
-  if (seg[1] === 'client' && seg[2] === 'profiles' && seg.length === 5) {
-    const profileName = seg[3]
-    if (seg[4] === 'status' && req.method === 'GET') {
-      return json(res, 200, client.status(profileName))
-    }
-    if (seg[4] === 'launch' && req.method === 'POST') {
-      const body = await readBody(req)
-      const fakeJava = client.fakeClientJava()
-      const res2 = await client.launch(profileName, { server: typeof body?.server === 'string' && body.server ? body.server : null, fakeJava })
-      return json(res, 200, { pid: res2.pid, version: res2.version, account: res2.account, warnings: res2.warnings })
-    }
-    if (seg[4] === 'stop' && req.method === 'POST') {
-      return json(res, 200, await client.stop(profileName))
-    }
-    return json(res, 405, { error: 'method not allowed' })
-  }
+  if (seg[1] === 'client') return handleClient(req, res, seg, url)
 
   if (seg[1] === 'health' && req.method === 'GET') {
     return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })

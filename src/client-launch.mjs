@@ -18,12 +18,17 @@ export function substitute(template, vars) {
   return { text, unknown }
 }
 
-export function buildCommand({ version, profile, profileName, account, java, os = currentOs(), harnessToken = null }) {
-  const hasServer = Boolean(profile.server)
+// `address` ({ host, port }, from parseServerAddress) joins a server SpawnLoft does not run, in
+// place of the profile's server.
+export function buildCommand({ version, profile, profileName, account, java, os = currentOs(), harnessToken = null, address = null }) {
+  const hasServer = Boolean(address || profile.server)
 
   let host = null
   let port = null
-  if (hasServer) {
+  if (address) {
+    host = address.host
+    port = address.port
+  } else if (hasServer) {
     const inst = getInstance(profile.server)
     const ip = boundAddress(inst.dir)
     host = (ip === '' || ip === '0.0.0.0' || ip === '::') ? '127.0.0.1' : ip
@@ -78,7 +83,7 @@ export function buildCommand({ version, profile, profileName, account, java, os 
   }
 
   if (hasServer) {
-    vars.quickPlayMultiplayer = `${host}:${port}`
+    vars.quickPlayMultiplayer = host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`
     // has_quick_plays_support also enables --quickPlayPath, the game's quick-play log
     vars.quickPlayPath = path.join(clientRunDir(profileName), 'quickPlay.json')
   }
@@ -156,6 +161,8 @@ export async function spawnClient(command, { name, state }) {
         javaPid: child.pid,
         harness: state.harness ?? null,
         server: state.server ?? null,
+        address: state.address ?? null,
+        launchedBy: state.launchedBy ?? null,
       }, { mode: PRIVATE_FILE_MODE })
       child.unref()
       resolve({ pid: child.pid, child })
