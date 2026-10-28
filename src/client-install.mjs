@@ -113,7 +113,7 @@ export function planInstall(version, { os = currentOs() } = {}) {
   }
 }
 
-export async function ensureVersion(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = false } = {}) {
+export async function ensureVersion(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = new Set() } = {}) {
   let rawJson
   try {
     rawJson = JSON.parse(fs.readFileSync(versionJson(id), 'utf8'))
@@ -277,8 +277,8 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   const completeFile = path.join(nativesDir(id), '.complete')
   const stamped = fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === plan.nativesStamp
-  // keepNatives: a running game has this folder's libraries loaded; an extracted one is left as it is
-  const keep = keepNatives && fs.existsSync(completeFile)
+  // keepNatives: the ids whose natives a running game has loaded; an extracted folder is left as it is
+  const keep = keepNatives.has(id) && fs.existsSync(completeFile)
   if (nativeRows.length > 0 && !keep && (nativeWasDownloaded || !stamped)) {
     await extractNatives(id, nativeRows, { stamp: plan.nativesStamp, subdir: plan.nativesSubdir, extraDirs: plan.nativesExtraDirs })
   }

@@ -540,7 +540,7 @@
   // per profile, where Join pointed last: { server } or { address }; nothing is the title screen
   const JOIN_KEY = 'spawnloft.launcher.join'
   const CALLBACK_URI = 'http://localhost/api/client/accounts/login/callback'
-  const STEPS = ['Java', 'Version', 'Files', 'Server', 'Start']
+  const STEPS = ['Version', 'Java', 'Files', 'Server', 'Start']
   // the all-versions plan's strict-mode codes: the version itself is refused, not this launch
   const STRICT_CODES = ['unknown-variable', 'unknown-rule-key', 'newer-launcher-format', 'unknown-asset-layout', 'no-natives-for-this-machine']
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
@@ -552,8 +552,9 @@
 
   // Which step of the strip a job stage belongs to; -1 is "Preparing…".
   function stepOf(stage) {
-    if (stage === 'java') return 0
-    if (stage === 'manifest' || stage === 'version') return 1
+    // the version file comes first: the Java is read from it
+    if (stage === 'manifest' || stage === 'version') return 0
+    if (stage === 'java') return 1
     if (['client', 'libraries', 'assets', 'natives', 'fabric', 'harness'].includes(stage)) return 2
     if (stage === 'server') return 3
     if (stage === 'spawn' || stage === 'running') return 4

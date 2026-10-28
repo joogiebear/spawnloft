@@ -392,10 +392,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onWarning(picked.warning)
   }
 
-  // another profile's game on this version has its natives loaded: a re-extraction (a new stamp,
-  // an arch switch) would pull them from under it, or fail on Windows, so it waits for a later launch
-  const nativesInUse = listProfiles().some((p) => p.name !== name && (readClientState(p.name)?.launch?.id ?? (readClientState(p.name) ? p.mc : null)) === versionId)
-  if (!fakeInstalled) await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: nativesInUse })
+  if (!fakeInstalled) await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
   if (!fakeJava) {
     if (profile.loader === 'fabric') {
       onStage({ stage: 'fabric', message: 'Checking Fabric API' })
@@ -462,6 +459,25 @@ function formatAddress({ host, port }) {
   return host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`
 }
 
+// The version ids whose natives a running game (of another profile) has loaded: each game's
+// own and every parent it inherits from, since a Fabric game loads its vanilla parent's natives.
+// A re-extraction (a new stamp, an arch switch) would pull them from under it, or fail on
+// Windows, so those folders wait for a later launch.
+function versionsInUse(except) {
+  const ids = new Set()
+  for (const p of listProfiles()) {
+    if (p.name === except) continue
+    const state = readClientState(p.name)
+    if (!state) continue
+    let id = state.launch?.id ?? p.mc
+    while (typeof id === 'string' && !ids.has(id)) {
+      ids.add(id)
+      id = readJson(versionJson(id), null)?.inheritsFrom ?? null
+    }
+  }
+  return ids
+}
+
 // What this launch was decided from, kept in the run's state for diagnose and the diag bundle.
 function launchFacts(resolved, picked, profile) {
   return {
@@ -486,7 +502,7 @@ export async function hostCapabilities(os = currentOs()) {
   if (os.name !== 'osx') return { x64: false }
   if (!rosettaSeen) {
     rosettaSeen = await new Promise((resolve) => {
-      execFile('arch', ['-x86_64', '/usr/bin/true'], { timeout: 10000 }, (err) => resolve(!err))
+      execFile('/usr/bin/arch', ['-x86_64', '/usr/bin/true'], { timeout: 10000 }, (err) => resolve(!err))
     })
   }
   return { x64: rosettaSeen }

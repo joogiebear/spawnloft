@@ -48,7 +48,7 @@ export function launchFeatures({ hasServer = false } = {}) {
 // sun.misc.Unsafe access every LWJGL 3.2 and 3.3 version makes (review R3).
 export function javaRequirement(version) {
   const jv = version.javaVersion
-  const major = Number.isInteger(jv?.majorVersion) ? jv.majorVersion : 8
+  const major = Number.isInteger(jv?.majorVersion) && jv.majorVersion >= 1 ? jv.majorVersion : 8
   const component = typeof jv?.component === 'string' ? jv.component : 'jre-legacy'
   if (component === 'jre-legacy') {
     return { major, component, min: 8, max: version.arguments ? 17 : 8, prefer: 8 }

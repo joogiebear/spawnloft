@@ -238,6 +238,26 @@ test('26.x natives go to the java/ folder its java.library.path names, and old i
   for (const dir of ['jna', 'lwjgl', 'netty']) assert.ok(fs.statSync(path.join(nDir, dir)).isDirectory(), dir)
 })
 
+test('keepNatives: a folder a running game has loaded is not re-extracted, its Fabric parent\'s included', async () => {
+  const id = '26.3-test'
+  const nDir = nativesDir(id)
+  const { fetchImpl } = makeStub()
+  // a stale stamp, as every install has after an upgrade, and a file the extraction would remove
+  fs.writeFileSync(path.join(nDir, '.complete'), 'stale')
+  fs.writeFileSync(path.join(nDir, 'loaded-by-a-running-game'), 'x')
+
+  const child = { id: 'fabric-keep-test', inheritsFrom: id, mainClass: 'x', arguments: { game: [], jvm: [] }, libraries: [] }
+  fs.mkdirSync(versionDir(child.id), { recursive: true })
+  fs.writeFileSync(versionJson(child.id), JSON.stringify(child))
+  await ensureVersion(child.id, { os: winOs, fetchImpl, keepNatives: new Set([child.id, id]) })
+  assert.equal(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), 'stale', 'the parent was kept')
+  assert.ok(fs.existsSync(path.join(nDir, 'loaded-by-a-running-game')))
+
+  await ensureVersion(id, { os: winOs, fetchImpl })
+  assert.notEqual(fs.readFileSync(path.join(nDir, '.complete'), 'utf8'), 'stale', 'redone once nothing holds it')
+  assert.equal(fs.existsSync(path.join(nDir, 'loaded-by-a-running-game')), false)
+})
+
 test('natives stamp: a hash of the rows and the arguments that place them, so a change re-extracts by itself', () => {
   const winOs2 = { name: 'windows', arch: 'x64', version: '10.0' }
   const base = JSON.parse(JSON.stringify(fixture))

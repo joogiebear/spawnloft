@@ -59,7 +59,7 @@ test('the launcher page carries a Content-Security-Policy that keeps it on the p
 test('the launch strip puts every job stage on a step', () => {
   const { stepOf, splitMessage } = lifted(['stepOf', 'splitMessage'])
   assert.deepEqual(['java', 'manifest', 'version', 'client', 'libraries', 'assets', 'natives', 'fabric', 'harness', 'server', 'spawn', 'running'].map(stepOf),
-    [0, 1, 1, 2, 2, 2, 2, 2, 2, 3, 4, 4])
+    [1, 0, 0, 2, 2, 2, 2, 2, 2, 3, 4, 4])
   assert.equal(stepOf('start'), -1)
   assert.equal(stepOf('something-new'), -1)
   assert.deepEqual(splitMessage('Downloading libraries · 212 of 1,049 files · 143 MB'), ['Downloading libraries', '212 of 1,049 files · 143 MB'])
