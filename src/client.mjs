@@ -6,7 +6,7 @@ import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, client
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
-import { ensureVersion } from './client-install.mjs'
+import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
@@ -345,7 +345,7 @@ export const LAUNCHED_BY = ['launcher', 'panel', 'cli', 'assistant']
 // `onStage` hears { stage, message } as each step starts; `onProgress` keeps the downloads'
 // { phase, done, total, bytes }. `ensureServer(target)` starts a stopped target server and waits
 // for it, just before the game is spawned; without it a stopped server is only a warning.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null, fetchImpl = null }) {
   const by = assistant ? 'assistant' : (launchedBy ?? 'cli')
   if (!LAUNCHED_BY.includes(by)) throw new Error(`unknown launchedBy "${launchedBy}"`)
   const profile = getProfile(name)
@@ -413,8 +413,10 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     } else {
       versionId = profile.mc
     }
-    fakeInstalled = fs.existsSync(versionJson(versionId))
-    if (!fakeInstalled) versionId = await prepareVersion(name, { onStage })
+    const onDisk = fs.existsSync(versionJson(versionId))
+    // tests that pass fetchImpl install it for real, with those downloads
+    fakeInstalled = onDisk && !fetchImpl
+    if (!onDisk) versionId = await prepareVersion(name, { onStage })
   } else {
     versionId = await prepareVersion(name, { onStage })
   }
@@ -443,7 +445,20 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onWarning(picked.warning)
   }
 
-  const installed = fakeInstalled ? null : await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name) })
+  const installed = fakeInstalled ? null : await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name), ...(fetchImpl ? { fetchImpl } : {}) })
+  // the older asset layouts: a tree under real names, shared (virtual) or in the profile (resources)
+  const assetsDir = installed ? assetTreeDir(installed.assetsLayout, installed.assetIndex.id, profileDir(name)) : null
+  if (assetsDir) {
+    onStage({ stage: 'assets', message: installed.assetsLayout === 'resources' ? "Laying out the sounds in this profile's folder" : 'Laying out the shared sounds and language files' })
+    // the resources tree is in the profile's folder, which the game writes to: copies, not links
+    await materialiseAssets(installed.assetIndex, assetsDir, { copy: installed.assetsLayout === 'resources' })
+  }
+  // N4: no machine the project has can try it
+  if (resolved.emulated && runOs.name === 'windows') {
+    const w = 'running under Windows x64 emulation (experimental)'
+    warnings.push(w)
+    onWarning(w)
+  }
   if (!fakeJava) {
     if (profile.loader === 'fabric') {
       onStage({ stage: 'fabric', message: 'Checking Fabric API' })
@@ -464,10 +479,10 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
-  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address })
+  const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address, assetsDir })
   onStage({ stage: 'spawn', message: 'Starting the game' })
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
-  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed) } })
+  const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed, assetsDir) } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
 }
@@ -530,7 +545,7 @@ function versionsInUse(except) {
 }
 
 // What this launch was decided from, kept in the run's state for diagnose and the diag bundle.
-function launchFacts(resolved, picked, profile, installed) {
+function launchFacts(resolved, picked, profile, installed, assetsDir) {
   return {
     id: resolved.id,
     java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: profile.java ? 'explicit' : picked.warning ? 'fallback' : 'installed', warning: picked.warning },
@@ -538,6 +553,7 @@ function launchFacts(resolved, picked, profile, installed) {
     emulated: resolved.emulated,
     nativesDir: resolved.natives.dir,
     assetsLayout: installed?.assetsLayout ?? null,
+    assetsDir,
     loggingConfig: resolved.logging?.id ?? null,
     minimumLauncherVersion: resolved.format.minimumLauncherVersion,
   }

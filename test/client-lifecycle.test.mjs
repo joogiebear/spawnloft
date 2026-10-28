@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import crypto from 'node:crypto'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
@@ -11,7 +12,7 @@ process.env.MCCTL_DATA_ROOT = scratch
 
 const { launch, status, stop, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
 const { readClientState } = await import('../src/client-launch.mjs')
-const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson } = await import('../src/client-paths.mjs')
+const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson, ASSETS_DIR, profileDir } = await import('../src/client-paths.mjs')
 
 const fakeJava = path.join(here, 'fixtures', 'fake-client.mjs')
 
@@ -262,8 +263,46 @@ test('a version with no arm64 natives runs as x64 on an arm64 machine that can e
     assert.equal(facts.arch, 'x64')
     assert.equal(facts.emulated, true)
     assert.equal(facts.java.major, 8)
+    await stop('emu')
+    // Windows 11 on arm64 runs it too, said to be experimental (review N4)
+    const res = await launch('emu', { fakeJava, os: { name: 'windows', arch: 'arm64', version: '10.0.22631' }, hostCaps: { x64: true } })
+    assert.deepEqual(res.warnings, ['running under Windows x64 emulation (experimental)'])
   } finally {
     try { await stop('emu') } catch { /* not running */ }
     removeProfile('emu')
+  }
+})
+
+test('an older asset layout is laid out by launch and handed to the game (V1c review S-2)', async () => {
+  const base = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'client', 'versions', '1.12.2.json'), 'utf8'))
+  const win = { name: 'windows', arch: 'x64', version: '10.0.19045' }
+  for (const [file, layout] of [['pre-1.6.json', 'resources'], ['legacy.json', 'virtual']]) {
+    const version = JSON.parse(JSON.stringify(base))
+    version.id = `launch-${layout}`
+    const indexText = fs.readFileSync(path.join(here, 'fixtures', 'client', 'assets', file))
+    version.assetIndex = { id: `${layout}-test`, url: `https://example.invalid/indexes/${file}`, sha1: crypto.createHash('sha1').update(indexText).digest('hex'), size: indexText.length }
+    fs.mkdirSync(versionDir(version.id), { recursive: true })
+    fs.writeFileSync(versionJson(version.id), JSON.stringify(version))
+    const fetchImpl = async (url, dest) => {
+      fs.mkdirSync(path.dirname(dest), { recursive: true })
+      fs.writeFileSync(dest, url === version.assetIndex.url ? indexText : 'spawnloft fixture body')
+    }
+    createProfile(layout, { mc: version.id })
+    try {
+      const stages = []
+      await launch(layout, { fakeJava, os: win, fetchImpl, onStage: (s) => stages.push(s.stage) })
+      assert.ok(stages.includes('assets'), `${layout}: the assets stage ran`)
+      const facts = readClientState(layout).launch
+      const tree = layout === 'resources' ? path.join(profileDir(layout), 'resources') : path.join(ASSETS_DIR, 'virtual', version.assetIndex.id)
+      assert.equal(facts.assetsLayout, layout)
+      assert.equal(facts.assetsDir, tree)
+      assert.equal(fs.readFileSync(path.join(tree, '.complete'), 'utf8'), version.assetIndex.sha1)
+      const [name, entry] = Object.entries(JSON.parse(indexText).objects)[0]
+      const object = path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash)
+      assert.equal(fs.statSync(path.join(tree, name)).ino === fs.statSync(object).ino, layout === 'virtual', `${layout}: ${layout === 'virtual' ? 'linked' : 'copied'}`)
+    } finally {
+      try { await stop(layout) } catch { /* not running */ }
+      removeProfile(layout)
+    }
   }
 })

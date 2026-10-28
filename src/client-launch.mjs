@@ -21,7 +21,9 @@ export function substitute(template, vars) {
 
 // `address` ({ host, port }, from parseServerAddress) joins a server SpawnLoft does not run, in
 // place of the profile's server.
-export function buildCommand({ version, profile, profileName, account, java, os = currentOs(), harnessToken = null, address = null }) {
+// `assetsDir` is the tree an older asset layout was laid out in (materialiseAssets), which
+// ${game_assets} names; null for the objects layout, which the game reads from assets/ itself.
+export function buildCommand({ version, profile, profileName, account, java, os = currentOs(), harnessToken = null, address = null, assetsDir = null }) {
   const hasServer = Boolean(address || profile.server)
 
   let host = null
@@ -75,9 +77,9 @@ export function buildCommand({ version, profile, profileName, account, java, os 
     auth_xuid: account.xuid,
     user_type: account.userType,
     // the minecraftArguments era's: the session as Mojang's launcher wrote it (an offline
-    // player's access token is "0"), the assets folder by its old name, and no Twitch properties
+    // player's access token is "0"), the assets folder the game reads, and no Twitch properties
     auth_session: `token:${account.accessToken}:${account.uuid}`,
-    game_assets: ASSETS_DIR,
+    game_assets: assetsDir ?? ASSETS_DIR,
     user_properties: '{}',
   }
 

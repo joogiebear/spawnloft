@@ -7,7 +7,7 @@ import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, assetLa
 import { nativesStamp } from './client-version.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
-import { fail } from './util.mjs'
+import { fail, safeRelativePath, isInside } from './util.mjs'
 
 export const PARALLEL = 8
 
@@ -32,6 +32,15 @@ function linkOrCopy(from, to) {
     fs.linkSync(from, to)
   } catch {
     fs.copyFileSync(from, to)
+  }
+}
+
+function sameFile(a, b) {
+  try {
+    const [x, y] = [fs.statSync(a), fs.statSync(b)]
+    return x.ino === y.ino && x.dev === y.dev
+  } catch {
+    return false
   }
 }
 
@@ -113,6 +122,60 @@ export function planInstall(version, { os = currentOs() } = {}) {
   }
 }
 
+// An index's files under their real names: [relative path, the object it is]. A path that would
+// leave its tree refuses the whole index.
+function assetTreeRows(index) {
+  const rows = []
+  for (const [name, entry] of Object.entries(index.objects ?? {})) {
+    const rel = safeRelativePath(name)
+    if (rel === null) fail(`the asset index names the file "${String(name).slice(0, 80)}", which would land outside its folder`)
+    // the stamp's own name, in any case (Windows and macOS fold it) and as a folder too
+    if (rel.split('/')[0].toLowerCase() === '.complete') fail(`the asset index names the file "${rel.slice(0, 80)}", which SpawnLoft keeps for itself`)
+    if (!/^[0-9a-f]{40}$/.test(String(entry?.hash))) fail(`the asset index names "${rel}" with a malformed hash`)
+    rows.push([rel, `objects/${entry.hash.slice(0, 2)}/${entry.hash}`])
+  }
+  return rows
+}
+
+// Where an index in an older layout is laid out for the game: the virtual one once for every
+// version that shares it (1.6.1 to 1.7.2), the resources one in the profile's own folder (before
+// 1.6, where the game reads <gameDir>/resources). null for the objects layout, read in place.
+export function assetTreeDir(layout, indexId, profileFolder) {
+  if (layout === 'virtual') return path.join(ASSETS_DIR, 'virtual', indexId)
+  if (layout === 'resources') return path.join(profileFolder, 'resources')
+  return null
+}
+
+// Lays out an index in an older layout as hard links into the object store (copies where links
+// fail), with a .complete stamp holding the index's sha1: a tree whose stamp is missing or names
+// another index is laid out again, so a half-done one is finished on the next launch. `copy`
+// copies every file instead: a tree in the profile's folder is the game's and the user's to
+// write, and a write through a hard link would change the shared object store.
+export async function materialiseAssets({ file, sha1 }, dest, { copy = false } = {}) {
+  const stampFile = path.join(dest, '.complete')
+  let stamp = null
+  try { stamp = fs.readFileSync(stampFile, 'utf8') } catch { /* not laid out yet */ }
+  if (!/^[0-9a-f]{40}$/i.test(String(sha1))) fail('the asset index has no sha1 to check it by')
+  if (stamp === sha1) return { files: 0 }
+  const rows = assetTreeRows(JSON.parse(fs.readFileSync(file, 'utf8')))
+  fs.mkdirSync(dest, { recursive: true })
+  fs.rmSync(stampFile, { force: true })
+  for (const [rel, object] of rows) {
+    const to = path.join(dest, rel)
+    if (!isInside(dest, to)) fail(`the asset index names the file "${rel}", which would land outside its folder`)
+    fs.mkdirSync(path.dirname(to), { recursive: true })
+    if (copy) {
+      fs.rmSync(to, { force: true })
+      fs.copyFileSync(path.join(ASSETS_DIR, object), to)
+    } else if (!sameFile(path.join(ASSETS_DIR, object), to)) {
+      // a link already in place stays, so a game running from a shared tree never sees it missing
+      linkOrCopy(path.join(ASSETS_DIR, object), to)
+    }
+  }
+  fs.writeFileSync(stampFile, sha1)
+  return { files: rows.length }
+}
+
 export async function ensureVersion(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = new Set() } = {}) {
   let rawJson
   try {
@@ -154,9 +217,9 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   if (layout === null) {
     fail(`Minecraft ${id}'s asset index (${ai.id}) is laid out in a way SpawnLoft does not know. Update SpawnLoft.`, 'unknown-asset-layout')
   }
-  if (layout !== 'objects') {
-    fail(`Minecraft ${id} keeps its sounds and language files in an older layout (asset index ${ai.id}) that this SpawnLoft does not set up yet. Update SpawnLoft.`, 'unknown-asset-layout')
-  }
+  // the older layouts name files by their real paths: every one must stay inside its tree, checked
+  // before anything else downloads
+  if (layout !== 'objects') assetTreeRows(indexJson)
 
   const jarPath = versionJar(id)
 
@@ -299,6 +362,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     jar: jarPath,
     logConfig: logCfg?.id ?? null,
     assetsLayout: layout,
+    assetIndex: { id: ai.id, sha1: ai.sha1, file: indexDest },
     libraries: plan.libraryRows,
     natives: nativeRows.length,
     assets: objRows.length,

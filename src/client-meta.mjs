@@ -357,8 +357,13 @@ export function log4jNoLookupsNeeded(version) {
   return false
 }
 
+// The index id names a file under assets/indexes and, for the virtual layout, a folder under
+// assets/virtual: one plain path segment.
 export function assetIndex(version) {
   const ai = version.assetIndex
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(String(ai?.id)) || ai.id.includes('..')) {
+    fail(`the asset index of ${version.id ?? 'this version'} has the id "${String(ai?.id).slice(0, 64)}", which is not a plain name`)
+  }
   return { id: ai.id, url: ai.url, sha1: ai.sha1, size: ai.size, totalSize: ai.totalSize }
 }
 
