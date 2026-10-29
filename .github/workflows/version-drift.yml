@@ -1,0 +1,62 @@
+# Once a week: do Mojang's newest versions, Fabric's profile for the newest release, their asset
+# indexes and Mojang's Java runtime list still fit this SpawnLoft? A launch refuses what does not
+# (strict mode); this says so before someone presses Play. A failure opens (or adds to) one issue,
+# "Mojang format drift", and the next green run closes it. A pull request that changes the check
+# or the launcher code it calls runs it too, without touching the issue.
+name: version-drift
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/check-version-drift.mjs
+      - tools/version-drift-baseline.json
+      - .github/workflows/version-drift.yml
+      - src/client-version.mjs
+      - src/client-meta.mjs
+      - src/client-java.mjs
+      - src/client-fabric.mjs
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Mojang's formats
+        id: check
+        run: node tools/check-version-drift.mjs --report drift-report.md
+      - name: Open or update the drift issue
+        if: failure() && steps.check.outcome == 'failure' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "The [weekly drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found formats this SpawnLoft does not handle. A launch of these versions is refused until it does."
+            echo
+            cat drift-report.md
+          } > issue.md
+          n=$(gh issue list --state open --search 'in:title "Mojang format drift"' --json number,title --jq '[.[] | select(.title == "Mojang format drift")][0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file issue.md
+          else
+            gh issue create --title "Mojang format drift" --body-file issue.md
+          fi
+      - name: Close the drift issue once green
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh issue list --state open --search 'in:title "Mojang format drift"' --json number,title --jq '[.[] | select(.title == "Mojang format drift")][0].number')
+          if [ -n "$n" ]; then
+            gh issue close "$n" --comment "The [drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) is green again."
+          fi
