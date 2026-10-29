@@ -299,7 +299,7 @@ test('a list that revokes a key drops a cached copy that key signed, huge serial
   const recovery = indexBytes({ serial: 5, revoke: [primary.spki] })
   assert.equal(await refresh(cacheDir, server(published(recovery, sign(recovery, spare))).fetchImpl), 'accepted')
   assert.equal(indexRows({ cacheDir, keys, minSerial: 1 })[0].sha256, 'ab'.repeat(32))
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(cacheDir, 'harness-revoked-keys.json'), 'utf8')), [primary.spki])
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(cacheDir, 'harness-revoked-keys.json'), 'utf8')).revoked, [primary.spki])
 
   // from now on the primary's lists are refused, on fetch and on load
   clock += 25 * 3600000
@@ -319,6 +319,23 @@ test('a list that revokes a key drops a cached copy that key signed, huge serial
   assert.equal(fs.existsSync(path.join(cacheDir2, 'harness-revoked-keys.json')), false)
 })
 
+test('stored revocations end with the key set they were made under', async () => {
+  // an attacker holding the primary got the spare revoked on this machine
+  const cacheDir = fresh()
+  const hostile = indexBytes({ serial: 2, revoke: [spare.spki] })
+  assert.equal(await refresh(cacheDir, server(published(hostile, sign(hostile))).fetchImpl), 'accepted')
+  clock += 25 * 3600000
+  const bySpare = indexBytes({ serial: 3 })
+  assert.equal(await refresh(cacheDir, server(published(bySpare, sign(bySpare, spare))).fetchImpl), 'harness-index-signature')
+
+  // a SpawnLoft release that replaces the primary starts clean, and the spare's list is accepted
+  const rotated = [{ name: 'primary', spki: pair('primary').spki }, keys[1]]
+  clock += 25 * 3600000
+  forgetHarnessIndex()
+  assert.equal(await refresh(cacheDir, server(published(bySpare, sign(bySpare, spare))).fetchImpl, { keys: rotated }), 'accepted')
+  assert.equal(indexRows({ cacheDir, keys: rotated, minSerial: 1 }).length, 1)
+})
+
 test('a cache folder that cannot be written is recorded, not thrown', async () => {
   const cacheDir = fresh()
   fs.writeFileSync(cacheDir, 'a file where the folder should be')
@@ -327,12 +344,15 @@ test('a cache folder that cannot be written is recorded, not thrown', async () =
 })
 
 test('built-in rows win over the list, and the merged ids are listed once', () => {
-  const cacheDir = path.join(scratch, 'data-cache')
-  void cacheDir
-  // the module's own cache folder (CLIENT_CACHE_DIR) is the scratch data root's
-  const ids = publishedHarnessIds()
-  assert.ok(ids.includes('1.21.11'))
-  assert.equal(new Set(ids).size, ids.length)
+  // a list that lists 1.21.11 with another jar, and adds 26.3
+  const bytes = indexBytes({ rows: [row('1.21.11', { sha256: 'cd'.repeat(32) }), row('26.3')] })
+  const listed = parse(bytes, sign(bytes)).rows
+  const builtIn = harnessFor('1.21.11', { listed: [] })
+  assert.deepEqual(harnessFor('1.21.11', { listed }), builtIn)
+  assert.equal(builtIn.sha256, '6e97b92cfde87bbd948f8ef4733979ba556337be79ed334b02c6942f2dae0d63')
+  assert.equal(harnessFor('26.3', { listed }).sha256, 'ab'.repeat(32))
+  assert.equal(harnessFor('26.3', { listed: [] }), null)
+  assert.deepEqual(publishedHarnessIds({ listed }), ['1.21.11', '26.3'])
 })
 
 test('the doctor line names the source, and a rejected list is a problem', () => {

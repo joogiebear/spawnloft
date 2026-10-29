@@ -20,14 +20,14 @@ export const HARNESS_RELEASES = [
 
 // The build for one Minecraft id, { minecraft: mc, version, url, sha256 }, or null. Never waits for
 // the network: the signed list is the copy already verified and cached (refreshHarnessIndex fetches).
-export function harnessFor(mc) {
-  const row = HARNESS_RELEASES.find(r => r.minecraft.includes(mc)) ?? indexRows().find(r => r.minecraft.includes(mc))
+export function harnessFor(mc, { listed = indexRows() } = {}) {
+  const row = HARNESS_RELEASES.find(r => r.minecraft.includes(mc)) ?? listed.find(r => r.minecraft.includes(mc))
   return row ? { minecraft: mc, version: row.version, url: harnessJarUrl(row), sha256: row.sha256 } : null
 }
 
 // Every id a harness build is published for, built-in and listed, for messages.
-export function publishedHarnessIds() {
-  return [...new Set([...HARNESS_RELEASES, ...indexRows()].flatMap(r => r.minecraft))]
+export function publishedHarnessIds({ listed = indexRows() } = {}) {
+  return [...new Set([...HARNESS_RELEASES, ...listed].flatMap(r => r.minecraft))]
 }
 
 export async function ensureHarnessJar(profileName, mc, { onProgress } = {}) {

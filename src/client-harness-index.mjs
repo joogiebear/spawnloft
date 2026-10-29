@@ -148,9 +148,15 @@ function readJsonFile(dest, fallback) {
   }
 }
 
-function readRevoked(cacheDir) {
-  const list = readJsonFile(file(cacheDir, REVOKED_FILE), [])
-  return Array.isArray(list) ? list.filter((k) => typeof k === 'string') : []
+// Revocations are kept with the key set they were made under. A SpawnLoft that ships other keys
+// (a rotation after a leak) starts clean, so a revocation an attacker managed to get stored cannot
+// outlive the release that replaces the keys.
+const keySetOf = (keys) => keys.map((k) => k.spki).sort().join(',')
+
+function readRevoked(cacheDir, keys) {
+  const stored = readJsonFile(file(cacheDir, REVOKED_FILE), null)
+  if (!stored || stored.keys !== keySetOf(keys) || !Array.isArray(stored.revoked)) return []
+  return stored.revoked.filter((k) => typeof k === 'string')
 }
 
 function writeStatus(cacheDir, status) {
@@ -178,7 +184,7 @@ export function loadCachedHarnessIndex({ cacheDir = CLIENT_CACHE_DIR, keys = HAR
     return null
   }
   try {
-    return { ...parseHarnessIndex(bytes, sig, { keys, minSerial, revoked: revoked ?? readRevoked(cacheDir) }), bytes }
+    return { ...parseHarnessIndex(bytes, sig, { keys, minSerial, revoked: revoked ?? readRevoked(cacheDir, keys) }), bytes }
   } catch (err) {
     dropCache(cacheDir)
     const old = readJsonFile(file(cacheDir, STATUS_FILE), {})
@@ -251,7 +257,7 @@ export async function refreshHarnessIndex({ cacheDir = CLIENT_CACHE_DIR, force =
     return record(err.code === 'too-large' ? 'harness-index-oversized' : 'harness-index-unreachable', err.message, current)
   }
 
-  const storedRevoked = readRevoked(cacheDir)
+  const storedRevoked = readRevoked(cacheDir, keys)
   let fresh
   try {
     fresh = parseHarnessIndex(bytes, sig, { keys, minSerial, revoked: storedRevoked })
@@ -286,7 +292,7 @@ export async function refreshHarnessIndex({ cacheDir = CLIENT_CACHE_DIR, force =
 
   try {
     fs.mkdirSync(cacheDir, { recursive: true })
-    if (revoked.length !== storedRevoked.length) writeAtomic(file(cacheDir, REVOKED_FILE), `${JSON.stringify(revoked, null, 2)}\n`)
+    if (revoked.length !== storedRevoked.length) writeAtomic(file(cacheDir, REVOKED_FILE), `${JSON.stringify({ keys: keySetOf(keys), revoked }, null, 2)}\n`)
     writeAtomic(file(cacheDir, INDEX_FILE), bytes)
     writeAtomic(file(cacheDir, SIG_FILE), sig)
     writeAtomic(file(cacheDir, `${INDEX_FILE}.fetched-at`), String(now()))
