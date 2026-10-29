@@ -13,7 +13,8 @@ import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versi
 import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
-import { harnessFor, HARNESS_RELEASES, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
+import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
+import { refreshHarnessIndex, harnessIndexStatus } from './client-harness-index.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 
 export const LOADERS = ['vanilla', 'fabric']
@@ -338,6 +339,15 @@ export async function launch(name, opts = {}) {
 
 export const LAUNCHED_BY = ['launcher', 'panel', 'cli', 'assistant']
 
+// The refusal for a harness profile on a version with no harness build, with why the published
+// list may not have been read.
+function harnessNotPublished(mc) {
+  const ids = publishedHarnessIds()
+  const st = harnessIndexStatus()
+  const unread = st.outcome && !['accepted', 'unchanged'].includes(st.outcome) ? ` (the published list could not be read: ${st.reason})` : ''
+  return `The harness mod is not published for Minecraft ${mc} yet (published: ${ids.join(', ')})${unread}. Turn the harness off on this profile to play (harness=false), or use ${ids.length === 1 ? ids[0] : 'one of those versions'} for harness work.`
+}
+
 // `assistant: true` marks a launch asked for by an AI assistant (the MCP tool): playing as a
 // Microsoft account is then allowed only on a profile whose assistantAccount key says so.
 // `onWarning` is told about a stopped target server before the game starts, so the warning comes
@@ -363,7 +373,10 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const target = address || server === false ? null : (server ?? profile.server)
   if (target && isDatabase(getInstance(target))) fail(`"${target}" is a database, not a Minecraft server; point the profile at a server`)
   if (profile.harness && !harnessFor(profile.mc)) {
-    fail('the harness mod is published for Minecraft ' + HARNESS_RELEASES.map(r => r.minecraft).join(', ') + ', not ' + profile.mc + '; set harness=false on the profile or use one of those versions')
+    // a build published since the signed list was last read is found before refusing (no wait
+    // when it was read within the day)
+    await refreshHarnessIndex()
+    if (!harnessFor(profile.mc)) fail(harnessNotPublished(profile.mc), 'harness-not-published')
   }
 
   // --as names an offline player; a signed-in account brings its own name. Both at once is a
@@ -893,6 +906,7 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
   const [mojang, fabricList] = await Promise.all([
     fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) }).then((m) => ({ m }), (err) => ({ err })),
     fabric || refresh ? fabricGameVersions({ force: refresh }).catch(() => null) : null,
+    refreshHarnessIndex({ force: refresh }),
   ])
   if (mojang.err) offline = `the Minecraft version list could not be read (${mojang.err?.message ?? mojang.err}), so only downloaded versions are listed`
   else manifest = mojang.m
@@ -940,7 +954,8 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
   const resolved = resolveVersion(json, { os, hostCaps: needsCaps ? await hostCapabilities(os) : null })
   const refused = resolvedRefusal(resolved)
   let fabric = null
-  try { fabric = fabricAvailable(mc, await fabricGameVersions()) } catch { /* unknown */ }
+  const [fabricList] = await Promise.all([fabricGameVersions().catch(() => null), refreshHarnessIndex()])
+  try { if (fabricList) fabric = fabricAvailable(mc, fabricList) } catch { /* unknown */ }
   return {
     id: mc,
     type: json.type ?? 'release',

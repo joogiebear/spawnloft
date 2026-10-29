@@ -7,15 +7,27 @@ import readline from 'node:readline'
 import { fail, UserError, readJson, sleep } from './util.mjs'
 import { profileDir } from './client-paths.mjs'
 import { downloadFile } from './download.mjs'
+import { indexRows, harnessJarUrl } from './client-harness-index.mjs'
 
 export const HARNESS_FILE = 'spawnloft-harness.json'
 
+// The builds this SpawnLoft ships knowing, in the signed list's row shape (client-harness-index.mjs).
+// More arrive through that list without a release; these win on a conflict, so the list can add a
+// version but never swap the jar of one listed here.
 export const HARNESS_RELEASES = [
-  { minecraft: '1.21.11', version: '0.1.0', url: 'https://github.com/joogiebear/spawnloft-harness-mod/releases/download/v0.1.0-mc1.21.11/spawnloft-harness-0.1.0%2B1.21.11.jar', sha256: '6e97b92cfde87bbd948f8ef4733979ba556337be79ed334b02c6942f2dae0d63' },
+  { minecraft: ['1.21.11'], version: '0.1.0', tag: 'v0.1.0-mc1.21.11', file: 'spawnloft-harness-0.1.0+1.21.11.jar', sha256: '6e97b92cfde87bbd948f8ef4733979ba556337be79ed334b02c6942f2dae0d63' },
 ]
 
+// The build for one Minecraft id, { minecraft: mc, version, url, sha256 }, or null. Never waits for
+// the network: the signed list is the copy already verified and cached (refreshHarnessIndex fetches).
 export function harnessFor(mc) {
-  return HARNESS_RELEASES.find(r => r.minecraft === mc) ?? null
+  const row = HARNESS_RELEASES.find(r => r.minecraft.includes(mc)) ?? indexRows().find(r => r.minecraft.includes(mc))
+  return row ? { minecraft: mc, version: row.version, url: harnessJarUrl(row), sha256: row.sha256 } : null
+}
+
+// Every id a harness build is published for, built-in and listed, for messages.
+export function publishedHarnessIds() {
+  return [...new Set([...HARNESS_RELEASES, ...indexRows()].flatMap(r => r.minecraft))]
 }
 
 export async function ensureHarnessJar(profileName, mc, { onProgress } = {}) {

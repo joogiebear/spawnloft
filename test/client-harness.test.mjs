@@ -115,3 +115,51 @@ test('a harness file from another process is ignored, and launch clears it', asy
   assert.ok(found === null || found.version !== 'stale', 'launch removed the stale file before the game wrote its own')
   await stop('harn')
 })
+
+test('a harness profile on a version with no build asks the published list once, then refuses with a code', async () => {
+  const crypto = await import('node:crypto')
+  const { loadProfiles, saveProfiles } = await import('../src/client.mjs')
+  const { CLIENT_CACHE_DIR } = await import('../src/client-paths.mjs')
+  const idx = await import('../src/client-harness-index.mjs')
+  fs.mkdirSync(versionDir('26.3'), { recursive: true })
+  fs.copyFileSync(path.join(here, 'fixtures', 'client', 'versions', '26.3.json'), versionJson('26.3'))
+  const reg = loadProfiles()
+  reg.profiles.h263 = { mc: '26.3', loader: 'fabric', loaderVersion: '0.20.1', java: null, memory: '2G', harness: true, server: null, account: null, assistantAccount: false, createdAt: new Date().toISOString() }
+  saveProfiles(reg)
+
+  const fetched = []
+  const realFetch = globalThis.fetch
+  const gate = process.env.SPAWNLOFT_HARNESS_INDEX_FETCH
+  delete process.env.SPAWNLOFT_HARNESS_INDEX_FETCH
+  globalThis.fetch = async (url) => { fetched.push(String(url)); throw new Error('getaddrinfo ENOTFOUND github.com') }
+  try {
+    await assert.rejects(launch('h263', { fakeJava }), (err) => {
+      assert.equal(err.code, 'harness-not-published')
+      assert.match(err.message, /not published for Minecraft 26\.3 yet \(published: 1\.21\.11\) \(the published list could not be read: .*ENOTFOUND/)
+      return true
+    })
+    assert.deepEqual([...new Set(fetched)], [idx.HARNESS_INDEX_URL])
+    // a second launch within the hour does not ask again
+    fetched.length = 0
+    await assert.rejects(launch('h263', { fakeJava }), { code: 'harness-not-published' })
+    assert.deepEqual(fetched, [])
+  } finally {
+    globalThis.fetch = realFetch
+    if (gate !== undefined) process.env.SPAWNLOFT_HARNESS_INDEX_FETCH = gate
+  }
+
+  // once a list carrying 26.3 is in use, the launch gets past the check
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519')
+  const keys = [{ name: 'primary', spki: publicKey.export({ type: 'spki', format: 'der' }).toString('base64') }]
+  const bytes = Buffer.from(JSON.stringify({ format: 1, serial: 1, rows: [{ minecraft: ['26.3'], version: '0.2.0', tag: 'v0.2.0-mc26.3', file: 'spawnloft-harness-0.2.0+26.3.jar', sha256: 'ab'.repeat(32) }] }))
+  const sig = crypto.sign(null, Buffer.concat([Buffer.from(idx.SIGNATURE_DOMAIN), bytes]), privateKey).toString('base64')
+  const answers = { [idx.HARNESS_INDEX_URL]: bytes, [idx.HARNESS_INDEX_SIG_URL]: Buffer.from(sig) }
+  const fetchImpl = async (url) => ({ ok: true, status: 200, body: (async function* () { yield answers[url] })() })
+  idx.forgetHarnessIndex()
+  assert.equal(await idx.refreshHarnessIndex({ cacheDir: CLIENT_CACHE_DIR, keys, fetchImpl, force: true }), 'accepted')
+  assert.equal(harnessFor('26.3').url, 'https://github.com/joogiebear/spawnloft-harness-mod/releases/download/v0.2.0-mc26.3/spawnloft-harness-0.2.0%2B26.3.jar')
+  const stages = []
+  await assert.rejects(launch('h263', { fakeJava, onStage: (s) => stages.push(s.stage), listFetchImpl: async () => { throw new Error('offline') }, fetchImpl: async () => { throw new Error('offline') } }),
+    (err) => err.code !== 'harness-not-published')
+  idx.forgetHarnessIndex()
+})

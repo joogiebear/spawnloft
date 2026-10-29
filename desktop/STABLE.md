@@ -73,6 +73,8 @@ SpawnLoft does not insert database credentials into plugin configuration files.
 
 ## Release build procedure
 
+Before the build, fold the signed harness list into the code: copy the rows of the current `harness-index.json` (the `index` release of joogiebear/spawnloft-harness-mod) that you still stand behind into `HARNESS_RELEASES` in `src/client-harness.mjs`, and set `HARNESS_INDEX_MIN_SERIAL` in `src/client-harness-index.mjs` to that list's serial. A fresh install then works offline for every harness build that existed at release time and can never be handed an older list. A folded row wins over the list from then on, so a build withdrawn from the list later stays in this release. Betas do not fold.
+
 Maintainers build every platform from the same clean `main` commit. On the Windows Azure signing machine, on `main`, run `npm run release:stable` in `desktop`. It dispatches `desktop-stable`, which builds, signs, notarizes and exercises both native Mac apps, including an installed beta-to-stable upgrade, and builds both Linux architectures, installs the `.deb` with apt on Ubuntu 24.04 and the `.rpm` with dnf on Fedora, and exercises the installed app. Meanwhile it builds and signs the Windows installer, verifies it, runs the packaged-app smoke test and records its manifest; then it collects every platform's files in `desktop/dist/stable-release` and verifies them together.
 
 `npm run release:stable -- --publish` then publishes. Publication checks all package bytes, Windows Authenticode, matching clean source commits, the successful native workflow, and the uploaded GitHub digests before exposing the complete release. Both beta and stable feeds are included so existing installations can move to stable.
