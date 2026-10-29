@@ -348,3 +348,15 @@ test('the doctor line names the source, and a rejected list is a problem', () =>
   assert.equal(offline.problem, false)
   assert.match(offline.text, /fetched 9 days ago .*could not be read \(could not reach the harness list: ENOTFOUND\)/)
 })
+
+test('a list written and signed by the mod repo\'s sign-index script reads here', () => {
+  const dir = new URL('./fixtures/client/harness-index/', import.meta.url)
+  const bytes = fs.readFileSync(new URL('harness-index.json', dir))
+  const sig = fs.readFileSync(new URL('harness-index.json.sig', dir), 'utf8')
+  const spki = fs.readFileSync(new URL('test-public-key.txt', dir), 'utf8').trim()
+  const got = parseHarnessIndex(bytes, sig, { keys: [{ name: 'primary', spki }], minSerial: 1 })
+  assert.equal(got.serial, 1)
+  assert.deepEqual(got.rows.map((r) => r.minecraft[0]), ['1.21.11', '26.3'])
+  assert.equal(harnessJarUrl(got.rows[0]), harnessFor('1.21.11').url)
+  assert.equal(got.rows[0].sha256, harnessFor('1.21.11').sha256)
+})
