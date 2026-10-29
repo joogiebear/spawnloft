@@ -7,7 +7,7 @@ import { launchFeatures } from './client-version.mjs'
 import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
-import { writeJson, readJson, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
+import { writeJson, readJson, fail, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
 
 export function substitute(template, vars) {
   const unknown = []
@@ -17,6 +17,32 @@ export function substitute(template, vars) {
     return match
   })
   return { text, unknown }
+}
+
+export const HOSTNAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
+export const IPV6 = /^[0-9A-Fa-f:.]+$/
+
+// A host the game's command line can carry: a name, an IPv4 address or an IPv6 one (unbracketed).
+export function validHost(host) {
+  if (typeof host !== 'string' || !host || host.length > 253) return false
+  return host.includes(':') ? IPV6.test(host) : HOSTNAME.test(host)
+}
+
+// Where the game finds a SpawnLoft server on this machine: the server-ip in its server.properties,
+// or 127.0.0.1 when it listens on every interface. Checked here because the game's quick play
+// shows any address it cannot parse (a port that is not a number turns the whole address into
+// one) or look up as "Unknown host", long after the launch has gone through.
+export function localJoinAddress(inst) {
+  const port = Number(inst.port)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    fail(`server "${inst.name}" has no usable port (${JSON.stringify(inst.port ?? null)}), so the game would have no address to join; give it a port in the server's settings`)
+  }
+  const ip = boundAddress(inst.dir).replace(/^\[(.*)\]$/, '$1')
+  const host = (ip === '' || ip === '0.0.0.0' || ip === '::') ? '127.0.0.1' : ip
+  if (!validHost(host)) {
+    fail(`server "${inst.name}" has server-ip=${ip} in its server.properties, which is not an address the game can join; clear it (server-ip=) so the server listens on every interface`)
+  }
+  return { host, port }
 }
 
 // `address` ({ host, port }, from parseServerAddress) joins a server SpawnLoft does not run, in
@@ -32,10 +58,7 @@ export function buildCommand({ version, profile, profileName, account, java, os 
     host = address.host
     port = address.port
   } else if (hasServer) {
-    const inst = getInstance(profile.server)
-    const ip = boundAddress(inst.dir)
-    host = (ip === '' || ip === '0.0.0.0' || ip === '::') ? '127.0.0.1' : ip
-    port = inst.port
+    ;({ host, port } = localJoinAddress(getInstance(profile.server)))
   }
 
   const features = launchFeatures({ hasServer })

@@ -45,10 +45,12 @@ export function firewallActive({ read = file => fs.readFileSync(file, 'utf8'), r
   return false
 }
 
-// server-ip from server.properties; empty means every interface, Minecraft's default
+// server-ip from server.properties; empty means every interface, Minecraft's default. Spaces and
+// tabs only around the key: \s would cross the line end of an empty server-ip= (as Minecraft
+// writes it) and read the next line, server-port=25565, as the address.
 export function boundAddress(dir, read = file => fs.readFileSync(file, 'utf8')) {
   try {
-    const hit = /^\s*server-ip\s*=\s*(.*)$/m.exec(read(path.join(dir, 'server.properties')))
+    const hit = /^[ \t]*server-ip[ \t]*=[ \t]*(.*)$/m.exec(read(path.join(dir, 'server.properties')))
     return hit ? hit[1].trim() : ''
   } catch { return '' }
 }

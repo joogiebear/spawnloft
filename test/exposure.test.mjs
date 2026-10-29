@@ -36,6 +36,11 @@ test('a firewall is reported on, off, or not knowable - never guessed', () => {
 test('server-ip is read from server.properties, and absent means every interface', () => {
   assert.equal(boundAddress('/srv/x', () => 'motd=hi\nserver-ip=127.0.0.1\nserver-port=25565\n'), '127.0.0.1')
   assert.equal(boundAddress('/srv/x', () => 'server-ip=\n'), '')
+  // an empty server-ip as Minecraft writes it: the next line is not the address
+  assert.equal(boundAddress('/srv/x', () => 'server-ip=\nserver-port=25565\n'), '')
+  assert.equal(boundAddress('/srv/x', () => 'server-ip=\r\nserver-port=25565\r\n'), '')
+  assert.equal(boundAddress('/srv/x', () => 'server-ip=  \nserver-port=25565\n'), '')
+  assert.equal(boundAddress('/srv/x', () => 'server-ip=10.0.0.5\r\nserver-port=25565\r\n'), '10.0.0.5')
   assert.equal(boundAddress('/srv/x', () => 'motd=hi\n'), '')
   assert.equal(boundAddress('/srv/x', () => { throw new Error('gone') }), '')
 })
