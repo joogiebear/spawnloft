@@ -36,7 +36,8 @@ writer of SpawnLoft's own.
   SpawnLoft knows which Java each Minecraft version needs (17 for 1.18 to 1.20.4, 21 for 1.20.5 and
   1.21, 25 for 26.x) and picks the newest installed Java that fits when a server is created; a
   version nothing installed can run is refused before the download, with the download link.
-  `--force` on `new` and `start` goes ahead anyway.
+  `--force` on `new` and `start` goes ahead anyway. The game client is different: when no installed
+  Java fits the version, it downloads Mojang's own (see [CLIENT.md](CLIENT.md#java)).
 - **Node 20+**, for the CLI from a checkout. The desktop app and the Linux command-line package
   carry their own runtime and do not need it.
 - **Windows 10/11**, **macOS 13+** or **Linux** (a `.deb` for Ubuntu 22.04+ and Debian 12+, an `.rpm` for Fedora,

@@ -1774,10 +1774,10 @@
       h('summary', { text: 'Advanced' }),
       h('div', { class: 'in' },
         running
-          ? h('div', { class: 'grid2' }, ro('Java', f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric loader version', f.loaderVersion || 'Newest stable'))
+          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's Java" : f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric loader version', f.loaderVersion || 'Newest stable'))
           : h('div', { class: 'grid2' },
             h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
-              h('small', { class: 'hint', text: 'A path to java or javaw, checked at launch.' })),
+              h('small', { class: 'hint', text: 'A path to java or javaw, or mojang for Mojang\'s own Java for the version. Checked at launch.' })),
             f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
               h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
         f.editing
