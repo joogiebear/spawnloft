@@ -1,0 +1,77 @@
+{
+  "files": {
+    "jre.bundle": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/Home": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/Home/bin": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/Home/bin/java": {
+      "type": "file",
+      "executable": true,
+      "downloads": {
+        "raw": {
+          "sha1": "b28f7d037ef9f5b4cfcdf9debd39e2cfa32cf1ad",
+          "size": 47,
+          "url": "https://piston-data.mojang.com/v1/objects/b28f7d037ef9f5b4cfcdf9debd39e2cfa32cf1ad/java"
+        },
+        "lzma": {
+          "sha1": "fd8b5422b8388a2a5cf67a1159899f529261f3ca",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/fd8b5422b8388a2a5cf67a1159899f529261f3ca/java"
+        }
+      }
+    },
+    "jre.bundle/Contents/Home/lib": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/Home/lib/rt.jar": {
+      "type": "file",
+      "executable": false,
+      "downloads": {
+        "raw": {
+          "sha1": "38e304b97d63900ae633b247c5502a20a47102d9",
+          "size": 49,
+          "url": "https://piston-data.mojang.com/v1/objects/38e304b97d63900ae633b247c5502a20a47102d9/rt.jar"
+        },
+        "lzma": {
+          "sha1": "026267b55fdfb04cec662aba04052875bf94648c",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/026267b55fdfb04cec662aba04052875bf94648c/rt.jar"
+        }
+      }
+    },
+    "jre.bundle/Contents/Home/lib/jli": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/Home/lib/jli/libjli.dylib": {
+      "type": "file",
+      "executable": false,
+      "downloads": {
+        "raw": {
+          "sha1": "ffc7949c38632c000f32c3104d03680e3a9c9149",
+          "size": 59,
+          "url": "https://piston-data.mojang.com/v1/objects/ffc7949c38632c000f32c3104d03680e3a9c9149/libjli.dylib"
+        },
+        "lzma": {
+          "sha1": "a462bf332309f7419cf93791c3cfa6372f23166c",
+          "size": 10,
+          "url": "https://piston-data.mojang.com/v1/objects/a462bf332309f7419cf93791c3cfa6372f23166c/libjli.dylib"
+        }
+      }
+    },
+    "jre.bundle/Contents/MacOS": {
+      "type": "directory"
+    },
+    "jre.bundle/Contents/MacOS/libjli.dylib": {
+      "type": "link",
+      "target": "../Home/lib/jli/libjli.dylib"
+    }
+  }
+}

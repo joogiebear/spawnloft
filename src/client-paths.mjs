@@ -7,6 +7,8 @@ export const PROFILES_FILE = path.join(CLIENT_ROOT, 'profiles.json')
 export const LIBRARIES_DIR = path.join(CLIENT_ROOT, 'libraries')
 export const ASSETS_DIR = path.join(CLIENT_ROOT, 'assets')
 export const NATIVES_DIR = path.join(CLIENT_ROOT, 'natives')
+// Mojang's Java runtimes, one folder per component and platform (client-java.mjs)
+export const RUNTIME_DIR = path.join(CLIENT_ROOT, 'runtime')
 export const ACCOUNTS_FILE = path.join(CLIENT_ROOT, 'accounts.json')
 
 export function profileDir(name) {

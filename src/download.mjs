@@ -57,9 +57,9 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
   try {
     res = await fetchRetry(url, { headers: { 'User-Agent': UA } })
   } catch (err) {
-    fail(`download of ${what} failed: ${err.cause?.message || err.message}`)
+    fail(`download of ${what} failed: ${err.cause?.message || err.message}`, 'download-failed')
   }
-  if (!res.ok || !res.body) fail(`download of ${what} failed (${res.status}) from ${url}`)
+  if (!res.ok || !res.body) fail(`download of ${what} failed (${res.status}) from ${url}`, 'download-failed')
 
   const tmp = `${dest}.part`
   const digest = hash ? crypto.createHash(hash) : null
@@ -82,7 +82,7 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
     const got = digest.digest('hex')
     if (got.toLowerCase() !== String(expected).toLowerCase()) {
       fs.rmSync(tmp, { force: true })
-      fail(`checksum mismatch for ${what}\n  expected ${expected}\n  got      ${got}`)
+      fail(`checksum mismatch for ${what}\n  expected ${expected}\n  got      ${got}`, 'checksum-mismatch')
     }
   }
   fs.renameSync(tmp, dest)

@@ -15,6 +15,8 @@ process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 const client = await import('../src/client.mjs')
 const { profileDir, versionDir, versionJson, versionJar } = await import('../src/client-paths.mjs')
 const { checkClientProfiles } = await import('../src/doctor-client.mjs')
+const { platformKey } = await import('../src/client-java.mjs')
+const { currentOs } = await import('../src/client-meta.mjs')
 const { runDoctor } = await import('../src/doctor.mjs')
 
 const mc = '1.21.11'
@@ -47,19 +49,47 @@ test('a vanilla profile notes its version, whether it is installed and whether i
   }
 })
 
-test('a Java too old for the profile is a problem naming the major needed', () => {
+test('a Java too old for the profile is a note: the launch downloads Mojang\'s (plan V2)', () => {
   client.createProfile('v', { mc, loader: 'vanilla' })
   try {
     const r1 = checkClientProfiles({ javas: [{ path: 'java', major: 17, version: '17.0.2' }] })
-    assert.equal(r1.problems.length, 1)
-    assert.match(r1.problems[0], /client v:/)
-    assert.match(r1.problems[0], /Java 21/)
-    assert.match(r1.problems[0], /adoptium/)
+    // where Mojang publishes no runtime (Linux arm64) it stays a problem (V2 review N-6)
+    const host = currentOs()
+    const downloads = platformKey(host.name, host.arch) !== null
+    assert.equal(r1.problems.length, downloads ? 0 : 1)
+    const line = downloads ? r1.notes.find((n) => /Java 21/.test(n)) : r1.problems[0]
+    assert.match(line, /client v:/)
+    assert.match(line, /Java 21/)
+    if (downloads) assert.match(line, /first launch downloads Mojang's/)
+    assert.match(line, /adoptium/)
 
     const r2 = checkClientProfiles({ javas: javas21 })
     assert.equal(r2.problems.length, 0)
   } finally {
     client.removeProfile('v', { purge: true })
+  }
+})
+
+test('java=mojang is not a missing path, and a damaged runtime is a problem', async () => {
+  client.createProfile('moj', { mc, loader: 'vanilla', java: 'mojang' })
+  const { RUNTIME_DIR } = await import('../src/client-paths.mjs')
+  try {
+    assert.equal(checkClientProfiles({ javas: [] }).problems.length, 0)
+    // a recorded runtime whose one file is the wrong size
+    const body = 'runtime file bin/java\n'
+    const manifest = { files: { bin: { type: 'directory' }, 'bin/java': { type: 'file', executable: true, downloads: { raw: { sha1: 'a'.repeat(40), size: body.length, url: 'https://example.invalid/java' } } } } }
+    fs.mkdirSync(path.join(RUNTIME_DIR, 'jre-legacy', 'linux', 'bin'), { recursive: true })
+    fs.writeFileSync(path.join(RUNTIME_DIR, 'jre-legacy', 'linux.manifest.json'), JSON.stringify(manifest))
+    fs.writeFileSync(path.join(RUNTIME_DIR, 'index.json'), JSON.stringify({ runtimes: { 'jre-legacy/linux': { component: 'jre-legacy', platform: 'linux', version: '8u202', javaPath: 'bin/java', manifestSha1: 'b'.repeat(40) } } }))
+    fs.writeFileSync(path.join(RUNTIME_DIR, 'jre-legacy', 'linux', 'bin', 'java'), body)
+    assert.ok(checkClientProfiles({ javas: [] }).notes.includes('client Java runtime jre-legacy 8u202 (linux): whole'))
+    fs.writeFileSync(path.join(RUNTIME_DIR, 'jre-legacy', 'linux', 'bin', 'java'), 'x')
+    const r = checkClientProfiles({ javas: [] })
+    assert.equal(r.problems.length, 1)
+    assert.match(r.problems[0], /^client Java runtime jre-legacy \(linux\): 1 file\(s\) missing or the wrong size, such as bin\/java/)
+  } finally {
+    client.removeProfile('moj', { purge: true })
+    fs.rmSync(RUNTIME_DIR, { recursive: true, force: true })
   }
 })
 

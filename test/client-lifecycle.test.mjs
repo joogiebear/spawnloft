@@ -299,10 +299,52 @@ test('an older asset layout is laid out by launch and handed to the game (V1c re
       assert.equal(fs.readFileSync(path.join(tree, '.complete'), 'utf8'), version.assetIndex.sha1)
       const [name, entry] = Object.entries(JSON.parse(indexText).objects)[0]
       const object = path.join(ASSETS_DIR, 'objects', entry.hash.slice(0, 2), entry.hash)
-      assert.equal(fs.statSync(path.join(tree, name)).ino === fs.statSync(object).ino, layout === 'virtual', `${layout}: ${layout === 'virtual' ? 'linked' : 'copied'}`)
+      assert.equal(fs.statSync(path.join(tree, name), { bigint: true }).ino === fs.statSync(object, { bigint: true }).ino, layout === 'virtual', `${layout}: ${layout === 'virtual' ? 'linked' : 'copied'}`)
     } finally {
       try { await stop(layout) } catch { /* not running */ }
       removeProfile(layout)
     }
+  }
+})
+
+test("with no Java that fits, launch downloads Mojang's runtime and runs the game on it (V2 review S-2)", { skip: process.platform === 'win32' && 'the stand-in java is a shell script' }, async () => {
+  const { RUNTIME_DIR } = await import('../src/client-paths.mjs')
+  const base = JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'client', 'versions', '1.12.2.json'), 'utf8'))
+  const version = { ...base, id: 'launch-mojang-java' }
+  fs.mkdirSync(versionDir(version.id), { recursive: true })
+  fs.writeFileSync(versionJson(version.id), JSON.stringify(version))
+  // the runtime's java: the fake game under a shell script, as Mojang's would be a binary
+  const javaBody = `#!/bin/sh\nexec "${process.execPath}" "${fakeJava}" "$@"\n`
+  const sha1 = (b) => crypto.createHash('sha1').update(b).digest('hex')
+  const javaUrl = 'https://piston-data.mojang.com/v1/objects/java/java'
+  const manifest = JSON.stringify({ files: { bin: { type: 'directory' }, 'bin/java': { type: 'file', executable: true, downloads: { raw: { sha1: sha1(javaBody), size: Buffer.byteLength(javaBody), url: javaUrl } } } } })
+  const manifestUrl = 'https://piston-meta.mojang.com/v1/packages/x/manifest.json'
+  const all = { linux: { 'jre-legacy': [{ manifest: { sha1: sha1(manifest), size: manifest.length, url: manifestUrl }, version: { name: '8u202' } }] } }
+  const fetchImpl = async (url, dest) => {
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.writeFileSync(dest, url === manifestUrl ? manifest : url === javaUrl ? javaBody : url === version.assetIndex.url ? '{"objects":{}}' : 'spawnloft fixture body')
+  }
+  createProfile('mojang-java', { mc: version.id })
+  try {
+    const stages = []
+    const progress = []
+    await launch('mojang-java', { os: { name: 'linux', arch: 'x64', version: '6.8.0' }, hostCaps: { x64: true }, foundJavas: [], fetchImpl, listFetchImpl: async () => all, onStage: (s) => stages.push(s.message), onProgress: (p) => progress.push(p.phase) })
+    assert.ok(stages.includes("Getting Mojang's Java 8"), stages.join(' | '))
+    assert.ok(progress.includes('java'))
+    const javaPath = path.join(RUNTIME_DIR, 'jre-legacy', 'linux', 'bin', 'java')
+    const facts = readClientState('mojang-java').launch
+    assert.equal(facts.java.source, 'mojang-runtime')
+    assert.equal(facts.java.chosenPath, javaPath)
+    assert.equal(JSON.parse(fs.readFileSync(path.join(RUNTIME_DIR, 'index.json'), 'utf8')).runtimes['jre-legacy/linux'].version, '8u202')
+    const deadline = Date.now() + 3000
+    let found = false
+    while (Date.now() < deadline && !found) {
+      found = tailClientLog('mojang-java').some((l) => l.includes('Setting user'))
+      if (!found) await new Promise((r) => setTimeout(r, 50))
+    }
+    assert.ok(found, 'the game started on the downloaded java')
+  } finally {
+    try { await stop('mojang-java') } catch { /* not running */ }
+    removeProfile('mojang-java')
   }
 })

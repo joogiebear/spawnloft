@@ -229,17 +229,18 @@ test('Java: the refusals name the Java the version needs; a newer one runs with 
     code: 'java-too-old',
     message: 'Minecraft 26.3 needs Java 25 or newer. The newest Java on this machine is 21 (/jvm/21-x64/bin/java). Install Java 25 from https://adoptium.net/temurin/releases/?version=25, or point the profile at one.',
   })
-  // only newer Javas than the bounds: the closest one, with a warning, until V2 fetches Mojang's runtime
+  // only newer Javas than the bounds and no way to Mojang's runtime: the closest one, with a warning
   assert.deepEqual(await pickClientJava({ requirement: javaRequirement(F.loadVersion('1.16.5')), what: 'Minecraft 1.16.5', found: javas([25], [21]) }), {
     path: '/jvm/21-x64/bin/java',
     warning: 'Minecraft 1.16.5 wants Java 8 to 17; using Java 21 at /jvm/21-x64/bin/java, which is newer, so the game may not start. Install Java 8 from https://adoptium.net/temurin/releases/?version=8, or point the profile at one.',
+    source: 'fallback',
   })
   await assert.rejects(pickClientJava({ requirement: req, what: 'Minecraft 26.3', found: [] }), { code: 'java-missing' })
   await assert.rejects(pickClientJava({ requirement: javaRequirement(F.loadVersion('1.16.5')), arch: 'x64', what: 'Minecraft 1.16.5', found: javas([17, 'arm64']) }), {
     code: 'java-wrong-arch',
     message: 'Minecraft 1.16.5 runs as x64 on this machine and needs an x64 Java 8 to 17; the Javas found are arm64. Install Java 8 from https://adoptium.net/temurin/releases/?version=8, or point the profile at one.',
   })
-  assert.deepEqual(await pickClientJava({ requirement: req, found: javas([25], [21]) }), { path: '/jvm/25-x64/bin/java', warning: null })
+  assert.deepEqual(await pickClientJava({ requirement: req, found: javas([25], [21]) }), { path: '/jvm/25-x64/bin/java', warning: null, source: 'installed' })
 })
 
 test('Java: probe() reports the arch of a real Java', { skip: !realJava.found && 'no Java on PATH' }, async () => {
@@ -348,7 +349,7 @@ test('Java: an explicit Java of the wrong arch, too old, or newer with a warning
   assert.equal(picked.path, newer)
   assert.match(picked.warning, /^Minecraft 1\.16\.5 wants Java 8 to 17; using Java 21 at .*, which is newer, so the game may not start\./)
   const eight = stubJava('java-8', { major: 8 })
-  assert.deepEqual(await pickClientJava({ explicit: eight, requirement: req, arch: 'x64' }), { path: eight, warning: null })
+  assert.deepEqual(await pickClientJava({ explicit: eight, requirement: req, arch: 'x64' }), { path: eight, warning: null, source: 'explicit' })
 })
 
 test('Java: probe() asks again with -version when a Java refuses -XshowSettings (review N-4)', { skip: posixOnly }, async () => {

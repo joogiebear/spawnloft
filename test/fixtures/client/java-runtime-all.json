@@ -1,0 +1,818 @@
+{
+  "gamecore": {
+    "java-runtime-alpha": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "b5e645767d385e08b494c85a4e2ae709de82dec7",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/b5e645767d385e08b494c85a4e2ae709de82dec7/manifest.json"
+        },
+        "version": {
+          "name": "16.0.1.9.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "37a16572bb8e18648b935cc00176de984eab91cf",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/37a16572bb8e18648b935cc00176de984eab91cf/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "ad4f7b81843cb4dc2820db25172f2c94bfaa12f8",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/ad4f7b81843cb4dc2820db25172f2c94bfaa12f8/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "b808a1cf5ae91eafdc996f5438cb6409f4542c8a",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/b808a1cf5ae91eafdc996f5438cb6409f4542c8a/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "d575aed5d45681c4d043300f97cba23dfba7dcea",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/d575aed5d45681c4d043300f97cba23dfba7dcea/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "f7f48d8963f75d1789c6ec0aa3d80234f5c5dc9e",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/f7f48d8963f75d1789c6ec0aa3d80234f5c5dc9e/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "d38d62794a054406bdb24b4dcb376f4faf30fa7b",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/d38d62794a054406bdb24b4dcb376f4faf30fa7b/manifest.json"
+        },
+        "version": {
+          "name": "8u202",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "6d1e13574be6c4eebb4a26bb05ad66f60ee297d1",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/6d1e13574be6c4eebb4a26bb05ad66f60ee297d1/manifest.json"
+        },
+        "version": {
+          "name": "1.0",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ]
+  },
+  "linux": {
+    "java-runtime-alpha": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "bfd12e11d46368ea6b70fb4a50b9fc2103c197ef",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/bfd12e11d46368ea6b70fb4a50b9fc2103c197ef/manifest.json"
+        },
+        "version": {
+          "name": "16.0.1.9.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "37304ccdbf9b007ff989496348e6853315faea02",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/37304ccdbf9b007ff989496348e6853315faea02/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "203713410b4a583871b3981dbf73328e69399626",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/203713410b4a583871b3981dbf73328e69399626/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "363253a8cb8ae32a8e6842931383de6e834a6af5",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/363253a8cb8ae32a8e6842931383de6e834a6af5/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "bf2cf811211225f09a96c06ec7118b54a30db682",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/bf2cf811211225f09a96c06ec7118b54a30db682/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "817822c25fa58b18c32a724465ed9645181cecd0",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/817822c25fa58b18c32a724465ed9645181cecd0/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "18f0cb4346ac4f1bbaca8f158aa721f2f2bd63ad",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/18f0cb4346ac4f1bbaca8f158aa721f2f2bd63ad/manifest.json"
+        },
+        "version": {
+          "name": "8u202",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": []
+  },
+  "linux-i386": {
+    "java-runtime-alpha": [],
+    "java-runtime-beta": [],
+    "java-runtime-delta": [],
+    "java-runtime-epsilon": [],
+    "java-runtime-gamma": [],
+    "java-runtime-gamma-snapshot": [],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "9704e9eff1d06f2a6b9eb1ac02fb714e8cf724da",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/9704e9eff1d06f2a6b9eb1ac02fb714e8cf724da/manifest.json"
+        },
+        "version": {
+          "name": "8u202",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": []
+  },
+  "mac-os": {
+    "java-runtime-alpha": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "69d1f6d49247a067b93587a9a6b7d25a0892cdff",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/69d1f6d49247a067b93587a9a6b7d25a0892cdff/manifest.json"
+        },
+        "version": {
+          "name": "16.0.1.9.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "c131ea594b3cfc3f61dcef84dcb453e9ddf6a588",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/c131ea594b3cfc3f61dcef84dcb453e9ddf6a588/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "a85d2b37c540e82a3793a471e6acef46c95fd2d1",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/a85d2b37c540e82a3793a471e6acef46c95fd2d1/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "cd7fd7ce9f42fbbce1bb62e99d85db5bf293c9ed",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/cd7fd7ce9f42fbbce1bb62e99d85db5bf293c9ed/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "2fc2505ca191ee4dc4ff3af446c7d8f0e32d304f",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/2fc2505ca191ee4dc4ff3af446c7d8f0e32d304f/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "7662d22a33b486f33045794b914c646b7d98da6e",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/7662d22a33b486f33045794b914c646b7d98da6e/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "e59423adebe86c1faa261588df922e288449c7f0",
+          "size": 2342,
+          "url": "https://piston-meta.mojang.com/v1/packages/e59423adebe86c1faa261588df922e288449c7f0/manifest.json"
+        },
+        "version": {
+          "name": "8u51",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": []
+  },
+  "mac-os-arm64": {
+    "java-runtime-alpha": [],
+    "java-runtime-beta": [],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "2244d38703547a2355f3c440b9fb7326be457d37",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/2244d38703547a2355f3c440b9fb7326be457d37/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "6c3de0510558aa17afb9de01dc09cdcee8bf426b",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/6c3de0510558aa17afb9de01dc09cdcee8bf426b/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "5ecf717964c767311bcc98fd317ce1e2ea0b2a91",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/5ecf717964c767311bcc98fd317ce1e2ea0b2a91/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "d4a2f77ca8521f34ca9f178d9ff629596f68db91",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/d4a2f77ca8521f34ca9f178d9ff629596f68db91/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [],
+    "minecraft-java-exe": []
+  },
+  "windows-arm64": {
+    "java-runtime-alpha": [],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "b05214caa7c107f4336a9126f3981afe9e494aed",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/b05214caa7c107f4336a9126f3981afe9e494aed/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "68c2be10d1a6c0344e278cd692ad310d18e49a00",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/68c2be10d1a6c0344e278cd692ad310d18e49a00/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "5a3e1d8b56a201e1dac4cd214286c5f5fab6be0b",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/5a3e1d8b56a201e1dac4cd214286c5f5fab6be0b/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "606bdf5bc02a43f6ce8663b93ed2cf50f54e1627",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/606bdf5bc02a43f6ce8663b93ed2cf50f54e1627/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "d8ba4d4865c0425311cedd971a968529294ccab1",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/d8ba4d4865c0425311cedd971a968529294ccab1/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [],
+    "minecraft-java-exe": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "81f5ea7a454178fad01f15d4c7e19adbcffdaa67",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/81f5ea7a454178fad01f15d4c7e19adbcffdaa67/manifest.json"
+        },
+        "version": {
+          "name": "1.0",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ]
+  },
+  "windows-x64": {
+    "java-runtime-alpha": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "c7ca317496a6fb5681048dbc3b7d006a110bdd0d",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/c7ca317496a6fb5681048dbc3b7d006a110bdd0d/manifest.json"
+        },
+        "version": {
+          "name": "16.0.1.9.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "4a63db3717de8ad2cd44b74072673a52ce97344a",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/4a63db3717de8ad2cd44b74072673a52ce97344a/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "3796c3e9dc116321a1ce5769c11ceabc5c8e9a82",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/3796c3e9dc116321a1ce5769c11ceabc5c8e9a82/manifest.json"
+        },
+        "version": {
+          "name": "21.0.7",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-epsilon": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "7baab271423653c7ae1afc3b6c383bf85f219cac",
+          "size": 2092,
+          "url": "https://piston-meta.mojang.com/v1/packages/7baab271423653c7ae1afc3b6c383bf85f219cac/manifest.json"
+        },
+        "version": {
+          "name": "25.0.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "af1ed3a6cdf6635c520c54e41daecc863fd57483",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/af1ed3a6cdf6635c520c54e41daecc863fd57483/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "33dc5a28c44f9212448e3b873dc52631238cf8e7",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/33dc5a28c44f9212448e3b873dc52631238cf8e7/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "aec2114736f104308c47312562820ec218e168a1",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/aec2114736f104308c47312562820ec218e168a1/manifest.json"
+        },
+        "version": {
+          "name": "8u202",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "1acce096d24d712ba73d337313dfc0083308c57d",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/1acce096d24d712ba73d337313dfc0083308c57d/manifest.json"
+        },
+        "version": {
+          "name": "1.0",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ]
+  },
+  "windows-x86": {
+    "java-runtime-alpha": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "84d83ec9bbdefe4daf6071036346b7d05633eb95",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/84d83ec9bbdefe4daf6071036346b7d05633eb95/manifest.json"
+        },
+        "version": {
+          "name": "16.0.1.9.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-beta": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "2e4e5df76ebb0418817d4036b82b3e40195aa192",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/2e4e5df76ebb0418817d4036b82b3e40195aa192/manifest.json"
+        },
+        "version": {
+          "name": "17.0.1.12.1",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-delta": [],
+    "java-runtime-epsilon": [],
+    "java-runtime-gamma": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "5b5e0db840b32198cd8db7a69ae828c0631f76e1",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/5b5e0db840b32198cd8db7a69ae828c0631f76e1/manifest.json"
+        },
+        "version": {
+          "name": "17.0.8",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "java-runtime-gamma-snapshot": [],
+    "jre-legacy": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "ee51917b96615b5275593250d4ce7df870121fc5",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/ee51917b96615b5275593250d4ce7df870121fc5/manifest.json"
+        },
+        "version": {
+          "name": "8u202",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ],
+    "minecraft-java-exe": [
+      {
+        "availability": {
+          "group": 1,
+          "progress": 100
+        },
+        "manifest": {
+          "sha1": "846c8ff63df1dbf5c78bb0148531facf172ed379",
+          "size": 1000,
+          "url": "https://piston-meta.mojang.com/v1/packages/846c8ff63df1dbf5c78bb0148531facf172ed379/manifest.json"
+        },
+        "version": {
+          "name": "1.0",
+          "released": "2025-10-21T00:00:00+00:00"
+        }
+      }
+    ]
+  }
+}
