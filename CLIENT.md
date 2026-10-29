@@ -21,9 +21,11 @@ system of SpawnLoft's own. It is the stock client, installed and launched for yo
 
 ## Setup
 
-You need **Java 21 or newer** for Minecraft 1.21.x (the same Java a server of that version
-needs; `spawnloft doctor` says what is installed). SpawnLoft finds it the way it finds a server's
-Java and picks the newest that fits; a profile can be pinned to one with `java=<path>`.
+You need nothing installed first. The version decides which Java it runs on (Java 8 for 1.16.5
+and older, 16 or 17 for 1.17 to 1.20.4, 21 for 1.20.5 to 1.21.11, 25 for 26.1 and newer; see
+[Java](#java)), and when no Java on the machine fits, SpawnLoft downloads Mojang's own build of
+it once, the same one Mojang's launcher uses. A Java you installed for your servers is used when
+it fits, so most people download nothing.
 
 ```
 spawnloft client new play --mc 1.21.11 --server survival
@@ -31,8 +33,8 @@ spawnloft client launch play
 ```
 
 The first launch downloads the client jar, its libraries and assets (a few hundred megabytes,
-with progress on stderr) and starts the game as an offline player named after the profile. The
-download is shared between profiles of the same version, so a second profile on 1.21.11 starts
+with progress on stderr, plus Mojang's Java when it is needed) and starts the game as an offline
+player named after the profile. The download is shared between profiles of the same version, so a second profile on 1.21.11 starts
 at once. `spawnloft client install <name>` does the download without starting the game.
 
 `launch` takes `--as <playerName>` to play offline under another name, `--account <name>` to
@@ -49,14 +51,85 @@ server would refuse the join for sure: sign in and play as that account (`--acco
 and the assistant's `client_launch` refuse with the same words. A profile whose `server` is a
 database target is refused before anything downloads.
 
-**Platforms.** Windows x64, macOS on Apple Silicon (tested on an arm64 Mac with arm64 Java) and
-Linux x64 are supported. Linux arm64 is not: Mojang ships no arm64 Linux natives, so `launch` and
-`install` refuse with "use bots on this machine" before downloading anything. Windows arm64 works
-only for Minecraft versions that ship Windows arm64 natives (1.21 and newer) and is refused for
-older ones. The native libraries come from the machine's own CPU architecture, as Node reports
-it, not from the chosen Java's: a Java of the other architecture
-than the machine's (an x64 Java under Rosetta on Apple Silicon) will not load them, so use a
-native Java there.
+**Platforms.** Windows x64, macOS on Apple Silicon and Linux x64 are supported, and Windows on
+arm64 is experimental. Linux arm64 is not: Mojang ships no arm64 Linux build of the game or of
+Java, so `launch` and `install` refuse with "use bots on this machine" before downloading
+anything. On arm64 the game runs natively from 1.19 on, the first versions Mojang built for arm64;
+older versions run as x64 (see [Arm64 machines](#arm64-machines)).
+
+## Every version Mojang lists
+
+A profile can be any version in Mojang's version list, from `rd-132211` (2009) to this week's
+snapshot: releases, snapshots, pre-releases, release candidates, and the old alphas and betas.
+SpawnLoft reads what each version needs from the version's own file, the way Mojang's launcher
+does, so there is no list of supported versions to keep up to date. What changes between eras,
+and what SpawnLoft does about it:
+
+| Versions | Java | On arm64 | Notes |
+| --- | --- | --- | --- |
+| Old alphas and betas, 1.0 to 1.5.2 | 8 | x64, emulated | Sounds and languages are copied into the profile's `resources/` folder, where these versions look for them. |
+| 1.6.1 to 1.7.2 | 8 | x64, emulated | Sounds and languages are laid out under their real names in `assets/virtual/legacy/`. |
+| 1.7.3 to 1.12.2 | 8 | x64, emulated | From 1.7 to 1.18.0 the game is started with Mojang's patched log4j config (the Log4Shell fix). |
+| 1.13 to 1.16.5 | 8 (accepts up to 17) | x64, emulated | Fabric from 1.14. |
+| 1.17 to 1.18.2 | 16 (an installed 17 is preferred), then 17 | x64, emulated | |
+| 1.19 to 1.20.4 | 17 | native | |
+| 1.20.5 to 1.21.11 | 21 | native | |
+| 26.1 and newer | 25 | native | |
+
+Fabric builds for 1.14 and newer, snapshots included; a Fabric profile on an older version is
+refused with "use Vanilla for it". The harness has its own, shorter list (see [The harness](#the-harness)).
+
+When Mojang changes the format of a version file in a way this SpawnLoft does not understand (a
+new launcher format, a platform rule or a launcher setting it has not seen), the launch is
+refused with "Update SpawnLoft" before anything downloads, rather than starting a game that
+would crash halfway. A weekly check in SpawnLoft's own CI runs the newest release and snapshot
+through the same code, so a new format is usually handled before it reaches you.
+
+## Java
+
+The version decides. Each version file names the Java it was built for, and SpawnLoft holds to
+it, because a game on the wrong Java either does not start or crashes later:
+
+- **Up to 1.12.2: Java 8, exactly.** These versions do not start on anything newer.
+- **1.13 to 1.16.5: Java 8,** and up to 17 is accepted.
+- **1.17 and newer: the version's own Java or newer** (16 or 17, 21, 25). The version's own one
+  is preferred over a newer one (17 for the 1.17 versions, which name 16): 26.1 needs 25, and a later Java may stop letting the libraries
+  of older versions in.
+
+The pick, for a profile with no `java` set: an installed Java of exactly the version's own major,
+else the newest installed one within the bounds above, else **Mojang's runtime** for the
+version, downloaded once into `client/runtime/` and shared by every profile that needs it. Offline,
+or on a machine Mojang builds no Java for, an installed Java newer than the bounds is used with a
+warning that the game may not start. A runtime that downloads wrong (a checksum, a size) is
+refused like any other damaged download, never swapped for another Java.
+
+`java=mojang` on a profile always uses Mojang's runtime. `java=<path>` pins one Java: it is
+refused when it is too old for the version or built for the wrong CPU, and used with a warning
+when it is newer than the version accepts. `spawnloft doctor` lists the runtimes
+downloaded and checks their sizes.
+
+Why Mojang's Java and not any Java 8: Mojang's old builds (8u51, 8u74) carry an updated list of
+certificate authorities. A stock Java 8 older than 8u141 cannot reach sites signed by Let's
+Encrypt, which some skin, sign-in and mod servers use, and fails there with an SSL error. A
+current Java 8 (Temurin 8, for one) is fine too.
+
+### Arm64 machines
+
+Minecraft has arm64 builds from 1.19 on. On an arm64 machine, those run natively with an arm64
+Java; anything older runs as x64, through the machine's x64 emulation:
+
+- **Apple Silicon:** under Rosetta, as Mojang's launcher does it. SpawnLoft uses an x64 Java for
+  these versions (Mojang's x64 runtime, unless an x64 Java is installed); an arm64 Java cannot
+  load their x64 libraries. Without Rosetta the launch is refused with the command that installs
+  it (`softwareupdate --install-rosetta --agree-to-license`); once it is installed, the next Play
+  sees it.
+- **Windows arm64:** Windows 11 runs x64 programs, Windows 10 on arm64 does not, and an older
+  version is refused there. Running Minecraft under Windows' x64 emulation is
+  **experimental**: nobody has tried it on real hardware yet, and the launch says so in a warning.
+
+The native libraries follow the arch the game runs as, so a version is always given the Java and
+libraries of the same arch. Windows on x86 (32-bit) is not a target, and runs what Mojang still
+builds for it: Mojang's Java there stops at 17, so 1.20.4 and older.
 
 ## Profiles
 
@@ -397,6 +470,9 @@ client/
                              virtual/<index>/ lays out 1.6.1 to 1.7.2's sounds and language files under
                              their real names (hard links into objects/)
   natives/<id>/              the native libraries, per version
+  runtime/                   Mojang's Java runtimes, downloaded when no installed Java fits: one folder per
+                             runtime and machine (jre-legacy/mac-os/, java-runtime-delta/windows-x64/),
+                             each with its manifest beside it; index.json lists them
   run/<name>/state.json      what is running: pid, start time, player, server, harness token and port (owner-only)
   run/<name>/launch.lock     held while a launch is under way, so two Play clicks cannot start two games
   run/<name>/client.log      SpawnLoft's capture of what the game process printed, one launch at a time
@@ -427,11 +503,25 @@ dependency or built for another version, a server that could not be reached, a v
 with the server, an expired or offline login refused by an online-mode server, a resource pack
 that would not load, a crash, and a Java too old for the version.
 
+A launch that cannot work is refused before the game opens, most of them before anything
+downloads. The panel, the launcher and the assistant's tools get the same words and a code:
+
+| Code | What it means | What to do |
+| --- | --- | --- |
+| `unknown-version` | Mojang's version list has no such id. The nearest ones are listed. | Check the id: releases look like `26.3`, snapshots like `26.4-snapshot-6`, old versions like `b1.7.3`. |
+| `fabric-not-available` | Fabric has no build for this version, or none yet for a new one. | Use Vanilla, or wait a day for a new release. |
+| `newer-launcher-format`, `unknown-rule-key`, `unknown-variable` | The version file uses something this SpawnLoft does not understand yet. | Update SpawnLoft. |
+| `no-natives-for-this-machine` | Mojang built no game for this machine (Linux arm64), or this version needs x64 emulation the machine does not have. | Install Rosetta on a Mac (the message has the command); use Windows 11 on arm64; use bots on Linux arm64. |
+| `java-too-old`, `java-missing` | The profile's own Java is too old, or no Java fits and Mojang's could not be had. | Let SpawnLoft download Mojang's (clear the profile's `java`, be online once), or install the Java the message names. |
+| `java-wrong-arch` | The profile's Java is built for the other CPU (an arm64 Java for a version that runs as x64 on Apple Silicon, say). | Clear the profile's `java`, or point it at a Java of the arch the message names. |
+| `no-runtime-for-this-machine` | Mojang builds no Java this version needs for this machine (Windows x86 past Java 17). | Install the Java the message names. |
+| `runtime-offline` | Mojang's runtime is needed, is not downloaded yet, and Mojang's list cannot be read. | Go online once; the runtime is kept after that. |
+| `runtime-format` | Mojang's runtime manifest has something SpawnLoft will not write (a link out of the folder, a compressed-only file). | Update SpawnLoft, or install the Java yourself. |
+
 ## What it does not do
 
 - Sign in for an AI assistant. A person signs in, on the command line or in the launcher; offline players join offline-mode servers only.
 - Be a modpack launcher, news feed or store. The launcher starts profiles you made; mods go in the profile's `mods/` folder.
-- Download Java. Install Java 21 or newer yourself, as for a server.
 - Bundle mods or tweaks of its own. The only mod it ever installs is the harness, and only when a profile asks for it.
 - Run on Linux arm64, or on a machine with no display. The client needs a graphics driver; use bots there.
 - Drive the game through anything but the harness: no screen scraping, no input injection.
