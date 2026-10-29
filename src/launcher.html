@@ -359,34 +359,44 @@
   .chip.empty { border-style: dashed; color: var(--ink-2); }
   .chip[aria-expanded="true"] { border-color: var(--lapis-edge); background: var(--lapis-wash); }
 
-  .stage { flex: 1; min-height: 0; overflow: auto; position: relative; display: grid; justify-items: center; align-content: start; padding: 64px var(--s-6) var(--s-7);
-    background: radial-gradient(900px 420px at 50% 115%, var(--lapis-wash), transparent 70%), var(--void); }
-  .playbox { width: clamp(560px, 46vw, 820px); max-width: 100%; display: grid; gap: var(--s-4); }
+  /* The stage centres one column in both directions, a little above the middle so a menu opening
+     under it has room. margin:auto centres it and still scrolls when it is taller. The window's own
+     zoom (desktop/ui-zoom.js) is what grows it on a big screen. */
+  .stage { flex: 1; min-height: 0; overflow: auto; position: relative; display: grid; padding: var(--s-6) var(--s-6) 14vh;
+    background:
+      radial-gradient(1100px 620px at 50% 46%, var(--lapis-wash), transparent 70%),
+      linear-gradient(rgba(var(--ink-rgb), .022) 1px, transparent 1px) 0 0 / 48px 48px,
+      linear-gradient(90deg, rgba(var(--ink-rgb), .022) 1px, transparent 1px) 0 0 / 48px 48px,
+      var(--void); }
+  .playbox { width: min(clamp(680px, 34vw, 960px), 100%); margin: auto; display: grid; gap: var(--s-4); }
   .eyebrow { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+  /* Ready: Play, what it does and where to join sit together in one card. The other states
+     (a launch, a running game) put their own card here. */
+  .playbox:has(> .split), .playbox[aria-busy] { padding: var(--s-6); gap: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-md); }
 
-  /* the split button: Play, and the setup it plays */
-  .split { display: flex; width: max-content; max-width: 100%; }
-  .split .play { min-height: 64px; padding: 0 var(--s-7); font: 650 clamp(var(--t-6), 1.6vw, 28px)/1 var(--display); letter-spacing: -.01em; border-radius: var(--r) 0 0 var(--r); gap: var(--s-3); }
-  .split .play .ico { font-size: 22px; }
-  .split .ver { min-height: 64px; padding: 0 var(--s-4); border-radius: 0 var(--r) var(--r) 0; border: 1px solid var(--primary-edge); border-left: 1px solid rgba(0,0,0,.28); background: color-mix(in srgb, var(--primary-top) 78%, black); color: var(--primary-ink); box-shadow: none; gap: var(--s-3); text-align: left; max-width: 260px; }
+  /* the split button: Play fills the row, the setup it plays sits at its right */
+  .split { display: flex; width: 100%; }
+  .split .play { flex: 1; min-height: clamp(72px, 4.2vw, 100px); padding: 0 var(--s-6); font: 650 clamp(var(--t-6), 1.5vw, 34px)/1 var(--display); letter-spacing: -.01em; border-radius: var(--r) 0 0 var(--r); gap: var(--s-3); }
+  .split .play .ico { font-size: 1em; }
+  .split .ver { min-height: clamp(72px, 4.2vw, 100px); min-width: 168px; padding: 0 var(--s-4); border-radius: 0 var(--r) var(--r) 0; border: 1px solid var(--primary-edge); border-left: 1px solid rgba(0,0,0,.28); background: color-mix(in srgb, var(--primary-top) 78%, black); color: var(--primary-ink); box-shadow: none; gap: var(--s-3); text-align: left; justify-content: space-between; max-width: 260px; }
   .split .ver:where(:hover:not(:disabled)) { background: color-mix(in srgb, var(--primary-top) 88%, black); border-color: var(--primary-edge); }
-  .split .ver .vt { display: grid; gap: 3px; min-width: 0; }
-  .split .ver .vt b { font-size: var(--t-3); font-weight: 650; }
-  .split .ver .vt small { font-size: var(--t-1); font-weight: 500; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+  .split .ver .vt { display: grid; gap: 4px; min-width: 0; }
+  .split .ver .vt b { font: 650 var(--t-5)/1 var(--display); }
+  .split .ver .vt small { font-size: var(--t-2); font-weight: 500; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
   .split .ver .ico { font-size: 14px; }
-  .does { font: var(--type-body); font-size: clamp(var(--t-3), .95vw, var(--t-5)); color: var(--ink-2); }
+  .does { font: var(--type-body); font-size: clamp(var(--t-4), .85vw, 18px); color: var(--ink-2); text-align: center; }
   .does b { color: var(--ink); font-weight: 600; }
-  .why { display: flex; gap: var(--s-2); align-items: flex-start; font: var(--type-body); font-size: clamp(var(--t-3), .95vw, var(--t-5)); color: var(--warn-ink); }
+  .why { display: flex; gap: var(--s-2); align-items: flex-start; font: var(--type-body); font-size: var(--t-4); color: var(--warn-ink); justify-content: center; }
   .why .ico { margin-top: .3em; }
   .why b { font-weight: 600; }
 
   /* the Join field: a picked server, a typed address, or the title screen */
-  .join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-1) var(--s-3); align-items: center; padding-top: var(--s-4); border-top: 1px solid var(--line-soft); }
+  .join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-1) var(--s-3); align-items: center; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
   .join > .hint { grid-column: 2; }
-  .joinbox { display: flex; align-items: center; gap: var(--s-2); min-height: 40px; padding: 0 var(--s-1) 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
+  .joinbox { display: flex; align-items: center; gap: var(--s-2); min-height: 44px; padding: 0 var(--s-1) 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
   .joinbox:focus-within { border-color: var(--lapis-edge); background: var(--field-focus); }
   .joinbox.bad { border-color: var(--fault); }
-  .joinbox input { width: auto; border: 0; background: transparent; min-height: 38px; padding: 0; flex: 1; min-width: 4ch; font-size: var(--t-3); }
+  .joinbox input { width: auto; border: 0; background: transparent; min-height: 42px; padding: 0; flex: 1; min-width: 4ch; font-size: var(--t-4); }
   .joinbox input:focus { background: transparent; }
   .joinbox input:focus-visible { outline: none; }
   .joinbox input.picked { flex: 0 1 auto; field-sizing: content; font-weight: 650; }
@@ -396,6 +406,7 @@
   /* menus: under their button; a bottom sheet on a narrow window */
   .menu { position: absolute; z-index: 6; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
   .menu.vmenu { top: calc(100% + 6px); left: 0; }
+  .split > .menu.vmenu { left: auto; right: 0; }
   .menu.who { top: calc(100% + 6px); right: 0; }
   .menu.srv { top: calc(100% + 6px); left: 0; right: 0; width: auto; }
   .menu.ask { top: calc(100% + 6px); left: 0; width: 400px; }
@@ -443,7 +454,7 @@
   pre.log .w { color: var(--warn-ink); } pre.log .e { color: var(--fault-ink); }
 
   /* the one full-stage block: the panel is not answering */
-  .nothing { display: grid; justify-items: center; text-align: center; gap: var(--s-3); max-width: 420px; margin-top: var(--s-7); }
+  .nothing { display: grid; justify-items: center; align-content: start; text-align: center; gap: var(--s-3); max-width: 420px; margin: auto; }
   .nothing .glyph { width: 48px; height: 48px; border-radius: var(--r-sm); border: 1px dashed var(--edge); display: grid; place-items: center; color: var(--ink-3); font-size: 20px; }
   .nothing h2 { font: var(--type-section); }
   .nothing p { color: var(--ink-2); font-size: var(--t-3); }
@@ -480,10 +491,10 @@
   /* narrow windows: the column fills, the Join label sits above, menus come up from the bottom */
   @media (max-width: 699px) {
     .top { padding: 0 var(--s-4); }
-    .stage { padding: var(--s-5) var(--s-4) var(--s-6); }
+    .stage { padding: var(--s-4) var(--s-4) var(--s-6); }
     .playbox { width: 100%; }
-    .split { width: 100%; }
-    .split .play { flex: 1; padding: 0 var(--s-5); }
+    .playbox:has(> .split), .playbox[aria-busy] { padding: var(--s-4); }
+    .split .play { padding: 0 var(--s-5); }
     .join { grid-template-columns: minmax(0, 1fr); }
     .join > .hint { grid-column: 1; }
     .menu, .menu.vmenu, .menu.who, .menu.srv, .menu.ask { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 75vh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding: var(--s-3) var(--s-3) var(--s-5); }
@@ -1027,6 +1038,8 @@
       const first = document.querySelector('.menu button:not(:disabled), .menu input')
       first?.focus({ preventScroll: true })
     }
+    // a menu that opens under a centred column can run past the window: bring it into view
+    document.querySelector('.menu')?.scrollIntoView({ block: 'nearest' })
   }
 
   function closeMenu({ refocus = false } = {}) {
@@ -1156,7 +1169,7 @@
   function playView() {
     const sum = S.summary
     if (!sum) {
-      return h('div', { class: 'playbox', 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('width:320px;height:64px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
+      return h('div', { class: 'playbox', 'aria-busy': 'true', 'aria-label': 'Loading' }, sk('height:72px;border-radius:var(--r)'), sk('width:60%;height:16px'), sk('height:40px;margin-top:var(--s-4)'))
     }
     const p = currentProfile()
     if (!p) return firstRunView()
