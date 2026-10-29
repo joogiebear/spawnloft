@@ -430,8 +430,12 @@ holds the token, is readable only by your own user. And Minecraft's crash report
 so a crash report in the profile's `crash-reports/` holds a token that is already dead; the
 diagnostics bundle redacts it anyway.
 
-The harness is published for the Minecraft versions it was built against (1.21.11 today). A
-harness profile on another version is refused at launch with the list.
+The harness is built per Minecraft version, and Fabric loads it only on the version it was built
+for. SpawnLoft knows the builds that existed when it was released and reads newer ones from a
+list in the harness repo, signed with a key only the maintainer holds, at most once a day; a list
+that does not verify is ignored. `spawnloft doctor` says which list is in use and how old it is.
+A harness profile on a version with no build is refused at launch (`harness-not-published`) with
+the versions that have one.
 
 ## Bots or the real client
 

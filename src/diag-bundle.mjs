@@ -17,6 +17,7 @@ import { createZip, zipEntries } from './zip.mjs'
 import { getProfile, status, latestLogPath } from './client.mjs'
 import { profileDir, clientLog, clientStateFile } from './client-paths.mjs'
 import { clientDiagnose } from './client-diagnose.mjs'
+import { harnessIndexStatus } from './client-harness-index.mjs'
 
 export const TAIL_LINES = 5000
 
@@ -182,6 +183,7 @@ export async function collectClient(name, { lines = TAIL_LINES } = {}) {
     startedAt: st.startedAt,
     account: st.account,
     launch,
+    harnessList: harnessIndexStatus(),
   }
 
   const files = []

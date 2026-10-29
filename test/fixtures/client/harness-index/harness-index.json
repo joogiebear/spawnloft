@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "serial": 1,
+  "generated": "2026-10-29T00:51:30Z",
+  "rows": [
+    {
+      "minecraft": [
+        "1.21.11"
+      ],
+      "version": "0.1.0",
+      "tag": "v0.1.0-mc1.21.11",
+      "file": "spawnloft-harness-0.1.0+1.21.11.jar",
+      "sha256": "6e97b92cfde87bbd948f8ef4733979ba556337be79ed334b02c6942f2dae0d63"
+    },
+    {
+      "minecraft": [
+        "26.3"
+      ],
+      "version": "0.2.0",
+      "tag": "v0.2.0-mc26.3",
+      "file": "spawnloft-harness-0.2.0+26.3.jar",
+      "sha256": "abababababababababababababababababababababababababababababababab"
+    }
+  ]
+}

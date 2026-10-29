@@ -9,5 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 const testDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test')
 const files = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.mjs')).sort().map((f) => path.join('test', f))
-const res = spawnSync(process.execPath, ['--test', ...process.argv.slice(2), ...files], { stdio: 'inherit', cwd: path.join(testDir, '..') })
+// no test reads the real signed harness list from GitHub: its rows would change what tests see
+const env = { ...process.env, SPAWNLOFT_HARNESS_INDEX_FETCH: 'off' }
+const res = spawnSync(process.execPath, ['--test', ...process.argv.slice(2), ...files], { stdio: 'inherit', cwd: path.join(testDir, '..'), env })
 process.exit(res.status ?? 1)

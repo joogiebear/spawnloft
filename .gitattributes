@@ -7,3 +7,4 @@
 # The Java runtime fixtures: java-runtime-all.json names the two manifests by the sha1 of their bytes.
 /test/fixtures/client/java-runtime-*.json text eol=lf
 /test/fixtures/client/jre-legacy-*.json text eol=lf
+/test/fixtures/client/harness-index/* text eol=lf

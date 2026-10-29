@@ -38,6 +38,60 @@ export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500,
   }
 }
 
+// A small file read into memory, for bytes that are checked before anything trusts them (the
+// signed harness list). The body is counted as it arrives and the request is aborted the moment it
+// passes maxBytes, whatever Content-Length said; one deadline covers each attempt, body included,
+// so a server that sends a byte a second cannot hold the caller. Two attempts, for GitHub's stray
+// 504s. Fails with code 'too-large' or 'download-failed'.
+export async function fetchCapped(url, { maxBytes, timeoutMs = 10000, attempts = 2, delayMs = 1500, fetcher = fetch, label = url } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    const last = attempt >= attempts
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(new Error(`timed out after ${timeoutMs / 1000} s`)), timeoutMs)
+    const aborted = new Promise((_, reject) => controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true }))
+    aborted.catch(() => {})
+    try {
+      let res
+      try {
+        res = await Promise.race([fetcher(url, { headers: { 'User-Agent': UA, Accept: 'application/octet-stream, */*' }, signal: controller.signal }), aborted])
+      } catch (err) {
+        if (last) fail(`could not reach ${label}: ${err.cause?.message || err.message}`, 'download-failed')
+        await wait(delayMs * attempt)
+        continue
+      }
+      if (!res.ok || !res.body) {
+        controller.abort(new Error('unwanted body'))
+        if (last || !TRANSIENT.has(res.status)) fail(`${label} answered ${res.status}`, 'download-failed')
+        await wait(delayMs * attempt)
+        continue
+      }
+      const chunks = []
+      let size = 0
+      const reader = res.body[Symbol.asyncIterator]()
+      try {
+        for (;;) {
+          const { value, done } = await Promise.race([reader.next(), aborted])
+          if (done) break
+          size += value.length
+          if (size > maxBytes) {
+            controller.abort(new Error('too large'))
+            fail(`${label} is larger than ${humanBytes(maxBytes)}`, 'too-large')
+          }
+          chunks.push(Buffer.from(value))
+        }
+      } catch (err) {
+        if (err.code === 'too-large') throw err
+        fail(`could not read ${label}: ${err.cause?.message || err.message}`, 'download-failed')
+      } finally {
+        reader.return?.().catch?.(() => {})
+      }
+      return Buffer.concat(chunks)
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+}
+
 export async function fetchJson(url, { label = url } = {}) {
   let res
   try {

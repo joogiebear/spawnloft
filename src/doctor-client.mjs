@@ -3,7 +3,8 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { listProfiles, status } from './client.mjs'
 import { profileDir, versionJson, versionJar } from './client-paths.mjs'
-import { harnessFor, HARNESS_FILE, readHarnessFile, removeHarnessFile } from './client-harness.mjs'
+import { harnessFor, publishedHarnessIds, HARNESS_FILE, readHarnessFile, removeHarnessFile } from './client-harness.mjs'
+import { harnessIndexStatus } from './client-harness-index.mjs'
 import { fabricApiJars } from './client-fabric.mjs'
 import { requiredMajor, DOWNLOAD_URL } from './java.mjs'
 import { readJson } from './util.mjs'
@@ -92,5 +93,37 @@ export function checkClientProfiles({ repair = false, javas = [] } = {}) {
     }
   }
 
+  // the signed harness list, once per machine, when a profile uses the harness
+  if (listProfiles().some((p) => p.harness)) {
+    const line = harnessListLine(harnessIndexStatus())
+    if (line.problem) problems.push(line.text)
+    else notes.push(line.text)
+  }
+
   return { problems, notes }
+}
+
+const REJECTED = ['harness-index-signature', 'harness-index-format', 'harness-index-serial']
+
+function ago(ms) {
+  const m = Math.max(0, Math.round((Date.now() - ms) / 60000))
+  if (m < 60) return `${m} min ago`
+  const h = Math.round(m / 60)
+  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`
+}
+
+// One line on where the harness builds come from: the signed list (its serial, age and key) or
+// the built-in rows, and why the last check did not take a list. A list that was fetched and
+// refused is a problem: someone published something wrong.
+export function harnessListLine(st) {
+  const ids = publishedHarnessIds().join(', ')
+  const head = st.source === 'index'
+    ? `harness list: serial ${st.serial}${st.generated ? ` from ${st.generated.slice(0, 10)}` : ''}${st.key && st.key !== 'primary' ? `, signed with the ${st.key} key` : ''}${st.fetchedAt ? `, fetched ${ago(st.fetchedAt)}` : ''} (${ids})`
+    : `harness list: built-in only (${ids})`
+  if (!st.outcome || st.outcome === 'accepted' || st.outcome === 'unchanged') {
+    return { problem: false, text: st.lastCheck ? head : `${head}; the published list has not been checked yet` }
+  }
+  const when = st.lastCheck ? ` ${ago(st.lastCheck)}` : ''
+  if (REJECTED.includes(st.outcome)) return { problem: true, text: `${head}; the published list was rejected${when}: ${st.reason}` }
+  return { problem: false, text: `${head}; the published list was last tried${when} and could not be read (${st.reason})` }
 }

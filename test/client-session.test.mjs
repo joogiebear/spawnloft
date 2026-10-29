@@ -51,7 +51,14 @@ test('session before launch rejects', async () => {
 
 test('launch rejects for an unlisted mc version', async () => {
   createProfile('old', { mc: '1.20.1', loader: 'fabric', loaderVersion: '0.19.5', harness: true })
-  await assert.rejects(launch('old', { fakeJava }), /published for Minecraft 1\.21\.11, not 1\.20\.1/)
+  // the published harness list is asked first; no network here
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => { throw new Error('no network in this test') }
+  try {
+    await assert.rejects(launch('old', { fakeJava }), { code: 'harness-not-published', message: /not published for Minecraft 1\.20\.1 yet \(published: 1\.21\.11\)/ })
+  } finally {
+    globalThis.fetch = realFetch
+  }
 })
 
 test('session resolves and caches after launch', async () => {
