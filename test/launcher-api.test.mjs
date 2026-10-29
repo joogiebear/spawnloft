@@ -490,6 +490,51 @@ test('a launch can join an address SpawnLoft does not run', async () => {
   assert.equal(client.status('addr').running, false)
 })
 
+test('an address the game could not look up is refused before anything downloads, not shown as "Unknown host" in the game', async () => {
+  const { localJoinAddress } = await import('../src/client-launch.mjs')
+  const at = (props, port = 45930) => {
+    addServer('where', port, props)
+    return localJoinAddress(registry.getInstance('where'))
+  }
+  assert.deepEqual(at('online-mode=false\n'), { host: '127.0.0.1', port: 45930 })
+  assert.deepEqual(at('server-ip=\r\nonline-mode=false\r\n'), { host: '127.0.0.1', port: 45930 })
+  assert.deepEqual(at('server-ip=0.0.0.0\n'), { host: '127.0.0.1', port: 45930 })
+  assert.deepEqual(at('server-ip=::\n'), { host: '127.0.0.1', port: 45930 })
+  assert.deepEqual(at('server-ip=[::1]\n'), { host: '::1', port: 45930 })
+  assert.deepEqual(at('server-ip=192.168.1.20\n'), { host: '192.168.1.20', port: 45930 })
+  assert.throws(() => at('server-ip=my pc\n'), /server-ip=my pc .* not an address the game can join/)
+  assert.throws(() => at('online-mode=false\n', '45930x'), /no usable port/)
+  assert.throws(() => at('online-mode=false\n', null), /no usable port/)
+
+  client.createProfile('nowhere', { mc })
+  const stagesOf = (events) => events.map((e) => e.stage).filter((s, i, all) => s !== all[i - 1])
+
+  // a typed name nothing resolves (.invalid never does): refused before Java or the version
+  const typed = await jobEvents('nowhere-typed', () => call('client/profiles/nowhere/launch', { method: 'POST', body: { jobId: 'nowhere-typed', address: 'play.nowhere.invalid:25570' } }))
+  assert.deepEqual(stagesOf(typed), ['start', 'error'])
+  assert.match(typed.at(-1).message, /play\.nowhere\.invalid:25570 cannot be reached: this machine cannot find play\.nowhere\.invalid \(ENOTFOUND\)/)
+
+  // a SpawnLoft server whose server-ip names nothing: refused before the server is started for it
+  addServer('where', 45930, 'online-mode=false\nserver-ip=old-pc.invalid\n')
+  const started = []
+  await assert.rejects(client.launch('nowhere', { server: 'where', fakeJava: process.env.MCCTL_FAKE_CLIENT, launchedBy: 'launcher', ensureServer: async (name) => { started.push(name) } }),
+    /server "where" cannot be reached: this machine cannot find old-pc\.invalid/)
+  assert.deepEqual(started, [], 'a server is not started for a game that could not join it')
+
+  // through the page's "Start server and play" too
+  const local = await jobEvents('nowhere-local', () => call('client/profiles/nowhere/launch', { method: 'POST', body: { jobId: 'nowhere-local', server: 'where', startServer: true } }))
+  assert.deepEqual(stagesOf(local), ['start', 'error'])
+  assert.match(local.at(-1).message, /cannot find old-pc\.invalid/)
+  assert.equal(client.status('nowhere').running, false)
+
+  // the same server listening everywhere launches and joins 127.0.0.1
+  addServer('where', 45930, 'online-mode=false\n')
+  const out = await client.launch('nowhere', { server: 'where', fakeJava: process.env.MCCTL_FAKE_CLIENT, launchedBy: 'launcher' })
+  assert.equal(typeof out.pid, 'number')
+  await client.stop('nowhere')
+  registry.removeInstance('where')
+})
+
 test('a version this SpawnLoft cannot launch fails its job with the refusal\'s code (review N-4)', async () => {
   const future = JSON.parse(fs.readFileSync(path.join(fixtures, 'future.json'), 'utf8'))
   fs.mkdirSync(clientPaths.versionDir(future.id), { recursive: true })

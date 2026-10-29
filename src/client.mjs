@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
+import dns from 'node:dns'
+import net from 'node:net'
 import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
@@ -10,7 +12,7 @@ import { mojangJava } from './client-java.mjs'
 import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
-import { buildCommand, spawnClient, readClientState, stopClient } from './client-launch.mjs'
+import { buildCommand, spawnClient, readClientState, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
 import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
@@ -356,7 +358,7 @@ function harnessNotPublished(mc) {
 // `onStage` hears { stage, message } as each step starts; `onProgress` keeps the downloads'
 // { phase, done, total, bytes }. `ensureServer(target)` starts a stopped target server and waits
 // for it, just before the game is spawned; without it a stopped server is only a warning.
-async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null, fetchImpl = null, listFetchImpl = null, foundJavas = null }) {
+async function launchLocked(name, { playerName = null, account: accountSelector = null, server = null, address: addressText = null, onProgress = () => {}, onStage = () => {}, onWarning = () => {}, ensureServer = null, fakeJava = null, assistant = false, launchedBy = null, os = launchOs(fakeJava), hostCaps = null, fetchImpl = null, listFetchImpl = null, foundJavas = null, lookupHost = null }) {
   const by = assistant ? 'assistant' : (launchedBy ?? 'cli')
   if (!LAUNCHED_BY.includes(by)) throw new Error(`unknown launchedBy "${launchedBy}"`)
   const profile = getProfile(name)
@@ -411,6 +413,14 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     warnings.push(`${provisional.name} is an offline player, so ${addressText} will refuse the join unless it runs with online-mode=false; sign in to play on public servers`)
   }
   for (const w of warnings) onWarning(w)
+
+  // The game shows an address it cannot parse or look up as "Unknown host" on its own screen,
+  // after the downloads and after a stopped server was started for it; checked here instead, as
+  // the game will see it.
+  const joinAt = address ?? (target ? localJoinAddress(getInstance(target)) : null)
+  if (joinAt) {
+    await assertResolvable(joinAt, { what: address ? addressText.trim() : `server "${target}"`, lookup: lookupHost ?? (fakeJava ? fakeLookup : osLookup) })
+  }
 
   // The version file comes first: what the game needs (its Java, the arch it runs as, anything
   // this SpawnLoft cannot launch) is read from it before Java is looked for or anything else
@@ -506,9 +516,6 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
 }
 
-const HOSTNAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
-const IPV6 = /^[0-9A-Fa-f:.]+$/
-
 // A server outside SpawnLoft to join at launch: host[:port], a name, an IPv4 address or a
 // bracketed IPv6 one. Strict because the host lands on the game's command line: it can never
 // start with a dash or carry a space, a scheme or a path.
@@ -538,6 +545,44 @@ export function parseServerAddress(text) {
     if (port < 1 || port > 65535) bad()
   }
   return { host, port }
+}
+
+const LOOKUP_WAIT_MS = 5000
+
+const osLookup = (host) => dns.promises.lookup(host)
+
+// the fake game's network: RFC 6761's .invalid names never resolve, anywhere; every other name does
+function fakeLookup(host) {
+  if (/(^|\.)invalid$/i.test(host)) return Promise.reject(Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' }))
+  return Promise.resolve({ address: '127.0.0.1', family: 4 })
+}
+
+// Minecraft looks a name up as the operating system does, after a _minecraft._tcp SRV record
+// when the port is the default one. A lookup slower than LOOKUP_WAIT_MS is let through: the
+// game waits longer, and a slow resolver is not a missing name.
+async function assertResolvable({ host, port }, { what, lookup }) {
+  if (net.isIP(host)) return
+  // both queries share the one wait, so a resolver that drops packets cannot hold the launch
+  let timer
+  const slow = new Promise((resolve) => { timer = setTimeout(() => resolve('slow'), LOOKUP_WAIT_MS) })
+  let code
+  try {
+    try {
+      await Promise.race([lookup(host), slow])
+      return
+    } catch (err) {
+      code = err.code ?? err.message
+    }
+    if (port === 25565 && lookup === osLookup) {
+      try {
+        const srv = await Promise.race([dns.promises.resolveSrv(`_minecraft._tcp.${host}`), slow])
+        if (srv === 'slow' || srv.length) return
+      } catch { /* no SRV record either */ }
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+  fail(`${what} cannot be reached: this machine cannot find ${host} (${code}), so the game would stop at "Unknown host"; check the spelling, or that this machine is online`, 'unknown-host')
 }
 
 function formatAddress({ host, port }) {
