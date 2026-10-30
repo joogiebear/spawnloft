@@ -321,11 +321,11 @@
   .notice.fault { background: var(--fault-wash); border-color: var(--fault-edge); color: var(--fault-ink); box-shadow: inset var(--spine) 0 0 var(--fault); }
   .notice.fault b { color: var(--fault-ink); }
   .notice.live { background: var(--live-fill); border-color: var(--live-edge); color: var(--live-ink); }
-  .notice .body { flex: 1; min-width: 0; display: grid; gap: var(--s-1); }
-  .notice .acts { display: flex; gap: var(--s-2); flex: none; align-items: center; }
+  .notice .body { flex: 1 1 200px; min-width: 0; display: grid; gap: var(--s-1); }
+  .notice .acts { display: flex; gap: var(--s-2); flex: none; align-items: center; margin-left: auto; }
   /* a log under a notice spans it, lined up with the text */
   .notice { flex-wrap: wrap; }
-  .notice > pre.log { flex-basis: 100%; margin-left: calc(14px + var(--s-3)); width: calc(100% - 14px - var(--s-3)); }
+  .notice > pre.log { flex-basis: 100%; margin-left: calc(14px + var(--s-3)); width: calc(100% - 14px - var(--s-3)); max-height: 128px; }
 
   .pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--t-1); font-weight: 600; color: var(--ink-2); background: var(--recess); white-space: nowrap; }
   .pill.live { color: var(--live-ink); border-color: var(--live-edge); background: var(--live-fill); }
@@ -368,11 +368,14 @@
       linear-gradient(rgba(var(--ink-rgb), .022) 1px, transparent 1px) 0 0 / 48px 48px,
       linear-gradient(90deg, rgba(var(--ink-rgb), .022) 1px, transparent 1px) 0 0 / 48px 48px,
       var(--void); }
-  .playbox { width: min(clamp(680px, 34vw, 960px), 100%); margin: auto; display: grid; gap: var(--s-4); }
-  .eyebrow { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
-  /* Ready: Play, what it does and where to join sit together in one card. The other states
-     (a launch, a running game) put their own card here. */
-  .playbox:has(> .split), .playbox[aria-busy] { padding: var(--s-6); gap: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-md); }
+  /* One card for every state: Play, a launch under way, a running game, a game that closed
+     early, a blocked Play. What changes is the block in the button's place, never the frame.
+     minmax(0, 1fr) keeps a long log line from widening the card past the window. */
+  .playbox { width: min(clamp(680px, 34vw, 960px), 100%); margin: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-5); padding: var(--s-6); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-md); }
+  .playbox > * { min-width: 0; }
+  /* the card's status row while the game is being launched or is running: the pill and the setup */
+  .eyebrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: calc(var(--s-2) - var(--s-5)); font: var(--type-card); color: var(--ink-2); }
+  .eyebrow .hint { font: var(--type-card); color: var(--ink-2); }
 
   /* the split button: Play fills the row, the setup it plays sits at its right */
   .split { display: flex; width: 100%; }
@@ -434,20 +437,25 @@
   .waiting a { color: var(--lapis-ink); text-underline-offset: 3px; cursor: pointer; }
   .waiting .acts { display: flex; gap: var(--s-3); align-items: center; margin-left: auto; }
 
-  /* a launch under way, or a game running: a card in the button's place */
-  .prog { display: grid; gap: var(--s-3); padding: var(--s-4) var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--lift); }
+  /* a launch under way, or a game running: a well in the button's place, at the button's weight */
+  .prog { display: grid; gap: var(--s-3); min-height: clamp(72px, 4.2vw, 100px); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--recess); box-shadow: var(--lift); }
   .prog .line { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
-  .prog .line b { font: var(--type-section); }
+  .prog .line > b { font: 650 clamp(var(--t-5), 1.1vw, 22px)/1.2 var(--display); letter-spacing: -.01em; }
   .prog .line .hint { margin-left: auto; }
-  .bar { height: 8px; border-radius: 999px; background: var(--recess); border: 1px solid var(--line-soft); overflow: hidden; }
+  .prog > .hint { font-size: var(--t-3); }
+  .bar { height: 10px; border-radius: 999px; background: var(--sunken); border: 1px solid var(--line-soft); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--lapis); border-radius: 999px; }
   .bar.indet i { width: 30%; margin-left: 20%; opacity: .7; }
   .steps { display: flex; gap: var(--s-3); flex-wrap: wrap; }
   .step { font-size: var(--t-1); color: var(--ink-4); display: inline-flex; gap: 5px; align-items: center; }
   .step.done { color: var(--live-ink); }
   .step.now { color: var(--lapis-ink); font-weight: 650; }
-  .runrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-  .runrow .stop { min-height: 48px; padding: 0 var(--s-6); font-size: var(--t-5); border-radius: var(--r); }
+  .runrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-1); }
+  .runrow .stop { min-height: 52px; padding: 0 var(--s-7); font: 650 var(--t-5)/1 var(--display); border-radius: var(--r); gap: var(--s-3); }
+  .runrow .stop .ico { font-size: 14px; }
+  .runrow button:not(.stop) { min-height: 52px; padding: 0 var(--s-5); border-radius: var(--r); }
+  .facts { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); font: var(--type-meta); color: var(--ink-3); }
+  .facts b { color: var(--ink-2); font-weight: 600; }
   .path { font: var(--type-mono); font-size: var(--t-2); color: var(--ink-3); word-break: break-all; }
 
   pre.log { margin: 0; width: 100%; padding: var(--s-2) var(--s-3); background: var(--sunken); border: 1px solid var(--line-soft); border-radius: var(--r-xs); font: var(--type-mono); font-size: var(--t-2); color: var(--console-ink); line-height: 1.55; white-space: pre; overflow: auto; max-height: 220px; }
@@ -492,8 +500,8 @@
   @media (max-width: 699px) {
     .top { padding: 0 var(--s-4); }
     .stage { padding: var(--s-4) var(--s-4) var(--s-6); }
-    .playbox { width: 100%; }
-    .playbox:has(> .split), .playbox[aria-busy] { padding: var(--s-4); }
+    .playbox { width: 100%; padding: var(--s-4); }
+    .prog { padding: var(--s-4); }
     .split .play { padding: 0 var(--s-5); }
     .join { grid-template-columns: minmax(0, 1fr); }
     .join > .hint { grid-column: 1; }
@@ -1401,16 +1409,22 @@
   }
 
   function runningCard(p) {
-    const who = p.runningAccount?.name ? ` · as ${p.runningAccount.name}` : ''
     const target = p.launchTarget
+    const facts = [
+      h('span', {}, 'since ', h('b', { text: clockTime(p.startedAt) })),
+      p.runningAccount?.name && h('span', {}, 'as ', h('b', { text: p.runningAccount.name })),
+      h('span', { text: `pid ${p.pid}` }),
+    ]
     return [
       h('div', { class: 'eyebrow' }, pill('live', 'Running', true), h('span', { class: 'hint', text: setupTitle(p) }), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
       h('div', { class: 'prog' },
-        h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint', text: `since ${clockTime(p.startedAt)} · pid ${p.pid}${who}` })),
-        h('p', { class: 'hint' }, target ? ['Joined ', h('b', { style: 'color:var(--ink-2)', text: target }), '. '] : 'On the title screen. ', 'Closing this window does not stop the game.'),
+        h('div', { class: 'line' }, h('b', { text: 'Minecraft is running' }), h('span', { class: 'hint' }, target ? ['joined ', h('b', { style: 'color:var(--ink-2)', text: target })] : 'on the title screen')),
         h('div', { class: 'runrow' },
           h('button', { class: 'danger stop', id: 'stop', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop'),
-          desktop?.openProfileFolder ? h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder') : p.folder && h('span', { class: 'path', title: 'This setup\'s folder', text: p.folder }))),
+          desktop?.openProfileFolder && h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder')),
+        h('div', { class: 'facts' }, facts),
+        h('p', { class: 'hint', text: 'Closing this window does not stop the game.' }),
+        !desktop?.openProfileFolder && p.folder && h('span', { class: 'path', title: 'This setup\'s folder', text: p.folder })),
     ]
   }
 
