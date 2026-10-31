@@ -10,6 +10,7 @@ import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
 import { mojangJava } from './client-java.mjs'
 import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
+import { plainClientLog } from './client-log.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
@@ -871,17 +872,20 @@ export async function stop(name) {
   return res
 }
 
+// The last lines of the process capture, as plain lines (client-log.mjs turns the game's log4j
+// XML events back into latest.log's form). An event is a handful of raw lines, hence the window.
 export function tailClientLog(name, count = 100) {
   const file = clientLog(name)
   if (!fs.existsSync(file)) return []
   const size = fs.statSync(file).size
-  const readBytes = Math.min(size, Math.max(64 * 1024, count * 512))
+  const readBytes = Math.min(size, Math.max(64 * 1024, count * 2048))
   const fd = fs.openSync(file, 'r')
   const buf = Buffer.alloc(readBytes)
   fs.readSync(fd, buf, 0, readBytes, size - readBytes)
   fs.closeSync(fd)
-  const lines = buf.toString('utf8').split(/\r?\n/)
-  if (size > readBytes && lines.length) lines.shift()
+  let text = buf.toString('utf8')
+  if (size > readBytes) text = text.slice(text.indexOf('\n') + 1)
+  const lines = plainClientLog(text).split(/\r?\n/)
   while (lines.length && lines[lines.length - 1] === '') lines.pop()
   return lines.slice(-count)
 }

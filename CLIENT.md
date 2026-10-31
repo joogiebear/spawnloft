@@ -484,7 +484,7 @@ client/
   run/<name>/cache/          Mojang's and Fabric's version lists, with the time they were fetched
 ```
 
-`spawnloft client logs <name>` shows the process capture (JVM errors land there);
+`spawnloft client logs <name>` shows the process capture as plain lines (JVM errors land there; the game writes it as log4j XML, which is read back into latest.log's form);
 `--latest` shows the game's own `logs/latest.log`.
 
 A second launch of a profile that is starting or running is refused ("is being launched (pid N)").
