@@ -416,13 +416,16 @@
   .joinbox .hint { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .joinbox .chev { margin-left: auto; color: var(--ink-3); }
 
-  /* menus: under their button; a bottom sheet on a narrow window */
-  .menu { position: absolute; z-index: 6; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
-  .menu.vmenu { top: calc(100% + 6px); left: 0; }
-  .split > .menu.vmenu { left: auto; right: 0; }
-  .menu.who { top: calc(100% + 6px); right: 0; }
-  .menu.srv { top: calc(100% + 6px); left: 0; right: 0; width: auto; }
-  .menu.ask { top: calc(100% + 6px); left: 0; width: 400px; }
+  /* menus: under their button; a bottom sheet on a narrow window. The pad is where the menu used
+     to be positioned; its bottom padding is in flow, so the stage scrolls a little past the menu
+     (a positioned box's own margin would not count, in Chromium at least). */
+  .menupad { position: absolute; z-index: 6; top: calc(100% + 6px); left: 0; right: 0; padding-bottom: var(--s-6); display: flex; pointer-events: none; }
+  .menupad.end { justify-content: flex-end; }
+  .menu { flex: none; pointer-events: auto; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
+  .menu.srv { width: 100%; }
+  .menu.ask { width: 400px; }
+  .menu .mark { width: 16px; height: 16px; flex: none; color: var(--lapis-ink); }
+  .menu .mark .ico { width: 16px; height: 16px; }
   .menu .mhead { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); padding: var(--s-2) var(--s-2) var(--s-1); }
   .menu .row { display: flex; align-items: center; gap: var(--s-2); border-radius: var(--r-sm); font-size: var(--t-3); min-height: 36px; }
   .menu .row.cur { background: var(--lapis-wash); }
@@ -516,7 +519,8 @@
     .split .play { padding: 0 var(--s-5); }
     .join { grid-template-columns: minmax(0, 1fr); }
     .join > .hint { grid-column: 1; }
-    .menu, .menu.vmenu, .menu.who, .menu.srv, .menu.ask { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 75vh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding: var(--s-3) var(--s-3) var(--s-5); }
+    .menupad { display: contents; }
+    .menu, .menu.srv, .menu.ask { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; width: auto; max-height: 75vh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding: var(--s-3) var(--s-3) var(--s-5); }
     .grid2 { grid-template-columns: minmax(0, 1fr); }
     .sheet { padding: var(--s-4); }
   }
@@ -1019,14 +1023,18 @@
   }
 
   function loadTargets() {
-    const out = {}
     let saved = null
     try { saved = JSON.parse(stored('local', JOIN_KEY) ?? 'null') } catch { /* ignored */ }
-    if (saved && typeof saved === 'object') {
-      for (const [name, t] of Object.entries(saved)) {
-        if (!t || typeof t !== 'object') continue
-        out[name] = { server: typeof t.server === 'string' && t.server ? t.server : null, address: typeof t.address === 'string' ? t.address.slice(0, 260) : '' }
-      }
+    return cleanTargets(saved)
+  }
+
+  // What localStorage held, or anything else, made into the shape the page trusts.
+  function cleanTargets(saved) {
+    const out = {}
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out
+    for (const [name, t] of Object.entries(saved)) {
+      if (!t || typeof t !== 'object') continue
+      out[name] = { server: typeof t.server === 'string' && t.server ? t.server : null, address: typeof t.address === 'string' ? t.address.slice(0, 260) : '' }
     }
     return out
   }
@@ -1078,7 +1086,7 @@
       first?.focus({ preventScroll: true })
     }
     // a menu that opens under a centred column can run past the window: bring it into view
-    document.querySelector('.menu')?.scrollIntoView({ block: 'nearest' })
+    document.querySelector('.menupad')?.scrollIntoView({ block: 'nearest' })
   }
 
   function closeMenu({ refocus = false } = {}) {
@@ -1090,6 +1098,9 @@
   }
 
   const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
+
+  // Every menu sits in a pad under its button; `end` aligns it to the button's right edge.
+  const menuPad = (menu, end = false) => h('div', { class: end ? 'menupad end' : 'menupad' }, menu)
 
   const menuItems = (menu) => [...menu.querySelectorAll('button:not(:disabled), input')]
 
@@ -1137,19 +1148,19 @@
   function accountChip() {
     const def = defaultAccount()
     const open = S.menu === 'account'
-    const attrs = { id: 'chip', 'aria-haspopup': 'menu', 'aria-expanded': String(open), 'aria-controls': 'menuAccount', onclick: toggleMenu('account') }
+    const attrs = { id: 'chip', 'aria-expanded': String(open), 'aria-controls': 'menuAccount', onclick: toggleMenu('account') }
     const chip = def
       ? h('button', { ...attrs, class: 'chip' }, tile(def), h('span', { class: 'who' }, h('b', { text: def.name }),
         h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev'))
       : h('button', { ...attrs, class: 'chip empty' }, h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
         h('span', { class: 'who' }, h('b', { text: 'Not signed in' }), h('small', { text: S.login ? 'Signing in…' : 'Sign in or play offline' })), ico('chev'))
-    return [chip, open && accountMenu(def)].filter(Boolean)
+    return [chip, open && menuPad(accountMenu(def), true)].filter(Boolean)
   }
 
   function accountMenu(def) {
     const accounts = accountsNow()
     const o = S.offline
-    return h('div', { class: 'menu who', id: 'menuAccount', role: 'menu', 'aria-label': 'Accounts', onkeydown: menuKeys },
+    return h('div', { class: 'menu who', id: 'menuAccount', role: 'group', 'aria-label': 'Accounts', onkeydown: menuKeys },
       S.acctNotice && acctNotice(S.acctNotice),
       S.login && waitingStrip(S.login),
       accounts.length > 0 && [
@@ -1158,14 +1169,14 @@
           const offline = a.type === 'offline'
           const meta = `${offline ? 'Offline' : 'Microsoft'}${a === def ? ' · default' : ''}`
           return h('div', { class: a === def ? 'row cur' : 'row' },
-            h('button', { class: 'pick', role: 'menuitemradio', 'aria-checked': String(a === def), onclick: () => setDefault(a.uuid) },
+            h('button', { class: 'pick', 'aria-current': a === def ? 'true' : null, onclick: () => setDefault(a.uuid) },
               tile(a, 'sm'), h('span', { text: a.name }), h('span', { class: a.refreshFailedAt ? 'meta warn' : 'meta', text: !offline && a.refreshFailedAt ? 'sign in again' : meta })),
             !offline && a.refreshFailedAt && h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, 'Sign in again'),
-            a !== def && h('button', { class: 'sm quiet icon', role: 'menuitem', title: `${offline ? 'Remove' : 'Sign out'} ${a.name}`, 'aria-label': `${offline ? 'Remove' : 'Sign out'} ${a.name}`, onclick: () => removeAccount(a) }, ico('x')))
+            a !== def && h('button', { class: 'sm quiet icon', title: `${offline ? 'Remove' : 'Sign out'} ${a.name}`, 'aria-label': `${offline ? 'Remove' : 'Sign out'} ${a.name}`, onclick: () => removeAccount(a) }, ico('x')))
         }),
         h('hr'),
       ],
-      h('button', { class: 'row act', role: 'menuitem', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account', h('span', { class: 'meta', text: 'opens Microsoft\'s page' })),
+      h('button', { class: 'row act', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account', h('span', { class: 'meta', text: 'opens Microsoft\'s page' })),
       h('div', { class: 'mhead', text: 'Play offline on local servers' }),
       h('div', { class: 'inline' },
         h('input', { id: 'offName', 'aria-label': 'Offline name', value: o.name, maxlength: '16', placeholder: 'Name, 3 to 16 characters', class: o.error ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
@@ -1173,7 +1184,7 @@
         h('button', { class: 'sm', onclick: () => addOffline() }, 'Add')),
       o.error && h('small', { class: 'hint bad', text: sentence(o.error) }),
       h('p', { class: 'note', text: 'An offline name plays on servers with online-mode=false, like the ones SpawnLoft makes. Online servers need a Microsoft account.' }),
-      def && [h('hr'), h('button', { class: 'row act', role: 'menuitem', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`)])
+      def && [h('hr'), h('button', { class: 'row act', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`)])
   }
 
   function acctNotice(n) {
@@ -1264,14 +1275,19 @@
     return h('div', { class: 'playbox' }, flashNotice(),
       h('div', { class: 'split menuhost', 'data-menu': 'version' },
         h('button', { class: 'primary play', id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play'), S.firstRun ? 'Getting ready…' : 'Play'),
-        h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': 'Setup: the latest release. Change setup', onclick: toggleMenu('version') },
+        h('button', { class: 'ver', id: 'verBtn', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': 'Setup: the latest release. Change setup', onclick: toggleMenu('version') },
           h('span', { class: 'vt' }, h('b', { text: mc ?? '…' }), h('small', { text: 'Latest release' })), ico('chev')),
-        S.menu === 'version' && h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'menu', 'aria-label': 'Setups', onkeydown: menuKeys },
+        S.menu === 'version' && menuPad(h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'group', 'aria-label': 'Setups', onkeydown: menuKeys },
           h('div', { class: 'mhead', text: 'Play with' }),
           h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own:' }),
-          h('button', { class: 'row act', role: 'menuitem', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })))),
+          h('button', { class: 'row act', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' }))), true)),
       does,
       joinField(draft, plan, false))
+  }
+
+  // The setup Play makes on a fresh install: the latest release, vanilla, the usual memory.
+  function firstProfileBody(mc, taken) {
+    return { name: autoName(mc, 'vanilla', taken), mc, loader: 'vanilla', memory: defaultMemory('vanilla') }
   }
 
   async function firstPlay() {
@@ -1282,7 +1298,7 @@
     render()
     let made = null
     try {
-      made = await api('client/profiles', { method: 'POST', body: { name: autoName(mc, 'vanilla', profilesNow().map((q) => q.name)), mc, loader: 'vanilla', memory: defaultMemory('vanilla') } })
+      made = await api('client/profiles', { method: 'POST', body: firstProfileBody(mc, profilesNow().map((q) => q.name)) })
     } catch (err) {
       if (err instanceof PanelDown) S.down = true
       S.flash = { tone: 'fault', title: 'Couldn\'t make a setup', text: sentence(err.message) }
@@ -1352,10 +1368,10 @@
     const given = givenName(p)
     return h('div', { class: 'split menuhost', 'data-menu': 'version ask' },
       h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => startLaunch(p) }, ico('play'), label),
-      h('button', { class: 'ver', id: 'verBtn', 'aria-haspopup': 'menu', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
+      h('button', { class: 'ver', id: 'verBtn', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
         h('span', { class: 'vt' }, h('b', { text: p.mc }), h('small', { text: `${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${given ? ` · ${given}` : ''}` })), ico('chev')),
-      S.menu === 'version' && versionMenu(p),
-      S.menu === 'ask' && askMenu(p))
+      S.menu === 'version' && menuPad(versionMenu(p), true),
+      S.menu === 'ask' && menuPad(askMenu(p)))
   }
 
   function setupSub(q) {
@@ -1363,15 +1379,16 @@
   }
 
   function versionMenu(p) {
-    return h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'menu', 'aria-label': 'Setups', onkeydown: menuKeys },
+    return h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'group', 'aria-label': 'Setups', onkeydown: menuKeys },
       h('div', { class: 'mhead', text: 'Play with' }),
       profilesNow().map((q) => h('div', { class: q === p ? 'row cur' : 'row' },
-        h('button', { class: 'pick', role: 'menuitemradio', 'aria-checked': String(q === p), onclick: () => { pickProfile(q.name); closeMenu({ refocus: true }) } },
+        h('button', { class: 'pick', 'aria-current': q === p ? 'true' : null, onclick: () => { pickProfile(q.name); closeMenu({ refocus: true }) } },
+          h('span', { class: 'mark' }, q === p && ico('check')),
           h('span', { class: 'sub' }, h('b', { text: setupTitle(q) }), h('small', { text: setupSub(q) })),
           q.running ? h('span', { class: 'meta' }, pill('live', 'running', true)) : S.job?.profile === q.name ? h('span', { class: 'meta' }, pill('accent', 'launching', true)) : null),
-        h('button', { class: 'sm quiet icon', role: 'menuitem', title: `Edit ${setupTitle(q)}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear')))),
+        h('button', { class: 'sm quiet icon', title: `Edit ${setupTitle(q)}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear')))),
       h('hr'),
-      h('button', { class: 'row act', role: 'menuitem', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })),
+      h('button', { class: 'row act', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })),
       h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits memory, Java and the rest.' }))
   }
 
@@ -1384,7 +1401,7 @@
       h('div', { class: 'menuhost', 'data-menu': 'join' },
         h('div', { class: address && addrProblem ? 'joinbox bad' : 'joinbox' }, dot,
           h('input', {
-            id: 'join', role: 'combobox', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-autocomplete': 'none', autocomplete: 'off', spellcheck: 'false',
+            id: 'join', autocomplete: 'off', spellcheck: 'false',
             class: picked ? 'picked' : null, size: picked ? String(Math.max(4, picked.name.length + 1)) : null, disabled: inert,
             placeholder: 'Pick a server or type an address', value: picked ? picked.name : t.address,
             onclick: () => { if (!open) openMenu('join', { focus: false }) },
@@ -1395,8 +1412,8 @@
             },
           }),
           picked && h('span', { class: 'hint', text: `${statusText(picked.status)}${picked.mc ? ` · ${picked.mc}` : ''}` }),
-          h('button', { class: 'sm quiet icon chev', tabindex: '-1', 'aria-label': 'Your servers', disabled: inert, onclick: toggleMenu('join') }, ico('chev'))),
-        open && joinMenu(p, plan)),
+          h('button', { class: 'sm quiet icon chev', tabindex: '-1', 'aria-label': 'Your servers', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', disabled: inert, onclick: toggleMenu('join') }, ico('chev'))),
+        open && menuPad(joinMenu(p, plan))),
       address && h('small', { class: addrProblem ? 'hint bad' : 'hint', text: addrProblem ?? `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` }))
   }
 
@@ -1404,19 +1421,19 @@
     const { t, choices } = plan
     const title = !t.server && !t.address.trim()
     const pickServer = (c) => () => { setTarget(p, { server: c.name }); closeMenu({ refocus: true }) }
-    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'listbox', 'aria-label': 'Where to join', onkeydown: menuKeys },
+    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'group', 'aria-label': 'Where to join', onkeydown: menuKeys },
       choices.length ? h('div', { class: 'mhead', text: 'Your servers' }) : h('p', { class: 'note', text: 'No SpawnLoft servers yet.' }),
       choices.map((c) => {
         let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
         let warn = false
         if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion) { meta = 'runs a different version'; warn = true }
-        return h('button', { class: c.name === t.server ? 'row cur' : 'row', role: 'option', 'aria-selected': String(c.name === t.server), disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
+        return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
           h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
           h('span', { class: 'sub' }, h('b', { text: c.label && c.label !== c.name ? `${c.name} (${c.label})` : c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` · ${c.mc}` : ''}` })),
           h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
       }),
       h('hr'),
-      h('button', { class: title ? 'row act cur' : 'row act', role: 'option', 'aria-selected': String(title), onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen only'),
+      h('button', { class: title ? 'row act cur' : 'row act', 'aria-current': title ? 'true' : null, onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen only'),
       h('p', { class: 'note', text: 'Or type an address above: play.example.net or 192.168.1.20:25566. Online servers need a Microsoft account.' }))
   }
 
@@ -1759,9 +1776,8 @@
         h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
         changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
         refused && h('small', { class: 'hint warn', text: sentence(refused) }),
-        h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint' },
-          v?.error ? `The version list could not be read: ${v.error}. ` : v?.offline ? sentence(v.offline) + '. ' : '',
-          facts.length ? `${sentence(facts.join(' · '))} · ` : '',
+        (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint', text: v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : sentence(facts.join(' · ')) }),
+        h('small', { class: 'hint' },
           show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all'), ' · ',
           h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), onclick: () => loadVersions({ refresh: true }) }, 'Refresh')))
     }
@@ -1873,25 +1889,34 @@
           h('button', { class: 'primary', disabled: f.saving || !f.mc, onclick: saveSheet }, f.saving ? 'Saving…' : f.editing ? 'Save' : 'Create'))))
   }
 
+  // A typed field as the panel wants it: trimmed, and null when empty.
+  function fieldText(s) { return String(s ?? '').trim() || null }
+
+  // What a New sheet POSTs: a name unless one was typed, and the fields the panel's route takes.
+  function newProfileBody(f, taken) {
+    const name = fieldText(f.name) ?? autoName(f.mc, f.loader, taken)
+    return { name, mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account) }
+  }
+
+  // What an Edit sheet wants the setup to be; profilePatch keeps only what changed.
+  function editedProfile(f) {
+    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account), assistantAccount: f.assistantAccount }
+  }
+
   async function saveSheet() {
     const f = S.sheet
-    const text = (s) => (String(s ?? '').trim() || null)
     f.saving = true
     f.error = null
     render()
     try {
       if (!f.editing) {
-        const name = f.name.trim() || autoName(f.mc, f.loader, profilesNow().map((q) => q.name))
-        const made = await api('client/profiles', {
-          method: 'POST',
-          body: { name, mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account) },
-        })
-        pickProfile(made?.name ?? name)
+        const body = newProfileBody(f, profilesNow().map((q) => q.name))
+        const made = await api('client/profiles', { method: 'POST', body })
+        pickProfile(made?.name ?? body.name)
         S.flash = { tone: 'live', title: `Made ${setupTitle(made ?? f)}`, text: 'Press Play to start it. The first time downloads the game.' }
       } else {
         const before = profileNamed(f.editing)
-        const next = { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? text(f.loaderVersion) : null, memory: f.memory, java: text(f.java), harness: f.harness, server: text(f.server), account: text(f.account), assistantAccount: f.assistantAccount }
-        const patch = profilePatch(before ?? {}, next)
+        const patch = profilePatch(before ?? {}, editedProfile(f))
         const out = Object.keys(patch).length ? await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch }) : { warnings: [] }
         const label = setupTitle(out.profile ?? before ?? f)
         if (patch.mc !== undefined) delete S.refusals[f.editing]
