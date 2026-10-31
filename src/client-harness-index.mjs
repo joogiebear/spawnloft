@@ -36,8 +36,8 @@ export const HARNESS_INDEX_SIG_URL = `${HARNESS_INDEX_URL}.sig`
 // can never pass for a list.
 export const SIGNATURE_DOMAIN = 'spawnloft-harness-index/1\n'
 
-const MAX_INDEX_BYTES = 64 * 1024
-const MAX_SIG_BYTES = 1024
+export const MAX_INDEX_BYTES = 64 * 1024
+export const MAX_SIG_BYTES = 1024
 const MAX_ROWS = 100
 const MAX_REVOKE = 8
 const FETCH_TIMEOUT_MS = 10000

@@ -3,18 +3,24 @@
 // their asset indexes and Mojang's Java runtime list, runs the launcher's own resolver on them for
 // every OS and arch it knows, and fails on anything a launch would refuse or a SpawnLoft release
 // would be needed for. The facts that change only with Mojang (log config ids, natives
-// classifiers, runtime platforms) are compared with tools/version-drift-baseline.json.
+// classifiers, runtime platforms) are compared with tools/version-drift-baseline.json. It also
+// checks the signed harness list as the mod repo publishes it: the list verifies with the keys this
+// SpawnLoft trusts, and every jar it and HARNESS_RELEASES name still downloads with its sha256, so a
+// deleted or replaced release shows up here before a user's launch finds it.
 //
 //   node tools/check-version-drift.mjs [--report <file.md>] [--update-baseline]
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { fetchJson } from '../src/download.mjs'
+import { fetchJson, fetchCapped } from '../src/download.mjs'
 import { MANIFEST_URL, mergeInherited, assetLayout } from '../src/client-meta.mjs'
 import { resolveVersion, launchFeatures, versionKind } from '../src/client-version.mjs'
 import { META_URL, pickLoader } from '../src/client-fabric.mjs'
 import { RUNTIME_INDEX_URL, platformKey } from '../src/client-java.mjs'
+import { HARNESS_INDEX_KEYS, HARNESS_INDEX_MIN_SERIAL, HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, MAX_INDEX_BYTES, MAX_SIG_BYTES, harnessJarUrl, parseHarnessIndex } from '../src/client-harness-index.mjs'
+import { HARNESS_RELEASES } from '../src/client-harness.mjs'
 
 export const BASELINE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'version-drift-baseline.json')
 
@@ -158,6 +164,53 @@ export async function checkDrift({ get = (url, label) => fetchJson(url, { label 
   return { rows, failures, notes, facts }
 }
 
+// The published harness list and every jar it or the built-in rows name: { failures, notes }.
+// `getBytes(url, label, maxBytes)` fetches a Buffer.
+export async function checkHarnessList({
+  getBytes = (url, label, maxBytes) => fetchCapped(url, { maxBytes, timeoutMs: 60000, label }),
+  keys = HARNESS_INDEX_KEYS,
+  minSerial = HARNESS_INDEX_MIN_SERIAL,
+  builtIn = HARNESS_RELEASES,
+} = {}) {
+  const failures = []
+  const notes = []
+  let listed = []
+  try {
+    const bytes = await getBytes(HARNESS_INDEX_URL, 'the harness list', MAX_INDEX_BYTES)
+    const sig = await getBytes(HARNESS_INDEX_SIG_URL, "the harness list's signature", MAX_SIG_BYTES)
+    const index = parseHarnessIndex(bytes, sig.toString('utf8'), { keys, minSerial })
+    listed = index.rows
+    notes.push(`harness list: serial ${index.serial}, signed with the ${index.key} key, ${index.rows.length} row(s)`)
+    if (index.revoke.length) notes.push(`the harness list revokes ${index.revoke.length} key(s)`)
+  } catch (err) {
+    failures.push(`the signed harness list: ${err.message}`)
+  }
+
+  // harnessFor takes a built-in row over a listed one, so a listed row that disagrees is never used
+  for (const row of listed) {
+    for (const id of row.minecraft) {
+      const own = builtIn.find((r) => r.minecraft.includes(id))
+      if (own && (own.version !== row.version || own.tag !== row.tag || own.file !== row.file || own.sha256 !== row.sha256)) {
+        failures.push(`the harness list's row for Minecraft ${id} (${row.tag}) differs from the one built into SpawnLoft (${own.tag}); the built-in one wins`)
+      }
+    }
+  }
+
+  const rows = [...builtIn, ...listed]
+  const jars = rows.filter((r, i) => rows.findIndex((o) => harnessJarUrl(o) === harnessJarUrl(r) && o.sha256 === r.sha256) === i)
+  for (const row of jars) {
+    const label = `harness ${row.file} (for ${row.minecraft.join(', ')})`
+    try {
+      const jar = await getBytes(harnessJarUrl(row), label, 32 * 1024 * 1024)
+      const hash = crypto.createHash('sha256').update(jar).digest('hex')
+      if (hash !== row.sha256) failures.push(`${label} has sha256 ${hash}, not the ${row.sha256} it is listed with`)
+    } catch (err) {
+      failures.push(err.message)
+    }
+  }
+  return { failures, notes }
+}
+
 export function report({ rows, failures, notes }) {
   const lines = [failures.length ? `**${failures.length} problem(s)**` : '**No drift.**', '']
   for (const f of failures) lines.push(`- ${f}`)
@@ -173,6 +226,9 @@ async function main(argv) {
   const updating = argv.includes('--update-baseline')
   const baseline = updating ? null : JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'))
   const result = await checkDrift({ baseline })
+  const harness = await checkHarnessList()
+  result.failures.push(...harness.failures)
+  result.notes.push(...harness.notes)
   const text = report(result)
   process.stdout.write(text)
   if (reportFile) fs.writeFileSync(reportFile, text)

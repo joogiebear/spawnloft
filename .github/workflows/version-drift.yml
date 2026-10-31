@@ -1,6 +1,7 @@
 # Once a week: do Mojang's newest versions, Fabric's profile for the newest release, their asset
 # indexes and Mojang's Java runtime list still fit this SpawnLoft? A launch refuses what does not
-# (strict mode); this says so before someone presses Play. A failure opens (or adds to) one issue,
+# (strict mode); this says so before someone presses Play. It also checks that the signed
+# harness list still verifies and every harness jar still downloads with its sha256. A failure opens (or adds to) one issue,
 # "Mojang format drift", and the next green run closes it. A pull request that changes the check
 # or the launcher code it calls runs it too, without touching the issue.
 name: version-drift
@@ -18,6 +19,8 @@ on:
       - src/client-meta.mjs
       - src/client-java.mjs
       - src/client-fabric.mjs
+      - src/client-harness.mjs
+      - src/client-harness-index.mjs
 
 permissions:
   contents: read
@@ -32,7 +35,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check Mojang's formats
+      - name: Check Mojang's formats and the harness list
         id: check
         run: node tools/check-version-drift.mjs --report drift-report.md
       - name: Open or update the drift issue
@@ -41,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            echo "The [weekly drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found formats this SpawnLoft does not handle. A launch of these versions is refused until it does."
+            echo "The [weekly drift check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found problems: a Mojang format this SpawnLoft does not handle refuses a launch, and a harness list or jar problem means the harness is missing or stale for those versions."
             echo
             cat drift-report.md
           } > issue.md

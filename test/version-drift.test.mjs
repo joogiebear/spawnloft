@@ -1,5 +1,6 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,7 +11,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-version-drift-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { checkDrift, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
+const { checkDrift, checkHarnessList, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
+const { HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, SIGNATURE_DOMAIN, harnessJarUrl } = await import('../src/client-harness-index.mjs')
 const { MANIFEST_URL } = await import('../src/client-meta.mjs')
 const { RUNTIME_INDEX_URL } = await import('../src/client-java.mjs')
 const { META_URL } = await import('../src/client-fabric.mjs')
@@ -80,4 +82,53 @@ test('an unreadable list, a manifest type the picker does not know and a missing
   const result = await checkDrift({ get: odd, baseline })
   assert.ok(result.failures.includes('the version list has types the picker does not know: april_fools'))
   assert.ok(result.failures.some((f) => /has no java-runtime-epsilon \(for 26\.3 \(release\)\) on linux/.test(f)))
+})
+
+// ---- the signed harness list ---------------------------------------------------------------
+
+const signer = crypto.generateKeyPairSync('ed25519')
+const keys = [{ name: 'primary', spki: signer.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') }]
+const jarA = Buffer.from('jar for 1.21.11')
+const jarB = Buffer.from('jar for 26.3')
+const sha = (b) => crypto.createHash('sha256').update(b).digest('hex')
+const builtIn = [{ minecraft: ['1.21.11'], version: '0.1.0', tag: 'v0.1.0-mc1.21.11', file: 'spawnloft-harness-0.1.0+1.21.11.jar', sha256: sha(jarA) }]
+const listedB = { minecraft: ['26.3'], version: '0.2.0', tag: 'v0.2.0-mc26.3', file: 'spawnloft-harness-0.2.0+26.3.jar', sha256: sha(jarB) }
+
+// The mod repo's release assets: a list of `rows` signed with `key`, and the two jars
+function published({ rows = [builtIn[0], listedB], key = signer.privateKey, jars = { [harnessJarUrl(builtIn[0])]: jarA, [harnessJarUrl(listedB)]: jarB } } = {}) {
+  const bytes = Buffer.from(JSON.stringify({ format: 1, serial: 2, generated: '2026-10-30T00:00:00Z', rows }, null, 2) + '\n')
+  const sig = crypto.sign(null, Buffer.concat([Buffer.from(SIGNATURE_DOMAIN), bytes]), key).toString('base64') + '\n'
+  const answers = new Map([[HARNESS_INDEX_URL, bytes], [HARNESS_INDEX_SIG_URL, Buffer.from(sig)], ...Object.entries(jars)])
+  const asked = []
+  const getBytes = async (url, label) => {
+    asked.push(url)
+    if (answers.has(url)) return answers.get(url)
+    throw new Error(`${label} answered 404`)
+  }
+  return { getBytes, asked }
+}
+
+test('the published harness list verifies and every jar has its sha256, each fetched once', async () => {
+  const { getBytes, asked } = published()
+  const result = await checkHarnessList({ getBytes, keys, minSerial: 1, builtIn })
+  assert.deepEqual(result.failures, [])
+  assert.deepEqual(result.notes, ['harness list: serial 2, signed with the primary key, 2 row(s)'])
+  assert.equal(asked.filter((u) => u.endsWith('.jar')).length, 2, 'the 1.21.11 jar in both lists is fetched once')
+})
+
+test('a list signed by a key SpawnLoft does not trust fails, and the built-in jars are still checked', async () => {
+  const { getBytes, asked } = published({ key: crypto.generateKeyPairSync('ed25519').privateKey })
+  const result = await checkHarnessList({ getBytes, keys, minSerial: 1, builtIn })
+  assert.deepEqual(result.failures, ['the signed harness list: the signature does not verify with any key this SpawnLoft trusts'])
+  assert.ok(asked.includes(harnessJarUrl(builtIn[0])))
+})
+
+test('a replaced jar, a deleted release and a row that disagrees with the built-in one each fail', async () => {
+  const other = { ...builtIn[0], tag: 'v0.1.1-mc1.21.11', file: 'spawnloft-harness-0.1.1+1.21.11.jar', sha256: sha(Buffer.from('x')) }
+  const { getBytes } = published({ rows: [other, listedB], jars: { [harnessJarUrl(builtIn[0])]: Buffer.from('tampered') } })
+  const text = (await checkHarnessList({ getBytes, keys, minSerial: 1, builtIn })).failures.join('\n')
+  assert.match(text, /^harness spawnloft-harness-0\.1\.0\+1\.21\.11\.jar \(for 1\.21\.11\) has sha256 [0-9a-f]{64}, not the/m)
+  assert.match(text, /^harness spawnloft-harness-0\.2\.0\+26\.3\.jar \(for 26\.3\) answered 404$/m)
+  assert.match(text, /^harness spawnloft-harness-0\.1\.1\+1\.21\.11\.jar \(for 1\.21\.11\) answered 404$/m)
+  assert.match(text, /row for Minecraft 1\.21\.11 \(v0\.1\.1-mc1\.21\.11\) differs from the one built into SpawnLoft \(v0\.1\.0-mc1\.21\.11\)/)
 })
