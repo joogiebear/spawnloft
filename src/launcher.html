@@ -562,6 +562,8 @@
   // a game that ends this soon after it started gets the crash callout
   const CRASH_WINDOW_MS = 60000
   const LOG_LINES = 20
+  // how far back the log is read to tell a crash from a game that was simply closed
+  const LOG_SCAN = 200
   // the memory segments; anything else is Custom, a slider in half-gigabyte steps
   const MEMORY_CHOICES = ['2G', '4G', '8G']
   const STOPPED = new Set(['stopped', 'stale'])
@@ -715,6 +717,18 @@
     const blocked = blockReason(c)
     if (blocked) return { kind: 'blocked', ...blocked }
     return { kind: c.crashed ? 'closed-early' : 'ready' }
+  }
+
+  // A game that was closed, not one that crashed: the log ends in Minecraft's own "Stopping!" and
+  // nothing in it went wrong. Such an exit gets no callout, however soon after Play it came.
+  function cleanExit(lines) {
+    const tail = lines.filter((l) => l.trim())
+    if (!tail.length) return false
+    // the level is read from its bracket, not the word, so an INFO line about an "error" is not one;
+    // stack-trace lines count too, in case the trace is long enough to push its header out of view
+    const wrong = /\/(ERROR|FATAL)\]:|^\s+at [\w.$<>/]+\(|^Caused by: |Exception in thread|fatal error has been detected|crash report/i
+    if (tail.some((l) => wrong.test(l))) return false
+    return tail.slice(-10).some((l) => /\]: Stopping!\s*$/.test(l))
   }
 
   // Which watched games ended within CRASH_WINDOW_MS of starting without a Stop from this page.
@@ -1201,7 +1215,7 @@
     const plan = launchPlan(p)
     const { state } = plan
     const kids = [flashNotice()]
-    if (S.crash?.profile === p.name && state.kind !== 'running' && state.kind !== 'launching') kids.push(crashNotice(S.crash))
+    if (S.crash?.profile === p.name && !S.crash.pending && state.kind !== 'running' && state.kind !== 'launching') kids.push(crashNotice(S.crash))
     if (S.notice?.profile === p.name && state.kind !== 'launching' && !(S.notice.busy && state.kind === 'blocked')) {
       const n = S.notice
       kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: 'sm', onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
@@ -1325,7 +1339,7 @@
       busy: Boolean(S.notice?.busy && S.notice.profile === p.name),
       otherJob: Boolean(S.job && !job),
       refusal: S.refusals[p.name]?.message ?? null,
-      crashed: S.crash?.profile === p.name,
+      crashed: S.crash?.profile === p.name && !S.crash.pending,
     })
     const startsServer = Boolean(picked?.stopped)
     const who = acct.missing ? `${acct.name} (no longer signed in)` : acct.name
@@ -1466,7 +1480,7 @@
       }
       pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'w' : 'e', text: m[1] }), line.slice(m.index + m[1].length))
     })
-    if (!lines.length) pre.append('Reading the log…')
+    if (!lines.length) pre.append('The game left no log lines.')
     return pre
   }
 
@@ -2156,23 +2170,32 @@
   }
 
   // A game this page saw running that is gone within a minute of starting, not stopped from
-  // here, crashed (or was closed at once): the crash callout, with the log as it ended.
+  // here, may have crashed: the log decides (readLog), and until it has been read nothing shows.
   function noticeExits(next) {
     // a game running again is no longer the crash being shown
     if (S.crash && next.profiles.some((p) => p.name === S.crash.profile && p.running)) S.crash = null
     for (const { name, seconds } of earlyExits(S.watch, next.profiles, Date.now())) {
-      S.crash = { profile: name, seconds, report: null }
+      S.crash = { profile: name, seconds, report: null, pending: true }
       S.log = { profile: name, lines: [] }
     }
   }
 
-  // The log is read once, for a game that closed early; it does not change after the game has gone.
+  // The log is read once, for a game that closed early; it does not change after the game has
+  // gone. A game that was simply closed (cleanExit) gets no callout; a crash gets the callout with
+  // the log's last lines.
   async function readLog() {
     const c = S.crash
-    if (!c || (S.log.profile === c.profile && S.log.lines.length) || profileNamed(c.profile)?.running) return
+    if (!c || !c.pending || profileNamed(c.profile)?.running) return
     try {
-      const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_LINES}`)
-      S.log = { profile: c.profile, lines: out.lines ?? [] }
+      const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_SCAN}`)
+      const lines = out.lines ?? []
+      if (cleanExit(lines)) {
+        if (S.crash === c) S.crash = null
+        S.log = { profile: null, lines: [] }
+        return
+      }
+      c.pending = false
+      S.log = { profile: c.profile, lines: lines.slice(-LOG_LINES) }
     } catch { /* the next poll tries again */ }
   }
 

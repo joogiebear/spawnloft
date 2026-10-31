@@ -359,3 +359,20 @@ test('a server card\'s pre-fill picks the setup that fits, running or not', () =
   assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0] })
   assert.doesNotMatch(fnSource('takePrefill'), /!p\.running/)
 })
+
+test('a game that was closed is not a crash: "Stopping!" at the end and nothing wrong before it', () => {
+  const { cleanExit } = lifted(['cleanExit'])
+  const quit = ['[21:03:00] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas', '[21:03:01] [Render thread/INFO]: Stopping!', '']
+  assert.equal(cleanExit(quit), true)
+  // the game may say a little more after Stopping!
+  assert.equal(cleanExit([...quit, '[21:03:01] [Render thread/INFO]: Stopping worker threads']), true)
+  assert.equal(cleanExit([]), false)
+  assert.equal(cleanExit(['[21:03:01] [Render thread/INFO]: Loading 14 mods']), false)
+  // an INFO line that mentions an error is not an error; a trace whose header scrolled away is
+  assert.equal(cleanExit(['[21:03:00] [Render thread/INFO]: Realms error 401 ignored', '[21:03:01] [Render thread/INFO]: Stopping!']), true)
+  assert.equal(cleanExit(['\tat net.minecraft.client.Minecraft.run(Minecraft.java:1)', 'Caused by: java.lang.NullPointerException', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
+  // a crash that stops cleanly afterwards is still a crash
+  assert.equal(cleanExit(['[21:03:00] [main/ERROR]: Incompatible mods found!', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
+  assert.equal(cleanExit(['# A fatal error has been detected by the Java Runtime Environment:', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
+  assert.equal(cleanExit(['[21:03:00] [Render thread/INFO]: Stopping!', ...Array.from({ length: 12 }, (_, i) => `[21:03:0${i % 10}] [main/INFO]: later ${i}`)]), false)
+})

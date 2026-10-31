@@ -17,6 +17,7 @@ import { createZip, zipEntries } from './zip.mjs'
 import { getProfile, status, latestLogPath } from './client.mjs'
 import { profileDir, clientLog, clientStateFile } from './client-paths.mjs'
 import { clientDiagnose } from './client-diagnose.mjs'
+import { plainClientLines } from './client-log.mjs'
 import { harnessIndexStatus } from './client-harness-index.mjs'
 
 export const TAIL_LINES = 5000
@@ -137,10 +138,11 @@ export async function collectClient(name, { lines = TAIL_LINES } = {}) {
 
   const latestPath = latestLogPath(name)
   const latestLines = await readLines(latestPath, lines)
-  // The game prints to stdout what it writes to latest.log, so the process capture is kept for
-  // what only it has: JVM errors, launcher output, lines after the logger died.
+  // The game prints to stdout what it writes to latest.log (as log4j XML events, read back into
+  // latest.log's lines here), so the process capture is kept for what only it has: JVM errors,
+  // launcher output, lines after the logger died. An event is several raw lines, hence the window.
   const inLatest = new Set(latestLines)
-  const processLines = (await readLines(clientLog(name), lines)).filter((l) => !inLatest.has(l))
+  const processLines = plainClientLines(await readLines(clientLog(name), lines * 4)).slice(-lines).filter((l) => !inLatest.has(l))
 
   let anchor = null
   let launch = null
