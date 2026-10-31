@@ -100,10 +100,10 @@ function published({ rows = [builtIn[0], listedB], key = signer.privateKey, jars
   const sig = crypto.sign(null, Buffer.concat([Buffer.from(SIGNATURE_DOMAIN), bytes]), key).toString('base64') + '\n'
   const answers = new Map([[HARNESS_INDEX_URL, bytes], [HARNESS_INDEX_SIG_URL, Buffer.from(sig)], ...Object.entries(jars)])
   const asked = []
-  const getBytes = async (url) => {
+  const getBytes = async (url, label) => {
     asked.push(url)
     if (answers.has(url)) return answers.get(url)
-    throw new Error('answered 404')
+    throw new Error(`${label} answered 404`)
   }
   return { getBytes, asked }
 }

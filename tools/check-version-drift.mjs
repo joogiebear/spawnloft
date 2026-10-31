@@ -19,7 +19,7 @@ import { MANIFEST_URL, mergeInherited, assetLayout } from '../src/client-meta.mj
 import { resolveVersion, launchFeatures, versionKind } from '../src/client-version.mjs'
 import { META_URL, pickLoader } from '../src/client-fabric.mjs'
 import { RUNTIME_INDEX_URL, platformKey } from '../src/client-java.mjs'
-import { HARNESS_INDEX_KEYS, HARNESS_INDEX_MIN_SERIAL, HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, harnessJarUrl, parseHarnessIndex } from '../src/client-harness-index.mjs'
+import { HARNESS_INDEX_KEYS, HARNESS_INDEX_MIN_SERIAL, HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, MAX_INDEX_BYTES, MAX_SIG_BYTES, harnessJarUrl, parseHarnessIndex } from '../src/client-harness-index.mjs'
 import { HARNESS_RELEASES } from '../src/client-harness.mjs'
 
 export const BASELINE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'version-drift-baseline.json')
@@ -176,8 +176,8 @@ export async function checkHarnessList({
   const notes = []
   let listed = []
   try {
-    const bytes = await getBytes(HARNESS_INDEX_URL, 'the harness list', 64 * 1024)
-    const sig = await getBytes(HARNESS_INDEX_SIG_URL, "the harness list's signature", 1024)
+    const bytes = await getBytes(HARNESS_INDEX_URL, 'the harness list', MAX_INDEX_BYTES)
+    const sig = await getBytes(HARNESS_INDEX_SIG_URL, "the harness list's signature", MAX_SIG_BYTES)
     const index = parseHarnessIndex(bytes, sig.toString('utf8'), { keys, minSerial })
     listed = index.rows
     notes.push(`harness list: serial ${index.serial}, signed with the ${index.key} key, ${index.rows.length} row(s)`)
@@ -190,7 +190,7 @@ export async function checkHarnessList({
   for (const row of listed) {
     for (const id of row.minecraft) {
       const own = builtIn.find((r) => r.minecraft.includes(id))
-      if (own && (own.tag !== row.tag || own.file !== row.file || own.sha256 !== row.sha256)) {
+      if (own && (own.version !== row.version || own.tag !== row.tag || own.file !== row.file || own.sha256 !== row.sha256)) {
         failures.push(`the harness list's row for Minecraft ${id} (${row.tag}) differs from the one built into SpawnLoft (${own.tag}); the built-in one wins`)
       }
     }
@@ -199,13 +199,13 @@ export async function checkHarnessList({
   const rows = [...builtIn, ...listed]
   const jars = rows.filter((r, i) => rows.findIndex((o) => harnessJarUrl(o) === harnessJarUrl(r) && o.sha256 === r.sha256) === i)
   for (const row of jars) {
-    const label = `harness ${row.file}`
+    const label = `harness ${row.file} (for ${row.minecraft.join(', ')})`
     try {
       const jar = await getBytes(harnessJarUrl(row), label, 32 * 1024 * 1024)
       const hash = crypto.createHash('sha256').update(jar).digest('hex')
-      if (hash !== row.sha256) failures.push(`${label} (for ${row.minecraft.join(', ')}) has sha256 ${hash}, not the ${row.sha256} it is listed with`)
+      if (hash !== row.sha256) failures.push(`${label} has sha256 ${hash}, not the ${row.sha256} it is listed with`)
     } catch (err) {
-      failures.push(`${label} (for ${row.minecraft.join(', ')}): ${err.message}`)
+      failures.push(err.message)
     }
   }
   return { failures, notes }
