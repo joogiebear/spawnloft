@@ -723,22 +723,28 @@
     return { kind: c.crashed ? 'closed-early' : 'ready' }
   }
 
+  // Something went wrong in these log lines: an ERROR or FATAL line (the level is read from its
+  // bracket, not the word, so an INFO line about an "error" is not one), a stack trace (its lines
+  // count too, in case the trace is long enough to push its header out of view), a JVM fault or a
+  // crash report.
+  function crashSigns(lines) {
+    const wrong = /\/(ERROR|FATAL)\]:|^\s+at [\w.$<>/]+\(|^Caused by: |Exception in thread|fatal error has been detected|crash report/i
+    return lines.some((l) => wrong.test(l))
+  }
+
   // A game that was closed, not one that crashed: the log ends in Minecraft's own "Stopping!" and
   // nothing in it went wrong. Such an exit gets no callout, however soon after Play it came.
   function cleanExit(lines) {
     const tail = lines.filter((l) => l.trim())
     if (!tail.length) return false
-    // the level is read from its bracket, not the word, so an INFO line about an "error" is not one;
-    // stack-trace lines count too, in case the trace is long enough to push its header out of view
-    const wrong = /\/(ERROR|FATAL)\]:|^\s+at [\w.$<>/]+\(|^Caused by: |Exception in thread|fatal error has been detected|crash report/i
-    if (tail.some((l) => wrong.test(l))) return false
+    if (crashSigns(tail)) return false
     return tail.slice(-10).some((l) => /\]: Stopping!\s*$/.test(l))
   }
 
-  // Which watched games ended within CRASH_WINDOW_MS of starting without a Stop from this page.
-  // `watch` is { name: { since, stopping } }; answers [{ name, seconds }] and changes `watch`:
-  // running games join it, ended ones leave it.
-  function earlyExits(watch, profiles, now) {
+  // Which watched games ended without a Stop from this page. `watch` is { name: { since, stopping } };
+  // answers [{ name, seconds, early }], early meaning within CRASH_WINDOW_MS of starting, and changes
+  // `watch`: running games join it, ended ones leave it.
+  function watchedExits(watch, profiles, now) {
     const out = []
     for (const row of profiles) {
       if (row.running && !watch[row.name]) watch[row.name] = { since: Date.parse(row.startedAt) || now, stopping: false }
@@ -748,9 +754,19 @@
       if (row?.running) continue
       delete watch[name]
       const lived = now - w.since
-      if (row && !w.stopping && lived < CRASH_WINDOW_MS) out.push({ name, seconds: Math.max(1, Math.round(lived / 1000)) })
+      if (row && !w.stopping) out.push({ name, seconds: Math.max(1, Math.round(lived / 1000)), early: lived < CRASH_WINDOW_MS })
     }
     return out
+  }
+
+  // How long the game ran, for the crash notice: seconds up to two minutes, then minutes, then hours.
+  function ranFor(seconds) {
+    const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
+    if (seconds < 120) return n(seconds, 'second')
+    const minutes = Math.round(seconds / 60)
+    if (minutes < 120) return n(minutes, 'minute')
+    const hours = Math.floor(minutes / 60)
+    return minutes % 60 ? `${n(hours, 'hour')} ${n(minutes % 60, 'minute')}` : n(hours, 'hour')
   }
 
   // The keys the Edit sheet changed, as PATCH sends them. A running profile keeps the keys that
@@ -1482,7 +1498,7 @@
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
     const lines = S.log.profile === crash.profile ? S.log.lines : []
-    return notice({ tone: 'fault', title: `Minecraft closed ${crash.seconds} second${crash.seconds === 1 ? '' : 's'} after it started`, text, acts, extra: logBlock(lines), onclose: () => { S.crash = null; render() } })
+    return notice({ tone: 'fault', title: `Minecraft closed ${ranFor(crash.seconds)} after it started`, text, acts, extra: logBlock(lines), onclose: () => { S.crash = null; render() } })
   }
 
   function logBlock(lines) {
@@ -2198,27 +2214,29 @@
     }
   }
 
-  // A game this page saw running that is gone within a minute of starting, not stopped from
-  // here, may have crashed: the log decides (readLog), and until it has been read nothing shows.
+  // A game this page saw running that is gone, not stopped from here, may have crashed: the log
+  // decides (readLog), and until it has been read nothing shows.
   function noticeExits(next) {
     // a game running again is no longer the crash being shown
     if (S.crash && next.profiles.some((p) => p.name === S.crash.profile && p.running)) S.crash = null
-    for (const { name, seconds } of earlyExits(S.watch, next.profiles, Date.now())) {
-      S.crash = { profile: name, seconds, report: null, pending: true }
+    for (const { name, seconds, early } of watchedExits(S.watch, next.profiles, Date.now())) {
+      S.crash = { profile: name, seconds, early, report: null, pending: true }
       S.log = { profile: name, lines: [] }
     }
   }
 
-  // The log is read once, for a game that closed early; it does not change after the game has
-  // gone. A game that was simply closed (cleanExit) gets no callout; a crash gets the callout with
-  // the log's last lines.
+  // The log is read once, for a game that has gone; it does not change after that. A game that was
+  // simply closed (cleanExit) gets no callout. One gone within a minute of starting is a crash
+  // unless the log says it was closed; one that ran longer is a crash only when the log shows
+  // something wrong (crashSigns), so a Fabric error dialog left open for a while and then closed
+  // still gets the callout, and a game quit after an evening's play never does.
   async function readLog() {
     const c = S.crash
     if (!c || !c.pending || profileNamed(c.profile)?.running) return
     try {
       const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_SCAN}`)
       const lines = out.lines ?? []
-      if (cleanExit(lines)) {
+      if (cleanExit(lines) || (!c.early && !crashSigns(lines))) {
         if (S.crash === c) S.crash = null
         S.log = { profile: null, lines: [] }
         return
