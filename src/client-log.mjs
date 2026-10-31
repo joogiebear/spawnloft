@@ -47,12 +47,16 @@ export function plainClientLog(text, { clock = clockTime } = {}) {
   if (firstClose !== -1 && (firstOpen === -1 || firstClose < firstOpen)) {
     text = text.slice(firstClose + '</log4j:Event>'.length).replace(/^\r?\n/, '')
   }
-  return text.replace(EVENT_RE, (_, attrs, body) => {
+  let out = text.replace(EVENT_RE, (_, attrs, body) => {
     const a = attributes(attrs)
     const line = `[${clock(Number(a.timestamp))}] [${a.thread ?? '?'}/${a.level ?? 'INFO'}]: ${section(body, 'Message')}`
     const thrown = section(body, 'Throwable').replace(/\s+$/, '')
     return thrown ? `${line}\n${thrown}` : line
   })
+  // an event still being written at the end (the game is running) is not readable either
+  const open = out.lastIndexOf('<log4j:Event')
+  if (open !== -1) out = out.slice(0, open).replace(/\s+$/, '')
+  return out
 }
 
 // the same, for lines already split

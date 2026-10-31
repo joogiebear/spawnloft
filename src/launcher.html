@@ -724,7 +724,10 @@
   function cleanExit(lines) {
     const tail = lines.filter((l) => l.trim())
     if (!tail.length) return false
-    if (tail.some((l) => /\b(ERROR|FATAL)\b|fatal error|Exception in thread|crash report/i.test(l))) return false
+    // the level is read from its bracket, not the word, so an INFO line about an "error" is not one;
+    // stack-trace lines count too, in case the trace is long enough to push its header out of view
+    const wrong = /\/(ERROR|FATAL)\]:|^\s+at [\w.$<>/]+\(|^Caused by: |Exception in thread|fatal error has been detected|crash report/i
+    if (tail.some((l) => wrong.test(l))) return false
     return tail.slice(-10).some((l) => /\]: Stopping!\s*$/.test(l))
   }
 
@@ -1477,7 +1480,7 @@
       }
       pre.append(line.slice(0, m.index), h('span', { class: m[1] === 'WARN' ? 'w' : 'e', text: m[1] }), line.slice(m.index + m[1].length))
     })
-    if (!lines.length) pre.append('Reading the log…')
+    if (!lines.length) pre.append('The game left no log lines.')
     return pre
   }
 
@@ -2187,7 +2190,7 @@
       const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_SCAN}`)
       const lines = out.lines ?? []
       if (cleanExit(lines)) {
-        S.crash = null
+        if (S.crash === c) S.crash = null
         S.log = { profile: null, lines: [] }
         return
       }

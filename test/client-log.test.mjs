@@ -38,6 +38,11 @@ test('a tail that starts inside an event drops the torn event and keeps the whol
   assert.deepEqual(plainClientLines(torn.split('\n'), { clock }), ['[T7] [Worker-1/WARN]: slow'])
 })
 
+test('CRLF files (log4j\'s default line ending) read the same, and an event still being written is left out', () => {
+  const crlf = `${event(1, 'INFO', 'main', 'x', 'one')}\r\n${event(2, 'INFO', 'main', 'x', 'two')}\r\n  <log4j:Event logger="x" timestamp="3" level="INFO" thread="main">\r\n    <log4j:Message><![CDATA[par`.replace(/\n/g, '\r\n')
+  assert.deepEqual(plainClientLines(crlf.split(/\r?\n/), { clock }), ['[T1] [main/INFO]: one', '[T2] [main/INFO]: two'])
+})
+
 test('plain text is returned untouched, and the clock prints HH:MM:SS or a placeholder', () => {
   const plain = '[12:00:00] [main/INFO]: already plain\nError: could not create the Java Virtual Machine'
   assert.equal(plainClientLog(plain), plain)

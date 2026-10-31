@@ -884,7 +884,7 @@ export function tailClientLog(name, count = 100) {
   fs.readSync(fd, buf, 0, readBytes, size - readBytes)
   fs.closeSync(fd)
   let text = buf.toString('utf8')
-  if (size > readBytes) text = text.slice(text.indexOf('\n') + 1)
+  if (size > readBytes) { const nl = text.indexOf('\n'); text = nl === -1 ? '' : text.slice(nl + 1) }
   const lines = plainClientLog(text).split(/\r?\n/)
   while (lines.length && lines[lines.length - 1] === '') lines.pop()
   return lines.slice(-count)
