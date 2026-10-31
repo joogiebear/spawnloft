@@ -1412,7 +1412,8 @@ async function route(req, res) {
     return
   }
 
-  // the game launcher's own page, opened as a window of its own; same theme injection as /
+  // the game launcher's page: the panel's Play page frames it, and it is a page of its own for
+  // `spawnloft ui --launcher` and a browser; same theme injection as /
   if (url.pathname === '/launcher') {
     const html = readFileSync(path.join(HERE, 'launcher.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)

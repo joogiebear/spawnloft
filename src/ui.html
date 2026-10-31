@@ -2784,11 +2784,12 @@
   </aside>
   <section class="stage">
 
-    <!-- ============ nothing selected ===================================== -->
     <!-- ============ Play: the game launcher as a page of the panel =========== -->
     <div class="view play" id="vPlay">
       <iframe id="playFrame" title="Play"></iframe>
     </div>
+
+    <!-- ============ nothing selected ===================================== -->
 
     <div class="view empty" id="vEmpty">
       <svg class="mark" viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
@@ -5898,6 +5899,8 @@ function setPlayDisabled(name, disabled) {
 function showPlay() {
   const frame = $('#playFrame');
   if (!frame.getAttribute('src')) frame.src = '/launcher';
+  // a sheet left open on the way here is not somewhere to come back to
+  sheetStack.length = 0;
   show('play');
   focusPlay();
 }
@@ -5907,7 +5910,7 @@ function focusPlay() {
   const frame = $('#playFrame');
   try {
     const button = frame.contentDocument && frame.contentDocument.getElementById('play');
-    if (button) { button.focus(); return; }
+    if (button && !button.disabled) { button.focus(); return; }
   } catch { /* not loaded, or not ours */ }
   frame.focus();
 }

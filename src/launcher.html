@@ -11,6 +11,9 @@
   // overrides it, for screenshots.
   const themeAsked = new URLSearchParams(location.search).get('theme')
   if (themeAsked) document.documentElement.dataset.theme = themeAsked === 'spawnloft' ? 'spawnloft' : 'classic'
+  // inside the panel's Play page (a frame of the panel's own origin): the top bar is a page head,
+  // set before the first paint so the brand never shows (the body script reads this as EMBEDDED)
+  if (window.self !== window.top) document.documentElement.dataset.embedded = ''
 </script>
 
 <style>
@@ -505,7 +508,8 @@
 
   /* narrow windows: the column fills, the Join label sits above, menus come up from the bottom */
   @media (max-width: 699px) {
-    .top { padding: 0 var(--s-4); }
+    .top, :root[data-embedded] .top { padding: 0 var(--s-4); }
+    :root[data-embedded] .top { padding: var(--s-3) var(--s-4); }
     .stage { padding: var(--s-4) var(--s-4) var(--s-6); }
     .playbox { width: 100%; padding: var(--s-4); }
     .prog { padding: var(--s-4); }
@@ -578,7 +582,6 @@
   // of its own: the top bar becomes a page head (CSS), and the two lines that speak of closing
   // "this window" speak of leaving the page. Nothing else here knows the difference.
   const EMBEDDED = window.self !== window.top
-  if (EMBEDDED) document.documentElement.dataset.embedded = ''
   const CLOSING = EMBEDDED ? 'Leaving this page' : 'Closing this window'
 
   // ---- pure helpers (test/launcher-page.test.mjs lifts these by name) ----------------------
@@ -2243,8 +2246,8 @@
     })
   }
 
-  // The same, for a launcher that was already open: the panel brings this window forward rather
-  // than reloading it, and the storage event is how the card's choice arrives. A sheet already
+  // The same, for a launcher already loaded (the panel's Play page, or a window of its own the
+  // panel brings forward rather than reloading): the storage event is how the card's choice arrives. A sheet already
   // open keeps what was typed into it.
   window.addEventListener('storage', (e) => {
     if (e.key !== NEW_PROFILE_KEY || !e.newValue) return

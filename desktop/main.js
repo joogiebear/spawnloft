@@ -190,9 +190,10 @@ function createWindow(loadUrl, theme = 'classic') {
   win.loadURL(loadUrl)
   win.once('ready-to-show', () => win.show())
   // otherwise a failed load leaves a hidden window and no UI
-  win.webContents.on('did-fail-load', (_e, code, desc) => {
-    // ERR_ABORTED: navigation superseded or cancelled, not a failure
-    if (code === -3) return
+  win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+    // ERR_ABORTED: navigation superseded or cancelled, not a failure; a frame (the Play page)
+    // failing shows its own unreachable screen, the panel is still there
+    if (code === -3 || isMainFrame === false) return
     if (win && !win.isDestroyed()) win.show()
     dialog.showErrorBox('SpawnLoft could not open its panel', `${desc} (${code})\n\n${loadUrl}`)
   })
@@ -304,6 +305,9 @@ function focusLauncher() {
 // in a window of its own; the panel no longer does.)
 function showPlay() {
   if (!panelUrl || !win || win.isDestroyed() || !win.webContents.getURL().startsWith(panelUrl)) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
   win.webContents.executeJavaScript("typeof showPlay === 'function' && void showPlay()", true).catch(() => {})
 }
 
@@ -553,8 +557,8 @@ if (process.platform === 'win32') app.setAppUserModelId('io.github.joogiebear.mc
 
 // no menu bar elsewhere: the default one is for a text editor, and copy/paste still work without
 // it. macOS routes editing shortcuts and Quit through the application menu.
-// The game launcher's entry on macOS is also Window > Game launcher; elsewhere it is the sidebar's
-// Play, which every platform has.
+// The Play page's entry on macOS is also Window > Play; elsewhere it is the sidebar's Play, which
+// every platform has.
 Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
   { role: 'appMenu' },
   { role: 'editMenu' },
