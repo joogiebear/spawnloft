@@ -160,22 +160,61 @@ test('small display helpers', () => {
   assert.equal(loaderText({ loader: 'fabric', loaderVersion: null }), 'Fabric')
 })
 
-test('a game gone within a minute of starting is a crash, unless this page stopped it', () => {
-  const { earlyExits } = lifted(['CRASH_WINDOW_MS', 'earlyExits'])
+test('every watched game that goes without a Stop from this page is noticed, and an early one is marked', () => {
+  const { watchedExits } = lifted(['CRASH_WINDOW_MS', 'watchedExits'])
   const t0 = Date.parse('2026-10-28T10:00:00Z')
   const watch = {}
   const running = (name, startedAt) => ({ name, running: true, startedAt })
   const gone = (name) => ({ name, running: false, startedAt: null })
   // running games join the watch from their own start time
-  assert.deepEqual(earlyExits(watch, [running('a', '2026-10-28T10:00:00Z'), running('b', '2026-10-28T10:00:00Z'), running('c', '2026-10-28T09:00:00Z')], t0 + 5000), [])
+  assert.deepEqual(watchedExits(watch, [running('a', '2026-10-28T10:00:00Z'), running('b', '2026-10-28T10:00:00Z'), running('c', '2026-10-28T09:00:00Z')], t0 + 5000), [])
   assert.deepEqual(Object.keys(watch).sort(), ['a', 'b', 'c'])
   watch.b.stopping = true
-  // a gone 18 s in: a crash; b stopped from here: none; c ran an hour: none
-  assert.deepEqual(earlyExits(watch, [gone('a'), gone('b'), gone('c')], t0 + 18000), [{ name: 'a', seconds: 18 }])
+  // a gone 18 s in: early; b stopped from here: nothing; c ran an hour: noticed, the log decides
+  assert.deepEqual(watchedExits(watch, [gone('a'), gone('b'), gone('c')], t0 + 18000), [{ name: 'a', seconds: 18, early: true }, { name: 'c', seconds: 3618, early: false }])
   assert.deepEqual(watch, {})
-  // a removed profile is no crash either
+  // a removed profile is nothing either
   watch.d = { since: t0, stopping: false }
-  assert.deepEqual(earlyExits(watch, [], t0 + 1000), [])
+  assert.deepEqual(watchedExits(watch, [], t0 + 1000), [])
+  // the log decides (readLog -> exitVerdict); exits wait their turn while one is shown
+  assert.match(fnSource('readLog'), /if \(exitVerdict\(lines, c\.early\) === 'closed'\)/)
+  assert.match(fnSource('noticeExits'), /S\.exits\.push\(\.\.\.watchedExits\(S\.watch, next\.profiles, Date\.now\(\)\)\)/)
+  assert.match(fnSource('nextExit'), /if \(S\.crash \|\| !S\.exits\.length\) return/)
+})
+
+test('an exit the page did not ask for is a crash or a quit by what the log says, with a stricter first minute', () => {
+  const { exitVerdict } = lifted(['crashSigns', 'saidStopping', 'cleanExit', 'exitVerdict'])
+  const info = (t) => `[21:03:00] [Render thread/INFO]: ${t}`
+  const quit = [info('Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas'), '[21:03:01] [Render thread/INFO]: Stopping!']
+  const fabric = ['[21:03:00] [main/ERROR]: Incompatible mods found!', '\tat net.fabricmc.loader.impl.discovery.ModDiscoverer.discoverMods(ModDiscoverer.java:155)']
+  const routineError = ['[20:10:00] [Render thread/ERROR]: Couldn\'t load texture minecraft:textures/missing.png', ...Array.from({ length: 30 }, (_, i) => info(`tick ${i}`)), '[21:03:01] [Render thread/INFO]: Stopping!']
+  const cutOff = [info('Loading 14 mods'), info('Rendering world')]
+  // the first minute: anything but a clean quit is a crash
+  assert.equal(exitVerdict(quit, true), 'closed')
+  assert.equal(exitVerdict(fabric, true), 'crash')
+  assert.equal(exitVerdict([...fabric, '[21:03:01] [Render thread/INFO]: Stopping!'], true), 'crash')
+  assert.equal(exitVerdict(cutOff, true), 'crash')
+  assert.equal(exitVerdict([], true), 'crash')
+  // later: what counts is whether the game said it was stopping at the end
+  assert.equal(exitVerdict(quit, false), 'closed')
+  assert.equal(exitVerdict(routineError, false), 'closed')
+  assert.equal(exitVerdict(fabric, false), 'crash')
+  assert.equal(exitVerdict(cutOff, false), 'crash')
+  assert.equal(exitVerdict([], false), 'crash')
+  // "Stopping!" far from the end is not the end
+  assert.equal(exitVerdict(['[21:03:00] [Render thread/INFO]: Stopping!', ...Array.from({ length: 12 }, (_, i) => info(`later ${i}`))], false), 'crash')
+})
+
+test('the crash notice says how long the game ran in the unit that fits', () => {
+  const { ranFor } = lifted(['ranFor'])
+  assert.equal(ranFor(1), '1 second')
+  assert.equal(ranFor(18), '18 seconds')
+  assert.equal(ranFor(119), '119 seconds')
+  assert.equal(ranFor(120), '2 minutes')
+  assert.equal(ranFor(1380), '23 minutes')
+  assert.equal(ranFor(7200), '2 hours')
+  assert.equal(ranFor(9000), '2 hours 30 minutes')
+  assert.match(fnSource('crashNotice'), /Minecraft closed \$\{ranFor\(crash\.seconds\)\} after it started/)
 })
 
 test('the Edit form sends only what changed, and nothing a running game cannot change', () => {
@@ -361,7 +400,7 @@ test('a server card\'s pre-fill picks the setup that fits, running or not', () =
 })
 
 test('a game that was closed is not a crash: "Stopping!" at the end and nothing wrong before it', () => {
-  const { cleanExit } = lifted(['cleanExit'])
+  const { cleanExit, crashSigns } = lifted(['crashSigns', 'saidStopping', 'cleanExit'])
   const quit = ['[21:03:00] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas', '[21:03:01] [Render thread/INFO]: Stopping!', '']
   assert.equal(cleanExit(quit), true)
   // the game may say a little more after Stopping!
@@ -375,6 +414,10 @@ test('a game that was closed is not a crash: "Stopping!" at the end and nothing 
   assert.equal(cleanExit(['[21:03:00] [main/ERROR]: Incompatible mods found!', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
   assert.equal(cleanExit(['# A fatal error has been detected by the Java Runtime Environment:', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
   assert.equal(cleanExit(['[21:03:00] [Render thread/INFO]: Stopping!', ...Array.from({ length: 12 }, (_, i) => `[21:03:0${i % 10}] [main/INFO]: later ${i}`)]), false)
+  // the signs on their own, for a game that ran a while before it went
+  assert.equal(crashSigns(['[21:03:00] [main/ERROR]: Incompatible mods found!', '\tat net.fabricmc.loader.impl.discovery.ModDiscoverer.discoverMods(ModDiscoverer.java:155)']), true)
+  assert.equal(crashSigns(['[21:03:00] [Render thread/WARN]: Realms error 401 ignored', '[21:03:01] [Render thread/INFO]: Stopping!']), false)
+  assert.equal(crashSigns([]), false)
 })
 
 test('what Join remembered in localStorage is cleaned before the page trusts it', () => {

@@ -208,9 +208,13 @@ is running. Changing the version of a setup that has mods in its folder warns th
 load. **Remove setup** keeps its folder unless you tick the box.
 
 While a game runs the button turns into **Stop**, with **Open folder** (desktop app only; a
-browser tab shows the folder's path instead). If the game closes within a minute of starting
-without a Stop from the page, a notice says so, shows the last lines of the game log, and offers
-**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. When
+browser tab shows the folder's path instead). If the game goes away without a Stop from the page
+and did not simply quit, a notice says so, shows the last lines of the game log, and offers
+**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. "Did
+not simply quit" is read from the log: within the first minute, anything but a clean exit (the
+game's own "Stopping!" with no error before it); after that, a log that does not end in that
+"Stopping!", which is a hard crash or a mod loader's error dialog closed after a while, and never
+a routine error line from earlier in a long session. When
 Play cannot work it is greyed with the reason where the line under it was, and a link that fixes
 it: the account the setup names is no longer signed in or its sign-in expired, an online-mode
 server was picked for an offline player, another launch is under way, the machine cannot run the
