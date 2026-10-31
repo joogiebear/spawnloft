@@ -420,7 +420,7 @@
      to be positioned; its bottom padding is in flow, so the stage scrolls a little past the menu
      (a positioned box's own margin would not count, in Chromium at least). */
   .menupad { position: absolute; z-index: 6; top: calc(100% + 6px); left: 0; right: 0; padding-bottom: var(--s-6); display: flex; pointer-events: none; }
-  .menupad.end { justify-content: flex-end; }
+  .menupad:has(> .who), .menupad:has(> .vmenu) { justify-content: flex-end; }
   .menu { flex: none; pointer-events: auto; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
   .menu.srv { width: 100%; }
   .menu.ask { width: 400px; }
@@ -1033,7 +1033,7 @@
     const out = {}
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out
     for (const [name, t] of Object.entries(saved)) {
-      if (!t || typeof t !== 'object') continue
+      if (!t || typeof t !== 'object' || name === '__proto__') continue
       out[name] = { server: typeof t.server === 'string' && t.server ? t.server : null, address: typeof t.address === 'string' ? t.address.slice(0, 260) : '' }
     }
     return out
@@ -1099,8 +1099,8 @@
 
   const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
 
-  // Every menu sits in a pad under its button; `end` aligns it to the button's right edge.
-  const menuPad = (menu, end = false) => h('div', { class: end ? 'menupad end' : 'menupad' }, menu)
+  // Every menu sits in a pad under its button; the pad's CSS aligns it to the button's edge.
+  const menuPad = (menu) => h('div', { class: 'menupad' }, menu)
 
   const menuItems = (menu) => [...menu.querySelectorAll('button:not(:disabled), input')]
 
@@ -1154,7 +1154,7 @@
         h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev'))
       : h('button', { ...attrs, class: 'chip empty' }, h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
         h('span', { class: 'who' }, h('b', { text: 'Not signed in' }), h('small', { text: S.login ? 'Signing in…' : 'Sign in or play offline' })), ico('chev'))
-    return [chip, open && menuPad(accountMenu(def), true)].filter(Boolean)
+    return [chip, open && menuPad(accountMenu(def))].filter(Boolean)
   }
 
   function accountMenu(def) {
@@ -1277,10 +1277,7 @@
         h('button', { class: 'primary play', id: 'play', disabled: !mc || S.firstRun || Boolean(machine), 'aria-describedby': machine ? 'why' : 'does', onclick: firstPlay }, ico('play'), S.firstRun ? 'Getting ready…' : 'Play'),
         h('button', { class: 'ver', id: 'verBtn', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': 'Setup: the latest release. Change setup', onclick: toggleMenu('version') },
           h('span', { class: 'vt' }, h('b', { text: mc ?? '…' }), h('small', { text: 'Latest release' })), ico('chev')),
-        S.menu === 'version' && menuPad(h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'group', 'aria-label': 'Setups', onkeydown: menuKeys },
-          h('div', { class: 'mhead', text: 'Play with' }),
-          h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own:' }),
-          h('button', { class: 'row act', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' }))), true)),
+        S.menu === 'version' && menuPad(versionMenu(draft))),
       does,
       joinField(draft, plan, false))
   }
@@ -1370,7 +1367,7 @@
       h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => startLaunch(p) }, ico('play'), label),
       h('button', { class: 'ver', id: 'verBtn', 'aria-expanded': String(S.menu === 'version'), 'aria-controls': 'menuVersion', 'aria-label': `Setup: ${setupTitle(p)}${given ? ` (${given})` : ''}. Change setup`, onclick: toggleMenu('version') },
         h('span', { class: 'vt' }, h('b', { text: p.mc }), h('small', { text: `${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}${given ? ` · ${given}` : ''}` })), ico('chev')),
-      S.menu === 'version' && menuPad(versionMenu(p), true),
+      S.menu === 'version' && menuPad(versionMenu(p)),
       S.menu === 'ask' && menuPad(askMenu(p)))
   }
 
@@ -1379,17 +1376,19 @@
   }
 
   function versionMenu(p) {
+    const list = profilesNow()
     return h('div', { class: 'menu vmenu', id: 'menuVersion', role: 'group', 'aria-label': 'Setups', onkeydown: menuKeys },
       h('div', { class: 'mhead', text: 'Play with' }),
-      profilesNow().map((q) => h('div', { class: q === p ? 'row cur' : 'row' },
+      !list.length && h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own:' }),
+      list.map((q) => h('div', { class: q === p ? 'row cur' : 'row' },
         h('button', { class: 'pick', 'aria-current': q === p ? 'true' : null, onclick: () => { pickProfile(q.name); closeMenu({ refocus: true }) } },
           h('span', { class: 'mark' }, q === p && ico('check')),
           h('span', { class: 'sub' }, h('b', { text: setupTitle(q) }), h('small', { text: setupSub(q) })),
           q.running ? h('span', { class: 'meta' }, pill('live', 'running', true)) : S.job?.profile === q.name ? h('span', { class: 'meta' }, pill('accent', 'launching', true)) : null),
         h('button', { class: 'sm quiet icon', title: `Edit ${setupTitle(q)}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear')))),
-      h('hr'),
+      list.length > 0 && h('hr'),
       h('button', { class: 'row act', onclick: () => openSheet() }, ico('plus'), 'New setup', h('span', { class: 'meta', text: 'any version, snapshots too' })),
-      h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits memory, Java and the rest.' }))
+      list.length > 0 && h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits memory, Java and the rest.' }))
   }
 
   function joinField(p, plan, inert) {
@@ -1401,7 +1400,7 @@
       h('div', { class: 'menuhost', 'data-menu': 'join' },
         h('div', { class: address && addrProblem ? 'joinbox bad' : 'joinbox' }, dot,
           h('input', {
-            id: 'join', autocomplete: 'off', spellcheck: 'false',
+            id: 'join', role: 'combobox', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', autocomplete: 'off', spellcheck: 'false',
             class: picked ? 'picked' : null, size: picked ? String(Math.max(4, picked.name.length + 1)) : null, disabled: inert,
             placeholder: 'Pick a server or type an address', value: picked ? picked.name : t.address,
             onclick: () => { if (!open) openMenu('join', { focus: false }) },
@@ -1421,7 +1420,7 @@
     const { t, choices } = plan
     const title = !t.server && !t.address.trim()
     const pickServer = (c) => () => { setTarget(p, { server: c.name }); closeMenu({ refocus: true }) }
-    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'group', 'aria-label': 'Where to join', onkeydown: menuKeys },
+    return h('div', { class: 'menu srv', id: 'menuJoin', role: 'dialog', 'aria-label': 'Where to join', onkeydown: menuKeys },
       choices.length ? h('div', { class: 'mhead', text: 'Your servers' }) : h('p', { class: 'note', text: 'No SpawnLoft servers yet.' }),
       choices.map((c) => {
         let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
@@ -1776,7 +1775,8 @@
         h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
         changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
         refused && h('small', { class: 'hint warn', text: sentence(refused) }),
-        (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint', text: v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : sentence(facts.join(' · ')) }),
+        (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint',
+          text: [v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : '', facts.length ? sentence(facts.join(' · ')) : ''].filter(Boolean).join(' ') }),
         h('small', { class: 'hint' },
           show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all'), ' · ',
           h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), onclick: () => loadVersions({ refresh: true }) }, 'Refresh')))
@@ -1892,15 +1892,19 @@
   // A typed field as the panel wants it: trimmed, and null when empty.
   function fieldText(s) { return String(s ?? '').trim() || null }
 
-  // What a New sheet POSTs: a name unless one was typed, and the fields the panel's route takes.
+  // The sheet's fields as the panel's profile routes take them. A Fabric build only goes with Fabric.
+  function profileFields(f) {
+    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account) }
+  }
+
+  // What a New sheet POSTs: a name unless one was typed, and the fields.
   function newProfileBody(f, taken) {
-    const name = fieldText(f.name) ?? autoName(f.mc, f.loader, taken)
-    return { name, mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account) }
+    return { name: fieldText(f.name) ?? autoName(f.mc, f.loader, taken), ...profileFields(f) }
   }
 
   // What an Edit sheet wants the setup to be; profilePatch keeps only what changed.
   function editedProfile(f) {
-    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account), assistantAccount: f.assistantAccount }
+    return { ...profileFields(f), assistantAccount: f.assistantAccount }
   }
 
   async function saveSheet() {

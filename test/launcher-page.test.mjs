@@ -392,11 +392,15 @@ test('what Join remembered in localStorage is cleaned before the page trusts it'
     a: { server: null, address: '' },
     d: { server: null, address: 'a'.repeat(260) },
   })
+  // a key that would set the prototype is not a setup
+  const odd = cleanTargets(JSON.parse('{"__proto__": {"server": "x", "address": ""}, "a": {}}'))
+  assert.deepEqual(Object.keys(odd), ['a'])
+  assert.equal(odd.server, undefined)
   assert.match(fnSource('loadTargets'), /return cleanTargets\(saved\)/)
 })
 
 test('the New sheet POSTs the fields the panel\'s route takes, named by the version unless a name was typed', () => {
-  const { newProfileBody, editedProfile } = lifted(['nameBase', 'autoName', 'fieldText', 'newProfileBody', 'editedProfile'])
+  const { newProfileBody, editedProfile } = lifted(['nameBase', 'autoName', 'fieldText', 'profileFields', 'newProfileBody', 'editedProfile'])
   const f = { name: '  ', mc: '1.21.11', loader: 'vanilla', loaderVersion: '0.17.3', memory: '2G', java: ' ', harness: false, server: '', account: null, assistantAccount: true }
   assert.deepEqual(newProfileBody(f, ['1-21-11']), {
     name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla', loaderVersion: null, memory: '2G', java: null, harness: false, server: null, account: null,
@@ -434,19 +438,26 @@ test('on a fresh install Play makes a vanilla setup for the latest release and k
 
 test('menus are disclosures over groups of plain buttons, each in a pad with a bottom margin', () => {
   // no ARIA menu or listbox: the panels hold headings, notes and an input, which those roles forbid
-  assert.doesNotMatch(html, /role: '(menu|menuitem|menuitemradio|listbox|option|combobox)'/)
-  assert.doesNotMatch(html, /aria-haspopup/)
-  for (const id of ['menuAccount', 'menuVersion', 'menuJoin']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
+  assert.doesNotMatch(html, /role: '(menu|menuitem|menuitemradio|listbox|option)'/)
+  assert.doesNotMatch(html, /'aria-haspopup': '(menu|listbox|true)'/)
+  for (const id of ['menuAccount', 'menuVersion']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
+  // Join is a combobox whose popup is a dialog, so the field that is focused carries the state
+  assert.match(html, /id: 'join', role: 'combobox', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin'/)
+  assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)
   // every opener names what it opens, and every menu renders inside the pad
   for (const id of ['menuAccount', 'menuVersion', 'menuJoin']) assert.match(html, new RegExp(`'aria-expanded': String\\([^)]*\\), 'aria-controls': '${id}'`), id)
-  assert.match(fnSource('accountChip'), /menuPad\(accountMenu\(def\), true\)/)
-  assert.match(fnSource('playButton'), /menuPad\(versionMenu\(p\), true\)/)
+  assert.match(fnSource('accountChip'), /menuPad\(accountMenu\(def\)\)/)
+  assert.match(fnSource('playButton'), /menuPad\(versionMenu\(p\)\)/)
   assert.match(fnSource('playButton'), /menuPad\(askMenu\(p\)\)/)
   assert.match(fnSource('joinField'), /menuPad\(joinMenu\(p, plan\)\)/)
-  assert.match(fnSource('firstRunView'), /menuPad\(h\('div', \{ class: 'menu vmenu'/)
+  // the first run shares the setups menu, which says there are none yet
+  assert.match(fnSource('firstRunView'), /menuPad\(versionMenu\(draft\)\)/)
+  assert.match(fnSource('versionMenu'), /!list\.length && h\('p', \{ class: 'note', text: 'No setups yet/)
   assert.match(html, /querySelector\('\.menupad'\)\?\.scrollIntoView\(\{ block: 'nearest' \}\)/)
   // the chosen setup carries a mark, the others an empty one, so the rows line up
   assert.match(fnSource('versionMenu'), /h\('span', \{ class: 'mark' \}, q === p && ico\('check'\)\)/)
-  assert.match(html, /\.menupad \{ position: absolute; z-index: 6; top: calc\(100% \+ 6px\); left: 0; right: 0; padding-bottom: var\(--s-6\)/)
+  // the pad is positioned where the menu was and keeps a margin under it; alignment is the pad's
+  assert.match(html, /\.menupad \{[^}]*position: absolute;[^}]*padding-bottom: var\(--s-6\)/)
+  assert.match(html, /\.menupad:has\(> \.who\), \.menupad:has\(> \.vmenu\) \{ justify-content: flex-end; \}/)
 })
