@@ -349,6 +349,13 @@
   .brand svg { display: block; }
   .brand b { font: 650 var(--t-4)/1 var(--display); letter-spacing: -.015em; }
   .brand small { display: block; font-size: var(--t-1); color: var(--ink-3); margin-top: 3px; font-weight: 400; letter-spacing: .02em; }
+  /* Inside the panel's Play page (this document in a frame of the panel's stage) the panel's own
+     header carries the brand, so the top bar becomes the page's head: its title at the panel's
+     page-title size, the account at the right, a hairline under both, no second band of chrome. */
+  .pagetitle { display: none; margin: 0; font: var(--type-page); letter-spacing: var(--track-display); }
+  :root[data-embedded] .top { height: auto; min-height: 64px; padding: var(--s-4) var(--s-6); background: none; border-bottom: 1px solid var(--line-soft); }
+  :root[data-embedded] .brand { display: none; }
+  :root[data-embedded] .pagetitle { display: block; }
   .menuhost { position: relative; min-width: 0; }
 
   .chip { gap: var(--s-2); min-height: 40px; padding: 0 var(--s-2) 0 var(--s-1); background: var(--surface); max-width: 260px; }
@@ -531,6 +538,7 @@
 <div class="app">
   <header class="top">
     <div class="brand"><svg width="24" height="24" aria-hidden="true"><use href="#i-logo"/></svg><div><b>SpawnLoft</b><small>Launcher</small></div></div>
+    <h1 class="pagetitle">Play</h1>
     <span class="grow"></span>
     <div class="menuhost" data-menu="account" id="chipwrap"></div>
   </header>
@@ -566,6 +574,12 @@
   const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
   // the desktop app's bridge; null in a browser tab
   const desktop = window.mcctlDesktop ?? null
+  // Inside the panel's Play page, a frame of the panel's own origin, rather than a window or tab
+  // of its own: the top bar becomes a page head (CSS), and the two lines that speak of closing
+  // "this window" speak of leaving the page. Nothing else here knows the difference.
+  const EMBEDDED = window.self !== window.top
+  if (EMBEDDED) document.documentElement.dataset.embedded = ''
+  const CLOSING = EMBEDDED ? 'Leaving this page' : 'Closing this window'
 
   // ---- pure helpers (test/launcher-page.test.mjs lifts these by name) ----------------------
 
@@ -1404,7 +1418,7 @@
           if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
           return h('span', { class: 'step' }, s.name)
         })),
-        h('p', { class: 'hint', text: 'Closing this window does not stop the download. It keeps going and the files are used next time.' })),
+        h('p', { class: 'hint', text: `${CLOSING} does not stop the download. It keeps going and the files are used next time.` })),
     ]
   }
 
@@ -1423,7 +1437,7 @@
           h('button', { class: 'danger stop', id: 'stop', disabled: S.stopping === p.name, onclick: () => stopProfile(p) }, ico('stop'), S.stopping === p.name ? 'Stopping…' : 'Stop'),
           desktop?.openProfileFolder && h('button', { onclick: () => openFolder(p) }, ico('folder'), 'Open folder')),
         h('div', { class: 'facts' }, facts),
-        h('p', { class: 'hint', text: 'Closing this window does not stop the game.' }),
+        h('p', { class: 'hint', text: `${CLOSING} does not stop the game.` }),
         !desktop?.openProfileFolder && p.folder && h('span', { class: 'path', title: 'This setup\'s folder', text: p.folder })),
     ]
   }

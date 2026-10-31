@@ -6,9 +6,9 @@ pointed at one of your SpawnLoft servers. Nothing is drawn or patched by SpawnLo
 the client Mojang ships from Mojang's own servers, the way Prism and MultiMC do, and runs it.
 
 There are two ways to drive it. The command line (`spawnloft client ...`) is below; for a person
-who would rather click, the [game launcher](#the-game-launcher) is a window with one Play
-screen: a Play button with the setup it plays, a Join field, an account menu with the Microsoft
-sign-in, and a version picker.
+who would rather click, the [game launcher](#the-game-launcher) is one Play screen, the panel's
+**Play** page: a Play button with the setup it plays, a Join field, an account menu with the
+Microsoft sign-in, and a version picker.
 
 The same client can be driven by an AI assistant or a script. A small Fabric mod, the *harness*,
 opens a control channel on this machine only, and through it `spawnloft mcp`'s `client_*` tools
@@ -165,9 +165,10 @@ way you would in any launcher.
 
 ## The game launcher
 
-The game launcher is a window for the same profiles and accounts the command line uses (nothing
+The game launcher is one page for the same profiles and accounts the command line uses (nothing
 is kept twice: a profile made in one shows in the other). It is a dev tool that goes with
-SpawnLoft, not a separate product, and it is one screen. On it a profile is called a **setup**,
+SpawnLoft, not a separate product, and it is one screen: the **Play** page of the panel, or
+`/launcher` as a page of its own. On it a profile is called a **setup**,
 named by what it is (`1.21.11 · Vanilla`, `1.21.1 · Fabric (modded)`); the command line, the API
 and the files keep "profile".
 
@@ -175,7 +176,7 @@ and the files keep "profile".
   opens the setups menu: pick another setup, edit one (the gear), or make a **New setup**. A line
   under the button says what will happen ("Opens Minecraft 1.21.11 and joins survival as
   Wunga_."). The first launch of a version downloads the game (progress shows in the button's
-  place; closing the window does not stop the download, and the files are used next time).
+  place; leaving the page does not stop the download, and the files are used next time).
 - **Join** is one field. Its menu lists the SpawnLoft servers with their state (and a note when one
   runs another version than the setup), plus *Title screen only*. A stopped server is started
   first: the button then reads **Start server and play**, waits up to two minutes for it, launches
@@ -231,15 +232,15 @@ diagnostics bundle hides them). No route returns a token.
 
 | From | How |
 | --- | --- |
-| The desktop app | The **Play** button at the bottom of the sidebar opens the launcher in a window of its own, which remembers its size and place. A second press brings the open one forward. |
-| macOS | **Window → Game launcher** in the menu bar does the same. (Windows and Linux have no app menu bar; use the sidebar button.) |
-| The command line | `spawnloft ui --launcher` starts the panel and opens `/launcher` in the browser. If a panel is already running on the port, it opens that panel's launcher instead of failing. `--no-open` prints the address (`http://127.0.0.1:8770/launcher`) without opening it. |
-| A browser | Go to `/launcher` on a running panel. The sidebar button works there too, as a tab. |
-| A server card | The **Play** on a server card (and its ⋯ menu) opens the launcher with that server and its Minecraft version pre-filled. |
+| The panel | The **Play** button at the bottom of the sidebar shows the launcher as the panel's **Play** page, in place of the server. Opening a server afterwards keeps it loaded: a launch under way keeps going, and Play brings it back as it was. |
+| macOS | **Window → Play** in the menu bar does the same. (Windows and Linux have no app menu bar; use the sidebar button.) |
+| The command line | `spawnloft ui --launcher` starts the panel and opens `/launcher`, the launcher as a page of its own, in the browser. If a panel is already running on the port, it opens that panel's launcher instead of failing. `--no-open` prints the address (`http://127.0.0.1:8770/launcher`) without opening it. |
+| A browser | Go to `/launcher` on a running panel for the page of its own; the panel's sidebar Play shows the Play page there too. |
+| A server card | The **Play** on a server card (and its ⋯ menu) opens the Play page with that server and its Minecraft version pre-filled. |
 
 In the desktop app the Microsoft sign-in opens in a small window of its own (not your browser)
 that closes by itself when the sign-in is done; in a browser it is a new tab. The launcher page
-refuses to be framed by other pages.
+refuses to be framed by any page but the panel's own.
 
 ## Accounts
 

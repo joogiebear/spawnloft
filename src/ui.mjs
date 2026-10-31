@@ -1417,12 +1417,13 @@ async function route(req, res) {
     const html = readFileSync(path.join(HERE, 'launcher.html'), 'utf8')
       .replace('data-theme="classic"', `data-theme="${readTheme()}"`)
     // Launch, sign out and remove are one click each, so no other site may put the page in a
-    // frame and steer those clicks; a meta CSP cannot say frame-ancestors, a header can.
+    // frame and steer those clicks; a meta CSP cannot say frame-ancestors, a header can. The
+    // panel itself frames it, as its Play page, from this same origin.
     res.writeHead(200, {
       'content-type': 'text/html; charset=utf-8',
       'cache-control': 'no-store',
-      'x-frame-options': 'DENY',
-      'content-security-policy': "frame-ancestors 'none'",
+      'x-frame-options': 'SAMEORIGIN',
+      'content-security-policy': "frame-ancestors 'self'",
     })
     res.end(html)
     return

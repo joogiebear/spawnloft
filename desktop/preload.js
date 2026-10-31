@@ -2,6 +2,11 @@
 
 const { contextBridge, ipcRenderer } = require('electron')
 
+// The bridge is for the panel's own pages: the panel itself and its Play page, which is /launcher
+// in a frame of the panel. Any other frame gets nothing. (The main process refuses other senders
+// by their URL as well; this keeps the surface out of their reach to begin with.)
+if (window.self !== window.top && window.location.pathname !== '/launcher') return
+
 // The only bridge between the page and the machine: named calls, nothing generic. Forwarding
 // arbitrary IPC would hand the page the whole main process.
 contextBridge.exposeInMainWorld('mcctlDesktop', {

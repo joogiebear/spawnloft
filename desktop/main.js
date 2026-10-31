@@ -168,6 +168,10 @@ function createWindow(loadUrl, theme = 'classic') {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      // the preload runs in the Play page's frame (/launcher, preload.js keeps it out of any
+      // other frame) as well as the panel; Node stays off everywhere, this only says where the
+      // preload runs
+      nodeIntegrationInSubFrames: true,
       // the saved size from the first paint; setting it after load shows a 100% frame first
       zoomFactor: zoom,
     },
@@ -274,9 +278,15 @@ function createWindow(loadUrl, theme = 'classic') {
     if (launcherState?.maximized) child.maximize()
     windowState.track(child, launcherStateFile())
   })
-  // the top frame must stay on the loopback URL it was opened at
+  // the top frame must stay on the loopback URL it was opened at, and so must every frame in it
+  // (the Play page is /launcher in a frame of the panel)
   win.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(loadUrl)) e.preventDefault()
+  })
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (e.isMainFrame) return
+    const url = String(e.url)
+    if (url !== launcherUrl && !url.startsWith(launcherUrl + '#')) e.preventDefault()
   })
   return win
 }
@@ -289,12 +299,12 @@ function focusLauncher() {
   return true
 }
 
-// The macOS menu item: the same window.open the sidebar's Play makes, so there is one way the
-// launcher window comes into being. Nothing to do while the setup wizard is up.
-function openLauncher() {
-  if (focusLauncher()) return
+// The macOS menu item: the panel's Play page, as the sidebar's Play shows it. Nothing to do while
+// the setup wizard is up. (The launcher window rules above stay for a page that opens /launcher
+// in a window of its own; the panel no longer does.)
+function showPlay() {
   if (!panelUrl || !win || win.isDestroyed() || !win.webContents.getURL().startsWith(panelUrl)) return
-  win.webContents.executeJavaScript("void window.open('/launcher', 'spawnloft-launcher')", true).catch(() => {})
+  win.webContents.executeJavaScript("typeof showPlay === 'function' && void showPlay()", true).catch(() => {})
 }
 
 // The calls below are for the panel's own pages. The login window has no preload, so it cannot
@@ -554,7 +564,7 @@ Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
       { role: 'minimize' },
       { role: 'zoom' },
       { type: 'separator' },
-      { label: 'Game launcher', click: () => openLauncher() },
+      { label: 'Play', click: () => showPlay() },
       { type: 'separator' },
       { role: 'front' },
     ],

@@ -14,8 +14,9 @@ It also launches the game itself. `spawnloft client new play --mc 1.21.11 --serv
 pointed at your server, as an offline player. With the harness mod on a profile, an AI assistant
 can join, chat, take a screenshot and read the client's logs as a real player, where scripted
 bots only see packets. Windows, Apple Silicon Macs and Linux x64 are supported (not Linux arm64).
-`spawnloft ui --launcher` (or **Play** in the desktop app's sidebar) opens a game launcher window
-with profiles, Microsoft sign-in and a Play button, including for servers SpawnLoft does not run.
+**Play** in the panel's sidebar is the game launcher, a page of the panel with profiles, Microsoft
+sign-in and a Play button, including for servers SpawnLoft does not run; `spawnloft ui --launcher`
+opens the same launcher as a page of its own in the browser.
 See [CLIENT.md](CLIENT.md) for the launcher and when to use which.
 
 Zero dependencies — plain Node 20+ and the `tar` the system already has. Where that `tar` is

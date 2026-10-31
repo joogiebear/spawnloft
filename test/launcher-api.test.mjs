@@ -443,9 +443,9 @@ test('/launcher is served with the saved theme and no-store', async () => {
   assert.equal(res.headers.get('cache-control'), 'no-store')
   assert.match(res.headers.get('content-type'), /text\/html/)
   assert.match(await res.text(), /<html lang="en" data-theme="spawnloft">/)
-  // no other site may frame it
-  assert.equal(res.headers.get('x-frame-options'), 'DENY')
-  assert.equal(res.headers.get('content-security-policy'), "frame-ancestors 'none'")
+  // the panel frames it as its Play page; no other site may
+  assert.equal(res.headers.get('x-frame-options'), 'SAMEORIGIN')
+  assert.equal(res.headers.get('content-security-policy'), "frame-ancestors 'self'")
 })
 
 test('a server address outside SpawnLoft is parsed strictly', () => {

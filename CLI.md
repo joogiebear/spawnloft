@@ -136,7 +136,7 @@ Offline profiles join offline-mode servers only. `logs --latest` reads the game'
 `latest.log`. `launch` prints a `warning:` (in `warnings` with `--json`) when the server is stopped
 or in online mode; `remove` keeps the profile's game folder unless given `--purge`; a profile
 that plays as a Microsoft account is launched by an AI assistant only after
-`client set <name> assistantAccount=true`. Linux arm64 is refused. `spawnloft ui --launcher` opens the game launcher window for the same profiles. [CLIENT.md](CLIENT.md) has the profiles, the launcher, the harness and the folder layout;
+`client set <name> assistantAccount=true`. Linux arm64 is refused. `spawnloft ui --launcher` opens the game launcher page for the same profiles (in the panel it is the **Play** page). [CLIENT.md](CLIENT.md) has the profiles, the launcher, the harness and the folder layout;
 `spawnloft diag <server> --client <profile> --json` answers one envelope with `command` `diag`.
 
 ## AI assistants
