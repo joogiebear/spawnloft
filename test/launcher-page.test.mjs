@@ -176,11 +176,33 @@ test('every watched game that goes without a Stop from this page is noticed, and
   // a removed profile is nothing either
   watch.d = { since: t0, stopping: false }
   assert.deepEqual(watchedExits(watch, [], t0 + 1000), [])
-  // the log decides: an early exit is a crash unless the game said it was closed; a late one only
-  // when the log shows something wrong
-  const read = fnSource('readLog')
-  assert.match(read, /if \(cleanExit\(lines\) \|\| \(!c\.early && !crashSigns\(lines\)\)\)/)
-  assert.match(fnSource('noticeExits'), /S\.crash = \{ profile: name, seconds, early, report: null, pending: true \}/)
+  // the log decides (readLog -> exitVerdict); exits wait their turn while one is shown
+  assert.match(fnSource('readLog'), /if \(exitVerdict\(lines, c\.early\) === 'closed'\)/)
+  assert.match(fnSource('noticeExits'), /S\.exits\.push\(\.\.\.watchedExits\(S\.watch, next\.profiles, Date\.now\(\)\)\)/)
+  assert.match(fnSource('nextExit'), /if \(S\.crash \|\| !S\.exits\.length\) return/)
+})
+
+test('an exit the page did not ask for is a crash or a quit by what the log says, with a stricter first minute', () => {
+  const { exitVerdict } = lifted(['crashSigns', 'saidStopping', 'cleanExit', 'exitVerdict'])
+  const info = (t) => `[21:03:00] [Render thread/INFO]: ${t}`
+  const quit = [info('Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas'), '[21:03:01] [Render thread/INFO]: Stopping!']
+  const fabric = ['[21:03:00] [main/ERROR]: Incompatible mods found!', '\tat net.fabricmc.loader.impl.discovery.ModDiscoverer.discoverMods(ModDiscoverer.java:155)']
+  const routineError = ['[20:10:00] [Render thread/ERROR]: Couldn\'t load texture minecraft:textures/missing.png', ...Array.from({ length: 30 }, (_, i) => info(`tick ${i}`)), '[21:03:01] [Render thread/INFO]: Stopping!']
+  const cutOff = [info('Loading 14 mods'), info('Rendering world')]
+  // the first minute: anything but a clean quit is a crash
+  assert.equal(exitVerdict(quit, true), 'closed')
+  assert.equal(exitVerdict(fabric, true), 'crash')
+  assert.equal(exitVerdict([...fabric, '[21:03:01] [Render thread/INFO]: Stopping!'], true), 'crash')
+  assert.equal(exitVerdict(cutOff, true), 'crash')
+  assert.equal(exitVerdict([], true), 'crash')
+  // later: what counts is whether the game said it was stopping at the end
+  assert.equal(exitVerdict(quit, false), 'closed')
+  assert.equal(exitVerdict(routineError, false), 'closed')
+  assert.equal(exitVerdict(fabric, false), 'crash')
+  assert.equal(exitVerdict(cutOff, false), 'crash')
+  assert.equal(exitVerdict([], false), 'crash')
+  // "Stopping!" far from the end is not the end
+  assert.equal(exitVerdict(['[21:03:00] [Render thread/INFO]: Stopping!', ...Array.from({ length: 12 }, (_, i) => info(`later ${i}`))], false), 'crash')
 })
 
 test('the crash notice says how long the game ran in the unit that fits', () => {
@@ -378,7 +400,7 @@ test('a server card\'s pre-fill picks the setup that fits, running or not', () =
 })
 
 test('a game that was closed is not a crash: "Stopping!" at the end and nothing wrong before it', () => {
-  const { cleanExit, crashSigns } = lifted(['crashSigns', 'cleanExit'])
+  const { cleanExit, crashSigns } = lifted(['crashSigns', 'saidStopping', 'cleanExit'])
   const quit = ['[21:03:00] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas', '[21:03:01] [Render thread/INFO]: Stopping!', '']
   assert.equal(cleanExit(quit), true)
   // the game may say a little more after Stopping!

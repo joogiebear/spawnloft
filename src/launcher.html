@@ -563,7 +563,8 @@
   'use strict'
 
   const POLL_MS = 3000
-  // a game that ends this soon after it started gets the crash callout
+  // a game gone this soon after it started is a crash unless its log says it was closed; one gone
+  // later is a crash when its log does not end in Minecraft's own stop (exitVerdict)
   const CRASH_WINDOW_MS = 60000
   const LOG_LINES = 20
   // how far back the log is read to tell a crash from a game that was simply closed
@@ -711,7 +712,8 @@
   }
 
   // What the Play screen shows: 'unreachable', 'loading', 'first-run', 'launching', 'running',
-  // 'blocked' (with blockReason's reason and fix), 'closed-early' or 'ready'.
+  // 'blocked' (with blockReason's reason and fix), 'closed-early' (a crash, however long the game
+  // ran: Play reads "Play again") or 'ready'.
   function playState(c) {
     if (c.down) return { kind: 'unreachable' }
     if (!c.loaded) return { kind: 'loading' }
@@ -732,13 +734,29 @@
     return lines.some((l) => wrong.test(l))
   }
 
+  // The game said it was stopping: Minecraft's own "Stopping!" is among the last lines.
+  function saidStopping(lines) {
+    return lines.filter((l) => l.trim()).slice(-10).some((l) => /\]: Stopping!\s*$/.test(l))
+  }
+
   // A game that was closed, not one that crashed: the log ends in Minecraft's own "Stopping!" and
   // nothing in it went wrong. Such an exit gets no callout, however soon after Play it came.
   function cleanExit(lines) {
     const tail = lines.filter((l) => l.trim())
     if (!tail.length) return false
     if (crashSigns(tail)) return false
-    return tail.slice(-10).some((l) => /\]: Stopping!\s*$/.test(l))
+    return saidStopping(tail)
+  }
+
+  // What an exit this page did not ask for was, from the game's log: 'closed' (no callout) or
+  // 'crash' (the callout with the log's last lines). Within the first minute, anything but a clean
+  // exit is a crash: the game did not get to a title screen anyone could have quit from. Later, a
+  // routine ERROR line somewhere in a long session is no crash; what counts is whether the game
+  // said it was stopping at the end. That catches a hard kill and a mod loader's error dialog
+  // closed after any wait, and never a game quit after an evening's play.
+  function exitVerdict(lines, early) {
+    if (early) return cleanExit(lines) ? 'closed' : 'crash'
+    return saidStopping(lines) ? 'closed' : 'crash'
   }
 
   // Which watched games ended without a Stop from this page. `watch` is { name: { since, stopping } };
@@ -1012,6 +1030,8 @@
     // profile -> { since, stopping }: games this page watches for an early exit
     watch: {},
     crash: null,
+    // exits still to be looked at while a crash is being shown: [{ profile, seconds, early }]
+    exits: [],
     notice: null,
     // the outcome of a change made in the sheet or a menu, above the button until dismissed
     flash: null,
@@ -1498,7 +1518,7 @@
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
     const lines = S.log.profile === crash.profile ? S.log.lines : []
-    return notice({ tone: 'fault', title: `Minecraft closed ${ranFor(crash.seconds)} after it started`, text, acts, extra: logBlock(lines), onclose: () => { S.crash = null; render() } })
+    return notice({ tone: 'fault', title: `Minecraft closed ${ranFor(crash.seconds)} after it started`, text, acts, extra: logBlock(lines), onclose: () => { S.crash = null; nextExit(); render() } })
   }
 
   function logBlock(lines) {
@@ -2215,30 +2235,35 @@
   }
 
   // A game this page saw running that is gone, not stopped from here, may have crashed: the log
-  // decides (readLog), and until it has been read nothing shows.
+  // decides (readLog), and until it has been read nothing shows. One exit is looked at at a time;
+  // the rest wait their turn (S.exits), so two games gone in the same poll both get seen.
   function noticeExits(next) {
     // a game running again is no longer the crash being shown
     if (S.crash && next.profiles.some((p) => p.name === S.crash.profile && p.running)) S.crash = null
-    for (const { name, seconds, early } of watchedExits(S.watch, next.profiles, Date.now())) {
-      S.crash = { profile: name, seconds, early, report: null, pending: true }
-      S.log = { profile: name, lines: [] }
-    }
+    S.exits.push(...watchedExits(S.watch, next.profiles, Date.now()))
+    nextExit()
   }
 
-  // The log is read once, for a game that has gone; it does not change after that. A game that was
-  // simply closed (cleanExit) gets no callout. One gone within a minute of starting is a crash
-  // unless the log says it was closed; one that ran longer is a crash only when the log shows
-  // something wrong (crashSigns), so a Fabric error dialog left open for a while and then closed
-  // still gets the callout, and a game quit after an evening's play never does.
+  // The next exit waiting, if no crash is being shown or read.
+  function nextExit() {
+    if (S.crash || !S.exits.length) return
+    const { name, seconds, early } = S.exits.shift()
+    S.crash = { profile: name, seconds, early, report: null, pending: true }
+    S.log = { profile: name, lines: [] }
+  }
+
+  // The log is read once, for a game that has gone; it does not change after that. exitVerdict
+  // says whether the game was closed (no callout) or crashed (the callout with the log's last lines).
   async function readLog() {
     const c = S.crash
     if (!c || !c.pending || profileNamed(c.profile)?.running) return
     try {
       const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_SCAN}`)
       const lines = out.lines ?? []
-      if (cleanExit(lines) || (!c.early && !crashSigns(lines))) {
+      if (exitVerdict(lines, c.early) === 'closed') {
         if (S.crash === c) S.crash = null
         S.log = { profile: null, lines: [] }
+        nextExit()
         return
       }
       c.pending = false
