@@ -486,7 +486,7 @@
   .side-new { display: flex; justify-content: center; margin: 0 var(--s-2) var(--s-3); }
   .side-new .ico { width: 14px; height: 14px; flex: none; }
   .side-new[aria-current="page"] { background: var(--lapis-wash); border-color: var(--lapis-edge); color: var(--ink); }
-  /* Play, under it: opens the game launcher, a window of its own (a tab in a browser). */
+  /* Play, under it: shows the Play page, the game launcher in the stage. */
   .side-play { margin-top: calc(var(--s-1) - var(--s-3)); }
 
   /*
@@ -593,6 +593,11 @@
   .stage { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); container-type: inline-size; container-name: stage; }
   .view { display: none; min-height: 0; }
   .view[data-active] { display: grid; }
+  /* The Play page: the game launcher, its own document (/launcher), filling the stage in a frame.
+     Loaded the first time Play is pressed and kept after, so a launch under way keeps its progress
+     while a server is open and coming back is instant. */
+  .play { grid-template-rows: minmax(0, 1fr); }
+  .play iframe { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: var(--void); }
 
   /* ---- controls --------------------------------------------------------- */
 
@@ -2773,13 +2778,19 @@
     <button type="button" class="side-new" id="bNew" title="New server">
       <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg><span class="nm">New server</span>
     </button>
-    <button type="button" class="side-new side-play" id="bLauncher" title="Game launcher">
+    <button type="button" class="side-new side-play" id="bLauncher" title="Play">
       <svg class="ico" aria-hidden="true" focusable="false"><use href="#i-play"/></svg><span class="nm">Play</span>
     </button>
   </aside>
   <section class="stage">
 
+    <!-- ============ Play: the game launcher as a page of the panel =========== -->
+    <div class="view play" id="vPlay">
+      <iframe id="playFrame" title="Play"></iframe>
+    </div>
+
     <!-- ============ nothing selected ===================================== -->
+
     <div class="view empty" id="vEmpty">
       <svg class="mark" viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
         <polygon points="8,20 32,8 56,20 32,32" fill="var(--cube-top)"/>
@@ -3632,7 +3643,7 @@ function ask(opts) {
   });
 }
 
-const VIEW_EL = { empty: '#vEmpty', home: '#vHome', server: '#vServer', add: '#vAdd', settings: '#vSettings', feedback: '#vFeedback' };
+const VIEW_EL = { empty: '#vEmpty', home: '#vHome', server: '#vServer', play: '#vPlay', add: '#vAdd', settings: '#vSettings', feedback: '#vFeedback' };
 
 function show(view) {
   state.view = view;
@@ -3792,7 +3803,9 @@ function openSheet(view, prepare) {
   show(view);
 }
 
-const SHEETS = new Set(['add', 'settings', 'feedback']);
+// Play is here too: it covers the stage like a sheet, and a sheet opened over it (Preferences from
+// the header) comes back to it.
+const SHEETS = new Set(['add', 'settings', 'feedback', 'play']);
 
 /** Back out of a sheet to wherever the person was. */
 function back() {
@@ -3906,11 +3919,12 @@ function updateTab(el, row) {
  * sits under whichever row is current, and goes back to the sidebar, hidden, when none is.
  */
 function markTabs() {
-  // A sheet covers the stage, so the server behind it is not where the person is: lighting its row
-  // would say otherwise. The Add sheet lights the button that opened it instead.
+  // A sheet or the Play page covers the stage, so the server behind it is not where the person
+  // is: lighting its row would say otherwise. The Add sheet and Play light their own buttons.
   const onSheet = SHEETS.has(state.view);
   $('#tabHome').setAttribute('aria-current', state.current || onSheet ? 'false' : 'page');
   $('#bNew').setAttribute('aria-current', state.view === 'add' ? 'page' : 'false');
+  $('#bLauncher').setAttribute('aria-current', state.view === 'play' ? 'page' : 'false');
   const dock = $('#dock');
   let current = null;
   for (const el of $$('#list .stab[data-name]')) {
@@ -4354,7 +4368,7 @@ function moreItems(row) {
   const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
-    { label: 'Play', hint: !play ? 'Opens the game launcher to make a profile for this server.' : play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) },
+    { label: 'Play', hint: !play ? 'Opens the Play page to make a setup for this server.' : play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) },
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -5707,7 +5721,7 @@ function updateHomeCard(card, row) {
   const play = card.querySelector('.sc-play');
   const pp = playProfileFor(row);
   play.textContent = pp && pp.running ? 'Playing' : 'Play';
-  play.title = !pp ? 'Opens the game launcher to make a profile for this server' : pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
+  play.title = !pp ? 'Opens the Play page to make a setup for this server' : pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
   play.disabled = Boolean(pp && launching.has(pp.name));
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
@@ -5878,27 +5892,33 @@ function setPlayDisabled(name, disabled) {
     if (pp && pp.name === name) btn.disabled = disabled;
   }
 }
-// The game launcher: its own window in the desktop app, a tab in a browser. One of each: the fixed
-// name brings an open one forward. The desktop app does that itself (it refuses the window.open and
-// focuses the window it has, so null is not a failure there). A browser would reload a named tab on
-// window.open('/launcher', name), so it is looked up by name first and only pointed at /launcher
-// while it is still blank. False when a pop-up blocker refused it.
-function openLauncher() {
-  if (window.mcctlDesktop) { window.open('/launcher', 'spawnloft-launcher'); return true; }
-  const tab = window.open('', 'spawnloft-launcher');
-  if (!tab) return false;
-  let blank = true;
-  try { blank = tab.location.pathname !== '/launcher'; } catch {}
-  if (blank) tab.location.href = '/launcher';
-  try { tab.focus(); } catch {}
-  return true;
+// The game launcher: the Play page, the /launcher document in a frame of the panel's own stage,
+// in the desktop app and a browser alike. Loaded the first time Play is pressed and kept loaded
+// after, so a launch under way keeps its progress while a server is open and coming back is
+// instant. /launcher stays a page of its own for `spawnloft ui --launcher` and a browser.
+function showPlay() {
+  const frame = $('#playFrame');
+  if (!frame.getAttribute('src')) frame.src = '/launcher';
+  // a sheet left open on the way here is not somewhere to come back to
+  sheetStack.length = 0;
+  show('play');
+  focusPlay();
 }
-// No profile fits the server: the launcher opens with its New profile form filled in for it (an
-// open launcher hears about it through the storage event).
+// Focus lands on the card's Play button when the page is there, on the frame while it loads
+// (same origin, so the page's document is ours to reach; anything else keeps the frame's focus).
+function focusPlay() {
+  const frame = $('#playFrame');
+  try {
+    const button = frame.contentDocument && frame.contentDocument.getElementById('play');
+    if (button && !button.disabled) { button.focus(); return; }
+  } catch { /* not loaded, or not ours */ }
+  frame.focus();
+}
+// No profile fits the server: the Play page opens with its New setup form filled in for it (a
+// loaded frame hears about it through the storage event, a fresh one reads the key as it loads).
 function openLauncherFor(row) {
   try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify({ mc: row.mcVersion || null, server: row.name })) } catch {}
-  // a refused window still leaves a way there
-  if (!openLauncher()) toast('Your browser blocked the game launcher. Open ' + location.origin + '/launcher to make a profile for ' + (row.label || row.name) + '.');
+  showPlay();
 }
 async function playClient(row) {
   const p = playProfileFor(row);
@@ -12785,7 +12805,11 @@ async function loadDbVersions() {
 
 for (const b of $$('.tabs [data-tab]')) b.onclick = () => selectTab(b.dataset.tab);
 $('#bNew').onclick = () => openAdd('new');
-$('#bLauncher').onclick = () => { if (!openLauncher()) toast('Your browser blocked the game launcher. Open ' + location.origin + '/launcher instead.'); };
+$('#bLauncher').onclick = () => showPlay();
+$('#playFrame').addEventListener('load', () => {
+  showTheme(document.documentElement.dataset.theme);
+  if (state.view === 'play') focusPlay();
+});
 $('#dNew').onclick = () => openAdd('new');
 $('#dAdopt').onclick = () => openAdd('adopt');
 $('#bAddClose').onclick = back;
@@ -13228,6 +13252,12 @@ function showTheme(theme) {
   const selected = theme === 'spawnloft' ? 'spawnloft' : 'classic';
   document.documentElement.dataset.theme = selected;
   $$('input[name="appTheme"]').forEach(input => { input.checked = input.value === selected; });
+  // The Play page is its own document, served with the theme saved at the time it loaded; it
+  // follows the panel from here on. Same origin, so its document is ours to reach.
+  try {
+    const doc = $('#playFrame').contentDocument;
+    if (doc && doc.documentElement) doc.documentElement.dataset.theme = selected;
+  } catch { /* not loaded yet, or not ours: it keeps the theme it was served with */ }
 }
 
 async function changeTheme(event) {
@@ -13919,7 +13949,7 @@ refresh().then(() => {
   }
   if (!state.current && (state.view === 'empty' || state.view === 'home')) showHome();
   // One server and nothing selected is not a choice worth making anyone click through.
-  if (state.rows.length === 1) select(state.rows[0].name);
+  if (state.rows.length === 1 && state.view !== 'play') select(state.rows[0].name);
 });
 setInterval(refresh, 4000);
 

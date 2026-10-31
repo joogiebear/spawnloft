@@ -168,6 +168,10 @@ function createWindow(loadUrl, theme = 'classic') {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      // the preload runs in the Play page's frame (/launcher, preload.js keeps it out of any
+      // other frame) as well as the panel; Node stays off everywhere, this only says where the
+      // preload runs
+      nodeIntegrationInSubFrames: true,
       // the saved size from the first paint; setting it after load shows a 100% frame first
       zoomFactor: zoom,
     },
@@ -186,9 +190,10 @@ function createWindow(loadUrl, theme = 'classic') {
   win.loadURL(loadUrl)
   win.once('ready-to-show', () => win.show())
   // otherwise a failed load leaves a hidden window and no UI
-  win.webContents.on('did-fail-load', (_e, code, desc) => {
-    // ERR_ABORTED: navigation superseded or cancelled, not a failure
-    if (code === -3) return
+  win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+    // ERR_ABORTED: navigation superseded or cancelled, not a failure; a frame (the Play page)
+    // failing shows its own unreachable screen, the panel is still there
+    if (code === -3 || isMainFrame === false) return
     if (win && !win.isDestroyed()) win.show()
     dialog.showErrorBox('SpawnLoft could not open its panel', `${desc} (${code})\n\n${loadUrl}`)
   })
@@ -274,9 +279,15 @@ function createWindow(loadUrl, theme = 'classic') {
     if (launcherState?.maximized) child.maximize()
     windowState.track(child, launcherStateFile())
   })
-  // the top frame must stay on the loopback URL it was opened at
+  // the top frame must stay on the loopback URL it was opened at, and so must every frame in it
+  // (the Play page is /launcher in a frame of the panel)
   win.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(loadUrl)) e.preventDefault()
+  })
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (e.isMainFrame) return
+    const url = String(e.url)
+    if (url !== launcherUrl && !url.startsWith(launcherUrl + '#')) e.preventDefault()
   })
   return win
 }
@@ -289,12 +300,15 @@ function focusLauncher() {
   return true
 }
 
-// The macOS menu item: the same window.open the sidebar's Play makes, so there is one way the
-// launcher window comes into being. Nothing to do while the setup wizard is up.
-function openLauncher() {
-  if (focusLauncher()) return
+// The macOS menu item: the panel's Play page, as the sidebar's Play shows it. Nothing to do while
+// the setup wizard is up. (The launcher window rules above stay for a page that opens /launcher
+// in a window of its own; the panel no longer does.)
+function showPlay() {
   if (!panelUrl || !win || win.isDestroyed() || !win.webContents.getURL().startsWith(panelUrl)) return
-  win.webContents.executeJavaScript("void window.open('/launcher', 'spawnloft-launcher')", true).catch(() => {})
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+  win.webContents.executeJavaScript("typeof showPlay === 'function' && void showPlay()", true).catch(() => {})
 }
 
 // The calls below are for the panel's own pages. The login window has no preload, so it cannot
@@ -543,8 +557,8 @@ if (process.platform === 'win32') app.setAppUserModelId('io.github.joogiebear.mc
 
 // no menu bar elsewhere: the default one is for a text editor, and copy/paste still work without
 // it. macOS routes editing shortcuts and Quit through the application menu.
-// The game launcher's entry on macOS is also Window > Game launcher; elsewhere it is the sidebar's
-// Play, which every platform has.
+// The Play page's entry on macOS is also Window > Play; elsewhere it is the sidebar's Play, which
+// every platform has.
 Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
   { role: 'appMenu' },
   { role: 'editMenu' },
@@ -554,7 +568,7 @@ Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
       { role: 'minimize' },
       { role: 'zoom' },
       { type: 'separator' },
-      { label: 'Game launcher', click: () => openLauncher() },
+      { label: 'Play', click: () => showPlay() },
       { type: 'separator' },
       { role: 'front' },
     ],

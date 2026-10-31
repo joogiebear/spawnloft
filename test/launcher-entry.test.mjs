@@ -86,15 +86,34 @@ test('ui without --launcher on a port a panel holds names the running panel', as
   }
 })
 
-test('the panel has a sidebar Play that opens the launcher, and the card falls back to it', () => {
+test('the panel has a sidebar Play that shows the Play page, and the card falls back to it', () => {
   const html = fs.readFileSync(path.join(root, 'src', 'ui.html'), 'utf8')
-  assert.match(html, /<button type="button" class="side-new side-play" id="bLauncher" title="Game launcher">/)
-  assert.match(html, /\$\('#bLauncher'\)\.onclick = \(\) => \{ if \(!openLauncher\(\)\)/)
-  // one name everywhere, and the only URL the desktop app allows
+  assert.match(html, /<button type="button" class="side-new side-play" id="bLauncher" title="Play">/)
+  assert.match(html, /\$\('#bLauncher'\)\.onclick = \(\) => showPlay\(\);/)
+  // the page is /launcher in a frame of the panel, loaded the first time Play is pressed
+  assert.match(html, /<iframe id="playFrame" title="Play"><\/iframe>/)
+  assert.match(html, /function showPlay\(\) \{[\s\S]*?frame\.src = '\/launcher';[\s\S]*?show\('play'\)/)
+  assert.match(html, /play: '#vPlay'/)
+  // and the panel opens no launcher window of its own any more
   const code = html.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n')
   const opens = [...code.matchAll(/window\.open\(([^)]*)\)/g)].map((m) => m[1]).filter((a) => a.includes('launcher'))
-  assert.deepEqual(opens, ["'/launcher', 'spawnloft-launcher'", "'', 'spawnloft-launcher'"])
-  assert.match(html, /function openLauncherFor\(row\) \{[\s\S]*?if \(!openLauncher\(\)\)/)
+  assert.deepEqual(opens, [])
+  assert.match(html, /function openLauncherFor\(row\) \{[\s\S]*?showPlay\(\)/)
+})
+
+test('inside the Play page the launcher is a page, not a window: a title for the brand, "leaving" for "closing"', () => {
+  const launcher = fs.readFileSync(path.join(root, 'src', 'launcher.html'), 'utf8')
+  assert.match(launcher, /const EMBEDDED = window\.self !== window\.top/)
+  assert.match(launcher, /const CLOSING = EMBEDDED \? 'Leaving this page' : 'Closing this window'/)
+  assert.doesNotMatch(launcher.replace(/const CLOSING = .*/, ''), /Closing this window/)
+  assert.match(launcher, /<h1 class="pagetitle">Play<\/h1>/)
+  assert.match(launcher, /:root\[data-embedded\] \.brand \{ display: none; \}/)
+  // the desktop app lets the preload into that frame and no other, and keeps every frame on the panel
+  const preload = fs.readFileSync(path.join(root, 'desktop', 'preload.js'), 'utf8')
+  assert.match(preload, /if \(window\.self !== window\.top && window\.location\.pathname !== '\/launcher'\) return/)
+  const main = fs.readFileSync(path.join(root, 'desktop', 'main.js'), 'utf8')
+  assert.match(main, /nodeIntegrationInSubFrames: true/)
+  assert.match(main, /on\('will-frame-navigate'/)
 })
 
 test('an open launcher takes a card\'s prefill from the storage event', () => {
