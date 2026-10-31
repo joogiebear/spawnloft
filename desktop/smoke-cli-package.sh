@@ -79,6 +79,23 @@ if [ "$kind" = rpm ]; then
   dnf install -y -q dnf-plugins-core cpio util-linux >/dev/null 2>&1 || dnf install -y -q cpio util-linux
 fi
 useradd -m sl 2>/dev/null || adduser --disabled-password --gecos "" sl >/dev/null
+# su is a package a Fedora image does not carry; runuser comes with the one it does.
+if command -v runuser >/dev/null 2>&1; then as_sl() { runuser -u sl -- "$@"; }; else as_sl() { su sl -s /bin/sh -c "$*"; }; fi
+if [ "$kind" = rpm ]; then
+  # An unprivileged user's dnf keeps a cache of its own under /var/tmp; root's install above did not
+  # fill it. So the first `dnf download` the smoke makes also fetches the repository metadata, and a
+  # slow mirror can spend SpawnLoft's whole 180 s timeout on that alone (Rocky, three runs in a row on
+  # 2026-10-31). Fetching the metadata here first, with retries, keeps mirror weather out of the test:
+  # what SpawnLoft does for a user is unchanged. A refused cache is not fatal; the smoke then pays
+  # the price it would have paid anyway.
+  try=1
+  until as_sl dnf -q -y makecache; do
+    if [ "$try" -ge 3 ]; then echo "dnf makecache did not succeed in $try tries; going on without a warm cache"; break; fi
+    echo "dnf makecache failed (try $try); trying again"
+    try=$((try + 1))
+    sleep 15
+  done
+fi
 cat > /tmp/db-smoke.sh <<'SH'
 set -eu
 # Root's test above exported these; this user has a home of its own.
@@ -94,8 +111,7 @@ ls -l "$libs"
 test -e "$libs/libaio.so.1"
 spawnloft stop pkgdb
 SH
-# su is a package a Fedora image does not carry; runuser comes with the one it does.
-if command -v runuser >/dev/null 2>&1; then runuser -u sl -- sh /tmp/db-smoke.sh; else su sl -s /bin/sh -c 'sh /tmp/db-smoke.sh'; fi
+as_sl sh /tmp/db-smoke.sh
 # Supplied privately: nothing was installed on the system to make that work.
 if ldconfig -p | grep -q 'libaio.so.1'; then echo "libaio reached the system"; exit 1; fi
 echo "PASS: managed MySQL on $(. /etc/os-release && echo "$PRETTY_NAME") with privately fetched libraries"
