@@ -258,7 +258,9 @@ export async function writeFixture(root, { servers = 0, prefix = 'perf', java = 
     fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n')
     fs.writeFileSync(path.join(dir, 'server.properties'),
       `server-port=${port}\nmotd=perf bench ${i}\nmax-players=20\nenable-rcon=true\nrcon.port=${rconPort}\nrcon.password=perf\nlevel-name=world\n`)
-    fs.writeFileSync(path.join(dir, 'world', 'level.dat'), Buffer.alloc(1024))
+    // A placeholder level.dat is enough for the fake JVM; a real server jar must make its own world,
+    // because Paper refuses to start on an unreadable level.dat.
+    if (!jar) fs.writeFileSync(path.join(dir, 'world', 'level.dat'), Buffer.alloc(1024))
     instances[name] = {
       dir,
       jar: jarName,
