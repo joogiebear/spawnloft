@@ -126,15 +126,23 @@ function guardProcess() {
 }
 
 // Everything runs on one event loop, so synchronous work stalls every request and the console
-// stream. Log any stall over LAG_LOG_MS.
+// stream. Log any stall over lagLogMs(): 250 ms, unless a measurement run (tools/perf) asks for
+// shorter ones with SPAWNLOFT_PERF_LOG_MS.
 const LAG_LOG_MS = 250
+export function lagLogMs(env = process.env) {
+  const raw = env.SPAWNLOFT_PERF_LOG_MS
+  if (raw == null || String(raw).trim() === '') return LAG_LOG_MS
+  const n = Number(raw)
+  return Number.isInteger(n) && n >= 1 && n <= 60000 ? n : LAG_LOG_MS
+}
 function watchEventLoop() {
+  const threshold = lagLogMs()
   const h = monitorEventLoopDelay({ resolution: 20 })
   h.enable()
   const timer = setInterval(() => {
     const worst = Math.round(h.max / 1e6)
     h.reset()
-    if (worst >= LAG_LOG_MS) panelLog(`event loop held for ${worst}ms`)
+    if (worst >= threshold) panelLog(`event loop held for ${worst}ms`)
   }, 1000)
   timer.unref()
 }
