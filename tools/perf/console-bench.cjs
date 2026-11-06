@@ -113,6 +113,8 @@ async function pageBench(o) {
       if (typeof flushConsole === 'function') {
         const s = performance.now()
         flushConsole()
+        // the layout the browser would otherwise do after the timer stops, during the frame
+        void document.getElementById('log').scrollHeight
         const d = performance.now() - s
         scriptMs += d
         if (d > worst) worst = d

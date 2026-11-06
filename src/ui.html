@@ -6056,7 +6056,7 @@ function makeLine(entry) {
 // Highlighting is built from text nodes and <mark>, never from innerHTML. A server name, a plugin
 // message or a jar filename is not markup and must never get the chance to become it.
 function appendSearched(parent, text) {
-  const needle = state.search.toLowerCase();
+  const needle = searchLower();
   if (!needle) { parent.append(document.createTextNode(text)); return; }
   const hay = text.toLowerCase();
   let at = 0;
@@ -6218,6 +6218,11 @@ function scheduleConsole() {
     ? { timer: setTimeout(flushConsole, 250) }
     : { raf: requestAnimationFrame(flushConsole) };
 }
+
+// A frame asked for just before the window was hidden would wait until it is shown again.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && conFrame && conFrame.raf) { cancelConsoleFrame(); scheduleConsole(); }
+});
 
 function cancelConsoleFrame() {
   if (!conFrame) return;
@@ -9914,6 +9919,9 @@ function renderFileEditor(row, view) {
     hlFrame = 0;
     // A trailing space keeps the last empty line's height, so the two layers scroll the same.
     pre.innerHTML = ta.value.split('\n').map((l) => highlightLine(l, lang)).join('\n') + '\n ';
+    // The textarea may have scrolled while the layer still held the shorter text, which clamps its
+    // scroll; line them up again now that it has the new text.
+    sync();
   };
   const paint = (soon) => {
     const n = ta.value.split('\n').length;
