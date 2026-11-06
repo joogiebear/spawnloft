@@ -29,3 +29,23 @@ CLAUDE.local.md
 
 # Local editor launch config, with machine-specific paths
 .claude/
+
+# Secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+# AI / agent tooling (kept local, not committed)
+/CLAUDE.md
+/CLAUDE.local.md
+/AGENTS.md
+/GEMINI.md
+/.superpowers/
+/.cursor/
+/.cursorrules
+/.windsurfrules
+/.codex/
+/.aider*
+# OS / editor / logs
+Thumbs.db
