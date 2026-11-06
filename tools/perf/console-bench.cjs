@@ -91,6 +91,7 @@ async function pageBench(o) {
     state.search = filter
     renderLog()
     for (let i = 0; i < o.warm; i++) pushLine(lines[i])
+    if (typeof flushConsole === 'function') flushConsole()
     await frame()
     long.length = 0
     let worst = 0
@@ -103,6 +104,15 @@ async function pageBench(o) {
       for (let j = i; j < end; j++) {
         const s = performance.now()
         pushLine(lines[j])
+        const d = performance.now() - s
+        scriptMs += d
+        if (d > worst) worst = d
+      }
+      // A panel that draws once a frame (flushConsole) does its DOM work here, not in pushLine;
+      // time it with the batch so before and after measure the same work.
+      if (typeof flushConsole === 'function') {
+        const s = performance.now()
+        flushConsole()
         const d = performance.now() - s
         scriptMs += d
         if (d > worst) worst = d
@@ -256,7 +266,7 @@ function rowsFrom(out, o) {
     if (!r) continue
     const tag = key === 'filtered' ? `filter "${r.filter}"` : 'no filter'
     rows.push({ id: `${key}-ms-per-1000`, label: `pushLine time per 1,000 lines, ${tag} (${o.warm} held)`, unit: 'ms', median: round(r.msPer1000), p90: null, n: o.timed })
-    rows.push({ id: `${key}-longest-pushline`, label: `longest single pushLine, ${tag}`, unit: 'ms', median: round(r.longestPushLineMs), p90: null })
+    rows.push({ id: `${key}-longest-pushline`, label: `longest single pushLine or frame flush, ${tag}`, unit: 'ms', median: round(r.longestPushLineMs), p90: null })
     rows.push({ id: `${key}-longest-batch`, label: `longest batch of ${o.batch}, ${tag}`, unit: 'ms', median: round(r.longestBatchMs), p90: null })
     rows.push({ id: `${key}-long-tasks`, label: `long tasks (> 50 ms), ${tag}`, unit: 'count', median: r.longTasks, p90: null, max: round(r.longestTaskMs) })
   }

@@ -11,7 +11,7 @@ own modules (Node 22 or later; the CLI package's bundled Node 24 works too).
 |---|---|---|
 | `cli-start.mjs` | M1, M6 | times `--help`, `list`, `status` and `mcp` (stdin closed) in fresh processes, beside the bare runtime; then `start` to "launched" and to ready on a fake JVM |
 | `panel-latency.mjs` | M2, M7 | starts `spawnloft ui` on bench fixtures (0, 3 and 10 servers, 0 to 3 running) and times each panel route; counts event-loop stalls; dead external database host; mixed load (the 4 s poll while a console streams 200 lines/s) |
-| `console-bench.cjs` | M3 | drives the panel page in the desktop app over the DevTools protocol: 5,000 lines, then 2,000 timed through the page's own `pushLine()`, without and with a search filter |
+| `console-bench.cjs` | M3 | drives the panel page in the desktop app over the DevTools protocol: 5,000 lines, then 2,000 timed through the page's own `pushLine()` (and `flushConsole()` once per batch of 50, where the panel has it), without and with a search filter |
 | `backup-bench.mjs` | M4 | copies a real world into a bench server and times `backup`, `verify` and `restore`, with the archiver's CPU; mirror case; the same backup started from the panel (panel RSS, stalls, latency during it) |
 | `memory.mjs` | M5 | samples each running server's daemon, its helper processes (the Windows vitals sampler) and its JVM: private/PSS where the OS gives it, RSS everywhere |
 | `compare.mjs` | | before/after table from two result files of the same metric |

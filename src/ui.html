@@ -6072,10 +6072,17 @@ function appendSearched(parent, text) {
   if (at < text.length) parent.append(document.createTextNode(text.slice(at)));
 }
 
+// Lowercased once per search, not once per line it is checked against.
+let searchMemo = { raw: '', lower: '' };
+function searchLower() {
+  if (searchMemo.raw !== state.search) searchMemo = { raw: state.search, lower: state.search.toLowerCase() };
+  return searchMemo.lower;
+}
+
 function visible(entry) {
   if (state.filter === 'error' && entry.level !== 'error') return false;
   if (state.filter === 'warn' && entry.level !== 'warn' && entry.level !== 'error') return false;
-  if (state.search && !entry.text.toLowerCase().includes(state.search.toLowerCase())) return false;
+  if (state.search && !entry.text.toLowerCase().includes(searchLower())) return false;
   return true;
 }
 
@@ -6091,7 +6098,8 @@ function updateCount(shown) {
   $('#nWarn').textContent = String(levelCounts.warn);
   $('#nErr').textContent = String(levelCounts.error);
   const total = state.lines.length;
-  const count = shown == null ? state.lines.filter(visible).length : shown;
+  // con.visible is kept as lines come and go, so the count never walks all 5,000 lines per line.
+  const count = shown == null ? con.visible : shown;
   const filtered = state.filter !== 'all' || Boolean(state.search);
   const held = state.paused ? total - state.pausedAt : 0;
   let text = filtered ? count + ' of ' + total + ' lines' : total + (total === 1 ? ' line' : ' lines');
@@ -6101,6 +6109,8 @@ function updateCount(shown) {
 
 function renderLog() {
   const log = $('#log');
+  // Everything is drawn from state.lines here, so lines waiting for the next frame are in it too.
+  cancelConsoleFrame();
   log.textContent = '';
   const frag = document.createDocumentFragment();
   let shown = 0;
@@ -6121,6 +6131,7 @@ function renderLog() {
           : 'No console output yet. Start the server and it appears here as it runs.';
     log.append(p);
   }
+  conReset(con, shown, shown);
   updateCount(shown);
   if (state.atBottom) log.scrollTop = log.scrollHeight;
 }
@@ -6136,43 +6147,115 @@ function cleanConsoleText(text) {
     .replace(ANSI_ESCAPE_RE, '').replace(LOG_CONTROL_RE, '');
 }
 
+/*
+  Lines reach the page one at a time, often hundreds a second, but the console is drawn at most once
+  a frame. Each change to a 5,000-line log makes the browser lay all of it out again the next time
+  anything reads a size, and reading scrollHeight per line did exactly that: about 75 ms a line on
+  a fast desktop. pushLine keeps state.lines and the counts current at once and queues the DOM work;
+  flushConsole does it for the whole queue with one layout read and one scroll.
+*/
+const con = { visible: 0, inDom: 0, trim: 0, pending: [] };
+let conFrame = null;
+
+/*
+  The bookkeeping, apart from the DOM so the tests can run it. visible: held lines that pass the
+  filter and search, for "N of M lines". inDom: line nodes in #log. trim: nodes to drop from the
+  front at the next draw. pending: visible lines waiting for a node. A line pushed while paused
+  counts as visible but gets no node, which is why the two counts are kept apart.
+*/
+function conPush(c, shows, paused) {
+  if (!shows) return false;
+  c.visible++;
+  return !paused;
+}
+
+// The oldest line was dropped. Nodes are older than queued lines, so its node, if it has one, is
+// the first not already marked to drop; otherwise it is the head of the queue, or it never got one
+// (pushed while paused).
+function conEvict(c, shows) {
+  if (!shows) return;
+  c.visible--;
+  if (c.trim < c.inDom) c.trim++;
+  else if (c.pending.length) c.pending.shift();
+}
+
+function conReset(c, visible, inDom) {
+  c.visible = visible;
+  c.inDom = inDom;
+  c.trim = 0;
+  c.pending.length = 0;
+}
+
 function pushLine(text) {
   text = cleanConsoleText(text);
   const prev = state.lines.length ? state.lines[state.lines.length - 1].level : null;
   const entry = { text: text, level: levelOf(text, prev), n: ++state.seq };
   state.lines.push(entry);
   if (raisesLevel(entry)) levelCounts[entry.level]++;
+  const queue = conPush(con, visible(entry), state.paused);
   updateConMini();
 
   // A busy server writes thousands of lines a minute. Without a ceiling the panel keeps a DOM node
   // per line until the window stops responding - a bug that only appears after someone has left it
   // open for an afternoon, which is exactly the session this tool is for.
-  const log = $('#log');
   while (state.lines.length > MAX_LINES) {
     const gone = state.lines.shift();
     if (raisesLevel(gone)) levelCounts[gone.level]--;
     if (state.pausedAt > 0) state.pausedAt--;
     // Only drop a node if that line had one. With a filter on, most lines never reached the DOM.
-    if (visible(gone)) {
-      const first = log.firstElementChild;
-      if (first && !first.classList.contains('log-empty')) first.remove();
-    }
+    conEvict(con, visible(gone));
   }
 
-  if (state.paused || !visible(entry)) { updateCount(); return; }
+  if (queue) con.pending.push(entry);
+  scheduleConsole();
+}
 
-  const placeholder = log.querySelector('.log-empty');
-  if (placeholder) placeholder.remove();
-  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  log.append(makeLine(entry));
-  if (atBottom) log.scrollTop = log.scrollHeight;
-  else { state.unseen++; paintJump(); }
+function scheduleConsole() {
+  if (conFrame) return;
+  // A hidden window gets no animation frames, so it is drawn on a slow timer instead and does not
+  // save up a whole console of work for the moment it is shown again.
+  conFrame = document.hidden
+    ? { timer: setTimeout(flushConsole, 250) }
+    : { raf: requestAnimationFrame(flushConsole) };
+}
+
+function cancelConsoleFrame() {
+  if (!conFrame) return;
+  if (conFrame.timer) clearTimeout(conFrame.timer);
+  else cancelAnimationFrame(conFrame.raf);
+  conFrame = null;
+}
+
+function flushConsole() {
+  cancelConsoleFrame();
+  const log = $('#log');
+  if (con.trim || con.pending.length) {
+    // The one layout read, taken before anything changes.
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    for (; con.trim > 0; con.trim--) {
+      const first = log.firstElementChild;
+      if (first && !first.classList.contains('log-empty')) { first.remove(); con.inDom--; }
+    }
+    if (con.pending.length) {
+      log.querySelector('.log-empty')?.remove();
+      const frag = document.createDocumentFragment();
+      for (const entry of con.pending) frag.append(makeLine(entry));
+      const added = con.pending.length;
+      con.inDom += added;
+      con.pending.length = 0;
+      log.append(frag);
+      if (atBottom) log.scrollTop = log.scrollHeight;
+      else { state.unseen += added; paintJump(); }
+    }
+  }
   updateCount();
 }
 
 function clearLines() {
   state.lines = [];
   state.seq = 0;
+  conReset(con, 0, 0);
+  cancelConsoleFrame();
   levelCounts.warn = 0;
   levelCounts.error = 0;
   updateConMini();
@@ -9823,7 +9906,16 @@ function renderFileEditor(row, view) {
   body.append(foot);
 
   let lines = -1;
-  const paint = () => {
+  // Highlighting re-reads the whole file (up to HIGHLIGHT_MAX), so typing draws it once a frame
+  // rather than once a key; the gutter and the unsaved dot stay immediate.
+  let hlFrame = 0;
+  const highlight = () => {
+    if (hlFrame) cancelAnimationFrame(hlFrame);
+    hlFrame = 0;
+    // A trailing space keeps the last empty line's height, so the two layers scroll the same.
+    pre.innerHTML = ta.value.split('\n').map((l) => highlightLine(l, lang)).join('\n') + '\n ';
+  };
+  const paint = (soon) => {
     const n = ta.value.split('\n').length;
     if (n !== lines) {
       lines = n;
@@ -9831,8 +9923,8 @@ function renderFileEditor(row, view) {
       for (let i = 1; i <= n; i++) s += i + '\n';
       gutter.textContent = s + ' ';
     }
-    // A trailing space keeps the last empty line's height, so the two layers scroll the same.
-    if (painted) pre.innerHTML = ta.value.split('\n').map((l) => highlightLine(l, lang)).join('\n') + '\n ';
+    if (painted && !soon) highlight();
+    else if (painted && !hlFrame) hlFrame = requestAnimationFrame(highlight);
     const dirty = ta.value !== ed.original;
     dot.hidden = !dirty;
     save.disabled = !dirty;
@@ -9847,7 +9939,7 @@ function renderFileEditor(row, view) {
     const ln = before.split('\n').length;
     where.textContent = 'Line ' + ln + ', column ' + (before.length - before.lastIndexOf('\n'));
   };
-  ta.addEventListener('input', () => { ed.text = ta.value; paint(); caret(); });
+  ta.addEventListener('input', () => { ed.text = ta.value; paint(true); caret(); });
   ta.addEventListener('scroll', sync);
   ta.addEventListener('keyup', caret);
   ta.addEventListener('click', caret);
