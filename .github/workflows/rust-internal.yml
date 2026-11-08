@@ -16,6 +16,10 @@ on:
   push:
     branches: [v2]
   workflow_dispatch:
+    inputs:
+      repeat:
+        description: Times to run the daemon suites in a row in one job (5 for the R1 gate)
+        default: '1'
 
 permissions:
   contents: read
@@ -92,9 +96,62 @@ jobs:
           cargo deny --version
           cargo deny check
 
+  daemons:
+    # R1 (P0-D): the daemon suites under both daemons, on Windows and Linux. The rust leg builds
+    # spawnloft-core and points the supervisor at it; daemon-contract.test.mjs checks that the
+    # daemon answering ping really is the Rust one, so a silent fallback to daemon.mjs fails here.
+    if: github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-latest]
+        daemon: [node, rust]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      SPAWNLOFT_DAEMON: ${{ matrix.daemon }}
+      REPEAT: ${{ inputs.repeat || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        if: matrix.daemon == 'rust'
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        if: matrix.daemon == 'rust'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        if: matrix.daemon == 'rust'
+        working-directory: rust
+        run: |
+          cargo build --release --locked -p spawnloft-core
+          exe=spawnloft-core; [ "$RUNNER_OS" = Windows ] && exe=spawnloft-core.exe
+          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/release/$exe" >> "$GITHUB_ENV"
+      - name: Daemon suites under the ${{ matrix.daemon }} daemon
+        env:
+          TMPDIR: /tmp
+        run: |
+          files="lifecycle active-guard active-guard-uninstall databases databases-garnet metrics metrics-linux crashguard notify daemon-contract"
+          for i in $(seq 1 "$REPEAT"); do
+            echo "::group::run $i of $REPEAT"
+            for f in $files; do
+              node --test --test-concurrency=1 "test/$f.test.mjs" || { echo "::error::run $i: $f failed under the ${{ matrix.daemon }} daemon"; exit 1; }
+            done
+            echo "::endgroup::"
+            echo "run $i of $REPEAT green"
+          done
+
   node:
-    # The Node suite, once per platform. P0-D turns this into the dual-daemon matrix
-    # (SPAWNLOFT_DAEMON=node and rust) once the Rust daemon exists.
+    # The whole Node suite, once per platform, on the default daemon.
     if: github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -117,7 +174,7 @@ jobs:
 
   package:
     if: github.ref == 'refs/heads/v2'
-    needs: [rust, deny, node]
+    needs: [rust, deny, node, daemons]
     strategy:
       fail-fast: false
       matrix:

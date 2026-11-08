@@ -11,6 +11,7 @@ import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
 import { patternsFor, scanConsole } from './ready.mjs'
 import * as activity from './activity.mjs'
+import { daemonChoice, coreBinary, databaseSpec, rustDaemonArgs, noteFallback, FALLBACK_CODES } from './daemon-launch.mjs'
 
 const DAEMON = path.join(path.dirname(fileURLToPath(import.meta.url)), 'daemon.mjs')
 
@@ -125,16 +126,7 @@ async function launch(name, { wait = true, timeout = 180000, sync = true, force 
 
     if (sync && !database) syncProps(inst)
 
-    const child = spawn(process.execPath, [DAEMON, name], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      cwd: path.dirname(DAEMON),
-      // In the desktop app process.execPath is the Electron binary, not node; without this flag
-      // the spawn would relaunch the whole app instead of the daemon. Plain node ignores it.
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-    })
-    child.unref()
+    const child = await spawnDaemon(name, inst, database)
     attempt.launched = true
 
     const deadline = Date.now() + 15000
@@ -167,6 +159,51 @@ async function launch(name, { wait = true, timeout = 180000, sync = true, force 
 
   const ready = await waitForReady(name, timeout)
   return { started: true, javaPid: live.state.javaPid, ...ready }
+}
+
+function spawnNodeDaemon(name) {
+  const child = spawn(process.execPath, [DAEMON, name], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+    cwd: path.dirname(DAEMON),
+    // In the desktop app process.execPath is the Electron binary, not node; without this flag
+    // the spawn would relaunch the whole app instead of the daemon. Plain node ignores it.
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  })
+  child.unref()
+  return child
+}
+
+// The Node daemon, or the Rust one when SPAWNLOFT_DAEMON=rust (src/daemon-launch.mjs). A Rust
+// binary that could not be run at all falls back to the Node daemon with a logged line; once it
+// ran, its failures are its own (a second daemon on the same world is never started).
+async function spawnDaemon(name, inst, database) {
+  if (daemonChoice() !== 'rust') return spawnNodeDaemon(name)
+  const bin = coreBinary()
+  // computed before the spawn, so an engine that is missing fails the start with its own message
+  const spec = database ? JSON.stringify(await databaseSpec(inst)) : null
+  const child = spawn(bin, rustDaemonArgs(name, { database }), {
+    detached: true,
+    stdio: [database ? 'pipe' : 'ignore', 'ignore', 'ignore'],
+    windowsHide: true,
+    cwd: path.dirname(DAEMON),
+    // the same environment daemon.mjs gets, so the servers under either daemon see the same one
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  })
+  if (child.pid === undefined) {
+    const err = await new Promise((resolve) => child.once('error', resolve))
+    if (!FALLBACK_CODES.has(err?.code)) fail(`"${name}" could not start: the Rust daemon at ${bin} could not be run (${err?.message})`)
+    noteFallback(name, `SPAWNLOFT_DAEMON=rust, but ${bin} could not be run (${err?.code}); started the Node daemon instead`)
+    return spawnNodeDaemon(name)
+  }
+  child.on('error', () => {})
+  if (database) {
+    child.stdin.on('error', () => {})
+    child.stdin.end(spec)
+  }
+  child.unref()
+  return child
 }
 
 // Tails the captured console until the server reports ready, dies, or we time out.

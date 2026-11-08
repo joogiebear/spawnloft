@@ -13,8 +13,6 @@ pub struct Outcome {
 
 /// Exit code for a command line that could not be understood (BSD `EX_USAGE`).
 pub const EXIT_USAGE: u8 = 64;
-/// Exit code for a command that exists but is not built yet in this internal build.
-pub const EXIT_NOT_BUILT: u8 = 69;
 
 fn ok(stdout: String) -> Outcome {
     Outcome {
@@ -50,7 +48,7 @@ pub fn help() -> String {
          \n\
          Usage:\n  \
            {name} --version [--json]   print this build's version, commit and target\n  \
-           {name} daemon <name>        supervise one server (not built yet: the Rust daemon is P0-D)\n  \
+           {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
            {name} help                 this text\n",
         line = info.line(),
         name = build::NAME,
@@ -66,23 +64,85 @@ fn version(rest: &[String]) -> Outcome {
     }
 }
 
-/// The Node supervisor spawns `<binary> daemon <name>`. Until P0-D lands this refuses clearly, with
-/// its own exit code, so a supervisor that is pointed here by mistake fails loudly, not silently.
+/// What `daemon` was asked to do, before anything is started.
+#[derive(Debug, PartialEq, Eq)]
+pub struct DaemonArgs {
+    pub name: String,
+    pub data_root: Option<String>,
+    pub node: Option<String>,
+    pub spec_on_stdin: bool,
+}
+
+/// `daemon <name> [--data-root <dir>] [--node <path>] [--spec -]`, as the Node supervisor spawns it.
+pub fn parse_daemon(rest: &[String]) -> Result<DaemonArgs, Outcome> {
+    let Some((name, flags)) = rest.split_first() else {
+        return Err(usage_error("daemon needs the server name: daemon <name>"));
+    };
+    if name.starts_with('-') {
+        return Err(usage_error(&format!("`{name}` is not a server name")));
+    }
+    let mut out = DaemonArgs {
+        name: name.clone(),
+        data_root: None,
+        node: None,
+        spec_on_stdin: false,
+    };
+    let mut it = flags.iter();
+    while let Some(flag) = it.next() {
+        let mut value = || {
+            it.next()
+                .cloned()
+                .ok_or_else(|| usage_error(&format!("{flag} needs a value")))
+        };
+        match flag.as_str() {
+            "--data-root" => out.data_root = Some(value()?),
+            "--node" => out.node = Some(value()?),
+            "--spec" => {
+                let v = value()?;
+                if v != "-" {
+                    return Err(usage_error("--spec only reads stdin: --spec -"));
+                }
+                out.spec_on_stdin = true;
+            }
+            other => {
+                return Err(usage_error(&format!(
+                    "unexpected argument `{other}` after the server name"
+                )));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Runs the daemon; returns only when it could not start (the daemon ends the process itself).
 fn daemon(rest: &[String]) -> Outcome {
-    match rest {
-        [] => usage_error("daemon needs the server name: daemon <name>"),
-        [name] if name.starts_with('-') => usage_error(&format!("`{name}` is not a server name")),
-        [name] => Outcome {
-            stdout: String::new(),
-            stderr: format!(
-                "{}: the Rust daemon is not built yet, so `{name}` was not started.\n\
-                 This internal build only carries the binary; servers still run on the Node daemon \
-                 (SPAWNLOFT_DAEMON=node, the default).\n",
-                build::NAME
-            ),
-            code: EXIT_NOT_BUILT,
-        },
-        [_, extra, ..] => usage_error(&format!("unexpected argument `{extra}` after the server name")),
+    let args = match parse_daemon(rest) {
+        Ok(a) => a,
+        Err(outcome) => return outcome,
+    };
+    let spec = if args.spec_on_stdin {
+        use std::io::Read;
+        let mut text = String::new();
+        if let Err(e) = std::io::stdin().read_to_string(&mut text) {
+            return usage_error(&format!("could not read the launch spec from stdin: {e}"));
+        }
+        match spawnloft_lib::serde_json::from_str(&text) {
+            Ok(v) => Some(v),
+            Err(e) => return usage_error(&format!("the launch spec on stdin is not JSON: {e}")),
+        }
+    } else {
+        None
+    };
+    let code = spawnloft_lib::daemon::run(spawnloft_lib::daemon::Options {
+        name: args.name,
+        data_root: args.data_root.map(Into::into),
+        node: args.node.map(Into::into),
+        spec,
+    });
+    Outcome {
+        stdout: String::new(),
+        stderr: String::new(),
+        code: u8::try_from(code).unwrap_or(1),
     }
 }
 
@@ -133,18 +193,37 @@ mod tests {
     }
 
     #[test]
-    fn daemon_stub_refuses_with_its_own_code() {
-        let out = run(&args(&["daemon", "survival"]));
-        assert_eq!(out.code, EXIT_NOT_BUILT);
-        assert!(out.stderr.contains("`survival` was not started"));
-        assert!(out.stdout.is_empty());
-    }
-
-    #[test]
-    fn daemon_needs_exactly_one_name() {
-        assert_eq!(run(&args(&["daemon"])).code, EXIT_USAGE);
-        assert_eq!(run(&args(&["daemon", "--force"])).code, EXIT_USAGE);
-        assert_eq!(run(&args(&["daemon", "a", "b"])).code, EXIT_USAGE);
+    fn daemon_arguments() {
+        let a = parse_daemon(&args(&[
+            "survival",
+            "--data-root",
+            "/d",
+            "--node",
+            "/n",
+            "--spec",
+            "-",
+        ]))
+        .unwrap();
+        assert_eq!(
+            a,
+            DaemonArgs {
+                name: "survival".into(),
+                data_root: Some("/d".into()),
+                node: Some("/n".into()),
+                spec_on_stdin: true
+            }
+        );
+        assert_eq!(parse_daemon(&args(&["survival"])).unwrap().data_root, None);
+        assert_eq!(
+            parse_daemon(&args(&["s", "--spec", "file.json"]))
+                .unwrap_err()
+                .code,
+            EXIT_USAGE
+        );
+        assert_eq!(
+            parse_daemon(&args(&["s", "--node"])).unwrap_err().code,
+            EXIT_USAGE
+        );
     }
 
     #[test]

@@ -29,12 +29,25 @@ fn version_json_is_parseable_shape() {
 }
 
 #[test]
-fn daemon_stub_exits_69_without_touching_the_data_root() {
-    let root = TempDir::new("daemon-stub");
-    let out = spawnloft_fakes::run_in(BIN, &["daemon", "survival"], root.path());
-    assert_eq!(out.code, Some(69), "stderr: {}", out.stderr);
-    assert!(out.stdout.is_empty());
-    assert!(root.is_empty(), "the stub must not write anything");
+fn daemon_for_an_unknown_server_says_why_in_its_state_file() {
+    let root = TempDir::new("daemon-unknown");
+    let data = root.path().to_string_lossy().into_owned();
+    let out = spawnloft_fakes::run_in(BIN, &["daemon", "survival", "--data-root", &data], root.path());
+    assert_eq!(out.code, Some(1), "stderr: {}", out.stderr);
+    let state = std::fs::read_to_string(root.path().join("run/survival/state.json")).unwrap();
+    assert!(state.contains("\"running\": false"), "{state}");
+    assert!(state.contains("no instance named \\\"survival\\\""), "{state}");
+    let log = std::fs::read_to_string(root.path().join("run/survival/daemon.log")).unwrap();
+    assert!(log.contains("failed to start: no instance named"), "{log}");
+}
+
+#[test]
+fn daemon_refuses_a_name_that_is_not_one() {
+    let root = TempDir::new("daemon-badname");
+    let data = root.path().to_string_lossy().into_owned();
+    let out = spawnloft_fakes::run_in(BIN, &["daemon", "../etc", "--data-root", &data], root.path());
+    assert_eq!(out.code, Some(2), "stderr: {}", out.stderr);
+    assert!(root.is_empty(), "nothing is written for a bad name");
 }
 
 #[test]
