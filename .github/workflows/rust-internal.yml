@@ -51,9 +51,14 @@ jobs:
       - name: Install the pinned toolchain
         # with no argument rustup (1.28+) installs what rust/rust-toolchain.toml pins
         run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
+      # first-party actions only: the repository's Actions policy allows a fixed list
+      - uses: actions/cache@v4
         with:
-          workspaces: rust
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}
       - name: Formatting
         if: matrix.runner == 'ubuntu-24.04'
         run: cargo fmt --all --check
@@ -68,11 +73,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          manifest-path: rust/Cargo.toml
-          command: check
-          arguments: --all-features
+      - name: Install cargo-deny (pinned release, checked against its sha256)
+        env:
+          DENY_VERSION: 0.20.2
+          DENY_SHA256: 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+        run: |
+          name="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/deny.tar.gz" "https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${name}.tar.gz"
+          echo "${DENY_SHA256}  $RUNNER_TEMP/deny.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/deny.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/${name}" >> "$GITHUB_PATH"
+      - name: cargo deny
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          cargo deny --version
+          cargo deny check
 
   node:
     # The Node suite, once per platform. P0-D turns this into the dual-daemon matrix
@@ -144,10 +160,13 @@ jobs:
         run: |
           rustup toolchain install
           rustup target add ${{ matrix.triple }}
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/cache@v4
         with:
-          workspaces: rust
-          key: ${{ matrix.triple }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}
       - name: Build spawnloft-core
         working-directory: rust
         run: cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
