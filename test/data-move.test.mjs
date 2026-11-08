@@ -14,7 +14,7 @@ const REGISTRY = JSON.stringify({ version: 1, instances: { Srv: { dir: 'PLACEHOL
 let n = 0
 function world(name = `w${++n}`) {
   const base = path.join(scratch, name)
-  const root = path.join(base, 'mcctl')
+  const root = path.join(base, 'spawnloft')
   const put = (rel, content, when) => {
     const file = path.join(root, rel)
     fs.mkdirSync(path.dirname(file), { recursive: true })
@@ -133,7 +133,7 @@ test('scheduled tasks are said to be paused, and are listed to be', async () => 
 })
 
 function privateCopy({ archives = 0, onlyInCopy = [], files = 0 } = {}) {
-  const dir = path.join(scratch, `priv-${++n}`, 'Local', 'mcctl')
+  const dir = path.join(scratch, `priv-${++n}`, 'Local', 'spawnloft')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'activity.jsonl'), '{}\n')
   return { package: 'Acme.Client_1', dir, registry: { state: 'absent', onlyInCopy }, backups: { archives, bytes: archives * 100 }, instances: { files } }
@@ -392,7 +392,7 @@ test('an interrupted move after the original was parked puts the original back a
 
 test('a data folder that is simply empty is the data, and rolling back does not discard it', async () => {
   const base = path.join(scratch, `w${++n}`)
-  const root = path.join(base, 'mcctl')
+  const root = path.join(base, 'spawnloft')
   const dest = path.join(base, 'moved')
   fs.mkdirSync(path.join(root, 'instances'), { recursive: true })
   fs.mkdirSync(path.join(dest, 'instances'), { recursive: true })

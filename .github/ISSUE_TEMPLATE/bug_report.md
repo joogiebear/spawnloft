@@ -14,7 +14,7 @@ assignees: ''
 
 <!--
 Open the panel, Settings, "Copy diagnostics", and paste below. From the command line,
-`mcctl doctor` covers most of the same ground. Neither includes passwords or webhook URLs.
+`spawnloft doctor` covers most of the same ground. Neither includes passwords or webhook URLs.
 -->
 
 ```

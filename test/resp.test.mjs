@@ -11,7 +11,7 @@ import { respSend, respPing } from '../src/resp.mjs'
 import { findFreePort, sleep, UserError } from '../src/util.mjs'
 
 const FAKE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-garnet', 'GarnetServer.mjs')
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-resp-'))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-resp-'))
 const port = await findFreePort(46000 + Math.floor(Math.random() * 5000))
 const child = spawn(process.execPath, [FAKE, '--port', String(port), '--bind', '127.0.0.1', '--auth', 'Password', '--password', 'pw', '--checkpointdir', dir], { stdio: 'ignore' })
 await sleep(500)

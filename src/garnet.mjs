@@ -134,7 +134,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
   if (!supports()) {
     fail('Managed Redis (Garnet) requires Windows x64, an Apple Silicon or Intel Mac, or Linux on x64 or arm64.')
   }
-  if (version !== VERSION) fail(`No verified Garnet ${version} bundle. See: mcctl db versions --engine garnet`)
+  if (version !== VERSION) fail(`No verified Garnet ${version} bundle. See: spawnloft db versions --engine garnet`)
   const archive = archiveFor(version)
   fs.mkdirSync(ENGINES_DIR, { recursive: true })
   const lock = `${dir}.install-lock`

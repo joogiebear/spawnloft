@@ -95,7 +95,7 @@ for (const rel of ['mcctl.mjs', 'spawnloft.mjs', 'src/mysql.mjs', 'src/cli-outpu
   if (!fs.existsSync(path.join(core, rel))) problems.push(`resources/core/${rel} is missing from the build`)
 }
 if (!problems.some((p) => p.includes('resources/core'))) notes.push('core: bundled into resources/core')
-for (const name of ['spawnloft', 'mcctl']) {
+for (const name of ['spawnloft', 'spawnloft']) {
   const launcher = path.join(RESOURCES, 'bin', POSIX ? name : `${name}.cmd`)
   if (!fs.existsSync(launcher)) problems.push(`terminal launcher ${name} is missing`)
   else if (POSIX && (fs.statSync(launcher).mode & 0o111) === 0) problems.push(`terminal launcher ${name} is not executable`)

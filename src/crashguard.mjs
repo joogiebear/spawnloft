@@ -2,12 +2,13 @@
 // A requested stop stays stopped. So does a clean exit: "stop" typed into the server console
 // bypasses the daemon and only shows up as exit code 0. A crash restarts after a delay, but
 // three crashes inside ten minutes means give up.
+import { envVar } from './env.mjs'
 
 export const CRASH_WINDOW_MS = 10 * 60 * 1000
 export const CRASH_LIMIT = 3
 // long enough for the port and world file locks to be released; env override is for tests
-export const RESTART_DELAY_MS = Number(process.env.MCCTL_RESTART_DELAY_MS) > 0
-  ? Number(process.env.MCCTL_RESTART_DELAY_MS)
+export const RESTART_DELAY_MS = Number(envVar('RESTART_DELAY_MS')) > 0
+  ? Number(envVar('RESTART_DELAY_MS'))
   : 10 * 1000
 
 // `crashes` includes the one being decided about: the caller records first, then asks.

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { DATA_ROOT, LAYOUT, ROOT, REGISTRY_FILE, RUN_DIR } from './paths.mjs'
-import { describeServersElsewhere, inspect as inspectSettings } from './settings.mjs'
+import { describeServersElsewhere, inspect as inspectSettings, shadowedSettingsFile } from './settings.mjs'
 import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
 import { readState, clearState } from './control.mjs'
@@ -52,6 +52,8 @@ export async function runDoctor({ repair = false } = {}) {
   notes.push(`node: ${process.version}`)
   notes.push(`root: ${ROOT}`)
   notes.push(`data root: ${DATA_ROOT}`)
+  const shadowed = shadowedSettingsFile()
+  if (shadowed) notes.push(`settings: also found ${shadowed}, which is ignored because the spawnloft folder takes precedence`)
   // an unreadable settings file falls back to defaults (see settings.load)
   const stored = inspectSettings()
   if (!stored.ok) {
@@ -87,7 +89,7 @@ export async function runDoctor({ repair = false } = {}) {
       else seenPorts.set(port, `${inst.name} ${label}`)
     }
     const { status } = readState(inst.name)
-    if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "mcctl kill ${inst.name}"`)
+    if (status === 'orphaned') problems.push(`${inst.name}: orphaned java process - run "spawnloft kill ${inst.name}"`)
     // checked even when stopped: the port opens as soon as it starts
     const exposed = rconExposure(inst)
     if (exposed) problems.push(`${inst.name}: ${exposed.title.toLowerCase()}. ${exposed.advice}`)

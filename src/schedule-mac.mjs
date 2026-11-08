@@ -64,7 +64,7 @@ export function writeShim(id) {
   label(id)
   const file = shimFile(id)
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  const env = { MCCTL_DATA_ROOT: DATA_ROOT, ELECTRON_RUN_AS_NODE: '1' }
+  const env = { SPAWNLOFT_DATA_ROOT: DATA_ROOT, ELECTRON_RUN_AS_NODE: '1' }
   // pass only the settings locations, not the caller's whole environment
   for (const key of ['HOME', 'APPDATA', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME']) if (process.env[key]) env[key] = process.env[key]
   const script = '#!/bin/sh\n' + Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}\n`).join('') +

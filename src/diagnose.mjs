@@ -16,7 +16,7 @@ export const SHAPES = [
     test: /FAILED TO BIND TO PORT|Address already in use|Failed to bind to address/i,
     title: 'The port is already taken',
     advice: (m, ctx) => `Something else is listening on port ${ctx.port ?? 'this server’s port'} - `
-      + 'usually another server, or another copy of this one. "mcctl list" shows who; '
+      + 'usually another server, or another copy of this one. "spawnloft list" shows who; '
       + 'change the port under Manage if both should run at once.',
   },
   {
@@ -34,7 +34,7 @@ export const SHAPES = [
       const needs = CLASS_VERSION_TO_JAVA(Number(m[1]))
       return `This server is built for Java ${needs} or newer, and the Java that launched it is older. `
         + `Install Java ${needs}+ and, if several are installed, point this server at it with `
-        + `"mcctl set <name> java=<path-to-java.exe>".`
+        + `"spawnloft set <name> java=<path-to-java.exe>".`
     },
   },
   {
@@ -49,8 +49,8 @@ export const SHAPES = [
     test: /No space left on device|There is not enough space on the disk/i,
     title: 'The disk is full',
     advice: () => 'The drive this server lives on has no room left - saves and logs are failing. '
-      + 'Free space, or move the server with "mcctl config set-instances" onto a drive that has some. '
-      + '"mcctl prune" can thin old snapshots.',
+      + 'Free space, or move the server with "spawnloft config set-instances" onto a drive that has some. '
+      + '"spawnloft prune" can thin old snapshots.',
   },
   {
     id: 'missing-plugin-dependency',
@@ -82,7 +82,7 @@ export const SHAPES = [
     test: /Exception reading .*level\.dat|Failed to load level|ChunkIoErrorReport|Corrupted chunk/i,
     title: 'The world failed to load',
     advice: () => 'Part of the world data would not read back - usually a hard power-off mid-save. '
-      + 'Restore the latest snapshot from the Backups tab; "mcctl verify" proves which ones are whole.',
+      + 'Restore the latest snapshot from the Backups tab; "spawnloft verify" proves which ones are whole.',
   },
   {
     id: 'ticking-crash',
@@ -105,7 +105,7 @@ export const SHAPES = [
     test: /Unable to access jarfile (.+)/i,
     title: 'The server jar is missing',
     advice: (m) => `Java could not find ${m[1] ? `"${m[1].trim()}"` : 'the server jar'}. `
-      + 'Re-download it ("mcctl upgrade" for Paper, or re-choose a jar with "mcctl set <name> jar=..."), '
+      + 'Re-download it ("spawnloft upgrade" for Paper, or re-choose a jar with "spawnloft set <name> jar=..."), '
       + 'or restore the folder from a snapshot.',
   },
 ]

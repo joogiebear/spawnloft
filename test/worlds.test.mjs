@@ -7,7 +7,7 @@ import path from 'node:path'
 import { listWorlds, findWorldRoot, activateWorld, deleteWorld, importWorld } from '../src/worlds.mjs'
 import { UserError } from '../src/util.mjs'
 
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-worlds-'))
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-worlds-'))
 
 function world(dir, name) {
   fs.mkdirSync(path.join(dir, name, 'region'), { recursive: true })

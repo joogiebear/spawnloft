@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// mcctl: the SpawnLoft command line.
+// spawnloft: the SpawnLoft command line.
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -55,7 +55,7 @@ const cliContext = { command: null, json: false }
 
 function requireName(positional, command) {
   const name = positional[0]
-  if (!name) fail(`${command} requires an instance name. See: mcctl list`)
+  if (!name) fail(`${command} requires an instance name. See: spawnloft list`)
   return name
 }
 
@@ -73,8 +73,8 @@ function cmdList() {
     out(`No instances registered in ${paths.DATA_ROOT}.`)
     for (const line of settings.describeServersElsewhere(paths.DATA_ROOT)) out(`  NOTE: ${line}`)
     out('')
-    out('  Adopt an existing server:  mcctl adopt <name> <path-to-server-dir>')
-    out('  Create a fresh one:        mcctl new <name> --jar <jar> --accept-eula')
+    out('  Adopt an existing server:  spawnloft adopt <name> <path-to-server-dir>')
+    out('  Create a fresh one:        spawnloft new <name> --jar <jar> --accept-eula')
     return
   }
   const rows = [['NAME', 'STATUS', 'PORT', 'RCON', 'MEM', 'UPTIME', 'DIR']]
@@ -188,7 +188,7 @@ function cmdWhy(positional) {
   const found = printFindings(name)
   if (!found) {
     out('Nothing SpawnLoft recognises in the recent console. The last lines of the log are the')
-    out(`next place to look: mcctl logs ${name} -n 60 --grep " ERROR]| WARN]|Exception"`)
+    out(`next place to look: spawnloft logs ${name} -n 60 --grep " ERROR]| WARN]|Exception"`)
   }
   const crashes = crashReports(inst, { limit: 5 })
   if (crashes.reports.length) {
@@ -235,7 +235,7 @@ async function cmdStart(positional, flags) {
 
   if (!wait) {
     out(`Launched (${processKind} pid ${res.javaPid}). Not waiting for ready.`)
-    out(`Follow with: mcctl logs ${name} -f`)
+    out(`Follow with: spawnloft logs ${name} -f`)
     return
   }
   if (res.ready) {
@@ -254,7 +254,7 @@ async function cmdStart(positional, flags) {
     return
   }
   out(`Timed out after ${timeout / 1000}s waiting for ready. The server may still be loading.`)
-  out(`Follow with: mcctl logs ${name} -f`)
+  out(`Follow with: spawnloft logs ${name} -f`)
   process.exitCode = 1
 }
 
@@ -308,7 +308,7 @@ function cmdLogs(positional, flags) {
 async function cmdCmd(positional, flags) {
   const name = requireName(positional, 'cmd')
   const command = positional.slice(1).join(' ').trim()
-  if (!command) fail('cmd requires a command, e.g. mcctl cmd survival "tps"')
+  if (!command) fail('cmd requires a command, e.g. spawnloft cmd survival "tps"')
   const inst = getInstance(name)
   if (!sup.isRunning(name)) fail(`instance "${name}" is not running`)
 
@@ -357,7 +357,7 @@ async function cmdConsole(positional) {
       try {
         await sup.sendConsole(name, trimmed)
       } catch (err) {
-        out(`[mcctl] ${err.message}`)
+        out(`[spawnloft] ${err.message}`)
       }
     })
     rl.on('close', resolve)
@@ -388,7 +388,7 @@ async function cmdNew(positional, flags) {
       ['port:', String(res.port)],
     ]))
     out('')
-    out(`Start it with: mcctl start ${name}`)
+    out(`Start it with: spawnloft start ${name}`)
     out('Players need the matching client pack to join - the same pack, installed in their launcher.')
     return
   }
@@ -450,7 +450,7 @@ async function cmdNew(positional, flags) {
       onProgress: ({ message }) => out(`  ${message}`),
     })
     out(`Created instance "${res.name}" — NeoForge ${res.neoVersion} (minecraft ${res.mc}), port ${res.port}`)
-    out(`Start it with: mcctl start ${name}`)
+    out(`Start it with: spawnloft start ${name}`)
     return
   }
 
@@ -486,14 +486,14 @@ async function cmdNew(positional, flags) {
     out('  (see https://aka.ms/MinecraftEULA)')
   } else {
     out('')
-    out(`Start it with: mcctl start ${inst.name}`)
+    out(`Start it with: spawnloft start ${inst.name}`)
   }
 }
 
 async function cmdClone(positional, flags) {
   const src = positional[0]
   const dst = positional[1]
-  if (!src || !dst) fail('clone requires a source and a destination: mcctl clone <src> <new-name>')
+  if (!src || !dst) fail('clone requires a source and a destination: spawnloft clone <src> <new-name>')
   const inst = await create.newInstance(dst, {
     from: src,
     withWorlds: Boolean(flags.withWorlds),
@@ -509,13 +509,13 @@ async function cmdClone(positional, flags) {
     ['rcon port:', String(inst.rcon.port)],
   ]))
   out('')
-  out(`Start it with: mcctl start ${dst}`)
+  out(`Start it with: spawnloft start ${dst}`)
 }
 
 async function cmdAdopt(positional, flags) {
   const name = positional[0]
   const dir = positional[1]
-  if (!name || !dir) fail('adopt requires a name and a directory: mcctl adopt <name> <server-dir>')
+  if (!name || !dir) fail('adopt requires a name and a directory: spawnloft adopt <name> <server-dir>')
   const inst = await create.adoptInstance(name, dir, {
     jar: flags.jar ?? null,
     memory: flags.memory ?? '4G',
@@ -561,7 +561,7 @@ function cmdRemove(positional, flags) {
 function cmdSet(positional) {
   const name = requireName(positional, 'set')
   const assignments = positional.slice(1)
-  if (!assignments.length) fail('set requires key=value pairs, e.g. mcctl set survival memory=8G')
+  if (!assignments.length) fail('set requires key=value pairs, e.g. spawnloft set survival memory=8G')
   const patch = {}
   const inst = getInstance(name)
   for (const pair of assignments) {
@@ -711,7 +711,7 @@ function cmdSnapshots(positional) {
   getInstance(name)
   const snaps = backup.listSnapshots(name)
   if (!snaps.length) {
-    out(`No snapshots for "${name}". Create one with: mcctl backup ${name}`)
+    out(`No snapshots for "${name}". Create one with: spawnloft backup ${name}`)
     return
   }
   const rows = [['NAME', 'SCOPE', 'SIZE', 'CREATED']]
@@ -768,7 +768,7 @@ async function cmdVerify(positional, flags) {
   const targets = flags.all
     ? backup.listSnapshots(name)
     : [backup.resolveSnapshot(name, positional[1] ?? 'latest')]
-  if (!targets.length) fail(`no snapshots exist for "${name}". Create one with: mcctl backup ${name}`)
+  if (!targets.length) fail(`no snapshots exist for "${name}". Create one with: spawnloft backup ${name}`)
 
   let failed = 0
   for (const target of targets) {
@@ -798,7 +798,7 @@ function cmdTemplates(positional, flags) {
   if (sub === 'save') {
     const instName = positional[1]
     const tplName = positional[2]
-    if (!instName || !tplName) fail('usage: mcctl templates save <instance> <template-name>')
+    if (!instName || !tplName) fail('usage: spawnloft templates save <instance> <template-name>')
     const res = create.saveTemplate(getInstance(instName), tplName, { includeWorlds: Boolean(flags.withWorlds) })
     out(`Saved template "${res.name}" -> ${res.dir}`)
     return
@@ -806,7 +806,7 @@ function cmdTemplates(positional, flags) {
   const tpls = create.listTemplates()
   if (!tpls.length) {
     out('No templates. Create one from an existing instance:')
-    out('  mcctl templates save <instance> <template-name>')
+    out('  spawnloft templates save <instance> <template-name>')
     return
   }
   const rows = [['NAME', 'JAR', 'WORLDS', 'FROM']]
@@ -832,14 +832,14 @@ function cmdConfig(positional, flags) {
     if (l.usingLegacyLayout) {
       out('')
       out('Using the folder SpawnLoft lives in, because it already holds instances.json.')
-      out('Move it with: mcctl config set-root <path>')
+      out('Move it with: spawnloft config set-root <path>')
     }
     return
   }
 
   if (sub === 'set-root' || sub === 'set-instances') {
     const dir = positional[1]
-    if (!dir) fail(`usage: mcctl config ${sub} <path>`)
+    if (!dir) fail(`usage: spawnloft config ${sub} <path>`)
     const abs = path.resolve(dir)
     const check = settings.checkWritable(abs)
     // Write-tested rather than inspected: permission bits and free space both lie on network
@@ -866,7 +866,7 @@ function cmdConfig(positional, flags) {
 
   if (sub === 'set-backup-mirror') {
     const arg = positional[1]
-    if (!arg) fail('usage: mcctl config set-backup-mirror <path>|off')
+    if (!arg) fail('usage: spawnloft config set-backup-mirror <path>|off')
     if (arg.toLowerCase() === 'off') {
       settings.save({ backupsMirrorDir: null })
       out('Mirroring turned off. Copies already made stay where they are.')
@@ -889,7 +889,7 @@ function cmdConfig(positional, flags) {
     return
   }
 
-  fail('usage: mcctl config [show|set-root <path>|set-instances <path>|same-drive]')
+  fail('usage: spawnloft config [show|set-root <path>|set-instances <path>|same-drive]')
 }
 
 /**
@@ -1018,7 +1018,7 @@ async function cmdData(positional, flags) {
 function cmdRename(positional) {
   const from = positional[0]
   const to = positional[1]
-  if (!from || !to) fail('usage: mcctl rename <old-name> <new-name>')
+  if (!from || !to) fail('usage: spawnloft rename <old-name> <new-name>')
   const res = manage.rename(from, to)
   out(`Renamed "${from}" -> "${to}"`)
   if (res.movedDir) out(`  directory moved to ${res.dir}`)
@@ -1065,10 +1065,10 @@ async function cmdUpgrade(positional, flags) {
     const channel = info.latestBuild.channel
     out(`${name} runs ${info.label} ${info.current.version} build ${info.current.build}.`)
     out(info.buildUpdate
-      ? `Build ${info.latestBuild.build} is available${channel ? ` (${channel.toLowerCase()})` : ''}. Apply with: mcctl upgrade ${name}`
+      ? `Build ${info.latestBuild.build} is available${channel ? ` (${channel.toLowerCase()})` : ''}. Apply with: spawnloft upgrade ${name}`
       : `That is the newest ${channel === 'STABLE' ? 'stable ' : ''}build for ${info.current.version}.`)
     if (info.newerVersions.length) {
-      out(`Minecraft ${info.newerVersions[0]} is out. Cross with: mcctl upgrade ${name} --version ${info.newerVersions[0]} --yes`)
+      out(`Minecraft ${info.newerVersions[0]} is out. Cross with: spawnloft upgrade ${name} --version ${info.newerVersions[0]} --yes`)
     }
     return
   }
@@ -1109,7 +1109,7 @@ async function cmdPack(positional, flags) {
     out(`${name} runs ${pack.name} ${pack.versionNumber} (minecraft ${pack.mc}, ${packLoader.kind} ${packLoader.version})`)
     const info = await mrpack.checkPackUpdate(inst)
     out(info.updateAvailable
-      ? `Release ${info.latest.version} is out. Apply with: mcctl pack ${name} update --yes`
+      ? `Release ${info.latest.version} is out. Apply with: spawnloft pack ${name} update --yes`
       : 'That is the newest release.')
     return
   }
@@ -1134,7 +1134,7 @@ async function cmdPack(positional, flags) {
     return
   }
 
-  fail('usage: mcctl pack <name> [update --yes]')
+  fail('usage: spawnloft pack <name> [update --yes]')
 }
 
 async function cmdWorlds(positional, flags) {
@@ -1145,7 +1145,7 @@ async function cmdWorlds(positional, flags) {
   if (sub === 'list') {
     const data = await worlds.listWorlds(inst)
     if (!data.worlds.length) {
-      out(`No worlds in ${inst.dir}. The server generates one on first start, or: mcctl worlds ${name} import <zip-or-folder> --as <name>`)
+      out(`No worlds in ${inst.dir}. The server generates one on first start, or: spawnloft worlds ${name} import <zip-or-folder> --as <name>`)
       return
     }
     const t = [['WORLD', 'ACTIVE', 'DIMENSIONS', 'SIZE']]
@@ -1158,7 +1158,7 @@ async function cmdWorlds(positional, flags) {
 
   if (sub === 'use') {
     const target = positional[2]
-    if (!target) fail(`usage: mcctl worlds ${name} use <world>`)
+    if (!target) fail(`usage: spawnloft worlds ${name} use <world>`)
     worlds.activateWorld(inst, target)
     out(`${target} is now the active world. Takes effect on the next start.`)
     return
@@ -1166,12 +1166,12 @@ async function cmdWorlds(positional, flags) {
 
   if (sub === 'import') {
     const source = positional[2]
-    if (!source) fail(`usage: mcctl worlds ${name} import <zip-or-folder> --as <name>`)
+    if (!source) fail(`usage: spawnloft worlds ${name} import <zip-or-folder> --as <name>`)
     const asName = flags.as
       ?? path.basename(String(source)).replace(/\.(zip|tar\.gz|tgz)$/i, '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 32)
     const res = await worlds.importWorld(inst, source, { name: asName })
     out(`Imported "${res.name}" (${res.sizeHuman}${res.dimensions.length ? `, with ${res.dimensions.join(' and ')}` : ''}).`)
-    out(`Make it the active world with: mcctl worlds ${name} use ${res.name}`)
+    out(`Make it the active world with: spawnloft worlds ${name} use ${res.name}`)
     return
   }
 
@@ -1185,7 +1185,7 @@ async function cmdWorlds(positional, flags) {
 
   if (sub === 'delete') {
     const target = positional[2]
-    if (!target) fail(`usage: mcctl worlds ${name} delete <world> --yes`)
+    if (!target) fail(`usage: spawnloft worlds ${name} delete <world> --yes`)
     if (!flags.yes) {
       fail(`deleting "${target}" is permanent: only the ACTIVE world is ever in snapshots, so an
   inactive world has no way back unless it was exported. Re-run with --yes.`)
@@ -1195,7 +1195,7 @@ async function cmdWorlds(positional, flags) {
     return
   }
 
-  fail('usage: mcctl worlds <name> [use <world> | import <src> --as <name> | export [world] | delete <world> --yes]')
+  fail('usage: spawnloft worlds <name> [use <world> | import <src> --as <name> | export [world] | delete <world> --yes]')
 }
 
 function cmdPlugins(positional) {
@@ -1205,34 +1205,34 @@ function cmdPlugins(positional) {
 
   if (sub === 'enable' || sub === 'disable') {
     const ref = positional[2]
-    if (!ref) fail(`usage: mcctl plugins <name> ${sub} <plugin>`)
+    if (!ref) fail(`usage: spawnloft plugins <name> ${sub} <plugin>`)
     const rows = plugins.listPlugins(inst)
     const hit = rows.find((p) => p.file === ref || p.name.toLowerCase() === String(ref).toLowerCase())
-    if (!hit) fail(`no plugin "${ref}" on "${name}". See: mcctl plugins ${name}`)
+    if (!hit) fail(`no plugin "${ref}" on "${name}". See: spawnloft plugins ${name}`)
     const res = plugins.setPluginEnabled(inst, hit.file, sub === 'enable')
     out(`${hit.name} is now ${res.enabled ? 'enabled' : 'disabled'}. Takes effect on the next start.`)
     return
   }
-  if (sub) fail('usage: mcctl plugins <name> [enable|disable <plugin>]')
+  if (sub) fail('usage: spawnloft plugins <name> [enable|disable <plugin>]')
 
   const rows = plugins.listPlugins(inst)
   if (!rows.length) {
     out(`No plugins in ${path.join(inst.dir, 'plugins')}. The panel's Plugins tab installs from Modrinth.`)
     return
   }
-  // Lists everything; SOURCE separates jars mcctl updates ("modrinth") from the user's own
+  // Lists everything; SOURCE separates jars spawnloft updates ("modrinth") from the user's own
   // ("manual"). The panel lists only the former.
   const t = [['NAME', 'VERSION', 'STATE', 'SOURCE', 'FILE', 'SIZE']]
   for (const p of rows) {
     t.push([p.name, p.version ?? '-', p.enabled ? 'on' : 'off',
-      p.managed ? (p.source ?? 'mcctl') : 'manual', p.file, humanBytes(p.size)])
+      p.managed ? (p.source ?? 'spawnloft') : 'manual', p.file, humanBytes(p.size)])
   }
   out(table(t))
 }
 
 
 function cmdLaunchers(positional) {
-  // Backfills instances made before launchers existed and repairs them if mcctl moves; the .bat
+  // Backfills instances made before launchers existed and repairs them if spawnloft moves; the .bat
   // files hold an absolute path to the CLI.
   const targets = positional.length ? positional.map(getInstance) : listInstances()
   for (const inst of targets) {
@@ -1297,7 +1297,7 @@ async function cmdPaper(positional, flags) {
 
   if (sub === 'builds') {
     const version = positional[1]
-    if (!version) fail('usage: mcctl paper builds <version>')
+    if (!version) fail('usage: spawnloft paper builds <version>')
     const all = await paper.builds(version)
     const rows = [['BUILD', 'CHANNEL', 'DATE', 'FILE']]
     for (const b of all.slice(0, Number(flags.limit ?? 15))) {
@@ -1309,32 +1309,32 @@ async function cmdPaper(positional, flags) {
 
   if (sub === 'fetch') {
     const version = positional[1]
-    if (!version) fail('usage: mcctl paper fetch <version> [build] [--force]')
+    if (!version) fail('usage: spawnloft paper fetch <version> [build] [--force]')
     const res = await paper.fetchBuild(version, positional[2] ?? null, { force: Boolean(flags.force) })
     if (res.cached) {
       out(`Already stored: ${res.name} (build ${res.build}, ${res.channel}). Re-download with --force.`)
     } else {
       out(`Downloaded ${res.name} — build ${res.build}, ${res.channel}, ${res.sizeHuman}, checksum verified.`)
     }
-    out(`Use it with: mcctl new <name> --jar ${res.name}`)
+    out(`Use it with: spawnloft new <name> --jar ${res.name}`)
     return
   }
 
-  fail('usage: mcctl paper [versions|builds <version>|fetch <version> [build]]')
+  fail('usage: spawnloft paper [versions|builds <version>|fetch <version> [build]]')
 }
 
 function cmdJars(positional, flags) {
   const sub = positional[0]
   if (sub === 'import') {
     const src = positional[1]
-    if (!src) fail('usage: mcctl jars import <path-to-jar> [--as <name>]')
+    if (!src) fail('usage: spawnloft jars import <path-to-jar> [--as <name>]')
     const dest = create.importJar(src, { as: flags.as ?? null })
     out(`Imported ${dest}`)
     return
   }
   const jars = create.listJars()
   if (!jars.length) {
-    out('No jars stored. Import one with: mcctl jars import <path-to-jar>')
+    out('No jars stored. Import one with: spawnloft jars import <path-to-jar>')
     return
   }
   const rows = [['NAME', 'SIZE', 'ADDED']]
@@ -1345,7 +1345,7 @@ function cmdJars(positional, flags) {
 /**
  * Scheduled tasks. `task run` is what Task Scheduler invokes, through a small batch file. What a
  * task does comes from its stored definition, not the command line, so a trigger can only ever
- * run one of the actions mcctl allows.
+ * run one of the actions spawnloft allows.
  */
 async function cmdTask(positional, flags) {
   const sub = positional[0] ?? 'list'
@@ -1355,7 +1355,7 @@ async function cmdTask(positional, flags) {
     if (!tasks.length) {
       out('No scheduled tasks.')
       out('')
-      out('  Add one with: mcctl task add <instance> --do backup --daily 03:00')
+      out('  Add one with: spawnloft task add <instance> --do backup --daily 03:00')
       return
     }
     const rows = [['ID', 'INSTANCE', 'DOES', 'WHEN', 'STATE', 'LAST', 'NEXT']]
@@ -1385,21 +1385,21 @@ async function cmdTask(positional, flags) {
       out('Lingering is on. Tasks now run whether or not you are logged in, from boot.')
       return
     }
-    if (positional[1] !== undefined) fail('usage: mcctl task linger [on]')
+    if (positional[1] !== undefined) fail('usage: spawnloft task linger [on]')
     for (const line of schedule.loggedOutNote()) out(line)
     return
   }
 
   if (sub === 'run') {
     const id = positional[1]
-    if (!id) fail('usage: mcctl task run <id>')
+    if (!id) fail('usage: spawnloft task run <id>')
     // Attribute the task's actions to the schedule.
     return activity.asActor({ kind: 'schedule', name: schedule.load().tasks[id]?.name ?? id }, () => runTask(id))
   }
 
   if (sub === 'add') {
     const instance = positional[1]
-    if (!instance) fail('usage: mcctl task add <instance> --do <backup|command|restart|stop|start> [when]')
+    if (!instance) fail('usage: spawnloft task add <instance> --do <backup|command|restart|stop|start> [when]')
     getInstance(instance)
     const type = String(flags.do ?? 'backup')
     const action = { type }
@@ -1422,7 +1422,7 @@ async function cmdTask(positional, flags) {
 
   if (sub === 'rm') {
     const id = positional[1]
-    if (!id) fail('usage: mcctl task rm <id>')
+    if (!id) fail('usage: spawnloft task rm <id>')
     schedule.remove(id)
     out(`Removed "${id}".`)
     return
@@ -1430,13 +1430,13 @@ async function cmdTask(positional, flags) {
 
   if (sub === 'enable' || sub === 'disable') {
     const id = positional[1]
-    if (!id) fail(`usage: mcctl task ${sub} <id>`)
+    if (!id) fail(`usage: spawnloft task ${sub} <id>`)
     schedule.setEnabled(id, sub === 'enable')
     out(`${sub === 'enable' ? 'Enabled' : 'Disabled'} "${id}".`)
     return
   }
 
-  fail('usage: mcctl task [list|add|run|rm|enable|disable|linger]')
+  fail('usage: spawnloft task [list|add|run|rm|enable|disable|linger]')
 }
 
 // Windows reports local time with an offset, launchd and systemd report UTC, so slicing the
@@ -1628,8 +1628,8 @@ async function cmdDb(positional, flags) {
     if (!dbs.length) {
       out('No databases.')
       out('')
-      out('  Add one with: mcctl db add <name> --version <mysql-version>')
-      out('  See versions: mcctl db versions')
+      out('  Add one with: spawnloft db add <name> --version <mysql-version>')
+      out('  See versions: spawnloft db versions')
       return
     }
     out(table(databaseRows(dbs)))
@@ -1647,7 +1647,7 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'add') {
     const name = positional[1]
-    if (!name) fail('usage: mcctl db add <name> --version <version> [--port <n>] [--label "..."]')
+    if (!name) fail('usage: spawnloft db add <name> --version <version> [--port <n>] [--label "..."]')
     const engine = services.assertNewEngine(String(flags.engine ?? services.defaultEngine()))
     let version = flags.version ? String(flags.version) : null
     if (!version) {
@@ -1674,14 +1674,14 @@ async function cmdDb(positional, flags) {
     })
     out('')
     out(`Created database "${db.name}" (${services.ENGINES[db.engine]?.label ?? db.engine} ${db.version}) on 127.0.0.1:${db.port}`)
-    out(`Start it with: mcctl start ${db.name}`)
-    out(`Then attach a server: mcctl db attach ${db.name} <server>`)
+    out(`Start it with: spawnloft start ${db.name}`)
+    out(`Then attach a server: spawnloft db attach ${db.name} <server>`)
     return
   }
 
   if (sub === 'create') {
     const serverName = positional[1]
-    if (!serverName) fail('usage: mcctl db create <server> [--version <version>] [--engine mysql|garnet]')
+    if (!serverName) fail('usage: spawnloft db create <server> [--version <version>] [--engine mysql|garnet]')
     const engine = services.assertNewEngine(String(flags.engine ?? services.defaultEngine()))
     let lastPercent = -1
     const { database: db, credentials } = await services.createForServer(serverName, {
@@ -1706,7 +1706,7 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'attach' || sub === 'detach') {
     const [, dbName, serverName] = positional
-    if (!dbName || !serverName) fail(`usage: mcctl db ${sub} <database> <server>${sub === 'detach' ? ' [--drop]' : ''}`)
+    if (!dbName || !serverName) fail(`usage: spawnloft db ${sub} <database> <server>${sub === 'detach' ? ' [--drop]' : ''}`)
     if (sub === 'attach') {
       const creds = await services.attach(dbName, serverName)
       out(`"${serverName}" is attached to "${dbName}".`)
@@ -1721,14 +1721,14 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'creds' || sub === 'credentials') {
     const [, dbName, serverName] = positional
-    if (!dbName || !serverName) fail('usage: mcctl db creds <database> <server>')
+    if (!dbName || !serverName) fail('usage: spawnloft db creds <database> <server>')
     printCredentials(services.credentials(dbName, serverName))
     return
   }
 
   if (sub === 'connect') {
     const name = positional[1]
-    if (!name) fail('usage: mcctl db connect <name> --engine mysql|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]')
+    if (!name) fail('usage: spawnloft db connect <name> --engine mysql|garnet --host <host> --port <n> --user <u> --password <p> [--tools <folder>]')
     const engine = services.assertNewEngine(String(flags.engine ?? services.defaultEngine()))
     const db = await services.registerExternal(name, {
       engine,
@@ -1740,14 +1740,14 @@ async function cmdDb(positional, flags) {
       label: flags.label ?? null,
     })
     out(`Registered "${db.name}": ${services.ENGINES[engine].label} at ${db.host}:${db.port}, answering.`)
-    out(`Attach a server: mcctl db attach ${db.name} <server>`)
+    out(`Attach a server: spawnloft db attach ${db.name} <server>`)
     return
   }
 
   if (sub === 'address') {
     const dbName = positional[1]
     if (!dbName || !['host', 'port', 'user', 'password'].some((k) => flags[k] != null)) {
-      fail('usage: mcctl db address <database> [--host h] [--port n] [--user u] [--password p]')
+      fail('usage: spawnloft db address <database> [--host h] [--port n] [--user u] [--password p]')
     }
     const db = await services.updateExternal(dbName, {
       host: flags.host != null ? String(flags.host) : null,
@@ -1761,7 +1761,7 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'root') {
     const dbName = positional[1]
-    if (!dbName) fail('usage: mcctl db root <database>')
+    if (!dbName) fail('usage: spawnloft db root <database>')
     const db = services.getDatabase(dbName)
     out(table([['host:', db.host ?? '127.0.0.1'], ['port:', String(db.port)], ['user:', db.root?.user ?? 'root'], ['password:', db.root?.password ?? '']]))
     return
@@ -1769,14 +1769,14 @@ async function cmdDb(positional, flags) {
 
   if (sub === 'remove' || sub === 'rm') {
     const dbName = positional[1]
-    if (!dbName) fail('usage: mcctl db remove <database> [--purge]')
+    if (!dbName) fail('usage: spawnloft db remove <database> [--purge]')
     const res = services.removeDatabase(dbName, { purge: Boolean(flags.purge) })
     out(`Removed database "${res.name}"${res.purged ? ' and its files' : ' (files kept)'}.`)
     if (res.detached.length) out(`Servers that were attached: ${res.detached.join(', ')} - update any plugin configs you configured manually.`)
     return
   }
 
-  fail('usage: mcctl db [list|versions|add|create|connect|attach|detach|creds|root|remove]')
+  fail('usage: spawnloft db [list|versions|add|create|connect|attach|detach|creds|root|remove]')
 }
 
 function printCredentials(c) {
@@ -1858,7 +1858,7 @@ async function cmdMcp(positional, flags) {
 }
 
 function cmdHelp() {
-  out(`spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.
+  out(`spawnloft - local Minecraft servers, from a terminal. spawnloft remains a compatible alias.
 
 AUTOMATION
   spawnloft status <name> --json     Versioned status record (no configured credentials)
@@ -1878,28 +1878,28 @@ AUTOMATION
       --show-ips                     Stop hiding player IP addresses in console lines
 
 LIFECYCLE
-  mcctl list                         Show every instance and its state
-  mcctl status <name>                Detailed state for one instance
-  mcctl start <name>                 Start and wait until the server reports ready
+  spawnloft list                         Show every instance and its state
+  spawnloft status <name>                Detailed state for one instance
+  spawnloft start <name>                 Start and wait until the server reports ready
       --detach                       Return as soon as the process launches
       --timeout <sec>                Ready timeout (default 180)
       --no-sync                      Do not push registry ports into server.properties
-  mcctl stop <name> [--timeout sec]  Graceful shutdown via the console "stop" command
-  mcctl restart <name>               Stop then start
-  mcctl kill <name>                  Force-kill the process tree
+  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console "stop" command
+  spawnloft restart <name>               Stop then start
+  spawnloft kill <name>                  Force-kill the process tree
 
 CONSOLE
-  mcctl logs <name> [-n 60] [-f]     Read the captured console; -f follows
+  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows
       --grep <regex>                 Filter lines
-  mcctl cmd <name> "<command>"       Run a command over RCON and print the reply
-  mcctl send <name> "<line>"         Write a raw line to the server's stdin
-  mcctl console <name>               Interactive attach (server survives detach)
-  mcctl players <name>               Who is online
+  spawnloft cmd <name> "<command>"       Run a command over RCON and print the reply
+  spawnloft send <name> "<line>"         Write a raw line to the server's stdin
+  spawnloft console <name>               Interactive attach (server survives detach)
+  spawnloft players <name>               Who is online
 
 INSTANCES
-  mcctl adopt <name> <dir>           Register an existing server directory in place
+  spawnloft adopt <name> <dir>           Register an existing server directory in place
       --jar <file> --memory <4G>
-  mcctl new <name> [options]         Create a fresh instance
+  spawnloft new <name> [options]         Create a fresh instance
       --jar <file>                   Server jar from the jars/ store
       --paper <version>              Download that Paper version and use it
       --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper
@@ -1914,99 +1914,99 @@ INSTANCES
       --accept-eula                  Write eula=true (you accept Mojang's EULA)
       --offline                      Let anyone join as any name, no account needed.
                                      Puts an OFFLINE/INSECURE banner in every log.
-  mcctl clone <src> <new>            Copy plugins+config into a new instance
+  spawnloft clone <src> <new>            Copy plugins+config into a new instance
       --with-worlds                  Also copy world data (default: fresh worlds)
-  mcctl set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,
+  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,
                                      auto-restart=on|off, webhook=<url>|off
-  mcctl props <name> [key=value...]  Read or edit server.properties
-  mcctl plugins <name>               List plugins; flip one with: plugins <name> disable <x>
-  mcctl worlds <name>                List worlds; use <w>, import <src> --as <n>,
+  spawnloft props <name> [key=value...]  Read or edit server.properties
+  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>
+  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,
                                      export [w], delete <w> --yes
-  mcctl rm <name> [--purge --yes]    Unregister (and optionally delete files)
+  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)
 
 SNAPSHOTS
-  mcctl backup <name>                Snapshot to backups/<name>/
+  spawnloft backup <name>                Snapshot to backups/<name>/
       --scope <${backup.SCOPES.join('|')}>
       --label <text> --keep <n>
-  mcctl snapshots <name>             List snapshots
-  mcctl restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped
-  mcctl prune <name> --keep <n>      Delete all but the newest n
-  mcctl verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage
+  spawnloft snapshots <name>             List snapshots
+  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped
+  spawnloft prune <name> --keep <n>      Delete all but the newest n
+  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage
 
 OTHER
-  mcctl templates                    List templates
-  mcctl templates save <inst> <tpl>  Save an instance's plugins+config as a template
-  mcctl ui [--port n] [--no-open] [--launcher]
+  spawnloft templates                    List templates
+  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template
+  spawnloft ui [--port n] [--no-open] [--launcher]
                                     Serve the local control panel (and open it in a browser);
                                     --launcher opens the game launcher instead
-  mcctl paper versions               Paper versions available to download
-  mcctl paper fetch <version>        Download a Paper build into the jar store
-  mcctl upgrade <name> [--check]     Move to the newest build for its version (Paper,
+  spawnloft paper versions               Paper versions available to download
+  spawnloft paper fetch <version>        Download a Paper build into the jar store
+  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,
                                      Purpur, Folia or Advanced Slime Paper);
                                      --version <v> --yes crosses Minecraft versions
-  mcctl pack <name> [update --yes]   A modpack server's pack: show, check, update
+  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update
                                      (snapshot first; worlds and hand-added files untouched)
-  mcctl config                       Show where servers, jars and backups live
-  mcctl config set-root <path>       Move the data root (new servers only)
-  mcctl config set-instances <path>  Put servers on a different drive
-  mcctl data move <folder> [--yes]   Move the whole data folder and leave a link where it was,
+  spawnloft config                       Show where servers, jars and backups live
+  spawnloft config set-root <path>       Move the data root (new servers only)
+  spawnloft config set-instances <path>  Put servers on a different drive
+  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,
                                      so nothing stored needs changing (default: show the plan)
-  mcctl data status|finish|rollback  Where the data is; delete the parked original; undo a move
+  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move
                                      that was interrupted
-  mcctl config set-backup-mirror <path>|off
+  spawnloft config set-backup-mirror <path>|off
                                      Copy every new snapshot to a second drive too
-  mcctl rename <old> <new>           Rename an instance (and its folder)
-  mcctl rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins
-  mcctl reveal <name>                Open the instance folder in Explorer
-  mcctl launchers [name]             Write start/console/stop .bat files
-  mcctl jars                         List stored server jars
-  mcctl jars import <path> [--as x]  Add a server jar to the store
-  mcctl why <name>                   Say what is wrong with a server, from its own console
-  mcctl diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings
+  spawnloft rename <old> <new>           Rename an instance (and its folder)
+  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins
+  spawnloft reveal <name>                Open the instance folder in Explorer
+  spawnloft launchers [name]             Write start/console/stop .bat files
+  spawnloft jars                         List stored server jars
+  spawnloft jars import <path> [--as x]  Add a server jar to the store
+  spawnloft why <name>                   Say what is wrong with a server, from its own console
+  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings
                                      for a bug report (--lines N, --json)
 
 BOTS (plugin testing with scripted players)
-  mcctl bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
-  mcctl bot check <server>           Say whether bots can join: offline mode, running, bound address
-  mcctl bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report
+  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
+  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address
+  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report
       --instance <server>            Use this server instead of the scenario's
       --json                         The report as one JSON line; exit 1 when a step fails
 
 CLIENT (a game client for your own servers)
-  mcctl client list                  Profiles, with running state
-  mcctl client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
-  mcctl client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount
-  mcctl client remove <name>         Delete a profile (--purge also removes its game folder)
-  mcctl client install <name>        Download what the profile needs, with progress on stderr
-  mcctl client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
-  mcctl client status <name>         Say whether the client is running
-  mcctl client stop <name>           Stop a running client
-  mcctl client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
-  mcctl client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
-  mcctl client logout <name>         Forget a signed-in (or offline) account
-  mcctl client accounts              Signed-in and offline accounts, and the launcher's default
+  spawnloft client list                  Profiles, with running state
+  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
+  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount
+  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)
+  spawnloft client install <name>        Download what the profile needs, with progress on stderr
+  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
+  spawnloft client status <name>         Say whether the client is running
+  spawnloft client stop <name>           Stop a running client
+  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
+  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
+  spawnloft client logout <name>         Forget a signed-in (or offline) account
+  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default
 
 DATABASES
-  mcctl db                           List databases
-  mcctl db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
-  mcctl db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]
-  mcctl db connect <name> --host h --port n --user u --password p   Register a database you already run
-  mcctl db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address
-  mcctl db create <server>           A database of the server's own on the port after its game port, started and attached
-  mcctl db attach <db> <server>      Give a server its own database and user; prints the credentials
-  mcctl db detach <db> <server>      Take the user away [--drop deletes the data too]
-  mcctl db creds <db> <server>       Show a server's credentials again
-  mcctl db remove <db> [--purge]     Forget a stopped database [and delete its files]
+  spawnloft db                           List databases
+  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
+  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]
+  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run
+  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address
+  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached
+  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials
+  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]
+  spawnloft db creds <db> <server>       Show a server's credentials again
+  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]
   start, stop, restart, logs and status take a database's name like a server's.
 
-  mcctl task list                    Scheduled tasks, when each last ran and runs next
-  mcctl task add <server> --do <backup|restart|stop|start|command> [--line "<cmd>"]
+  spawnloft task list                    Scheduled tasks, when each last ran and runs next
+  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line "<cmd>"]
       --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon
-  mcctl task run|rm|enable|disable <id>
-  mcctl task linger [on]             Linux: whether tasks run while you are logged out, and turn that on
+  spawnloft task run|rm|enable|disable <id>
+  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on
 
-  mcctl doctor                       Check environment, ports, EULA, disk, stale state
-  mcctl uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what mcctl made
+  spawnloft doctor                       Check environment, ports, EULA, disk, stale state
+  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made
 `)
 }
 

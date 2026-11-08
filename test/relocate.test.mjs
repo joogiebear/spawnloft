@@ -9,7 +9,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-relocate-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-relocate-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
 const { putInstance } = await import('../src/registry.mjs')
@@ -36,7 +36,7 @@ test('with no record, shims and launchers are rewritten for this runtime and a r
   putInstance('smp', { dir, jar: 'paper.jar', memory: '4G', port: 25565 })
   fs.writeFileSync(tasksFile, JSON.stringify({ version: 1, tasks: { nightly: { instance: 'smp', action: { type: 'backup' }, schedule: { kind: 'daily', at: '03:00' } } } }))
 
-  const oldExe = 'C:\\Users\\me\\AppData\\Local\\Programs\\mcctl\\mcctl.exe'
+  const oldExe = 'C:\\Users\\me\\AppData\\Local\\Programs\\spawnloft\\spawnloft.exe'
   stale(shim, `@echo off\r\n"${oldExe}" "C:\\old\\mcctl.mjs" task run nightly\r\n`)
   stale(path.join(dir, launcher('start')), `@echo off\r\n"${oldExe}" "C:\\old\\mcctl.mjs" start smp\r\n`)
 

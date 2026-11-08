@@ -1,3 +1,4 @@
+import { envVar } from './env.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
@@ -674,11 +675,11 @@ function onlineModeRefusal(server, playerName) {
   return `server "${server}" runs in online mode and ${playerName} is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server`
 }
 
-// MCCTL_FAKE_CLIENT points launch at a script run by this Node instead of Java (the test suite's
+// SPAWNLOFT_FAKE_CLIENT (or the older MCCTL_FAKE_CLIENT) points launch at a script run by this Node instead of Java (the test suite's
 // fake game). It is honoured only with NODE_ENV=test, so a stray variable in a user's environment
 // cannot make SpawnLoft run an arbitrary script in place of the game.
 export function fakeClientJava(env = process.env) {
-  return env.NODE_ENV === 'test' && env.MCCTL_FAKE_CLIENT ? env.MCCTL_FAKE_CLIENT : null
+  return env.NODE_ENV === 'test' && envVar('FAKE_CLIENT', env) ? envVar('FAKE_CLIENT', env) : null
 }
 
 export function assistantAccountRefusal(name) {

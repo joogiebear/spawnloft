@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-uninstall-orphan-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-uninstall-orphan-'))
 process.env.MCCTL_DATA_ROOT = scratch
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
