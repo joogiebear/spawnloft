@@ -10,7 +10,6 @@
   },
   "bin": {
     "spawnloft": "./spawnloft.mjs",
-    "spawnloft": "./spawnloft.mjs",
     "mcctl": "./mcctl.mjs"
   },
   "engines": {

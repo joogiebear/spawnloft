@@ -77,7 +77,7 @@ test('both CLI names reject removed database config commands without changing pl
   fs.writeFileSync(config, original)
   const registry = path.join(data, 'instances.json')
   const before = fs.readFileSync(registry, 'utf8')
-  for (const name of ['spawnloft', 'spawnloft']) {
+  for (const name of ['spawnloft', 'mcctl']) {
     for (const args of [['db', 'apply', 'externaldb', 'royalplugins', 'luckperms'], ['db', 'plugins', 'royalplugins']]) {
       const result = cli(args, name)
       assert.notEqual(result.code, 0)
@@ -215,7 +215,7 @@ test('packaged launchers quote paths and forward arguments using the bundled run
   for (const platform of ['darwin', 'linux', 'win32']) {
     const resources = path.join(scratch, platform, 'App With Spaces', 'Resources')
     writeCliLaunchers(resources, platform)
-    for (const name of ['spawnloft', 'spawnloft']) {
+    for (const name of ['spawnloft', 'mcctl']) {
       const file = path.join(resources, 'bin', name + (platform === 'win32' ? '.cmd' : ''))
       const script = fs.readFileSync(file, 'utf8')
       assert.ok(script.includes('ELECTRON_RUN_AS_NODE=1'))

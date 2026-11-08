@@ -50,3 +50,11 @@ test('when both settings files exist the spawnloft one wins and the other is rep
   assert.equal(s.shadowedSettingsFile(), path.join(dir, 'config', 'mcctl', 'settings.json'))
   assert.equal(s.defaultDataRoot(), path.join(dir, 'local', 'spawnloft'))
 })
+
+test('uninstall --data removes the ignored settings file as well', async () => {
+  const { purgeTargets } = await import('../src/uninstall.mjs')
+  const layout = { jarsDir: 'j', backupsDir: 'b', templatesDir: 't', runDir: 'r', enginesDir: 'e', dataRoot: 'd', registryFile: 'd/i.json', instancesDir: 'd/instances', servicesDir: 'd/services' }
+  const t = purgeTargets({ instances: [], layout, settings: '/c/spawnloft/settings.json', otherSettings: '/c/mcctl/settings.json' })
+  assert.ok(t.remove.includes('/c/spawnloft/settings.json') && t.remove.includes('/c/mcctl/settings.json'))
+  assert.ok(t.removeIfEmpty.includes('/c/mcctl'))
+})

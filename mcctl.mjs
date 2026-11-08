@@ -1858,7 +1858,7 @@ async function cmdMcp(positional, flags) {
 }
 
 function cmdHelp() {
-  out(`spawnloft - local Minecraft servers, from a terminal. spawnloft remains a compatible alias.
+  out(`spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.
 
 AUTOMATION
   spawnloft status <name> --json     Versioned status record (no configured credentials)

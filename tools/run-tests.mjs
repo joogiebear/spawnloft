@@ -11,5 +11,7 @@ const testDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 't
 const files = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.mjs')).sort().map((f) => path.join('test', f))
 // no test reads the real signed harness list from GitHub: its rows would change what tests see
 const env = { ...process.env, SPAWNLOFT_HARNESS_INDEX_FETCH: 'off' }
+// the tests isolate themselves with MCCTL_DATA_ROOT, which a SPAWNLOFT_DATA_ROOT would override
+delete env.SPAWNLOFT_DATA_ROOT
 const res = spawnSync(process.execPath, ['--test', ...process.argv.slice(2), ...files], { stdio: 'inherit', cwd: path.join(testDir, '..'), env })
 process.exit(res.status ?? 1)

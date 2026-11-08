@@ -26,3 +26,8 @@ whether the old one ever stops working.
 | Control pipe `\\.\pipe\mcctl-<name>` | unchanged | Changes once, later, with the protocol version. |
 | Code-signing account and profile names | unchanged | Azure resource names. |
 | `mcctl-site` repository | unchanged | The repository keeps its name. |
+
+## Notes
+
+- Old names keep working in one direction only. A newer build reads both spellings, but an older build reads only `MCCTL_*` and `mcctl/`: after going back to an older build, a launchd job written by the new one (which sets `SPAWNLOFT_DATA_ROOT`) falls back to that build's default data folder until the job is rewritten.
+- On Windows, `%APPDATA%\spawnloft` is the same folder as the desktop app's own data folder `%APPDATA%\SpawnLoft` (Windows ignores letter case), so a new install's settings file sits beside the window state. Deleting that folder to reset the app also deletes the file that records where the data folder is.

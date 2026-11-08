@@ -49,10 +49,10 @@ async function main() {
     LOCALAPPDATA: localData,
     XDG_CONFIG_HOME: config,
     XDG_DATA_HOME: path.join(scratch, 'share'),
-    MCCTL_DATA_ROOT: data,
+    SPAWNLOFT_DATA_ROOT: data,
   }
   delete env.ELECTRON_RUN_AS_NODE
-  delete env.MCCTL_CORE
+  delete env.MCCTL_CORE; delete env.SPAWNLOFT_CORE_DIR
   delete env.FAKE_JAVA_FAIL
   const errors = []
   const log = []
@@ -447,7 +447,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(await page.locator('#performanceBody .ranges button[aria-pressed="true"]').textContent(), '1m')
     const beforeClose = await api(`instances/${name}/metrics`)
     fs.writeFileSync(path.join(output, 'performance-live.json'), JSON.stringify(beforeClose, null, 2))
-    const cliMetrics = JSON.parse((await terminal('mcctl', ['metrics', name, '--json'])).stdout)
+    const cliMetrics = JSON.parse((await terminal('spawnloft', ['metrics', name, '--json'])).stdout)
     assert.equal(cliMetrics.data.cpuScale, 'whole-machine')
     assert.ok(cliMetrics.data.samples.length >= beforeClose.samples.length)
     assert.equal(cliMetrics.data.samples[0].cpuPercent, beforeClose.samples[0].cpu)

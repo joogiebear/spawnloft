@@ -38,15 +38,15 @@ async function main() {
   const home = path.join(scratch, 'home')
   const userData = path.join(scratch, 'userData')
   for (const folder of [data, config, home, path.dirname(installed)]) fs.mkdirSync(folder, { recursive: true })
-  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data }
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data, SPAWNLOFT_DATA_ROOT: data }
   delete env.ELECTRON_RUN_AS_NODE
-  delete env.MCCTL_CORE
+  delete env.MCCTL_CORE; delete env.SPAWNLOFT_CORE_DIR
   // the token is for CI release discovery only, never the installed app
   delete env.GITHUB_TOKEN
   delete env.GH_TOKEN
   const preserved = new Map()
   for (const [name, content] of [
-    [path.join(config, 'spawnloft/settings.json'), JSON.stringify({ dataRoot: data, theme: 'spawnloft' })],
+    [path.join(config, 'mcctl/settings.json'), JSON.stringify({ dataRoot: data, theme: 'spawnloft' })],
     [path.join(data, 'instances.json'), JSON.stringify({ version: 1, instances: {} })],
     [path.join(data, 'instances/upgrade-fixture/plugins/Manual/config.yml'), 'database:\n  password: manual-fixture-only\n'],
     [path.join(data, 'services/upgrade-fixture/data.bin'), 'database preservation fixture'],
@@ -85,7 +85,7 @@ async function main() {
     app = await launch()
     const page = await app.firstWindow()
     await page.waitForLoadState('domcontentloaded')
-    assert.equal((await page.evaluate(() => window.spawnloftDesktop.appInfo())).manualUpdates, false)
+    assert.equal((await page.evaluate(() => window.mcctlDesktop.appInfo())).manualUpdates, false)
     await app.evaluate(({ app, autoUpdater: nativeUpdater }, url) => {
       const updater = process.mainModule.require('electron-updater').autoUpdater
       updater.setFeedURL({ provider: 'generic', url })
@@ -95,7 +95,7 @@ async function main() {
       nativeUpdater.once('update-downloaded', () => { globalThis.__nativeUpdateReady = true })
       updater.on('error', e => globalThis.__updateErrors.push(String(e)))
     }, `http://127.0.0.1:${server.address().port}/`)
-    const check = await page.evaluate(() => window.spawnloftDesktop.checkUpdate())
+    const check = await page.evaluate(() => window.mcctlDesktop.checkUpdate())
     assert.equal(check.ok, true, JSON.stringify(check))
     assert.equal(check.version, info.version)
     await until(async () => {
@@ -103,7 +103,7 @@ async function main() {
       assert.deepEqual(state.errors, [])
       return state.ready
     }, 'Squirrel.Mac did not accept the signed update')
-    await page.evaluate(() => { void window.spawnloftDesktop.installUpdate() }).catch(() => {})
+    await page.evaluate(() => { void window.mcctlDesktop.installUpdate() }).catch(() => {})
     await until(() => {
       try { return JSON.parse(fs.readFileSync(path.join(installed, 'Contents/Resources/build-info.json'))).version === info.version }
       catch { return false }

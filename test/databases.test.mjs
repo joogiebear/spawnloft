@@ -129,7 +129,7 @@ test('both CLI launchers start, restart, and detach a database without treating 
     [fileURLToPath(new URL(`../${launcher}.mjs`, import.meta.url)), ...args],
     { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] })
   assert.equal(services.getDatabase(DB).rcon, undefined, 'a database has no RCON settings')
-  for (const launcher of ['spawnloft', 'spawnloft']) {
+  for (const launcher of ['spawnloft', 'mcctl']) {
     await sup.stop(DB, { timeout: 10000 })
     const started = cli(launcher, ['start', DB, '--timeout', '15'])
     assert.match(started, /Ready -/)
