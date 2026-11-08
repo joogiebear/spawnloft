@@ -212,6 +212,9 @@ test('a stop that times out is forced', { timeout: 60000 }, async () => {
   const name = await makeInstance('forced')
   await sup.start(name, { timeout: 15000 })
   await sup.sendConsole(name, 'hang')
+  // "hang" and "stop" arriving in one read would both be taken as lines before the fake stops
+  // reading (seen on Windows), so let "hang" land first, as lifecycle.test.mjs does
+  await sleep(500)
   const reply = await ask(name, 'stop-forced')
   assert.equal(reply.forced, true)
   await settled(name)
