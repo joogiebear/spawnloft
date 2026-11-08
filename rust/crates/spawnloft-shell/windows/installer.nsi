@@ -103,6 +103,7 @@ Var OldMainBinaryName
 ; SPAWNLOFT: 1 when the install found is SpawnLoft 1.x (Electron), 1 when electron-updater asked
 ; for the app to be started afterwards
 Var LegacyMode
+Var LegacyDir
 Var ForceRun
 
 Name "${PRODUCTNAME}"
@@ -442,7 +443,8 @@ Function PageLeaveReinstall
 FunctionEnd
 
 ; 5. Choose install directory page
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+; SPAWNLOFT: not when replacing 1.x, which must stay where its shims and launchers point
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassiveOrLegacy
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; 6. Start menu shortcut page
@@ -556,12 +558,14 @@ Function .onInit
     StrCpy $UpdateMode 1
   ${EndIf}
 
-  ; SPAWNLOFT: electron-updater runs the new installer with `--updated /S --force-run`
-  ${GetOptions} $CMDLINE "--updated" $R0
+  ; SPAWNLOFT: electron-updater runs the new installer with `--updated /S --force-run`. Read from
+  ; the parameters only: an unquoted installer path with a ' in it confuses GetOptions.
+  ${GetParameters} $R1
+  ${GetOptions} $R1 "--updated" $R0
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
-  ${GetOptions} $CMDLINE "--force-run" $R0
+  ${GetOptions} $R1 "--force-run" $R0
   ${IfNot} ${Errors}
     StrCpy $ForceRun 1
   ${EndIf}
@@ -594,12 +598,12 @@ Function .onInit
     Call RestorePreviousInstallLocation
   ${EndIf}
 
-  ; SPAWNLOFT: is the install found SpawnLoft 1.x? This installer marks its own installs, and
-  ; 1.x's uninstaller has a name of its own.
-  ReadRegStr $R0 SHCTX "${MANUPRODUCTKEY}" "SpawnLoftShell"
-  ${If} $R0 == ""
-  ${AndIf} ${FileExists} "$INSTDIR\${LEGACYUNINSTALLER}"
+  ; SPAWNLOFT: is the install found SpawnLoft 1.x? Only 1.x has an uninstaller by that name (2.x
+  ; never ships one and RemoveLegacyInstall deletes it). Not a registry marker: a 1.x rollback
+  ; over 2.x rewrites the keys but keeps any value it does not know.
+  ${If} ${FileExists} "$INSTDIR\${LEGACYUNINSTALLER}"
     StrCpy $LegacyMode 1
+    StrCpy $LegacyDir $INSTDIR
   ${EndIf}
 
 
@@ -756,7 +760,12 @@ Section Install
     Delete "$INSTDIR\resources\bin\spawnloft-core.exe"
     ${If} ${Errors}
       System::Call "kernel32::GetTickCount() i .r0"
+      ClearErrors
       Rename "$INSTDIR\resources\bin\spawnloft-core.exe" "$INSTDIR\resources\bin\spawnloft-core.old-$0.exe"
+      ${If} ${Errors}
+        SetErrorLevel 2
+        Abort "spawnloft-core.exe is in use and could not be moved aside"
+      ${EndIf}
       DetailPrint "spawnloft-core.exe is in use by running servers; the old copy stays until they stop"
     ${EndIf}
   ${EndIf}
@@ -898,7 +907,8 @@ Function un.onInit
   ${EndIf}
 
   ; SPAWNLOFT: a 1.x installer replacing this install (rollback) runs it with --updated
-  ${GetOptions} $CMDLINE "--updated" $R0
+  ${GetParameters} $R1
+  ${GetOptions} $R1 "--updated" $R0
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
@@ -1008,6 +1018,8 @@ Section Uninstall
   ; on an update the next installer writes it again
   ${If} $UpdateMode <> 1
     DeleteRegKey SHCTX "${MANUPRODUCTKEY}"
+  ${Else}
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "SpawnLoftShell"
   ${EndIf}
 
   ; Removes the Autostart entry for ${PRODUCTNAME} from the HKCU Run key if it exists.
@@ -1066,6 +1078,7 @@ FunctionEnd
 Function RemoveLegacyInstall
   DetailPrint "Replacing SpawnLoft 1"
   InitPluginsDir
+  StrCpy $INSTDIR $LegacyDir
   StrCpy $R5 0
   CopyFiles /SILENT "$INSTDIR\${LEGACYUNINSTALLER}" "$PLUGINSDIR\old-uninstaller.exe"
   legacy_retry:
@@ -1083,13 +1096,23 @@ Function RemoveLegacyInstall
         Sleep 1000
         Goto legacy_retry
       ${EndIf}
-      DetailPrint "SpawnLoft 1 could not be removed (exit code $R0)"
-      MessageBox MB_ICONSTOP "SpawnLoft 1 could not be removed, so SpawnLoft 2 was not installed. Close SpawnLoft and try again." /SD IDOK
-      Quit
+      Goto legacy_failed
     ${EndIf}
+  ; exit code 0 is not proof: electron-builder's running-app check can Quit with 0 and leave
+  ; everything in place. Electron's app.asar gone is the proof.
+  ${If} ${FileExists} "$INSTDIR\resources\app.asar"
+    StrCpy $R0 "0, but SpawnLoft 1 is still there"
+    Goto legacy_failed
+  ${EndIf}
   ; run in place (_?=), it could not delete itself
   Delete "$INSTDIR\${LEGACYUNINSTALLER}"
   StrCpy $LegacyMode 2
+  Return
+  legacy_failed:
+    DetailPrint "SpawnLoft 1 could not be removed (exit code $R0)"
+    MessageBox MB_ICONSTOP "SpawnLoft 1 could not be removed, so SpawnLoft 2 was not installed. Close SpawnLoft and try again." /SD IDOK
+    SetErrorLevel 2
+    Quit
 FunctionEnd
 
 Function Skip
@@ -1098,6 +1121,10 @@ FunctionEnd
 
 Function SkipIfPassive
   ${IfThen} $PassiveMode = 1  ${|} Abort ${|}
+FunctionEnd
+Function SkipIfPassiveOrLegacy
+  ${IfThen} $PassiveMode = 1  ${|} Abort ${|}
+  ${IfThen} $LegacyMode = 1  ${|} Abort ${|}
 FunctionEnd
 Function un.SkipIfPassive
   ${IfThen} $PassiveMode = 1  ${|} Abort ${|}
