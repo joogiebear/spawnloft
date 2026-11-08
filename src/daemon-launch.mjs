@@ -20,9 +20,19 @@ export const CORE_EXE = process.platform === 'win32' ? 'spawnloft-core.exe' : 's
 // spawn errors that prove nothing was launched
 export const FALLBACK_CODES = new Set(['ENOENT', 'EACCES', 'ENOEXEC', 'UNKNOWN'])
 
-export function daemonChoice(env = process.env, settings = null) {
-  const said = env.SPAWNLOFT_DAEMON || (settings ?? safeSettings()).daemon
+export function daemonChoice(env = process.env, settings = null, root = CODE_ROOT) {
+  const said = env.SPAWNLOFT_DAEMON || (settings ?? safeSettings()).daemon || buildDefault(root)
   return said === 'rust' ? 'rust' : 'node'
+}
+
+// An internal v2 build's own default (desktop/internal.config.cjs writes it); 1.x builds and
+// checkouts have no such file, so they stay on daemon.mjs.
+function buildDefault(root) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, 'internal-defaults.json'), 'utf8')).daemon
+  } catch {
+    return undefined
+  }
 }
 
 function safeSettings() {

@@ -1,3 +1,4 @@
 node_modules/
 dist/
 build/bin/
+build/internal-defaults.json

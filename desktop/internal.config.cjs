@@ -33,6 +33,13 @@ if (!fs.existsSync(path.join(__dirname, staged))) {
   throw new Error(`${staged} is missing: build the Rust core and run node stage-core.mjs first`)
 }
 
+// Internal builds run servers on the Rust daemon unless the tester says otherwise
+// (SPAWNLOFT_DAEMON or "daemon" in settings.json win): read by src/daemon-launch.mjs from
+// resources/core/internal-defaults.json, a file 1.x builds never have.
+const defaults = path.join('build', 'internal-defaults.json')
+fs.mkdirSync(path.join(__dirname, 'build'), { recursive: true })
+fs.writeFileSync(path.join(__dirname, defaults), JSON.stringify({ daemon: 'rust' }) + '\n')
+
 const win = { ...source.build.win }
 delete win.azureSignOptions
 win.extraResources = [{ from: staged, to: `bin/${exe}` }]
@@ -46,6 +53,7 @@ module.exports = {
   ...source.build,
   // Not a release, so nothing to publish to; also stops app-update.yml being written.
   publish: null,
+  extraResources: [...(source.build.extraResources || []), { from: defaults, to: 'core/internal-defaults.json' }],
   extraMetadata: { version, spawnloft: { channel: 'internal', updates: 'off' } },
   win,
   linux,
