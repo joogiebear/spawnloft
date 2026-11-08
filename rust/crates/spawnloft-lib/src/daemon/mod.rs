@@ -165,9 +165,60 @@ enum Waiter {
     },
 }
 
+/// Console lines queued for the server: at most this many wait while it is not reading.
+const CONSOLE_QUEUE: usize = 1024;
+
+/// The server's stdin, written by its own thread, so a server that stops reading its console
+/// (a deadlocked JVM) can never block the main loop: ping, stop and kill keep working.
+struct ConsoleInput {
+    queue: mpsc::SyncSender<Vec<u8>>,
+    closed: Arc<AtomicBool>,
+}
+
+impl ConsoleInput {
+    fn start(mut stdin: ChildStdin, log: Arc<Log>) -> Option<Self> {
+        let (queue, lines) = mpsc::sync_channel::<Vec<u8>>(CONSOLE_QUEUE);
+        let closed = Arc::new(AtomicBool::new(false));
+        let flag = closed.clone();
+        std::thread::Builder::new()
+            .name("console-in".into())
+            .spawn(move || {
+                // ends when the sender is dropped (the server is gone) or the pipe breaks
+                for line in lines {
+                    if let Err(e) = stdin.write_all(&line).and_then(|()| stdin.flush()) {
+                        // the server closed its console while we still held it (EPIPE)
+                        log.line(&format!("stdin error: {e}"));
+                        flag.store(true, Ordering::SeqCst);
+                        return;
+                    }
+                }
+            })
+            .ok()?;
+        Some(Self { queue, closed })
+    }
+
+    fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::SeqCst)
+    }
+
+    fn write(&self, text: &str) -> Result<(), &'static str> {
+        if self.is_closed() {
+            return Err("the server console is closed");
+        }
+        match self.queue.try_send(text.as_bytes().to_vec()) {
+            Ok(()) => Ok(()),
+            Err(mpsc::TrySendError::Full(_)) => Err("the server console is not reading input"),
+            Err(mpsc::TrySendError::Disconnected(_)) => {
+                self.closed.store(true, Ordering::SeqCst);
+                Err("the server console is closed")
+            }
+        }
+    }
+}
+
 struct Running {
     child: Child,
-    stdin: Option<ChildStdin>,
+    stdin: Option<ConsoleInput>,
     tree: Tree,
     readers_done: Arc<AtomicUsize>,
     sampler: metrics::Sampler,
@@ -357,7 +408,10 @@ impl Daemon {
                 readers_done.clone(),
             );
         }
-        let stdin = child.stdin.take();
+        let stdin = child
+            .stdin
+            .take()
+            .and_then(|s| ConsoleInput::start(s, self.log.clone()));
 
         let mut state = Map::new();
         state.insert("name".into(), json!(self.name));
@@ -450,7 +504,7 @@ impl Daemon {
         self.state.insert("error".into(), json!(message));
         self.save_state();
         std::thread::sleep(EXIT_DELAY);
-        std::process::exit(1);
+        self.leave(1);
     }
 
     /// `die()`: the reason in the daemon log and the state file, the server killed if it was
@@ -477,7 +531,7 @@ impl Daemon {
             st.insert("killedOnDaemonFailure".into(), json!(true));
         }
         let _ = fsx::write_json(&self.roots.state_file(&self.name), &Value::Object(st));
-        std::process::exit(1);
+        self.leave(1);
     }
 
     fn force_kill(&self) {
@@ -662,7 +716,10 @@ impl Daemon {
             }
             Replier::Sigterm => {
                 if value.get("ok") == Some(&Value::Bool(true)) {
-                    std::process::exit(0);
+                    // leave through the main loop's exit path, so every other waiter answered
+                    // in this same pass has its reply delivered first
+                    self.shutdown_at.get_or_insert_with(Instant::now);
+                    return;
                 }
                 let why = value.get("error").and_then(Value::as_str).unwrap_or("unknown");
                 self.log.line(&format!(
@@ -695,7 +752,10 @@ impl Daemon {
             {
                 Stop::Stdin(line) => {
                     self.log.line("sending stop to console");
-                    self.write_console_input(&line);
+                    if let Err(e) = self.write_console_input(&line) {
+                        self.log
+                            .line(&format!("stop not delivered: {e}; killing at the deadline"));
+                    }
                 }
                 Stop::Command { cmd, args, env } => {
                     self.log.line(&format!(
@@ -715,13 +775,14 @@ impl Daemon {
                         "asking for shutdown over the Redis protocol at {host}:{port}"
                     ));
                     let events = self.events.clone();
+                    let failed = self.events.clone();
                     let log = self.log.clone();
                     let wait = if terminate_after_save {
                         timeout
                     } else {
                         Duration::from_secs(5)
                     };
-                    let _ = std::thread::Builder::new().name("resp".into()).spawn(move || {
+                    let spawned = std::thread::Builder::new().name("resp".into()).spawn(move || {
                         let result =
                             resp::send(&host, port, &commands, password.as_deref(), wait).map(|_| ());
                         if terminate_after_save {
@@ -730,6 +791,15 @@ impl Daemon {
                             log.line(&format!("shutdown request: {e}"));
                         }
                     });
+                    if let Err(e) = spawned {
+                        self.log.line(&format!("shutdown request: could not start: {e}"));
+                        if terminate_after_save {
+                            // answered on the next pass, after the waiter below is in place
+                            let _ = failed.send(Event::RespDone {
+                                result: Err(format!("could not start the request: {e}")),
+                            });
+                        }
+                    }
                     if terminate_after_save {
                         self.waiters.push(Waiter::Checkpoint { reply, timeout });
                         return;
@@ -798,23 +868,15 @@ impl Daemon {
         });
     }
 
-    /// Writes to the server's console; a closed console is remembered, never fatal.
-    fn write_console_input(&mut self, text: &str) -> bool {
+    /// Queues a line for the server's console; never blocks, a closed console is never fatal.
+    fn write_console_input(&mut self, text: &str) -> Result<(), &'static str> {
         let Some(r) = self.running.as_mut() else {
-            return false;
+            return Err("server process is not running");
         };
-        let Some(stdin) = r.stdin.as_mut() else {
-            return false;
+        let Some(stdin) = r.stdin.as_ref() else {
+            return Err("the server console is closed");
         };
-        match stdin.write_all(text.as_bytes()).and_then(|()| stdin.flush()) {
-            Ok(()) => true,
-            Err(e) => {
-                // the server closed its console while we still held it (EPIPE)
-                self.log.line(&format!("stdin error: {e}"));
-                r.stdin = None;
-                false
-            }
-        }
+        stdin.write(text)
     }
 
     fn run_shutdown_tool(&self, cmd: &str, args: &[String], env: &[(String, String)]) {
@@ -890,15 +952,15 @@ impl Daemon {
         let Some(line) = req.get("line").and_then(Value::as_str) else {
             return json!({ "ok": false, "error": "send requires a line" });
         };
-        if r.stdin.is_none() {
+        if r.stdin.as_ref().is_none_or(ConsoleInput::is_closed) {
             return json!({ "ok": false, "error": "the server console is closed" });
         }
         let clean = line
             .strip_suffix('\n')
             .map(|l| l.strip_suffix('\r').unwrap_or(l))
             .unwrap_or(line);
-        if !self.write_console_input(&format!("{clean}\n")) {
-            return json!({ "ok": false, "error": "the server console is closed" });
+        if let Err(e) = self.write_console_input(&format!("{clean}\n")) {
+            return json!({ "ok": false, "error": e });
         }
         self.log.line(&format!("console <- {line}"));
         json!({ "ok": true })
@@ -917,7 +979,13 @@ impl Daemon {
         self.save_state();
         self.force_kill();
         std::thread::sleep(Duration::from_secs(1));
-        std::process::exit(1);
+        self.leave(1);
+    }
+
+    /// Ends the daemon, removing the control socket it bound (as daemon.mjs's server.close()).
+    fn leave(&self, code: i32) -> ! {
+        control::remove_socket(&self.control);
+        std::process::exit(code);
     }
 
     fn tick_waiters(&mut self) {
@@ -981,7 +1049,7 @@ impl Daemon {
                     }
                 }
                 if self.exit_at.is_some_and(|t| Instant::now() >= t) {
-                    std::process::exit(0);
+                    self.leave(0);
                 }
             }
             match events.recv_timeout(Duration::from_millis(50)) {
@@ -1097,6 +1165,9 @@ fn install_panic_hook(roots: Roots, name: String, log_file: PathBuf) {
             st.insert("killedOnDaemonFailure".into(), json!(true));
         }
         let _ = fsx::write_json(&roots.state_file(&name), &Value::Object(st));
+        // the same end in every profile: a debug build would otherwise unwind only the thread
+        // that panicked and carry on supervising a server this hook just killed
+        std::process::abort();
     }));
 }
 

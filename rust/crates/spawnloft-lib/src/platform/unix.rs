@@ -15,9 +15,26 @@ const SIGTERM: i32 = 15;
 unsafe extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
     fn getuid() -> u32;
+    fn umask(mask: ModeT) -> ModeT;
     fn signal(sig: i32, handler: usize) -> usize;
     #[cfg(target_os = "linux")]
     fn sysconf(name: i32) -> i64;
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+type ModeT = u16;
+#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "freebsd")))]
+type ModeT = u32;
+
+/// Runs `f` with a 077 umask, so a file it creates (the control socket) is never reachable by
+/// anyone else, not even for the moment before a chmod.
+pub fn with_private_umask<T>(f: impl FnOnce() -> T) -> T {
+    // SAFETY: umask has no preconditions and cannot fail; it is restored right after.
+    let old = unsafe { umask(0o077) };
+    let out = f();
+    // SAFETY: as above.
+    unsafe { umask(old) };
+    out
 }
 
 /// This process's user id.

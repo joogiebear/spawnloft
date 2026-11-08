@@ -70,6 +70,28 @@ pub fn handle_connection<S: Read + Write>(mut stream: S, events: &Sender<Event>)
     }
 }
 
+/// The socket file this daemon bound (device, inode), so exiting removes ours and never a
+/// newer daemon's that took the path after we wrote our final state.
+#[cfg(unix)]
+static BOUND: std::sync::OnceLock<(u64, u64)> = std::sync::OnceLock::new();
+
+/// Removes the control socket this daemon bound, if it is still ours. Windows pipes go with
+/// their handles.
+pub fn remove_socket(addr: &str) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Some(&(dev, ino)), Ok(m)) = (BOUND.get(), std::fs::symlink_metadata(addr))
+            && m.dev() == dev
+            && m.ino() == ino
+        {
+            let _ = std::fs::remove_file(addr);
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = addr;
+}
+
 #[cfg(unix)]
 fn listen(addr: String, events: Sender<Event>, log: Arc<Log>) {
     use std::os::unix::fs::PermissionsExt;
@@ -78,7 +100,7 @@ fn listen(addr: String, events: Sender<Event>, log: Arc<Log>) {
     let _ = std::fs::remove_file(&addr);
     let deadline = Instant::now() + LISTEN_TIMEOUT;
     let listener = loop {
-        match UnixListener::bind(&addr) {
+        match crate::platform::with_private_umask(|| UnixListener::bind(&addr)) {
             Ok(l) => break l,
             Err(e) if e.kind() == std::io::ErrorKind::AddrInUse && Instant::now() < deadline => {
                 log.line(&format!("control socket busy at {addr}, retrying"));
@@ -90,8 +112,12 @@ fn listen(addr: String, events: Sender<Event>, log: Arc<Log>) {
             }
         }
     };
-    // owner-only, whatever the umask
+    // owner-only from the start: the bind ran under a 077 umask, and the mode is set again here
     let _ = std::fs::set_permissions(&addr, std::fs::Permissions::from_mode(0o600));
+    if let Ok(m) = std::fs::symlink_metadata(&addr) {
+        use std::os::unix::fs::MetadataExt;
+        let _ = BOUND.set((m.dev(), m.ino()));
+    }
     let _ = events.send(Event::Bound(addr.clone()));
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
@@ -131,7 +157,25 @@ fn listen(addr: String, events: Sender<Event>, log: Arc<Log>) {
     };
     let _ = events.send(Event::Bound(addr.clone()));
     loop {
-        match wait_for_client(&pipe) {
+        let connected = wait_for_client(&pipe);
+        // The next instance is made while this one still exists, so the name is never without an
+        // instance of ours that another process could take (FILE_FLAG_FIRST_PIPE_INSTANCE only
+        // guards the first), and it is listening before a client gives up waiting.
+        let deadline = Instant::now() + LISTEN_TIMEOUT;
+        let next = loop {
+            match server.instance(false) {
+                Ok(h) => break h,
+                Err(e) if Instant::now() < deadline => {
+                    log.line(&format!("control pipe instance failed: {e}; retrying"));
+                    std::thread::sleep(LISTEN_RETRY);
+                }
+                Err(e) => {
+                    let _ = events.send(Event::BindFatal(format!("no new pipe instance: {e}")));
+                    return;
+                }
+            }
+        };
+        match connected {
             Ok(()) => {
                 let file = std::fs::File::from(pipe);
                 let tx = events.clone();
@@ -142,16 +186,7 @@ fn listen(addr: String, events: Sender<Event>, log: Arc<Log>) {
             // the client left before it was served (ERROR_NO_DATA), or the instance broke
             Err(_) => drop(pipe),
         }
-        // the next instance must be listening before a client gives up waiting (libuv waits 30 s)
-        pipe = loop {
-            match server.instance(false) {
-                Ok(h) => break h,
-                Err(e) => {
-                    log.line(&format!("control pipe instance failed: {e}; retrying"));
-                    std::thread::sleep(LISTEN_RETRY);
-                }
-            }
-        };
+        pipe = next;
     }
 }
 

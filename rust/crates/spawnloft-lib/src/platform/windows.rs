@@ -20,6 +20,9 @@ use windows_sys::Win32::Security::{
     GetTokenInformation, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX};
+use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
+};
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, TerminateJobObject,
 };
@@ -29,8 +32,8 @@ use windows_sys::Win32::System::Pipes::{
 };
 use windows_sys::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows_sys::Win32::System::Threading::{
-    CREATE_NO_WINDOW, GetCurrentProcess, GetExitCodeProcess, GetProcessTimes, OpenProcess, OpenProcessToken,
-    PROCESS_QUERY_LIMITED_INFORMATION,
+    CREATE_NO_WINDOW, CREATE_SUSPENDED, GetCurrentProcess, GetExitCodeProcess, GetProcessTimes, OpenProcess,
+    OpenProcessToken, OpenThread, PROCESS_QUERY_LIMITED_INFORMATION, ResumeThread, THREAD_SUSPEND_RESUME,
 };
 
 use super::Probe;
@@ -40,9 +43,42 @@ pub fn hide_window(cmd: &mut Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
-/// An ordinary child with no window: `detached` would give the server a console of its own.
+/// An ordinary child with no window (`detached` would give the server a console of its own),
+/// started suspended so [`Tree::attach`] puts it in the job before it can run, let alone fork:
+/// a process it started first would be outside the job and survive a force kill.
+/// `Tree::attach` must follow every spawn made with this, since it is what resumes the child.
 pub fn prepare_server(cmd: &mut Command) {
-    hide_window(cmd);
+    cmd.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
+}
+
+/// Resumes every thread of a process started with CREATE_SUSPENDED (it has just the one).
+fn resume(pid: u32) -> std::io::Result<()> {
+    // SAFETY: a thread snapshot of the system; the handle is checked and owned below.
+    let snap = owned(unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }).ok_or_else(last_error)?;
+    let snap_h = snap.as_raw_handle() as HANDLE;
+    // SAFETY: a zeroed THREADENTRY32 with dwSize set is the documented input.
+    let mut entry: THREADENTRY32 = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+    let mut resumed = 0;
+    // SAFETY: a valid snapshot handle and a correctly sized entry.
+    let mut more = unsafe { Thread32First(snap_h, &mut entry) } != 0;
+    while more {
+        if entry.th32OwnerProcessID == pid {
+            // SAFETY: the result is checked and owned (closed on drop).
+            if let Some(t) = owned(unsafe { OpenThread(THREAD_SUSPEND_RESUME, 0, entry.th32ThreadID) }) {
+                // SAFETY: a valid thread handle opened with THREAD_SUSPEND_RESUME.
+                if unsafe { ResumeThread(t.as_raw_handle() as HANDLE) } != u32::MAX {
+                    resumed += 1;
+                }
+            }
+        }
+        // SAFETY: as above.
+        more = unsafe { Thread32Next(snap_h, &mut entry) } != 0;
+    }
+    if resumed == 0 {
+        return Err(std::io::Error::other("no thread of the server could be resumed"));
+    }
+    Ok(())
 }
 
 /// Windows has no SIGTERM; a stop always comes over the control pipe.
@@ -75,7 +111,24 @@ pub struct Tree {
 }
 
 impl Tree {
+    /// Puts a child started by [`prepare_server`] (suspended) in a job, then lets it run. A
+    /// child that cannot be resumed is terminated, so it is seen to exit rather than hang.
     pub fn attach(child: &Child) -> Tree {
+        let tree = Self::join(child);
+        if let Err(e) = resume(child.id()) {
+            // SAFETY: the child's own handle, valid while `child` lives.
+            unsafe {
+                windows_sys::Win32::System::Threading::TerminateProcess(child.as_raw_handle() as HANDLE, 1)
+            };
+            return Tree {
+                fallback_reason: Some(format!("the server could not be started from suspended ({e})")),
+                ..tree
+            };
+        }
+        tree
+    }
+
+    fn join(child: &Child) -> Tree {
         let pid = child.id();
         // SAFETY: default security, no name; the result is checked.
         let job = owned(unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) });
@@ -119,7 +172,10 @@ impl Tree {
 }
 
 fn taskkill(pid: u32) {
-    let mut cmd = Command::new("taskkill");
+    // by full path: a bare name is searched for in the daemon's directory and cwd first
+    let root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+    let exe = std::path::Path::new(&root).join("System32").join("taskkill.exe");
+    let mut cmd = Command::new(exe);
     cmd.args(["/PID", &pid.to_string(), "/T", "/F"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -409,21 +465,38 @@ mod tests {
         }
         assert!(sddl.starts_with("D:P"), "{sddl}");
         assert_eq!(sddl.matches("(A;").count(), 1, "{sddl}");
-        assert!(sddl.ends_with(&format!(";;;{sid})")), "{sddl}");
+        // SDDL prints a well-known account by its alias: the built-in Administrator (RID 500,
+        // which the CI runners use) as LA
+        let trustee = if sid.ends_with("-500") {
+            "LA".to_string()
+        } else {
+            sid.clone()
+        };
+        assert!(sddl.ends_with(&format!(";;;{trustee})")), "{sddl} for {sid}");
     }
 
     #[test]
     fn a_job_kill_takes_the_tree() {
-        let mut child = Command::new("cmd")
-            .args(["/C", "ping -n 30 127.0.0.1 >NUL"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .unwrap();
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "ping -n 30 127.0.0.1 >NUL"]);
+        prepare_server(&mut cmd);
+        let mut child = cmd.spawn().unwrap();
         let tree = Tree::attach(&child);
         assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
         tree.kill();
         let status = child.wait().unwrap();
         assert_eq!(status.code(), Some(1));
+    }
+
+    #[test]
+    fn a_suspended_server_runs_once_attached() {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "exit 7"]);
+        prepare_server(&mut cmd);
+        let mut child = cmd.spawn().unwrap();
+        let tree = Tree::attach(&child);
+        assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
+        assert_eq!(child.wait().unwrap().code(), Some(7));
     }
 
     #[test]

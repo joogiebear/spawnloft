@@ -28,7 +28,9 @@ pub fn post(url: &str, body: &str) -> Result<u16, String> {
     if url.starts_with("https://") {
         return post_with_curl(url, body);
     }
-    Err(format!("{url} is not an http(s) URL"))
+    // the scheme only: the rest of a webhook URL is its secret token
+    let scheme = url.split_once(':').map_or("no scheme", |(s, _)| s);
+    Err(format!("the webhook URL is not http(s) (scheme: {scheme})"))
 }
 
 fn post_plain(rest: &str, body: &str) -> Result<u16, String> {

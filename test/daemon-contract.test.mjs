@@ -233,3 +233,20 @@ test('the Rust daemon\'s control socket is its owner\'s alone',
     assert.equal(fs.statSync(controlPath(name)).mode & 0o777, 0o600)
     await sup.stop(name)
   })
+
+test('a server that stops reading its console cannot wedge the daemon', { timeout: 60000 }, async () => {
+  const name = await makeInstance('wedge')
+  await sup.start(name, { timeout: 15000 })
+  assert.equal((await controlRequest(name, { op: 'send', line: 'hang' })).ok, true)
+  // far past any pipe buffer (4 KiB on Windows, 64 KiB on Linux) with nobody reading
+  const line = 'say ' + 'x'.repeat(1000)
+  for (let i = 0; i < 300; i++) {
+    const r = await controlRequest(name, { op: 'send', line })
+    assert.equal(typeof r.ok, 'boolean')
+  }
+  const pong = await controlRequest(name, { op: 'ping' })
+  assert.equal(pong.ok, true)
+  const killed = await controlRequest(name, { op: 'kill' })
+  assert.equal(killed.ok, true)
+  assert.ok(await until(() => readState(name).state?.running === false, 15000))
+})
