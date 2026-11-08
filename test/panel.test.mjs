@@ -88,6 +88,73 @@ function backupRefreshFixture(api) {
   return { render, state, body, history, status }
 }
 
+const { conPush, conEvict, conReset } = lifted(['conPush', 'conEvict', 'conReset'])
+
+// A model of the console: every held line with whether it matches and whether it got a node, so
+// the bookkeeping can be checked against what the DOM would actually hold after a draw.
+function consoleModel() {
+  const c = { visible: 0, inDom: 0, trim: 0, pending: [] }
+  const held = []
+  let dom = []
+  return {
+    c,
+    push(matches, paused) {
+      const e = { matches }
+      held.push(e)
+      if (conPush(c, matches, paused)) c.pending.push(e)
+    },
+    evict() { conEvict(c, held.shift().matches) },
+    draw() {
+      dom = dom.slice(c.trim)
+      c.inDom -= c.trim
+      c.trim = 0
+      dom.push(...c.pending)
+      c.inDom += c.pending.length
+      c.pending.length = 0
+      return dom
+    },
+    rebuild() { dom = held.filter((e) => e.matches); conReset(c, dom.length, dom.length) },
+    held,
+  }
+}
+
+test('console counts matching lines without walking them, and drops the right nodes', () => {
+  const m = consoleModel()
+  for (let i = 0; i < 10; i++) m.push(i % 3 === 0, false)
+  assert.equal(m.c.visible, 4)
+  assert.equal(m.draw().length, 4)
+  for (let i = 0; i < 6; i++) { m.evict(); m.push(true, false) }
+  const dom = m.draw()
+  assert.deepEqual(dom, m.held.filter((e) => e.matches))
+  assert.equal(m.c.visible, dom.length)
+})
+
+test('console eviction before a draw drops queued lines, not other nodes', () => {
+  const m = consoleModel()
+  for (let i = 0; i < 3; i++) m.push(true, false)
+  m.draw()
+  for (let i = 0; i < 5; i++) m.push(true, false)
+  for (let i = 0; i < 6; i++) m.evict()
+  assert.deepEqual(m.draw(), m.held)
+  assert.equal(m.c.inDom, 2)
+})
+
+test('console lines held while paused count but never remove a node they do not have', () => {
+  const m = consoleModel()
+  m.push(true, false)
+  m.push(true, false)
+  m.draw()
+  for (let i = 0; i < 4; i++) m.push(true, true)
+  assert.equal(m.c.visible, 6)
+  assert.equal(m.c.pending.length, 0)
+  for (let i = 0; i < 3; i++) m.evict()
+  assert.deepEqual(m.draw(), [])
+  assert.equal(m.c.inDom, 0)
+  assert.equal(m.c.visible, 3)
+  m.rebuild()
+  assert.equal(m.draw().length, 3)
+})
+
 test('backup history refreshes external changes without rebuilding unchanged history or forms', async () => {
   const data = { snapshots: [], running: false, dir: '/backups/test-server', root: '/backups', mirror: null }
   const fixture = backupRefreshFixture(async route => {
