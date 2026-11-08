@@ -508,13 +508,14 @@ ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
 })
 
 ipcMain.handle('mcctl:checkUpdate', async () => {
+  // before the Mac manual path, so an internal Mac build is never sent to the beta release page
+  if (updatesOff) return { ok: false, reason: 'internal', message: internalUpdateMessage }
   if (manualUpdates) {
     return { ok: false, reason: 'manual', message: 'Mac previews update manually. Download the current build from the beta release page.' }
   }
   if (!app.isPackaged) {
     return { ok: false, reason: 'dev', message: 'Updates only apply to an installed build.' }
   }
-  if (updatesOff) return { ok: false, reason: 'internal', message: internalUpdateMessage }
   try {
     const res = await autoUpdater.checkForUpdates()
     return { ok: true, version: res?.updateInfo?.version ?? null, current: app.getVersion() }

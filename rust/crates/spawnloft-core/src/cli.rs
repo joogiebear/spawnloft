@@ -36,6 +36,11 @@ fn usage_error(message: &str) -> Outcome {
     }
 }
 
+/// An argument that is not valid UTF-8: nothing this binary takes can contain one yet.
+pub fn not_utf8() -> Outcome {
+    usage_error("an argument is not valid UTF-8")
+}
+
 pub fn help() -> String {
     let info = build::current();
     format!(

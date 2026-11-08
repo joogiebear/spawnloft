@@ -358,11 +358,11 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows and Linux keep their updater')
     // the no-network manual path applies only to ad-hoc packages; signed ones have their own
     // Squirrel.Mac smoke test
-    if (manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
+    if (manual && provenance.updates !== 'off') assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
     // internal builds (v2 branch) never ask GitHub for an update; the check answers without the network
     if (provenance.updates === 'off') {
       assert.equal(info.updates, 'off', 'An internal build must report its updater as off')
-      if (!manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'internal')
+      assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'internal')
       record('PASS: internal build has its update check turned off')
     }
     await page.locator('#bSettings').click()

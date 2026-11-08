@@ -32,7 +32,7 @@ pub const fn current() -> BuildInfo {
 impl BuildInfo {
     /// The commit cut to twelve characters, as the desktop app's build-info.json does.
     pub fn short_commit(&self) -> Option<&'static str> {
-        self.commit.map(|c| if c.len() > 12 { &c[..12] } else { c })
+        self.commit.map(|c| c.get(..12).unwrap_or(c))
     }
 
     /// One line: `spawnloft-core 2.0.0-internal.7 (1a461f1e2b3c, x86_64-pc-windows-msvc)`.

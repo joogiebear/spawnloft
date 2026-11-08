@@ -58,7 +58,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}
+          # a fresh key each run so the cache is re-saved; restore-keys picks up the newest one
+          key: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-check-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Formatting
         if: matrix.runner == 'ubuntu-24.04'
         run: cargo fmt --all --check
@@ -114,6 +116,7 @@ jobs:
           npm --prefix desktop test
 
   package:
+    if: github.ref == 'refs/heads/v2'
     needs: [rust, deny, node]
     strategy:
       fail-fast: false
@@ -166,7 +169,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}
+          key: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Build spawnloft-core
         working-directory: rust
         run: cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
