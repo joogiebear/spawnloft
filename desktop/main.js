@@ -8,6 +8,7 @@ const { autoUpdater } = require('electron-updater')
 const windowState = require('./window-state')
 const uiZoom = require('./ui-zoom')
 const updateChannel = require('./update-channel')
+const majorUpdate = require('./major-update')
 const launcherWindow = require('./launcher-window')
 const loginWindow = require('./login-window')
 // ad-hoc packages can't take Squirrel.Mac updates; signed betas use the normal updater,
@@ -455,13 +456,19 @@ function updateChannelFile() {
   return path.join(app.getPath('userData'), 'update-channel.json')
 }
 
+// set by setupUpdates: which version is on offer and whether it is a new major
+let offered = { offered: null, major: false }
+
 // Downloads happen in the background; installing waits for the user, or for the window closing
-// (the updater applies it on quit). Packaged builds only, so a dev run never touches a checkout.
+// (the updater applies it on quit) - except a new major, which only installs from the button
+// (major-update.js). Packaged builds only, so a dev run never touches a checkout.
 // The NSIS install runs with /S, per-user, so there is no UAC prompt.
 function setupUpdates() {
   if (manualUpdates || updatesOff) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
+  // registered before the listeners below, so they already see the decision
+  offered = majorUpdate.guard(autoUpdater, app.getVersion())
   // mac updates use complete signed zips; windows keeps differential updates
   if (process.platform === 'darwin') autoUpdater.disableDifferentialDownload = true
   autoUpdater.logger = null
@@ -471,7 +478,7 @@ function setupUpdates() {
   autoUpdater.on('update-not-available', () => send('update:none', {}))
   autoUpdater.on('error', (err) => send('update:error', { error: String(err?.message ?? err) }))
   autoUpdater.on('download-progress', (p) => send('update:progress', { percent: Math.round(p.percent) }))
-  autoUpdater.on('update-downloaded', (info) => send('update:ready', { version: info.version }))
+  autoUpdater.on('update-downloaded', (info) => send('update:ready', { version: info.version, major: offered.major }))
 
   setTimeout(checkForUpdatesQuietly, UPDATE_FIRST_DELAY_MS).unref?.()
   // periodic because this app is left open for days
@@ -527,11 +534,38 @@ ipcMain.handle('spawnloft:checkUpdate', async () => {
 // quitAndInstall(true, true): silent NSIS install (/S), then reopen on the new version.
 // Servers survive (detached daemons) but the panel goes away mid-restart, so the caller should
 // warn about running servers first.
+//
+// A new major on Windows waits until nothing is running: what its installer does to running
+// SpawnLoft.exe daemons is not known yet (major-update.js). A scheduled task can still start a
+// server in the seconds between this check and the installer; accepted for the bridge release.
 ipcMain.handle('spawnloft:installUpdate', async () => {
   if (manualUpdates || updatesOff || !app.isPackaged) return { ok: false }
+  if (offered.major && process.platform === 'win32') {
+    const running = await activeServers()
+    if (running.length) {
+      return {
+        ok: false,
+        reason: 'running',
+        running,
+        message: `Stop ${running.join(', ')} first. SpawnLoft ${offered.offered} is a new major version and installs only with every server stopped.`,
+      }
+    }
+  }
   autoUpdater.quitAndInstall(true, true)
   return { ok: true }
 })
+
+// names of servers and databases whose daemon or java is still up; unreadable counts as running,
+// so a broken registry never lets a major install over live servers
+async function activeServers() {
+  try {
+    const registry = await loadCore('src/registry.mjs')
+    const control = await loadCore('src/control.mjs')
+    return registry.listAll().map((i) => i.name).filter((n) => control.isActiveStatus(control.readState(n).status))
+  } catch (err) {
+    return [`(could not read the server list: ${String(err?.message ?? err)})`]
+  }
+}
 
 // written into resources at build time so a bug report can name the exact commit
 function buildInfo() {

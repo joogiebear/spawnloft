@@ -25,6 +25,7 @@ import * as pluginActions from './plugin-actions.mjs'
 import * as upgrade from './upgrade.mjs'
 import * as sources from './sources.mjs'
 import { repairAfterMove } from './relocate.mjs'
+import { dataFormatWarning } from './data-format.mjs'
 import * as services from './services.mjs'
 import * as software from './software.mjs'
 import * as mrpack from './mrpack.mjs'
@@ -66,6 +67,8 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   } catch (err) {
     panelLog(`could not check whether the installation moved: ${err?.message ?? err}`)
   }
+  const newerData = dataFormatWarning()
+  if (newerData) panelLog(`warning: ${newerData}`)
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -1458,7 +1461,7 @@ async function route(req, res) {
   if (seg[1] === 'client') return handleClient(req, res, seg, url)
 
   if (seg[1] === 'health' && req.method === 'GET') {
-    return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL })
+    return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL, dataFormat: dataFormatWarning() })
   }
 
   if (seg[1] === 'java' && seg[2] === 'needs' && req.method === 'GET') {

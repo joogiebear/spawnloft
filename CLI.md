@@ -73,6 +73,14 @@ sharing them. A historical diagnostic finding is not a failed command or a plugi
 verdict. `doctor --json` is read-only and returns `ok:false` plus its findings when checks
 fail. The existing plain-text `doctor` retains its stale-state repair behavior.
 
+`spawnloft repair [--json]` rewrites every scheduled-task shim under `<data>/tasks/` and every
+server's double-click launchers (`start`, `console`, `stop`) so they run the SpawnLoft that runs
+this command. The panel does the same by itself when the program folder moved or a release changed
+what those files run; `repair` does it unconditionally, for after installing another version over
+this one or going back to an older one. It touches no Task Scheduler, launchd or systemd entry (they
+hold the shim's path, which does not change) and no server. With `--json`, `data` carries `shims`,
+`launchers`, `runtime` (the executable) and `root` (the code folder).
+
 `spawnloft diag <server> [--lines N] [--out <dir>] [--json]` writes a zip holding the
 server console, the daemon log, crash reports, `server.properties` (secrets removed) and
 the known-problem findings, with passwords and account names stripped. The default
