@@ -12,6 +12,7 @@ pub mod js;
 pub mod json;
 pub mod metrics;
 pub mod notify;
+pub mod panel;
 pub mod paths;
 pub mod patterns;
 pub mod platform;

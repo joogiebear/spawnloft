@@ -8,7 +8,7 @@
 # Victor says "push to beta"; see .github/workflows/rust-internal.yml.
 [workspace]
 resolver = "3"
-members = ["crates/spawnloft-lib", "crates/spawnloft-core", "crates/spawnloft-fakes"]
+members = ["crates/spawnloft-lib", "crates/spawnloft-core", "crates/spawnloft-fakes", "crates/spawnloft-shell"]
 
 [workspace.package]
 # The version a local build prints. CI overrides it per run with SPAWNLOFT_VERSION

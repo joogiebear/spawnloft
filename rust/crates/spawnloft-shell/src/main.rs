@@ -1,0 +1,278 @@
+//! `SpawnLoft` (`SpawnLoft.exe`): the window. Phase 0 spike (P0-F, PLAN-RUST-TAURI.md section 3
+//! item 5), internal only.
+//!
+//! It spawns `spawnloft-core ui --port 0` and opens one window on the address that prints,
+//! exactly as step 2's Electron will, so step 3 changes nothing below the window. Everything the
+//! panel does goes through that HTTP endpoint; the window itself has no Tauri API exposed to the
+//! page (capabilities/default.json).
+//!
+//! Also here, because they are what the spike has to prove:
+//! - the argv compatibility form (REVIEW-REV3 B1): `SpawnLoft.exe <...>\mcctl.mjs <command...>`,
+//!   which every 1.x task shim, server launcher and MCP config runs, is forwarded to the Node core
+//!   so those keep working after the shell replaces Electron;
+//! - one Tauri updater cycle, run when `SPAWNLOFT_SPIKE_FEED` names a feed;
+//! - start-time numbers, written when `SPAWNLOFT_SPIKE_MEASURE` names a file.
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, ExitCode, Stdio};
+use std::sync::Mutex;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+use tauri::webview::PageLoadEvent;
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_updater::UpdaterExt;
+
+/// The running `spawnloft-core ui` and the pipe that keeps it alive (it exits when stdin closes).
+#[derive(Default)]
+struct Core {
+    child: Mutex<Option<(Child, ChildStdin)>>,
+}
+
+impl Core {
+    fn stop(&self) {
+        if let Ok(mut guard) = self.child.lock()
+            && let Some((mut child, stdin)) = guard.take()
+        {
+            drop(stdin);
+            // it exits on its own once stdin closes; give it a moment, then make sure
+            for _ in 0..20 {
+                if matches!(child.try_wait(), Ok(Some(_))) {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+fn main() -> ExitCode {
+    let started = Instant::now();
+    let args: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    if let Some(code) = argv_compat(&args) {
+        return code;
+    }
+
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(Core::default())
+        .setup(move |app| {
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                .title("SpawnLoft")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(900.0, 600.0)
+                .build()?;
+            start_core(app.handle().clone());
+            if let Some(feed) = std::env::var_os("SPAWNLOFT_SPIKE_FEED") {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = update_once(handle, feed.to_string_lossy().into_owned()).await {
+                        spike_log(&format!("update: {e}"));
+                    }
+                });
+            }
+            Ok(())
+        })
+        .on_page_load(move |_webview, payload| {
+            if payload.event() == PageLoadEvent::Finished && payload.url().scheme() == "http" {
+                measure(started);
+            }
+        })
+        .build(tauri::generate_context!());
+    let app = match app {
+        Ok(a) => a,
+        Err(e) => {
+            spike_log(&format!("could not start: {e}"));
+            return ExitCode::from(1);
+        }
+    };
+    app.run(|app, event| {
+        if let RunEvent::Exit = event {
+            app.state::<Core>().stop();
+        }
+    });
+    ExitCode::SUCCESS
+}
+
+/// `<exe dir>/resources`, where the installer puts the core binary and the Node core, as 1.x does.
+fn resources_dir() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    Some(exe.parent()?.join("resources"))
+}
+
+fn core_binary() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("SPAWNLOFT_CORE_BIN").filter(|p| !p.is_empty()) {
+        return Some(PathBuf::from(p));
+    }
+    let name = if cfg!(windows) {
+        "spawnloft-core.exe"
+    } else {
+        "spawnloft-core"
+    };
+    Some(resources_dir()?.join("bin").join(name))
+}
+
+/// The Node core (`mcctl.mjs`, `spawnloft.mjs`, `src/`): `SPAWNLOFT_CORE_DIR`, then the bundled copy.
+fn core_dir() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
+        return Some(PathBuf::from(p));
+    }
+    Some(resources_dir()?.join("core"))
+}
+
+fn start_core(app: tauri::AppHandle) {
+    let (Some(bin), Some(dir)) = (core_binary(), core_dir()) else {
+        spike_log("no core binary path");
+        return;
+    };
+    let mut cmd = Command::new(&bin);
+    cmd.args(["ui", "--port", "0", "--exit-with-stdin", "--core-dir"])
+        .arg(&dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            spike_log(&format!("could not start {}: {e}", bin.display()));
+            return;
+        }
+    };
+    let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
+        let _ = child.kill();
+        return;
+    };
+    if let Ok(mut guard) = app.state::<Core>().child.lock() {
+        *guard = Some((child, stdin));
+    }
+    std::thread::spawn(move || {
+        let mut opened = false;
+        for line in BufReader::new(stdout).lines() {
+            let Ok(line) = line else { break };
+            if opened {
+                continue;
+            }
+            let Some(url) = line.trim().strip_prefix(spawnloft_lib::panel::READY_PREFIX) else {
+                continue;
+            };
+            opened = true;
+            match (url.trim().parse(), app.get_webview_window("main")) {
+                (Ok(url), Some(w)) => {
+                    if let Err(e) = w.navigate(url) {
+                        spike_log(&format!("navigate: {e}"));
+                    }
+                }
+                _ => spike_log(&format!("bad panel address `{url}`")),
+            }
+        }
+    });
+}
+
+/// `SpawnLoft.exe <path ending in mcctl.mjs or spawnloft.mjs> <command...>`: what 1.x task shims,
+/// server launchers and MCP configs run (with ELECTRON_RUN_AS_NODE, ignored here). Forwarded to
+/// Node with the same arguments; `None` when the command line is not that form.
+fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
+    let first = args.get(1)?.to_string_lossy().to_ascii_lowercase();
+    if !(first.ends_with("mcctl.mjs") || first.ends_with("spawnloft.mjs")) {
+        return None;
+    }
+    let script = Path::new(&args[1]);
+    // the shim names the 1.x path; the same file ships at the same place in this install
+    let script = if script.is_file() {
+        script.to_path_buf()
+    } else {
+        core_dir()?.join(script.file_name()?)
+    };
+    let Some(node) = spawnloft_lib::panel::find_node(None) else {
+        spike_log("argv compatibility: Node.js not found");
+        return Some(ExitCode::from(127));
+    };
+    let status = Command::new(node)
+        .arg(script)
+        .args(&args[2..])
+        .env_remove("ELECTRON_RUN_AS_NODE")
+        .status();
+    Some(match status {
+        Ok(s) => ExitCode::from(u8::try_from(s.code().unwrap_or(1)).unwrap_or(1)),
+        Err(e) => {
+            spike_log(&format!("argv compatibility: {e}"));
+            ExitCode::from(1)
+        }
+    })
+}
+
+/// One check against `feed`; installs and exits if it offers a newer signed version.
+async fn update_once(app: tauri::AppHandle, feed: String) -> Result<(), String> {
+    let url = feed.parse().map_err(|e| format!("feed url: {e}"))?;
+    let stopper = app.clone();
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![url])
+        .map_err(|e| e.to_string())?
+        // the installer replaces resources\bin\spawnloft-core.exe: the core must not hold it
+        .on_before_exit(move || stopper.state::<Core>().stop())
+        .build()
+        .map_err(|e| e.to_string())?;
+    spike_log(&format!(
+        "update: checking {feed} from {}",
+        app.package_info().version
+    ));
+    match updater.check().await.map_err(|e| e.to_string())? {
+        None => spike_log("update: none offered"),
+        Some(update) => {
+            spike_log(&format!("update: offered {}", update.version));
+            update
+                .download_and_install(|_, _| {}, || spike_log("update: downloaded, verified"))
+                .await
+                .map_err(|e| e.to_string())?;
+            // Windows exits inside download_and_install; elsewhere restart into the new bundle
+            app.restart();
+        }
+    }
+    Ok(())
+}
+
+fn epoch_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+fn measure(started: Instant) {
+    let Some(path) = std::env::var_os("SPAWNLOFT_SPIKE_MEASURE") else {
+        return;
+    };
+    let line = format!(
+        "{{\"panelLoadedEpochMs\":{},\"sinceMainMs\":{}}}\n",
+        epoch_ms(),
+        started.elapsed().as_millis()
+    );
+    let _ = std::fs::write(path, line);
+}
+
+fn spike_log(msg: &str) {
+    let Some(path) = std::env::var_os("SPAWNLOFT_SPIKE_LOG") else {
+        return;
+    };
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "{} {msg}", epoch_ms());
+    }
+}

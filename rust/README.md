@@ -8,6 +8,7 @@
 | --- | --- |
 | `spawnloft-lib` | The library: version and build identity now; the daemon, archives and the core later |
 | `spawnloft-core` | The console binary (`spawnloft-core`, `spawnloft-core.exe`). Today: `--version` and a `daemon` stub |
+| `spawnloft-shell` | The window (`SpawnLoft.exe`), a Tauri 2 shell over the panel `spawnloft-core ui` serves. Phase 0 spike (P0-F): its NSIS template installs over 1.x; see `crates/spawnloft-shell/spike/` |
 | `spawnloft-fakes` | Test helpers: temp dirs and running the built binary; fake java, CDNs and token endpoints later |
 
 ## Build and check
@@ -21,6 +22,15 @@ cargo test --workspace --locked
 cargo deny check            # cargo install cargo-deny --locked
 cargo build --release --locked -p spawnloft-core
 ./target/release/spawnloft-core --version
+```
+
+The shell links webkit2gtk on Linux: `sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev
+librsvg2-dev` before building the workspace there. To run it against a checkout, build the core
+and point the shell at it:
+
+```sh
+cargo build -p spawnloft-core -p spawnloft-shell
+SPAWNLOFT_CORE_BIN=target/debug/spawnloft-core SPAWNLOFT_CORE_DIR=.. ./target/debug/SpawnLoft
 ```
 
 On Windows this needs rustup and the Visual Studio 2022 Build Tools with the "Desktop

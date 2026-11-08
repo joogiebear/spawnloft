@@ -1,0 +1,29 @@
+[package]
+name = "spawnloft-shell"
+description = "SpawnLoft's window: a Tauri 2 shell over the panel that spawnloft-core serves (Phase 0 spike)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+# the Windows image name stays SpawnLoft.exe, as in 1.x: shortcuts, the taskbar pin and the
+# installers' running-app check all name it (tauri.conf.json mainBinaryName says the same)
+name = "SpawnLoft"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.7.4", features = [] }
+
+[dependencies]
+spawnloft-lib.workspace = true
+tauri = { version = "=2.12.5", features = [] }
+# generate_context! expands to code naming serde_json at the crate root
+serde_json = "1.0.154"
+tauri-plugin-updater = "=2.14.1"
+tauri-plugin-single-instance = "=2.5.5"
+
+[lints]
+workspace = true

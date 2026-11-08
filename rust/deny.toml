@@ -8,6 +8,15 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# Unmaintained (not vulnerable) crates that only the Tauri shell pulls in, all on Linux: GTK's
+# macros and the D-Bus crates behind tauri-plugin-single-instance. No maintained release of
+# Tauri 2 avoids them. Each entry is re-checked by the thread that bumps Tauri (P0-F, 2026-11-08).
+ignore = [
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error via glib-macros (gtk-rs 0.18), Linux build of tauri only; compile-time macro" },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant via zbus 5 (tauri-plugin-single-instance on Linux); merged into zbus 6, which the plugin has not adopted yet" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names via zbus 5, as above" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive via zbus 5, as above" },
+]
 
 [licenses]
 version = 2
@@ -25,6 +34,8 @@ allow = [
   "Zlib",
   "MPL-2.0",
   "CC0-1.0",
+  # webpki-root-certs (Mozilla's root list as data), via reqwest in tauri and its updater plugin
+  "CDLA-Permissive-2.0",
 ]
 
 [bans]

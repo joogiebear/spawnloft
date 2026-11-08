@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SpawnLoft",
+  "mainBinaryName": "SpawnLoft",
+  "version": "2.0.0-spike.0",
+  "identifier": "io.github.joogiebear.mcctl",
+  "build": {
+    "frontendDist": "dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "victor zemeckis",
+    "copyright": "joogiebear",
+    "homepage": "https://github.com/joogiebear/spawnloft",
+    "icon": ["../../../desktop/build/icon.png", "../../../desktop/build/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "nsis": {
+        "template": "windows/installer.nsi",
+        "installMode": "currentUser",
+        "installerIcon": "../../../desktop/build/icon.ico"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

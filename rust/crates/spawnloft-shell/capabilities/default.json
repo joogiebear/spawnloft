@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Nothing yet: the panel is a remote origin (http://127.0.0.1:<port>) and the spike gives it no Tauri API. Pickers, zoom and open-in-folder arrive with a remote.urls entry in step 3.",
+  "windows": ["main"],
+  "permissions": []
+}
