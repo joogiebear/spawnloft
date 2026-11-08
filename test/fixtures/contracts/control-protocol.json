@@ -1,0 +1,349 @@
+{
+  "about": "The per-server daemon's control channel (src/daemon.mjs handle(), clients in src/control.mjs and src/supervisor.mjs). Shapes use the language in shape.mjs. Asserted by test/contracts-daemon.test.mjs against a real daemon (asserted: live) or, where a case needs a real engine or a race to reach, by test/contracts.test.mjs against the daemon source (asserted: source).",
+  "transport": {
+    "framing": "JSON lines, UTF-8. The client connects, writes one request line, reads the first reply line and closes. The daemon answers every non-blank line it reads on a connection, in order, one reply line each.",
+    "unix": "a Unix socket at <data root>/run/<name>/control.sock, or /tmp/spawnloft-<uid>/<first 20 hex of sha256(natural path)>.sock when the natural path passes sun_path (107 bytes on Linux, 103 on macOS); see src/paths.mjs controlPath",
+    "windows": "the named pipe \\\\.\\pipe\\mcctl-<name>",
+    "bind": "a busy address (EADDRINUSE) is retried every 250 ms for 15 s; if it never binds the daemon kills the server and writes state.error \"control channel unavailable: <reason>\"",
+    "clientErrors": "ENOENT or ECONNREFUSED on connect means the server is not running; a close before any reply line is an error, not a stop"
+  },
+  "ops": [
+    "ping",
+    "send",
+    "stop",
+    "kill"
+  ],
+  "requests": {
+    "ping": {
+      "object": {
+        "op": {
+          "const": "ping"
+        }
+      },
+      "extra": true
+    },
+    "send": {
+      "object": {
+        "op": {
+          "const": "send"
+        },
+        "line": "string"
+      },
+      "extra": true
+    },
+    "stop": {
+      "object": {
+        "op": {
+          "const": "stop"
+        },
+        "timeout?": "number"
+      },
+      "extra": true
+    },
+    "kill": {
+      "object": {
+        "op": {
+          "const": "kill"
+        }
+      },
+      "extra": true
+    }
+  },
+  "cases": [
+    {
+      "id": "ping",
+      "when": "any time the daemon is up. Readers must accept extra fields: the protocol version the 1.7 bridge adds rides here.",
+      "request": {
+        "op": "ping"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "javaPid": "integer|null",
+          "startedAt": "integer",
+          "alive": "boolean"
+        },
+        "extra": true
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "send",
+      "when": "a Minecraft server is running and its console is open; the line goes to stdin with one trailing newline (a trailing \\r?\\n in line is dropped first)",
+      "request": {
+        "op": "send",
+        "line": "say hello"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "send-no-line",
+      "when": "line is missing or not a string",
+      "request": {
+        "op": "send"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "send requires a line"
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "send-database",
+      "when": "the instance is a database (kind database); checked before anything else",
+      "request": {
+        "op": "send",
+        "line": "PING"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "a database has no console input - use its client, or the panel"
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "send-not-running",
+      "when": "the server process has exited (for example during the restart delay)",
+      "request": {
+        "op": "send",
+        "line": "say hello"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "server process is not running"
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "send-console-closed",
+      "when": "the server closed its stdin but is still running",
+      "request": {
+        "op": "send",
+        "line": "say hello"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "the server console is closed"
+          }
+        }
+      },
+      "asserted": "source",
+      "source": "return { ok: false, error: 'the server console is closed' }"
+    },
+    {
+      "id": "stop",
+      "when": "graceful stop: Minecraft gets \"stop\" on stdin, MariaDB/MySQL their admin tool, Garnet a RESP SAVE then SIGTERM; the reply comes once the process has exited. timeout is milliseconds, default 90000 when absent or not positive.",
+      "request": {
+        "op": "stop",
+        "timeout": 15000
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "code": "integer|null"
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "stop-forced",
+      "when": "the process did not exit within timeout; it is force-killed (taskkill /T /F on Windows, SIGKILL to the process group elsewhere) and waited on for up to 10 s",
+      "request": {
+        "op": "stop",
+        "timeout": 1000
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "forced": {
+            "const": true
+          },
+          "code": "integer|null"
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "stop-during-restart-delay",
+      "when": "a stop arrives in the pause before a crash restart: the restart is cancelled, the daemon writes its final state and exits. code is null, not the crash's exit code, and the final state.exitCode is null too (exitCode is only written at the final exit, which this path reaches without it); a known quirk both daemons keep until it is changed on purpose",
+      "request": {
+        "op": "stop"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "code": "null",
+          "already": {
+            "const": true
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "stop-already-exited",
+      "when": "a stop reaches a daemon whose process has already exited outside the restart delay (a second stop on a connection opened before the daemon closed its listener)",
+      "request": {
+        "op": "stop"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "code": "integer",
+          "already": {
+            "const": true
+          }
+        }
+      },
+      "asserted": "source",
+      "source": "return { ok: true, code: child.exitCode, already: true }"
+    },
+    {
+      "id": "stop-garnet-checkpoint-failed",
+      "when": "Garnet: the RESP SAVE before SIGTERM failed; the process is left running and the daemon stays up",
+      "request": {
+        "op": "stop"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "match": "^Redis checkpoint failed; the process was left running: "
+          }
+        }
+      },
+      "asserted": "source",
+      "source": "return { ok: false, error: `Redis checkpoint failed; the process was left running: ${err.message}` }"
+    },
+    {
+      "id": "kill",
+      "when": "force kill of a running server, waited on for up to 10 s",
+      "request": {
+        "op": "kill"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "code": "integer|null",
+          "forced": {
+            "const": true
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "kill-during-restart-delay",
+      "when": "a kill in the pause before a crash restart cancels it like a stop; code is null for the same reason",
+      "request": {
+        "op": "kill"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": true
+          },
+          "code": "null",
+          "forced": {
+            "const": true
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "unknown-op",
+      "when": "any op not in ops; there is no status, metrics or players op (status is state.json, metrics are metrics.log)",
+      "request": {
+        "op": "status"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "unknown op \"status\""
+          }
+        }
+      },
+      "asserted": "live"
+    },
+    {
+      "id": "handler-error",
+      "when": "a handler threw; the error's message is the reply",
+      "request": {
+        "op": "stop"
+      },
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": "string"
+        }
+      },
+      "asserted": "source",
+      "source": "res = { ok: false, error: err.message }"
+    },
+    {
+      "id": "malformed",
+      "when": "a line that is not JSON; the connection stays open for further lines",
+      "raw": "this is not json",
+      "reply": {
+        "object": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "const": "malformed request"
+          }
+        }
+      },
+      "asserted": "live"
+    }
+  ]
+}

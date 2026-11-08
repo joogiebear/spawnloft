@@ -1,0 +1,28 @@
+{
+  "about": "The per-server webhook (registry field webhook) the daemon posts to on a crash, a recovery and a failed auto-restart (a restart that throws, such as the instance having been removed; a restart whose program cannot be spawned writes the spawn-error state and posts nothing) (src/notify.mjs, src/daemon.mjs tell()). A failed post is logged to daemon.log and otherwise ignored; shutdown waits at most 4 s for the last one. test/contracts.test.mjs checks the payload builder and that every message the daemon source writes is listed; test/contracts-daemon.test.mjs captures a real post.",
+  "request": {
+    "method": "POST",
+    "url": "the webhook field as stored, query string included (Discord's ?wait=true for example)",
+    "headers": { "content-type": "application/json" },
+    "timeoutMs": 5000,
+    "schemes": ["http:", "https:"],
+    "body": { "object": { "content": "string" } },
+    "content": "**<server name>** — <message> (an em dash, U+2014, with a space each side)"
+  },
+  "daemonMessages": [
+    { "id": "crash-restarting", "template": "crashed (exit <code or signal>).<cause> Restarting in <seconds>s.", "regex": "^crashed \\(exit [^)]+\\)\\.( Likely cause: .+\\.)? Restarting in \\d+s\\.$" },
+    { "id": "crash-staying-down", "template": "crashed (exit <code or signal>) and is staying down — auto-restart is off.<cause>", "regex": "^crashed \\(exit [^)]+\\) and is staying down — auto-restart is off\\.( Likely cause: .+\\.)?$" },
+    { "id": "crash-guard-gave-up", "template": "crashed <n> times in <minutes> minutes; auto-restart gave up. It is staying down until someone looks at it.", "regex": "^crashed \\d+ times in \\d+ minutes; auto-restart gave up\\. It is staying down until someone looks at it\\.$" },
+    { "id": "recovered", "template": "back up after a crash — restart <n> of <limit> allowed per <minutes> minutes.", "regex": "^back up after a crash — restart \\d+ of \\d+ allowed per \\d+ minutes\\.$" },
+    { "id": "auto-restart-failed", "template": "auto-restart failed: <reason>", "regex": "^auto-restart failed: .+$" }
+  ],
+  "causeNote": "<cause> is \" Likely cause: <diagnosis title, lower case>.\" when src/diagnose.mjs recognises the console tail, else empty; never for a database.",
+  "examples": [
+    { "server": "survival", "message": "crashed (exit 3). Restarting in 10s.", "body": { "content": "**survival** — crashed (exit 3). Restarting in 10s." } },
+    { "server": "survival", "message": "crashed (exit SIGKILL) and is staying down — auto-restart is off.", "body": { "content": "**survival** — crashed (exit SIGKILL) and is staying down — auto-restart is off." } },
+    { "server": "survival", "message": "crashed (exit 3) and is staying down — auto-restart is off. Likely cause: something in the world crashed the server.", "body": { "content": "**survival** — crashed (exit 3) and is staying down — auto-restart is off. Likely cause: something in the world crashed the server." } },
+    { "server": "survival", "message": "crashed 3 times in 10 minutes; auto-restart gave up. It is staying down until someone looks at it.", "body": { "content": "**survival** — crashed 3 times in 10 minutes; auto-restart gave up. It is staying down until someone looks at it." } },
+    { "server": "survival", "message": "back up after a crash — restart 1 of 3 allowed per 10 minutes.", "body": { "content": "**survival** — back up after a crash — restart 1 of 3 allowed per 10 minutes." } },
+    { "server": "survival", "message": "auto-restart failed: no instance named \"survival\"", "body": { "content": "**survival** — auto-restart failed: no instance named \"survival\"" } }
+  ]
+}

@@ -1,0 +1,552 @@
+{
+  "about": "run/<name>/state.json, written by the daemon (src/daemon.mjs) by temp file and rename, with the default file mode (it holds no secrets). Read by src/control.mjs readState, which reconciles it with live pids into a status. Shapes use the language in shape.mjs. Each example names the status readState gives it when its daemon and java pids are alive or dead; test/contracts.test.mjs checks that, and test/contracts-daemon.test.mjs checks that a real daemon writes exactly the example's field set in the same situation.",
+  "statusRules": [
+    "no file: stopped",
+    "running && daemon alive && java alive: running",
+    "running && daemon dead && java alive: orphaned",
+    "running && daemon alive && java dead: stopping (a shutdown, or the pause before a crash restart)",
+    "running && daemon dead && java dead: stale",
+    "otherwise: stopped",
+    "a pid counts as alive only if it exists and its executable's base name matches daemonExe/javaExe (case-insensitive, .exe ignored; a 15-byte Linux name matches as a prefix)"
+  ],
+  "statuses": [
+    "running",
+    "orphaned",
+    "stopping",
+    "stale",
+    "stopped"
+  ],
+  "shapes": {
+    "launched": {
+      "object": {
+        "name": "string",
+        "kind": {
+          "enum": [
+            "server",
+            "database"
+          ]
+        },
+        "daemonPid": "integer",
+        "javaPid?": "integer",
+        "daemonExe": "string",
+        "javaExe": "string",
+        "startedAt": "integer",
+        "dir": "string",
+        "jar": "string|null",
+        "memory": "string|null",
+        "port": "integer",
+        "rconPort": "integer|null",
+        "control": "string",
+        "running": "boolean",
+        "restarts": "integer",
+        "restarting?": {
+          "const": true
+        },
+        "crashed?": "boolean",
+        "exitCode?": "integer|null",
+        "exitSignal?": "string|null",
+        "stoppedAt?": "integer",
+        "error?": "string",
+        "failedAt?": "integer",
+        "killedOnDaemonFailure?": {
+          "const": true
+        }
+      }
+    },
+    "failedToStart": {
+      "object": {
+        "name": "string",
+        "daemonPid": "integer",
+        "running": {
+          "const": false
+        },
+        "error": "string",
+        "failedAt": "integer"
+      }
+    }
+  },
+  "fieldNotes": {
+    "startedAt": "wall clock in ms when this java was spawned, not the OS process start time; a crash restart writes a new one",
+    "daemonExe": "base name of the daemon's own executable (node, node.exe, SpawnLoft.exe, spawnloft-desktop)",
+    "javaExe": "base name of the program run: java, java.exe, mariadbd, GarnetServer, or node for a .mjs stand-in",
+    "jar": "null for a database",
+    "memory": "null for a database",
+    "rconPort": "null for a database or a server without RCON",
+    "control": "the control channel address, as in control-protocol.json transport",
+    "restarts": "crashes counted so far by this daemon (all of them, not only those in the crash window)",
+    "restarting": "present only while waiting to restart after a crash",
+    "crashed": "set when the process exits: true for a non-zero code or a signal that was not asked for",
+    "exitCode": "set at the final exit; null when the process died from a signal, and after a stop or kill during the restart delay (see control-protocol.json)",
+    "javaPid": "absent only when the program could not be spawned at all (no pid)",
+    "exitSignal": "set at the final exit; null for a normal exit, else SIGKILL, SIGTERM and so on",
+    "error": "why the server is down when it is not a plain exit; a start reads any state with error as a failure",
+    "failedAt": "when the daemon itself failed (die()), ms",
+    "killedOnDaemonFailure": "the daemon failed after launching java and killed it"
+  },
+  "examples": [
+    {
+      "id": "running",
+      "pids": {
+        "daemon": "alive",
+        "java": "alive"
+      },
+      "status": "running",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 0
+      }
+    },
+    {
+      "id": "running-after-restart",
+      "pids": {
+        "daemon": "alive",
+        "java": "alive"
+      },
+      "status": "running",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4180,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646460000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 1
+      }
+    },
+    {
+      "id": "database-running",
+      "pids": {
+        "daemon": "alive",
+        "java": "alive"
+      },
+      "status": "running",
+      "shape": "launched",
+      "state": {
+        "name": "cache",
+        "kind": "database",
+        "daemonPid": 5200,
+        "javaPid": 5201,
+        "daemonExe": "SpawnLoft.exe",
+        "javaExe": "GarnetServer.exe",
+        "startedAt": 1762646400000,
+        "dir": "C:\\Users\\v\\AppData\\Local\\spawnloft\\services\\cache",
+        "jar": null,
+        "memory": null,
+        "port": 6379,
+        "rconPort": null,
+        "control": "\\\\.\\pipe\\mcctl-cache",
+        "running": true,
+        "restarts": 0
+      }
+    },
+    {
+      "id": "restarting",
+      "pids": {
+        "daemon": "alive",
+        "java": "dead"
+      },
+      "status": "stopping",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 0,
+        "crashed": true,
+        "restarting": true
+      }
+    },
+    {
+      "id": "shutting-down",
+      "pids": {
+        "daemon": "alive",
+        "java": "dead"
+      },
+      "status": "stopping",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 0
+      }
+    },
+    {
+      "id": "orphaned",
+      "pids": {
+        "daemon": "dead",
+        "java": "alive"
+      },
+      "status": "orphaned",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 0
+      }
+    },
+    {
+      "id": "stale",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stale",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": true,
+        "restarts": 0
+      }
+    },
+    {
+      "id": "stopped",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "crashed": false,
+        "exitCode": 0,
+        "exitSignal": null,
+        "stoppedAt": 1762650000000
+      }
+    },
+    {
+      "id": "stopped-killed",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "crashed": false,
+        "exitCode": null,
+        "exitSignal": "SIGKILL",
+        "stoppedAt": 1762650000000
+      }
+    },
+    {
+      "id": "crashed-staying-down",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "crashed": true,
+        "exitCode": 3,
+        "exitSignal": null,
+        "stoppedAt": 1762650000000
+      }
+    },
+    {
+      "id": "stopped-during-restart-delay",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "crashed": true,
+        "exitCode": null,
+        "exitSignal": null,
+        "stoppedAt": 1762650000000
+      }
+    },
+    {
+      "id": "crash-guard-gave-up",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4190,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646520000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 2,
+        "crashed": true,
+        "exitCode": 3,
+        "exitSignal": null,
+        "stoppedAt": 1762646530000,
+        "error": "crashed 3 times in 10 minutes; auto-restart gave up"
+      }
+    },
+    {
+      "id": "auto-restart-failed",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 1,
+        "crashed": true,
+        "exitCode": 3,
+        "exitSignal": null,
+        "stoppedAt": 1762646410000,
+        "error": "auto-restart failed: no instance named \"survival\""
+      }
+    },
+    {
+      "id": "spawn-error",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "daemonExe": "node",
+        "javaExe": "no-such-java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "error": "spawn no-such-java ENOENT"
+      }
+    },
+    {
+      "id": "control-channel-unavailable",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "\\\\.\\pipe\\mcctl-survival",
+        "running": false,
+        "restarts": 0,
+        "error": "control channel unavailable: listen EADDRINUSE: address already in use \\\\.\\pipe\\mcctl-survival"
+      }
+    },
+    {
+      "id": "failed-to-start",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "failedToStart",
+      "state": {
+        "name": "survival",
+        "daemonPid": 4100,
+        "running": false,
+        "error": "no instance named \"survival\"",
+        "failedAt": 1762646400000
+      }
+    },
+    {
+      "id": "daemon-failed-after-launch",
+      "pids": {
+        "daemon": "dead",
+        "java": "dead"
+      },
+      "status": "stopped",
+      "shape": "launched",
+      "state": {
+        "name": "survival",
+        "kind": "server",
+        "daemonPid": 4100,
+        "javaPid": 4101,
+        "daemonExe": "node",
+        "javaExe": "java",
+        "startedAt": 1762646400000,
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "server.jar",
+        "memory": "4G",
+        "port": 25565,
+        "rconPort": 25575,
+        "control": "/home/v/.local/share/spawnloft/run/survival/control.sock",
+        "running": false,
+        "restarts": 0,
+        "error": "ENOSPC: no space left on device, write",
+        "failedAt": 1762646401000,
+        "killedOnDaemonFailure": true
+      }
+    }
+  ]
+}
