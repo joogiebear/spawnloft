@@ -15,7 +15,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lifecycle-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
 process.env.MCCTL_RESTART_DELAY_MS = '300'
 
@@ -98,7 +98,7 @@ test('start waits for ready, a console line reaches the server, and stop is clea
   assert.equal(stopped.code, 0)
   assert.equal(stopped.forced, undefined)
   assert.equal(readState(name).status, 'stopped')
-  assert.ok(consoleText(name).includes('[mcctl] server process exited (code=0)'))
+  assert.ok(consoleText(name).includes('[spawnloft] server process exited (code=0)'))
 })
 
 test('a second start while running is refused; a stop of a stopped server is a no-op', { timeout: 30000 }, async () => {
@@ -147,7 +147,7 @@ test('a crash with auto-restart on comes back, and the console says so', { timeo
     return status === 'running' && state.javaPid !== firstPid && state.restarts === 1
   }, 15000)
   assert.ok(recovered, `did not recover: ${JSON.stringify(readState(name))}`)
-  assert.match(consoleText(name), /\[mcctl\] crash 1 of 3 allowed/)
+  assert.match(consoleText(name), /\[spawnloft\] crash 1 of 3 allowed/)
   assert.match(consoleText(name), /likely cause: Something in the world crashed the server/)
 
   await sup.stop(name)
@@ -213,7 +213,7 @@ test('a server that dies during startup is reported as failed, with the reason',
 })
 
 test('a java that does not exist fails the start instead of hanging', { timeout: 30000 }, async () => {
-  const name = await makeInstance('nojava', { java: 'no-such-java-binary-for-mcctl-tests' })
+  const name = await makeInstance('nojava', { java: 'no-such-java-binary-for-spawnloft-tests' })
   // Either the daemon's spawn error is read from the state file during the launch wait, or the
   // exit is seen while waiting for ready. Both are a failure said out loud; neither is a hang.
   let outcome

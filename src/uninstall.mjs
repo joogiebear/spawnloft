@@ -6,7 +6,7 @@ import { LAYOUT } from './paths.mjs'
 import { listAll } from './registry.mjs'
 import * as supervisor from './supervisor.mjs'
 import * as schedule from './schedule.mjs'
-import { settingsFile } from './settings.mjs'
+import { settingsFile, shadowedSettingsFile } from './settings.mjs'
 
 // Runs before the uninstaller removes the program. The program folder is removed and nothing
 // else, so reinstalling doesn't lose worlds, but scheduled tasks and running servers are always
@@ -17,7 +17,7 @@ import { settingsFile } from './settings.mjs'
 // and folders only if that leaves them empty.
 
 // pure, so it can be tested
-export function purgeTargets({ instances, layout, settings, desktopDirs = [] }) {
+export function purgeTargets({ instances, layout, settings, otherSettings = null, desktopDirs = [] }) {
   const remove = []
   for (const inst of instances) {
     // adopted servers were the person's before this program saw them
@@ -33,9 +33,10 @@ export function purgeTargets({ instances, layout, settings, desktopDirs = [] }) 
     path.join(layout.dataRoot, 'tasks'),
     layout.registryFile,
     settings,
+    otherSettings,
     ...desktopDirs,
   )
-  const removeIfEmpty = [layout.instancesDir, layout.servicesDir, layout.dataRoot, path.dirname(settings)]
+  const removeIfEmpty = [layout.instancesDir, layout.servicesDir, layout.dataRoot, path.dirname(settings), otherSettings && path.dirname(otherSettings)]
   return { remove: [...new Set(remove.filter(Boolean))], removeIfEmpty: [...new Set(removeIfEmpty.filter(Boolean))] }
 }
 
@@ -91,6 +92,7 @@ export async function run({ data = false, log = () => {} } = {}) {
     instances: listAll(),
     layout: LAYOUT,
     settings: settingsFile(),
+    otherSettings: shadowedSettingsFile(),
     desktopDirs: desktopDataDirs(),
   })
   for (const target of targets.remove) {

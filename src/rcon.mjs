@@ -1,3 +1,4 @@
+import { envVar } from './env.mjs'
 import net from 'node:net'
 import { UserError, sleep } from './util.mjs'
 
@@ -30,8 +31,8 @@ function encodePacket(id, type, body) {
 }
 
 // How long a command may take to answer. The env override is for tests.
-export const RCON_TIMEOUT_MS = Number(process.env.MCCTL_RCON_TIMEOUT_MS) > 0
-  ? Number(process.env.MCCTL_RCON_TIMEOUT_MS)
+export const RCON_TIMEOUT_MS = Number(envVar('RCON_TIMEOUT_MS')) > 0
+  ? Number(envVar('RCON_TIMEOUT_MS'))
   : 8000
 
 // Minimal RCON client for the Source protocol Minecraft uses.

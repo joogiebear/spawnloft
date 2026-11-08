@@ -8,7 +8,7 @@ import { CODE_ROOT, resolveRoots } from './settings.mjs'
 // in one directory and look for it in another. Changes take effect on restart.
 const roots = resolveRoots()
 
-// Where the code lives, not data. For invoking mcctl itself (the generated .bat launchers); user
+// Where the code lives, not data. For invoking spawnloft itself (the generated .bat launchers); user
 // data goes under the roots below.
 export const ROOT = CODE_ROOT
 
@@ -22,7 +22,7 @@ export const RUN_DIR = roots.runDir
 export const ENGINES_DIR = roots.enginesDir
 export const SERVICES_DIR = roots.servicesDir
 
-// the resolved layout, for `mcctl config` and the panel's settings screen
+// the resolved layout, for `spawnloft config` and the panel's settings screen
 export const LAYOUT = roots
 
 // per-instance runtime scratch: pid/state file, captured console

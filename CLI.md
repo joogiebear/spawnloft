@@ -1,6 +1,6 @@
 # SpawnLoft command line
 
-`spawnloft` is the preferred command. `mcctl` runs the same implementation and remains
+`spawnloft` is the command. The older name `mcctl` runs the same implementation and remains
 supported for existing scripts, scheduled tasks, and shortcuts. Settings, data directories,
 application identity, and the Windows updater have not been renamed.
 
@@ -163,7 +163,7 @@ before deleting the app, and keep SpawnLoft background activity enabled in macOS
 On macOS 15 or later, `spawnloft db create royalplugins` downloads the verified MySQL 8.4 LTS
 engine for your Mac, creates and starts a database, and prints the server's credentials.
 Use `spawnloft db add testdb` for a standalone database, then `spawnloft start testdb` and
-`spawnloft db attach testdb royalplugins`. Both `spawnloft` and `mcctl` work.
+`spawnloft db attach testdb royalplugins`. The older `mcctl` name works too.
 
 `spawnloft db creds testdb royalplugins` shows connection details again. Plugin configuration
 is always manual. Existing databases are never silently upgraded to another engine/version.

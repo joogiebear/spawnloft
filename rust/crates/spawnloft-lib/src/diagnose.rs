@@ -53,7 +53,7 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
             "The port is already taken",
             |_, c| {
                 format!(
-                    "Something else is listening on port {} - usually another server, or another copy of this one. \"mcctl list\" shows who; change the port under Manage if both should run at once.",
+                    "Something else is listening on port {} - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
                     c.port.as_deref().unwrap_or("this server\u{2019}s port")
                 )
             },
@@ -77,7 +77,7 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
             |m, _| {
                 let needs = class_version_to_java(m[1].parse().unwrap_or(0));
                 format!(
-                    "This server is built for Java {needs} or newer, and the Java that launched it is older. Install Java {needs}+ and, if several are installed, point this server at it with \"mcctl set <name> java=<path-to-java.exe>\"."
+                    "This server is built for Java {needs} or newer, and the Java that launched it is older. Install Java {needs}+ and, if several are installed, point this server at it with \"spawnloft set <name> java=<path-to-java.exe>\"."
                 )
             },
         ),
@@ -97,7 +97,7 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
             r"(?i)No space left on device|There is not enough space on the disk",
             "The disk is full",
             |_, _| {
-                "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"mcctl config set-instances\" onto a drive that has some. \"mcctl prune\" can thin old snapshots.".to_string()
+                "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"spawnloft config set-instances\" onto a drive that has some. \"spawnloft prune\" can thin old snapshots.".to_string()
             },
         ),
         shape(
@@ -138,7 +138,7 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
             r"(?i)Exception reading .*level\.dat|Failed to load level|ChunkIoErrorReport|Corrupted chunk",
             "The world failed to load",
             |_, _| {
-                "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"mcctl verify\" proves which ones are whole.".to_string()
+                "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.".to_string()
             },
         ),
         shape(
@@ -167,7 +167,7 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
                     None => "the server jar".to_string(),
                 };
                 format!(
-                    "Java could not find {what}. Re-download it (\"mcctl upgrade\" for Paper, or re-choose a jar with \"mcctl set <name> jar=...\"), or restore the folder from a snapshot."
+                    "Java could not find {what}. Re-download it (\"spawnloft upgrade\" for Paper, or re-choose a jar with \"spawnloft set <name> jar=...\"), or restore the folder from a snapshot."
                 )
             },
         ),

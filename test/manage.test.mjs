@@ -9,7 +9,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-manage-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-manage-'))
 process.env.MCCTL_DATA_ROOT = scratch
 // the mirror test saves settings and MCCTL_DATA_ROOT does not move the settings file, so redirect
 // it or the developer's own settings.json gets rewritten
@@ -28,7 +28,7 @@ function world(dir, name) {
   fs.writeFileSync(path.join(dir, name, 'level.dat'), 'nbt')
 }
 
-/** An instance where mcctl would have put it, so rename moves the folder the way it does for real. */
+/** An instance where spawnloft would have put it, so rename moves the folder the way it does for real. */
 function makeInstance(name, { level = 'world', port = 40000, rconPort = 40001 } = {}) {
   const dir = path.join(INSTANCES_DIR, name)
   fs.mkdirSync(dir, { recursive: true })

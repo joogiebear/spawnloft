@@ -115,7 +115,7 @@ pub fn get_instance(registry_file: &Path, name: &str) -> Result<Instance, String
         None => {
             let known: Vec<&str> = instances.keys().map(String::as_str).collect();
             Err(if known.is_empty() {
-                format!("no instance named \"{name}\". Create one with: mcctl new <name>")
+                format!("no instance named \"{name}\". Create one with: spawnloft new <name>")
             } else {
                 format!(
                     "no instance named \"{name}\". Known instances: {}",

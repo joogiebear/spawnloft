@@ -44,7 +44,7 @@ export function allowedPackUrl(raw) {
   return url.href
 }
 
-// Reduces the index to what the install needs and refuses loaders mcctl can't run.
+// Reduces the index to what the install needs and refuses loaders spawnloft can't run.
 export function parseIndex(index) {
   if (!index || index.game !== 'minecraft' || !Array.isArray(index.files)) {
     fail('that file does not look like a Modrinth modpack index')
@@ -256,7 +256,7 @@ async function fetchPackArchive(packFile, onProgress) {
     const got = crypto.createHash('sha1').update(packBytes).digest('hex')
     if (got !== packFile.hashes.sha1) fail('the pack download did not match its checksum; nothing was installed')
   }
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mrpack-'))
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-mrpack-'))
   try {
     const mrpack = path.join(tmp, 'pack.mrpack')
     fs.writeFileSync(mrpack, packBytes)
@@ -398,7 +398,7 @@ export function packOf(inst) {
 }
 
 // What an update may delete: files the old pack owned that the new one doesn't, and nothing else.
-// `protect` entries (worlds, root server files, mcctl records) survive even a bad record; a path
+// `protect` entries (worlds, root server files, spawnloft records) survive even a bad record; a path
 // matches exactly or as a directory prefix.
 export function planRemovals(oldFiles = [], newFiles = [], { protect = [] } = {}) {
   const keep = new Set(newFiles.map((p) => String(p).replace(/\\/g, '/')))

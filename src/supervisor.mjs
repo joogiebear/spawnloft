@@ -60,12 +60,12 @@ async function ensureJava(inst, { force = false } = {}) {
       if (fit && fit.path !== 'java') return updateInstance(inst.name, { java: fit.path })
     }
     fail(`"${inst.name}" runs Minecraft ${mcVersionOf(inst)}, which needs Java ${needs}, but ${bin} is Java ${state.major}.\n`
-      + `  Pick another in the panel under Settings → Java, or: mcctl set ${inst.name} java=<path-to-java.exe>\n`
-      + `  Install Java ${needs} from ${java.DOWNLOAD_URL}. To start on Java ${state.major} anyway: mcctl start ${inst.name} --force`)
+      + `  Pick another in the panel under Settings → Java, or: spawnloft set ${inst.name} java=<path-to-java.exe>\n`
+      + `  Install Java ${needs} from ${java.DOWNLOAD_URL}. To start on Java ${state.major} anyway: spawnloft start ${inst.name} --force`)
   }
   if (bin !== 'java') {
     fail(`"${inst.name}" could not start: ${bin} could not be run (${state.message})\n`
-      + `  Point it at another Java with: mcctl set ${inst.name} java=<path-to-java.exe>`)
+      + `  Point it at another Java with: spawnloft set ${inst.name} java=<path-to-java.exe>`)
   }
   const found = needs ? await java.javaFor(needs) : null
   const fallback = found?.path ?? (await java.defaultJava())
@@ -117,7 +117,7 @@ async function launch(name, { wait = true, timeout = 180000, sync = true, force 
     if (status === 'orphaned') {
       fail(
         `instance "${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon.\n` +
-          `  Reattach is not possible; stop it with: mcctl kill ${name}`,
+          `  Reattach is not possible; stop it with: spawnloft kill ${name}`,
       )
     }
     if (status === 'stale') clearState(name)
@@ -277,7 +277,7 @@ export async function stop(name, { timeout = 90000 } = {}) {
     return { alreadyStopped: true }
   }
   if (status === 'orphaned') {
-    fail(`instance "${name}" is orphaned (java pid ${state.javaPid}, no daemon). Use: mcctl kill ${name}`)
+    fail(`instance "${name}" is orphaned (java pid ${state.javaPid}, no daemon). Use: spawnloft kill ${name}`)
   }
   const res = await controlRequest(name, { op: 'stop', timeout }, { timeout: timeout + 30000 })
   if (!res.ok) fail(res.error || 'stop failed')

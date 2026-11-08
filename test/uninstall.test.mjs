@@ -17,7 +17,7 @@ const layout = {
   runDir: 'D:\\Games\\run',
   registryFile: 'D:\\Games\\instances.json',
 }
-const settings = 'C:\\Users\\me\\AppData\\Roaming\\mcctl\\settings.json'
+const settings = 'C:\\Users\\me\\AppData\\Roaming\\spawnloft\\settings.json'
 
 test('servers this program created go; adopted ones stay, whatever folder they are in', () => {
   const { remove } = purgeTargets({

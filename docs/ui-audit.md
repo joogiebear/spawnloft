@@ -5,7 +5,7 @@ Overview redesign, #131). Every view except Overview was walked in both themes (
 SpawnLoft) at 1440×900, with spot checks at 1000×760, against a scratch data root holding four
 servers (two running), two databases, plugins, mods, backups and forty activity entries. Error and
 loading states were forced by failing or holding the panel's API calls in the browser. The wizard
-was opened from disk with a stubbed `window.mcctlDesktop`.
+was opened from disk with a stubbed `window.spawnloftDesktop`.
 
 Overview is out of scope except where it should adopt a shared component.
 
@@ -179,7 +179,7 @@ Worth keeping, so the later steps do not undo it:
 | Problem | Fix | Sev | Step |
 |---|---|---|---|
 | Long absolute paths wrap mid-word in a narrow column. | Truncate from the middle with the full path in a tooltip and a copy button. | low | 8 |
-| "To move these, run: mcctl config set-root <path>" tells a desktop user to use a terminal. | Keep for the CLI build; in the desktop app, point at the data-folder move flow. | low | 8 |
+| "To move these, run: spawnloft config set-root <path>" tells a desktop user to use a terminal. | Keep for the CLI build; in the desktop app, point at the data-folder move flow. | low | 8 |
 
 ## Empty, loading and error states
 

@@ -12,7 +12,7 @@ test('the major version is read from both shapes java -version has used', () => 
 })
 
 test('a java that is not there answers not-installed rather than throwing', async () => {
-  const res = await probe('no-such-java-binary-for-mcctl-tests')
+  const res = await probe('no-such-java-binary-for-spawnloft-tests')
   assert.equal(res.ok, false)
   assert.equal(res.found, false)
   assert.equal(res.reason, 'not-installed')

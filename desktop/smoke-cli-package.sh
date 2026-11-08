@@ -28,17 +28,17 @@ if command -v node >/dev/null 2>&1; then echo "this image has Node on PATH, so i
 test -x /usr/bin/spawnloft
 test "$(cat /opt/spawnloft-cli/package-type)" = "$kind"
 
-export MCCTL_DATA_ROOT=/tmp/spawnloft-data
+export SPAWNLOFT_DATA_ROOT=/tmp/spawnloft-data
 export HOME=/tmp/spawnloft-home
-mkdir -p "$HOME" "$MCCTL_DATA_ROOT/instances/pkgtest"
+mkdir -p "$HOME" "$SPAWNLOFT_DATA_ROOT/instances/pkgtest"
 spawnloft config
 
 cp /repo/test/fixtures/fake-java.mjs /tmp/fake-java.mjs
-printf 'eula=true\n' > "$MCCTL_DATA_ROOT/instances/pkgtest/eula.txt"
-: > "$MCCTL_DATA_ROOT/instances/pkgtest/server.jar"
-cat > "$MCCTL_DATA_ROOT/instances.json" <<JSON
+printf 'eula=true\n' > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/eula.txt"
+: > "$SPAWNLOFT_DATA_ROOT/instances/pkgtest/server.jar"
+cat > "$SPAWNLOFT_DATA_ROOT/instances.json" <<JSON
 { "version": 1, "instances": { "pkgtest": {
-  "dir": "$MCCTL_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java.mjs", "memory": "1G",
+  "dir": "$SPAWNLOFT_DATA_ROOT/instances/pkgtest", "jar": "server.jar", "java": "/tmp/fake-java.mjs", "memory": "1G",
   "port": 45665, "rcon": { "port": 45675, "password": "package-smoke" }, "autoRestart": false } } }
 JSON
 
@@ -100,13 +100,13 @@ cat > /tmp/db-smoke.sh <<'SH'
 set -eu
 # Root's test above exported these; this user has a home of its own.
 export HOME=/home/sl
-export MCCTL_DATA_ROOT="$HOME/data"
+export SPAWNLOFT_DATA_ROOT="$HOME/data"
 cd "$HOME"
 spawnloft db add pkgdb
 spawnloft start pkgdb
 spawnloft db
 spawnloft status pkgdb --json | grep -q '"status": *"running"'
-libs=$(ls -d "$MCCTL_DATA_ROOT"/engines/*/spawnloft-libs)
+libs=$(ls -d "$SPAWNLOFT_DATA_ROOT"/engines/*/spawnloft-libs)
 ls -l "$libs"
 test -e "$libs/libaio.so.1"
 spawnloft stop pkgdb

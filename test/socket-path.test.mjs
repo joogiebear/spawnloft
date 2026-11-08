@@ -11,7 +11,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const posix = process.platform !== 'win32'
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-socket-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-socket-'))
 // Deep enough that run/<name>/control.sock under it is past 108 bytes on any machine.
 const deep = path.join(scratch, 'a-data-folder-with-a-long-name'.repeat(3), 'and-another-level-below-that-one')
 process.env.MCCTL_DATA_ROOT = deep

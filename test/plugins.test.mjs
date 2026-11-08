@@ -58,7 +58,7 @@ function buildZip(entries, { deflate = false } = {}) {
   return Buffer.concat([...locals, cd, eocd])
 }
 
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-plugins-'))
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-plugins-'))
 
 function writeJar(dir, name, yml, opts) {
   const file = path.join(dir, name)
@@ -157,7 +157,7 @@ test('disable renames in place and enable renames it back', () => {
   assert.ok(fs.existsSync(path.join(inst.dir, 'plugins', 'Alpha.jar')))
 })
 
-test('a hand-dropped jar is not managed; one mcctl recorded is', () => {
+test('a hand-dropped jar is not managed; one spawnloft recorded is', () => {
   const inst = fakeInstance()
   writeJar(path.join(inst.dir, 'plugins'), 'Premium.jar', 'name: Premium\n')
   writeJar(path.join(inst.dir, 'plugins'), 'FromModrinth.jar', 'name: FromModrinth\n')

@@ -14,7 +14,7 @@ const config = (name) => {
   const dir = path.join(scratch, name)
   process.env.APPDATA = dir
   process.env.XDG_CONFIG_HOME = dir
-  return path.join(dir, 'mcctl', 'settings.json')
+  return path.join(dir, 'spawnloft', 'settings.json')
 }
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 config('init')

@@ -36,7 +36,7 @@ use crate::{activity, diagnose, fsx, metrics, notify, patterns, resp, time};
 use program::{Program, Stop};
 
 /// What the daemon's own lines in `console.log` start with. Matches `daemon.mjs` on this branch.
-pub const CONSOLE_PREFIX: &str = "[mcctl]";
+pub const CONSOLE_PREFIX: &str = "[spawnloft]";
 /// The control protocol's version, answered by `ping`. 1 is the four ops of 1.x.
 pub const PROTOCOL: u64 = 1;
 /// A stop with no timeout of its own waits this long before forcing.

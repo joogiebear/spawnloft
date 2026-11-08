@@ -24,12 +24,12 @@ const server = (memory) => ({ dir: '/srv/x', jar: 'paper.jar', memory, port: 255
 
 let n = 0
 // a machine: the data root, and for each package the private copy of it, as files by relative path.
-// real and copies are under Local\mcctl; realRoaming and copiesRoaming under Roaming\mcctl.
+// real and copies are under Local\spawnloft; realRoaming and copiesRoaming under Roaming\spawnloft.
 function machine({ real = {}, copies = {}, realRoaming = {}, copiesRoaming = {}, dataRootOutside = false } = {}) {
   const base = path.join(scratch, `m${++n}`)
   const local = path.join(base, 'local')
   const roaming = path.join(base, 'roaming')
-  const data = dataRootOutside ? path.join(base, 'elsewhere', 'data') : path.join(local, 'mcctl')
+  const data = dataRootOutside ? path.join(base, 'elsewhere', 'data') : path.join(local, 'spawnloft')
   const write = (dir, files) => {
     fs.mkdirSync(dir, { recursive: true })
     for (const [rel, content] of Object.entries(files)) {
@@ -38,16 +38,16 @@ function machine({ real = {}, copies = {}, realRoaming = {}, copiesRoaming = {},
     }
   }
   write(data, real)
-  write(path.join(roaming, 'mcctl'), realRoaming)
-  for (const [pkg, files] of Object.entries(copies)) write(path.join(local, 'Packages', pkg, 'LocalCache', 'Local', 'mcctl'), files)
-  for (const [pkg, files] of Object.entries(copiesRoaming)) write(path.join(local, 'Packages', pkg, 'LocalCache', 'Roaming', 'mcctl'), files)
+  write(path.join(roaming, 'spawnloft'), realRoaming)
+  for (const [pkg, files] of Object.entries(copies)) write(path.join(local, 'Packages', pkg, 'LocalCache', 'Local', 'spawnloft'), files)
+  for (const [pkg, files] of Object.entries(copiesRoaming)) write(path.join(local, 'Packages', pkg, 'LocalCache', 'Roaming', 'spawnloft'), files)
   fs.mkdirSync(path.join(local, 'Packages'), { recursive: true })
   const options = { platform: 'win32', localAppData: local, roamingAppData: roaming, dataRoot: data,
-    backupsDir: path.join(data, 'backups'), settingsFile: path.join(roaming, 'mcctl', 'settings.json') }
+    backupsDir: path.join(data, 'backups'), settingsFile: path.join(roaming, 'spawnloft', 'settings.json') }
   return { local, roaming, data, options }
 }
 
-const privateData = (m, pkg = PACKAGE) => path.join(m.local, 'Packages', pkg, 'LocalCache', 'Local', 'mcctl')
+const privateData = (m, pkg = PACKAGE) => path.join(m.local, 'Packages', pkg, 'LocalCache', 'Local', 'spawnloft')
 const describe = (copies, m) => describePrivateCopies(copies, { backupsDir: m.options.backupsDir })
 
 test('nothing is reported where Windows does not redirect, or where nothing the data lives in is under AppData', async () => {
@@ -309,8 +309,8 @@ const onWindows = { skip: process.platform !== 'win32' && 'Windows only: the red
 function windowsEnv({ copyRegistry }) {
   const base = path.join(scratch, `real-${++n}`)
   const local = path.join(base, 'local')
-  const data = path.join(local, 'mcctl')
-  const priv = path.join(local, 'Packages', PACKAGE, 'LocalCache', 'Local', 'mcctl')
+  const data = path.join(local, 'spawnloft')
+  const priv = path.join(local, 'Packages', PACKAGE, 'LocalCache', 'Local', 'spawnloft')
   fs.mkdirSync(data, { recursive: true })
   fs.mkdirSync(priv, { recursive: true })
   fs.writeFileSync(path.join(data, 'instances.json'), registry({ here: server('4G') }))

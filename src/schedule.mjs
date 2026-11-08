@@ -14,8 +14,8 @@ import { normaliseSteps } from './task-steps.mjs'
 const native = process.platform === 'darwin' ? mac : process.platform === 'linux' ? linux : null
 
 // Scheduled work on Windows uses Task Scheduler, which survives reboots and records exit codes
-// and next run times. It holds only a trigger that calls back into `mcctl task run <id>`; the
-// definitions live in schedules.json, so what a task can do stays inside mcctl and editing one
+// and next run times. It holds only a trigger that calls back into `spawnloft task run <id>`; the
+// definitions live in schedules.json, so what a task can do stays inside spawnloft and editing one
 // doesn't mean recreating the Windows task.
 //
 // Tasks run interactive only (logged in, screen lock is fine, not after sign-out). Running
@@ -37,7 +37,7 @@ function withTasksLock(fn) {
   try { return fn() } finally { tasksLockDepth--; release() }
 }
 
-// one folder so uninstall can remove everything mcctl created
+// one folder so uninstall can remove everything spawnloft created
 export const TASK_FOLDER = 'mcctl'
 
 const EMPTY = { version: 1, tasks: {} }
@@ -447,7 +447,7 @@ export function runNow(id) {
   return { id, started: true }
 }
 
-// Reads mcctl's own per-run lines from the instance's tasks.log, since Task Scheduler only
+// Reads spawnloft's own per-run lines from the instance's tasks.log, since Task Scheduler only
 // keeps an exit code. Two line formats: `time, task id, status, action, detail` and the older
 // `time, status, action, detail` without an id (still read, shown unattributed).
 export function recentRuns(instance, limit = 40) {

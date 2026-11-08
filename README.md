@@ -30,10 +30,10 @@ writer of SpawnLoft's own.
   [Temurin 25](https://adoptium.net/temurin/releases/?version=25) is a good default, and a JDK
   rather than a JRE if you want Spigot or CraftBukkit built here.
   The desktop app checks for it on first run and the panel says so in a banner if it is missing;
-  `mcctl doctor` reports it from the command line. SpawnLoft looks for Java on PATH **and** in the
+  `spawnloft doctor` reports it from the command line. SpawnLoft looks for Java on PATH **and** in the
   usual install folders (Program Files, the per-user Programs folder, `JAVA_HOME`), so a Java that
   the installer did not add to PATH, or one added after SpawnLoft was already running, is still found
-  and used. Each server can also be pointed at a specific Java with `mcctl set <name> java=<path>`.
+  and used. Each server can also be pointed at a specific Java with `spawnloft set <name> java=<path>`.
   SpawnLoft knows which Java each Minecraft version needs (17 for 1.18 to 1.20.4, 21 for 1.20.5 and
   1.21, 25 for 26.x) and picks the newest installed Java that fits when a server is created; a
   version nothing installed can run is refused before the download, with the download link.
@@ -52,7 +52,7 @@ A Minecraft server is an interactive foreground process. Launched from a normal
 shell call it blocks forever, its stdin is unreachable, and its console output is
 lost. That makes the ordinary edit-restart-check loop painful to automate.
 
-`mcctl` puts a supervisor in front of each server so short-lived commands can
+`spawnloft` puts a supervisor in front of each server so short-lived commands can
 start it, read what it printed, talk to it, and shut it down cleanly.
 
 ## Quickstart
@@ -110,7 +110,7 @@ still works**: `spawnloft ui --no-open` serves it on `127.0.0.1:8770`, which
 Updates are a newer package installed the same way; there is no updater on a machine with
 nobody to prompt.
 
-From a checkout on Linux or macOS, `./spawnloft` does the same. On Windows `mcctl.cmd` wraps the above, so `mcctl list` works once this folder is
+From a checkout on Linux or macOS, `./spawnloft` does the same. On Windows `spawnloft.cmd` wraps the above, so `spawnloft list` works once this folder is
 on your PATH.
 
 ## Commands
@@ -320,7 +320,7 @@ only hide the link is renamed, never deleted, when you add `--set-aside-private-
 ## How it works
 
 ```
-mcctl (short-lived CLI)
+spawnloft (short-lived CLI)
    │
    ├─ spawns detached ──▶ src/daemon.mjs (one per instance)
    │                        │
@@ -363,7 +363,7 @@ cannot silently desync an instance from what SpawnLoft believes about it. Pass
 ### Layout
 
 ```
-mcctl/
+spawnloft/
 ├── mcctl.mjs           CLI
 ├── mcctl.cmd           Windows shim
 ├── instances.json      Registry: ports, memory, RCON credentials  (gitignored)
@@ -377,7 +377,7 @@ mcctl/
 │   ├── create.mjs      new/clone/adopt/templates/jars
 │   ├── props.mjs       server.properties reader/writer (preserves comments)
 │   └── util.mjs        Ports, pids, tables, formatting
-├── instances/          Instance data for servers mcctl created
+├── instances/          Instance data for servers spawnloft created
 ├── templates/          Saved plugin+config sets
 ├── jars/               Server jar store
 ├── backups/            Snapshots + manifests
@@ -405,7 +405,7 @@ This is built for **localhost and LAN only**.
   that get thrown out on sight.
 
   Offline is still one toggle away, for multi-account testing or working without internet:
-  `mcctl new <name> --offline`, `mcctl props <name> online-mode=false`, or the panel's
+  `spawnloft new <name> --offline`, `spawnloft props <name> online-mode=false`, or the panel's
   **Settings…** on a server. The panel badges any server running that way.
 - Nothing here opens firewall ports or touches your router. Exposing a server to
   the internet is a deliberate, separate decision.
@@ -432,7 +432,7 @@ This is built for **localhost and LAN only**.
   what a first-party request looks like.
 - **Scheduled tasks are code that runs on a timer**, so what a task may be is an allowlist rather
   than a command string: back up, send a console command, restart, stop, start. Windows holds only
-  a trigger calling `mcctl task run <id>`; what that id means lives in SpawnLoft's own file, and a value
+  a trigger calling `spawnloft task run <id>`; what that id means lives in SpawnLoft's own file, and a value
   it does not recognise is refused rather than executed. Tasks run as the signed-in user, with no
   stored password and no elevation.
 - The page never receives an RCON password. Every route that returns an instance strips it first,
@@ -467,7 +467,7 @@ One HTML file, served by Node's own http module. No framework, no build step, no
 the panel that ships is the file in `src/ui.html`, and it works offline because nothing is fetched
 from anywhere.
 
-The same page runs in a browser tab and inside the desktop app. `window.mcctlDesktop` exists only in
+The same page runs in a browser tab and inside the desktop app. `window.spawnloftDesktop` exists only in
 Electron, and everything that depends on it is additive: a Browse button beside a path field, a
 Settings screen that can move the data folder, update checking. In a browser those simply are not
 there, and nothing else changes.
@@ -497,7 +497,7 @@ taken first). Hangar projects that host their downloads elsewhere are linked to 
 than pretended at. The page manages **only what SpawnLoft installed** — it records
 provenance in the plugins folder — so a custom or premium plugin dropped in by hand is
 never listed there, never offered a meaningless update, and never has its hash sent to
-anyone. `mcctl plugins <name>` lists the full inventory, manual jars included, with a
+anyone. `spawnloft plugins <name>` lists the full inventory, manual jars included, with a
 SOURCE column saying which is which. Enable/disable renames the jar in place, so a
 disabled plugin keeps its spot and its config.
 
@@ -554,7 +554,7 @@ axis draws every ordinary server as a flat line on the floor.
 
 **Settings** — the part of `server.properties` people actually change: who can join, MOTD,
 difficulty, game mode, max players, PvP, whitelist, view distance, spawn protection. Everything
-else stays in the file for `mcctl props` or an editor, and nothing the panel writes disturbs
+else stays in the file for `spawnloft props` or an editor, and nothing the panel writes disturbs
 another key or a comment.
 
 Under **World and load** the MOTD has a preview of the server as the multiplayer list shows it -
@@ -591,7 +591,7 @@ A window around the same panel, plus a native folder picker and first-run setup.
 cd desktop
 npm install
 npm start                  # runs the bundled core
-npm start -- --core ..     # develop against this checkout (or set MCCTL_CORE)
+npm start -- --core ..     # develop against this checkout (or set SPAWNLOFT_CORE_DIR)
 ```
 
 The core runs **inside** the Electron process. Electron is already a Node runtime, so importing
@@ -723,7 +723,7 @@ the tasks and the data all carry across.
 Saying yes deletes only what this program created. A server you added from a folder you already
 had stays where it is, and a data folder you pointed at a drive with other things on it loses only
 SpawnLoft's own folders. The same command is available from a terminal as
-`mcctl uninstall --yes [--data]`.
+`spawnloft uninstall --yes [--data]`.
 
 ## Databases
 
@@ -739,16 +739,16 @@ here, with nothing to install; so can plugins that want Redis, by way of Microso
 daemon as a server: a card with a lamp, a console, start, stop and restart, crash recovery.
 
 ```bash
-mcctl db versions                    # verified MySQL LTS releases
-mcctl db add sql                     # downloads verified MySQL, once, and sets one up on a free port
-mcctl start sql
-mcctl db attach sql survival       # a database and a user for that server; prints the credentials
-mcctl db create survival             # or all of that in one step: survival-db on port 25566, started, attached
-mcctl db creds sql survival        # shows them again
-mcctl db detach sql survival       # takes the user away; --drop deletes the data too
-mcctl db add cache --engine garnet   # a Redis-compatible server, the same way
-mcctl db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
-mcctl db address xampp --port 3307  # it moved: point SpawnLoft at the new address (also under its Settings in the panel)
+spawnloft db versions                    # verified MySQL LTS releases
+spawnloft db add sql                     # downloads verified MySQL, once, and sets one up on a free port
+spawnloft start sql
+spawnloft db attach sql survival       # a database and a user for that server; prints the credentials
+spawnloft db create survival             # or all of that in one step: survival-db on port 25566, started, attached
+spawnloft db creds sql survival        # shows them again
+spawnloft db detach sql survival       # takes the user away; --drop deletes the data too
+spawnloft db add cache --engine garnet   # a Redis-compatible server, the same way
+spawnloft db connect xampp --port 3306 --user root --password ''   # one you already run, registered so servers can attach
+spawnloft db address xampp --port 3307  # it moved: point SpawnLoft at the new address (also under its Settings in the panel)
 ```
 
 MySQL comes from Oracle's CDN as a pinned native archive, hash-checked and unpacked with the

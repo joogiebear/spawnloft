@@ -25,11 +25,11 @@ const internalUpdateMessage = 'Internal test build: updates are off. Install the
 // The core runs in this process (imported directly), so there is no second Node to ship
 // and no orphaned child if the window dies.
 
-// packaged: core sits in resources. dev: the checkout, or --core <dir> / MCCTL_CORE.
+// packaged: core sits in resources. dev: the checkout, or --core <dir> / SPAWNLOFT_CORE_DIR or the older MCCTL_CORE.
 function resolveCore() {
   const flagIndex = process.argv.indexOf('--core')
   const fromFlag = flagIndex !== -1 ? process.argv[flagIndex + 1] : null
-  const dev = fromFlag || process.env.MCCTL_CORE
+  const dev = fromFlag || process.env.SPAWNLOFT_CORE_DIR || process.env.MCCTL_CORE
   if (dev) return { dir: path.resolve(dev), mode: 'dev' }
 
   const bundled = app.isPackaged
@@ -325,7 +325,7 @@ function fromPanel(e) {
 }
 
 // Opens a launcher profile's folder in the file manager. The page gets { ok } and nothing else.
-ipcMain.handle('mcctl:openProfileFolder', async (e, name) => {
+ipcMain.handle('spawnloft:openProfileFolder', async (e, name) => {
   if (!fromPanel(e)) return { ok: false }
   try {
     const client = await loadCore('src/client.mjs')
@@ -338,7 +338,7 @@ ipcMain.handle('mcctl:openProfileFolder', async (e, name) => {
 
 // Microsoft's sign-in page in its own window (login-window.js). Only the authorize URL the panel
 // made for this app and this panel's callback is accepted. Resolves once the window has closed.
-ipcMain.handle('mcctl:openMicrosoftLogin', async (e, url) => {
+ipcMain.handle('spawnloft:openMicrosoftLogin', async (e, url) => {
   if (!fromPanel(e)) return { ok: false }
   const auth = await loadCore('src/client-auth.mjs')
   const port = Number(new URL(panelUrl).port)
@@ -351,7 +351,7 @@ ipcMain.handle('mcctl:openMicrosoftLogin', async (e, url) => {
   return { ok: true }
 })
 
-ipcMain.handle('mcctl:pickFolder', async (_e, { title } = {}) => {
+ipcMain.handle('spawnloft:pickFolder', async (_e, { title } = {}) => {
   const res = await dialog.showOpenDialog(win, {
     title: title || 'Choose a folder',
     properties: ['openDirectory', 'createDirectory'],
@@ -361,7 +361,7 @@ ipcMain.handle('mcctl:pickFolder', async (_e, { title } = {}) => {
 
 // for world archives. Windows can't offer files and folders in one native dialog, so this
 // picks files; the page has a text field for pasting a folder path.
-ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
+ipcMain.handle('spawnloft:pickFile', async (_e, { title } = {}) => {
   const res = await dialog.showOpenDialog(win, {
     title: title || 'Choose a file',
     properties: ['openFile'],
@@ -373,23 +373,23 @@ ipcMain.handle('mcctl:pickFile', async (_e, { title } = {}) => {
   return res.canceled ? null : res.filePaths[0]
 })
 
-ipcMain.handle('mcctl:getZoom', async () => ({ setting, zoom }))
-ipcMain.handle('mcctl:setZoom', async (_e, value) => setZoom(value))
+ipcMain.handle('spawnloft:getZoom', async () => ({ setting, zoom }))
+ipcMain.handle('spawnloft:setZoom', async (_e, value) => setZoom(value))
 
 // asked by the first-run wizard: Java is the one prerequisite we can't supply
-ipcMain.handle('mcctl:checkJava', async () => {
+ipcMain.handle('spawnloft:checkJava', async () => {
   const java = await loadCore('src/java.mjs')
   return { ...(await java.health()), downloadUrl: java.DOWNLOAD_URL }
 })
 
 // https only, so a compromised page can't launch a local executable or reach a file:// path
-ipcMain.handle('mcctl:openExternal', async (_e, url) => {
+ipcMain.handle('spawnloft:openExternal', async (_e, url) => {
   if (typeof url !== 'string' || !url.startsWith('https://')) return { ok: false }
   await shell.openExternal(url)
   return { ok: true }
 })
 
-ipcMain.handle('mcctl:getSetup', async () => {
+ipcMain.handle('spawnloft:getSetup', async () => {
   const settings = await loadCore('src/settings.mjs')
   const roots = settings.resolveRoots()
   return {
@@ -402,7 +402,7 @@ ipcMain.handle('mcctl:getSetup', async () => {
   }
 })
 
-ipcMain.handle('mcctl:saveSetup', async (_e, { dataRoot, instancesDir, separate }) => {
+ipcMain.handle('spawnloft:saveSetup', async (_e, { dataRoot, instancesDir, separate }) => {
   const settings = await loadCore('src/settings.mjs')
 
   // write-test the folders: unplugged drives, read-only mounts and network shares look fine
@@ -490,11 +490,11 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload)
 }
 
-ipcMain.handle('mcctl:updateChannel', async () => updateChannel.describe(updateChannelFile(), app.getVersion()))
+ipcMain.handle('spawnloft:updateChannel', async () => updateChannel.describe(updateChannelFile(), app.getVersion()))
 
 // takes effect on the next check, which runs immediately so opting in shows something happening;
 // opting out is never a downgrade (see update-channel.js)
-ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
+ipcMain.handle('spawnloft:setUpdateChannel', async (_e, beta) => {
   if (typeof beta !== 'boolean') return { ok: false }
   if (updatesOff) return { ok: false, message: internalUpdateMessage }
   try {
@@ -507,7 +507,7 @@ ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
   return { ok: true, ...updateChannel.describe(updateChannelFile(), app.getVersion()) }
 })
 
-ipcMain.handle('mcctl:checkUpdate', async () => {
+ipcMain.handle('spawnloft:checkUpdate', async () => {
   // before the Mac manual path, so an internal Mac build is never sent to the beta release page
   if (updatesOff) return { ok: false, reason: 'internal', message: internalUpdateMessage }
   if (manualUpdates) {
@@ -527,7 +527,7 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
 // quitAndInstall(true, true): silent NSIS install (/S), then reopen on the new version.
 // Servers survive (detached daemons) but the panel goes away mid-restart, so the caller should
 // warn about running servers first.
-ipcMain.handle('mcctl:installUpdate', async () => {
+ipcMain.handle('spawnloft:installUpdate', async () => {
   if (manualUpdates || updatesOff || !app.isPackaged) return { ok: false }
   autoUpdater.quitAndInstall(true, true)
   return { ok: true }
@@ -546,7 +546,7 @@ function buildInfo() {
   }
 }
 
-ipcMain.handle('mcctl:appInfo', async () => {
+ipcMain.handle('spawnloft:appInfo', async () => {
   const build = buildInfo()
   return {
     version: app.getVersion(),

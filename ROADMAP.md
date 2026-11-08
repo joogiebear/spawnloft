@@ -10,14 +10,14 @@ user accounts, a remote web panel - stay off it on purpose.
 
 - **Reliability** *(v0.6 line)* — crash auto-restart with a crash-loop stop, scheduled
   restarts that warn the players first, Discord webhook notifications for the events
-  nobody is watching for, and `mcctl verify` to prove snapshots actually restore.
-- **Plugin manager** — a Plugins tab and `mcctl plugins`: Modrinth search and install
+  nobody is watching for, and `spawnloft verify` to prove snapshots actually restore.
+- **Plugin manager** — a Plugins tab and `spawnloft plugins`: Modrinth search and install
   filtered to compatible builds, hash-based update check, one-click update with a
   plugins snapshot first, enable/disable by renaming in place. Manages only what it
   installed (provenance recorded beside the jars); hand-dropped custom and premium
   plugins are left alone and never hashed to anyone.
 
-- **Server updates** — `mcctl upgrade` and a "Server software" card in Settings: a
+- **Server updates** — `spawnloft upgrade` and a "Server software" card in Settings: a
   routine one-click move to the newest Paper build (old jar kept as the way back), and
   a deliberately harder, confirmed, snapshot-first path for crossing Minecraft
   versions, because worlds migrate one-way.
@@ -35,7 +35,7 @@ user accounts, a remote web panel - stay off it on purpose.
   ecosystem, and a mismatched build installs with the author's version claim stated.
 - **Form controls with depth** *(v0.6.6)* — carved fields, an owned select chevron,
   drawn radios, troughed switches; the wizard matches the panel.
-- **Worlds** *(v0.7.0)* — a Worlds tab and `mcctl worlds`: every world listed with the
+- **Worlds** *(v0.7.0)* — a Worlds tab and `spawnloft worlds`: every world listed with the
   active one named (and shown in the vitals), import a downloaded map from a zip or
   folder (found wherever it is nested, never overwriting), export one as a zip, switch
   which world runs, delete with the truth stated (only the active world is ever in
@@ -48,7 +48,7 @@ user accounts, a remote web panel - stay off it on purpose.
   (port taken, EULA, wrong Java, out of memory or disk, missing plugin/mod dependencies,
   duplicate plugins, corrupt worlds, ticking crashes, watchdog stalls, missing jars) and
   says the fix wherever the failure surfaces: a strip under the panel's vitals, advice on
-  a failed `mcctl start`, `mcctl why <name>`, and the daemon's crash webhook naming the
+  a failed `spawnloft start`, `spawnloft why <name>`, and the daemon's crash webhook naming the
   likely cause. Minecraft's own crash reports are surfaced beside them, with their
   Description line, one click from the folder.
 

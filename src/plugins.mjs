@@ -175,7 +175,7 @@ function pluginsDir(inst) {
   return path.join(inst.dir, contentKindFor(inst).dir)
 }
 
-// Record of the jars mcctl installed. Hand-dropped jars are not managed: no updates, and their
+// Record of the jars spawnloft installed. Hand-dropped jars are not managed: no updates, and their
 // hashes are never sent to Modrinth. Kept in the plugins folder (the server ignores non-jars)
 // so snapshots carry it.
 const STORE = '.mcctl-plugins.json'
@@ -313,7 +313,7 @@ export function listPlugins(inst) {
     rows.push({
       file,
       enabled,
-      // managed = mcctl installed it; hand-dropped jars are listed but never managed
+      // managed = spawnloft installed it; hand-dropped jars are listed but never managed
       managed: Boolean(record),
       source: record?.source ?? null,
       project: record?.project ?? null,
@@ -603,7 +603,7 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
   return { installed: name, version: version.version_number, size: bytes.length, versionNote }
 }
 
-// Asks Modrinth by sha1 (version_files/update) for newer builds of the jars mcctl installed.
+// Asks Modrinth by sha1 (version_files/update) for newer builds of the jars spawnloft installed.
 // Hand-dropped jars are never asked about; their hashes are not ours to send.
 export async function checkUpdates(inst, { gameVersion = null } = {}) {
   const rows = listPlugins(inst).filter((p) => p.enabled && p.managed)
