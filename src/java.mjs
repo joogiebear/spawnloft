@@ -3,7 +3,7 @@ import fsSync from 'node:fs'
 import path from 'node:path'
 import { fail, UserError } from './util.mjs'
 
-// Checks for a Java the server can run on. It is the one prerequisite mcctl can't supply, so the
+// Checks for a Java the server can run on. It is the one prerequisite spawnloft can't supply, so the
 // wizard, panel and doctor share this to answer the same way.
 
 // Minecraft 26.x needs 25 (Mojang's version metadata), 1.21.x needs 21 and older versions 17, which

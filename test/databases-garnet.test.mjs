@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-garnet-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-garnet-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
 const { putInstance, listServices } = await import('../src/registry.mjs')

@@ -1,4 +1,4 @@
 @echo off
-title mcctl panel
+title spawnloft panel
 node "%~dp0mcctl.mjs" ui
 pause

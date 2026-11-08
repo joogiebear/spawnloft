@@ -38,9 +38,9 @@ async function main() {
   const home = path.join(scratch, 'home')
   const userData = path.join(scratch, 'userData')
   for (const folder of [data, config, home, path.dirname(installed)]) fs.mkdirSync(folder, { recursive: true })
-  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data }
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, MCCTL_DATA_ROOT: data, SPAWNLOFT_DATA_ROOT: data }
   delete env.ELECTRON_RUN_AS_NODE
-  delete env.MCCTL_CORE
+  delete env.MCCTL_CORE; delete env.SPAWNLOFT_CORE_DIR
   // the token is for CI release discovery only, never the installed app
   delete env.GITHUB_TOKEN
   delete env.GH_TOKEN
@@ -116,7 +116,7 @@ async function main() {
     app = await launch()
     const updated = await app.firstWindow()
     await updated.waitForLoadState('domcontentloaded')
-    const actual = await updated.evaluate(() => window.mcctlDesktop.appInfo())
+    const actual = await updated.evaluate(() => window.spawnloftDesktop.appInfo())
     assert.equal(actual.version, info.version)
     assert.equal(actual.manualUpdates, false)
     for (const [file, content] of preserved) assert.equal(fs.readFileSync(file, 'utf8'), content, `Changed user data: ${file}`)

@@ -6,7 +6,7 @@ const os = require('node:os')
 const path = require('node:path')
 const ws = require('./window-state')
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-ws-'))
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-ws-'))
 const file = path.join(tmp, 'window-state.json')
 const write = (o) => fs.writeFileSync(file, JSON.stringify(o))
 

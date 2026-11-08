@@ -12,7 +12,7 @@ test('a taken port names the port and the way to see who has it', () => {
   const f = one('[12:00:01 WARN]: FAILED TO BIND TO PORT!', { port: 25566 })
   assert.equal(f.id, 'port-in-use')
   assert.match(f.advice, /25566/)
-  assert.match(f.advice, /mcctl list/)
+  assert.match(f.advice, /spawnloft list/)
 })
 
 test('the EULA refusal points at the file', () => {
@@ -104,7 +104,7 @@ test('every shape has the fields the surfaces rely on', () => {
 })
 
 test('crash reports list newest first with their own description line', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-diag-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-diag-'))
   const crashes = path.join(dir, 'crash-reports')
   fs.mkdirSync(crashes)
   fs.writeFileSync(path.join(crashes, 'crash-2026-08-30_old.txt'),
@@ -120,6 +120,6 @@ test('crash reports list newest first with their own description line', () => {
 })
 
 test('a server with no crash-reports folder has an empty, unremarkable answer', () => {
-  const out = crashReports({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-diag-')) })
+  const out = crashReports({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-diag-')) })
   assert.deepEqual(out.reports, [])
 })

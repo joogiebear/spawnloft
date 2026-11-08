@@ -97,7 +97,7 @@ export async function createDatabase(name, { engine = defaultEngine(), version, 
   validateName(name)
   if (hasInstance(name)) fail(`"${name}" already exists - servers and databases share one set of names`)
   if (!ENGINES[engine]) fail(`unknown database engine "${engine}"`)
-  if (!version) fail('a version is required - see: mcctl db versions')
+  if (!version) fail('a version is required - see: spawnloft db versions')
   const mod = ENGINES[engine].module
 
   const chosenPort = port != null

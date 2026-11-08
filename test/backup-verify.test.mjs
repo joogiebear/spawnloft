@@ -14,7 +14,7 @@ const TAR = process.platform === 'win32'
   : 'tar'
 
 function makeArchive(members) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-verify-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-verify-'))
   fs.mkdirSync(path.join(dir, 'plugins'))
   fs.writeFileSync(path.join(dir, 'plugins', 'Example.jar'), 'not really a jar')
   fs.mkdirSync(path.join(dir, 'world'))
@@ -61,7 +61,7 @@ test('a zero-byte archive is the finding, said plainly', async () => {
 })
 
 test('a missing archive file is reported, not thrown', async () => {
-  const res = await verifyArchive(path.join(os.tmpdir(), 'mcctl-never-existed.tar.gz'))
+  const res = await verifyArchive(path.join(os.tmpdir(), 'spawnloft-never-existed.tar.gz'))
   assert.equal(res.ok, false)
   assert.deepEqual(res.problems, ['the archive file is missing'])
 })

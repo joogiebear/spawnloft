@@ -1,5 +1,5 @@
 // Purpur downloads from api.purpurmc.org. The API lists versions and builds oldest-first; both are
-// reversed here so the first entry is the newest everywhere in mcctl.
+// reversed here so the first entry is the newest everywhere in spawnloft.
 import fs from 'node:fs'
 import path from 'node:path'
 

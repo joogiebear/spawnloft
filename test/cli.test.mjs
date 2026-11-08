@@ -36,7 +36,7 @@ const at = Math.floor(Date.now() / 1000)
 fs.writeFileSync(metrics, `${at - 20} 12.5 128\n${at - 10} 6.25 256\n`)
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-function cli(args, name = 'mcctl') {
+function cli(args, name = 'spawnloft') {
   try { return { code: 0, stdout: execFileSync(process.execPath, [path.join(root, `${name}.mjs`), ...args],
     { env, encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] }), stderr: '' } }
   catch (error) { if (!Number.isInteger(error.status)) throw error
@@ -77,7 +77,7 @@ test('both CLI names reject removed database config commands without changing pl
   fs.writeFileSync(config, original)
   const registry = path.join(data, 'instances.json')
   const before = fs.readFileSync(registry, 'utf8')
-  for (const name of ['mcctl', 'spawnloft']) {
+  for (const name of ['spawnloft', 'mcctl']) {
     for (const args of [['db', 'apply', 'externaldb', 'royalplugins', 'luckperms'], ['db', 'plugins', 'royalplugins']]) {
       const result = cli(args, name)
       assert.notEqual(result.code, 0)

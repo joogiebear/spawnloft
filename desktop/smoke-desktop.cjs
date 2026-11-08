@@ -40,7 +40,7 @@ async function main() {
   const userData = path.join(scratch, 'u')
   const localData = path.join(scratch, 'l')
   for (const dir of [data, config, home, userData, localData]) fs.mkdirSync(dir, { recursive: true })
-  const settingsFile = path.join(config, 'mcctl', 'settings.json')
+  const settingsFile = path.join(config, 'spawnloft', 'settings.json')
   const env = {
     ...process.env,
     HOME: home,
@@ -49,10 +49,10 @@ async function main() {
     LOCALAPPDATA: localData,
     XDG_CONFIG_HOME: config,
     XDG_DATA_HOME: path.join(scratch, 'share'),
-    MCCTL_DATA_ROOT: data,
+    SPAWNLOFT_DATA_ROOT: data,
   }
   delete env.ELECTRON_RUN_AS_NODE
-  delete env.MCCTL_CORE
+  delete env.MCCTL_CORE; delete env.SPAWNLOFT_CORE_DIR
   delete env.FAKE_JAVA_FAIL
   const errors = []
   const log = []
@@ -350,7 +350,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.deepEqual(mcpLaunch.env, { ELECTRON_RUN_AS_NODE: '1' })
     record('PASS: Settings gives AI apps the packaged executable and script')
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'classic')
-    const info = await page.evaluate(() => window.mcctlDesktop.appInfo())
+    const info = await page.evaluate(() => window.spawnloftDesktop.appInfo())
     assert.equal(info.packaged, true)
     assert.equal(info.coreMode, 'bundled')
     const provenance = JSON.parse(fs.readFileSync(path.join(path.dirname(core), 'build-info.json'), 'utf8'))
@@ -358,7 +358,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(info.manualUpdates, manual, 'Signed Mac builds enable updates; ad-hoc Mac builds stay manual; Windows and Linux keep their updater')
     // the no-network manual path applies only to ad-hoc packages; signed ones have their own
     // Squirrel.Mac smoke test
-    if (manual) assert.equal((await page.evaluate(() => window.mcctlDesktop.checkUpdate())).reason, 'manual')
+    if (manual) assert.equal((await page.evaluate(() => window.spawnloftDesktop.checkUpdate())).reason, 'manual')
     await page.locator('#bSettings').click()
     await page.locator('input[name="appTheme"][value="spawnloft"]').check()
     await page.waitForFunction(() => document.querySelector('#themeStatus').textContent.includes('SpawnLoft theme saved.'))
@@ -372,7 +372,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
       assert.equal(await page.locator('#setUpdates').isVisible(), false, 'A build that updates by hand offers no beta setting')
     } else {
       await page.locator('#setUpdates').waitFor({ state: 'visible' })
-      const following = await page.evaluate(() => window.mcctlDesktop.updateChannel())
+      const following = await page.evaluate(() => window.spawnloftDesktop.updateChannel())
       const onBeta = info.version.includes('-')
       assert.deepEqual(following, { beta: onBeta, chosen: false, onBetaBuild: onBeta, waitingFor: null })
       assert.equal(await page.locator('#setBeta').isChecked(), onBeta, 'With no choice made, a copy follows what its own version followed')
@@ -453,7 +453,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.equal(cliMetrics.data.samples[0].cpuPercent, beforeClose.samples[0].cpu)
     assert.equal(cliMetrics.data.samples[0].rssMiB, beforeClose.samples[0].rss)
     const csvPath = path.join(scratch, 'test run export.csv')
-    await terminal('spawnloft', ['metrics', name, '--csv', '--output', csvPath])
+    await terminal('mcctl', ['metrics', name, '--csv', '--output', csvPath])
     const csvBytes = fs.readFileSync(csvPath)
     assert.match(csvBytes.toString('utf8'), /^instance,run_id,timestamp,cpu_percent,rss_mib,cores\n/)
     assert.ok(csvBytes.toString('utf8').includes(`,${beforeClose.samples[0].cpu},${beforeClose.samples[0].rss},`))

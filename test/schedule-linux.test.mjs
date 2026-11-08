@@ -43,7 +43,7 @@ test('systemd answers are read per unit, and absent units are not reported as wo
     lastRun: '2026-09-13T08:00:00.000Z', nextRun: '2026-09-14T08:00:00.000Z' })
   const local = parseShow(`Id=${svc}\nLoadState=loaded\nActiveState=inactive\nExecMainStatus=0\nExecMainExitTimestamp=Sun 2026-09-13 03:00:00 CDT\n\nId=${clock}\nLoadState=loaded`)
   assert.equal(describe(id, { ...daily, enabled: false }, local, null).lastRun, null)
-  // The run log's own time wins over systemd's: it is when mcctl did the work.
+  // The run log's own time wins over systemd's: it is when spawnloft did the work.
   assert.equal(describe(id, daily, units, '2026-09-12T08:00:00.000Z').lastRun, '2026-09-12T08:00:00.000Z')
   assert.equal(describe(id, { ...daily, enabled: false }, units, null).state, 'Disabled')
 

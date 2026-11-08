@@ -131,10 +131,10 @@ test('the desktop window rules pass their own tests', () => {
 
 test('the desktop app exposes exactly the two launcher calls, and packages their modules', () => {
   const preload = fs.readFileSync(path.join(root, 'desktop', 'preload.js'), 'utf8')
-  assert.match(preload, /openProfileFolder: \(name\) => ipcRenderer\.invoke\('mcctl:openProfileFolder', String\(name \?\? ''\)\)/)
-  assert.match(preload, /openMicrosoftLogin: \(url\) => ipcRenderer\.invoke\('mcctl:openMicrosoftLogin', String\(url \?\? ''\)\)/)
+  assert.match(preload, /openProfileFolder: \(name\) => ipcRenderer\.invoke\('spawnloft:openProfileFolder', String\(name \?\? ''\)\)/)
+  assert.match(preload, /openMicrosoftLogin: \(url\) => ipcRenderer\.invoke\('spawnloft:openMicrosoftLogin', String\(url \?\? ''\)\)/)
   const main = fs.readFileSync(path.join(root, 'desktop', 'main.js'), 'utf8')
-  for (const channel of ['mcctl:openProfileFolder', 'mcctl:openMicrosoftLogin']) {
+  for (const channel of ['spawnloft:openProfileFolder', 'spawnloft:openMicrosoftLogin']) {
     assert.match(main, new RegExp(`ipcMain\\.handle\\('${channel}', async \\(e, \\w+\\) => \\{\\r?\\n  if \\(!fromPanel\\(e\\)\\) return \\{ ok: false \\}`))
   }
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'desktop', 'package.json'), 'utf8'))

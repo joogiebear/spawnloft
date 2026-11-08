@@ -1,3 +1,4 @@
+import { envVar } from './env.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -8,12 +9,28 @@ import { protectPrivateFile } from './private-files.mjs'
 export const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 // Settings live in the user config dir, not next to the code: an installed program directory is
-// read-only, and this file says where everything else lives.
-export function settingsFile() {
-  const base = process.platform === 'win32'
+// read-only, and this file says where everything else lives. The folder is spawnloft/ for new
+// installs. An install that predates the rename keeps mcctl/settings.json, which is read (and
+// written) in place; if both exist, spawnloft/ wins and `doctor` reports the other.
+function configBase() {
+  return process.platform === 'win32'
     ? process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
     : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
-  return path.join(base, 'mcctl', 'settings.json')
+}
+
+export function settingsFile() {
+  const base = configBase()
+  const current = path.join(base, 'spawnloft', 'settings.json')
+  const legacy = path.join(base, 'mcctl', 'settings.json')
+  return !fs.existsSync(current) && fs.existsSync(legacy) ? legacy : current
+}
+
+// the other settings file when both exist, else null
+export function shadowedSettingsFile() {
+  const base = configBase()
+  const current = path.join(base, 'spawnloft', 'settings.json')
+  const legacy = path.join(base, 'mcctl', 'settings.json')
+  return fs.existsSync(current) && fs.existsSync(legacy) ? legacy : null
 }
 
 // kind 'content': read but unusable (empty, not JSON, not an object). kind 'io': could not be read
@@ -120,12 +137,21 @@ function linkTarget(file) {
   }
 }
 
-// per-user and writable, unlike the program directory
-export function defaultDataRoot() {
-  const base = process.platform === 'win32'
+function dataBase() {
+  return process.platform === 'win32'
     ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
     : process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share')
-  return path.join(base, 'mcctl')
+}
+
+// Per-user and writable, unlike the program directory. New installs get spawnloft/; a machine that
+// already has the older mcctl/ folder keeps using it (`spawnloft data move` relocates it).
+export function legacyDataRoot() {
+  return path.join(dataBase(), 'mcctl')
+}
+
+export function defaultDataRoot() {
+  const current = path.join(dataBase(), 'spawnloft')
+  return !fs.existsSync(current) && fs.existsSync(legacyDataRoot()) ? legacyDataRoot() : current
 }
 
 // Order: settings; the code directory if it already holds instances.json (keeps an existing
@@ -135,9 +161,9 @@ export function resolveRoots(overrides = {}) {
   const s = { ...load(), ...overrides }
 
   const legacy = fs.existsSync(path.join(CODE_ROOT, 'instances.json'))
-  // MCCTL_DATA_ROOT wins: lifecycle tests use it to keep daemons and registry in a scratch folder,
+  // SPAWNLOFT_DATA_ROOT (or the older MCCTL_DATA_ROOT) wins: lifecycle tests use it to keep daemons and registry in a scratch folder,
   // and spawned daemons inherit it.
-  const forced = process.env.MCCTL_DATA_ROOT
+  const forced = envVar('DATA_ROOT')
   const dataRoot = forced ? path.resolve(forced) : s.dataRoot ? path.resolve(s.dataRoot) : legacy ? CODE_ROOT : defaultDataRoot()
 
   // off (default): servers live under the data root
@@ -169,7 +195,7 @@ export function resolveRoots(overrides = {}) {
 export function serversElsewhere(dataRoot) {
   const here = path.resolve(dataRoot)
   const found = []
-  for (const root of new Set([defaultDataRoot(), CODE_ROOT].map((r) => path.resolve(r)))) {
+  for (const root of new Set([defaultDataRoot(), legacyDataRoot(), path.join(dataBase(), 'spawnloft'), CODE_ROOT].map((r) => path.resolve(r)))) {
     if (root === here) continue
     let names = []
     try {
@@ -191,7 +217,7 @@ export function describeServersElsewhere(dataRoot) {
 // Checks by actually writing: permission bits and free space lie on network shares, read-only mounts
 // and unplugged drives.
 export function checkWritable(dir) {
-  const probe = path.join(dir, '.mcctl-write-test')
+  const probe = path.join(dir, '.spawnloft-write-test')
   try {
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(probe, 'ok')

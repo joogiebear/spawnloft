@@ -2241,7 +2241,7 @@
   }
   /*
     No spine for a healthy task. "Ready" is the normal state of every task on the screen. The one
-    worth marking is a task mcctl believes in that Windows has never heard of - that one will never
+    worth marking is a task spawnloft believes in that Windows has never heard of - that one will never
     fire, and it should look like it.
   */
   .task::before {
@@ -3401,7 +3401,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
 const MAX_LINES = 5000;
-const desktop = window.mcctlDesktop;
+const desktop = window.spawnloftDesktop;
 const panelPlatform = $('meta[name="spawnloft-platform"]').content;
 const windowsFeatures = panelPlatform === 'win32';
 const schedulerName = { darwin: 'macOS launchd', linux: 'systemd' }[panelPlatform] || 'Windows Task Scheduler';
@@ -3839,7 +3839,7 @@ const STATE_TEXT = {
 // The states nobody can be expected to know the meaning of. Saying it here beats a support
 // question, and each one names its way out.
 const STATE_NOTE = {
-  orphaned: ['Orphaned', 'The Java process is still running but the supervisor that owned it is gone, so SpawnLoft can no longer talk to it. Stop it with "mcctl kill" in a terminal, then start it again here.'],
+  orphaned: ['Orphaned', 'The Java process is still running but the supervisor that owned it is gone, so SpawnLoft can no longer talk to it. Stop it with "spawnloft kill" in a terminal, then start it again here.'],
   stale: ['Stale state', 'A leftover state file from a session that did not shut down cleanly. Starting the server clears it.'],
   unknown: ['Unavailable', 'SpawnLoft could not read this server’s state. Its folder may have been moved or deleted.'],
   unreachable: ['Unreachable', 'This database runs elsewhere and is not answering at its address. Start it there, or check the host, port and password under Settings.'],
@@ -6012,7 +6012,7 @@ const LEVEL_RE = /\[(?:[^\]]*[\/ ])?(INFO|WARN|WARNING|ERROR|SEVERE|FATAL|DEBUG|
 const BARE_LEVEL_RE = /^\S+\s+\S+\s+(INFO|WARN|WARNING|ERROR|SEVERE|FATAL)\s/;
 const CONT_RE = /^(?:\s+|at\s|Caused by:|Suppressed:|\.\.\.\s*\d+\s+more)/;
 const EXC_RE = /^[a-z][\w.$]*(?:\.[A-Z][\w$]*)+(?::|\s*$)/;
-const MCCTL_RE = /^\[mcctl\]/;
+const MCCTL_RE = /^\[(?:spawnloft|mcctl)\]/; // consoles written before the rename say [mcctl]
 
 function levelOf(text, previous) {
   if (MCCTL_RE.test(text)) return 'sys';
@@ -6466,7 +6466,7 @@ $('#miExportShare').onclick = async () => {
     title: 'Upload this console to mclo.gs?',
     // Only what is documented. mclo.gs's own policy promises IP removal, best effort, and
     // deletion 90 days after the log was last opened - nothing about player names or paths.
-    // mcctl takes the account name out of paths itself before sending; the rest goes as is.
+    // spawnloft takes the account name out of paths itself before sending; the rest goes as is.
     text: 'The log is published at a public link that anyone holding it can read. Before sending, '
       + 'SpawnLoft replaces your account name in file paths. mclo.gs removes IP addresses on its side, '
       + 'best effort, and deletes the log 90 days after it was last opened. Player names, plugin '
@@ -7275,7 +7275,7 @@ function playerDetail(p, data, base, again) {
 /**
  * A face for a player, drawn from their id.
  *
- * <p>The obvious way to do this is to fetch a skin head from one of the avatar services. mcctl has
+ * <p>The obvious way to do this is to fetch a skin head from one of the avatar services. spawnloft has
  * to work with no network at all - that is a stated constraint, not a preference - so instead the
  * UUID is treated as what it already is: thirty-two hex digits of stable, well-distributed noise.
  *
@@ -8824,7 +8824,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
  * Everything scheduled for this server, and what happened when it ran.
  *
  * <p>The run log is the half Task Scheduler cannot give you. Windows records an exit code per task
- * and nothing else, so "0" is all it can say about a backup; mcctl writes its own line naming the
+ * and nothing else, so "0" is all it can say about a backup; spawnloft writes its own line naming the
  * file it produced, and both are shown - the state from Windows, the detail from us.
  */
 /**
@@ -9044,7 +9044,7 @@ function taskCard(task, data, base, again, editor) {
     state.textContent = 'Off';
     state.dataset.tone = 'off';
   } else if (!task.known) {
-    // mcctl has a definition Windows has never heard of. Someone deleted it in Task Scheduler, or
+    // spawnloft has a definition Windows has never heard of. Someone deleted it in Task Scheduler, or
     // the query failed - either way it is not going to run, and saying "Ready" would be a lie.
     state.textContent = 'Not in Windows';
     state.dataset.tone = 'bad';
@@ -10235,7 +10235,7 @@ function sameSchedule(a, b) {
  * failable operation nobody asked for. So the old ones stay put and the dialog says so - the
  * alternative is a history that looks like it lost everything.
  *
- * The path is resolved when mcctl starts, for the reason spelled out in paths.mjs, so this takes
+ * The path is resolved when spawnloft starts, for the reason spelled out in paths.mjs, so this takes
  * effect on the next launch rather than pretending to apply now.
  */
 async function changeBackupsLocation(current) {
@@ -10692,7 +10692,7 @@ function renderBackupHistory(row, data, signature) {
         text: 'Every new snapshot, for every server, is copied there as it is taken - ideally on '
           + 'a different drive, so one disk failure cannot take the servers and their backups '
           + 'together. Retention deletions follow the mirror too.',
-        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\mcctl-backups' },
+        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\spawnloft-backups' },
         confirmLabel: 'Use this folder',
       });
       if (!answer || !answer.text) return;
@@ -13801,7 +13801,7 @@ api('/health').then((health) => {
 });
 
 // ---- desktop-only: version and updates -------------------------------------
-// The same page runs in a plain browser, where window.mcctlDesktop does not exist. Everything here
+// The same page runs in a plain browser, where window.spawnloftDesktop does not exist. Everything here
 // is additive and silent when it is absent.
 
 if (desktop) {

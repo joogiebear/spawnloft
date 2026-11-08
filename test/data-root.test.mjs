@@ -76,9 +76,9 @@ test('a server in a folder picked at setup is found by a fresh MCP server with n
     Survival: { dir: serverDir, jar: 'paper.jar', memory: '2G', port: 45711, rcon: { port: 45712, password: 'x' } },
   } }))
   const config = path.join(home, 'config')
-  fs.mkdirSync(path.join(config, 'mcctl'), { recursive: true })
+  fs.mkdirSync(path.join(config, 'spawnloft'), { recursive: true })
   // The exact shape desktop/main.js saveSetup writes.
-  fs.writeFileSync(path.join(config, 'mcctl', 'settings.json'),
+  fs.writeFileSync(path.join(config, 'spawnloft', 'settings.json'),
     JSON.stringify({ dataRoot: chosen, separateInstances: false, instancesDir: null }))
 
   const env = { ...process.env, APPDATA: config, XDG_CONFIG_HOME: config, HOME: home, USERPROFILE: home,

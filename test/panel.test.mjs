@@ -161,11 +161,13 @@ test('a stack trace inherits the level of the line that introduced it', () => {
   assert.equal(levelOf('Caused by: java.lang.NullPointerException', 'error'), 'error')
   assert.equal(levelOf('... 12 more', 'error'), 'error')
   assert.equal(levelOf('\tat com.example.Fine(Fine.java:1)', 'warn'), 'warn')
-  // ...but never from an mcctl system line, which is not a server error.
+  // ...but never from a spawnloft system line, which is not a server error.
   assert.equal(levelOf('\tat com.example.Fine(Fine.java:1)', 'sys'), 'info')
 })
 
-test('mcctl speaking for itself is sys, never a server level', () => {
+test('spawnloft speaking for itself is sys, never a server level', () => {
+  assert.equal(levelOf('[spawnloft] server process exited (code=0)'), 'sys')
+  // consoles written before the rename, and daemons still running from the old version, say [mcctl]
   assert.equal(levelOf('[mcctl] server process exited (code=0)'), 'sys')
 })
 

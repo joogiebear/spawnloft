@@ -1,4 +1,4 @@
-// Table of the server software mcctl can create. Pure data (no network or filesystem) so plugins.mjs
+// Table of the server software spawnloft can create. Pure data (no network or filesystem) so plugins.mjs
 // can import it cheaply; the fetch clients are in sources.mjs.
 // family: bukkit loads plugins/ (Paper and the forks and ancestors around it), fabric and neoforge load mods/,
 // vanilla loads nothing. modrinth is the search loader facet, widest-compatible first, narrowing down

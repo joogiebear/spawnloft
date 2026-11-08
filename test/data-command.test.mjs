@@ -14,7 +14,7 @@ let n = 0
 /** A data folder, and the environment that makes the CLI look nowhere else. */
 function setup({ files = true } = {}) {
   const base = path.join(scratch, `c${++n}`)
-  const data = path.join(base, 'mcctl')
+  const data = path.join(base, 'spawnloft')
   if (files) {
     fs.mkdirSync(path.join(data, 'instances', 'Srv'), { recursive: true })
     fs.mkdirSync(path.join(data, 'run'), { recursive: true })

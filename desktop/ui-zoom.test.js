@@ -5,7 +5,7 @@ const os = require('node:os')
 const path = require('node:path')
 const z = require('./ui-zoom')
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-zoom-'))
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-zoom-'))
 const file = path.join(tmp, 'ui-zoom.json')
 let pass = 0
 const check = (label, fn) => {

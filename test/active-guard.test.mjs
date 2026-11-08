@@ -14,7 +14,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-active-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-active-'))
 process.env.MCCTL_DATA_ROOT = scratch
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
@@ -99,7 +99,7 @@ test('the reason names the way out, which differs for an orphan', () => {
   setStatus(name, 'orphaned')
   const orphan = activeBlock(name, 'deleting it')
   assert.match(orphan, /orphaned java process \(pid \d+\)/)
-  assert.match(orphan, new RegExp(`mcctl kill ${name}`), '"stop it" would send them to a command that refuses an orphan')
+  assert.match(orphan, new RegExp(`spawnloft kill ${name}`), '"stop it" would send them to a command that refuses an orphan')
 
   for (const status of FREE) {
     setStatus(name, status)
