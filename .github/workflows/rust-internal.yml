@@ -46,7 +46,7 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, windows-latest, macos-15]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: rust
@@ -55,6 +55,9 @@ jobs:
       - name: Install the pinned toolchain
         # with no argument rustup (1.28+) installs what rust/rust-toolchain.toml pins
         run: rustup toolchain install
+      - name: Install the Tauri shell's Linux build libraries (webkit2gtk 4.1, GTK 3)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
       # first-party actions only: the repository's Actions policy allows a fixed list
       - uses: actions/cache@v4
         with:
@@ -171,6 +174,111 @@ jobs:
         run: |
           npm test
           npm --prefix desktop test
+
+  tauri-spike:
+    # P0-F: the Tauri 2 shell over the panel, packaged with SpawnLoft's NSIS template, installed
+    # over a published 1.6 beta the way electron-updater does it, one Tauri updater cycle
+    # (spike-a -> spike-b) and start/memory numbers against 1.6. Unsigned installers, a throwaway
+    # updater key made here, a loopback feed: nothing leaves the runner except workflow artifacts.
+    if: github.ref == 'refs/heads/v2'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      SPIKE_A: 2.0.0-spike.1
+      SPIKE_B: 2.0.0-spike.2
+      # the 1.6 beta installed first; any signed 1.6 beta with a Windows installer will do
+      BETA_TAG: v1.6.0-beta.413
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core (the panel endpoint the shell opens)
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+      - name: A throwaway updater key for this run
+        run: |
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          "$tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/spike.key" -f
+          ls -la "$RUNNER_TEMP"/spike.key*
+      - name: Build spike-a and spike-b
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/spike.key")"
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          mkdir -p "$RUNNER_TEMP/feed"
+          for v in "$SPIKE_A" "$SPIKE_B"; do
+            node spike/spike-config.mjs "$v" "$RUNNER_TEMP/spike.key.pub" "$RUNNER_TEMP/spike-$v.json"
+            SPAWNLOFT_VERSION="$v" "$tauri" build --ci --bundles nsis --config "$RUNNER_TEMP/spike-$v.json"
+            cp ../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe* "$RUNNER_TEMP/feed/"
+          done
+          ls -la "$RUNNER_TEMP/feed"
+      - name: Download the signed 1.6 beta installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$BETA_TAG" -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/beta"
+      - name: Install 1.6 and measure it
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Select-Object -First 1
+          $p = Start-Process $setup.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "1.6 installer exit $($p.ExitCode)" }
+          # point its updater at nothing (PLAN-RUST-TAURI s3 item 4: app-update.yml is the switch),
+          # so a newer 1.6 beta cannot install itself while this job measures or hands over
+          Set-Content "$env:LOCALAPPDATA\Programs\SpawnLoft\resources\app-update.yml" "provider: generic`nurl: http://127.0.0.1:9/`nupdaterCacheDirName: spawnloft-updater"
+          # a configured data root, so 1.6 opens on the panel and not on its first-run page
+          New-Item -ItemType Directory -Force "$env:APPDATA\mcctl", "$env:LOCALAPPDATA\mcctl" | Out-Null
+          @{ dataRoot = "$env:LOCALAPPDATA\mcctl" } | ConvertTo-Json | Set-Content "$env:APPDATA\mcctl\settings.json"
+          npm install --prefix "$env:RUNNER_TEMP\pw" --no-save --no-package-lock playwright@1.63.0
+          $env:NODE_PATH = "$env:RUNNER_TEMP\pw\node_modules"
+          New-Item -ItemType Directory -Force spike-results | Out-Null
+          node rust/crates/spawnloft-shell/spike/measure.cjs electron "$env:LOCALAPPDATA\Programs\SpawnLoft\SpawnLoft.exe" spike-results/measure-electron-1.6.json 3
+          @{ installerBytes = $setup.Length; name = $setup.Name } | ConvertTo-Json | Set-Content spike-results/installer-1.6.json
+      - name: Hand over from 1.6 to spike-a the way electron-updater does
+        shell: pwsh
+        run: |
+          $a = Get-ChildItem "$env:RUNNER_TEMP\feed" -Filter "SpawnLoft_$($env:SPIKE_A)_x64-setup.exe"
+          ./rust/crates/spawnloft-shell/spike/handover.ps1 -SpikeA $a.FullName -Out spike-results
+          @{ installerBytes = $a.Length; name = $a.Name } | ConvertTo-Json | Set-Content spike-results/installer-spike.json
+      - name: Measure the Tauri shell
+        shell: pwsh
+        run: node rust/crates/spawnloft-shell/spike/measure.cjs tauri "$env:LOCALAPPDATA\Programs\SpawnLoft\SpawnLoft.exe" spike-results/measure-tauri.json 3
+      - name: One Tauri updater cycle, spike-a to spike-b
+        shell: pwsh
+        run: ./rust/crates/spawnloft-shell/spike/update-cycle.ps1 -FeedDir "$env:RUNNER_TEMP\feed" -From $env:SPIKE_A -To $env:SPIKE_B -Out spike-results
+      - name: Uninstall (keeps data, removes tasks)
+        shell: pwsh
+        run: ./rust/crates/spawnloft-shell/spike/handover.ps1 -Uninstall -Out spike-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tauri-spike-${{ github.run_number }}-results
+          retention-days: 14
+          path: spike-results/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tauri-spike-${{ github.run_number }}-installers
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/feed/*.exe
+            ${{ runner.temp }}/feed/*.sig
 
   package:
     if: github.ref == 'refs/heads/v2'

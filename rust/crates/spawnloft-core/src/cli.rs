@@ -49,6 +49,7 @@ pub fn help() -> String {
          Usage:\n  \
            {name} --version [--json]   print this build's version, commit and target\n  \
            {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
+           {name} ui [--port n]        the panel on 127.0.0.1 (proxies to the Node panel for now)\n  \
            {name} help                 this text\n",
         line = info.line(),
         name = build::NAME,
@@ -146,6 +147,45 @@ fn daemon(rest: &[String]) -> Outcome {
     }
 }
 
+/// `ui [--port <n>] [--core-dir <dir>] [--node <path>] [--upstream <url>] [--exit-with-stdin]`.
+pub fn parse_ui(rest: &[String]) -> Result<spawnloft_lib::panel::Options, Outcome> {
+    let mut out = spawnloft_lib::panel::Options::default();
+    let mut it = rest.iter();
+    while let Some(flag) = it.next() {
+        let mut value = || {
+            it.next()
+                .cloned()
+                .ok_or_else(|| usage_error(&format!("{flag} needs a value")))
+        };
+        match flag.as_str() {
+            "--port" => {
+                let v = value()?;
+                out.port = v
+                    .parse()
+                    .map_err(|_| usage_error(&format!("`{v}` is not a port")))?;
+            }
+            "--core-dir" => out.core_dir = Some(value()?.into()),
+            "--node" => out.node = Some(value()?.into()),
+            "--upstream" => out.upstream = Some(value()?),
+            "--exit-with-stdin" => out.exit_with_stdin = true,
+            // what `spawnloft ui` takes today; this binary never opens a browser itself
+            "--no-open" => {}
+            other => return Err(usage_error(&format!("unexpected argument `{other}`"))),
+        }
+    }
+    Ok(out)
+}
+
+fn ui(rest: &[String]) -> Outcome {
+    match parse_ui(rest) {
+        Ok(opts) => Outcome {
+            code: u8::try_from(spawnloft_lib::panel::run(opts)).unwrap_or(1),
+            ..Outcome::default()
+        },
+        Err(outcome) => outcome,
+    }
+}
+
 pub fn run(args: &[String]) -> Outcome {
     let Some((command, rest)) = args.split_first() else {
         return Outcome {
@@ -158,6 +198,7 @@ pub fn run(args: &[String]) -> Outcome {
         "--version" | "-V" | "version" => version(rest),
         "help" | "--help" | "-h" => ok(help()),
         "daemon" => daemon(rest),
+        "ui" => ui(rest),
         other => usage_error(&format!("unknown command `{other}`")),
     }
 }
@@ -224,6 +265,16 @@ mod tests {
             parse_daemon(&args(&["s", "--node"])).unwrap_err().code,
             EXIT_USAGE
         );
+    }
+
+    #[test]
+    fn ui_arguments() {
+        let o = parse_ui(&args(&["--port", "0", "--core-dir", "/c", "--exit-with-stdin"])).unwrap();
+        assert_eq!(o.port, 0);
+        assert_eq!(o.core_dir, Some("/c".into()));
+        assert!(o.exit_with_stdin);
+        assert_eq!(parse_ui(&args(&["--port", "x"])).unwrap_err().code, EXIT_USAGE);
+        assert_eq!(parse_ui(&args(&["--bogus"])).unwrap_err().code, EXIT_USAGE);
     }
 
     #[test]
