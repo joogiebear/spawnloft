@@ -7,7 +7,7 @@ import path from 'node:path'
 import { exportConsole, shareConsole, trimForUpload, redactAccountName, MAX_LINES, MAX_BYTES } from '../src/mclogs.mjs'
 import { UserError } from '../src/util.mjs'
 
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mclogs-'))
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-mclogs-'))
 
 function fixture(consoleText) {
   const dir = scratch()
@@ -180,8 +180,8 @@ test('sharing a server that has never run is refused before anything is sent', a
 // nothing else is touched, because nothing else is promised.
 test('the account name is taken out of paths, on both kinds of machine', () => {
   assert.equal(
-    redactAccountName('at C:\\Users\\Josh Smith\\AppData\\Local\\mcctl\\instances\\smp\\plugins\\x.jar'),
-    'at C:\\Users\\<user>\\AppData\\Local\\mcctl\\instances\\smp\\plugins\\x.jar',
+    redactAccountName('at C:\\Users\\Josh Smith\\AppData\\Local\\spawnloft\\instances\\smp\\plugins\\x.jar'),
+    'at C:\\Users\\<user>\\AppData\\Local\\spawnloft\\instances\\smp\\plugins\\x.jar',
   )
   assert.equal(redactAccountName('cwd=D:/Users/josh/servers'), 'cwd=D:/Users/<user>/servers')
   assert.equal(redactAccountName('home is C:\\Users\\josh'), 'home is C:\\Users\\<user>')

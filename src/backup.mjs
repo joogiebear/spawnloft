@@ -1,3 +1,4 @@
+import { envVar } from './env.mjs'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -180,8 +181,8 @@ export { runTar, tarBinary, tarMember } from './tar.mjs'
 
 // two minutes: well past an ordinary command's eight seconds, but short enough that a hung server
 // doesn't hold a backup for long. The env override is for tests.
-export const FLUSH_TIMEOUT_MS = Number(process.env.MCCTL_FLUSH_TIMEOUT_MS) > 0
-  ? Number(process.env.MCCTL_FLUSH_TIMEOUT_MS)
+export const FLUSH_TIMEOUT_MS = Number(envVar('FLUSH_TIMEOUT_MS')) > 0
+  ? Number(envVar('FLUSH_TIMEOUT_MS'))
   : 120 * 1000
 
 // Returns a warning when save-on could not be confirmed, else null. A refused connection means the
@@ -239,7 +240,7 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
   let dumps = { dumped: [], skipped: [] }
   let dumpDir = null
   if (scope === 'standard' || scope === 'full') {
-    dumpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-dump-'))
+    dumpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-dump-'))
     try {
       dumps = await services.dumpAttachments(inst.name, dumpDir)
     } catch (err) {

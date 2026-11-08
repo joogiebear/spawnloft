@@ -86,7 +86,7 @@ export function activeBlock(name, verb) {
   if (status === 'running') return `"${name}" is running - stop it before ${verb}.`
   if (status === 'stopping') return `"${name}" is still shutting down - wait for it to finish before ${verb}.`
   if (status === 'orphaned') {
-    return `"${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon - run "mcctl kill ${name}" before ${verb}.`
+    return `"${name}" has an orphaned java process (pid ${state.javaPid}) with no daemon - run "spawnloft kill ${name}" before ${verb}.`
   }
   return null
 }

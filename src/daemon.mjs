@@ -1,5 +1,5 @@
 /**
- * Instance daemon, spawned detached by `mcctl start`. Owns the server child, mirrors its
+ * Instance daemon, spawned detached by `spawnloft start`. Owns the server child, mirrors its
  * output to a log file, serves a control socket for console input and shutdown, and
  * relaunches it after a crash when auto-restart is on (rules in crashguard.mjs).
  */
@@ -236,7 +236,7 @@ function launch({ first }) {
 
   child.on('error', (err) => {
     log(`spawn error: ${err.message}`)
-    out.write(`\n[mcctl] failed to launch server: ${err.message}\n`)
+    out.write(`\n[spawnloft] failed to launch server: ${err.message}\n`)
     state.running = false
     state.error = err.message
     writeJson(stateFile(name), state)
@@ -268,7 +268,7 @@ function onExit(code, signal) {
   log(`java exited code=${code} signal=${signal}`)
   stopSampler()
   ticks.stop()
-  out.write(`\n[mcctl] server process exited (code=${code}${signal ? `, signal=${signal}` : ''})\n`)
+  out.write(`\n[spawnloft] server process exited (code=${code}${signal ? `, signal=${signal}` : ''})\n`)
 
   const crashed = (code !== 0 && code !== null) || Boolean(signal)
   if (crashed && !stopping) crashes.push(Date.now())
@@ -282,7 +282,7 @@ function onExit(code, signal) {
     const finding = diagnose(recent.split(/\r?\n/), { port: inst.port, memory: inst.memory, dir: inst.dir })[0]
     if (finding) {
       cause = ` Likely cause: ${finding.title.toLowerCase()}.`
-      out.write(`[mcctl] likely cause: ${finding.title} — ${finding.advice}\n`)
+      out.write(`[spawnloft] likely cause: ${finding.title} — ${finding.advice}\n`)
     }
   }
 
@@ -299,7 +299,7 @@ function onExit(code, signal) {
 
   if (verdict.kind === 'restart') {
     const wait = Math.round(verdict.delayMs / 1000)
-    out.write(`[mcctl] crash ${verdict.recent} of ${CRASH_LIMIT} allowed per ${CRASH_WINDOW_MS / 60000} minutes — restarting in ${wait}s\n`)
+    out.write(`[spawnloft] crash ${verdict.recent} of ${CRASH_LIMIT} allowed per ${CRASH_WINDOW_MS / 60000} minutes — restarting in ${wait}s\n`)
     tell(`crashed (exit ${signal || code}).${cause} Restarting in ${wait}s.`)
     // State stays running:true during the delay so readState reports "stopping", not "stopped";
     // a start racing into this window would collide with the respawn.
@@ -312,7 +312,7 @@ function onExit(code, signal) {
         launch({ first: false })
       } catch (err) {
         log(`auto-restart failed: ${err.message}`)
-        out.write(`\n[mcctl] auto-restart failed: ${err.message}\n`)
+        out.write(`\n[spawnloft] auto-restart failed: ${err.message}\n`)
         tell(`auto-restart failed: ${err.message}`)
         shutDown(code, signal, `auto-restart failed: ${err.message}`)
       }
@@ -322,7 +322,7 @@ function onExit(code, signal) {
 
   if (verdict.kind === 'give-up') {
     const why = `crashed ${verdict.recent} times in ${CRASH_WINDOW_MS / 60000} minutes; auto-restart gave up`
-    out.write(`[mcctl] ${why}. See the lines above for the reason it keeps dying.\n`)
+    out.write(`[spawnloft] ${why}. See the lines above for the reason it keeps dying.\n`)
     tell(`${why}. It is staying down until someone looks at it.`)
     return shutDown(code, signal, why)
   }
@@ -500,7 +500,7 @@ function listenWithRetry(deadline = Date.now() + LISTEN_TIMEOUT_MS) {
       return
     }
     log(`control socket fatal: ${err.message}`)
-    out.write(`\n[mcctl] control channel unavailable (${err.message}); stopping the server\n`)
+    out.write(`\n[spawnloft] control channel unavailable (${err.message}); stopping the server\n`)
     state.running = false
     state.error = `control channel unavailable: ${err.message}`
     writeJson(stateFile(name), state)

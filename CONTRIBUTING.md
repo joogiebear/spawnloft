@@ -29,7 +29,7 @@ cannot be merged.
 
 ```
 git clone https://github.com/joogiebear/spawnloft
-cd mcctl
+cd spawnloft
 npm test                 # node:test, no dependencies, ~a second
 node mcctl.mjs ui --no-open --port 8771    # the panel, from source
 ```

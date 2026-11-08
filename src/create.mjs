@@ -26,7 +26,7 @@ export function placeJar(dir, chosenJar) {
     fail([
       `server jar "${chosenJar}" is not in ${JARS_DIR}.`,
       have ? `  Stored jars: ${have}` : '  The jar store is empty.',
-      '  Download one with "mcctl paper fetch <version>" or add one with "mcctl jars import <path>".',
+      '  Download one with "spawnloft paper fetch <version>" or add one with "spawnloft jars import <path>".',
     ].join(String.fromCharCode(10)))
   }
   fs.copyFileSync(src, inInstance)
@@ -229,7 +229,7 @@ export async function newInstance(
     memory = memory ?? src.memory
   } else if (template) {
     const tpl = listTemplates().find((t) => t.name === template)
-    if (!tpl) fail(`no template named "${template}" - see: mcctl templates`)
+    if (!tpl) fail(`no template named "${template}" - see: spawnloft templates`)
     copyTree(tpl.dir, dir, { skip: new Set(['template.json']) })
     sourceJar = tpl.jar ?? null
   }
@@ -240,7 +240,7 @@ export async function newInstance(
   if (!chosenJar && loader !== 'neoforge') {
     fail(
       `no server jar specified.\n` +
-        `  Pick one with --jar <file>. Available: ${listJars().map((j) => j.name).join(', ') || '(none - use "mcctl jars import <path>")'}`,
+        `  Pick one with --jar <file>. Available: ${listJars().map((j) => j.name).join(', ') || '(none - use "spawnloft jars import <path>")'}`,
     )
   }
   if (chosenJar) placeJar(dir, chosenJar)

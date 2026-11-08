@@ -7,7 +7,7 @@ import { DATA_ROOT } from './paths.mjs'
 import { fail } from './util.mjs'
 import { writeShim as writePosixShim, nextCalendarRun } from './schedule-mac.mjs'
 
-// systemd user units that call back into `mcctl task run <id>`; what a task does stays in
+// systemd user units that call back into `spawnloft task run <id>`; what a task does stays in
 // schedules.json. No root needed. Without lingering, user units only run while logged in.
 
 // namespaced per data folder so separate installs don't replace each other's units

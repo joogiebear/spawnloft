@@ -54,7 +54,7 @@ export function getInstance(name) {
     const known = Object.keys(reg.instances)
     fail(
       `no instance named "${name}"` +
-        (known.length ? `. Known instances: ${known.join(', ')}` : '. Create one with: mcctl new <name>'),
+        (known.length ? `. Known instances: ${known.join(', ')}` : '. Create one with: spawnloft new <name>'),
     )
   }
   return { name, ...cfg }

@@ -584,7 +584,7 @@
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
   const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
   // the desktop app's bridge; null in a browser tab
-  const desktop = window.mcctlDesktop ?? null
+  const desktop = window.spawnloftDesktop ?? null
   // Inside the panel's Play page, a frame of the panel's own origin, rather than a window or tab
   // of its own: the top bar becomes a page head (CSS), and the two lines that speak of closing
   // "this window" speak of leaving the page. Nothing else here knows the difference.

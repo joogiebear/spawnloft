@@ -7,7 +7,7 @@ import childProcess from 'node:child_process'
 
 import { humanBytes, humanDuration, table, validateName, stamp, randomPassword, readJson, writeJson, UserError, dirSize, dirSizeAsync, sameProcess, maskSecretArgs, refreshProcessTable, acquireLock, acquireLockAsync, withLock, lockHolder } from '../src/util.mjs'
 
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-lock-'))
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-lock-'))
 
 test('bytes read at the right unit, whole below 1 KB', () => {
   assert.equal(humanBytes(0), '0 B')
@@ -49,11 +49,11 @@ test('passwords draw only from the unambiguous alphabet, at the asked length', (
 })
 
 test('readJson answers the fallback for a missing file, not an error', () => {
-  assert.deepEqual(readJson(path.join(os.tmpdir(), 'mcctl-does-not-exist.json'), { a: 1 }), { a: 1 })
+  assert.deepEqual(readJson(path.join(os.tmpdir(), 'spawnloft-does-not-exist.json'), { a: 1 }), { a: 1 })
 })
 
 test('writeJson round-trips and leaves no .tmp behind', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-util-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-util-'))
   const file = path.join(dir, 'deep', 'reg.json')
   writeJson(file, { version: 1, instances: {} })
   assert.deepEqual(readJson(file), { version: 1, instances: {} })
@@ -160,7 +160,7 @@ test('acquireLockAsync times out with the holder named, rather than waiting fore
 })
 
 test('dirSizeAsync agrees with dirSize', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-size-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-size-'))
   fs.mkdirSync(path.join(dir, 'region', 'deeper'), { recursive: true })
   fs.writeFileSync(path.join(dir, 'level.dat'), 'x'.repeat(10))
   fs.writeFileSync(path.join(dir, 'region', 'r.0.0.mca'), 'y'.repeat(300))

@@ -45,7 +45,7 @@ function buildZip(entries) {
   return Buffer.concat([...locals, cd, eocd])
 }
 
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-mrpack-'))
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-mrpack-'))
 
 const SHA1 = 'a'.repeat(40)
 const SHA512 = 'b'.repeat(128)
@@ -82,7 +82,7 @@ test('a neoforge pack is a first-class citizen now', () => {
   assert.deepEqual(parseIndex(neo).loader, { kind: 'neoforge', version: '26.2.0.75' })
 })
 
-test('a pack for a loader mcctl cannot run is refused by name', () => {
+test('a pack for a loader spawnloft cannot run is refused by name', () => {
   const forge = { ...INDEX, dependencies: { minecraft: '26.2', forge: '52.0.1' } }
   assert.throws(() => parseIndex(forge), /forge.*Fabric and NeoForge packs only/s)
   const quilt = { ...INDEX, dependencies: { minecraft: '26.2', 'quilt-loader': '0.26.0' } }

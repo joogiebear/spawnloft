@@ -12,7 +12,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-databases-'))
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-databases-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
 const { putInstance, updateInstance, listInstances, listServices, listAll, isDatabase, usedPorts } = await import('../src/registry.mjs')
@@ -129,7 +129,7 @@ test('both CLI launchers start, restart, and detach a database without treating 
     [fileURLToPath(new URL(`../${launcher}.mjs`, import.meta.url)), ...args],
     { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'pipe'] })
   assert.equal(services.getDatabase(DB).rcon, undefined, 'a database has no RCON settings')
-  for (const launcher of ['mcctl', 'spawnloft']) {
+  for (const launcher of ['spawnloft', 'mcctl']) {
     await sup.stop(DB, { timeout: 10000 })
     const started = cli(launcher, ['start', DB, '--timeout', '15'])
     assert.match(started, /Ready -/)

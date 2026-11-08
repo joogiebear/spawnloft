@@ -30,7 +30,7 @@ test('the game version reads out of a Fabric launcher name too', () => {
 })
 
 test('a fabric.mod.json manifest is read from a jar in mods/', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcctl-loader-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-loader-'))
   fs.mkdirSync(path.join(dir, 'mods'))
   const inst = { name: 'modded', dir, jar: 'fabric-server-mc.26.2-loader.0.19.3-launcher.1.1.2.jar', loader: 'fabric' }
   // A stored (uncompressed) zip holding only the manifest, built by hand like the zip tests.
