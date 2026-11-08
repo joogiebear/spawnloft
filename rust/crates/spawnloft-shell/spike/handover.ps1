@@ -46,10 +46,18 @@ function Reg($key, $name) {
 }
 
 function Cli16([string[]] $cliArgs) {
+  # SpawnLoft.exe is a GUI-subsystem program: PowerShell neither waits for it nor captures its
+  # output when called with &, so start it explicitly and read its output from files
   $env:ELECTRON_RUN_AS_NODE = '1'
+  $o = Join-Path $env:RUNNER_TEMP 'cli16.out'
+  $e = Join-Path $env:RUNNER_TEMP 'cli16.err'
   try {
-    $output = & "$inst\SpawnLoft.exe" "$inst\resources\core\mcctl.mjs" @cliArgs 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "1.6 CLI $($cliArgs -join ' ') failed: $output" }
+    $argList = @("`"$inst\resources\core\mcctl.mjs`"") + ($cliArgs | ForEach-Object { "`"$_`"" })
+    $p = Start-Process -FilePath "$inst\SpawnLoft.exe" -ArgumentList $argList -Wait -PassThru -NoNewWindow `
+      -RedirectStandardOutput $o -RedirectStandardError $e
+    $output = "$(Get-Content $o -Raw)$(Get-Content $e -Raw)"
+    if ($p.ExitCode -ne 0) { throw "1.6 CLI $($cliArgs -join ' ') failed ($($p.ExitCode)): $output" }
+    Write-Host $output
     $output
   } finally {
     Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
