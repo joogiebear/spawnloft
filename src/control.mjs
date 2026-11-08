@@ -3,6 +3,16 @@ import fs from 'node:fs'
 import { controlPath, stateFile } from './paths.mjs'
 import { readJson, pidAlive, sameProcess, UserError } from './util.mjs'
 
+// The control protocol's version, answered by `ping` with `daemon` ('node' or 'rust') and the
+// release `version`. 1 is the four ops of 1.x (ping, send, stop, kill). Both sides only ever add:
+// a field nobody knows is ignored, an op nobody knows answers { ok: false, error }, and a reply
+// without `protocol` is from a daemon older than this field, which speaks 1.
+export const CONTROL_PROTOCOL = 1
+
+export function protocolOf(pong) {
+  return Number.isInteger(pong?.protocol) && pong.protocol > 0 ? pong.protocol : 1
+}
+
 export function controlRequest(name, req, { timeout = 120000 } = {}) {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection(controlPath(name))
