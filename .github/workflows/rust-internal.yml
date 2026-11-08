@@ -343,6 +343,8 @@ jobs:
         run: node desktop/stage-core.mjs "rust/target/${{ matrix.triple }}/release/${{ matrix.exe }}"
       - name: Install the desktop toolchain
         run: npm ci --prefix desktop
+      - name: A new major never installs on quit (the shipped updater against a local feed)
+        run: node --test desktop/major-update-feed.test.cjs
       - name: Install the rpm build tool
         if: matrix.platform == 'linux'
         run: sudo apt-get update && sudo apt-get install -y rpm

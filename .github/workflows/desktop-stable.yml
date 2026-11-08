@@ -65,7 +65,7 @@ jobs:
       - name: Install the desktop toolchain
         run: npm ci --prefix desktop
       - name: Verify updater compatibility on every platform
-        run: node --test desktop/updater-preview.test.cjs
+        run: node --test desktop/updater-preview.test.cjs desktop/major-update-feed.test.cjs
       - name: Sign and notarize the Mac release
         if: matrix.platform == 'darwin'
         working-directory: desktop
