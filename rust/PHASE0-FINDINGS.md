@@ -29,13 +29,17 @@ both; the result tables below have an "observed" column to fill in.
      the data root, never under `Programs\SpawnLoft`), so it is **left running without a
      daemon**;
    - `Stop-Process` is `Process.Kill()`, that is `TerminateProcess`. Neither daemon's SIGTERM
-     handler runs, so neither stops its server gracefully first. The Node daemon leaves the JVM
-     (it is a plain child; Windows does not kill children with the parent). The Rust daemon's
-     Job Object is created without `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so when the daemon's
-     handle closes with the process the JVM survives there too.
-   - After the update the state file still says `running` with a dead `daemonPid` and a live
-     `javaPid`: `readState` reports **`orphaned`**, `start` and `stop` refuse, and the only way
-     out is `spawnloft kill <name>`, a force kill of a JVM that was never asked to save.
+     handler runs, so neither stops its server gracefully first. What happens to the JVM then
+     differs: under the **Node daemon it dies with the daemon**, because libuv on Windows puts
+     every non-detached child in a job object with `KILL_ON_JOB_CLOSE` (`daemon.mjs` spawns
+     java with `detached: false` on Windows; the "JVM is detached and outlives us" comment in
+     that file is true only on macOS and Linux). That is a hard kill of a server that was never
+     asked to save. Under the **Rust daemon the JVM survives**: its Job Object is created without
+     `KILL_ON_JOB_CLOSE`, so the server keeps running with no daemon.
+   - After the update the state file still says `running` with a dead `daemonPid`. Node:
+     `javaPid` is dead too, `readState` reports **`stale`**, the server shows as stopped with
+     no record of why. Rust: `javaPid` alive, `readState` reports **`orphaned`**, `start` and
+     `stop` refuse, and the only way out is `spawnloft kill <name>`.
 2. **The panel's update dialog promises the opposite.** `src/ui.html` says "Running servers
    keep running — SpawnLoft supervises them as separate processes", and `desktop/main.js`
    repeats "Servers survive (detached daemons)". On the reading above that has been false on
@@ -119,9 +123,9 @@ makes the "orphaned" state and the data at risk real.
 | Panel quits | gone | gone |
 | Installer's first `FIND_PROCESS` | daemon found | daemon found |
 | Daemon after the install | **killed** (predicted) / observed: | **killed** (predicted) / observed: |
-| JVM after the install | **alive, orphaned** (predicted) / observed: | **alive, orphaned** (predicted) / observed: |
-| `state.json` after relaunch | `running: true`, dead `daemonPid`; `status` reads `orphaned` / observed: | same / observed: |
-| Panel after relaunch | server shown orphaned; stop refused; `kill` required / observed: | same / observed: |
+| JVM after the install | **killed with the daemon** (libuv kill-on-close job) / observed: | **alive, orphaned** (predicted) / observed: |
+| `state.json` after relaunch | `running: true`, dead `daemonPid` and `javaPid`; `status` reads `stale` / observed: | `running: true`, dead `daemonPid`, live `javaPid`; `status` reads `orphaned` / observed: |
+| Panel after relaunch | server shown stopped, no crash record, world last saved whenever the server last autosaved / observed: | server shown orphaned; stop refused; `kill` required / observed: |
 | Installer exit code (updater log) | 0 / observed: | 0 / observed: |
 | Leftovers | none expected; `%TEMP%\ns*.tmp` removed / observed: | same / observed: |
 | Scheduled task present | survives (`customUnInstall` is skipped on `--updated`) / observed: | same / observed: |
@@ -231,9 +235,10 @@ Based on the reading above, to be confirmed by 4a:
    `SpawnLoft.exe`/`spawnloft-core.exe` to `*.old.exe` when in use, the daemons keep running,
    the next start cleans up. The custom check matches the panel by full path only.
 4. **Job Object flag:** keep the Rust daemon's job **without** `KILL_ON_JOB_CLOSE`. With it a
-   killed daemon would take the JVM down hard, mid-save; without it the server survives and is
-   reported `orphaned`, which is recoverable by `kill` and loses at most one autosave
-   interval. The right fix is not killing the daemon (item 1), not killing the server with it.
+   killed daemon takes the JVM down hard, mid-save, which is exactly what the Node daemon does
+   today through libuv's own job; without it the server survives and is reported `orphaned`,
+   which is recoverable by `kill` and loses at most one autosave interval. The right fix is not
+   killing the daemon (item 1), not killing the server with it.
    If a later decision wants "no orphans ever", add the flag together with a daemon-side
    handler that stops the server on `CTRL_CLOSE`/console events; `TerminateProcess` gives no
    such chance, so the flag alone is a world-corruption risk.
@@ -241,8 +246,8 @@ Based on the reading above, to be confirmed by 4a:
 What 4a can change in this: if the live run shows the daemons **surviving** (PowerShell
 unavailable or policy `Restricted` on that machine, or `.Path` empty for `ELECTRON_RUN_AS_NODE`
 processes), item 1 becomes "document the dependency on PowerShell and still ship the custom
-check so the behaviour stops depending on it". If the JVM dies with the daemon, the Job Object
-or child handling differs from the reading and item 4 is revisited.
+check so the behaviour stops depending on it". If the JVM under the Node daemon survives, or
+dies under the Rust one, the job-object reading is wrong and item 4 is revisited.
 
 ### Running the experiments
 
