@@ -296,6 +296,14 @@ jobs:
             desktop/dist/spawnloft-cli-*.deb
             desktop/dist/spawnloft-cli-*.rpm
             desktop/dist/build-info.json
+      - name: Keep the unpacked Windows app (runs without installing over the 1.x beta)
+        if: matrix.platform == 'win32'
+        uses: actions/upload-artifact@v4
+        with:
+          name: spawnloft-internal-${{ github.run_number }}-win32-x64-portable
+          retention-days: 14
+          if-no-files-found: error
+          path: desktop/dist/win-unpacked/
       - name: Keep the bare core binary too
         uses: actions/upload-artifact@v4
         with:
