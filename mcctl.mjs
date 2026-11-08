@@ -1813,6 +1813,24 @@ async function cmdUninstall(positional, flags) {
   if (res.failed.length) process.exitCode = 1
 }
 
+/**
+ * Rewrites every scheduled-task shim and every server's double-click launchers for the program
+ * running this command, whether or not it looks moved: the way back after installing another
+ * release over this one, or going back to this one from a newer one. Touches no OS scheduler entry
+ * (those hold the shim's path, which does not change) and no server.
+ */
+async function cmdRepair(positional, flags) {
+  checkFlags(flags, ['json'])
+  if (positional.length) throw new UsageError('Usage: spawnloft repair [--json]')
+  const { repairAfterMove } = await import('./src/relocate.mjs')
+  const res = repairAfterMove({ force: true })
+  if (flags.json) {
+    process.stdout.write(jsonLine('repair', { shims: res.shims, launchers: res.launchers, runtime: process.execPath, root: ROOT }))
+    return
+  }
+  out(`Rewrote ${res.shims} task shim(s) and the launchers of ${res.launchers} server(s) for ${process.execPath}.`)
+}
+
 async function cmdDoctor(positional, flags = {}) {
   if (flags.json) {
     checkFlags(flags, ['json'])
@@ -2006,6 +2024,7 @@ DATABASES
   spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on
 
   spawnloft doctor                       Check environment, ports, EULA, disk, stale state
+  spawnloft repair                       Rewrite task shims and server launchers for this install
   spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made
 `)
 }
@@ -2336,6 +2355,7 @@ const COMMANDS = {
   panel: cmdUi,
   task: cmdTask,
   doctor: cmdDoctor,
+  repair: cmdRepair,
   db: cmdDb,
   mcp: cmdMcp,
   bot: cmdBot,
@@ -2367,7 +2387,7 @@ async function main() {
     process.stdout.write(jsonLine(cliContext.command, query(cliContext.command, positional, flags)))
     return
   }
-  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'metrics', 'data', 'bot', 'diag', 'client'].includes(command)) {
+  if (cliContext.json && !['backup', 'snapshot', 'doctor', 'repair', 'metrics', 'data', 'bot', 'diag', 'client'].includes(command)) {
     throw new UsageError(`--json is not supported for ${command}; no action was performed`)
   }
   // Not for `data`: it is what puts things right after a move was interrupted, when the data folder

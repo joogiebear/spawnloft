@@ -21,6 +21,19 @@ import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
 import * as mysql from './mysql.mjs'
 import { respSend } from './resp.mjs'
+import { CONTROL_PROTOCOL } from './control.mjs'
+
+// Everything this process will ever run is imported above, statically, before the server starts:
+// an update or a 2.0 install can replace or delete these files while the daemon keeps running (on
+// macOS and Linux nothing stops it), and a module loaded lazily at crash time would then fail in the dark.
+// test/daemon-imports.test.mjs keeps it that way. Files read later are data, never code.
+const VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version ?? null
+  } catch {
+    return null
+  }
+})()
 
 const name = process.argv[2]
 if (!name) {
@@ -459,7 +472,15 @@ const server = net.createServer((socket) => {
 async function handle(req) {
   switch (req.op) {
     case 'ping':
-      return { ok: true, javaPid: child?.pid ?? null, startedAt: state.startedAt, alive: Boolean(child) && child.exitCode === null }
+      return {
+        ok: true,
+        javaPid: child?.pid ?? null,
+        startedAt: state.startedAt,
+        alive: Boolean(child) && child.exitCode === null,
+        protocol: CONTROL_PROTOCOL,
+        daemon: 'node',
+        version: VERSION,
+      }
     case 'send':
       if (isDatabase(inst)) return { ok: false, error: 'a database has no console input - use its client, or the panel' }
       if (!child || child.exitCode !== null) return { ok: false, error: 'server process is not running' }

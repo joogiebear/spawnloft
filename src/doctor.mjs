@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { DATA_ROOT, LAYOUT, ROOT, REGISTRY_FILE, RUN_DIR } from './paths.mjs'
+import { dataFormatWarning } from './data-format.mjs'
 import { describeServersElsewhere, inspect as inspectSettings, shadowedSettingsFile } from './settings.mjs'
 import { findPrivateCopies, describePrivateCopies } from './private-copy.mjs'
 import { listInstances, serverJarPath } from './registry.mjs'
@@ -52,6 +53,9 @@ export async function runDoctor({ repair = false } = {}) {
   notes.push(`node: ${process.version}`)
   notes.push(`root: ${ROOT}`)
   notes.push(`data root: ${DATA_ROOT}`)
+  // a note, not a problem: it stays true for as long as the marker exists, and nothing is broken
+  const newerData = dataFormatWarning()
+  if (newerData) notes.push(`data format: ${newerData}`)
   const shadowed = shadowedSettingsFile()
   if (shadowed) notes.push(`settings: also found ${shadowed}, which is ignored because the spawnloft folder takes precedence`)
   // an unreadable settings file falls back to defaults (see settings.load)
