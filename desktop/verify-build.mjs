@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 import { windowsPowerShellEnv } from './windows-powershell.mjs'
+import { binaryArch } from './core-binary.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 // electron-builder passes the packed directory; run by hand, the default is assumed
@@ -101,6 +102,48 @@ for (const name of ['spawnloft', 'mcctl']) {
   else if (POSIX && (fs.statSync(launcher).mode & 0o111) === 0) problems.push(`terminal launcher ${name} is not executable`)
 }
 
+// The Rust core (v2 branch only). Internal builds must carry it; any other build that does is
+// checked the same way. On the Mac it sits beside the main executable, not under Resources.
+const internal = buildConfig?.extraMetadata?.spawnloft?.channel === 'internal'
+const CORE_BIN = MAC ? path.join(APP, 'Contents', 'MacOS', 'spawnloft-core')
+  : path.join(RESOURCES, 'bin', LINUX ? 'spawnloft-core' : 'spawnloft-core.exe')
+if (!fs.existsSync(CORE_BIN)) {
+  if (internal) problems.push(`the Rust core is missing from ${path.relative(UNPACKED, CORE_BIN)} - run node desktop/stage-core.mjs before packaging`)
+} else {
+  let info = null
+  try {
+    info = JSON.parse(fs.readFileSync(path.join(RESOURCES, 'build-info.json'), 'utf8'))
+  } catch {
+    // structure-only runs from afterPack have it; a hand run on an old folder may not
+  }
+  const found = binaryArch(fs.readFileSync(CORE_BIN))
+  const wantPlatform = MAC ? 'darwin' : LINUX ? 'linux' : 'win32'
+  const wantArch = info?.arch
+  if (!found) problems.push('the Rust core is not an executable this verifier recognises')
+  else if (found.platform !== wantPlatform || (wantArch && found.arch !== wantArch)) {
+    problems.push(`the Rust core is built for ${found.platform}-${found.arch}, but this is a ${wantPlatform}-${wantArch ?? '?'} build`)
+  } else if (POSIX && (fs.statSync(CORE_BIN).mode & 0o111) === 0) {
+    problems.push('the Rust core is not executable')
+  } else if (found.platform === process.platform && found.arch === process.arch) {
+    const ran = spawnSync(CORE_BIN, ['--version', '--json'], { encoding: 'utf8', windowsHide: true, timeout: 30000 })
+    let printed = null
+    try {
+      printed = JSON.parse(ran.stdout)
+    } catch {
+      // reported below
+    }
+    if (ran.status !== 0 || printed?.name !== 'spawnloft-core') {
+      problems.push(`the Rust core does not run: --version exited ${ran.status ?? ran.error?.message}${ran.stderr ? ` (${ran.stderr.trim()})` : ''}`)
+    } else if (internal && info?.version && printed.version !== info.version) {
+      problems.push(`the Rust core says ${printed.version} but the app is ${info.version} - it was built for another run`)
+    } else {
+      notes.push(`core binary: ${found.platform}-${found.arch}, prints ${printed.name} ${printed.version} (${printed.target})`)
+    }
+  } else {
+    notes.push(`core binary: ${found.platform}-${found.arch}, not run on this ${process.platform}-${process.arch} machine`)
+  }
+}
+
 const asar = path.join(RESOURCES, 'app.asar')
 if (!fs.existsSync(asar)) {
   problems.push('resources/app.asar is missing')
@@ -109,6 +152,16 @@ if (!fs.existsSync(asar)) {
   const bytes = fs.readFileSync(asar)
   for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'ui-zoom.js', 'update-channel.js', 'launcher-window.js', 'login-window.js']) {
     if (!bytes.includes(Buffer.from(name))) problems.push(`${name} is not in app.asar - check the "files" list in package.json`)
+  }
+  // internal builds: the update check is off in the packaged package.json, and no feed config ships
+  if (internal) {
+    if (!/"spawnloft":\{"channel":"internal","updates":"off"\}/.test(bytes.toString('latin1').replace(/\s+/g, ''))) {
+      problems.push('this internal build does not carry spawnloft.updates = "off" in its package.json, so it would look for updates')
+    } else if (fs.existsSync(path.join(RESOURCES, 'app-update.yml'))) {
+      problems.push('this internal build ships resources/app-update.yml, a feed configuration it must not have')
+    } else {
+      notes.push('updates: off in this internal build, and no app-update.yml')
+    }
   }
   if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js, launcher-window.js, login-window.js and setup.html are packaged')
 }

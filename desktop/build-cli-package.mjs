@@ -151,6 +151,15 @@ function stage(work, kind, node, info) {
   fs.chmodSync(path.join(prefix, 'bin', 'node'), 0o755)
   fs.copyFileSync(path.join(node, 'LICENSE'), path.join(prefix, 'NODE-LICENSE'))
   copyCore(path.join(prefix, 'core'), info.version)
+  // v2 branch: the Rust core rides along beside Node (static musl, so no new dependency); an
+  // internal build without it is a broken build
+  const rustCore = path.join(HERE, 'build', 'bin', `linux-${info.arch}`, 'spawnloft-core')
+  if (fs.existsSync(rustCore)) {
+    fs.copyFileSync(rustCore, path.join(prefix, 'bin', 'spawnloft-core'))
+    fs.chmodSync(path.join(prefix, 'bin', 'spawnloft-core'), 0o755)
+  } else if (String(info.version).includes('-internal.')) {
+    throw new Error(`${rustCore} is missing; run node desktop/stage-core.mjs first`)
+  }
   fs.writeFileSync(path.join(prefix, 'build-info.json'), JSON.stringify({ ...info, package: PACKAGE, node: NODE_VERSION }, null, 2) + '\n')
   fs.writeFileSync(path.join(prefix, 'package-type'), kind)
   fs.mkdirSync(path.join(root, 'usr', 'bin'), { recursive: true })

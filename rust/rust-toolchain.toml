@@ -1,0 +1,6 @@
+# Pinned so CI, Victor's Windows signing machine and every thread build with the same compiler.
+# Bump it in its own commit, never alongside code changes.
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

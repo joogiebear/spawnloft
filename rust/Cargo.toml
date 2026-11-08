@@ -1,0 +1,40 @@
+# SpawnLoft's Rust workspace (internal phase, `v2` branch only).
+#
+#   spawnloft-lib    the library every binary is built from
+#   spawnloft-core   the console binary: CLI, per-server daemon, MCP, task runner, panel API
+#   spawnloft-fakes  test helpers (temp dirs, running the built binary, later fake java and CDNs)
+#
+# The Tauri shell (spawnloft-shell) joins with the spike. Nothing here ships on dev betas until
+# Victor says "push to beta"; see .github/workflows/rust-internal.yml.
+[workspace]
+resolver = "3"
+members = ["crates/spawnloft-lib", "crates/spawnloft-core", "crates/spawnloft-fakes"]
+
+[workspace.package]
+# The version a local build prints. CI overrides it per run with SPAWNLOFT_VERSION
+# (2.0.0-internal.<run number>), so this only moves when the product version does.
+version = "2.0.0-internal.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+repository = "https://github.com/joogiebear/spawnloft"
+publish = false
+
+[workspace.dependencies]
+spawnloft-lib = { path = "crates/spawnloft-lib" }
+spawnloft-fakes = { path = "crates/spawnloft-fakes" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release]
+# One binary, started often (every CLI call and every daemon): small and quick to load matters more
+# than build time. Panics abort so a crashed daemon never leaves a half-unwound process behind.
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

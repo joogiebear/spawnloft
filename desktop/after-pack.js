@@ -83,6 +83,10 @@ exports.default = async function afterPack(context) {
   info.platform = context.electronPlatformName
   info.arch = require('builder-util').Arch[context.arch]
   if (info.platform === 'darwin') info.macSigningMode = require('./mac-signing.cjs').signingMode()
+  // internal builds (internal.config.cjs) say so, and that their updater is off
+  const marker = context.packager.config.extraMetadata?.spawnloft
+  if (marker?.channel) info.channel = marker.channel
+  if (marker?.updates) info.updates = marker.updates
   if (info.platform === 'win32') info.windowsSigningMode = context.packager.platformSpecificBuildOptions.azureSignOptions ? 'azure' : 'unsigned'
   if (!info.commit) {
     console.warn('  warn could not read the source commit; this build will not say what produced it')

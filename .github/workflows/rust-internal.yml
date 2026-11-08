@@ -1,0 +1,231 @@
+name: rust-internal
+
+# Internal builds of the v2 branch: the Rust core inside the Electron app, for Victor's own
+# machines only (PLAN-RUST-TAURI.md section 13). Nothing here reaches a beta or a release:
+#
+# - it runs on pushes to v2 (and by hand, on v2 only), never on dev, main or a pull request;
+# - it has no publish job, writes no feed, makes no tag and no release, and holds no secrets;
+# - its packages are workflow artifacts kept for 14 days, versioned 2.0.0-internal.<run>;
+# - Windows builds are unsigned and Mac builds ad-hoc signed (CI signing only trusts dev pushes);
+# - the app's update check is off in these builds (desktop/internal.config.cjs).
+#
+# desktop-preview.yml is untouched: its push trigger is dev only and its publish job checks
+# refs/heads/dev, so a push here cannot reach it.
+
+on:
+  push:
+    branches: [v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-internal-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  INTERNAL_BUILD: ${{ github.run_number }}
+  SPAWNLOFT_VERSION: 2.0.0-internal.${{ github.run_number }}
+  SPAWNLOFT_COMMIT: ${{ github.sha }}
+
+jobs:
+  rust:
+    if: github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned toolchain
+        # with no argument rustup (1.28+) installs what rust/rust-toolchain.toml pins
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Formatting
+        if: matrix.runner == 'ubuntu-24.04'
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked
+
+  deny:
+    if: github.ref == 'refs/heads/v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: rust/Cargo.toml
+          command: check
+          arguments: --all-features
+
+  node:
+    # The Node suite, once per platform. P0-D turns this into the dual-daemon matrix
+    # (SPAWNLOFT_DAEMON=node and rust) once the Rust daemon exists.
+    if: github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Core and desktop tests
+        env:
+          TMPDIR: /tmp
+          MAC_SIGNING_MODE: ad-hoc
+        run: |
+          npm test
+          npm --prefix desktop test
+
+  package:
+    needs: [rust, deny, node]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform: win32
+            target: win
+            arch: x64
+            triple: x86_64-pc-windows-msvc
+            exe: spawnloft-core.exe
+            app: desktop/dist/win-unpacked
+          - runner: macos-15
+            platform: darwin
+            target: mac
+            arch: arm64
+            triple: aarch64-apple-darwin
+            exe: spawnloft-core
+            app: desktop/dist/mac-arm64/SpawnLoft.app
+          # musl: one static binary with no glibc floor, so it runs on the oldest distribution
+          # the spawnloft-cli package claims (glibc 2.28) as well as on this runner
+          - runner: ubuntu-24.04
+            platform: linux
+            target: linux
+            arch: x64
+            triple: x86_64-unknown-linux-musl
+            exe: spawnloft-core
+            app: desktop/dist/linux-unpacked
+            wrap: xvfb-run -a
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      MAC_SIGNING_MODE: ad-hoc
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain and target
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: ${{ matrix.triple }}
+      - name: Build spawnloft-core
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
+      - name: Stage it for packaging
+        run: node desktop/stage-core.mjs "rust/target/${{ matrix.triple }}/release/${{ matrix.exe }}"
+      - name: Install the desktop toolchain
+        run: npm ci --prefix desktop
+      - name: Install the rpm build tool
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Package the internal build
+        working-directory: desktop
+        run: npx electron-builder --config internal.config.cjs --${{ matrix.target }} --${{ matrix.arch }} --publish never
+      - name: Verify the packaged app
+        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/internal.config.cjs
+      - name: Verify the Mac ad-hoc signature covers the core
+        if: matrix.platform == 'darwin'
+        run: |
+          node desktop/verify-mac-signing.cjs "${{ matrix.app }}"
+          codesign --verify --strict --verbose=2 "${{ matrix.app }}/Contents/MacOS/spawnloft-core"
+          "${{ matrix.app }}/Contents/MacOS/spawnloft-core" --version
+      - name: Nothing to publish was produced
+        # no feed files: an internal build must never be something an updater could be pointed at
+        run: |
+          if ls desktop/dist/*.yml 2>/dev/null | grep -v builder-; then
+            echo "::error::an updater feed file was written"; exit 1
+          fi
+      - name: Install the desktop package the way a user would
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-amd64.deb
+          test -x /opt/SpawnLoft/resources/bin/spawnloft-core
+          /opt/SpawnLoft/resources/bin/spawnloft-core --version
+          /usr/bin/spawnloft config
+      - name: Build the command-line packages
+        if: matrix.platform == 'linux'
+        run: node desktop/build-cli-package.mjs
+      - name: Install the command-line package where there is no Node, and run a server
+        if: matrix.platform == 'linux'
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04 sh -ec '
+            sh /repo/desktop/smoke-cli-package.sh deb
+            /opt/spawnloft-cli/bin/spawnloft-core --version
+          '
+          docker run --rm -v "$PWD:/repo:ro" rockylinux:9 sh -ec '
+            dnf install -y -q /repo/desktop/dist/spawnloft-cli-*.rpm
+            /opt/spawnloft-cli/bin/spawnloft-core --version
+          '
+      - name: Install the isolated UI test tool
+        run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
+      - name: Open the packaged app and exercise the shared regressions
+        env:
+          NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
+        run: ${{ matrix.wrap }} node desktop/smoke-desktop.cjs "${{ matrix.platform == 'linux' && '/opt/SpawnLoft' || matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spawnloft-internal-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            desktop/dist/SpawnLoft-Setup-*.exe
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
+            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
+            desktop/dist/SpawnLoft-*-linux-*.deb
+            desktop/dist/SpawnLoft-*-linux-*.rpm
+            desktop/dist/spawnloft-cli-*.deb
+            desktop/dist/spawnloft-cli-*.rpm
+            desktop/dist/build-info.json
+      - name: Keep the bare core binary too
+        uses: actions/upload-artifact@v4
+        with:
+          name: spawnloft-core-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: rust/target/${{ matrix.triple }}/release/${{ matrix.exe }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spawnloft-internal-smoke-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 14
+          path: desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}/

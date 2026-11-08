@@ -1,0 +1,22 @@
+[package]
+name = "spawnloft-core"
+description = "SpawnLoft's console binary: CLI, per-server daemon, MCP server, task runner, panel API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "spawnloft-core"
+path = "src/main.rs"
+
+[dependencies]
+spawnloft-lib.workspace = true
+
+[dev-dependencies]
+spawnloft-fakes.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,7 @@
+# The Windows binary links the C runtime statically, so it runs on a PC with no Visual C++
+# Redistributable installed (the Electron app around it needs none either).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

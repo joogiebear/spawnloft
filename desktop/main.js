@@ -14,6 +14,12 @@ const loginWindow = require('./login-window')
 // and missing provenance fails closed on mac
 const manualUpdates = process.platform === 'darwin' && (!app.isPackaged || buildInfo()?.macSigningMode !== 'signed')
 const previewDownloadUrl = 'https://github.com/joogiebear/spawnloft/releases'
+// Internal test builds (the v2 branch's rust-internal workflow) never look for updates: they must
+// not be offered a 1.x beta, and nothing about them is in any feed. Set through extraMetadata, so it
+// is in the packaged package.json and cannot be switched on by a file in userData.
+const updatesOff = app.isPackaged && require('./package.json').spawnloft?.updates === 'off'
+const internalDownloadUrl = 'https://github.com/joogiebear/spawnloft/actions/workflows/rust-internal.yml'
+const internalUpdateMessage = 'Internal test build: updates are off. Install the next internal build by hand.'
 
 // Window around the panel the CLI serves, plus a native folder picker and first-run setup.
 // The core runs in this process (imported directly), so there is no second Node to ship
@@ -453,7 +459,7 @@ function updateChannelFile() {
 // (the updater applies it on quit). Packaged builds only, so a dev run never touches a checkout.
 // The NSIS install runs with /S, per-user, so there is no UAC prompt.
 function setupUpdates() {
-  if (manualUpdates) return
+  if (manualUpdates || updatesOff) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
   // mac updates use complete signed zips; windows keeps differential updates
@@ -476,7 +482,7 @@ function setupUpdates() {
 // button. checkForUpdates rejects as well as emitting 'error'; swallow it so a missing network
 // doesn't crash the process.
 function checkForUpdatesQuietly() {
-  if (!app.isPackaged || manualUpdates) return
+  if (!app.isPackaged || manualUpdates || updatesOff) return
   autoUpdater.checkForUpdates().catch(() => {})
 }
 
@@ -490,6 +496,7 @@ ipcMain.handle('mcctl:updateChannel', async () => updateChannel.describe(updateC
 // opting out is never a downgrade (see update-channel.js)
 ipcMain.handle('mcctl:setUpdateChannel', async (_e, beta) => {
   if (typeof beta !== 'boolean') return { ok: false }
+  if (updatesOff) return { ok: false, message: internalUpdateMessage }
   try {
     updateChannel.save(updateChannelFile(), beta)
   } catch (err) {
@@ -507,6 +514,7 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
   if (!app.isPackaged) {
     return { ok: false, reason: 'dev', message: 'Updates only apply to an installed build.' }
   }
+  if (updatesOff) return { ok: false, reason: 'internal', message: internalUpdateMessage }
   try {
     const res = await autoUpdater.checkForUpdates()
     return { ok: true, version: res?.updateInfo?.version ?? null, current: app.getVersion() }
@@ -519,7 +527,7 @@ ipcMain.handle('mcctl:checkUpdate', async () => {
 // Servers survive (detached daemons) but the panel goes away mid-restart, so the caller should
 // warn about running servers first.
 ipcMain.handle('mcctl:installUpdate', async () => {
-  if (manualUpdates || !app.isPackaged) return { ok: false }
+  if (manualUpdates || updatesOff || !app.isPackaged) return { ok: false }
   autoUpdater.quitAndInstall(true, true)
   return { ok: true }
 })
@@ -547,7 +555,8 @@ ipcMain.handle('mcctl:appInfo', async () => {
     dirty: build?.dirty ?? null,
     builtAt: build?.builtAt ?? null,
     manualUpdates,
-    downloadUrl: manualUpdates ? previewDownloadUrl : null,
+    updates: updatesOff ? 'off' : 'on',
+    downloadUrl: manualUpdates ? (updatesOff ? internalDownloadUrl : previewDownloadUrl) : null,
   }
 })
 
