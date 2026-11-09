@@ -3,10 +3,11 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { test } from 'node:test'
 
 import { assemble, singleFileFeed, linuxFeed, linuxFeedNames, writeElectronFeeds, resolveTauriCommand } from './release-feed.mjs'
-import { gate, releaseFlags, semverKey, semverLess } from './release-gate.mjs'
+import { gate, releaseFlags, semverKey, semverLess, peVersionInfo, infoPlistShortVersion } from './release-gate.mjs'
 import { main as publishMain } from './release-publish.mjs'
 import { parsePublicKey } from './update-envelope.mjs'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
@@ -71,23 +72,56 @@ test('linuxFeed lists every package, deb primary, accepted by the verifier', () 
 
 // Builds a full release folder from fake raw bundles and gates it. `full` adds the mac bundles and
 // a command-line package, so the whole §5.2 set is exercised.
-function buildRelease(version, { key, extra = [], signEnvelope, full = false } = {}) {
+function buildRelease(version, { key, extra = [], signEnvelope, full = false, winBytes, macUpdaterBytes } = {}) {
   key ??= makeKey()
   const raw = tmp()
   const out = tmp()
   const inputs = { out, version, pubkey: pubFile(key), cli: [], sign: true, date: '2026-12-01T00:00:00Z', extraEnvelope: extra }
   const put = (name, bytes = 1024) => { const p = path.join(raw, name); fs.writeFileSync(p, crypto.randomBytes(bytes)); return p }
-  inputs.win = put('SpawnLoft_setup.exe', 2048)
+  const putBytes = (name, bytes) => { const p = path.join(raw, name); fs.writeFileSync(p, bytes); return p }
+  inputs.win = winBytes ? putBytes('SpawnLoft_setup.exe', winBytes) : put('SpawnLoft_setup.exe', 2048)
   inputs.deb = put('bundle.deb')
   inputs.rpm = put('bundle.rpm')
   if (full) {
-    inputs['mac-updater'] = put('SpawnLoft.app.tar.gz', 3000)
+    inputs['mac-updater'] = macUpdaterBytes ? putBytes('SpawnLoft.app.tar.gz', macUpdaterBytes) : put('SpawnLoft.app.tar.gz', 3000)
     inputs['mac-dmg'] = put('SpawnLoft.dmg', 4000)
     inputs['mac-zip'] = put('SpawnLoft.zip', 3500)
     inputs.cli = [put(`spawnloft-cli-${version}-linux-amd64.deb`, 1500)]
   }
   const envelope = assemble(inputs, signEnvelope ?? key.sign)
   return { key, out, envelope }
+}
+
+// A buffer carrying a VS_FIXEDFILEINFO block (signature 0xFEEF04BD) with the given four-part
+// version in both the file and product fields, as an NSIS installer's VERSIONINFO resource would.
+function fakePeVersion(a, b, c, d) {
+  const info = Buffer.alloc(24)
+  info.writeUInt32LE(0xfeef04bd, 0)
+  info.writeUInt32LE(0x00010000, 4) // dwStrucVersion
+  const ms = a * 0x10000 + b; const ls = c * 0x10000 + d
+  info.writeUInt32LE(ms, 8); info.writeUInt32LE(ls, 12) // file
+  info.writeUInt32LE(ms, 16); info.writeUInt32LE(ls, 20) // product
+  return Buffer.concat([crypto.randomBytes(96), info, crypto.randomBytes(96)])
+}
+
+// A gzipped tar holding one SpawnLoft.app/Contents/Info.plist with the given short version string.
+function fakeMacTarball(shortVersion) {
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>\n<key>CFBundleShortVersionString</key><string>${shortVersion}</string>\n<key>CFBundleVersion</key><string>${shortVersion}</string>\n</dict></plist>\n`
+  const data = Buffer.from(plist, 'utf8')
+  const header = Buffer.alloc(512)
+  header.write('SpawnLoft.app/Contents/Info.plist', 0, 'utf8')
+  header.write('0000644\0', 100, 'ascii')
+  header.write('0000000\0', 108, 'ascii')
+  header.write('0000000\0', 116, 'ascii')
+  header.write(data.length.toString(8).padStart(11, '0') + '\0', 124, 'ascii')
+  header.write('00000000000\0', 136, 'ascii')
+  header.write('        ', 148, 'ascii') // checksum field is spaces while summing
+  header.write('0', 156, 'ascii') // typeflag: regular file
+  let sum = 0; for (const byte of header) sum += byte
+  header.write(sum.toString(8).padStart(6, '0') + '\0 ', 148, 'ascii')
+  const body = Buffer.alloc(Math.ceil(data.length / 512) * 512)
+  data.copy(body)
+  return zlib.gzipSync(Buffer.concat([header, body, Buffer.alloc(1024)]))
 }
 
 function pubFile(key) {
@@ -213,6 +247,52 @@ test('no feed is ever produced for an internal build (updates off by constructio
     () => assemble({ out, version: '2.0.0-internal.9', pubkey: pubFile(key), win, cli: [], sign: true, extraEnvelope: [] }, key.sign),
     /no update channel/,
   )
+})
+
+test('peVersionInfo reads the version out of a VERSIONINFO resource, or null when absent', () => {
+  assert.deepEqual(peVersionInfo(fakePeVersion(2, 0, 0, 0)).product, [2, 0, 0, 0])
+  assert.deepEqual(peVersionInfo(fakePeVersion(2, 0, 0, 9000)).file, [2, 0, 0, 9000])
+  assert.equal(peVersionInfo(crypto.randomBytes(512)), null)
+})
+
+test('infoPlistShortVersion reads CFBundleShortVersionString from the mac tarball', () => {
+  assert.equal(infoPlistShortVersion(fakeMacTarball('2.0.0')), '2.0.0')
+  assert.equal(infoPlistShortVersion(zlib.gzipSync(Buffer.alloc(1024))), null) // empty archive, no plist
+})
+
+test('§11: the gate checks the installer VIProductVersion when --check-binary-versions is set', () => {
+  // VIProductVersion 2.0.0.x matches the 2.0.0-beta.9000 release (the resource drops the tag)
+  const { key, out } = buildRelease('2.0.0-beta.9000', { winBytes: fakePeVersion(2, 0, 0, 9000) })
+  assert.ok(gate({ dir: out, version: '2.0.0-beta.9000', pubkey: pubFile(key) }).ok) // off by default
+  const r = gate({ dir: out, version: '2.0.0-beta.9000', pubkey: pubFile(key), checkBinaryVersions: true })
+  assert.ok(r.ok, r.problems.join('; '))
+  assert.ok(r.notes.some(n => /VIProductVersion 2\.0\.0/.test(n)), r.notes.join('; '))
+})
+
+test('§11: a VIProductVersion that differs from the tag fails the gate', () => {
+  const { key, out } = buildRelease('2.0.0-beta.9000', { winBytes: fakePeVersion(1, 9, 9, 0) })
+  const r = gate({ dir: out, version: '2.0.0-beta.9000', pubkey: pubFile(key), checkBinaryVersions: true })
+  assert.ok(!r.ok)
+  assert.ok(r.problems.some(p => /VIProductVersion is 1\.9\.9/.test(p)), r.problems.join('; '))
+})
+
+test('§11: an installer with no VERSIONINFO fails the check when it is asked for', () => {
+  const { key, out } = buildRelease('2.0.0-beta.9000') // placeholder random bytes, no resource
+  const r = gate({ dir: out, version: '2.0.0-beta.9000', pubkey: pubFile(key), checkBinaryVersions: true })
+  assert.ok(!r.ok)
+  assert.ok(r.problems.some(p => /no VERSIONINFO resource/.test(p)), r.problems.join('; '))
+})
+
+test('§11: the mac app Info.plist version is checked and a mismatch fails', () => {
+  const ok = buildRelease('2.0.0-beta.9000', { full: true, winBytes: fakePeVersion(2, 0, 0, 9000), macUpdaterBytes: fakeMacTarball('2.0.0') })
+  const rok = gate({ dir: ok.out, version: '2.0.0-beta.9000', pubkey: pubFile(ok.key), checkBinaryVersions: true })
+  assert.ok(rok.ok, rok.problems.join('; '))
+  assert.ok(rok.notes.some(n => /Info\.plist version 2\.0\.0/.test(n)), rok.notes.join('; '))
+
+  const bad = buildRelease('2.0.0-beta.9000', { full: true, winBytes: fakePeVersion(2, 0, 0, 9000), macUpdaterBytes: fakeMacTarball('1.9.0') })
+  const rbad = gate({ dir: bad.out, version: '2.0.0-beta.9000', pubkey: pubFile(bad.key), checkBinaryVersions: true })
+  assert.ok(!rbad.ok)
+  assert.ok(rbad.problems.some(p => /CFBundleShortVersionString is 1\.9\.0/.test(p)), rbad.problems.join('; '))
 })
 
 test('writeElectronFeeds writes identical channel pairs', () => {

@@ -15,14 +15,21 @@
 //     stable release is latest unless it is deliberately held,
 //   - nothing unexpected is in the folder.
 //
+//   - the version strings compiled into the built binaries match the release version (design 11):
+//     the Windows installer's VIProductVersion / VIFileVersion and the macOS app's
+//     CFBundleShortVersionString, checked when --check-binary-versions is set (the numeric
+//     resources carry no prerelease tag, so major.minor.patch is what must agree),
+//
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
+//        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
@@ -89,6 +96,10 @@ function parseArgs(argv) {
       // subject CN is this name, or 1.x installs refuse the update forever (design 10, PHASE0 S195);
       // omitted for the unsigned dry run
       case '--authenticode-cn': out.authenticodeCn = value(); break
+      // when set, the version compiled into each built binary (the installer's VIProductVersion,
+      // the mac app's Info.plist) must equal the release version; the real workflow sets it, the
+      // unit tests that use placeholder bytes do not (design 11)
+      case '--check-binary-versions': out.checkBinaryVersions = true; break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -98,7 +109,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -212,6 +223,32 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     if (packages.length) checkFeedPair(dir, names, read, problems, notes, text => verifyLinuxFeed(text, version, packages))
   }
 
+  // The versions compiled into the built binaries (design 11): the installer's VIProductVersion /
+  // VIFileVersion and the mac app's CFBundleShortVersionString must equal the release version. The
+  // numeric resources carry no prerelease tag, so major.minor.patch is what must agree. Checked only
+  // when asked (the real workflow), since placeholder bytes carry no such resource.
+  if (checkBinaryVersions) {
+    const core3 = (/^(\d+)\.(\d+)\.(\d+)/.exec(version) || [,version]).slice(1, 4).join('.')
+    if (has(installer)) {
+      const info = peVersionInfo(read(installer))
+      if (!info) problems.push(`${installer}: no VERSIONINFO resource, so VIProductVersion can't be checked`)
+      else {
+        const product = info.product.join('.'); const file = info.file.join('.')
+        if (info.product.slice(0, 3).join('.') !== core3) problems.push(`${installer}: VIProductVersion is ${product}, expected ${core3}.x for ${version}`)
+        else if (info.file.slice(0, 3).join('.') !== core3) problems.push(`${installer}: VIFileVersion is ${file}, expected ${core3}.x for ${version}`)
+        else notes.push(`${installer}: VIProductVersion ${product} matches ${version}`)
+      }
+    }
+    const macTar = `SpawnLoft-${version}-mac-arm64.app.tar.gz`
+    if (has(macTar)) {
+      let short
+      try { short = infoPlistShortVersion(read(macTar)) } catch (e) { problems.push(`${macTar}: could not read Info.plist (${e.message})`) }
+      if (short === null) problems.push(`${macTar}: no CFBundleShortVersionString in Info.plist`)
+      else if (short !== undefined && short !== core3 && short !== version) problems.push(`${macTar}: Info.plist CFBundleShortVersionString is ${short}, expected ${core3} for ${version}`)
+      else if (short !== undefined) notes.push(`${macTar}: Info.plist version ${short} matches ${version}`)
+    }
+  }
+
   // Assets not named by the update envelope: the mac .dmg (manual install) and the command-line
   // packages (the package manager installs and verifies them). Present and non-empty is enough.
   const manual = [`SpawnLoft-${version}-mac-arm64.dmg`, ...fs.readdirSync(dir).filter(n => /^spawnloft-cli-/.test(n))]
@@ -248,6 +285,44 @@ function authenticode(file) {
   } catch (e) {
     return { ok: false, why: `could not read the Authenticode signature (${e.message})` }
   }
+}
+
+// The version NSIS stamps into the installer's VERSIONINFO resource (VIProductVersion /
+// VIFileVersion). Found by the VS_FIXEDFILEINFO signature (0xFEEF04BD) rather than a full PE walk:
+// the signature is distinctive and the fixed struct follows it. The four 16-bit fields of each
+// version are HIWORD/LOWORD of two DWORDs (MS = major<<16|minor, LS = patch<<16|build). Tauri
+// drops any prerelease tag here, so only major.minor.patch are meaningful. Returns
+// { product, file } as [a, b, c, d], or null if no such resource is present.
+export function peVersionInfo(bytes) {
+  const SIG = 0xfeef04bd
+  for (let i = 0; i + 24 <= bytes.length; i++) {
+    if (bytes[i] !== 0xbd || bytes.readUInt32LE(i) !== SIG) continue
+    const struc = bytes.readUInt32LE(i + 4)
+    if (struc >>> 16 > 1) continue // dwStrucVersion is 0 or 0x00010000; skip a chance collision
+    const parts = (ms, ls) => [ms >>> 16, ms & 0xffff, ls >>> 16, ls & 0xffff]
+    return { file: parts(bytes.readUInt32LE(i + 8), bytes.readUInt32LE(i + 12)), product: parts(bytes.readUInt32LE(i + 16), bytes.readUInt32LE(i + 20)) }
+  }
+  return null
+}
+
+// CFBundleShortVersionString from the Info.plist inside the macOS updater tarball (a gzipped tar of
+// SpawnLoft.app). Reads the tar's 512-byte headers (name at 0, octal size at 124) to find
+// */Contents/Info.plist. Returns the string, or null if there is no Info.plist or no such key.
+export function infoPlistShortVersion(tgz) {
+  const tar = zlib.gunzipSync(tgz)
+  for (let off = 0; off + 512 <= tar.length;) {
+    const name = tar.toString('utf8', off, off + 100).replace(/\0.*$/s, '')
+    if (!name) break // the archive ends with zero blocks
+    const size = parseInt(tar.toString('ascii', off + 124, off + 136).replace(/[^0-7]/g, ''), 8) || 0
+    const data = off + 512
+    if (/(^|\/)Contents\/Info\.plist$/.test(name)) {
+      const plist = tar.toString('utf8', data, data + size)
+      const m = /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]*)<\/string>/.exec(plist)
+      return m ? m[1].trim() : null
+    }
+    off = data + Math.ceil(size / 512) * 512
+  }
+  return null
 }
 
 function checkFeedPair(dir, names, read, problems, notes, verify) {

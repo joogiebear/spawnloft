@@ -127,12 +127,12 @@ jobs:
             --tauri "$TAURI_CLI" --win "$DRY_SETUP" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ls -la "$RUNNER_TEMP/release"
       - name: The release gate
-        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub"
+        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-binary-versions
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \
             --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
-            --commit "$GITHUB_SHA"
+            --commit "$GITHUB_SHA" --check-binary-versions
       - name: Show the assembled feed
         run: |
           echo "===== spawnloft-updates.json"; cat "$RUNNER_TEMP/release/spawnloft-updates.json"
