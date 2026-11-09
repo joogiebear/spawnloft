@@ -6,13 +6,15 @@ P0-F (the Tauri spike) is at the end.
 
 ## P0-E: experiments 4a and 4b (plan section 3 item 4, section 12 item 6)
 
-Status, 2026-11-09: the code reading is complete and is written up below. **Experiment 4a has
-run for the Node daemon on Victor's Windows desktop (00:27 UTC) and confirmed the prediction:
-the update killed the daemon and the JVM, with no stop and no save.** The Rust daemon run is
-in progress on the same machine; 4b still needs a scratch repository on GitHub. Section
-"Running the experiments" is the runbook; the result tables carry the observations. Raw files
-(process snapshots every 500 ms, feed log, state and status after) are in
-`S:\VMs\spawnloft-win\p0e\` on Victor's desktop.
+Status, 2026-11-09: **complete.** The code reading is written up below, and both experiments
+have run live on Victor's Windows desktop (Desktop-Main). 4a ran twice for the Node daemon and
+twice for the Rust daemon (00:27 to 00:50 UTC); 4b ran all seven release-ordering scenarios
+against the scratch repository `joogiebear/spawnloft-update-test` (00:53 to 01:15 UTC; the
+repository is Victor's to delete, nothing was created on the real repository). The result
+tables carry the observations; the "Running the experiments" section is the runbook. Raw files
+(process snapshots every 500 ms, installer child-process log, feed log, state and status after,
+Chromium net logs of every update check, `4b-results.md`) are in `S:\VMs\spawnloft-win\p0e\`
+on Desktop-Main. The machine was left on `2.0.0-internal.16` with no servers running.
 
 ### Summary
 
@@ -54,7 +56,9 @@ in progress on the same machine; 4b still needs a scratch repository on GitHub. 
    the kill (elevated, or another user's) would keep running from a file moved to
    `%TEMP%\ns*.tmp\old-install\`, which NSIS then fails to delete on exit. So the installer's
    policy is "kill", never "fail".
-4. **Release ordering (4b) is decided by commit dates, not publish order or version.**
+4. **Release ordering (4b) is decided by commit dates, not publish order or version.
+   Confirmed live in all seven scenarios (2026-11-09), plus one surprise: a pushed tag with no
+   finished release breaks every beta install's check until the release is complete.**
    electron-updater's GitHub provider reads `releases.atom` and takes the **first** entry whose
    tag is a valid semver with no prerelease identifier or one of `alpha`/`beta` (for an install
    on a `-beta` version with betas enabled), then fetches that tag's `beta.yml`/`latest.yml`
@@ -119,7 +123,7 @@ The last row matters for the experiment design: `test/fixtures/fake-java.mjs` wo
 with the daemons and say nothing about a real JVM. 4a must run a real `java.exe`, which also
 makes the "orphaned" state and the data at risk real.
 
-**Predicted result table (fill "observed" from the live run):**
+**Result table (predictions replaced by the live observations):**
 
 | Step | Node daemon (1.6.0-beta.400 updated to .407, Victor's desktop, 2026-11-09 00:27 UTC) | Rust daemon (2.0.0-internal.N updated by the .407 installer run by hand with the updater's arguments) |
 | --- | --- | --- |
@@ -201,31 +205,76 @@ is in `created_at` order; it could not be fetched from the build container, whic
 alone decides is **which tag's yml is read**; the version inside the yml then has to beat the
 installed one.
 
-**Scenario table (fill "observed" from the live run against the scratch repository):**
+**Scenario table, as run (2026-11-09, test install 1.6.0-beta.407 with `app-update.yml`
+pointed at the scratch repository; "fetched" is the `releases/download/<tag>/*.yml` the updater
+requested, read from a Chromium `--log-net-log` of each check):**
 
-| # | Releases in the scratch repo (tag → tagged commit date) | Install | Predicted offer | Observed |
-| --- | --- | --- | --- | --- |
-| S1 | `v1.6.0-beta.407` (older commit), `v2.0.0-beta.1` (newer commit) | 1.6.0-beta.400, betas on | **2.0.0-beta.1** (first entry) | |
-| S2 | S1 plus `v1.6.0-beta.450` on a commit newer than both, published last | same | **1.6.0-beta.450** (first entry again) | |
-| S3 | S2 but `v2.0.0-beta.1` re-tagged on a commit newer than `.450`, published before `.450` | same | **2.0.0-beta.1**: publish order is irrelevant | |
-| S4 | `v2.0.0-next.1` newest commit, `v1.6.0-beta.407` | 1.6.0-beta.400, betas on | **1.6.0-beta.407**: `next` is a custom channel, skipped | |
-| S5 | S4 | 1.5.0 stable with betas turned on in Settings | **error**: first entry taken without the filter, `next.yml` and `latest.yml` missing on it | |
-| S6 | `v1.5.0` (old commit), `v2.0.0` (newer commit) stable, `v1.5.1` (newest commit) | 1.5.0, betas off | **1.5.1** (GitHub's latest by commit date) | |
-| S7 | S6 with `v1.5.1` published with `make_latest: false` | same | **2.0.0** | |
-| S8 | S6 with `v2.0.0` published with `make_latest: false` | same | **1.5.1**, and 2.0 stays invisible to stable 1.x until that flag flips | |
+| # | Releases in the scratch repo (atom order = tagged commit date, newest first) | Install | Predicted | Fetched (observed) | Match |
+| --- | --- | --- | --- | --- | --- |
+| S1 | `v2.0.0-beta.1` (newer commit), `v1.6.0-beta.450` (older commit) | beta.407, betas on | `2.0.0-beta.1` (first entry) | `v2.0.0-beta.1/beta.yml` | yes |
+| S2 | S1 plus `v1.6.0-beta.460` on a commit newer than both, published last | same | `1.6.0-beta.460` (first entry again) | `v1.6.0-beta.460/beta.yml` | yes |
+| S3 | S2 but `v2.0.0-beta.1` re-tagged on a commit newer than `.460` | same | `2.0.0-beta.1`: publish order is irrelevant, commit date decides | `v2.0.0-beta.1/beta.yml` | yes |
+| S4 | S3 plus `v2.0.0-next.1` on the newest commit (`next.yml` only) | same | `2.0.0-beta.1`: `next` is a custom channel, skipped | `v2.0.0-beta.1/beta.yml` | yes |
+| S5 | S4 plus stable `v1.6.1` and `v2.0.0` (newer commit) | beta.407, **betas off** | `2.0.0` (GitHub's `latest`) | `v2.0.0/latest.yml`, via `releases/latest` → `tag/v2.0.0` | yes |
+| S6 | S5 plus stable `v1.6.2` on the newest commit | same | `1.6.2` (now GitHub's `latest`) | 20 s after publishing: **`v2.0.0/latest.yml`** (stale web redirect); 2.5 min later: `v1.6.2/latest.yml` | yes, after the cache expired |
+| S7 | S6 with `v1.6.2` set `make_latest: false` and `v2.0.0` `make_latest: true` | same | `2.0.0` | `v2.0.0/latest.yml` (20 s and 2.5 min after the edit) | yes |
 
-S1 to S3 need only prerelease tags and copies of an existing signed beta's `beta.yml` with
-`version:` edited (and a wrong `sha512`, so nothing downloads and installs under a false
-version; the offer is visible in the panel before the download fails). S6 to S8 need
-`latest.yml` copies. Commit dates are set with `GIT_COMMITTER_DATE`/`GIT_AUTHOR_DATE` on
-empty commits in the scratch repository; the releases carry no installer.
+Every check then requested `SpawnLoft-Setup-<version>.exe` and its `.blockmap` from the chosen
+tag, which returned 404 as intended (the yml copies carried edited `version:` fields and a wrong
+`sha512`); nothing downloaded or installed. The planned S5 variant (a stable install with betas
+turned on taking the `-next` entry and failing on the missing channel file) was not run; it
+follows from the code path in step 2 above and from S4, and it is avoided by the rule below
+(no custom channels on the real repository). S8 (`v2.0.0` with `make_latest: false`) is the
+mirror image of S7 and was not run either.
+
+**What the live run added to the reading:**
+
+1. **Bare tags appear in `releases.atom` too**, newest commit first, with or without a release.
+   The first S1 attempt had all seven tags pushed before any release existed; the updater took
+   the first entry (`v1.6.2`, no release, no yml) and the check failed with a 404 on its
+   `beta.yml`. After deleting the tags without a release and pushing each tag right before
+   its release, every scenario matched. **Consequence for real releases:** a pushed tag with no
+   release, a draft being filled, or a release whose yml has not finished uploading, on a
+   commit newer than the newest beta, breaks every beta install's check ("Update failed")
+   until the release is complete. CI already tags and uploads in one job, but a manual tag
+   push or a stalled upload reproduces this.
+2. **`/releases/latest` on `github.com` lags the API by a couple of minutes.** 20 s after
+   `v1.6.2` was published the API already answered `v1.6.2`, while the web redirect the updater
+   follows still pointed at `tag/v2.0.0`; about 2.5 min later it had caught up. A `make_latest`
+   flip was visible within 20 s. Harmless, but a "check for updates" right after a publish may
+   show the previous stable once.
+3. **Asset `download_count` is no signal for a single check:** it lagged by more than ten
+   minutes and the repository, being public, was fetched from elsewhere once. Net logs are
+   the way to read which yml a check used.
+4. Tags on the test machine are annotated (its git config refuses lightweight tags); GitHub's
+   `created_at` still followed the tagged commit's committer date, as the docs say.
+
+**Release rules that follow (for the time when 2.0 goes public):**
+
+- Nothing 2.0 is tagged or released on `joogiebear/spawnloft` until "push to beta". A
+  `v2.0.0-beta.1` release on a commit newer than the last 1.6 beta is offered to **every**
+  1.6 beta install at once (S1, S3), whatever is published after it, unless a later 1.6 beta
+  sits on a newer commit (S2). Commit date, not publish time, is the order.
+- No `-next`/`-internal` tags or releases on the real repository: beta installs skip them (S4),
+  but a stable install with the beta switch on takes the first entry regardless of channel and
+  fails on the missing `latest.yml`. Internal builds stay on `rust-internal.yml` artifacts.
+- Tag and publish atomically (CI does), never push a tag by hand ahead of its release, and
+  keep drafts out of the feed until the yml is uploaded (a draft is not in the feed; a
+  published release with a missing yml is).
+- Stable 1.x installs follow `make_latest` (S5 to S7): publishing `v2.0.0` with
+  `make_latest: false` keeps stable 1.x on 1.x until the flag flips, which is the lever for a
+  staged 2.0 rollout to stable users; beta users cannot be held back that way.
 
 ### Q14 recommendation: Windows updates while servers run
 
-Based on the reading above, to be confirmed by 4a:
+Based on the reading above and confirmed by the live runs (4a: the Node daemon and its JVM
+die, the Rust daemon and its JVM survive; 4b: commit-date ordering, `next` skipped,
+`make_latest` honoured). Victor decided on 2026-11-08 that no further 1.x releases ship, so
+item 1 is kept as the record of what a 1.7 bridge would have been; what actually ships is
+items 2 to 4, all in 2.0.
 
-1. **1.x, now (bridge item for 1.7, `dev`):** stop telling users servers survive. Either make
-   it true or say the truth. Making it true is cheap and is the recommendation:
+1. **1.x bridge (not shipping; recorded for the reasoning):** the panel's "Running servers keep
+   running" text is false on Windows today. Making it true would have been cheap:
    - add `customCheckAppRunning` to `desktop/build/installer.nsh` that matches **only the
      panel**: processes under `$INSTDIR` whose command line has no `daemon.mjs`, no
      `spawnloft-core`, and is not `ELECTRON_RUN_AS_NODE` work (Win32_Process has
@@ -246,21 +295,28 @@ Based on the reading above, to be confirmed by 4a:
      (`SpawnLoft.exe`); the Rust daemon's `daemonExe` is `spawnloft-core.exe`, also unchanged.
    - the panel text becomes true again; the `autoInstallOnAppQuit` path also stops killing
      servers when the panel is closed with an update downloaded.
-2. **1.x → 2.0 handover (the 2.0 NSIS template, P0-F):** the plan's recommendation stands and
-   this reading strengthens it: **stop servers gracefully over the control pipe before the
-   installer runs, and offer to restart them on first launch.** Reason: at the handover the
-   daemons are 1.x Node daemons whose code and `SpawnLoft.exe` disappear (step 3 removes
-   Electron); letting them run from `old-install` means a 1.x daemon supervising a server the
-   2.0 panel cannot talk to across a protocol change, and a `SpawnLoft.exe` that lives on in
-   `%TEMP%`. The stop belongs in **1.x** (the last 1.x's `quitAndInstall` path and its
-   update-on-quit path: when the offered version's major is higher, stop every running server
-   first, record the list in `run\restart-after-update.json`, then install), because 2.0's
-   installer cannot speak the 1.x pipe protocol reliably and should not try. 2.0's first launch
-   reads the list and asks "start these again?". The installer itself (2.0 template, custom
-   check) matches by full path to `SpawnLoft.exe` only and never kills a daemon; in the
-   handover case there are none left. P0-B's "never install a major on quit" item is the other
-   half: a higher major is never installed silently on quit, only through the button, which
-   is where the stop-and-record step runs.
+2. **1.x → 2.0 handover (the 2.0 NSIS template, P0-F), the decision:** **the 2.0 installer
+   stops the running servers gracefully before it runs the old 1.6 uninstaller, and 2.0 offers
+   to restart them on first launch.** Reason: at the handover the daemons are 1.x Node daemons
+   running as `SpawnLoft.exe`, and the installed 1.6 uninstaller (which the 2.0 installer must
+   run, `/S --updated`) kills every process under the install folder, JVMs included, with no
+   save (4a, Node run). Since no 1.7 ships, the stop cannot live in 1.x; it lives in the 2.0
+   installer and must work silently too (the updater runs the installer with `/S`):
+   - before the old uninstaller: run the installed 1.6 CLI,
+     `"$INSTDIR\SpawnLoft.exe" "$INSTDIR\resources\core\spawnloft.mjs" stop --all --json`
+     (the 1.6 CLI speaks its own pipe protocol, so no reimplementation), with a timeout of a
+     few minutes for large worlds, and record what was running in
+     `%LOCALAPPDATA%\mcctl\run\restart-after-update.json`; if the CLI is missing or fails, fall
+     back to a graceful console close and then wait for the JVMs under the install folder to
+     exit before continuing, never `TerminateProcess` on a JVM.
+   - then the old uninstaller, then the 2.0 files; 2.0's first launch reads the list and asks
+     "start these again?" (silent mode: start them again without asking).
+   - the 2.0 installer's own `customCheckAppRunning` matches **only the panel** (full path
+     `$INSTDIR\SpawnLoft.exe` with no `daemon` argument) and never kills a daemon or a JVM;
+     in the handover case there are none left by then.
+   - P0-B's "never install a major on quit" item stays as belt and braces for the 1.6 side
+     that is already in the field: 1.6 installs betas on quit, so the 2.0 beta will be
+     installed on quit by 1.6; the stop in the installer is what makes that safe.
 3. **2.x → 2.y (Tauri updater):** rename-under-running as the plan says, now **demonstrated**:
    the Rust daemon kept supervising its server from a renamed binary through a whole
    uninstall-and-reinstall cycle and stopped it cleanly afterwards. The custom template renames
@@ -279,11 +335,13 @@ Based on the reading above, to be confirmed by 4a:
    handler that stops the server on `CTRL_CLOSE`/console events; `TerminateProcess` gives no
    such chance, so the flag alone is a world-corruption risk.
 
-What 4a can change in this: if the live run shows the daemons **surviving** (PowerShell
-unavailable or policy `Restricted` on that machine, or `.Path` empty for `ELECTRON_RUN_AS_NODE`
-processes), item 1 becomes "document the dependency on PowerShell and still ship the custom
-check so the behaviour stops depending on it". If the JVM under the Node daemon survives, or
-dies under the Rust one, the job-object reading is wrong and item 4 is revisited.
+What the live runs settled: the Node daemon and its JVM die (item 2 is mandatory, not
+optional); the Rust daemon and its JVM survive today's installer (item 3 works without a
+custom check, but the custom check ships anyway so that survival stops depending on which
+branch of electron-builder's probe runs); the job-object reading held (item 4 stands). Open
+loose end, not blocking: why the installer's PowerShell find reported nothing for
+`spawnloft-core.exe` while the same query by hand matches it (most likely the old uninstaller
+had already moved the files when the probe ran); the custom check removes the dependency on it.
 
 ### Running the experiments
 
@@ -348,20 +406,22 @@ installer by hand with the updater's exact arguments:
 5. Restore internal.N over the result (`SpawnLoft-Setup-2.0.0-internal.N.exe /S`, a downgrade
    by version; the NSIS templates have no version comparison), and `spawnloft kill p0e-test` if needed.
 
-**4b:**
+**4b (as run):**
 
-1. Victor creates an empty public repository, say `joogiebear/spawnloft-update-test`, and it
-   is added to the thread. Releases, tags and feeds live only there.
-2. The thread pushes empty commits with chosen dates and tags per scenario, creates the
-   releases (prerelease flags and `make_latest` as the table says) and uploads yml copies with
-   edited `version:` and a wrong `sha512`.
-3. On the test install (any 1.6 beta): set `app-update.yml` back to
-   `provider: github, owner: joogiebear, repo: spawnloft-update-test`, delete
-   `%LOCALAPPDATA%\mcctl-desktop-updater\pending\` if present, open Settings, "Check for
-   updates", read the offered version or the error, and note `releases.atom`'s entry order
-   from the machine's browser for the record. Repeat per scenario; for S5 to S8 toggle the
-   beta switch in Settings or install `1.5.0` first.
-4. Fill the "observed" column.
+1. Victor created the empty public repository `joogiebear/spawnloft-update-test`. Releases,
+   tags and feeds lived only there; the repository is his to delete.
+2. Per scenario: an empty commit with a chosen `GIT_COMMITTER_DATE`/`GIT_AUTHOR_DATE`, its tag
+   pushed **right before** its release is created (never ahead of it, see finding 1), the
+   release created with the prerelease flag and `make_latest` the table says, and a copy of
+   an existing signed beta's `beta.yml`/`latest.yml` uploaded with `version:` edited and a
+   wrong `sha512`.
+3. On the test install (1.6.0-beta.407 over internal.16): `app-update.yml` set to
+   `provider: github, owner: joogiebear, repo: spawnloft-update-test`,
+   `%LOCALAPPDATA%\mcctl-desktop-updater\pending\` emptied, then
+   `SpawnLoft.exe --log-net-log=<file>` for 40 s per check and the fetched
+   `releases/download/<tag>/*.yml` read from the net log (download counts are useless for
+   this). The beta switch in Settings turned off before S5.
+4. Internal.16 reinstalled over the result.
 
 ### Files read for this
 
