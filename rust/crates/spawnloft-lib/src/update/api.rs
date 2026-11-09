@@ -7,7 +7,7 @@
 //! | `POST /api/update/check` | runs a check now; returns the report |
 //! | `POST /api/update/install` | asks the window to install the pending offer (`update-request.json`) |
 //! | `GET /api/update/rollbacks` | the releases below the installed one and whether each may be chosen |
-//! | `POST /api/update/rollback` `{ "version": "2.0.1", "forceDataFormat": false }` | plans the rollback (hold written) and asks the window to run it |
+//! | `POST /api/update/rollback` `{ "version": "2.0.1" }` | plans the rollback (hold written) and asks the window to run it; a data-format mismatch is never overridden from here (the CLI's `--force-data-format` is the only way) |
 //! | `DELETE /api/update/hold` (or `POST .../hold/clear`) | clears the hold |
 //! | `POST /api/update/channel` `{ "beta": true }` | chooses the channel |
 //! | `GET /api/update/log?n=50` | the last lines of `update.log` |
@@ -82,7 +82,7 @@ pub fn handle(method: &str, path: &str, body: &[u8]) -> (u16, Value) {
                 200,
                 json!({
                     "installed": ctx.installed.to_string(),
-                    "dataFormat": Store::data_format(&ctx.data_root),
+                    "dataFormat": Store::data_format(&ctx.data_root).ok(),
                     "releases": list.iter().map(|e| e.to_json()).collect::<Vec<_>>(),
                 }),
             ),
@@ -95,11 +95,13 @@ pub fn handle(method: &str, path: &str, body: &[u8]) -> (u16, Value) {
             let Ok(version) = Version::parse(version) else {
                 return (400, json!({ "error": "`version` is not a semver version" }));
             };
-            let force = parsed_body
-                .get("forceDataFormat")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
-            match ctx.plan_rollback(&version, force) {
+            if parsed_body.get("forceDataFormat").is_some() {
+                return (
+                    400,
+                    json!({ "error": "the data-format rule cannot be overridden from the panel" }),
+                );
+            }
+            match ctx.plan_rollback(&version, false) {
                 Ok(pinned) => {
                     if let Err(e) = store.write_request(&Request {
                         action: "rollback".into(),

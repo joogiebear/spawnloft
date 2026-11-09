@@ -45,11 +45,28 @@ function CoreUpdate { param([string[]] $Args)
 function UpdateLog { if (Test-Path (Join-Path $config 'update.log')) { Get-Content (Join-Path $config 'update.log') -Raw } else { '' } }
 function RunApp($seconds, $until) {
   Start-Process (Join-Path $inst 'SpawnLoft.exe') | Out-Null
+  WaitFor $seconds $until
+}
+function WaitFor($seconds, $until) {
   $deadline = (Get-Date).AddSeconds($seconds)
   while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 1
     if ($until -and (Version) -eq $until) { break }
   }
+}
+# The window's first check runs 20 s after start; it downloads and stages the offer, and the
+# core's state says so (downloaded: true). Returns whether that happened within $seconds.
+function WaitStaged($seconds) {
+  $deadline = (Get-Date).AddSeconds($seconds)
+  while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 1
+    $state = Join-Path $config 'update-state.json'
+    if ((Test-Path $state) -and ((Get-Content $state -Raw | ConvertFrom-Json).downloaded -eq $true)) { return $true }
+  }
+  return $false
+}
+function Request($action, $version) {
+  @{ action = $action; version = $version; at = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json | Set-Content (Join-Path $config 'update-request.json')
 }
 function StopApp {
   Get-Process SpawnLoft -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -67,12 +84,17 @@ try {
   Reset
 
   # ---- scenario 5: a to b through the shell, with a running core surviving ----------------------
+  # the window checks 20 s after start and stages the download; the panel's "Restart to update"
+  # (here: the request file it would write) runs the install
   Variant good
   $held = Start-Process $core -ArgumentList 'ui', '--port', '0' -PassThru -WindowStyle Hidden
   Start-Sleep -Seconds 2
   Check 'a long-running spawnloft-core holds the binary before the update' (-not $held.HasExited)
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  RunApp 150 $B
+  Start-Process (Join-Path $inst 'SpawnLoft.exe') | Out-Null
+  Check 'scenario 5: the window staged the verified download after its first check' (WaitStaged 90) (UpdateLog)
+  Request 'install' $B
+  WaitFor 120 $B
   $result.s5Seconds = [math]::Round($sw.Elapsed.TotalSeconds, 1)
   Check "scenario 5: updated a to b ($B) through the signed feed" ((Version) -eq $B) (Version)
   Start-Sleep -Seconds 8
@@ -93,7 +115,7 @@ try {
 
   # ---- scenario 6: rollback b to a from the panel's request, then the hold ----------------------
   Remove-Item (Join-Path $config 'update.log') -ErrorAction SilentlyContinue
-  @{ action = 'rollback'; version = $A; at = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json | Set-Content (Join-Path $config 'update-request.json')
+  Request 'rollback' $A
   $sw = [Diagnostics.Stopwatch]::StartNew()
   RunApp 150 $A
   $result.s6Seconds = [math]::Round($sw.Elapsed.TotalSeconds, 1)
@@ -111,6 +133,31 @@ try {
   $check = CoreUpdate check
   Check 'scenario 6: clearing the hold offers b again' ($check.result -eq 'update' -and $check.update.version -eq $B) ($check | ConvertTo-Json -Compress)
   $result.s6Log = UpdateLog
+
+  # ---- scenario 6b: install on quit (a to b again), then a second rollback for scenario 7 -----
+  Remove-Item (Join-Path $config 'update.log') -ErrorAction SilentlyContinue
+  Start-Process (Join-Path $inst 'SpawnLoft.exe') | Out-Null
+  Check 'scenario 6b: the window staged b again' (WaitStaged 90) (UpdateLog)
+  # a graceful close (what the X does), not Stop-Process: the staged update installs on quit
+  $closed = @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() })
+  Check 'scenario 6b: the window took the close' ($closed -contains $true) ($closed -join ',')
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  WaitFor 120 $B
+  $result.s6bSeconds = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+  Check "scenario 6b: the staged update was installed on quit ($B)" ((Version) -eq $B) (Version)
+  Check 'scenario 6b: update.log records the on-quit install' ((UpdateLog) -match 'shell-install .*on-quit=yes')
+  Start-Sleep -Seconds 5
+  StopApp
+  $result.s6bLog = UpdateLog
+  # back to a for scenario 7 (artifact checks need b to be the offer); the hold from the first
+  # rollback stays the higher one
+  Request 'rollback' $A
+  RunApp 150 $A
+  Check "scenario 6b: second rollback b to a ($A)" ((Version) -eq $A) (Version)
+  StopApp
+  $hold = Get-Content (Join-Path $config 'update-hold.json') -Raw | ConvertFrom-Json
+  Check 'scenario 6b: the hold still names b' ($hold.below -eq $B) $hold.below
+  CoreUpdate hold clear | Out-Null
 
   # ---- scenario 7: refusals, through the installed core against each feed variant ---------------
   Reset
@@ -149,7 +196,7 @@ try {
   Check 'scenario 7: apply refuses the artifact whose signature belongs to another file' ($LASTEXITCODE -ne 0 -and $apply -match 'signature') $apply.Trim()
   RunApp 70 $null
   StopApp
-  Check 'scenario 7: the shell refused it too (plugin signature check) and nothing was installed' (((Version) -eq $A) -and ((UpdateLog) -match 'shell-check-failed|shell-download-refused')) (Version)
+  Check 'scenario 7: the window refused it too and nothing was installed' (((Version) -eq $A) -and ((UpdateLog) -match 'shell-check-failed .*signature')) (Version)
   Variant artifact-no-version
   CoreUpdate check | Out-Null
   $apply = & $core update apply --no-run --json 2>&1 | Out-String

@@ -20,6 +20,10 @@ pub const FEED_BASELINE: &str = match option_env!("SPAWNLOFT_FEED_BASELINE") {
     _ => "2026-11-09T00:00:00Z",
 };
 
+/// How far ahead of the host's clock a `generatedAt` may be (release runners and PCs disagree
+/// by minutes, not days).
+pub const FUTURE_SLACK_SECS: i64 = 24 * 3600;
+
 /// What the client knows about itself when it judges a feed.
 #[derive(Debug, Clone)]
 pub struct Install<'a> {
@@ -52,6 +56,9 @@ pub enum Skip {
 pub enum Reason {
     /// `generatedAt` older than the baseline or the last accepted feed.
     Replayed { generated_at: i64, floor: i64 },
+    /// `generatedAt` more than a day ahead of this host's clock: accepting it would raise the
+    /// replay floor past every feed to come.
+    FromTheFuture { generated_at: i64, now: i64 },
     /// The release's build could not read this data folder.
     DataFormatBelow { feed: u32, data: u32 },
     /// A rollback target whose data format differs from the data folder's.
@@ -68,6 +75,12 @@ impl fmt::Display for Reason {
                 "the feed was generated at {} but this SpawnLoft has already seen one from {} (a replayed feed)",
                 crate::time::iso(generated_at * 1000),
                 crate::time::iso(floor * 1000)
+            ),
+            Reason::FromTheFuture { generated_at, now } => write!(
+                f,
+                "the feed says it was generated at {}, which is after now ({}) by more than a day",
+                crate::time::iso(generated_at * 1000),
+                crate::time::iso(now * 1000)
             ),
             Reason::DataFormatBelow { feed, data } => write!(
                 f,
@@ -86,6 +99,7 @@ impl Reason {
     pub fn code(&self) -> &'static str {
         match self {
             Reason::Replayed { .. } => "replayed",
+            Reason::FromTheFuture { .. } => "future",
             Reason::DataFormatBelow { .. } => "data-format",
             Reason::DataFormatDiffers { .. } => "data-format",
             Reason::NotLower => "not-lower",
@@ -105,7 +119,6 @@ pub enum Verdict {
 
 /// The rule for an update check: a candidate the discovery step put forward.
 pub fn judge_update(install: &Install<'_>, env: &Envelope) -> Verdict {
-    debug_assert_eq!(env.channel, install.channel);
     if env.version <= *install.version {
         return Verdict::Skip(Skip::NotNewer);
     }
@@ -121,6 +134,12 @@ pub fn judge_update(install: &Install<'_>, env: &Envelope) -> Verdict {
         return Verdict::Refuse(Reason::Replayed {
             generated_at: env.generated_at_secs,
             floor,
+        });
+    }
+    if env.generated_at_secs > install.now_secs + FUTURE_SLACK_SECS {
+        return Verdict::Refuse(Reason::FromTheFuture {
+            generated_at: env.generated_at_secs,
+            now: install.now_secs,
         });
     }
     if *install.version < env.min_version {
@@ -142,7 +161,6 @@ pub fn judge_update(install: &Install<'_>, env: &Envelope) -> Verdict {
 /// The rule for a rollback the person chose: below the installed version, the same data format
 /// (unless forced from the CLI), no freshness rule (an older feed is the point).
 pub fn judge_rollback(install: &Install<'_>, env: &Envelope, force_data_format: bool) -> Verdict {
-    debug_assert_eq!(env.channel, install.channel);
     if env.version >= *install.version {
         return Verdict::Refuse(Reason::NotLower);
     }

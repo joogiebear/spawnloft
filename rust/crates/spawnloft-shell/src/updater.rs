@@ -1,13 +1,14 @@
 //! The window's half of the updater (INSTALLER-UPDATER-DESIGN.md 5.5 to 5.6).
 //!
 //! The core decides (`spawnloft-core update check --json` discovers, verifies the signed envelope
-//! and applies the policy); this file only acts on the pinned record it prints: it has
-//! `tauri-plugin-updater` download the artifact named by that record and nothing else, checks the
-//! bytes against the record again (minisign signature with the pinned key, signed version, size,
-//! sha512), keeps a copy in the config folder's cache, and installs on request (the panel's
-//! `update-request.json`) or on quit.
+//! and applies the policy) and downloads (`update apply --no-run` fetches the artifact the record
+//! names, capped at the size the envelope signed, verifies it and keeps it in the config folder's
+//! cache); this file only acts on the pinned record: it reads the cached file, checks the bytes
+//! against the record again (minisign signature with the compiled-in key the record's `keyId`
+//! names, signed version, size, sha512), hands them to `tauri-plugin-updater`, which verifies
+//! once more and runs the installer, on request (the panel's `update-request.json`) or on quit.
 //!
-//! The plugin never fetches a `latest.json`: the release manifest it works from is built from the
+//! The plugin never fetches anything: the release manifest it works from is built from the
 //! record (`Update::restore_update`), which also forces its signed-version check, and the
 //! `version_comparator` pins version, URL and signature once more. A rollback is the same path
 //! with the lower version the core verified, `/ROLLBACK` for the Windows template and no `/R`
@@ -20,7 +21,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 use spawnloft_lib::update::store::{Request, Store};
-use spawnloft_lib::update::{CACHE_KEEP, Pinned, keys, verify_artifact};
+use spawnloft_lib::update::{Pinned, keys, verify_artifact};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -49,6 +50,13 @@ impl Ready {
     fn put(&self, pinned: Pinned, bytes: Vec<u8>) {
         if let Ok(mut g) = self.staged.lock() {
             *g = Some((pinned, bytes));
+        }
+    }
+
+    /// Drops what is staged: the feed no longer offers it.
+    fn clear(&self) {
+        if let Ok(mut g) = self.staged.lock() {
+            *g = None;
         }
     }
 }
@@ -97,14 +105,20 @@ fn core_update(core: &PathBuf, args: &[&str]) -> Result<Value, String> {
     Ok(value)
 }
 
-/// The plugin, pinned to one record: its key, its version, its URL and its signature.
+/// The plugin, pinned to one record: the compiled-in key its `keyId` names (never a key the
+/// record carries), its version, its URL and its signature.
 fn updater(app: &AppHandle, pinned: &Pinned, restart: bool) -> Result<tauri_plugin_updater::Updater, String> {
+    let pubkey = keys::trusted()
+        .into_iter()
+        .find(|k| k.id == pinned.key_id)
+        .map(|k| k.plugin_pubkey())
+        .ok_or_else(|| format!("key {} is not trusted by this build", pinned.key_id))?;
     let pin = pinned.clone();
     let target = pinned.target.clone();
     let stopper = app.clone();
     let mut builder = app
         .updater_builder()
-        .pubkey(pinned.pubkey.clone())
+        .pubkey(pubkey)
         .target(target.clone())
         .version_comparator(move |_current, remote| {
             remote.version.to_string() == pin.version
@@ -133,9 +147,9 @@ fn pinned_update(app: &AppHandle, pinned: &Pinned, restart: bool) -> Result<Upda
         })
 }
 
-/// The artifact bytes for `pinned`: the verified cached copy, or a fresh download through the
-/// plugin, verified against the record and cached.
-async fn fetch_artifact(app: &AppHandle, pinned: &Pinned) -> Result<Vec<u8>, String> {
+/// The artifact bytes for `pinned`: the verified cached copy, or a fresh download by the core
+/// (`update apply --no-run`: capped at the signed size, verified, cached), verified here again.
+fn fetch_artifact(core: &PathBuf, pinned: &Pinned) -> Result<Vec<u8>, String> {
     let store = store();
     let trusted = keys::trusted();
     let cached = store.cache_file(&pinned.version, &pinned.file);
@@ -147,31 +161,21 @@ async fn fetch_artifact(app: &AppHandle, pinned: &Pinned) -> Result<Vec<u8>, Str
         store.remove_cached(&pinned.version);
         log("cache-dropped", &[("version", &pinned.version)]);
     }
-    let update = pinned_update(app, pinned, true)?;
+    // the core downloads what its own saved offer names; that must be this record
     log("download", &[("version", &pinned.version), ("url", &pinned.url)]);
-    // the plugin verifies the minisign signature and the signed version inside download()
-    let bytes = update
-        .download(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
-    // and the record's own checks: size and sha512 bind the bytes to the envelope
+    let applied = core_update(core, &["apply", "--no-run"])?;
+    if applied.get("version").and_then(Value::as_str) != Some(pinned.version.as_str()) {
+        return Err(format!(
+            "the core's offer is {}, not {}",
+            applied.get("version").and_then(Value::as_str).unwrap_or("-"),
+            pinned.version
+        ));
+    }
+    let bytes = std::fs::read(&cached).map_err(|e| format!("could not read {}: {e}", cached.display()))?;
     if let Err(why) = verify_artifact(&bytes, pinned, &trusted) {
+        store.remove_cached(&pinned.version);
         log("download-refused", &[("version", &pinned.version), ("why", &why)]);
         return Err(why);
-    }
-    match store.store_artifact(&pinned.version, &pinned.file, &bytes, CACHE_KEEP) {
-        Ok(_) => {
-            let mut state = store.state();
-            if state
-                .pending
-                .as_ref()
-                .is_some_and(|p| p.version == pinned.version)
-            {
-                state.downloaded = true;
-                let _ = store.save_state(&state);
-            }
-        }
-        Err(e) => log("cache-write-failed", &[("why", &e.to_string())]),
     }
     log(
         "downloaded",
@@ -192,14 +196,22 @@ fn install(app: &AppHandle, pinned: &Pinned, bytes: &[u8], on_quit: bool) -> Res
             ("on-quit", if on_quit { "yes" } else { "no" }),
         ],
     );
+    // Windows: the plugin verifies and extracts first and calls on_before_exit (which stops the
+    // core) right before it starts the installer, so a refused or failed install leaves the core
+    // running. macOS swaps the bundle in place, so the core is stopped first and started again
+    // when the swap fails.
+    #[cfg(not(windows))]
     app.state::<crate::Core>().stop();
-    update.install(bytes).map_err(|e| {
+    if let Err(e) = update.install(bytes) {
         log(
             "install-failed",
             &[("version", &pinned.version), ("why", &e.to_string())],
         );
-        e.to_string()
-    })?;
+        if !app.state::<crate::Core>().is_running() {
+            crate::start_core(app.clone());
+        }
+        return Err(e.to_string());
+    }
     // not reached on Windows; on macOS the bundle has been replaced
     if on_quit {
         app.exit(0);
@@ -209,21 +221,23 @@ fn install(app: &AppHandle, pinned: &Pinned, bytes: &[u8], on_quit: bool) -> Res
     Ok(())
 }
 
-async fn check(app: &AppHandle, core: &PathBuf, reason: &str) -> Result<(), String> {
+fn check(app: &AppHandle, core: &PathBuf, reason: &str) -> Result<(), String> {
     log("check", &[("reason", reason)]);
     let report = core_update(core, &["check"])?;
     let Some(update) = report.get("update").filter(|u| !u.is_null()) else {
+        // nothing offered (up to date, blocked, or the feed withdrew it): nothing stays staged
+        app.state::<Ready>().clear();
         return Ok(());
     };
     let pinned = Pinned::from_json(update).ok_or("the core's update record is malformed")?;
-    let bytes = fetch_artifact(app, &pinned).await?;
+    let bytes = fetch_artifact(core, &pinned)?;
     app.state::<Ready>().put(pinned, bytes);
     Ok(())
 }
 
-async fn serve(app: &AppHandle, core: &PathBuf, req: Request) -> Result<(), String> {
+fn serve(app: &AppHandle, core: &PathBuf, req: Request) -> Result<(), String> {
     match req.action.as_str() {
-        "check" => check(app, core, "panel").await,
+        "check" => check(app, core, "panel"),
         "install" => {
             let state = store().state();
             let Some(pinned) = state.pending else {
@@ -238,8 +252,8 @@ async fn serve(app: &AppHandle, core: &PathBuf, req: Request) -> Result<(), Stri
                 ));
             }
             let bytes = match app.state::<Ready>().take_for(Some(&pinned.version)) {
-                Some((_, bytes)) => bytes,
-                None => fetch_artifact(app, &pinned).await?,
+                Some((staged, bytes)) if staged.sha512 == pinned.sha512 => bytes,
+                _ => fetch_artifact(core, &pinned)?,
             };
             install(app, &pinned, &bytes, false)
         }
@@ -251,7 +265,7 @@ async fn serve(app: &AppHandle, core: &PathBuf, req: Request) -> Result<(), Stri
                 .get("update")
                 .and_then(Pinned::from_json)
                 .ok_or("the core's rollback record is malformed")?;
-            let bytes = fetch_artifact(app, &pinned).await?;
+            let bytes = fetch_artifact(core, &pinned)?;
             install(app, &pinned, &bytes, false)
         }
         other => Err(format!("unknown request `{other}`")),
@@ -266,24 +280,19 @@ pub fn start(app: AppHandle, core: PathBuf) {
     }
     let scheduled = app.clone();
     let core_a = core.clone();
-    tauri::async_runtime::spawn(async move {
-        tauri::async_runtime::spawn_blocking(|| std::thread::sleep(FIRST_CHECK))
-            .await
-            .ok();
+    // everything here is blocking work (the core runs as a subprocess), on plain threads
+    std::thread::spawn(move || {
+        std::thread::sleep(FIRST_CHECK);
         loop {
-            if let Err(e) = check(&scheduled, &core_a, "schedule").await {
+            if let Err(e) = check(&scheduled, &core_a, "schedule") {
                 log("check-failed", &[("why", &e)]);
             }
-            tauri::async_runtime::spawn_blocking(|| std::thread::sleep(INTERVAL))
-                .await
-                .ok();
+            std::thread::sleep(INTERVAL);
         }
     });
-    tauri::async_runtime::spawn(async move {
+    std::thread::spawn(move || {
         loop {
-            tauri::async_runtime::spawn_blocking(|| std::thread::sleep(REQUEST_POLL))
-                .await
-                .ok();
+            std::thread::sleep(REQUEST_POLL);
             if let Some(req) = store().take_request() {
                 log(
                     "request",
@@ -292,7 +301,7 @@ pub fn start(app: AppHandle, core: PathBuf) {
                         ("version", req.version.as_deref().unwrap_or("-")),
                     ],
                 );
-                if let Err(e) = serve(&app, &core, req).await {
+                if let Err(e) = serve(&app, &core, req) {
                     log("request-failed", &[("why", &e)]);
                 }
             }
@@ -315,6 +324,18 @@ pub fn install_on_quit(app: &AppHandle) -> bool {
     if pinned.rollback {
         // a rollback is only ever run on request
         app.state::<Ready>().put(pinned, bytes);
+        return false;
+    }
+    // only what the core still offers: a check since may have withdrawn it
+    let still_offered = store()
+        .state()
+        .pending
+        .is_some_and(|p| p.version == pinned.version && p.sha512 == pinned.sha512 && !p.rollback);
+    if !still_offered {
+        log(
+            "quit-install-skipped",
+            &[("version", &pinned.version), ("why", "no longer offered")],
+        );
         return false;
     }
     let handle = app.clone();

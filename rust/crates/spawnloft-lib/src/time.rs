@@ -48,6 +48,9 @@ pub fn parse_iso_utc(text: &str) -> Option<i64> {
     if b.len() < 20 || b[4] != b'-' || b[7] != b'-' || b[10] != b'T' || b[13] != b':' || b[16] != b':' {
         return None;
     }
+    if !t.is_ascii() {
+        return None;
+    }
     let num = |s: &str| -> Option<i64> {
         if s.is_empty() || !s.bytes().all(|c| c.is_ascii_digit()) {
             return None;

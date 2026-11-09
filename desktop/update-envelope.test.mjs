@@ -72,6 +72,12 @@ test('an artifact signature for another file or version is refused before the en
   assert.throws(() => buildEnvelope({ ...base, assets: [{ target: 'windows-x86_64', file: 'SpawnLoft-Setup-2.0.0.exe', bytes: exe, signature: k.sign(exe, tauriComment('SpawnLoft-Setup-2.0.0.exe', '1.9.0')) }] }), /carries version 1.9.0/)
   assert.throws(() => buildEnvelope({ ...base, assets: [{ target: 'windows-x86_64', file: 'SpawnLoft-Setup-2.0.0.exe', bytes: exe, signature: k.sign(exe, 'timestamp:1\tfile:SpawnLoft-Setup-2.0.0.exe') }] }), /sign with --app-version/)
   assert.throws(() => buildEnvelope({ ...base, channel: 'beta', assets: [] }), /not a beta release/)
+  // with the key given, the signature itself is verified: another key's, or a stale one, is refused
+  const other = makeKey()
+  const good = k.sign(exe, tauriComment('SpawnLoft-Setup-2.0.0.exe', '2.0.0'))
+  assert.throws(() => buildEnvelope({ ...base, key: k.parsed, assets: [{ target: 'windows-x86_64', file: 'SpawnLoft-Setup-2.0.0.exe', bytes: exe, signature: other.sign(exe, tauriComment('SpawnLoft-Setup-2.0.0.exe', '2.0.0')) }] }), /is by key/)
+  assert.throws(() => buildEnvelope({ ...base, key: k.parsed, assets: [{ target: 'windows-x86_64', file: 'SpawnLoft-Setup-2.0.0.exe', bytes: Buffer.from('rebuilt'), signature: good }] }), /does not verify/)
+  assert.ok(buildEnvelope({ ...base, key: k.parsed, assets: [{ target: 'windows-x86_64', file: 'SpawnLoft-Setup-2.0.0.exe', bytes: exe, signature: good }] }).platforms['windows-x86_64'].signature)
   assert.throws(() => buildEnvelope({ ...base, assets: [] }), /at least one artifact/)
 })
 

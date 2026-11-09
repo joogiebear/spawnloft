@@ -66,7 +66,11 @@ export function parsePublicKey(text) {
 
 // One release's envelope from its verified artifacts. `assets` is a list of
 // { target, file, bytes, signature? } (signature: the .sig file's text, Tauri's base64 form).
-export function buildEnvelope({ version, channel, keyId, generatedAt, expiresAt, minVersion, dataFormat, notes, assets }, downloadBase = DOWNLOAD_BASE) {
+// `key` ({ keyId, publicKey }, from parsePublicKey) makes each artifact signature verify
+// cryptographically against the release key before it is written into the envelope; a stale
+// .sig from an earlier build of the same version, or one by another key, would otherwise ship
+// and every client would download the installer only to refuse it.
+export function buildEnvelope({ version, channel, keyId, generatedAt, expiresAt, minVersion, dataFormat, notes, assets, key }, downloadBase = DOWNLOAD_BASE) {
   if (!SEMVER.test(version)) throw new Error(`${version} is not a semver version`)
   if (channel !== channelOf(version)) throw new Error(`${version} is not a ${channel} release`)
   if (!/^[0-9A-F]{16}$/.test(keyId)) throw new Error('keyId must be the 16-digit minisign key id')
@@ -87,6 +91,8 @@ export function buildEnvelope({ version, channel, keyId, generatedAt, expiresAt,
       const sig = String(a.signature).trim()
       if (!/^[A-Za-z0-9+/]+=*$/.test(sig)) throw new Error(`${a.file}: the signature is not base64`)
       verifyArtifactComment(sig, a.file, version)
+      if (decodeSignature(sig).keyId !== keyId) throw new Error(`${a.file}: its signature is by key ${decodeSignature(sig).keyId}, the envelope names ${keyId}`)
+      if (key && !verifyMinisign(a.bytes, sig, key)) throw new Error(`${a.file}: its signature does not verify with the release key (stale .sig?)`)
       entry.signature = sig
     }
     platforms[a.target] = entry
@@ -235,12 +241,15 @@ export function main(argv) {
   const key = parsePublicKey(fs.readFileSync(opts.pubkey, 'utf8'))
   const now = opts.generatedAt ? new Date(opts.generatedAt) : new Date()
   if (Number.isNaN(now.getTime())) throw new Error('--generated-at is not a date')
+  // the client refuses a feed dated more than a day ahead, and accepting one would raise every
+  // client's replay floor past the feeds to come: a typo here must not ship
+  if (now.getTime() > Date.now() + 3600000) throw new Error(`--generated-at ${opts.generatedAt} is in the future`)
   const generatedAt = now.toISOString().replace(/\.\d{3}Z$/, 'Z')
   const expiresAt = new Date(now.getTime() + opts.expiresDays * 86400000).toISOString().replace(/\.\d{3}Z$/, 'Z')
   const assets = collectAssets(opts.dist, opts.version)
   const envelope = buildEnvelope({
     version: opts.version, channel: opts.channel, keyId: key.keyId, generatedAt, expiresAt,
-    minVersion: opts.minVersion, dataFormat: opts.dataFormat, notes: opts.notes, assets,
+    minVersion: opts.minVersion, dataFormat: opts.dataFormat, notes: opts.notes, assets, key,
   }, opts.downloadBase)
   const envelopeFile = path.join(opts.dist, ENVELOPE_FILE)
   const bytes = Buffer.from(JSON.stringify(envelope, null, 2) + '\n')

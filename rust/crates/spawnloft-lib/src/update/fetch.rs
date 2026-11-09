@@ -119,6 +119,8 @@ impl Https {
             .timeout_global(Some(timeout))
             .http_status_as_error(false)
             .max_redirects(5)
+            // a redirect must not step down to plain HTTP; the loopback test feed is the one exception
+            .https_only(!cfg!(feature = "internal-feed"))
             .user_agent(format!(
                 "SpawnLoft/{} (update check)",
                 crate::build::current().version
@@ -188,6 +190,10 @@ pub(crate) mod testkit {
     }
 
     impl FakeFetch {
+        pub fn remove(&mut self, url: &str) {
+            self.files.remove(url);
+        }
+
         pub fn put(&mut self, url: impl Into<String>, body: impl Into<Vec<u8>>) {
             self.files.insert(url.into(), body.into());
         }

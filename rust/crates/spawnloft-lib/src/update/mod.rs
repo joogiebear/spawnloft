@@ -37,7 +37,7 @@ const MAX_API_PAGES: usize = 5;
 const ATOM_CAP: usize = 1024 * 1024;
 const API_CAP: usize = 2 * 1024 * 1024;
 /// The largest artifact `update apply` downloads itself.
-pub const ARTIFACT_CAP: usize = 512 * 1024 * 1024;
+pub const ARTIFACT_CAP: usize = envelope::MAX_ARTIFACT_BYTES as usize;
 /// Cached download versions kept.
 pub const CACHE_KEEP: usize = 2;
 
@@ -152,7 +152,7 @@ impl Pinned {
             notes: s("notes"),
             target: s("target")?,
             url: s("url")?,
-            file: s("file")?,
+            file: s("file").filter(|f| envelope::is_file_name(f))?,
             size: v.get("size").and_then(Value::as_u64)?,
             sha512: s("sha512")?,
             signature: s("signature"),
@@ -286,16 +286,16 @@ impl<'a> Context<'a> {
         })
     }
 
-    fn install_rules(&self, hold: Option<&'a Version>) -> Install<'_> {
-        Install {
+    fn install_rules(&self, hold: Option<&'a Version>) -> Result<Install<'_>, String> {
+        Ok(Install {
             version: &self.installed,
             channel: self.channel,
-            data_format: Store::data_format(&self.data_root),
+            data_format: Store::data_format(&self.data_root)?,
             baseline_secs: crate::time::parse_iso_utc(policy::FEED_BASELINE).unwrap_or(0),
             last_accepted_secs: self.store.last_accepted_secs(),
             hold_below: hold,
             now_secs: self.now_secs,
-        }
+        })
     }
 
     fn expect<'s>(&self, source: &'s Source) -> Expect<'s> {
@@ -433,7 +433,7 @@ impl<'a> Context<'a> {
         let mut tags = self
             .tags(source, steps)
             .map_err(|e| format!("could not list releases: {e}"))?;
-        let rules = self.install_rules(hold);
+        let rules = self.install_rules(hold)?;
         let mut walk = self.walk(source, &tags, &rules, hold, steps)?;
         // a hop is needed and the atom window did not reach down to the installed version: the
         // release in between may be older than the window shows
@@ -451,10 +451,61 @@ impl<'a> Context<'a> {
         if let Some(pinned) = walk.offer {
             return Ok((Outcome::Update(Box::new(pinned)), walk.stale));
         }
+        // nothing to offer: the feed may simply be frozen (a listing an attacker holds still, or
+        // newer releases removed). The newest release at or below the installed version, normally
+        // the installed one, carries the `expiresAt` that says so (design 5.3, review item 7).
+        if walk.blocked.is_none() {
+            walk.stale = self.frozen(source, &tags, &rules, steps)?;
+        }
         Ok((
             walk.blocked.map_or(Outcome::UpToDate, Outcome::Blocked),
             walk.stale,
         ))
+    }
+
+    /// Whether the newest envelope at or below the installed version has expired (or is missing).
+    /// A refused envelope here fails the source like one in the walk would.
+    fn frozen(
+        &self,
+        source: &Source,
+        tags: &[String],
+        rules: &Install<'_>,
+        steps: &mut Vec<String>,
+    ) -> Result<bool, String> {
+        let Some(cand) = releases::candidates(tags, self.channel)
+            .into_iter()
+            .find(|c| c.version <= self.installed)
+        else {
+            steps.push("no release at or below the installed version is listed".to_string());
+            return Ok(true);
+        };
+        match self.envelope(source, &cand) {
+            Ok(Some((env, _))) => {
+                let stale = policy::is_stale(rules, &env);
+                steps.push(format!(
+                    "{}: {}",
+                    cand.tag,
+                    if stale {
+                        "feed expired (stale)"
+                    } else {
+                        "feed current"
+                    }
+                ));
+                Ok(stale)
+            }
+            Ok(None) => {
+                steps.push(format!("{}: no update feed (stale)", cand.tag));
+                Ok(true)
+            }
+            Err(Step::Unreachable(why)) => Err(format!("{}: {why}", cand.tag)),
+            Err(Step::Refused(r)) => {
+                self.store.log(
+                    "refused",
+                    &[("tag", &cand.tag), ("code", r.code()), ("why", &r.to_string())],
+                );
+                Err(format!("{}: refused ({}): {r}", cand.tag, r.code()))
+            }
+        }
     }
 
     /// Newest first, every candidate above the installed version, until one may be offered.
@@ -467,18 +518,24 @@ impl<'a> Context<'a> {
         steps: &mut Vec<String>,
     ) -> Result<Walk, String> {
         let mut walk = Walk::default();
-        for (walked, cand) in releases::candidates(tags, self.channel).into_iter().enumerate() {
+        let mut fetched = 0;
+        for cand in releases::candidates(tags, self.channel) {
             if cand.version <= self.installed {
                 break;
             }
-            if walked >= MAX_WALK {
+            if fetched >= MAX_WALK {
                 steps.push(format!("stopped after {MAX_WALK} releases"));
                 break;
             }
+            fetched += 1;
             let (env, signer) = match self.envelope(source, &cand) {
                 Ok(Some(x)) => x,
                 Ok(None) => {
+                    // a release without its feed (never published with one, or taken down): an
+                    // offer made from it earlier is withdrawn
                     steps.push(format!("{}: no update feed (skipped)", cand.tag));
+                    self.forget_pending(&Some(cand.version.clone()), "no update feed");
+                    fetched -= 1;
                     continue;
                 }
                 Err(Step::Unreachable(why)) => return Err(format!("{}: {why}", cand.tag)),
@@ -532,8 +589,17 @@ impl<'a> Context<'a> {
                         ],
                     );
                     match reason {
-                        policy::Reason::Replayed { .. } => {
-                            return Err(format!("{}: refused (replayed): {reason}", cand.tag));
+                        policy::Reason::Replayed { .. } | policy::Reason::FromTheFuture { .. } => {
+                            // the newest release is older than one already accepted: that one may
+                            // have been taken down (a yanked release). Its offer is withdrawn so
+                            // nothing installs it; the floor stands, so only a release made after
+                            // the yank is ever offered again (fail closed)
+                            if let Some(p) = self.store.state().pending
+                                && !tags.contains(&p.tag)
+                            {
+                                self.forget_pending(&Version::parse(&p.version).ok(), "taken down");
+                            }
+                            return Err(format!("{}: refused ({}): {reason}", cand.tag, reason.code()));
                         }
                         other => {
                             steps.push(format!("{}: {other}", cand.tag));
@@ -546,6 +612,25 @@ impl<'a> Context<'a> {
             }
         }
         Ok(walk)
+    }
+
+    /// Withdraws the saved offer when it names `version` (or any offer, for `None`): the window
+    /// must not install something the feed no longer carries.
+    fn forget_pending(&self, version: &Option<Version>, why: &str) {
+        let mut state = self.store.state();
+        let Some(p) = state.pending.as_ref() else { return };
+        let same = match version {
+            Some(v) => Version::parse(&p.version).ok().as_ref() == Some(v),
+            None => true,
+        };
+        if !same {
+            return;
+        }
+        self.store
+            .log("offer-withdrawn", &[("version", &p.version), ("why", why)]);
+        state.pending = None;
+        state.downloaded = false;
+        let _ = self.store.save_state(&state);
     }
 
     fn record(&self, report: &Report) {
@@ -605,7 +690,7 @@ impl<'a> Context<'a> {
         let tags = self
             .tags(source, &mut steps)
             .map_err(|e| format!("could not list releases: {e}"))?;
-        let rules = self.install_rules(None);
+        let rules = self.install_rules(None)?;
         let mut out = Vec::new();
         for cand in releases::candidates(&tags, self.channel) {
             if cand.version >= self.installed {
@@ -669,7 +754,7 @@ impl<'a> Context<'a> {
                 return Err(format!("{}: refused ({}): {r}", cand.tag, r.code()));
             }
         };
-        let rules = self.install_rules(None);
+        let rules = self.install_rules(None)?;
         match policy::judge_rollback(&rules, &env, force_data_format) {
             Verdict::Offer { .. } => {}
             Verdict::Refuse(r) => return Err(r.to_string()),
@@ -678,15 +763,20 @@ impl<'a> Context<'a> {
         let (target, entry) = platform_entry(&env, &self.target)
             .ok_or_else(|| format!("{} has no build for {}", env.version, self.target))?;
         let pinned = Pinned::from(&env, signer, target, entry, true);
+        // a second rollback keeps the first hold: the version the person fled first stays held
+        let hold = match self.store.hold() {
+            Some(h) if h > self.installed => h,
+            _ => self.installed.clone(),
+        };
         self.store
-            .set_hold(&self.installed)
+            .set_hold(&hold)
             .map_err(|e| format!("could not write the hold: {e}"))?;
         self.store.log(
             "rollback-planned",
             &[
                 ("to", &pinned.version),
                 ("from", &self.installed.to_string()),
-                ("hold-below", &self.installed.to_string()),
+                ("hold-below", &hold.to_string()),
             ],
         );
         let mut state = self.store.state();
@@ -709,7 +799,7 @@ impl<'a> Context<'a> {
             "keys": self.keys.iter().map(|k| json!({ "id": k.id, "from": k.from })).collect::<Vec<_>>(),
             "keysOverridden": keys::is_overridden(),
             "feedBaseline": policy::FEED_BASELINE,
-            "dataFormat": Store::data_format(&self.data_root),
+            "dataFormat": Store::data_format(&self.data_root).ok(),
             "lastCheckAt": state.last_check_at,
             "lastResult": state.last_result,
             "pending": state.pending.as_ref().map(Pinned::to_json),
@@ -780,23 +870,15 @@ pub fn verify_artifact(bytes: &[u8], pinned: &Pinned, keys: &[TrustedKey]) -> Re
         .iter()
         .find(|k| k.id == pinned.key_id)
         .ok_or_else(|| format!("key {} is not trusted by this build", pinned.key_id))?;
+    if !envelope::is_file_name(&pinned.file) {
+        return Err(format!("`{}` is not an asset file name", pinned.file));
+    }
     let (signature, _) = envelope::verify_signature(bytes, sig, std::slice::from_ref(key))
         .map_err(|r| format!("artifact signature: {r}"))?;
-    let signed_version = signature
-        .trusted_comment()
-        .split('\t')
-        .find_map(|f| f.strip_prefix("version:"))
-        .ok_or("the artifact's signature carries no version")?;
+    // the signature's own comment binds it to this file and this version (design 5.3)
     let want = Version::parse(&pinned.version).map_err(|e| e.to_string())?;
-    match Version::parse(signed_version.trim_start_matches('v')) {
-        Ok(v) if v == want => {}
-        _ => {
-            return Err(format!(
-                "the artifact was signed for version {signed_version}, not {}",
-                pinned.version
-            ));
-        }
-    }
+    envelope::check_trusted_comment(signature.trusted_comment(), &pinned.file, &want)
+        .map_err(|r| format!("artifact signature: {r}"))?;
     if bytes.len() as u64 != pinned.size {
         return Err(format!(
             "the artifact is {} bytes, the feed said {}",
@@ -827,9 +909,11 @@ pub fn apply(ctx: &Context<'_>, pinned: &Pinned, run_installer: bool) -> Result<
             ctx.store.remove_cached(&pinned.version);
             ctx.store
                 .log("download", &[("version", &pinned.version), ("url", &pinned.url)]);
+            // the envelope named the size: a body past it is refused before it is in memory
+            let cap = usize::try_from(pinned.size.min(ARTIFACT_CAP as u64)).unwrap_or(usize::MAX);
             let b = ctx
                 .fetch
-                .get(&pinned.url, ARTIFACT_CAP)
+                .get(&pinned.url, cap)
                 .map_err(|e| format!("download failed: {e}"))?;
             if let Err(why) = verify_artifact(&b, pinned, &ctx.keys) {
                 ctx.store
@@ -1100,7 +1184,7 @@ mod tests {
     fn replayed_feed_is_refused_after_a_newer_one_was_accepted() {
         let mut f = Fixture::new("replay", &["v2.0.0-beta.4", "v2.0.0-beta.3"]);
         f.publish("2.0.0-beta.4", |m| {
-            m.insert("generatedAt".into(), "2026-12-05T00:00:00Z".into());
+            m.insert("generatedAt".into(), "2026-12-01T20:00:00Z".into());
         });
         assert!(matches!(
             f.ctx("2.0.0-beta.2").check().outcome,
@@ -1110,15 +1194,90 @@ mod tests {
         f.fetch
             .put(f.source.atom.clone(), atom(&["v2.0.0-beta.5", "v2.0.0-beta.4"]));
         f.publish("2.0.0-beta.5", |m| {
-            m.insert("generatedAt".into(), "2026-12-04T00:00:00Z".into());
+            m.insert("generatedAt".into(), "2026-12-01T19:00:00Z".into());
         });
         let report = f.ctx("2.0.0-beta.2").check();
         assert!(
             matches!(report.outcome, Outcome::Unreachable(ref w) if w.contains("replayed")),
             "{report:?}"
         );
-        // the earlier offer is kept: an unreachable check does not forget it
+        // the earlier offer is kept while its release is still listed
         assert_eq!(f.store.state().pending.unwrap().version, "2.0.0-beta.4");
+        // the accepted release disappears from the listing (taken down): the offer is withdrawn,
+        // and the floor stands, so the older beta.3 is still refused
+        f.fetch.put(f.source.atom.clone(), atom(&["v2.0.0-beta.3"]));
+        f.publish("2.0.0-beta.3", |_| {});
+        let report = f.ctx("2.0.0-beta.2").check();
+        assert!(
+            matches!(report.outcome, Outcome::Unreachable(ref w) if w.contains("replayed")),
+            "{report:?}"
+        );
+        assert_eq!(f.store.state().pending, None);
+        assert!(f.store.log_tail(50).iter().any(|l| l.contains("offer-withdrawn")));
+    }
+
+    #[test]
+    fn a_future_dated_feed_is_refused() {
+        let mut f = Fixture::new("future", &["v2.0.0-beta.4"]);
+        f.publish("2.0.0-beta.4", |m| {
+            m.insert("generatedAt".into(), "2026-12-10T00:00:00Z".into());
+        });
+        let report = f.ctx("2.0.0-beta.2").check();
+        assert!(
+            matches!(report.outcome, Outcome::Unreachable(ref w) if w.contains("refused (future)")),
+            "{report:?}"
+        );
+        assert_eq!(f.store.state().last_accepted_generated_at, None);
+    }
+
+    #[test]
+    fn a_release_taken_down_withdraws_its_offer() {
+        let mut f = Fixture::new("yanked", &["v2.0.0-beta.4", "v2.0.0-beta.3"]);
+        f.publish("2.0.0-beta.4", |_| {});
+        f.publish("2.0.0-beta.3", |_| {});
+        assert!(matches!(
+            f.ctx("2.0.0-beta.2").check().outcome,
+            Outcome::Update(_)
+        ));
+        // the tag stays listed but its feed is gone
+        f.fetch
+            .remove(&f.source.asset("v2.0.0-beta.4", envelope::FILE_NAME));
+        let report = f.ctx("2.0.0-beta.2").check();
+        assert!(
+            matches!(report.outcome, Outcome::Update(ref p) if p.version == "2.0.0-beta.3"),
+            "{report:?}"
+        );
+        assert_eq!(f.store.state().pending.unwrap().version, "2.0.0-beta.3");
+    }
+
+    #[test]
+    fn a_frozen_feed_is_reported_stale() {
+        let mut f = Fixture::new("frozen", &["v2.0.0-beta.4", "v2.0.0-beta.3"]);
+        f.publish("2.0.0-beta.4", |m| {
+            m.insert("expiresAt".into(), "2026-11-20T00:00:00Z".into());
+        });
+        let report = f.ctx("2.0.0-beta.4").check();
+        assert_eq!(report.outcome, Outcome::UpToDate);
+        assert!(report.stale, "{report:?}");
+        assert!(f.store.state().stale_feed);
+        // a listing with nothing at or below the installed version is stale too
+        let report = f.ctx("2.1.0").check();
+        assert_eq!(report.outcome, Outcome::UpToDate);
+        assert!(report.stale, "{report:?}");
+        // a current envelope for the installed release is not
+        f.publish("2.0.0-beta.4", |_| {});
+        let report = f.ctx("2.0.0-beta.4").check();
+        assert!(!report.stale, "{report:?}");
+        // and a tampered one fails the source like the walk would
+        let url = f.source.asset("v2.0.0-beta.4", envelope::FILE_NAME);
+        let mut bytes = f.fetch.files[&url].clone();
+        let n = bytes.len();
+        bytes[n - 3] ^= 1;
+        f.fetch.put(url, bytes);
+        assert!(matches!(
+            f.ctx("2.0.0-beta.4").check().outcome,
+            Outcome::Unreachable(_)
+        ));
     }
 
     #[test]
@@ -1254,6 +1413,11 @@ mod tests {
         assert!(pinned.rollback);
         assert_eq!(pinned.version, "2.0.1");
         assert_eq!(f.store.hold().unwrap().to_string(), "2.1.0");
+        // a second rollback (2.0.1 to 2.0.0-beta.9) keeps the higher hold
+        f.ctx("2.0.1")
+            .plan_rollback(&Version::parse("2.0.0-beta.9").unwrap(), false)
+            .unwrap();
+        assert_eq!(f.store.hold().unwrap().to_string(), "2.1.0");
         assert!(
             ctx.plan_rollback(&Version::parse("2.1.0").unwrap(), false)
                 .is_err()
@@ -1330,7 +1494,7 @@ mod tests {
         assert!(
             verify_artifact(&artifact, &wrong_version, &keys)
                 .unwrap_err()
-                .contains("signed for version")
+                .contains("made for version")
         );
         let mut wrong_hash = p.clone();
         wrong_hash.sha512 = "00".repeat(64);
@@ -1353,7 +1517,18 @@ mod tests {
                 .contains("not trusted")
         );
         // an artifact signed without --app-version
-        let legacy = key.sign_with_comment(&artifact, "timestamp:1\tfile:x.exe");
+        let moved = key.sign_with_comment(
+            &artifact,
+            "timestamp:1\tfile:SpawnLoft-Setup-2.0.0-beta.2.exe\tversion:2.0.0-beta.3",
+        );
+        let mut moved_pin = p.clone();
+        moved_pin.signature = Some(moved);
+        assert!(
+            verify_artifact(&artifact, &moved_pin, &keys)
+                .unwrap_err()
+                .contains("made for `SpawnLoft-Setup-2.0.0-beta.2.exe`")
+        );
+        let legacy = key.sign_with_comment(&artifact, "timestamp:1\tfile:SpawnLoft-Setup-2.0.0-beta.3.exe");
         let mut legacy_pin = p.clone();
         legacy_pin.signature = Some(legacy);
         assert!(

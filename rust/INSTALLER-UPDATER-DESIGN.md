@@ -503,13 +503,17 @@ every 6 h, 20 s after start, and on demand:
        check(): the plugin never fetches latest.json (as built by T2: one network read of the
        release data, the signed one; restore_update forces require_signed_version). Some(update)
        only when the plugin accepts exactly what the envelope named; None is logged
-    6. download() -> bytes (the plugin verifies the minisign signature inside download(),
-       verified from the 2.14.1 source); then our sha512 == envelope.sha512 as a second,
-       envelope-bound check; keep a copy in <config>/updates/<version>/<file> (last two
-       versions, pruned); a cached copy is re-checked with Update::verify() before reuse
-    7. on Restart (or on quit when autoInstallOnAppQuit is on): on_before_exit stops the core
-       child; install(bytes): the plugin verifies again and runs the installer with
-       /P /UPDATE /R (interactive) or /S /UPDATE (on quit), or replaces the bundle on macOS
+    6. the core downloads (`update apply --no-run`, as built by T2: the body is capped at the
+       size the envelope signed, so a swapped multi-GB asset is refused before it is in
+       memory), verifies signature, signed version, size and sha512, and keeps the copy in
+       <config>/updates/<version>/<file> (last two versions, pruned); the shell reads that
+       file and verifies it against the record again before staging it
+    7. on Restart (or on quit when autoInstallOnAppQuit is on): install(bytes): the plugin
+       verifies again, extracts, calls on_before_exit (which stops the core child) and runs the
+       installer with /P /UPDATE /R (interactive) or /P /UPDATE (on quit: the plugin has one
+       install mode per build, passive, so the on-quit install shows its progress bar and no
+       /R), or replaces the bundle on macOS. A staged update is installed on quit only while
+       the core's last check still offers that exact version and hash
     8. the new app starts; first launch (section 8) confirms the version and clears the pending state
 ```
 

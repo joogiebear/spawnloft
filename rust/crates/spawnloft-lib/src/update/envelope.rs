@@ -25,6 +25,8 @@ use super::keys::TrustedKey;
 pub const MAX_ENVELOPE_BYTES: usize = 64 * 1024;
 /// The largest signature file: a minisign signature is about 300 bytes before base64.
 pub const MAX_SIGNATURE_BYTES: usize = 1024;
+/// The largest artifact an envelope may name; the download is capped at the named size.
+pub const MAX_ARTIFACT_BYTES: u64 = 512 * 1024 * 1024;
 /// The envelope schema this client understands.
 pub const FORMAT: u64 = 1;
 /// The product every envelope must name.
@@ -56,8 +58,20 @@ impl Channel {
         }
     }
 
-    /// Whether a release version belongs to this channel: stable takes no prerelease; beta takes
-    /// none or `beta.N`. `next`, `internal`, `spike` and anything else are never offered.
+    /// The channel a release is published on: stable for a version without a prerelease, beta
+    /// for `beta.N`; `next`, `internal`, `spike` and anything else belong to no channel.
+    pub fn of(v: &Version) -> Option<Channel> {
+        if v.pre.is_empty() {
+            Some(Channel::Stable)
+        } else if v.pre.as_str().split('.').next() == Some("beta") {
+            Some(Channel::Beta)
+        } else {
+            None
+        }
+    }
+
+    /// Whether a release version is offered on this channel: stable takes stable releases; beta
+    /// takes stable and beta releases (a beta user is moved to the stable that follows).
     pub fn accepts(self, v: &Version) -> bool {
         if v.pre.is_empty() {
             return true;
@@ -192,7 +206,7 @@ pub fn verify(
             claimed: envelope.key_id,
         });
     }
-    check_trusted_comment(signature.trusted_comment(), &envelope.version)?;
+    check_trusted_comment(signature.trusted_comment(), FILE_NAME, &envelope.version)?;
     Ok(envelope)
 }
 
@@ -223,17 +237,17 @@ pub fn verify_signature<'k>(
 
 /// `timestamp:<unix>\tfile:spawnloft-updates.json\tversion:<version>` (the Tauri CLI's fields,
 /// any order, extra fields ignored): `file` and `version` must both be present and match.
-pub fn check_trusted_comment(comment: &str, version: &Version) -> Result<(), Refusal> {
+pub fn check_trusted_comment(comment: &str, file_name: &str, version: &Version) -> Result<(), Refusal> {
     let field = |name: &str| {
         comment
             .split('\t')
             .find_map(|f| f.strip_prefix(name).and_then(|rest| rest.strip_prefix(':')))
     };
     match field("file") {
-        Some(FILE_NAME) => {}
+        Some(f) if f == file_name => {}
         Some(other) => {
             return Err(Refusal::TrustedComment(format!(
-                "it was made for `{other}`, not {FILE_NAME}"
+                "it was made for `{other}`, not {file_name}"
             )));
         }
         None => return Err(Refusal::TrustedComment("it names no file".to_string())),
@@ -249,6 +263,15 @@ pub fn check_trusted_comment(comment: &str, version: &Version) -> Result<(), Ref
             "it was made for version {signed}, the feed says {version}"
         ))),
     }
+}
+
+/// An asset file name as the release tool writes it: `[A-Za-z0-9][A-Za-z0-9._-]*`, no path
+/// separators of either kind, no drive letter, no `..` (it would need a leading dot).
+pub fn is_file_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    matches!(bytes.next(), Some(b) if b.is_ascii_alphanumeric())
+        && name.len() <= 255
+        && bytes.all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
 }
 
 fn field<'a>(obj: &'a serde_json::Map<String, Value>, name: &str) -> Result<&'a Value, Refusal> {
@@ -296,18 +319,21 @@ pub fn parse(bytes: &[u8], expect: Expect<'_>) -> Result<Envelope, Refusal> {
         wanted: expect.channel,
         got: channel_text.clone(),
     })?;
-    if channel != expect.channel {
-        return Err(Refusal::Channel {
-            wanted: expect.channel,
-            got: channel_text,
-        });
-    }
     let version = version_field(&obj, "version")?;
-    if !channel.accepts(&version) {
+    // the label must be the version's own channel (a stable release's envelope says `stable`
+    // whoever reads it) and the version must be one the reader's channel takes: a beta client
+    // takes the stable that follows its betas, a stable client never takes a beta
+    if Channel::of(&version) != Some(channel) {
         return Err(Refusal::Field(format!(
             "version {version} is not a {} release",
             channel.as_str()
         )));
+    }
+    if !expect.channel.accepts(&version) {
+        return Err(Refusal::Channel {
+            wanted: expect.channel,
+            got: channel_text,
+        });
     }
     let tag = text(&obj, "tag", 80)?;
     if tag != format!("v{version}") {
@@ -372,12 +398,17 @@ pub fn parse(bytes: &[u8], expect: Expect<'_>) -> Result<Envelope, Refusal> {
             return Err(Refusal::Url(url));
         }
         let file = &url[prefix.len()..];
-        if file.contains('/') || file.contains('?') || file.contains('#') || file.contains('%') {
+        if !is_file_name(file) {
             return Err(Refusal::Url(url));
         }
         let size = field(e, "size")?
             .as_u64()
             .ok_or_else(|| Refusal::Field(format!("`size` of {target} is not a number")))?;
+        if size == 0 || size > MAX_ARTIFACT_BYTES {
+            return Err(Refusal::Field(format!(
+                "`size` of {target} is {size}, outside 1 to {MAX_ARTIFACT_BYTES}"
+            )));
+        }
         let sha512 = text(e, "sha512", 128)?.to_ascii_lowercase();
         if sha512.len() != 128 || !sha512.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(Refusal::Field(format!(
@@ -496,7 +527,7 @@ pub(crate) mod testkit {
             "format": 1,
             "product": "spawnloft",
             "keyId": key_id,
-            "channel": "beta",
+            "channel": if version.contains('-') { "beta" } else { "stable" },
             "version": version,
             "tag": tag,
             "generatedAt": "2026-12-01T18:02:11Z",
@@ -668,10 +699,11 @@ mod tests {
             "product"
         );
         assert_eq!(
+            // a beta version labelled stable: the label is wrong, whoever reads it
             refused(|m| {
                 m.insert("channel".into(), "stable".into());
             }),
-            "channel"
+            "field"
         );
         assert_eq!(
             refused(|m| {
@@ -765,6 +797,35 @@ mod tests {
                 .code(),
             "channel"
         );
+    }
+
+    #[test]
+    fn beta_channel_takes_the_stable_that_follows() {
+        let key = TestKey::generate();
+        // the release tool labels 2.0.0 `stable`; a beta client takes it
+        let (bytes, sig) = signed(&key, "2.0.0", |_| {});
+        let env = verify(&bytes, &sig, std::slice::from_ref(&key.trusted), beta()).unwrap();
+        assert_eq!(env.channel, Channel::Stable);
+        let stable = Expect {
+            channel: Channel::Stable,
+            download_base: BASE,
+        };
+        assert!(verify(&bytes, &sig, std::slice::from_ref(&key.trusted), stable).is_ok());
+        // a stable version labelled beta is malformed, whoever reads it
+        let (bytes, sig) = signed(&key, "2.0.0", |m| {
+            m.insert("channel".into(), "beta".into());
+        });
+        assert_eq!(
+            verify(&bytes, &sig, std::slice::from_ref(&key.trusted), beta())
+                .unwrap_err()
+                .code(),
+            "field"
+        );
+        // a `next` build belongs to no channel
+        let (bytes, sig) = signed(&key, "2.0.0-next.1", |m| {
+            m.insert("channel".into(), "beta".into());
+        });
+        assert!(verify(&bytes, &sig, std::slice::from_ref(&key.trusted), beta()).is_err());
     }
 
     #[test]

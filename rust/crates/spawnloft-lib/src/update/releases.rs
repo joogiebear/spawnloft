@@ -19,16 +19,24 @@ pub fn tag_version(tag: &str) -> Option<Version> {
 /// GitHub lists bare tags (no release yet) here too; a tag without an envelope is skipped later
 /// by the 404 rule.
 pub fn tags_from_atom(xml: &str) -> Vec<String> {
+    // only `href` attribute values count: a release note's text that mentions another tag's
+    // page is content, not an entry
     let mut out = Vec::new();
     let mut rest = xml;
-    while let Some(i) = rest.find("/releases/tag/") {
-        let after = &rest[i + "/releases/tag/".len()..];
-        let end = after
-            .find(|c: char| c == '"' || c == '\'' || c == '<' || c == '&' || c.is_whitespace())
-            .unwrap_or(after.len());
-        let tag = &after[..end];
-        if !tag.is_empty() && tag.len() <= 80 && !out.iter().any(|t| t == tag) {
-            out.push(tag.to_string());
+    while let Some(i) = rest.find("href=\"") {
+        let after = &rest[i + "href=\"".len()..];
+        let end = after.find('"').unwrap_or(after.len());
+        let href = &after[..end];
+        if let Some(j) = href.find("/releases/tag/") {
+            let tag = &href[j + "/releases/tag/".len()..];
+            if !tag.is_empty()
+                && tag.len() <= 80
+                && !tag.contains('/')
+                && !tag.contains('&')
+                && !out.iter().any(|t| t == tag)
+            {
+                out.push(tag.to_string());
+            }
         }
         rest = &after[end..];
     }

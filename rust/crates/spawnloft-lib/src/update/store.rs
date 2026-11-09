@@ -289,12 +289,21 @@ impl Store {
     // ---- data-format.json (data root) ----------------------------------------------------------
 
     /// The data folder's format, or this build's when the file is missing or unreadable.
-    pub fn data_format(data_root: &Path) -> u32 {
-        read_json(&data_root.join("data-format.json"))
+    pub fn data_format(data_root: &Path) -> Result<u32, String> {
+        let file = data_root.join("data-format.json");
+        if !file.exists() {
+            return Ok(super::policy::DATA_FORMAT);
+        }
+        read_json(&file)
             .and_then(|m| m.get("format").and_then(Value::as_u64))
             .and_then(|n| u32::try_from(n).ok())
             .filter(|n| *n >= 1)
-            .unwrap_or(super::policy::DATA_FORMAT)
+            .ok_or_else(|| {
+                format!(
+                    "{} is unreadable; no update is offered until it is fixed",
+                    file.display()
+                )
+            })
     }
 }
 
@@ -401,16 +410,16 @@ mod tests {
     #[test]
     fn data_format_defaults_to_the_build() {
         let root = temp("df");
-        assert_eq!(Store::data_format(&root), super::super::policy::DATA_FORMAT);
+        assert_eq!(Store::data_format(&root), Ok(super::super::policy::DATA_FORMAT));
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
             root.join("data-format.json"),
             br#"{"writtenBy":"2.3.0","format":2}"#,
         )
         .unwrap();
-        assert_eq!(Store::data_format(&root), 2);
+        assert_eq!(Store::data_format(&root), Ok(2));
         std::fs::write(root.join("data-format.json"), b"garbage").unwrap();
-        assert_eq!(Store::data_format(&root), super::super::policy::DATA_FORMAT);
+        assert!(Store::data_format(&root).is_err());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

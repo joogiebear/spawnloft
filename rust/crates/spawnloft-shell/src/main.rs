@@ -35,6 +35,10 @@ pub struct Core {
 }
 
 impl Core {
+    pub fn is_running(&self) -> bool {
+        self.child.lock().is_ok_and(|g| g.is_some())
+    }
+
     pub fn stop(&self) {
         if let Ok(mut guard) = self.child.lock()
             && let Some((mut child, stdin)) = guard.take()
@@ -174,7 +178,7 @@ fn resume_pending_handover() {
     }
 }
 
-fn start_core(app: tauri::AppHandle) {
+pub(crate) fn start_core(app: tauri::AppHandle) {
     let (Some(bin), Some(dir)) = (core_binary(), core_dir()) else {
         spike_log("no core binary path");
         return;
