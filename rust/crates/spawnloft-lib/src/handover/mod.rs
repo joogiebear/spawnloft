@@ -16,6 +16,7 @@
 //! side ([`resume::Starter`]) as traits, so the order, the deadline and the abort path are tested
 //! on any platform with fakes; `legacy`, `tasks` and `crate::nodecore` hold the real ones.
 
+pub mod api;
 pub mod cleanup;
 pub mod legacy;
 pub mod resume;

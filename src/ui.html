@@ -2721,6 +2721,7 @@
 </svg>
 
 <div id="banner"></div>
+<div id="upgradeNotices" aria-live="polite"></div>
 
 <header>
   <span class="brand">
@@ -3300,6 +3301,39 @@
           <dl class="kv" id="setPaths"></dl>
         </div>
         <div class="row" id="setActions"></div>
+        <div id="setUpdCore" hidden>
+          <h2>Updates</h2>
+          <p class="hint" id="updSummary" style="margin:0 0 10px"></p>
+          <div id="updOffer" hidden class="upd-offer"></div>
+          <div id="updHold" hidden class="upd-offer"></div>
+          <div id="updMsg" class="hint" hidden style="margin:0 0 10px"></div>
+          <div class="row" style="margin:0 0 12px">
+            <button type="button" id="updCheck">Check now</button>
+          </div>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" id="updBeta" class="switch" style="flex:none;margin-top:2px">
+            <span>
+              <strong>Get beta builds</strong>
+              <span class="hint" style="display:block;margin-top:2px">
+                New features as they are finished, instead of once they reach the monthly release.
+                Back up a server you care about first. You can turn this off at any time; nothing is
+                downgraded when you do.
+              </span>
+            </span>
+          </label>
+          <details id="updRollbackBox" style="margin-top:14px">
+            <summary>Reinstall a previous version</summary>
+            <p class="hint" style="margin:8px 0">
+              Going back pauses updates below the version you left until you resume them here.
+              A version that cannot read your servers' data is not offered.
+            </p>
+            <div id="updRollbacks"></div>
+          </details>
+          <details id="updLogBox" style="margin-top:10px">
+            <summary>Update log</summary>
+            <pre id="updLog" class="hint" style="white-space:pre-wrap;margin:8px 0 0;max-height:240px;overflow:auto"></pre>
+          </details>
+        </div>
         <div id="setUpdates" hidden>
           <h2>Updates</h2>
           <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
@@ -13362,6 +13396,7 @@ function renderSettings() {
     actions.append(hint);
   }
 
+  renderCoreUpdates().then((on) => { if (on) $('#setUpdates').hidden = true; });
   renderUpdateChannel();
   renderClientProfiles();
   renderMcp();
@@ -13410,6 +13445,7 @@ function updateChannelStatus(c) {
 
 async function renderUpdateChannel() {
   const box = $('#setUpdates');
+  if (coreUpd.on) { box.hidden = true; return; }
   if (!desktop || !desktop.updateChannel || !state.appInfo || state.appInfo.manualUpdates || !state.appInfo.packaged) {
     box.hidden = true;
     return;
@@ -13957,6 +13993,276 @@ document.addEventListener('keydown', (e) => {
     closeTool();
   }
 });
+
+// ---- 2.x updates and the handover banners ------------------------------------
+// The Rust core answers /api/update* and /api/handover* itself. A panel served by the old Node
+// core answers 404 to both, and everything here stays hidden. Release notes are text from a signed
+// feed, but still only ever set as textContent.
+
+const coreUpd = { on: false, status: null };
+
+const updWhen = (iso) => {
+  const t = Date.parse(iso || '');
+  return Number.isFinite(t) ? new Date(t).toLocaleString() : 'never';
+};
+
+function updEl(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+async function updJson(path, method, body) {
+  const res = await fetch('/api/update' + path, {
+    method: method || 'GET',
+    headers: body ? { 'content-type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || (res.status + ' ' + res.statusText));
+  return data;
+}
+
+function updOutcomeText(r) {
+  if (r.result === 'update') return '';
+  if (r.result === 'blocked') return 'A newer release exists but cannot be installed here: ' + (r.reason || 'it is not allowed') + '.';
+  if (r.result === 'unreachable') return 'The update feed could not be read (' + (r.reason || 'no answer') + '). Check your connection and try again.';
+  return 'SpawnLoft ' + r.installed + ' is the newest ' + r.channel + ' release.';
+}
+
+function updRenderOffer(st, installing) {
+  const box = $('#updOffer');
+  box.textContent = '';
+  const p = st.pending;
+  box.hidden = !p;
+  if (!p) return;
+  const lead = updEl('div', null);
+  const title = updEl('b', null, p.rollback
+    ? 'SpawnLoft ' + p.version + ' is ready to reinstall'
+    : 'SpawnLoft ' + p.version + ' is available');
+  lead.append(title, updEl('span', 'hint', st.downloaded
+    ? ' - downloaded and verified, ready to install.'
+    : ' - verified; it downloads when you install.'));
+  box.append(lead);
+  if (p.notes) {
+    const d = updEl('details', null);
+    d.style.margin = '6px 0';
+    d.append(updEl('summary', null, 'What changed'), updEl('pre', 'hint', p.notes));
+    d.lastChild.style.whiteSpace = 'pre-wrap';
+    box.append(d);
+  }
+  const go = updEl('button', null, installing ? 'Installing...' : (p.rollback ? 'Reinstall and restart' : 'Install and restart'));
+  go.type = 'button';
+  go.disabled = Boolean(installing);
+  go.onclick = async () => {
+    const ok = await ask({
+      title: p.rollback ? 'Reinstall SpawnLoft ' + p.version + '?' : 'Update to SpawnLoft ' + p.version + '?',
+      text: 'SpawnLoft closes, swaps itself for that version and reopens. Servers keep running; they are separate processes.',
+      confirmLabel: 'Restart and update',
+    });
+    if (!ok) return;
+    go.disabled = true;
+    go.textContent = 'Installing...';
+    try {
+      await updJson('/install', 'POST');
+      $('#updMsg').hidden = false;
+      $('#updMsg').textContent = 'The window is installing this. SpawnLoft will restart in a moment.';
+    } catch (e) {
+      go.disabled = false;
+      go.textContent = p.rollback ? 'Reinstall and restart' : 'Install and restart';
+      toast(e.message, 'bad');
+    }
+  };
+  box.append(go);
+}
+
+function updRenderHold(st) {
+  const box = $('#updHold');
+  box.textContent = '';
+  box.hidden = !st.hold;
+  if (!st.hold) return;
+  const b = updEl('button', 'ghost', 'Resume updates');
+  b.type = 'button';
+  b.onclick = async () => {
+    try { await updJson('/hold', 'DELETE'); await renderCoreUpdates(); } catch (e) { toast(e.message, 'bad'); }
+  };
+  box.append(updEl('span', null, 'Updates to SpawnLoft ' + st.hold + ' and newer are paused because you went back to an older version. '), b);
+}
+
+async function updLoadRollbacks() {
+  const box = $('#updRollbacks');
+  box.textContent = 'Loading...';
+  try {
+    const data = await updJson('/rollbacks');
+    box.textContent = '';
+    if (!data.releases.length) { box.append(updEl('p', 'hint', 'No older version is available.')); return; }
+    for (const r of data.releases) {
+      const row = updEl('div', null);
+      row.style.cssText = 'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:4px 0';
+      const name = updEl('b', null, r.version);
+      const btn = updEl('button', 'ghost', 'Reinstall');
+      btn.type = 'button';
+      btn.disabled = !r.allowed;
+      btn.onclick = async () => {
+        const ok = await ask({
+          title: 'Go back to SpawnLoft ' + r.version + '?',
+          text: 'SpawnLoft restarts on that version and stops offering newer ones until you resume updates here.',
+          confirmLabel: 'Reinstall',
+        });
+        if (!ok) return;
+        try {
+          await updJson('/rollback', 'POST', { version: r.version });
+          toast('Reinstalling ' + r.version + '. SpawnLoft will restart.', 'good');
+        } catch (e) { toast(e.message, 'bad'); }
+      };
+      row.append(name, btn);
+      if (!r.allowed) row.append(updEl('span', 'hint', r.reason || 'This version cannot read your data.'));
+      box.append(row);
+    }
+  } catch (e) {
+    box.textContent = '';
+    box.append(updEl('p', 'hint', 'Could not list versions: ' + e.message));
+  }
+}
+
+async function renderCoreUpdates(reportText) {
+  let st;
+  try {
+    st = await updJson('');
+  } catch {
+    coreUpd.on = false;
+    $('#setUpdCore').hidden = true;
+    return false;
+  }
+  coreUpd.on = true;
+  coreUpd.status = st;
+  $('#setUpdCore').hidden = false;
+  $('#updSummary').textContent = 'SpawnLoft ' + st.installed + ', ' + st.channel + ' releases. Last checked: '
+    + updWhen(st.lastCheckAt) + '.' + (st.staleFeed ? ' The update list is older than expected, so a newer release may exist.' : '');
+  updRenderOffer(st);
+  updRenderHold(st);
+  const msg = $('#updMsg');
+  if (reportText) { msg.hidden = false; msg.textContent = reportText; } else if (msg.textContent && !st.pending) { /* keep */ } else { msg.hidden = true; }
+  $('#updBeta').checked = st.channel === 'beta';
+
+  $('#updCheck').onclick = async () => {
+    const b = $('#updCheck');
+    b.disabled = true;
+    b.textContent = 'Checking...';
+    try {
+      const r = await updJson('/check', 'POST');
+      await renderCoreUpdates(updOutcomeText(r));
+    } catch (e) {
+      toast('Update check failed: ' + e.message, 'bad');
+    } finally {
+      b.disabled = false;
+      b.textContent = 'Check now';
+    }
+  };
+  $('#updBeta').onchange = async (e) => {
+    e.target.disabled = true;
+    try {
+      await updJson('/channel', 'POST', { beta: e.target.checked });
+      await renderCoreUpdates('The next check will use the ' + (e.target.checked ? 'beta' : 'release') + ' channel.');
+    } catch (err) { toast(err.message, 'bad'); e.target.checked = !e.target.checked; }
+    e.target.disabled = false;
+  };
+  $('#updRollbackBox').ontoggle = (e) => { if (e.target.open) updLoadRollbacks(); };
+  $('#updLogBox').ontoggle = async (e) => {
+    if (!e.target.open) return;
+    try { $('#updLog').textContent = (await updJson('/log?n=60')).lines.join('\n') || 'Nothing logged yet.'; }
+    catch (err) { $('#updLog').textContent = err.message; }
+  };
+  return true;
+}
+
+// ---- banners: what the 2.0 update did to running servers --------------------
+
+const upgradeBanner = { off: false, last: '' };
+
+function joinNames(names) {
+  if (names.length < 2) return names.join('');
+  return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+}
+
+function upgradeNoticeNodes(data) {
+  const out = [];
+  const rec = data.record;
+  if (rec) {
+    const dismissRec = () => fetch('/api/handover/dismiss', { method: 'POST' }).catch(() => {});
+    const servers = rec.servers || [];
+    const restarted = servers.filter((e) => e.stop === 'stopped' || e.stop === 'was-stopped');
+    const waiting = restarted.filter((e) => !e.start);
+    const failed = restarted.filter((e) => e.start === 'failed' || e.start === 'skipped');
+    const back1x = restarted.filter((e) => e.start === 'restored-1x');
+    const orphans = servers.filter((e) => e.stop === 'orphaned');
+    if (waiting.length) {
+      out.push(noticeBox({ tone: 'warn', title: 'Updating.',
+        text: 'Starting ' + joinNames(waiting.map((e) => e.name)) + ' again after the update.' }));
+    } else if (back1x.length) {
+      out.push(noticeBox({ tone: 'warn', title: 'The update was not applied.',
+        text: joinNames(back1x.map((e) => e.name)) + ' did not stop in time, so SpawnLoft left everything as it was and started what it had stopped again.',
+        dismiss: dismissRec }));
+    } else if (restarted.length && !failed.length) {
+      out.push(noticeBox({ tone: 'warn', title: 'Updated to SpawnLoft ' + rec.to + '.',
+        text: 'SpawnLoft stopped ' + joinNames(restarted.map((e) => e.name)) + ' for the update and started ' + (restarted.length === 1 ? 'it' : 'them') + ' again.',
+        dismiss: dismissRec }));
+    } else if (!servers.length) {
+      out.push(noticeBox({ tone: 'warn', title: 'Updated to SpawnLoft ' + rec.to + '.',
+        text: 'No servers were running, so nothing had to be stopped.', dismiss: dismissRec }));
+    }
+    for (const e of failed) {
+      out.push(noticeBox({ tone: 'fault', title: e.name + ' did not start again.',
+        text: (e.error ? e.error + ' ' : '') + 'It was stopped for the update.',
+        actions: [{ label: 'Start', primary: true, run: async () => {
+          try { await post('/instances/' + encodeURIComponent(e.name) + '/start'); toast('Started ' + e.name + '.', 'good'); pollUpgradeNotices(); }
+          catch (err) { toast(err.message, 'bad'); }
+        } }],
+        dismiss: dismissRec }));
+    }
+    for (const e of orphans) {
+      out.push(noticeBox({ tone: 'fault', title: e.name + ' has no supervisor.',
+        text: 'Its Java process has been running without one since before the update, so SpawnLoft cannot talk to it. Stop it with "spawnloft kill ' + e.name + '" in a terminal, then start it here.',
+        dismiss: dismissRec }));
+    }
+  }
+  for (const l of data.legacy || []) {
+    out.push(noticeBox({ tone: 'warn', title: l.name + ' still runs on SpawnLoft 1.',
+      text: 'Restart it to move it to this version. Nothing happens on its own, because players may be on it.',
+      actions: [{ label: 'Restart', run: async () => {
+        const ok = await ask({ title: 'Restart ' + l.name + '?',
+          text: 'It stops gracefully, then starts again under this version. Players on it are disconnected.',
+          confirmLabel: 'Restart' });
+        if (!ok) return;
+        const t = toast('Restarting ' + l.name + '...');
+        try {
+          await post('/instances/' + encodeURIComponent(l.name) + '/stop');
+          await post('/instances/' + encodeURIComponent(l.name) + '/start');
+          t.remove();
+          toast(l.name + ' restarted.', 'good');
+        } catch (err) { t.remove(); toast(err.message, 'bad'); }
+        pollUpgradeNotices();
+      } }] }));
+  }
+  return out;
+}
+
+async function pollUpgradeNotices() {
+  if (upgradeBanner.off) return;
+  let data;
+  try {
+    const res = await fetch('/api/handover');
+    if (!res.ok) { if (res.status === 404 || res.status === 503) upgradeBanner.off = res.status === 404; return; }
+    data = await res.json();
+  } catch { return; }
+  const key = JSON.stringify(data);
+  if (key === upgradeBanner.last) return;
+  upgradeBanner.last = key;
+  $('#upgradeNotices').replaceChildren(...upgradeNoticeNodes(data));
+}
+pollUpgradeNotices();
+setInterval(pollUpgradeNotices, 4000);
 
 show('empty');
 loadSettings();

@@ -271,7 +271,9 @@ impl Head {
 /// Routes `spawnloft-core ui` answers itself instead of forwarding (the updater, design 5.1).
 pub fn is_local_route(path: &str) -> bool {
     let route = path.split('?').next().unwrap_or(path);
-    route == "/api/update" || route.starts_with("/api/update/")
+    route == "/api/update"
+        || route.starts_with("/api/update/")
+        || crate::handover::api::is_route(route)
 }
 
 /// The largest body a locally answered route reads.
@@ -387,7 +389,12 @@ fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::
             body.extend_from_slice(&chunk[..n]);
         }
         body.truncate(want);
-        let (status, json) = crate::update::api::handle(head.method(), head.path(), &body);
+        let route = head.path().split('?').next().unwrap_or("");
+        let (status, json) = if crate::handover::api::is_route(route) {
+            crate::handover::api::handle(head.method(), head.path())
+        } else {
+            crate::update::api::handle(head.method(), head.path(), &body)
+        };
         return respond(&mut conn, status, "application/json", json.to_string().as_bytes());
     }
     let addr = match upstream {
