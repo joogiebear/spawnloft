@@ -116,8 +116,16 @@ fn updater(app: &AppHandle, pinned: &Pinned, restart: bool) -> Result<tauri_plug
     let pin = pinned.clone();
     let target = pinned.target.clone();
     let stopper = app.clone();
+    // `build()` refuses an updater with no endpoint, although `restore_update` never fetches one:
+    // the record was fetched and verified by the core. A fixed https placeholder satisfies the
+    // check (the pinned URL itself may be plain http in the CI scenario builds).
+    let placeholder: tauri::Url = "https://github.com/joogiebear/spawnloft/releases"
+        .parse()
+        .map_err(|e| format!("placeholder endpoint: {e}"))?;
     let mut builder = app
         .updater_builder()
+        .endpoints(vec![placeholder])
+        .map_err(|e| e.to_string())?
         .pubkey(pubkey)
         .target(target.clone())
         .version_comparator(move |_current, remote| {
