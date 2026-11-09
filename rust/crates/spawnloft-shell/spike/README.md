@@ -1,6 +1,6 @@
 # Tauri spike test scripts (P0-F, internal)
 
-Run by the `tauri-spike` job of `.github/workflows/rust-internal.yml` on `windows-latest`, and by
+Run by `.github/workflows/tauri-spike.yml` (its own workflow, so docs pushes to v2 do not cancel it) on `windows-latest`, and by
 hand on Victor's PC for the signed runs. Results go to `PHASE0-FINDINGS.md`.
 
 | Script | What it does |
