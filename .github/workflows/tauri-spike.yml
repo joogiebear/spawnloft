@@ -126,6 +126,14 @@ jobs:
         timeout-minutes: 10
         shell: pwsh
         run: ./rust/crates/spawnloft-shell/spike/handover.ps1 -Uninstall -Out spike-results
+      - name: Print the results (the artifacts cannot be fetched from every place that reads them)
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem spike-results -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "===== $($_.Name)"; Get-Content $_.FullName -Raw | Write-Host
+          }
+          Get-ChildItem "$env:RUNNER_TEMP\feed" -Filter *.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "$($_.Name) $($_.Length) bytes" }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
