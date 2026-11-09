@@ -107,7 +107,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         run: |
           export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/release.key")"
-          node installer/installer-config.mjs "$DRY_VERSION" "$RUNNER_TEMP/release.pub" "$RUNNER_TEMP/cfg"
+          # the Tauri updater plugin wants the base64 form the CLI writes (.key.pub), not the
+          # decoded two-line minisign file; release-feed/gate accept either (parsePublicKey)
+          node installer/installer-config.mjs "$DRY_VERSION" "$RUNNER_TEMP/release.key.pub" "$RUNNER_TEMP/cfg"
           SPAWNLOFT_VERSION="$DRY_VERSION" "$TAURI_CLI" build --ci --bundles nsis --config "$RUNNER_TEMP/cfg/overlay.json"
           setup="../../target/release/bundle/nsis/SpawnLoft_${DRY_VERSION}_x64-setup.exe"
           test -f "$setup" || { echo "::error::the installer was not produced at $setup"; ls -la ../../target/release/bundle/nsis || true; exit 1; }
