@@ -195,3 +195,5 @@ if (-not $Uninstall) {
 
 $result | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Out ($(if ($Uninstall) { 'uninstall.json' } else { 'handover.json' })))
 Write-Host 'handover: all checks passed'
+# the last native command's exit code (schtasks on a task that is gone) is not the result
+exit 0
