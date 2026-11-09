@@ -22,7 +22,7 @@ fn ok(stdout: String) -> Outcome {
     }
 }
 
-fn usage_error(message: &str) -> Outcome {
+pub fn usage_error(message: &str) -> Outcome {
     Outcome {
         stdout: String::new(),
         stderr: format!(
@@ -50,6 +50,9 @@ pub fn help() -> String {
            {name} --version [--json]   print this build's version, commit and target\n  \
            {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
            {name} ui [--port n]        the panel on 127.0.0.1 (proxies to the Node panel for now)\n  \
+           {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
+           {name} repair [--quiet]      rewrite task shims and server launchers for this install\n  \
+           {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
            {name} help                 this text\n",
         line = info.line(),
         name = build::NAME,
@@ -219,6 +222,9 @@ pub fn run(args: &[String]) -> Outcome {
         "daemon" => daemon(rest),
         "ui" => ui(rest),
         "probe-process" => probe_process(rest),
+        "handover" => crate::handover_cmd::handover(rest),
+        "repair" => crate::handover_cmd::repair(rest),
+        "uninstall" => crate::handover_cmd::uninstall(rest),
         other => usage_error(&format!("unknown command `{other}`")),
     }
 }
