@@ -3,7 +3,8 @@
  * loopback, says "ready for connections" on stderr the way the real one does, takes no stdin,
  * and speaks a one-line protocol the fake admin and client use:
  *
- *   shutdown          exit 0 after saying so
+ *   shutdown          exit 0 after saying so (and a line in <datadir>/fake-shutdowns.log, which
+ *                     outlives the console log a restart starts again)
  *   sql <base64>      append the statements to <datadir>/sql.log, answer "ok"
  *   dump <base64 db>  answer "ok <base64 dump text>" and close, the way a dump streams
  *
@@ -36,6 +37,11 @@ const server = net.createServer((socket) => {
       buf = buf.slice(nl + 1)
       if (line === 'shutdown') {
         note('Normal shutdown')
+        try {
+          fs.appendFileSync(path.join(datadir, 'fake-shutdowns.log'), JSON.stringify({ pid: process.pid, at: Date.now() }) + '\n')
+        } catch {
+          /* the console line is the evidence then */
+        }
         socket.end('ok\n')
         setTimeout(() => process.exit(0), 50)
       } else if (line.startsWith('sql ')) {
