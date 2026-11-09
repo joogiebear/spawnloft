@@ -135,16 +135,25 @@ makes the "orphaned" state and the data at risk real.
 | Also killed | the **MCP server** `SpawnLoft.exe resources\core\spawnloft.mjs mcp` left behind by the Claude desktop app, already by the .400 install that preceded the test: anything under the install folder is "the running app" | |
 | Differential download | the .400 blockmap was never published (404), so a full 112 MB download; harmless | |
 
-**Which check ran.** The two runs together say the installer matched processes by **image
-name** on Victor's machine: every `SpawnLoft.exe` died (the Node daemon, and the orphaned MCP
-server during the .400 install), `spawnloft-core.exe` under the same folder did not. That is
-electron-builder's fallback branch (`tasklist`/`taskkill /IM SpawnLoft.exe /FI "USERNAME eq
-%USERNAME%"`), which runs when `IS_POWERSHELL_AVAILABLE` fails its probe; the PowerShell
-branch would have matched the Rust binary by path. Why the probe failed on this machine is
-being checked (32-bit `powershell.exe` from `SysWOW64`, execution policy, AppLocker); the
-answer decides whether the image-name behaviour can be relied on for other users' machines.
-Until then the safe assumption for 2.0 is that **either** branch can run: the custom
-`customCheckAppRunning` macro, which replaces both, stays in the recommendation.
+**Which check ran (settled by a second run with the helper processes logged).** The
+installer on Victor's machine took the **PowerShell path**, not the image-name fallback: both
+the installer and the old uninstaller each spawned the three PowerShell probes
+(`Get-Command Get-CimInstance`, the execution-policy test, then the
+`Win32_Process | ? Path.StartsWith($INSTDIR)` find). Neither spawned any `Stop-Process`,
+`taskkill` or `cmd.exe`. So the find step reported nothing to kill, and the Rust daemon and its
+JVM lived. Run by hand at the same moment, that identical path query **does** match
+`spawnloft-core.exe` under the install folder, so the query is capable of seeing it; the
+installer's own find did not act on it. The exact reason the find returned empty at install
+time is the one loose end (candidates: the old uninstaller had begun moving files so the
+daemon's reported path no longer started with the install folder, or the probe could not read
+the core process's path); it does not change the outcome, which reproduced on both runs.
+
+The practical conclusion holds either way and is now backed by two live runs: **today's
+electron-builder installer does not kill `spawnloft-core.exe`.** The earlier worry that the
+path check would catch the renamed Rust binary did not happen in practice. Because a different
+machine (no PowerShell, a `Restricted` policy) would fall to the image-name branch, which also
+spares `spawnloft-core.exe`, both branches leave the Rust core alone. The Node daemon dies
+under both branches, since it runs as `SpawnLoft.exe`.
 
 **Extra observation.** The relaunched 1.6.0-beta.407 panel carried the stock GitHub
 `app-update.yml` and within a minute downloaded and, on its next quit, installed
