@@ -11,9 +11,23 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Test and CI builds only: honour SPAWNLOFT_UPDATE_SOURCE (a loopback http feed) in the updater.
+# Never enabled for a release build, so a release binary has no feed override at all.
+internal-feed = []
+
 [dependencies]
 regex = "1.13.1"
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
+# the updater (update/): minisign signatures, semver ordering, sha512 of artifacts, HTTPS fetches
+minisign-verify = "0.3.0"
+semver = "1.0.28"
+sha2 = "0.11.1"
+ureq = { version = "3.5.1", default-features = false, features = ["rustls"] }
+
+[dev-dependencies]
+# signs test envelopes and artifacts with throwaway keys; never linked into a binary
+minisign = "0.10.0"
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Pipes", "Win32_System_Threading", "Win32_System_JobObjects", "Win32_System_ProcessStatus", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Diagnostics_ToolHelp"] }

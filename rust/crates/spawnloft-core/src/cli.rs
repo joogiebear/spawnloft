@@ -53,9 +53,13 @@ pub fn help() -> String {
            {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
            {name} repair [--quiet]      rewrite task shims and server launchers for this install\n  \
            {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
-           {name} help                 this text\n",
+           {name} update <command>     the updater (check, status, apply, list, rollback, hold, channel, log)\n  \
+           {name} help                 this text\n\
+         \n\
+         Update commands:\n{update}\n",
         line = info.line(),
         name = build::NAME,
+        update = crate::update_cmd::HELP,
     )
 }
 
@@ -225,6 +229,7 @@ pub fn run(args: &[String]) -> Outcome {
         "handover" => crate::handover_cmd::handover(rest),
         "repair" => crate::handover_cmd::repair(rest),
         "uninstall" => crate::handover_cmd::uninstall(rest),
+        "update" => crate::update_cmd::run(rest),
         other => usage_error(&format!("unknown command `{other}`")),
     }
 }
