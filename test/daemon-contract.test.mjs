@@ -78,6 +78,8 @@ test('ping answers the server pid, its start and that it is alive', { timeout: 3
     assert.equal(pong.daemon, 'rust')
     assert.equal(pong.protocol, 1)
     assert.match(state.daemonExe, /^spawnloft-core(\.exe)?$/)
+    // (pid, creation time) identity, design section 4; macOS has no creation time to record
+    if (process.platform !== 'darwin') assert.match(state.daemonStartTime, /^\d+$/)
   }
   const unknown = await controlRequest(name, { op: 'status' })
   assert.deepEqual(unknown, { ok: false, error: 'unknown op "status"' })

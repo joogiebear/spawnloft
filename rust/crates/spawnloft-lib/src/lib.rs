@@ -16,6 +16,7 @@ pub mod panel;
 pub mod paths;
 pub mod patterns;
 pub mod platform;
+pub mod procid;
 pub mod rcon;
 pub mod registry;
 pub mod resp;

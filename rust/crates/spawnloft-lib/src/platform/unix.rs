@@ -80,6 +80,48 @@ fn send(pid: i32, sig: i32) -> bool {
     unsafe { kill(pid, sig) == 0 }
 }
 
+/// Whether `pid` names a live process (EPERM counts: the pid is taken, just not ours).
+pub fn pid_alive(pid: u32) -> bool {
+    let Ok(pid) = i32::try_from(pid) else {
+        return false;
+    };
+    if pid <= 0 {
+        return false;
+    }
+    send(pid, 0) || std::io::Error::last_os_error().raw_os_error() == Some(1)
+}
+
+/// The process start time in clock ticks since boot (`/proc/<pid>/stat` field 22) on Linux; the
+/// identity half a reused pid cannot repeat. `None` elsewhere (the file-name rule applies).
+pub fn process_start_time(pid: u32) -> Option<u64> {
+    #[cfg(target_os = "linux")]
+    {
+        let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+        let close = stat.rfind(')')?;
+        stat.get(close + 2..)?.split_whitespace().nth(19)?.parse().ok()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
+/// The running image's path, where the system says (Linux `/proc/<pid>/exe`).
+pub fn process_image(pid: u32) -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_link(format!("/proc/{pid}/exe"))
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = pid;
+        None
+    }
+}
+
 /// The server's process tree, for killing it. Unix needs no handle beyond the group id.
 #[derive(Debug)]
 pub struct Tree {
