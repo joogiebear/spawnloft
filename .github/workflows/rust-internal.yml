@@ -250,18 +250,22 @@ jobs:
           node rust/crates/spawnloft-shell/spike/measure.cjs electron "$env:LOCALAPPDATA\Programs\SpawnLoft\SpawnLoft.exe" spike-results/measure-electron-1.6.json 3
           @{ installerBytes = $setup.Length; name = $setup.Name } | ConvertTo-Json | Set-Content spike-results/installer-1.6.json
       - name: Hand over from 1.6 to spike-a the way electron-updater does
+        timeout-minutes: 15
         shell: pwsh
         run: |
           $a = Get-ChildItem "$env:RUNNER_TEMP\feed" -Filter "SpawnLoft_$($env:SPIKE_A)_x64-setup.exe"
           ./rust/crates/spawnloft-shell/spike/handover.ps1 -SpikeA $a.FullName -Out spike-results
           @{ installerBytes = $a.Length; name = $a.Name } | ConvertTo-Json | Set-Content spike-results/installer-spike.json
       - name: Measure the Tauri shell
+        timeout-minutes: 10
         shell: pwsh
         run: node rust/crates/spawnloft-shell/spike/measure.cjs tauri "$env:LOCALAPPDATA\Programs\SpawnLoft\SpawnLoft.exe" spike-results/measure-tauri.json 3
       - name: One Tauri updater cycle, spike-a to spike-b
+        timeout-minutes: 10
         shell: pwsh
         run: ./rust/crates/spawnloft-shell/spike/update-cycle.ps1 -FeedDir "$env:RUNNER_TEMP\feed" -From $env:SPIKE_A -To $env:SPIKE_B -Out spike-results
       - name: Uninstall (keeps data, removes tasks)
+        timeout-minutes: 10
         shell: pwsh
         run: ./rust/crates/spawnloft-shell/spike/handover.ps1 -Uninstall -Out spike-results
       - uses: actions/upload-artifact@v4
