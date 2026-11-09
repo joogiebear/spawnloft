@@ -73,7 +73,7 @@ function Check-Graceful($dataRoot, $name, $oldPid, $evidence = $null) {
     # the fake MariaDB says "Normal shutdown" on a graceful stop and logs it in its data folder's
     # fake-shutdowns.log (a restart starts the console log again); a kill does neither
     $logs = @(Get-ChildItem (Join-Path $dataRoot "services\$name") -Recurse -Filter 'fake-shutdowns.log' -ErrorAction SilentlyContinue)
-    Check "$name was stopped, not killed ($evidence: fake-shutdowns.log or console)" ($logs.Count -gt 0 -or (Console-Has $dataRoot $name $evidence))
+    Check "$name was stopped, not killed (${evidence}: fake-shutdowns.log or console)" ($logs.Count -gt 0 -or (Console-Has $dataRoot $name $evidence))
     return
   }
   # the fake java logs each graceful stop by pid in fake-stops.log (a restart rotates the console
