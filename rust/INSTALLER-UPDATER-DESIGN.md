@@ -1,6 +1,7 @@
 # SpawnLoft 2.0: installer and updater design
 
-2026-11-09, rev 2 (rev 1 reviewed by a fresh Fable thread the same day; the twenty findings and
+2026-11-09, rev 3: Victor decided every open question by its recommendation (02:59 UTC, "I trust
+recommendations"); section 13 records them as decisions. Rev 2 (rev 1 reviewed by a fresh Fable thread the same day; the twenty findings and
 what changed are in section 15). Internal, `v2` branch, planning only (no code). Follows P0-F in
 `PHASE0-FINDINGS.md` and PLAN-RUST-TAURI.md section 4 (which points at PLAN.md sections 6 and 7).
 Where this document and those differ, this one is newer and says so. Every statement about
@@ -19,12 +20,12 @@ The decisions, each argued in its section:
 
 | # | Decision | Section |
 | --- | --- | --- |
-| D1 | The 2.0 Windows installer stops running servers **gracefully through the installed 1.x CLI** before it runs the 1.x uninstaller, driven by the new `spawnloft-core` binary extracted first. The deadline is enforced on the **CLI client**, never passed to the daemon (which would force-kill at its timeout), so no JVM is ever terminated by the update. Servers first, then databases; the task folder is disabled meanwhile. A server that will not stop in time **aborts the update**, restarts what was already stopped, and leaves 1.x in place with a marker that stops silent retries from repeating the stop (Victor to confirm, Q-B). | 2.3 |
-| D2 | The installer **starts the servers it stopped again**, silent or not: databases first, then servers; on the Restart path the app is launched first and the resume runs behind the first-launch banner. 2.0's first launch reports what happened and offers Start only for the ones that failed (Victor to confirm, Q-A; PHASE0-FINDINGS Q14 said "offer on first launch"). | 2.5, 8 |
+| D1 | The 2.0 Windows installer stops running servers **gracefully through the installed 1.x CLI** before it runs the 1.x uninstaller, driven by the new `spawnloft-core` binary extracted first. The deadline is enforced on the **CLI client**, never passed to the daemon (which would force-kill at its timeout), so no JVM is ever terminated by the update. Servers first, then databases; the task folder is disabled meanwhile. A server that will not stop in time **aborts the update**, restarts what was already stopped, and leaves 1.x in place with a marker that stops silent retries from repeating the stop (decided, Q-B). | 2.3 |
+| D2 | The installer **starts the servers it stopped again**, silent or not: databases first, then servers; on the Restart path the app is launched first and the resume runs behind the first-launch banner. 2.0's first launch reports what happened and offers Start only for the ones that failed (decided, Q-A; supersedes PHASE0-FINDINGS Q14's "offer on first launch"). | 2.5, 8 |
 | D3 | The running-app check matches **only the panel**, by the full path of `SpawnLoft.exe` through Restart Manager (Tauri's check, **verified** not to match the core). Daemons are never "the running app". A single-instance mutex keeps a second installer out. | 3 |
 | D4 | 2.x updates **rename a held `spawnloft-core.exe` into a dated subfolder**, keeping its file name; 2.0 records the process creation time and identifies daemons by (pid, creation time) first, with the file-name rule as the fallback for old records. Which Windows APIs report a renamed image under which name **needs a test** (section 4); the folder rename is harmless either way and the creation-time identity is the real fix. | 4 |
 | D5 | Updates use `tauri-plugin-updater` for download, artifact signature and install, with **SpawnLoft's signed envelope** (`spawnloft-updates.json` + minisign signature, carrying a `keyId`) fetched and verified first; the plugin's `version_comparator` **pins** what the plugin fetched to what the envelope said, and `require_signed_version` pins the artifact's signed version to it. One minisign key pair signs artifacts and envelopes; the envelope is signed with `minisign`/`rsign2` and a fixed trusted comment (`tauri signer sign` writes its own comment; **needs a test**). | 5 |
-| D6 | The feed lives on **GitHub Releases only**: `releases.atom` for discovery, the envelope as a release asset. No site dependency and no new secret (differs from PLAN-RUST-TAURI Q17; Victor to confirm, Q-C). | 5.2 |
+| D6 | The feed lives on **GitHub Releases only**: `releases.atom` for discovery, the envelope as a release asset. No site dependency and no new secret (differs from PLAN-RUST-TAURI Q17; decided, Q-C). | 5.2 |
 | D7 | **Rollback** is "install a lower version that the verified feed lists and whose data format matches", in app, for 2.x to 2.y; the Windows template takes `/ROLLBACK` to allow that one downgrade, and the rollback is exempt from the feed-freshness rule but not from the signature checks. Nothing keeps a previous bundle or installer as the source of truth: the feed does. 2.0 to 1.x stays a manual reinstall with documented steps. | 5.6 |
 | D8 | macOS: `spawnloft-core` ships in `Contents/Resources/resources/bin/` and is **signed separately** (hardened runtime, timestamp) before `tauri build`; the Squirrel.Mac zip and the Tauri `.app.tar.gz` are both made from the one notarized, stapled `.app`. | 6 |
 | D9 | Windows per-user config: `%APPDATA%\SpawnLoft` and `%APPDATA%\spawnloft` are **one folder** (NTFS is case-insensitive). 2.0 treats it as its config folder, reads Electron's small JSON files in place, and deletes Electron's Chromium cache folders on first launch (allowlist). No copy, no second folder. | 7 |
@@ -409,7 +410,7 @@ Why not the static feed on the site that PLAN-RUST-TAURI Q17 recommended: the en
 the host untrusted anyway, so the site adds a second hosting dependency and a cross-repository
 secret for the release workflow without adding safety. The client takes a **list** of feed
 sources, so a site mirror can be added later as the first entry if GitHub availability becomes a
-problem. Victor to confirm (Q-C).
+problem. Decided (Q-C).
 
 ### 5.3 The envelope
 
@@ -859,46 +860,47 @@ no `-next`/`-internal` prerelease identifiers on the real repository.
    `LegacyMode`, the handover command and the forwarder stay for the life of 2.x (they cost
    nothing and a 1.x install can appear from an old backup at any time).
 
-## 13. Open questions for Victor
+## 13. Decisions on the open questions (Victor, 2026-11-09 02:59 UTC)
 
-Each has a recommendation; the design is written to the recommendation and changes if Victor
-decides otherwise.
+Victor: "I trust recommendations." Every question below is therefore decided as its
+recommendation says; the text is kept so the alternative and the reasoning stay on record.
+Nothing in this document is open.
 
 - **Q-A, restart after the handover:** the servers that were stopped are started again without
-  asking (recommended: a 1.x install-on-quit launches no app, so "offer on first launch" would
+  asking (**decided**: a 1.x install-on-quit launches no app, so "offer on first launch" would
   leave servers down until someone opens the panel; on the Restart path the window opens first
   and the restarts run behind the banner), or 2.0's first launch only offers (PHASE0-FINDINGS
   Q14 wording).
 - **Q-B, a server that does not stop in 5 minutes:** abort the update, start the already
   stopped servers again under 1.x, and do not repeat the stop on silent retries until that
-  server is gone (recommended: nothing is ever killed; the person sees "Update failed" in 1.x
+  server is gone (**decided**: nothing is ever killed; the person sees "Update failed" in 1.x
   and the panel keeps working), or kill the stuck server after the deadline so the update
   always goes through (what 1.x's own `stop` does at its timeout). Note that without the
   client-side deadline of 2.3.1 the 1.x code would make this choice "kill" by default.
-- **Q-C, feed hosting:** GitHub Releases only (recommended), or the static signed feed on the
+- **Q-C, feed hosting:** GitHub Releases only (**decided**), or the static signed feed on the
   site as PLAN-RUST-TAURI Q17 had it (needs a cross-repository secret and a second host).
 - **Q-D, key custody:** one minisign key for artifacts and envelopes, generated on Victor's
   machine, kept in his password manager and in GitHub secrets for `dev`/`main` workflows
-  (recommended, as Q23), with a pre-generated "next" key for rotation. Who generates it and when.
+  (**decided**, as Q23), with a pre-generated "next" key for rotation. Who generates it and when.
 - **Q-E, Chromium leftovers:** delete Electron's cache folders from `%APPDATA%\SpawnLoft` on the
-  first 2.0 launch by allowlist (recommended), or leave them until uninstall.
-- **Q-F, Linux updates:** notify and show the `apt`/`dnf` command (recommended for 2.0, same as
+  first 2.0 launch by allowlist (**decided**), or leave them until uninstall.
+- **Q-F, Linux updates:** notify and show the `apt`/`dnf` command (**decided** for 2.0, same as
   headless), or install through `pkexec` as 1.x does, or the plugin's deb/rpm path if the Linux
   thread verifies it.
 - **Q-G, rollback scope:** in-app rollback for 2.x to 2.y only; 2.0 to 1.x manual with
-  documented steps (recommended).
-- **Q-H, deadline:** 300 s for the whole stop phase (recommended), or longer for very large
+  documented steps (**decided**).
+- **Q-H, deadline:** 300 s for the whole stop phase (**decided**), or longer for very large
   worlds (the 1.x CLI's own default is 90 s per server).
 - **Q-I, stable timing:** reaffirm Q15: 2.0.0 stable no sooner than a month after 2.0.0-beta.1
   with no data-affecting bug in the last two weeks.
 - **Q-J, scheduled tasks during the handover:** disable the `\mcctl` task folder for the
-  minutes of the stop and re-enable it after (recommended; a backup due in that window runs at
+  minutes of the stop and re-enable it after (**decided**; a backup due in that window runs at
   its next trigger), or leave tasks alone and accept that a `restart` task firing mid-handover
   starts a daemon the 1.x uninstaller then kills.
 
-## 14. Threads to start (for the coordinator), after Victor's answers
+## 14. Threads to start (for the coordinator)
 
-All on `v2`, each with this document, PHASE0-FINDINGS.md, the spike template and a done-when;
+Ready to start now. All on `v2`, each with this document, PHASE0-FINDINGS.md, the spike template and a done-when;
 Fable reviews T1 and T2 before they are called done.
 
 1. **T1, Opus: the Windows installer.** Template changes (sections 2 to 4, 9: mutex, staging
@@ -926,6 +928,17 @@ Fable reviews T1 and T2 before they are called done.
    (channel, check, install, hold, rollback list), the installer's stopping page strings,
    release-notes text. Done when: every state in section 8 has a screenshot in the project files.
 6. **T6, Opus, after Q24: Linux packages** (5.7).
+
+**Needs Victor's own hands (nothing else is blocked on these; T2 can use a throwaway key until
+they are done):**
+
+1. Generate the release minisign key pair on his Windows signing machine (`tauri signer generate`
+   with a password), store the private key and password in his password manager, and keep the
+   public key for T2; generate the "next" pair the same way and seal its private half away.
+2. Add `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as repository
+   secrets (T4 scopes them to the `dev`/`main` release workflows, as the Azure and Apple secrets are).
+3. Later, before "push to beta": the signed handover runs on his PC and the Mac mini listed in
+   section 11, through Remote Control, with his go for each.
 
 Order: T1 and T2 in parallel (T2 needs T1's `/ROLLBACK` only at the end), T3 and T4 after T1's
 template is stable, T5 alongside, T6 last.
