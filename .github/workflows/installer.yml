@@ -128,6 +128,7 @@ jobs:
             Write-Host "===== $($_.Name)"; Get-Content $_.FullName -Raw | Write-Host
           }
           foreach ($root in "$env:LOCALAPPDATA\spawnloft", "$env:LOCALAPPDATA\mcctl", 'S:\spawnloft-data') {
+            if (-not (Test-Path $root)) { continue }
             foreach ($f in 'run\handover.log', 'run\handover.json', 'run\handover-blocked.json') {
               $p = Join-Path $root $f
               if (Test-Path $p) { Write-Host "===== $p"; Get-Content $p -Raw | Write-Host }

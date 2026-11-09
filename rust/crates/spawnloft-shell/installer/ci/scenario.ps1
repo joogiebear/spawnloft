@@ -36,13 +36,18 @@ function Start-Running1([string[]] $names) {
   Check "1.x started $($names -join ', ')" $ok
 }
 
-function Make-Orphan($dataRoot, $name) {
-  Cli1 @('start', $name, '--detach') | Out-Null
-  Check "1.x started $name" (Wait-Until { (List1)[$name].status -eq 'running' } 90)
-  $st = State $dataRoot $name
-  Stop-Process -Id $st.daemonPid -Force
+function Make-Orphan($dataRoot, $name, $dir) {
+  # what a crashed 1.x daemon leaves: java still running, the daemon gone, state.json saying
+  # running. (Killing a real 1.x daemon takes its JVM with it: the JVM is in the daemon's job.)
+  $java = Start-Process (Get-Command node).Source -ArgumentList "`"$fixtures\fake-java.mjs`"" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
+  $gone = Start-Process "$env:WINDIR\System32\cmd.exe" -ArgumentList '/c', 'exit' -PassThru -WindowStyle Hidden
+  $gone.WaitForExit()
+  $runDir = Join-Path $dataRoot "run\$name"
+  New-Item -ItemType Directory -Force $runDir | Out-Null
+  @{ name = $name; running = $true; daemonPid = $gone.Id; daemonExe = 'SpawnLoft.exe'; javaPid = $java.Id; javaExe = 'node.exe'; startedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } |
+    ConvertTo-Json | Set-Content (Join-Path $runDir 'state.json')
   Check "$name is orphaned under 1.x (java alive, daemon gone)" (Wait-Until { (List1)[$name].status -eq 'orphaned' } 30) "$((List1)[$name].status)"
-  $st.javaPid
+  $java.Id
 }
 
 function Java-Pid($dataRoot, $name) { (State $dataRoot $name).javaPid }
@@ -109,7 +114,7 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   $seed = Seed-Legacy @(@{ name = 'survival' }, @{ name = 'creative' }, @{ name = 'lost' }) @('mysql-main')
   Check 'seeded into the expected data root' ($seed.dataRoot -eq $dataRoot) "$($seed.dataRoot) vs $dataRoot"
   Start-Running1 @('mysql-main', 'survival')
-  $lostJava = Make-Orphan $dataRoot 'lost'
+  $lostJava = Make-Orphan $dataRoot 'lost' $seed.servers.lost
   $survivalJava = Java-Pid $dataRoot 'survival'
   $dbJava = Java-Pid $dataRoot 'mysql-main'
   Cli1 @('task', 'add', 'survival', '--do', 'backup', '--daily', '03:00') | Out-Null
@@ -243,10 +248,16 @@ switch ($Name) {
     $root = [Windows.Automation.AutomationElement]::RootElement
     $byPid = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty, $p.Id)
     function Window { $root.FindFirst([Windows.Automation.TreeScope]::Children, $byPid) }
-    function Button($w, $label) {
-      $c = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, $label)
+    # NSIS's own buttons by control id (1 Next/Install, 2 Cancel, 3 Back), pressed with BM_CLICK:
+    # plain Win32 buttons, which UI Automation does not always offer an Invoke pattern for
+    Add-Type -Namespace Ci -Name User32 -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);'
+    function Button($w, $id) {
+      $c = New-Object Windows.Automation.AndCondition(
+        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, "$id")),
+        (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button)))
       $w.FindFirst([Windows.Automation.TreeScope]::Descendants, $c)
     }
+    function Press($b) { [Ci.User32]::PostMessage([IntPtr] $b.Current.NativeWindowHandle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
     function Texts($w) {
       $c = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Text)
       ($w.FindAll([Windows.Automation.TreeScope]::Descendants, $c) | ForEach-Object { $_.Current.Name }) -join ' | '
@@ -261,8 +272,8 @@ switch ($Name) {
       $w = Window
       if (-not $w) { return $false }
       if ((Texts $w) -match 'Stopping servers|Looking for running servers|good') { return $true }
-      $n = Button $w 'Next >'
-      if ($n -and $n.Current.IsEnabled) { $n.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
+      $n = Button $w 1
+      if ($n -and $n.Current.IsEnabled) { Press $n; Start-Sleep -Milliseconds 700 }
       $false
     } 90
     $script:result.pageTexts = Texts (Window)
@@ -271,9 +282,9 @@ switch ($Name) {
     Check-Graceful $dataRoot 'good' $goodJava
     Start-Sleep -Seconds 2
     $script:result.pageTextsDuringStop = Texts (Window)
-    $cancel = Button (Window) 'Cancel'
+    $cancel = Button (Window) 2
     Check 'Cancel is enabled during the stop' ($cancel -and $cancel.Current.IsEnabled)
-    $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Press $cancel
     Check 'the setup ends after Cancel' ($p.WaitForExit(180000))
     $script:result.cancelExit = $p.ExitCode
     Check 'exit code 4 after Cancel' ($p.ExitCode -eq 4) "exit $($p.ExitCode)"
@@ -386,7 +397,9 @@ switch ($Name) {
     Check '/UPDATE uninstall exit 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
     Check '  task kept' (@(Tasks-Under-Mcctl).Count -eq 1)
     Check '  data kept' (Test-Path (Join-Path $dataRoot 'instances.json'))
-    Check '  server still running' ((Status2)['keep'].status -eq 'running')
+    # the program files are gone until the reinstall, so ask the process table, not a CLI
+    $st = State $dataRoot 'keep'
+    Check '  server still running (daemon and JVM alive)' ((Pid-Alive $st.daemonPid) -and (Pid-Alive $st.javaPid))
     $run = Run-Installer $setupA @('/S') 300
     Check 'reinstall exit 0' ($run.code -eq 0) "exit $($run.code)"
     Kill-Everything

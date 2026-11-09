@@ -158,7 +158,7 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     // Nothing is stopped that 2.0 could not start again: until R4 the restart goes through the
     // bundled Node core, so without Node the update waits (design 2.3, the NodeCore seam).
     if listed.iter().any(h::Listed::stoppable)
-        && let Err(e) = NodeCore::find(&data_root)
+        && let Err(e) = spawnloft_lib::nodecore::node()
     {
         log.line(&format!(
             "SpawnLoft 2 needs Node.js to start the servers again ({e}); nothing was stopped"
