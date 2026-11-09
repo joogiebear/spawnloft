@@ -7,7 +7,7 @@
 | Crate | What it is |
 | --- | --- |
 | `spawnloft-lib` | The library: version and build identity now; the daemon, archives and the core later |
-| `spawnloft-core` | The console binary (`spawnloft-core`, `spawnloft-core.exe`). Today: `--version` and a `daemon` stub |
+| `spawnloft-core` | The console binary (`spawnloft-core`, `spawnloft-core.exe`). Today: `--version`, a `daemon` stub, `ui`, and `update` (check, status, apply, list, rollback, hold, channel, log; the signed-feed side of INSTALLER-UPDATER-DESIGN.md section 5, library code in `spawnloft-lib/src/update/`) |
 | `spawnloft-shell` | The window (`SpawnLoft.exe`), a Tauri 2 shell over the panel `spawnloft-core ui` serves. Phase 0 spike (P0-F): its NSIS template installs over 1.x; see `crates/spawnloft-shell/spike/` |
 | `spawnloft-fakes` | Test helpers: temp dirs and running the built binary; fake java, CDNs and token endpoints later |
 
@@ -44,6 +44,12 @@ at `resources/bin/spawnloft-core` (`Contents/MacOS/spawnloft-core` on the Mac), 
 `spawnloft-cli` deb and rpm. Everything is a workflow artifact kept for 14 days, versioned
 `2.0.0-internal.<run>`, unsigned on Windows, ad-hoc signed on the Mac, with the app's update
 check turned off. The workflow never publishes, tags, writes a feed or makes a release.
+
+`.github/workflows/updater.yml` runs on `v2` when `rust/**` or `desktop/update-envelope.mjs`
+change: throwaway minisign keys made in the job (`SPAWNLOFT_UPDATE_PUBKEYS` overrides the
+compiled-in release keys), two shell builds, a loopback feed with every refusal variant
+(`crates/spawnloft-shell/updater-tests/`), and the design's scenarios 5 to 7 (update, rollback
+with the hold, refusals) on windows-latest. Nothing leaves the runner.
 
 To place a locally built binary where electron-builder picks it up:
 

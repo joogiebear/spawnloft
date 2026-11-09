@@ -10,8 +10,10 @@
 //! - the argv compatibility form (REVIEW-REV3 B1): `SpawnLoft.exe <...>\mcctl.mjs <command...>`,
 //!   which every 1.x task shim, server launcher and MCP config runs, is forwarded to the Node core
 //!   so those keep working after the shell replaces Electron;
-//! - one Tauri updater cycle, run when `SPAWNLOFT_SPIKE_FEED` names a feed;
 //! - start-time numbers, written when `SPAWNLOFT_SPIKE_MEASURE` names a file.
+//!
+//! Updates (2.x to 2.y) are in `updater.rs`: the core verifies the signed feed, the plugin
+//! installs exactly what the core pinned.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -23,16 +25,17 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_updater::UpdaterExt;
+
+mod updater;
 
 /// The running `spawnloft-core ui` and the pipe that keeps it alive (it exits when stdin closes).
-#[derive(Default)]
-struct Core {
+#[derive(Debug, Default)]
+pub struct Core {
     child: Mutex<Option<(Child, ChildStdin)>>,
 }
 
 impl Core {
-    fn stop(&self) {
+    pub fn stop(&self) {
         if let Ok(mut guard) = self.child.lock()
             && let Some((mut child, stdin)) = guard.take()
         {
@@ -70,6 +73,7 @@ fn main() -> ExitCode {
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Core::default())
+        .manage(updater::Ready::default())
         .setup(move |app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("SpawnLoft")
@@ -77,13 +81,8 @@ fn main() -> ExitCode {
                 .min_inner_size(900.0, 600.0)
                 .build()?;
             start_core(app.handle().clone());
-            if let Some(feed) = std::env::var_os("SPAWNLOFT_SPIKE_FEED") {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = update_once(handle, feed.to_string_lossy().into_owned()).await {
-                        spike_log(&format!("update: {e}"));
-                    }
-                });
+            if let Some(core) = core_binary() {
+                updater::start(app.handle().clone(), core);
             }
             Ok(())
         })
@@ -100,10 +99,16 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    app.run(|app, event| {
-        if let RunEvent::Exit = event {
-            app.state::<Core>().stop();
+    app.run(|app, event| match event {
+        // the last window closed: a verified, downloaded update installs now (on Windows the
+        // installer runs silently and this process exits inside install())
+        RunEvent::ExitRequested { code: None, api, .. } => {
+            if updater::install_on_quit(app) {
+                api.prevent_exit();
+            }
         }
+        RunEvent::Exit => app.state::<Core>().stop(),
+        _ => {}
     });
     ExitCode::SUCCESS
 }
@@ -254,38 +259,6 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
             ExitCode::from(1)
         }
     })
-}
-
-/// One check against `feed`; installs and exits if it offers a newer signed version.
-async fn update_once(app: tauri::AppHandle, feed: String) -> Result<(), String> {
-    let url = feed.parse().map_err(|e| format!("feed url: {e}"))?;
-    let stopper = app.clone();
-    let updater = app
-        .updater_builder()
-        .endpoints(vec![url])
-        .map_err(|e| e.to_string())?
-        // the installer replaces resources\bin\spawnloft-core.exe: the core must not hold it
-        .on_before_exit(move || stopper.state::<Core>().stop())
-        .build()
-        .map_err(|e| e.to_string())?;
-    spike_log(&format!(
-        "update: checking {feed} from {}",
-        app.package_info().version
-    ));
-    match updater.check().await.map_err(|e| e.to_string())? {
-        None => spike_log("update: none offered"),
-        Some(update) => {
-            spike_log(&format!("update: offered {}", update.version));
-            update
-                // the finish callback runs before the signature check, so it only means "downloaded"
-                .download_and_install(|_, _| {}, || spike_log("update: downloaded"))
-                .await
-                .map_err(|e| e.to_string())?;
-            // Windows exits inside download_and_install; elsewhere restart into the new bundle
-            app.restart();
-        }
-    }
-    Ok(())
 }
 
 fn epoch_ms() -> u128 {

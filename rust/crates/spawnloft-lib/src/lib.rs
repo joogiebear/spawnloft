@@ -25,6 +25,7 @@ pub mod resp;
 pub mod sha256;
 pub mod tick;
 pub mod time;
+pub mod update;
 
 /// The JSON library the daemon reads and writes with, for the binary crates.
 pub use serde_json;

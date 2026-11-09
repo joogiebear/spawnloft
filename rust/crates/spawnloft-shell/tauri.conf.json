@@ -15,13 +15,21 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "publisher": "victor zemeckis",
     "copyright": "joogiebear",
     "homepage": "https://github.com/joogiebear/spawnloft",
-    "icon": ["../../../desktop/build/icon.png", "../../../desktop/build/icon.ico"],
+    "icon": [
+      "../../../desktop/build/icon.png",
+      "../../../desktop/build/icon.ico"
+    ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
       "nsis": {
         "template": "windows/installer.nsi",
         "installMode": "currentUser",
@@ -31,8 +39,11 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
-      "windows": { "installMode": "passive" }
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFENkZBNzcyNEYxNTkzMTUKUldRVmt4VlBjcWR2SGJ2QmZqWlZKRUZIK05aSUREbm5PRXpJRnBqTERjZ25iUDBleDVwNytWSmQK",
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

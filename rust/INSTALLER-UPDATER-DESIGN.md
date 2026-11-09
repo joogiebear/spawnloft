@@ -437,12 +437,16 @@ problem. Decided (Q-C).
 ```
 
 - The signature file is minisign's format, made with the **same key pair** that signs the
-  artifacts (Tauri's keys are minisign keys), by `minisign -S -t "spawnloft-updates <version>
-  <channel>"` or `rsign2` in the release step, **not** by `tauri signer sign`, which writes its
-  own trusted comment (`timestamp:… file:… version:…`, the one the plugin's
-  `require_signed_version` parses) and has no flag to replace it (**needs a test**; if the CLI
-  turns out to accept a comment, either tool is fine). The client checks that the trusted
-  comment matches the payload, so a signature cannot be moved between files. `keyId` names the
+  artifacts (Tauri's keys are minisign keys). **Settled by T2 (2026-11-09):** `tauri signer
+  sign` 2.12.4 has no flag for a custom trusted comment, and none is needed. The envelope is
+  signed with `tauri signer sign --app-version <version> spawnloft-updates.json`, whose comment
+  is `timestamp:<t>\tfile:spawnloft-updates.json\tversion:<version>`; the client requires
+  `file:` to be the envelope's own name and `version:` to equal the payload's `version`, so a
+  signature cannot be moved between files or releases, and no second signing tool
+  (`minisign`, `rsign2`) enters the release step. The same rule binds each artifact's
+  signature (`file:<asset name>`, `version:`), which is why release artifacts are re-signed
+  **after** being renamed to their release names (`desktop/update-envelope.mjs` refuses an
+  artifact whose comment names another file). `keyId` names the
   key that signed the envelope and the artifacts of that release; it is inside the signed
   payload. The public keys are compiled into `spawnloft-core` and the shell as a list
   `{ id, pubkey, from }` with two slots (current and next) for rotation; the client picks the
@@ -492,12 +496,13 @@ every 6 h, 20 s after start, and on demand:
     3. policy: version > installed; minVersion <= installed; dataFormat ok; generatedAt fresh
     4. write update.log; return { version, notes, platform entry, latestJsonUrl, pinned: {version,url,signature} }
   shell (or headless `update apply`):
-    5. UpdaterBuilder: endpoints [latestJsonUrl], pubkey (the one envelope.keyId names),
-       require_signed_version(true), version_comparator =
+    5. UpdaterBuilder: pubkey (the one envelope.keyId names), target, version_comparator =
          |_, remote| remote.version == pinned.version && remote.download_url == pinned.url
                       && remote.signature == pinned.signature
-       check() -> Some(update) only when the plugin fetched exactly what the envelope named;
-       None otherwise ("feed changed between reads", logged, retried next time)
+       then Updater::restore_update(<manifest built from the pinned record>) instead of
+       check(): the plugin never fetches latest.json (as built by T2: one network read of the
+       release data, the signed one; restore_update forces require_signed_version). Some(update)
+       only when the plugin accepts exactly what the envelope named; None is logged
     6. download() -> bytes (the plugin verifies the minisign signature inside download(),
        verified from the 2.14.1 source); then our sha512 == envelope.sha512 as a second,
        envelope-bound check; keep a copy in <config>/updates/<version>/<file> (last two
@@ -958,6 +963,7 @@ all folded into rev 2:
 | 4 | Blocker | "Windows reports a renamed image under its new name" was marked verified but conflicts with P0-E (WMI showed the original path); API-dependent | Section 4 rewritten: needs a test, folder rename kept, (pid, creation time) is the fix; probe in scenario 5 |
 | 5 | Should fix | `installer_args` land after `/ARGS` and reach the relaunched app | 5.6: `restart_after_install(false)`, own relaunch, shell ignores unknown `/X` |
 | 6 | Should fix | `tauri signer sign` writes its own trusted comment; `require_signed_version` unused | 5.3: `minisign`/`rsign2` for the envelope (needs a test); 5.5: `require_signed_version(true)` |
+| 6a | Settled by T2 | The CLI has no custom-comment flag; `tauri signer sign --app-version` on `spawnloft-updates.json` gives a comment the client can bind to (`file:`, `version:`), so no second tool | 5.3 rewritten; 5.5 uses `restore_update` |
 | 7 | Should fix | Freshness rule refused rollbacks and did not detect a frozen feed; no baseline for fresh installs | 5.3: rollback exempt, `expiresAt`, baked-in baseline |
 | 8 | Should fix | A `restart`/`start` task firing mid-handover starts a daemon the uninstaller kills | 2.3.1 step 2 and 6: task folder disabled, active set re-read; Q-J |
 | 9 | Should fix | Servers and databases stopped and started in no order | 2.3.1 step 4, 2.5: servers then databases; databases then servers |
