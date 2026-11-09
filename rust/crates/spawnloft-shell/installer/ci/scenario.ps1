@@ -333,7 +333,11 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check 'tasks folder not left disabled' (@(Tasks-Under-Mcctl | Where-Object { $_.State -eq 'Disabled' }).Count -eq 0)
 
     # with the 1.x panel open: the update closes it and goes through
+    # slow is still holding the stop it was sent; let it finish, then start it again under 1.x
     Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
+    Check 'slow finishes the stop it held' (Wait-Until { (List1)['slow'].status -ne 'running' } 60) "$((List1)['slow'].status)"
+    Cli1 @('start', 'slow', '--detach') | Out-Null
+    Check 'slow runs again under 1.x' (Wait-Until { (List1)['slow'].status -eq 'running' } 90)
     # the app as a user starts it: no ELECTRON_RUN_AS_NODE, Electron's own log on stderr
     [Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null)
     $script:result.panelEnvRunAsNode = "$env:ELECTRON_RUN_AS_NODE"

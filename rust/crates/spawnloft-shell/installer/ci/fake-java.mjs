@@ -9,8 +9,9 @@
  *   fake-stops.log    one JSON line per graceful stop, by pid; never removed, so it survives a
  *                     restart that rotates the console log
  * and obeys:
- *   stop   exits 0 after writing fake-exit.json; ignored (with a console line) while a file
- *          `ignore-stop` exists in its folder, the server that refuses to stop
+ *   stop   exits 0 after writing fake-exit.json; held (with a console line) while a file
+ *          `ignore-stop` exists in its folder, the server that refuses to stop, and carried
+ *          out once that file is removed
  */
 import fs from 'node:fs'
 import readline from 'node:readline'
@@ -31,15 +32,23 @@ rl.on('line', (raw) => {
   const line = raw.trim()
   if (line === 'stop') {
     if (fs.existsSync('ignore-stop')) {
-      say('fake: ignoring stop (ignore-stop is present)')
+      // a save that takes as long as the file stays: the stop finishes once it is removed (a
+      // daemon that already sent stop does not send it again)
+      say('fake: holding the stop (ignore-stop is present)')
+      if (!pending) pending = setInterval(() => { if (!fs.existsSync('ignore-stop')) stop() }, 250)
       return
     }
+    stop()
+    return
+  }
+  say(`fake got: ${line}`)
+})
+let pending = null
+function stop() {
     say('Stopping server')
     say('Saving worlds')
     fs.appendFileSync('fake-stops.log', JSON.stringify({ pid: process.pid, at: Date.now() }) + '\n')
     fs.writeFileSync('fake-exit.json', JSON.stringify({ pid: process.pid, graceful: true, at: Date.now() }))
     process.exit(0)
-  }
-  say(`fake got: ${line}`)
-})
+}
 setInterval(() => {}, 1 << 30)
