@@ -334,7 +334,11 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
 
     # with the 1.x panel open: the update closes it and goes through
     Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
-    $panel = Start-Process "$inst\SpawnLoft.exe" -PassThru
+    # the app as a user starts it: no ELECTRON_RUN_AS_NODE, Electron's own log on stderr
+    [Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null)
+    $script:result.panelEnvRunAsNode = "$env:ELECTRON_RUN_AS_NODE"
+    $pOut = Join-Path $env:RUNNER_TEMP 'panel-out.txt'; $pErr = Join-Path $env:RUNNER_TEMP 'panel-err.txt'
+    $panel = Start-Process "$inst\SpawnLoft.exe" -ArgumentList '--enable-logging' -PassThru -RedirectStandardOutput $pOut -RedirectStandardError $pErr
     # the panel is an app window, whichever SpawnLoft.exe process shows it (Electron may hand
     # over to another process of its own)
     $panelOpen = Wait-Until { @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }).Count -gt 0 } 45
@@ -342,6 +346,9 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $script:result.panelProcesses = @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id) window=$($_.MainWindowHandle) '$($_.MainWindowTitle)'" })
     $script:result.panelFirstExited = $panel.HasExited
     if ($panel.HasExited) { $script:result.panelFirstExit = $panel.ExitCode }
+    $script:result.panelStdout = "$(Get-Content $pOut -Raw -ErrorAction SilentlyContinue)"
+    $script:result.panelStderr = "$(Get-Content $pErr -Raw -ErrorAction SilentlyContinue)" -replace '(?s)^(.{0,6000}).*$', '$1'
+    $script:result.spawnloftCommandLines = @(Get-CimInstance Win32_Process -Filter "Name='SpawnLoft.exe'" | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" })
     Check 'the 1.x panel is open' $panelOpen
     $run = Run-Installer $setupA @('--updated', '/S') 600
     $script:result.withPanel = $run
