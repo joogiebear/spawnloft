@@ -2,7 +2,7 @@
 
 Internal, `v2` branch (PLAN-RUST-TAURI.md section 13). Each section names the plan item it
 answers, what was established, how, and what is still a prediction waiting for a live run.
-P0-F adds the Tauri spike's numbers here.
+P0-F (the Tauri spike) is at the end.
 
 ## P0-E: experiments 4a and 4b (plan section 3 item 4, section 12 item 6)
 
@@ -374,3 +374,167 @@ is found), `rust/crates/spawnloft-lib/src/platform/windows.rs` (job object);
 include/allowOnlyOneInstallerInstance.nsh, include/installUtil.nsh}`;
 `electron-updater@6.8.9` `out/{AppUpdater.js, NsisUpdater.js, providers/GitHubProvider.js,
 providers/GenericProvider.js}`; the repository's release list (`created_at`, `published_at`).
+
+## P0-F: the Tauri 2 shell spike (plan section 3 item 5, section 12 item 7)
+
+Status, 2026-11-09: **the CI part is done and green.** `.github/workflows/tauri-spike.yml` run
+42541789349 (commit 30ef14a; the same checks passed in run 42541115034) built spike-a
+(2.0.0-spike.1) and spike-b (2.0.0-spike.2) with the custom NSIS template, installed the signed
+1.6.0-beta.413 setup on `windows-latest`, measured it, handed over to spike-a the way
+electron-updater runs an NSIS update, measured the Tauri shell, ran one Tauri updater cycle
+spike-a to spike-b, and uninstalled. Every check passed. (Its final step reported exit code 1
+after all six uninstall checks passed: pwsh ended the step with the last `schtasks` exit code.
+Fixed in 959d7b9.)
+
+Still to run, on Victor's machines and only with his go-ahead:
+
+- the same handover through the real electron-updater on his PC: Azure-signed spike, so the
+  publisher check runs, with servers stopped and his tasks present (this replaces
+  2.0.0-internal.8);
+- the Squirrel.Mac acceptance test on the Mac mini (same bundle id, signed and notarized,
+  offered to an installed signed beta);
+- Victor's verdict on the window on his 1440p and 4K displays.
+
+Q24 (does the plugin install `.deb` and `.rpm` on Linux) was not checked: the spike builds NSIS
+only.
+
+### What the spike is
+
+- `spawnloft-core ui` (`rust/crates/spawnloft-lib/src/panel.rs`): a 127.0.0.1 endpoint that
+  starts the Node panel (`spawnloft.mjs ui --port 0 --no-open`) and proxies to it, with ui.mjs's
+  Host/Origin rule applied before forwarding. It exits when its stdin closes.
+- `SpawnLoft.exe` (`rust/crates/spawnloft-shell`): a Tauri 2.12.5 window. It spawns
+  `resources\bin\spawnloft-core.exe ui --port 0 --exit-with-stdin` and navigates to the address
+  it prints. No Tauri API is exposed to the page. Single instance. It accepts the argv
+  compatibility form (`SpawnLoft.exe <...>\mcctl.mjs <command...>`), which it forwards to Node,
+  so 1.x task shims, server launchers and MCP configs keep working.
+- `windows/installer.nsi`: a fork of tauri-bundler 2.10.4's template, changes marked
+  `SPAWNLOFT:`, upstream copy beside it. It installs into `%LOCALAPPDATA%\Programs\SpawnLoft`
+  under the electron-builder uninstall key `bd3d287b-0ff4-5383-8897-c9d8dbd7d2e3`, and takes
+  electron-updater's flags (`--updated /S --force-run`) as well as Tauri's (`/P /UPDATE /R`).
+  It removes 1.x with 1.x's own uninstaller (`/S /KEEP_APP_DATA --keep-shortcuts --updated`),
+  verified by `app.asar` being gone, and keeps the shortcuts and `InstallLocation`.
+
+### Numbers (windows-latest runner, run 42541789349)
+
+| | 1.6.0-beta.413 (Electron) | spike (Tauri 2) |
+|---|---|---|
+| Installer | 112,672,360 B (107.5 MiB) | 3,357,667 B (3.2 MiB) |
+| Update download (spike-b) | | 3,355,206 B |
+| `SpawnLoft.exe` | 246,708,496 B | 6,904,320 B |
+| Start to panel loaded, runs 1 / 2 / 3 | 1196 / 727 / 659 ms | 528 / 518 / 488 ms |
+| Same, previous run (42541115034) | 1016 / 496 / 497 ms | 437 / 451 / 1785 ms |
+| Memory, whole tree, working set / private | 350 MB / 169 MB (5 processes) | 405 MB / 184 MB (11 processes) |
+| of which the shell (exe + WebView2 / Electron) | 350 MB / 169 MB, panel inside | 331 MB / 120 MB |
+| of which the panel behind it | (in Electron's main process) | 73 MB / 64 MB: `spawnloft-core` 5.7 / 1.4, `node` 54 / 60, two `conhost` |
+
+How it was measured (`spike/measure.cjs`): start time runs from spawning the exe to the panel
+page's load event (Electron through Playwright; Tauri through the webview's page-load-finished
+event). Memory is the summed process tree 15 s after the panel loaded, empty panel, no servers.
+Runners have no GPU and vary from run to run (see the 1785 ms outlier), so treat these as
+proportions, not as Victor's numbers.
+
+Against section 0's promises ("installer 100 MB to 15 to 25 MB, start under a second, shell
+memory about halved"):
+
+- **Installer: better than promised.** 3.2 MiB, against 15 to 25. But the spike ships the Node
+  core as files and uses the system Node; the 2.0 package adds the Rust core in its final form
+  and the panel assets, and WebView2 comes through the bootstrapper. A few MiB more, not 15.
+- **Start: met.** About 0.5 s warm and cold, against 0.5 to 1.2 s for 1.6.
+- **Shell memory: not halved. Correct the promise.** WebView2 costs about what Electron's
+  Chromium costs: its six processes are 303 MB working set and 116 MB private. The shell on its
+  own is 331 / 120 MB against Electron's 350 / 169 MB with the panel inside, so about 30 % less
+  private and the same working set. Today the Node panel behind the shell adds 73 / 64 MB, so
+  the spike as a whole uses a little more than 1.6. When the Rust core serves the panel itself
+  (step 2), the panel's part should drop to a few MB, and the total should come out at about
+  125 MB private against 169, a quarter less. Suggested wording for section 0: "shell memory
+  about a quarter lower; working set about the same (WebView2 is Chromium too)".
+
+### The handover from 1.6 (`spike/handover.ps1`)
+
+1.6 was installed per user. Its own CLI adopted a stopped server and added a daily backup task
+(`\mcctl\spike-backup`, shim `SpawnLoft.exe "...\resources\core\mcctl.mjs" task run
+spike-backup` under `ELECTRON_RUN_AS_NODE=1`), and the task ran once (result 0, 2 backups).
+Then `SpawnLoft_2.0.0-spike.1_x64-setup.exe --updated /S --force-run` ran, the command line
+electron-updater's NsisUpdater uses. It took 2.6 s and exited 0. After it:
+
+- `SpawnLoft.exe` was the Tauri shell (product version 2.0.0-spike.1), `resources\app.asar` and
+  `Uninstall SpawnLoft.exe` were gone, and `uninstall.exe`, `resources\bin\spawnloft-core.exe`
+  and `resources\core\mcctl.mjs` were present;
+- the uninstall key was the same, now with DisplayVersion 2.0.0-spike.1 and
+  `UninstallString "...\uninstall.exe"`, `InstallLocation` was unchanged, and no Tauri-default
+  key or folder appeared;
+- the Start menu and desktop shortcuts were kept and opened the new exe;
+- **the 1.x task was still registered and ran green through the Tauri exe** (result 0, 2 to 4
+  backups), through the argv compatibility form, with the shim text unchanged;
+- `--force-run` started the app (`startedAfterHandover: true`).
+
+Not covered here: the publisher-name check electron-updater makes before it runs the installer.
+The runner's spike is unsigned, so this run started the installer the way NsisUpdater does
+after that check. Victor's PC run covers it.
+
+Uninstall (`handover.ps1 -Uninstall`, silent): exit 0, exe removed, uninstall key and install
+key removed, the scheduled task removed by `spawnloft uninstall --yes`, data kept.
+
+### Q21: Tauri's updater plugin or our own
+
+**Answer: use the plugin (tauri-plugin-updater 2.14.1) with the custom template.** One real cycle
+ran on Windows (`spike/update-cycle.ps1`):
+
+- **A feed whose signature belongs to another artifact is refused.** The plugin downloaded
+  spike-b, failed with "The signature verification failed" and installed nothing. The version
+  stayed 2.0.0-spike.1. Note: the download-finished callback runs before the signature check,
+  so "downloaded" in a log does not mean "verified". The spike's log line said "downloaded,
+  verified" and is corrected.
+- **The right feed updates.** Check, download (3.3 MB from a loopback feed), verify, then the
+  plugin runs our NSIS installer with its passive flags (`/P /UPDATE /R`) and exits. 3.1 s from
+  launch to the uninstall key showing 2.0.0-spike.2. `SpawnLoft.exe` was the new build, still in
+  the 1.x folder under the 1.x key, and **the app came back up afterwards** (`/R`,
+  `restartedAfterUpdate: true`).
+- `on_before_exit` stopped `spawnloft-core` before the installer replaced it.
+
+So the install-mode flags and the custom template work together, which was the open question.
+Two things the plugin does not give, as rev 3.1 said, stay as own code on top of it: a signed
+envelope around the feed JSON (the feed itself is unsigned; only the artifact is signed) and a
+kept-previous-artifact rollback. For 2.0 also: `requireSignedVersion`-style checks, no
+downgrades from a feed (Fable review M2), and the env-var feed override compiled out.
+
+### Q22: binary topology
+
+**Confirmed as written:** two binaries. `SpawnLoft.exe` (the shell, GUI subsystem) and
+`spawnloft-core.exe` (console, at `resources\bin\spawnloft-core.exe`, as during steps 0 to 2).
+The shell spawns the core and talks to it only over 127.0.0.1 HTTP, and the core is the only
+thing the page sees. Tauri's running-app check (RestartManager on the full path of
+`$INSTDIR\SpawnLoft.exe`) does not match the core. P0-E found the same for electron-builder
+26.15.3's check after the second Rust run (above). The update replaced the core binary
+in place after `on_before_exit` stopped it; the template also renames a held core aside
+(`spawnloft-core.old-<tick>.exe`). That path is in the template but was not forced in this run.
+
+### Review (Fable) and what is deferred to 2.0
+
+The NSIS template and the updater use were reviewed before the CI runs. Fixed in 50e9e07: 1.x
+recognised by its uninstaller's file alone, so a 1.x rollback is handled; 1.x removal counted
+only when `app.asar` is gone; failures exit with code 2; `--updated` and `--force-run` read
+from the parameters, not the whole command line; no directory choice when replacing 1.x; a core
+that cannot be moved aside aborts the install.
+
+Deferred to 2.0, not fixed in the spike:
+
+- **H3:** uninstall runs `spawnloft uninstall --yes` through the system Node. Without Node, the
+  tasks stay registered. 2.0's uninstall must run the Rust core.
+- **M2:** a feed can offer a lower version. 2.0 needs signed-version checks, no downgrades, and
+  no env-var feed override.
+- **M3 and L4:** RestartManager can kill argv-compatibility wrappers, and a killed shell can
+  orphan the Node panel. Use a job object for the shell's children.
+- **L5:** proxy read timeouts in `spawnloft-core ui`, and a signed uninstaller.
+
+### Caveats
+
+- The runner installers are unsigned, the updater key was thrown away after the run, and the
+  feed was plain HTTP on loopback (`dangerousInsecureTransportProtocol`, spike only).
+- The spike needs Node.js on the machine, for the panel and for the argv compatibility form.
+  The job puts the runner's Node on the user PATH, as a user's Node install would be. 2.0 removes
+  that dependency.
+- Two script bugs held the job until fixed: PowerShell's `&` does not wait for a GUI-subsystem
+  exe (49cbb6c), and `Start-Process -Wait` waits for every descendant, including the daemon the
+  1.6 CLI starts and the app `--force-run` launches (184fbeb).

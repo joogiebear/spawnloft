@@ -239,7 +239,8 @@ async fn update_once(app: tauri::AppHandle, feed: String) -> Result<(), String> 
         Some(update) => {
             spike_log(&format!("update: offered {}", update.version));
             update
-                .download_and_install(|_, _| {}, || spike_log("update: downloaded, verified"))
+                // the finish callback runs before the signature check, so it only means "downloaded"
+                .download_and_install(|_, _| {}, || spike_log("update: downloaded"))
                 .await
                 .map_err(|e| e.to_string())?;
             // Windows exits inside download_and_install; elsewhere restart into the new bundle
