@@ -155,21 +155,16 @@ fn pinned_update(app: &AppHandle, pinned: &Pinned, restart: bool) -> Result<Upda
         })
 }
 
-/// The artifact bytes for `pinned`: the verified cached copy, or a fresh download by the core
-/// (`update apply --no-run`: capped at the signed size, verified, cached), verified here again.
+/// The artifact bytes for `pinned`, fetched through the core (`update apply --no-run`): the core
+/// serves its verified cached copy or downloads one capped at the signed size, verifies it, keeps
+/// it, and marks its saved offer downloaded. The bytes are verified here again before use.
 fn fetch_artifact(core: &PathBuf, pinned: &Pinned) -> Result<Vec<u8>, String> {
     let store = store();
     let trusted = keys::trusted();
     let cached = store.cache_file(&pinned.version, &pinned.file);
-    if let Ok(bytes) = std::fs::read(&cached) {
-        if verify_artifact(&bytes, pinned, &trusted).is_ok() {
-            log("cache-hit", &[("version", &pinned.version)]);
-            return Ok(bytes);
-        }
-        store.remove_cached(&pinned.version);
-        log("cache-dropped", &[("version", &pinned.version)]);
-    }
-    // the core downloads what its own saved offer names; that must be this record
+    // the core downloads what its own saved offer names; that must be this record. It goes
+    // through the core even when the file is cached, so the core's state (downloaded) is the
+    // one record of what is staged and nothing here writes the core's files.
     log("download", &[("version", &pinned.version), ("url", &pinned.url)]);
     let applied = core_update(core, &["apply", "--no-run"])?;
     if applied.get("version").and_then(Value::as_str) != Some(pinned.version.as_str()) {
