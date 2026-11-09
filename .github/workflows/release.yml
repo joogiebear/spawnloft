@@ -24,7 +24,10 @@ on:
       - 'desktop/release-feed.mjs'
       - 'desktop/release-gate.mjs'
       - 'desktop/release-publish.mjs'
+      - 'desktop/release-feed.test.mjs'
       - 'desktop/update-envelope.mjs'
+      - 'desktop/update-envelope.test.mjs'
+      - 'desktop/preview-artifacts.mjs'
       - 'rust/crates/spawnloft-shell/**'
       - '.github/workflows/release.yml'
 

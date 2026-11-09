@@ -10,8 +10,9 @@ key and the same `TAURI_SIGNING_PRIVATE_KEY` secret cover everything. A second, 
 ## The keys
 
 Generated on Victor's Windows signing machine on 2026-11-09 with `tauri signer generate`
-(password-protected). The private halves never leave that machine (kept in his password manager);
-only the public halves are in the repository and compiled into the binaries.
+(password-protected). The release private key is kept in his password manager and, for the release
+workflows only, as the GitHub secrets below; the "next" private key is sealed away until rotation.
+Only the public halves are in the repository and compiled into the binaries.
 
 | Role | Key id | Public key line (minisign) |
 | --- | --- | --- |
@@ -23,8 +24,11 @@ envelope signed by either and hands the plugin the one the envelope's `keyId` na
 key is also baked into `rust/crates/spawnloft-shell/tauri.conf.json` (`plugins.updater.pubkey`) as
 the plugin's own verification key.
 
-`release.pub` (the current release key's public file, minisign format) lives beside the shell at
-`rust/crates/spawnloft-shell/release.pub`; the release scripts and the gate read it from there.
+`release.pub` (the current release key's public file, the two-line minisign format) lives beside
+the shell at `rust/crates/spawnloft-shell/release.pub`; the release scripts and the gate read it
+from there. The Tauri updater plugin's `pubkey` (in `tauri.conf.json` and the overlay
+`installer-config.mjs` writes) is the base64 of that file; `installer-config.mjs` accepts either
+form and emits the base64, so `release.pub` can be handed to it directly.
 
 ## The GitHub secrets (Victor's hands)
 

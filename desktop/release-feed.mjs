@@ -16,20 +16,42 @@
 //        [--win <setup.exe>] [--mac-updater <app.tar.gz>] [--mac-dmg <dmg>] [--mac-zip <zip>]
 //        [--deb <deb> --rpm <rpm>] [--deb-arm64 <deb> --rpm-arm64 <rpm>] [--cli <file> ...]
 //        [--channel stable|beta] [--min-version <v>] [--data-format <n>] [--expires-days <n>]
-//        [--notes <url>] [--generated-at <iso>] [--no-sign] [--tauri <path>] [--date <iso>]
+//        [--notes <url>] [--generated-at <iso>] [--tauri <path>] [--date <iso>]
 //
-// Signing uses the Tauri CLI and TAURI_SIGNING_PRIVATE_KEY(_PASSWORD) from the environment, the
-// same key and secrets as `tauri build`. --no-sign writes an unsigned envelope and skips the
-// re-sign (used only by tests, which inject bytes a different way). release-gate.mjs checks the
-// finished folder before anything is published.
+// Signing uses the Tauri CLI (--tauri, or $TAURI_CLI) and TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)
+// from the environment, the same key and secrets as `tauri build`. Tests inject their own signer
+// as the second argument to assemble(). release-gate.mjs checks the finished folder before
+// anything is published.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const { main: envelopeMain, signWithTauri, artifactTargets, ENVELOPE_FILE, parsePublicKey, verifyEnvelope } =
+const { main: envelopeMain, artifactTargets, ENVELOPE_FILE, parsePublicKey, verifyEnvelope } =
   await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
+
+// A signer that calls `tauri signer sign --app-version <v> <file>`, writes <file>.sig and returns
+// it. npm's `.bin/tauri` is an extensionless shell shim Node cannot exec on Windows, so when the
+// path points at it, run the CLI's JS entry with this node instead (as updater-tests/make-feed.mjs
+// does). TAURI_SIGNING_PRIVATE_KEY(_PASSWORD) come from the environment, as for `tauri build`.
+// Resolves `tauriArg` to a runnable argv. npm's `.bin/tauri` is an extensionless shell shim Node
+// cannot exec on Windows, so point at the CLI's JS entry run by this node instead.
+export function resolveTauriCommand(tauriArg = process.env.TAURI_CLI || 'tauri') {
+  const m = String(tauriArg).match(/^(.*)[\\/]\.bin[\\/]tauri(\.cmd)?$/)
+  return m ? [process.execPath, path.join(m[1], '@tauri-apps', 'cli', 'tauri.js')] : [tauriArg]
+}
+
+export function makeTauriSigner(tauriArg = process.env.TAURI_CLI || 'tauri') {
+  const cmd = resolveTauriCommand(tauriArg)
+  return (file, version) => {
+    if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) throw new Error('TAURI_SIGNING_PRIVATE_KEY (or _PATH) is not set')
+    execFileSync(cmd[0], [...cmd.slice(1), 'signer', 'sign', '--app-version', version, file], { stdio: ['ignore', 'pipe', 'inherit'] })
+    if (!fs.existsSync(`${file}.sig`)) throw new Error(`tauri signer sign wrote no ${file}.sig`)
+    return fs.readFileSync(`${file}.sig`, 'utf8').trim()
+  }
+}
 
 const sha512b64 = bytes => crypto.createHash('sha512').update(bytes).digest('base64')
 
@@ -94,7 +116,7 @@ export function writeElectronFeeds(out, version, date) {
 export function placeArtifact(out, from, releaseName, version, { signed = false, sign } = {}) {
   const dest = path.join(out, releaseName)
   fs.copyFileSync(from, dest)
-  if (signed) (sign ?? ((f, v) => signWithTauri(f, v)))(dest, version)
+  if (signed) (sign ?? makeTauriSigner())(dest, version)
   return dest
 }
 
@@ -134,10 +156,10 @@ function parseArgs(argv) {
       case '--rpm-arm64': out['rpm-arm64'] = value(); break
       case '--cli': out.cli.push(value()); break
       case '--date': out.date = value(); break
-      case '--no-sign': out.sign = false; break
+      case '--tauri': out.tauri = value(); break
       // forwarded to update-envelope.mjs
       case '--channel': case '--min-version': case '--data-format':
-      case '--expires-days': case '--notes': case '--generated-at': case '--tauri':
+      case '--expires-days': case '--notes': case '--generated-at':
         out.extraEnvelope.push(a, value()); break
       default: throw new Error(`unknown argument ${a}`)
     }
@@ -147,11 +169,12 @@ function parseArgs(argv) {
 }
 
 export function assemble(opts, sign) {
+  const signer = sign ?? makeTauriSigner(opts.tauri)
   fs.mkdirSync(opts.out, { recursive: true })
   const names = releaseNames(opts.version)
   for (const kind of Object.keys(names)) {
     if (!opts[kind]) continue
-    placeArtifact(opts.out, opts[kind], names[kind].name, opts.version, { signed: opts.sign && names[kind].signed, sign })
+    placeArtifact(opts.out, opts[kind], names[kind].name, opts.version, { signed: opts.sign && names[kind].signed, sign: signer })
   }
   for (const file of opts.cli) fs.copyFileSync(file, path.join(opts.out, path.basename(file)))
 
@@ -163,7 +186,7 @@ export function assemble(opts, sign) {
   if (opts.sign) {
     // the signer writes <file>.sig (as `tauri signer sign` does); self-verify before it ships
     const envelopeFile = path.join(opts.out, ENVELOPE_FILE)
-    const sig = (sign ?? ((f, v) => signWithTauri(f, v)))(envelopeFile, opts.version)
+    const sig = signer(envelopeFile, opts.version)
     verifyEnvelope(fs.readFileSync(envelopeFile), sig, parsePublicKey(fs.readFileSync(opts.pubkey, 'utf8')))
   }
 

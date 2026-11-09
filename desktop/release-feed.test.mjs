@@ -5,8 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 
-import { assemble, singleFileFeed, linuxFeed, linuxFeedNames, writeElectronFeeds } from './release-feed.mjs'
-import { gate, releaseFlags } from './release-gate.mjs'
+import { assemble, singleFileFeed, linuxFeed, linuxFeedNames, writeElectronFeeds, resolveTauriCommand } from './release-feed.mjs'
+import { gate, releaseFlags, semverKey, semverLess } from './release-gate.mjs'
 import { main as publishMain } from './release-publish.mjs'
 import { parsePublicKey } from './update-envelope.mjs'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
@@ -69,21 +69,24 @@ test('linuxFeed lists every package, deb primary, accepted by the verifier', () 
   assert.deepEqual(linuxFeedNames('arm64'), ['latest-linux-arm64.yml', 'beta-linux-arm64.yml'])
 })
 
-// Builds a full release folder from fake raw bundles and gates it.
-function buildRelease(version, { key, extra = [], signEnvelope } = {}) {
+// Builds a full release folder from fake raw bundles and gates it. `full` adds the mac bundles and
+// a command-line package, so the whole §5.2 set is exercised.
+function buildRelease(version, { key, extra = [], signEnvelope, full = false } = {}) {
   key ??= makeKey()
   const raw = tmp()
   const out = tmp()
-  const win = path.join(raw, `SpawnLoft_${version}_x64-setup.exe`)
-  const deb = path.join(raw, 'bundle.deb')
-  const rpm = path.join(raw, 'bundle.rpm')
-  fs.writeFileSync(win, crypto.randomBytes(2048))
-  fs.writeFileSync(deb, crypto.randomBytes(1024))
-  fs.writeFileSync(rpm, crypto.randomBytes(1024))
-  const envelope = assemble({
-    out, version, pubkey: pubFile(key), win, deb, rpm,
-    cli: [], sign: true, date: '2026-12-01T00:00:00Z', extraEnvelope: extra,
-  }, signEnvelope ?? key.sign)
+  const inputs = { out, version, pubkey: pubFile(key), cli: [], sign: true, date: '2026-12-01T00:00:00Z', extraEnvelope: extra }
+  const put = (name, bytes = 1024) => { const p = path.join(raw, name); fs.writeFileSync(p, crypto.randomBytes(bytes)); return p }
+  inputs.win = put('SpawnLoft_setup.exe', 2048)
+  inputs.deb = put('bundle.deb')
+  inputs.rpm = put('bundle.rpm')
+  if (full) {
+    inputs['mac-updater'] = put('SpawnLoft.app.tar.gz', 3000)
+    inputs['mac-dmg'] = put('SpawnLoft.dmg', 4000)
+    inputs['mac-zip'] = put('SpawnLoft.zip', 3500)
+    inputs.cli = [put(`spawnloft-cli-${version}-linux-amd64.deb`, 1500)]
+  }
+  const envelope = assemble(inputs, signEnvelope ?? key.sign)
   return { key, out, envelope }
 }
 
@@ -107,6 +110,52 @@ test('a beta release assembles every asset and passes the gate', () => {
   assert.ok(result.ok, result.problems.join('; '))
   assert.deepEqual(result.flags, { prerelease: true, makeLatest: false })
   assert.ok(result.targets.includes('windows-x86_64'))
+})
+
+test('the full asset set (mac updater tarball, dmg, zip, cli package) passes the gate', () => {
+  const { key, out } = buildRelease('2.0.0-beta.3', { full: true })
+  const files = fs.readdirSync(out).sort()
+  for (const name of [
+    'SpawnLoft-2.0.0-beta.3-mac-arm64.app.tar.gz', 'SpawnLoft-2.0.0-beta.3-mac-arm64.app.tar.gz.sig',
+    'SpawnLoft-2.0.0-beta.3-mac-arm64.dmg', 'SpawnLoft-2.0.0-beta.3-mac-arm64.zip',
+    'latest-mac.yml', 'beta-mac.yml', 'spawnloft-cli-2.0.0-beta.3-linux-amd64.deb',
+  ]) assert.ok(files.includes(name), `${name} should be present, saw ${files.join(', ')}`)
+  const result = gate({ dir: out, version: '2.0.0-beta.3', pubkey: pubFile(key) })
+  assert.ok(result.ok, result.problems.join('; '))
+  assert.ok(result.targets.includes('darwin-aarch64'))
+})
+
+test('the gate rejects a signature whose trusted comment names another file', () => {
+  const { key, out } = buildRelease('2.0.0-beta.3')
+  // sign the SAME installer bytes under a different name, so the sig verifies but its comment lies
+  const installer = path.join(out, 'SpawnLoft-Setup-2.0.0-beta.3.exe')
+  const decoy = path.join(tmp(), 'decoy.exe')
+  fs.copyFileSync(installer, decoy)
+  const badSig = key.sign(decoy, '2.0.0-beta.3') // comment file:decoy.exe over the installer bytes
+  fs.writeFileSync(`${installer}.sig`, badSig + '\n')
+  const env = path.join(out, 'spawnloft-updates.json')
+  const doc = JSON.parse(fs.readFileSync(env, 'utf8'))
+  doc.platforms['windows-x86_64'].signature = badSig
+  fs.writeFileSync(env, JSON.stringify(doc, null, 2) + '\n')
+  key.sign(env, '2.0.0-beta.3') // re-sign the edited envelope so only the comment check fails
+  const result = gate({ dir: out, version: '2.0.0-beta.3', pubkey: pubFile(key) })
+  assert.ok(!result.ok)
+  assert.ok(result.problems.some(p => /made for decoy\.exe/.test(p)), result.problems.join('; '))
+})
+
+test('resolveTauriCommand turns npm\'s .bin shim into a node invocation', () => {
+  const r = resolveTauriCommand('/tmp/tauri-cli/node_modules/.bin/tauri')
+  assert.equal(r.length, 2)
+  assert.ok(r[1].endsWith(path.join('@tauri-apps', 'cli', 'tauri.js')))
+  assert.deepEqual(resolveTauriCommand('/usr/local/bin/tauri'), ['/usr/local/bin/tauri'])
+})
+
+test('semver helpers order betas below their stable and 1.x below 2.x', () => {
+  assert.ok(semverLess('2.0.0-beta.1', '2.0.0-beta.2'))
+  assert.ok(semverLess('2.0.0-beta.9000', '2.0.0'))
+  assert.ok(semverLess('1.6.0-beta.413', '2.0.0-beta.1'))
+  assert.ok(!semverLess('2.0.0', '2.0.0'))
+  assert.equal(semverKey('not-semver'), null)
 })
 
 test('a stable release is latest by default and can be held back', () => {

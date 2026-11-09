@@ -64,7 +64,9 @@ const overlay = {
   },
   plugins: {
     updater: {
-      pubkey: readFileSync(pubkeyFile, 'utf8').trim(),
+      // the plugin base64-decodes `pubkey`; accept either the base64 the CLI's .pub holds or the
+      // decoded two-line minisign file (UPDATER-KEYS.md release.pub), emitting the base64 form
+      pubkey: (text => (text.includes('\n') ? Buffer.from(text.trimEnd() + '\n').toString('base64') : text.trim()))(readFileSync(pubkeyFile, 'utf8')),
       windows: { installMode: 'passive' },
       // test feeds are a loopback HTTP server; a release feed is HTTPS
       ...(feedHttp ? { dangerousInsecureTransportProtocol: true } : {}),

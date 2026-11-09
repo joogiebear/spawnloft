@@ -6,8 +6,9 @@
 //   2. a DRAFT release is created or reused — a draft creates no git tag and no releases.atom
 //      entry, so discovery never sees the tag before its assets exist (a bare tag or an
 //      unfinished release newer than the newest beta makes every beta check 404);
-//   3. every asset is uploaded and the uploaded bytes are read back and compared to the local
-//      bytes (size and sha256) before anything is made public;
+//   3. every asset is uploaded and the size and sha256 digest GitHub reports for each uploaded
+//      asset are compared to the local bytes before anything is made public (as publish-stable
+//      does; GitHub computes the digest from the stored bytes);
 //   4. only then is the draft flipped to published, atomically carrying its prerelease and
 //      make_latest flags. make_latest follows the rule in release-gate.releaseFlags: a beta is a
 //      prerelease and is never latest; a stable release is latest unless deliberately held back.
@@ -20,12 +21,13 @@
 //        [--notes <file>] [--confirm]
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const { gate, releaseFlags } = await import(pathToFileURL(path.join(HERE, 'release-gate.mjs')).href)
+const { gate, releaseFlags, semverLess, semverKey } = await import(pathToFileURL(path.join(HERE, 'release-gate.mjs')).href)
 const { channelOf } = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
@@ -40,7 +42,7 @@ function parseArgs(argv) {
       case '--version': out.version = value(); break
       case '--commit': out.commit = value(); break
       case '--channel': out.channel = value(); break
-      case '--make-latest': out.makeLatest = value() === 'true'; break
+      case '--make-latest': { const v = value(); if (v !== 'true' && v !== 'false') throw new Error('--make-latest takes true or false'); out.makeLatest = v === 'true'; break }
       case '--repo': out.repo = value(); break
       case '--notes': out.notes = value(); break
       case '--pubkey': out.pubkey = value(); break
@@ -87,8 +89,10 @@ export function main(argv) {
   try { taggedCommit = gh(['api', `repos/${opts.repo}/commits/${tag}`, '--jq', '.sha']) }
   catch (error) { if (!/HTTP (404|422)/.test(String(error.stderr))) throw error }
   if (taggedCommit && taggedCommit !== opts.commit) throw new Error(`${tag} already exists on a different commit`)
+  if (taggedCommit === opts.commit) console.warn(`WARNING: ${tag} already points at ${opts.commit.slice(0, 12)} with no complete release; every beta install's check 404s until this finishes.`)
 
-  const existing = JSON.parse(gh(['api', `repos/${opts.repo}/releases`, '--paginate', '--slurp'])).flat().filter(r => r.tag_name === tag || r.name === tag)
+  const allReleases = JSON.parse(gh(['api', `repos/${opts.repo}/releases`, '--paginate', '--slurp'])).flat()
+  const existing = allReleases.filter(r => r.tag_name === tag || r.name === tag)
   if (existing.length > 1) throw new Error('more than one release claims this tag')
   const release = existing[0]
   if (release && !release.draft) {
@@ -96,6 +100,8 @@ export function main(argv) {
     console.log(`${tag} is already published with these exact assets.`)
     return { tag, prerelease, makeLatest, assets: local.map(a => a.name), alreadyPublished: true }
   }
+
+  checkOrdering(gh, opts, tag, allReleases.filter(r => !r.draft && r.tag_name && r.tag_name !== tag))
 
   // 2. a draft (creates no tag yet) with the notes
   const notes = opts.notes ?? writeNotes(opts)
@@ -114,6 +120,28 @@ export function main(argv) {
   return { tag, prerelease, makeLatest, assets: local.map(a => a.name) }
 }
 
+// Ordering (P0-E 4b / design 11): a 2.x release must be a higher version than every published
+// release and sit on a commit newer than the newest published one's, or a beta install's check is
+// offered the wrong release (discovery is by tagged-commit date, and GitHub's own order lags).
+function checkOrdering(gh, opts, tag, published) {
+  if (!published.length) return
+  for (const r of published) {
+    const v = r.tag_name.replace(/^v/, '')
+    if (semverKey(v) && !semverLess(v, opts.version)) {
+      throw new Error(`${r.tag_name} is not below ${tag}; a release must be a higher version than every published one`)
+    }
+  }
+  // the newest published release by creation time is the reference; our tagged commit must be newer
+  const newest = published.reduce((a, b) => (new Date(a.created_at) >= new Date(b.created_at) ? a : b))
+  const ourDate = new Date(gh(['api', `repos/${opts.repo}/commits/${opts.commit}`, '--jq', '.commit.committer.date']))
+  let theirDate
+  try { theirDate = new Date(gh(['api', `repos/${opts.repo}/commits/${newest.tag_name}`, '--jq', '.commit.committer.date'])) }
+  catch { return } // a tag that no longer resolves can't be the reference
+  if (ourDate.getTime() <= theirDate.getTime()) {
+    throw new Error(`${tag}'s commit is not newer than ${newest.tag_name}'s; release ordering is by commit date (P0-E 4b)`)
+  }
+}
+
 function verifyUploaded(release, local) {
   if (!Array.isArray(release.assets) || release.assets.length !== local.length) throw new Error('the published asset count differs from the built set')
   for (const a of local) {
@@ -125,7 +153,8 @@ function verifyUploaded(release, local) {
 }
 
 function writeNotes(opts) {
-  const file = path.join(opts.dir, 'release-notes.md')
+  // not into opts.dir: that folder is the gated, to-be-published asset set, and a retry re-gates it
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-notes-')), 'release-notes.md')
   const lead = opts.channel === 'beta'
     ? 'This is a 2.0 beta.'
     : 'SpawnLoft 2.0.'

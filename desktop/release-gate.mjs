@@ -17,19 +17,48 @@
 //
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
+//        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const U = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
-const { ENVELOPE_FILE, parsePublicKey, verifyEnvelope, verifyMinisign, buildLatestJson, artifactTargets, channelOf } = U
+const { ENVELOPE_FILE, DOWNLOAD_BASE, FORMAT, PRODUCT, parsePublicKey, verifyEnvelope, verifyMinisign, decodeSignature, buildLatestJson, artifactTargets, channelOf } = U
 
 const sha512hex = bytes => crypto.createHash('sha512').update(bytes).digest('hex')
+
+// The fields of a minisign trusted comment (`file:... version:...`), which the client checks so a
+// signature cannot be moved between files or versions (update-envelope verifyArtifactComment).
+function trustedFields(sigBase64) {
+  const { trustedComment } = decodeSignature(sigBase64)
+  return Object.fromEntries(trustedComment.split('\t').map(f => [f.slice(0, f.indexOf(':')), f.slice(f.indexOf(':') + 1)]))
+}
+
+// Ordering key for a release version (stable sorts above its betas); handles x.y.z and x.y.z-beta.N
+// (both 1.x and 2.x). Returns null for anything else.
+export function semverKey(v) {
+  const m = /^(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/.exec(v)
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] === undefined ? Number.MAX_SAFE_INTEGER : Number(m[4])] : null
+}
+function cmpKey(ka, kb) {
+  for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1
+  return 0
+}
+export function semverLE(a, b) {
+  const ka = semverKey(a); const kb = semverKey(b)
+  return ka && kb ? cmpKey(ka, kb) <= 0 : false
+}
+// Strictly a < b; false if either is not a comparable release version.
+export function semverLess(a, b) {
+  const ka = semverKey(a); const kb = semverKey(b)
+  return ka && kb ? cmpKey(ka, kb) < 0 : false
+}
 
 // The make_latest / prerelease pair a channel allows. Betas are prereleases and can never be
 // latest (electron-updater stable reads /releases/latest; betas follow releases.atom order).
@@ -54,8 +83,12 @@ function parseArgs(argv) {
       case '--version': out.version = value(); break
       case '--pubkey': out.pubkey = value(); break
       case '--channel': out.channel = value(); break
-      case '--make-latest': out.makeLatest = value() === 'true'; break
+      case '--make-latest': { const v = value(); if (v !== 'true' && v !== 'false') throw new Error('--make-latest takes true or false'); out.makeLatest = v === 'true'; break }
       case '--data-format': out.dataFormat = Number(value()); break
+      // when set, the Windows installer must carry a valid timestamped Authenticode signature whose
+      // subject CN is this name, or 1.x installs refuse the update forever (design 10, PHASE0 S195);
+      // omitted for the unsigned dry run
+      case '--authenticode-cn': out.authenticodeCn = value(); break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -65,7 +98,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -89,36 +122,65 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat }) 
   }
 
   if (envelope) {
+    // The deterministic payload fields a client checks, redone here so a typo never ships.
+    const tag = `v${version}`
     if (envelope.version !== version) problems.push(`the envelope says ${envelope.version}, this release is ${version}`)
     if (envelope.channel !== channel) problems.push(`the envelope channel is ${envelope.channel}, expected ${channel}`)
     if (envelope.keyId !== key.keyId) problems.push(`the envelope names key ${envelope.keyId}, the public key is ${key.keyId}`)
+    if (envelope.product !== PRODUCT) problems.push(`the envelope product is ${envelope.product}, expected ${PRODUCT}`)
+    if (envelope.format !== FORMAT) problems.push(`the envelope format is ${envelope.format}, this build knows ${FORMAT}`)
+    if (envelope.tag !== tag) problems.push(`the envelope tag is ${envelope.tag}, expected ${tag}`)
     if (dataFormat !== undefined && envelope.dataFormat !== dataFormat) problems.push(`the envelope data format is ${envelope.dataFormat}, expected ${dataFormat}`)
+    const gen = new Date(envelope.generatedAt)
+    if (Number.isNaN(gen.getTime())) problems.push(`the envelope generatedAt ${envelope.generatedAt} is not a date`)
+    else if (gen.getTime() > Date.now() + 3600000) problems.push(`the envelope generatedAt ${envelope.generatedAt} is in the future`)
+    if (!semverLE(envelope.minVersion, version)) problems.push(`the envelope minVersion ${envelope.minVersion} is above the release version ${version}`)
 
-    // Every artifact the envelope names must be present, match its size/sha512, and (signed ones)
-    // verify with the release key on the bytes on disk.
+    // Every artifact the envelope names must be present, match its url, size and sha512, and
+    // (signed ones) verify with the release key on the bytes on disk, with a trusted comment that
+    // names this file and version (so a signature cannot be moved between files).
     for (const target of artifactTargets(version)) {
       const entry = envelope.platforms[target.target]
       const present = has(target.file)
       if (!entry) {
-        if (present) problems.push(`${target.file} is in the folder but not in the envelope`)
+        if (present) { read(target.file); if (has(`${target.file}.sig`)) read(`${target.file}.sig`); problems.push(`${target.file} is in the folder but not in the envelope`) }
         continue
       }
       if (!present) { problems.push(`the envelope names ${target.file}, which is not in the folder`); continue }
       const bytes = read(target.file)
+      const wantUrl = `${DOWNLOAD_BASE}${tag}/${target.file}`
+      if (entry.url !== wantUrl) problems.push(`${target.file}: the envelope url is ${entry.url}, expected ${wantUrl}`)
       if (entry.size !== bytes.length) problems.push(`${target.file}: the envelope size ${entry.size} is not the file's ${bytes.length}`)
       if (entry.sha512 !== sha512hex(bytes)) problems.push(`${target.file}: the envelope sha512 does not match the file`)
       if (target.signed) {
         const sigName = `${target.file}.sig`
         if (!has(sigName)) { problems.push(`${target.file}: no ${sigName} beside it`); continue }
         const sig = read(sigName).toString('utf8').trim()
-        if (entry.signature !== sig) problems.push(`${target.file}: the envelope signature is not the .sig on disk`)
-        else if (!verifyMinisign(bytes, sig, key)) problems.push(`${target.file}: its signature does not verify with the release key`)
-        else notes.push(`${target.file}: signed and verified`)
+        if (entry.signature !== sig) { problems.push(`${target.file}: the envelope signature is not the .sig on disk`); continue }
+        if (!verifyMinisign(bytes, sig, key)) { problems.push(`${target.file}: its signature does not verify with the release key`); continue }
+        let fields
+        try { fields = trustedFields(sig) } catch (e) { problems.push(`${target.file}: its signature is unreadable (${e.message})`); continue }
+        if (fields.file !== target.file) problems.push(`${target.file}: its signature was made for ${fields.file ?? 'no file'}`)
+        else if ((fields.version ?? '').replace(/^v/, '') !== version) problems.push(`${target.file}: its signature carries version ${fields.version ?? 'none'}, not ${version}`)
+        else notes.push(`${target.file}: signed and verified (comment names the file and version)`)
       } else if (present) {
         notes.push(`${target.file}: present (${bytes.length} bytes)`) // package manager verifies the bytes
       }
     }
     if (!Object.keys(envelope.platforms).length) problems.push('the envelope names no platform')
+
+    // The Windows installer's Authenticode signature, when a publisher CN is required (real
+    // releases). Skipped on the unsigned dry run (no --authenticode-cn) and off Windows.
+    const installer = `SpawnLoft-Setup-${version}.exe`
+    if (authenticodeCn && has(installer)) {
+      if (process.platform !== 'win32') notes.push(`authenticode: not checked off Windows (${installer})`)
+      else {
+        const r = authenticode(path.join(dir, installer))
+        if (!r.ok) problems.push(`${installer}: ${r.why}`)
+        else if (r.cn !== authenticodeCn) problems.push(`${installer}: signed by "${r.cn}", expected "${authenticodeCn}"`)
+        else notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`)
+      }
+    }
 
     // latest.json must be exactly what the envelope derives.
     if (!has('latest.json')) problems.push('latest.json is missing')
@@ -150,6 +212,16 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat }) 
     if (packages.length) checkFeedPair(dir, names, read, problems, notes, text => verifyLinuxFeed(text, version, packages))
   }
 
+  // Assets not named by the update envelope: the mac .dmg (manual install) and the command-line
+  // packages (the package manager installs and verifies them). Present and non-empty is enough.
+  const manual = [`SpawnLoft-${version}-mac-arm64.dmg`, ...fs.readdirSync(dir).filter(n => /^spawnloft-cli-/.test(n))]
+  for (const name of manual) {
+    if (!has(name)) continue
+    const bytes = read(name)
+    if (!bytes.length) problems.push(`${name} is empty`)
+    else notes.push(`${name}: present (${bytes.length} bytes)`)
+  }
+
   // Nothing unexpected. Every file in the folder should have been read by a check above.
   for (const name of fs.readdirSync(dir)) {
     if (!fs.statSync(path.join(dir, name)).isFile()) { problems.push(`${name} is a directory; a release folder is flat`); continue }
@@ -158,6 +230,24 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat }) 
 
   const targets = envelope ? Object.keys(envelope.platforms) : []
   return { ok: problems.length === 0, problems, notes, flags, targets, channel, version }
+}
+
+// A Windows installer's Authenticode signature: valid, timestamped, and the signer's CN. A missing
+// timestamp is a failure (the certificate outlives the signature otherwise). Windows only.
+function authenticode(file) {
+  try {
+    const literal = file.replaceAll("'", "''")
+    const out = execFileSync('powershell', ['-NoProfile', '-Command',
+      `$s = Get-AuthenticodeSignature -LiteralPath '${literal}'; Write-Output $s.Status; Write-Output $s.SignerCertificate.Subject; Write-Output ($s.TimeStamperCertificate -ne $null)`],
+      { encoding: 'utf8', windowsHide: true, timeout: 60000 })
+    const [status, subject, stamped] = String(out).trim().split(/\r?\n/)
+    if (status !== 'Valid') return { ok: false, why: `Authenticode status is ${status || 'unreadable'}` }
+    if (String(stamped).trim() !== 'True') return { ok: false, why: 'the Authenticode signature has no timestamp, so it dies when the certificate expires' }
+    const cn = /CN=([^,]+)/.exec(subject || '')
+    return { ok: true, cn: cn ? cn[1] : subject }
+  } catch (e) {
+    return { ok: false, why: `could not read the Authenticode signature (${e.message})` }
+  }
 }
 
 function checkFeedPair(dir, names, read, problems, notes, verify) {
