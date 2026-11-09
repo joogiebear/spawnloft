@@ -337,8 +337,15 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     # the app as a user starts it: no ELECTRON_RUN_AS_NODE, Electron's own log on stderr
     [Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null)
     $script:result.panelEnvRunAsNode = "$env:ELECTRON_RUN_AS_NODE"
+    $script:result.panelEnvSeen = @(foreach ($scope in 'Process', 'User', 'Machine') {
+      $vars = [Environment]::GetEnvironmentVariables($scope)
+      foreach ($k in $vars.Keys) { if ("$k" -match 'ELECTRON|^NODE_') { "$scope $k=$($vars[$k])" } }
+    })
+    # started from a direct launch it ran as Node (Electron saw ELECTRON_RUN_AS_NODE from somewhere):
+    # start it the way a user does, through the shell, which gives it the session's environment
     $pOut = Join-Path $env:RUNNER_TEMP 'panel-out.txt'; $pErr = Join-Path $env:RUNNER_TEMP 'panel-err.txt'
-    $panel = Start-Process "$inst\SpawnLoft.exe" -ArgumentList '--enable-logging' -PassThru -RedirectStandardOutput $pOut -RedirectStandardError $pErr
+    Set-Content $pOut ''; Set-Content $pErr ''
+    $panel = Start-Process "$env:WINDIR\explorer.exe" -ArgumentList "`"$inst\SpawnLoft.exe`"" -PassThru
     # the panel is an app window, whichever SpawnLoft.exe process shows it (Electron may hand
     # over to another process of its own)
     $panelOpen = Wait-Until { @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }).Count -gt 0 } 45
