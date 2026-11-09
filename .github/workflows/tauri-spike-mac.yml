@@ -1,0 +1,101 @@
+name: tauri-spike-mac
+
+# P0-F (PLAN-RUST-TAURI.md section 3 item 5), internal only: the Tauri 2 shell as a macOS .app
+# with the 1.x bundle id, signed with the release Developer ID and notarized, for the
+# Squirrel.Mac acceptance test on Victor's Mac mini. By hand only, on v2 only. The one job that
+# reads the Mac signing secrets uploads a workflow artifact (14 days) and nothing else: no
+# feed, no tag, no release. Victor approved signing this in CI on 2026-11-09.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tauri-spike-mac-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  SPIKE_VERSION: 2.0.0-spike.1
+
+jobs:
+  mac-app:
+    if: github.ref == 'refs/heads/v2'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+      - name: Overlay config (version, resources, macOS icon, throwaway updater key)
+        run: |
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          "$tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/spike.key" -f
+          "$tauri" icon desktop/build/icon-mac.png -o "$RUNNER_TEMP/icons"
+          node rust/crates/spawnloft-shell/spike/spike-config.mjs "$SPIKE_VERSION" "$RUNNER_TEMP/spike.key.pub" "$RUNNER_TEMP/overlay.json"
+          node -e '
+            const fs = require("node:fs"); const f = process.argv[1]; const o = JSON.parse(fs.readFileSync(f, "utf8"))
+            o.bundle.icon = [process.argv[2] + "/icon.icns", process.argv[2] + "/icon.png"]
+            o.bundle.macOS = { minimumSystemVersion: "11.0", hardenedRuntime: true }
+            fs.writeFileSync(f, JSON.stringify(o, null, 2))
+          ' "$RUNNER_TEMP/overlay.json" "$RUNNER_TEMP/icons"
+          cat "$RUNNER_TEMP/overlay.json"
+      - name: Build, sign and notarize the .app
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/spike.key")"
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          # Tauri imports APPLE_CERTIFICATE into a temporary keychain and picks the Developer ID
+          # identity from it; notarizing (and stapling) runs when APPLE_ID/PASSWORD/TEAM_ID are set
+          for attempt in 1 2 3; do
+            SPAWNLOFT_VERSION="$SPIKE_VERSION" "$tauri" build --ci --bundles app --config "$RUNNER_TEMP/overlay.json" && break
+            echo "::warning::build, signing or notarization failed on attempt $attempt of 3"
+            [ "$attempt" -lt 3 ] && sleep 30 || exit 1
+          done
+      - name: Verify and package for Squirrel.Mac
+        run: |
+          app=rust/target/release/bundle/macos/SpawnLoft.app
+          mkdir -p out
+          codesign --verify --deep --strict --verbose=2 "$app" 2>&1 | tee out/codesign-verify.txt
+          codesign -dv --verbose=4 "$app" 2>&1 | tee out/codesign-info.txt
+          spctl -a -vv "$app" 2>&1 | tee out/spctl.txt || true
+          xcrun stapler validate "$app" 2>&1 | tee out/stapler.txt || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' -c 'Print :CFBundleShortVersionString' -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist" | tee out/info.txt
+          ls -la "$app/Contents/Resources/resources/bin" | tee -a out/info.txt
+          ditto -c -k --sequesterRsrc --keepParent "$app" "out/SpawnLoft-$SPIKE_VERSION-arm64-mac.zip"
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tauri-spike-mac-${{ github.run_number }}
+          retention-days: 14
+          path: out/
