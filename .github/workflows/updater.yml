@@ -71,8 +71,10 @@ jobs:
           for k in release next other; do
             "$tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/$k.key" -f
           done
-          id() { sed -n 1p "$1" | awk '{print $NF}'; }
-          line() { sed -n 2p "$1"; }
+          # the CLI writes the .pub as one base64 line holding the two-line minisign file
+          pub() { base64 -d "$1" 2>/dev/null || cat "$1"; }
+          id() { pub "$1" | sed -n 1p | awk '{print $NF}'; }
+          line() { pub "$1" | sed -n 2p; }
           echo "SPAWNLOFT_UPDATE_PUBKEYS=$(id "$RUNNER_TEMP/release.key.pub")=$(line "$RUNNER_TEMP/release.key.pub"),$(id "$RUNNER_TEMP/next.key.pub")=$(line "$RUNNER_TEMP/next.key.pub")" >> "$GITHUB_ENV"
           echo "TAURI_CLI=$tauri" >> "$GITHUB_ENV"
           ls -la "$RUNNER_TEMP"/*.key*
