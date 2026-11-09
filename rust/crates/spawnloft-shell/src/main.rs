@@ -105,10 +105,15 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `<exe dir>/resources`, where the installer puts the core binary and the Node core, as 1.x does.
+/// Where the bundle puts the core binary and the Node core: `<exe dir>/resources` on Windows and
+/// Linux, as 1.x does; `Contents/Resources/resources` in a macOS `.app` (Tauri's resource dir).
 fn resources_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    Some(exe.parent()?.join("resources"))
+    let dir = exe.parent()?;
+    if cfg!(target_os = "macos") {
+        return Some(dir.parent()?.join("Resources").join("resources"));
+    }
+    Some(dir.join("resources"))
 }
 
 fn core_binary() -> Option<PathBuf> {
