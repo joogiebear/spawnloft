@@ -36,16 +36,22 @@ function Start-Running1([string[]] $names) {
   Check "1.x started $($names -join ', ')" $ok
 }
 
-function Make-Orphan($dataRoot, $name) {
-  Cli1 @('start', $name, '--detach') | Out-Null
-  Check "1.x started $name" (Wait-Until { (List1)[$name].status -eq 'running' } 90)
-  $st = State $dataRoot $name
-  Stop-Process -Id $st.daemonPid -Force
+function Make-Orphan($dataRoot, $name, $dir) {
+  # what a crashed 1.x daemon leaves: java still running, the daemon gone, state.json saying
+  # running. (Killing a real 1.x daemon takes its JVM with it: the JVM is in the daemon's job.)
+  $java = Start-Process (Get-Command node).Source -ArgumentList "`"$fixtures\fake-java.mjs`"" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
+  $gone = Start-Process "$env:WINDIR\System32\cmd.exe" -ArgumentList '/c', 'exit' -PassThru -WindowStyle Hidden
+  $gone.WaitForExit()
+  $runDir = Join-Path $dataRoot "run\$name"
+  New-Item -ItemType Directory -Force $runDir | Out-Null
+  @{ name = $name; running = $true; daemonPid = $gone.Id; daemonExe = 'SpawnLoft.exe'; javaPid = $java.Id; javaExe = 'node.exe'; startedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() } |
+    ConvertTo-Json | Set-Content (Join-Path $runDir 'state.json')
   Check "$name is orphaned under 1.x (java alive, daemon gone)" (Wait-Until { (List1)[$name].status -eq 'orphaned' } 30) "$((List1)[$name].status)"
-  $st.javaPid
+  $java.Id
 }
 
-function Java-Pid($dataRoot, $name) { (State $dataRoot $name).javaPid }
+# the JVM as pid@start time (Proc-Key), so a reused pid is not taken for the old process
+function Java-Pid($dataRoot, $name) { Proc-Key (State $dataRoot $name).javaPid }
 
 function Record($dataRoot) { Read-Json (Join-Path $dataRoot 'run\handover.json') }
 
@@ -61,11 +67,19 @@ function Console-Has($dataRoot, $name, $text) {
   (Test-Path $f) -and [bool] (Select-String -LiteralPath $f -Pattern $text -SimpleMatch -Quiet)
 }
 
-function Check-Graceful($dataRoot, $name, $oldPid, $evidence = 'Saving worlds') {
+function Check-Graceful($dataRoot, $name, $oldPid, $evidence = $null) {
   Check "$name's old process is gone" (Wait-Until { -not (Pid-Alive $oldPid) } 30) "pid $oldPid"
-  # the fake java prints "Saving worlds" on a graceful stop, the fake MariaDB "Normal shutdown";
-  # a kill prints nothing
-  Check "$name was stopped, not killed ($evidence in its console log)" (Console-Has $dataRoot $name $evidence)
+  if ($evidence) {
+    # the fake MariaDB prints "Normal shutdown" on a graceful stop; a kill prints nothing
+    Check "$name was stopped, not killed ($evidence in its console log)" (Console-Has $dataRoot $name $evidence)
+    return
+  }
+  # the fake java logs each graceful stop by pid in fake-stops.log (a restart rotates the console
+  # log, so the console is not the evidence); a kill logs nothing
+  $f = Join-Path $dataRoot "instances\$name\fake-stops.log"
+  $stops = if (Test-Path $f) { @(Get-Content $f | ForEach-Object { ($_ | ConvertFrom-Json).pid }) } else { @() }
+  Check "$name was stopped, not killed (a graceful stop in fake-stops.log)" ($stops.Count -gt 0) "java pid $oldPid, stops: $($stops -join ',')"
+  Note "$name-stopPidMatches" ($stops -contains [int](("$oldPid" -split '@')[0]))
 }
 
 function Check-Rust-Daemon($dataRoot, $name) {
@@ -109,7 +123,7 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   $seed = Seed-Legacy @(@{ name = 'survival' }, @{ name = 'creative' }, @{ name = 'lost' }) @('mysql-main')
   Check 'seeded into the expected data root' ($seed.dataRoot -eq $dataRoot) "$($seed.dataRoot) vs $dataRoot"
   Start-Running1 @('mysql-main', 'survival')
-  $lostJava = Make-Orphan $dataRoot 'lost'
+  $lostJava = Make-Orphan $dataRoot 'lost' $seed.servers.lost
   $survivalJava = Java-Pid $dataRoot 'survival'
   $dbJava = Java-Pid $dataRoot 'mysql-main'
   Cli1 @('task', 'add', 'survival', '--do', 'backup', '--daily', '03:00') | Out-Null
@@ -237,43 +251,75 @@ switch ($Name) {
     $seed = Seed-Legacy @(@{ name = 'slow'; ignoreStop = $true }, @{ name = 'good' }) @()
     Start-Running1 @('slow', 'good')
     $goodJava = Java-Pid $dataRoot 'good'
-    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
     $p = Start-Process $setupA -PassThru
     $null = $p.Handle
-    $root = [Windows.Automation.AutomationElement]::RootElement
-    $byPid = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ProcessIdProperty, $p.Id)
-    function Window { $root.FindFirst([Windows.Automation.TreeScope]::Children, $byPid) }
-    function Button($w, $label) {
-      $c = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::NameProperty, $label)
-      $w.FindFirst([Windows.Automation.TreeScope]::Descendants, $c)
-    }
-    function Texts($w) {
-      $c = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Text)
-      ($w.FindAll([Windows.Automation.TreeScope]::Descendants, $c) | ForEach-Object { $_.Current.Name }) -join ' | '
-    }
+    # plain Win32 for NSIS's dialogs: the main window is the visible #32770 of the setup's pid
+    # with a Back button (id 3); its buttons are 1 Next/Install, 2 Cancel, 3 Back, pressed with
+    # BM_CLICK; texts are read with WM_GETTEXT, which Windows marshals across processes
+    Add-Type -Namespace Ci -Name Win -UsingNamespace System.Text, System.Collections.Generic -MemberDefinition @'
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+[DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
+[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
+[DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint m, IntPtr w, StringBuilder l, uint f, uint t, out IntPtr r);
+[DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+public static string Cls(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
+public static string Text(IntPtr h) { var s = new StringBuilder(4096); IntPtr r; SendMessageTimeout(h, 0x000D, (IntPtr)4096, s, 2, 2000, out r); return s.ToString(); }
+public static List<IntPtr> Tops(int pid) {
+  var l = new List<IntPtr>();
+  EnumWindows((h, x) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) l.Add(h); return true; }, IntPtr.Zero);
+  return l;
+}
+public static IntPtr Main(int pid) {
+  foreach (var h in Tops(pid)) if (Cls(h) == "#32770" && GetDlgItem(h, 3) != IntPtr.Zero) return h;
+  return IntPtr.Zero;
+}
+public static string Dump(int pid) {
+  var sb = new StringBuilder();
+  foreach (var t in Tops(pid)) {
+    sb.Append("[" + Cls(t) + " '" + Text(t) + "']");
+    EnumChildWindows(t, (h, x) => { if (IsWindowVisible(h)) { var tx = Text(h); if (tx.Length > 0) sb.Append(" | " + tx.Replace("\r", " ").Replace("\n", " ")); } return true; }, IntPtr.Zero);
+    sb.Append(" ;; ");
+  }
+  return sb.ToString();
+}
+public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
+'@
+    function Window { $h = [Ci.Win]::Main($p.Id); if ($h -eq [IntPtr]::Zero) { $null } else { $h } }
+    function Button($w, $id) { if (-not $w) { return $null }; $b = [Ci.Win]::GetDlgItem($w, $id); if ($b -eq [IntPtr]::Zero) { $null } else { $b } }
+    function Enabled($b) { $b -and [Ci.Win]::IsWindowEnabled($b) }
+    function Press($b) { [Ci.Win]::Click($b) }
+    function Texts { [Ci.Win]::Dump($p.Id) }
     Check 'the setup window appears' (Wait-Until { $null -ne (Window) } 60)
     # the mutex: a second setup (what the 1.x panel's install on quit would start) exits at once
     $second = Run-Installer $setupA @('--updated', '/S') 60
     $script:result.secondSetup = $second
     Check 'a second setup exits 5 at once (mutex)' ($second.code -eq 5) "exit $($second.code) after $($second.seconds) s"
     # Next through the welcome page until the stopping page shows
+    $script:result.pageTrail = @()
     $onStopping = Wait-Until {
       $w = Window
       if (-not $w) { return $false }
-      if ((Texts $w) -match 'Stopping servers|Looking for running servers|good') { return $true }
-      $n = Button $w 'Next >'
-      if ($n -and $n.Current.IsEnabled) { $n.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
+      $t = Texts
+      if ($script:result.pageTrail -notcontains $t) { $script:result.pageTrail += , $t }
+      if ($t -match 'Stopping servers|Looking for running servers|good') { return $true }
+      $n = Button $w 1
+      if (Enabled $n) { Press $n; Start-Sleep -Milliseconds 700 }
       $false
     } 90
-    $script:result.pageTexts = Texts (Window)
+    $script:result.pageTexts = Texts
     Check 'the stopping page appears' $onStopping
     Check 'good is stopped by the page' (Wait-Until { -not (Pid-Alive $goodJava) } 120)
     Check-Graceful $dataRoot 'good' $goodJava
     Start-Sleep -Seconds 2
-    $script:result.pageTextsDuringStop = Texts (Window)
-    $cancel = Button (Window) 'Cancel'
-    Check 'Cancel is enabled during the stop' ($cancel -and $cancel.Current.IsEnabled)
-    $cancel.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $script:result.pageTextsDuringStop = Texts
+    $cancel = Button (Window) 2
+    Check 'Cancel is enabled during the stop' (Enabled $cancel)
+    Press $cancel
     Check 'the setup ends after Cancel' ($p.WaitForExit(180000))
     $script:result.cancelExit = $p.ExitCode
     Check 'exit code 4 after Cancel' ($p.ExitCode -eq 4) "exit $($p.ExitCode)"
@@ -386,10 +432,13 @@ switch ($Name) {
     Check '/UPDATE uninstall exit 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
     Check '  task kept' (@(Tasks-Under-Mcctl).Count -eq 1)
     Check '  data kept' (Test-Path (Join-Path $dataRoot 'instances.json'))
-    Check '  server still running' ((Status2)['keep'].status -eq 'running')
+    # the program files are gone until the reinstall, so ask the process table, not a CLI
+    $st = State $dataRoot 'keep'
+    Check '  server still running (daemon and JVM alive)' ((Pid-Alive $st.daemonPid) -and (Pid-Alive $st.javaPid))
     $run = Run-Installer $setupA @('/S') 300
     Check 'reinstall exit 0' ($run.code -eq 0) "exit $($run.code)"
-    Kill-Everything
+    # only the shell: keep's daemon is a spawnloft-core.exe and must live to be stopped below
+    Get-Process SpawnLoft -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
     # a 1.x installer over 2.0 (rollback), servers stopped first
     Cli2 @('stop', 'keep') | Out-Null

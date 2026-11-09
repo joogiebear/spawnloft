@@ -33,6 +33,15 @@ pub fn core_dir() -> Option<PathBuf> {
     Some(exe.parent()?.parent()?.join("core"))
 }
 
+/// The Node.js a 2.0 install will run its Node core on, or why there is none. Checked before
+/// the handover stops anything (the 2.0 core folder itself is not installed yet then).
+pub fn node() -> Result<PathBuf, String> {
+    crate::panel::find_node(None).ok_or_else(|| {
+        "Node.js was not found (needed until the Rust core port lands; install it, or set SPAWNLOFT_NODE)"
+            .to_string()
+    })
+}
+
 impl NodeCore {
     pub fn find(data_root: &Path) -> Result<NodeCore, String> {
         let dir = core_dir().ok_or("the Node core folder could not be worked out")?;

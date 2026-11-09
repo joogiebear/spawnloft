@@ -17,6 +17,9 @@ use crate::cli::{Outcome, usage_error};
 /// A resume lock older than this belongs to a resume that died.
 const STALE_LOCK: Duration = Duration::from_secs(30 * 60);
 
+/// How long the installer's resume waits for another resume to finish.
+const RESUME_WAIT: Duration = Duration::from_secs(20 * 60);
+
 fn flags(
     rest: &[String],
     with_value: &[&str],
@@ -158,7 +161,7 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     // Nothing is stopped that 2.0 could not start again: until R4 the restart goes through the
     // bundled Node core, so without Node the update waits (design 2.3, the NodeCore seam).
     if listed.iter().any(h::Listed::stoppable)
-        && let Err(e) = NodeCore::find(&data_root)
+        && let Err(e) = spawnloft_lib::nodecore::node()
     {
         log.line(&format!(
             "SpawnLoft 2 needs Node.js to start the servers again ({e}); nothing was stopped"
@@ -315,7 +318,18 @@ fn resume_cmd(rest: &[String]) -> Outcome {
     if resume::candidates(&record, opts, time::now_ms()).is_empty() && record.tasks_reenabled {
         return done(0, json!({ "exit": 0, "started": 0 }));
     }
-    let Some(_lock) = take_lock(&files.lock()) else {
+    // The installer's resume waits for one already running (the relaunched app's pending
+    // resume, say), so the install ends with the servers back; the shell's own never waits.
+    let mut lock = take_lock(&files.lock());
+    if lock.is_none() && !opts.pending_only {
+        log.line("another handover resume is running; waiting for it");
+        let until = std::time::Instant::now() + RESUME_WAIT;
+        while lock.is_none() && std::time::Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(500));
+            lock = take_lock(&files.lock());
+        }
+    }
+    let Some(_lock) = lock else {
         log.line("another handover resume is running; leaving it to that one");
         return done(0, json!({ "exit": 0, "busy": true }));
     };
