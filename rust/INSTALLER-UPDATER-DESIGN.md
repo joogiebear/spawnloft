@@ -341,9 +341,25 @@ name the table reports for a renamed image depends on the API: `Win32_Process.Na
 Rust daemon running from the uninstaller's `old-install\` folder with "Windows still reports
 its original path" (via WMI; the file name had not changed there either). So the spike's
 `.old-<tick>.exe` rename **may** make a reader that uses `QueryFullProcessImageName` call a
-live daemon `stale`, and may not affect 1.x readers at all; **this needs a test** (both APIs,
-rename to a new name and into a folder; test plan item 5). Renaming into a folder keeps the
+live daemon `stale`, and may not affect 1.x readers at all; this needed a test (both APIs,
+rename to a new name and into a folder; test plan item 5), whose result follows. Renaming into a folder keeps the
 file name and is harmless whatever the test shows, so it is the rule; the real fix is below.
+
+**Probe result (installer.yml scenario 5, windows-latest, 2026-11-09, run 42558383080).** Three
+running copies of one image, before and after a rename while running:
+
+| Process | `Win32_Process.Name` / `ExecutablePath` | `tasklist` | `QueryFullProcessImageName` |
+| --- | --- | --- | --- |
+| renamed to `spawnloft-core.old-1234.exe` | `spawnloft-core.exe` / original path | `spawnloft-core.exe` | `...\spawnloft-core.old-1234.exe` (new name) |
+| moved into `old-20261109-000000\` | `spawnloft-core.exe` / original path | `spawnloft-core.exe` | `...\old-20261109-000000\spawnloft-core.exe` |
+| the Rust daemon after a real a-to-b update | `spawnloft-core.exe` / `resources\bin\spawnloft-core.exe` | `spawnloft-core.exe` | `resources\bin\old-<stamp>\spawnloft-core.exe` |
+
+So WMI and `tasklist` (what 1.x reads) keep the name and path fixed at process creation, and
+`QueryFullProcessImageName` (what 2.0's `procid::image` reads) follows the file. The spike's
+`.old-<tick>.exe` rename would have made a 2.0 reader that compares basenames call a live daemon
+`stale`; the folder rename keeps the basename for every API, and the creation time (which did not
+change: `134386701153422829` before and after) decides first anyway. The rule above stands as
+written, now measured.
 
 Identity, the real fix: 2.0's daemon writes `daemonStartTime` (the kernel's process creation
 time, an opaque integer) beside `daemonPid` in `state.json`; 2.0's readers check (pid, creation

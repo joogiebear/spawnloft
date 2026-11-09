@@ -5,7 +5,9 @@
  * In the server folder (its cwd) it keeps evidence a CI step can read after the fact:
  *   fake-starts.log   one JSON line per start: pid, the runtime that ran it, time
  *   fake-exit.json    written on a graceful `stop`, never on a kill: a JVM that was terminated
- *                     leaves no such file
+ *                     leaves no such file (removed again by the next start)
+ *   fake-stops.log    one JSON line per graceful stop, by pid; never removed, so it survives a
+ *                     restart that rotates the console log
  * and obeys:
  *   stop   exits 0 after writing fake-exit.json; ignored (with a console line) while a file
  *          `ignore-stop` exists in its folder, the server that refuses to stop
@@ -34,6 +36,7 @@ rl.on('line', (raw) => {
     }
     say('Stopping server')
     say('Saving worlds')
+    fs.appendFileSync('fake-stops.log', JSON.stringify({ pid: process.pid, at: Date.now() }) + '\n')
     fs.writeFileSync('fake-exit.json', JSON.stringify({ pid: process.pid, graceful: true, at: Date.now() }))
     process.exit(0)
   }

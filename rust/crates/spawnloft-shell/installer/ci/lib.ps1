@@ -166,8 +166,22 @@ function Wait-Until([scriptblock] $cond, $seconds = 60) {
   [bool] (& $cond)
 }
 
-function Pid-Alive([int] $id) {
-  [bool] (Get-Process -Id $id -ErrorAction SilentlyContinue)
+# a pid, or "pid@ticks" from Proc-Key: Windows hands a freed pid out again within seconds, so a
+# process is the same one only if its start time matches too
+function Pid-Alive($id) {
+  $pid0, $ticks = "$id" -split '@'
+  if (-not $pid0) { return $false }
+  $p = Get-Process -Id ([int] $pid0) -ErrorAction SilentlyContinue
+  if (-not $p) { return $false }
+  if (-not $ticks) { return $true }
+  try { "$($p.StartTime.ToUniversalTime().Ticks)" -eq $ticks } catch { $true }
+}
+
+function Proc-Key($id) {
+  if (-not $id) { return $id }
+  $p = Get-Process -Id ([int] $id) -ErrorAction SilentlyContinue
+  if (-not $p) { return "$id" }
+  try { "$id@$($p.StartTime.ToUniversalTime().Ticks)" } catch { "$id" }
 }
 
 function Read-Json($file) {

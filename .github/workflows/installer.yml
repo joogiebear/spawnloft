@@ -120,6 +120,13 @@ jobs:
           $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           ./rust/crates/spawnloft-shell/installer/ci/scenario.ps1 -Name ${{ matrix.name }} -Feed "$env:RUNNER_TEMP\feed" `
             -Beta $beta.FullName -Stable $stable.FullName -VersionA $env:VERSION_A -VersionB $env:VERSION_B
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-${{ github.run_number }}-${{ matrix.name }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: installer-results/
       - name: Print the results and logs
         if: always()
         shell: pwsh
@@ -134,10 +141,9 @@ jobs:
               if (Test-Path $p) { Write-Host "===== $p"; Get-Content $p -Raw | Write-Host }
             }
           }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: installer-${{ github.run_number }}-${{ matrix.name }}
-          retention-days: 14
-          if-no-files-found: ignore
-          path: installer-results/
+          # last, so a log tail shows it: every check that failed
+          Write-Host '===== failed checks'
+          Get-ChildItem $env:RESULTS -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object {
+            (Get-Content $_.FullName -Raw | ConvertFrom-Json).PSObject.Properties |
+              Where-Object { "$($_.Value)" -like 'FAIL*' } | ForEach-Object { Write-Host "FAIL  $($_.Name): $($_.Value)" }
+          }
