@@ -63,6 +63,12 @@ jobs:
           restore-keys: |
             rust-updater-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
             rust-installer-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # the bundler fetches NSIS and its Tauri plugin from GitHub releases on first use; a cached
+      # toolset spares the job that download (and its outages)
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tauri/NSIS
+          key: tauri-nsis-${{ runner.os }}-cli-2.12.4
       - name: Install the Tauri CLI (pinned, from npm)
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
       - name: Throwaway keys for this run (release, next, and one nobody trusts)
