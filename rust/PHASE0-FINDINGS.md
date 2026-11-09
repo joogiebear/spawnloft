@@ -446,14 +446,10 @@ spike-a to spike-b, and uninstalled. Every check passed. (Its final step reporte
 after all six uninstall checks passed: pwsh ended the step with the last `schtasks` exit code.
 Fixed in 959d7b9.)
 
-Still to run, on Victor's machines and only with his go-ahead:
-
-- the same handover through the real electron-updater on his PC: Azure-signed spike, so the
-  publisher check runs, with servers stopped and his tasks present (this replaces
-  2.0.0-internal.8);
-- the Squirrel.Mac acceptance test on the Mac mini (same bundle id, signed and notarized,
-  offered to an installed signed beta);
-- Victor's verdict on the window on his 1440p and 4K displays.
+**The signed run on Victor's PC passed too (2026-11-09 01:28 UTC, details below).** Still to
+run: the Squirrel.Mac acceptance test on the Mac mini (same bundle id, signed and notarized,
+offered to an installed signed beta). Victor on the window at 1440p and 4K: "It looks ok right
+now."
 
 Q24 (does the plugin install `.deb` and `.rpm` on Linux) was not checked: the spike builds NSIS
 only.
@@ -529,12 +525,46 @@ electron-updater's NsisUpdater uses. It took 2.6 s and exited 0. After it:
   backups), through the argv compatibility form, with the shim text unchanged;
 - `--force-run` started the app (`startedAfterHandover: true`).
 
-Not covered here: the publisher-name check electron-updater makes before it runs the installer.
-The runner's spike is unsigned, so this run started the installer the way NsisUpdater does
-after that check. Victor's PC run covers it.
+Not covered in CI: the publisher-name check electron-updater makes before it runs the
+installer. The runner's spike is unsigned, so this run started the installer the way NsisUpdater
+does after that check. Victor's PC run (next section) covers it.
 
 Uninstall (`handover.ps1 -Uninstall`, silent): exit 0, exe removed, uninstall key and install
 key removed, the scheduled task removed by `spawnloft uninstall --yes`, data kept.
+
+### The signed handover on Victor's PC (Desktop-Main, 2026-11-09)
+
+The real electron-updater path, publisher check included. Raw files are in
+`S:\VMs\spawnloft-win\p0f\` on Desktop-Main.
+
+- The CI-built `SpawnLoft_2.0.0-spike.1_x64-setup.exe` was Authenticode-signed with the release
+  profile (Azure Trusted Signing, account Mcctl, profile MCCTL; signer CN "victor zemeckis",
+  SHA256, Microsoft timestamp). Only the outer setup was signed; the inner exe stayed unsigned.
+- The signed `SpawnLoft-Setup-1.6.0-beta.413.exe` was installed over 2.0.0-internal.16, its
+  `app-update.yml` pointed at a loopback generic feed (`publisherName: victor zemeckis`), and a
+  test server and a daily backup task were made with the 1.6 CLI (first run: result 0).
+- 1.6 found 2.0.0-spike.1, fetched `latest.yml`, got a 404 for the blockmap (none published)
+  and fell back to a full download (3,373,304 B). It then wrote `pending\update-info.json`.
+  electron-updater 6.8.9's NsisUpdater only gets that far after `verifySignature` against
+  `publisherName` passes; a mismatch deletes the file and raises
+  `ERR_UPDATER_INVALID_SIGNATURE`. There is no log line to quote, because 1.6 sets
+  `autoUpdater.logger = null` (`desktop/main.js`). **2.0 needs an updater log** if a release
+  check is to show the publisher check.
+- Victor pressed "Restart and update" (quitAndInstall, so `--force-run`). 1.6 was gone and the
+  signed setup running at 01:27:59.465, DisplayVersion read 2.0.0-spike.1 at 01:28:01.893, and
+  the Tauri `SpawnLoft.exe`, started by the setup itself, was running at 01:28:02.117: **2.65 s
+  from the button to the new app.**
+- Every check from the CI run passed again: same key with `UninstallString` on `uninstall.exe`,
+  product version 2.0.0-spike.1, `app.asar` and the 1.x uninstaller gone, core and Node core in
+  place, shortcuts on the new exe, no Tauri-default key, `InstallLocation` unchanged, the task
+  still registered and **green through the Tauri exe (result 0, backups 2 to 4)**. The shell's
+  core served the panel (`/api/instances` listed the test server) with six WebView2 processes.
+- Restore: the internal.16 setup ran silently over the spike (exit 0, 4.3 s). Electron-builder
+  called the spike's `uninstall.exe` with `--updated`, which left the task and the data alone;
+  the task ran green under internal.16 afterwards (backups 4 to 6). So the 2.0 uninstaller's
+  update mode also works for a rollback from 2.0 to a 1.x-style install.
+- The installed 1.6 calls its updater cache `spawnloft-desktop-updater`, not
+  `mcctl-desktop-updater` as the P0-E runbook says.
 
 ### Q21: Tauri's updater plugin or our own
 
