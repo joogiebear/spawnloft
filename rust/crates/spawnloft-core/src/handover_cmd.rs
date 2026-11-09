@@ -7,10 +7,10 @@ use std::time::Duration;
 use spawnloft_lib::handover::legacy::{self, CliLegacy, OwnRead};
 use spawnloft_lib::handover::resume::{self, ResumeOptions, Starter};
 use spawnloft_lib::handover::tasks::WindowsTasks;
-use spawnloft_lib::handover::{self as h, Files, Kind, Legacy, Log, Marker, Record};
+use spawnloft_lib::handover::{self as h, Files, Kind, Log, Marker, Record};
 use spawnloft_lib::nodecore::NodeCore;
 use spawnloft_lib::serde_json::json;
-use spawnloft_lib::{build, paths, time};
+use spawnloft_lib::{build, paths, procid, time};
 
 use crate::cli::{Outcome, usage_error};
 
@@ -97,10 +97,11 @@ fn stop(rest: &[String]) -> Outcome {
                     .map(|a| a.iter().filter_map(|n| n.as_str()).collect::<Vec<_>>().join(", "))
             })
             .unwrap_or_default();
-        let _ = std::fs::write(
-            dir.join("handover-exit.txt"),
-            format!("{}\r\n{blocked}\r\n", out.code),
-        );
+        // written aside and renamed, so the page never reads a half-written file
+        let tmp = dir.join("handover-exit.tmp");
+        if std::fs::write(&tmp, format!("{}\r\n{blocked}\r\n", out.code)).is_ok() {
+            let _ = spawnloft_lib::fsx::rename_over(&tmp, &dir.join("handover-exit.txt"));
+        }
     }
     out
 }
@@ -138,6 +139,7 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         deadline,
         silent,
         cancel_file: status_dir.map(|d| d.join("handover-cancel")),
+        restore_wait: h::RESTORE_WAIT,
     };
     log.line(&format!(
         "handover stop: 1.x {} in {dir}, data root {}, deadline {} s, {}",
@@ -147,18 +149,25 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         if silent { "silent" } else { "interactive" }
     ));
 
-    let listed = match legacy.list() {
+    // 1.x's own view, from the files its `readState` reads (no shipped 1.x lists as JSON)
+    let listed = match legacy::read_state_files(&data_root) {
         Ok(l) => l,
-        Err(e) => {
-            log.line(&format!(
-                "the 1.x CLI could not list: {e}; reading the state files"
-            ));
-            match legacy::read_state_files(&data_root) {
-                Ok(l) => l,
-                Err(why) => return unreadable_root(&data_root, why, &log),
-            }
-        }
+        Err(why) => return unreadable_root(&data_root, why, &log),
     };
+
+    // Nothing is stopped that 2.0 could not start again: until R4 the restart goes through the
+    // bundled Node core, so without Node the update waits (design 2.3, the NodeCore seam).
+    if listed.iter().any(h::Listed::stoppable)
+        && let Err(e) = NodeCore::find(&data_root)
+    {
+        log.line(&format!(
+            "SpawnLoft 2 needs Node.js to start the servers again ({e}); nothing was stopped"
+        ));
+        return done(
+            h::EXIT_NO_NODE,
+            json!({ "exit": h::EXIT_NO_NODE, "error": "node.js not found", "record": null }),
+        );
+    }
 
     let previous = Marker::read(&files.marker());
     let out = h::run_stop(
@@ -245,15 +254,37 @@ fn take_lock(file: &Path) -> Option<Lock> {
         {
             Ok(mut f) => {
                 use std::io::Write;
-                let _ = write!(f, "{} {}", std::process::id(), time::iso_now());
+                // the owner by (pid, creation time): a lock is stale when its owner is gone,
+                // however long a resume of many servers takes
+                let _ = write!(
+                    f,
+                    "{} {} {}",
+                    std::process::id(),
+                    procid::own_start_time()
+                        .map(|t| t.to_string())
+                        .unwrap_or_default(),
+                    time::iso_now()
+                );
                 return Some(Lock(file.to_path_buf()));
             }
             Err(_) => {
-                let stale = std::fs::metadata(file)
-                    .and_then(|m| m.modified())
-                    .ok()
-                    .and_then(|t| t.elapsed().ok())
-                    .is_some_and(|age| age > STALE_LOCK);
+                let text = std::fs::read_to_string(file).unwrap_or_default();
+                let mut parts = text.split_whitespace();
+                let owner = parts.next().and_then(|p| p.parse::<u32>().ok());
+                let start = parts.next().and_then(|t| t.parse::<u64>().ok());
+                let stale = match owner {
+                    Some(pid) => !procid::same_process(&procid::Recorded {
+                        pid,
+                        exe: None,
+                        start_time: start,
+                    }),
+                    // unreadable or half-written: by age
+                    None => std::fs::metadata(file)
+                        .and_then(|m| m.modified())
+                        .ok()
+                        .and_then(|t| t.elapsed().ok())
+                        .is_some_and(|age| age > STALE_LOCK),
+                };
                 if !stale {
                     return None;
                 }

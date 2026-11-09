@@ -111,20 +111,11 @@ impl CliLegacy {
 }
 
 impl Legacy for CliLegacy {
+    /// What 1.x's `readState` would say for every registered server and database, read from the
+    /// data folder: no shipped 1.x has `list --json` (its CLI refuses --json for `list`), and the
+    /// files are what that command would read anyway.
     fn list(&self) -> Result<Vec<Listed>, String> {
-        match self.run(
-            &["list", "--json"],
-            &Cutoff::after(CLI_QUERY_TIMEOUT),
-            &Log::none(),
-        ) {
-            Ran::Exited(0, out) => parse_list(&out),
-            Ran::Exited(code, out) => Err(format!(
-                "`list --json` exited {code}: {}",
-                out.trim().lines().last().unwrap_or("")
-            )),
-            Ran::TimedOut => Err("`list --json` did not answer in 120 s".into()),
-            Ran::NotRun(e) => Err(e),
-        }
+        read_state_files(&self.data_root).map_err(|e| format!("{e:?}"))
     }
 
     fn stop(&self, name: &str, cut: &Cutoff, log: &Log) -> CliStop {

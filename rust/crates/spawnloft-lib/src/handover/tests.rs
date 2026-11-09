@@ -9,6 +9,9 @@ struct Fake {
     refuses: bool,
     /// the CLI fails for it (pipe fallback)
     cli_broken: bool,
+    /// still saving at the cutoff, stopped shortly after it
+    late: bool,
+    finish_at: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -30,6 +33,8 @@ impl FakeLegacy {
                     status: s.to_string(),
                     refuses: false,
                     cli_broken: false,
+                    late: false,
+                    finish_at: None,
                 },
             );
         }
@@ -48,10 +53,14 @@ impl FakeLegacy {
 
 impl Legacy for FakeLegacy {
     fn list(&self) -> Result<Vec<Listed>, String> {
-        Ok(self
-            .servers
-            .lock()
-            .unwrap()
+        let mut servers = self.servers.lock().unwrap();
+        for f in servers.values_mut() {
+            if f.finish_at.is_some_and(|t| Instant::now() >= t) {
+                f.status = "stopped".into();
+                f.finish_at = None;
+            }
+        }
+        Ok(servers
             .iter()
             .map(|(n, f)| Listed {
                 name: n.clone(),
@@ -73,6 +82,8 @@ impl Legacy for FakeLegacy {
                     status: "running".into(),
                     refuses: false,
                     cli_broken: false,
+                    late: false,
+                    finish_at: None,
                 },
             );
         }
@@ -81,6 +92,15 @@ impl Legacy for FakeLegacy {
                 code: 1,
                 output: "Error: something broke".into(),
             };
+        }
+        if f.late {
+            while !cut.passed() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            self.tweak(name, |f| {
+                f.finish_at = Some(Instant::now() + Duration::from_millis(100))
+            });
+            return CliStop::DeadlinePassed;
         }
         if f.refuses {
             while !cut.passed() {
@@ -154,6 +174,7 @@ fn opts(silent: bool, deadline_ms: u64) -> StopOptions {
         deadline: Duration::from_millis(deadline_ms),
         silent,
         cancel_file: None,
+        restore_wait: Duration::from_millis(300),
     }
 }
 
@@ -348,4 +369,39 @@ fn record_and_marker_round_trip() {
     m.write(&f.marker()).unwrap();
     assert_eq!(Marker::read(&f.marker()).unwrap(), m);
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_server_still_saving_at_the_cutoff_is_started_again_when_it_finishes() {
+    let l = FakeLegacy::with(&[
+        ("big", Kind::Server, "running"),
+        ("stuck", Kind::Server, "running"),
+    ]);
+    l.tweak("big", |f| f.late = true);
+    l.tweak("stuck", |f| f.refuses = true);
+    let out = go(&opts(true, 100), &l, &FakeTasks::default(), None);
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert_eq!(entry(&out.record, "big").stop, "was-stopped");
+    assert_eq!(entry(&out.record, "big").start.as_deref(), Some("restored-1x"));
+    assert_eq!(l.status("big"), "running");
+    assert_eq!(entry(&out.record, "stuck").stop, "still-running");
+    assert!(out.marker.unwrap().blocked_by.contains(&"stuck".to_string()));
+}
+
+#[test]
+fn a_retry_starts_again_what_blocked_before_and_is_stopped_now() {
+    let l = FakeLegacy::with(&[
+        ("stuck", Kind::Server, "stopped"),
+        ("other", Kind::Server, "running"),
+    ]);
+    let m = Marker {
+        blocked_by: vec!["stuck".into()],
+        at_ms: time::now_ms() - 60_000,
+        attempts: 1,
+    };
+    let out = go(&opts(true, 5_000), &l, &FakeTasks::default(), Some(m));
+    assert_eq!(out.code, EXIT_OK);
+    assert_eq!(entry(&out.record, "stuck").stop, "was-stopped");
+    assert!(entry(&out.record, "stuck").to_restart());
+    assert_eq!(entry(&out.record, "other").stop, "stopped");
 }

@@ -47,6 +47,7 @@ ManifestDPIAwareness PerMonitorV2
 
 !include MUI2.nsh
 !include FileFunc.nsh
+!include TextFunc.nsh
 !include x64.nsh
 !include WordFunc.nsh
 !include "utils.nsh"
@@ -631,8 +632,9 @@ Function StopTick
   FileRead $1 $2
   FileRead $1 $3
   FileClose $1
-  IntOp $2 $2 + 0
-  ${If} $2 = 0
+  ${TrimNewLines} $2 $2
+  ${TrimNewLines} $3 $3
+  ${If} $2 == "0"
     StrCpy $StopDone 1
     GetDlgItem $0 $HWNDPARENT 1
     EnableWindow $0 1
@@ -641,7 +643,11 @@ Function StopTick
   ${ElseIf} ${FileExists} "$PLUGINSDIR\handover-cancel"
     SetErrorLevel 4
     Quit
-  ${ElseIf} $2 = 3
+  ${ElseIf} $2 == "5"
+    MessageBox MB_ICONEXCLAMATION "This version of SpawnLoft needs Node.js (nodejs.org) to start your servers again after the update. Install Node.js and run the update again. Nothing was changed." /SD IDOK
+    SetErrorLevel 4
+    Quit
+  ${ElseIf} $2 == "3"
     MessageBox MB_ICONEXCLAMATION "$3 is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
     SetErrorLevel 4
     Quit
@@ -658,9 +664,9 @@ Function PageLeaveStopping
   ${EndIf}
 FunctionEnd
 
-; Cancel: a stop in progress is told to stop (it starts again what it had stopped, under 1.x);
+; Cancel (MUI's .onUserAbort calls it, MUI_CUSTOMFUNCTION_ABORT): a stop in progress is told to stop (it starts again what it had stopped, under 1.x);
 ; servers already stopped are started again; 1.x is left exactly as it was.
-Function .onUserAbort
+Function SpawnLoftUserAbort
   ${If} $StopRunning = 1
     FileOpen $1 "$PLUGINSDIR\handover-cancel" w
     FileClose $1
@@ -702,6 +708,7 @@ FunctionEnd
   FindClose $R7
 !macroend
 
+!define MUI_CUSTOMFUNCTION_ABORT SpawnLoftUserAbort
 ;Languages
 ; PageReinstall reads the misspelled `choowHowToInstall` as a fallback, and makensis warns
 ; about a language string that is read but never set, so default it to an empty string for
@@ -954,9 +961,16 @@ Section Install
       ${EndIf}
       nsExec::ExecToLog '"$CoreStaged" handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" $0'
       Pop $1
-      ${If} $1 = 0
+      ; string compares: nsExec pushes "error" or "timeout" when the core did not run, which an
+      ; integer compare would read as 0 (stopped) and let the 1.x uninstaller kill the servers
+      ${If} $1 == "0"
         StrCpy $StopDone 1
-      ${ElseIf} $1 = 3
+      ${ElseIf} $1 == "5"
+        DetailPrint "SpawnLoft 2 needs Node.js to start the servers again; SpawnLoft 1 was left as it was"
+        MessageBox MB_ICONEXCLAMATION "This version of SpawnLoft needs Node.js (nodejs.org) to start your servers again after the update. Install Node.js and run the update again. Nothing was changed." /SD IDOK
+        SetErrorLevel 4
+        Quit
+      ${ElseIf} $1 == "3"
         DetailPrint "A server is still running and could not be stopped; SpawnLoft 1 was left as it was"
         MessageBox MB_ICONEXCLAMATION "A server is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
         SetErrorLevel 4
@@ -1107,6 +1121,18 @@ Section Install
     DetailPrint "Updating scheduled tasks and server launchers"
     nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" repair --quiet'
     Pop $0
+    ; in the full UI, the servers start again here, before the Finish page, not when the window
+    ; closes; silent and passive installs do it in .onInstSuccess, after the app is up
+    ${IfNot} ${Silent}
+    ${AndIf} $PassiveMode <> 1
+      DetailPrint "Starting the servers again"
+      ${If} $NoResume = 1
+        nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" handover resume --skip-start'
+      ${Else}
+        nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" handover resume'
+      ${EndIf}
+      Pop $0
+    ${EndIf}
   ${EndIf}
 
   !ifmacrodef NSIS_HOOK_POSTINSTALL
@@ -1143,9 +1169,16 @@ Function .onInstSuccess
   ${EndIf}
 
   ; SPAWNLOFT: after a handover, start again what was stopped, through 2.0: databases, then
-  ; servers (2.3 step 9). After the app is started on the Restart path, so the window is up
-  ; first; in every mode, so an install on quit with nobody there still brings them back.
+  ; servers (2.3 step 9). Silent and passive: after the app is started on the Restart path, so
+  ; the window is up first, and also on an install on quit with nobody there. The full UI did it
+  ; at the end of the Install section, before the Finish page.
+  StrCpy $R2 0
+  ${If} ${Silent}
+  ${OrIf} $PassiveMode = 1
+    StrCpy $R2 1
+  ${EndIf}
   ${If} $LegacyMode = 2
+  ${AndIf} $R2 = 1
     ${If} $NoResume = 1
       nsExec::Exec '"$INSTDIR\resources\bin\spawnloft-core.exe" handover resume --skip-start'
     ${Else}
