@@ -16,6 +16,7 @@
 //! side ([`resume::Starter`]) as traits, so the order, the deadline and the abort path are tested
 //! on any platform with fakes; `legacy`, `tasks` and `crate::nodecore` hold the real ones.
 
+pub mod cleanup;
 pub mod legacy;
 pub mod resume;
 pub mod tasks;
@@ -98,6 +99,29 @@ impl Listed {
     }
 }
 
+/// When the stop phase must give up: its deadline, or the installer page's Cancel (a file the page
+/// creates in the status folder).
+#[derive(Debug, Clone)]
+pub struct Cutoff {
+    pub deadline: Instant,
+    pub cancel_file: Option<PathBuf>,
+}
+
+impl Cutoff {
+    pub fn after(d: Duration) -> Cutoff {
+        Cutoff {
+            deadline: Instant::now() + d,
+            cancel_file: None,
+        }
+    }
+    pub fn cancelled(&self) -> bool {
+        self.cancel_file.as_deref().is_some_and(Path::exists)
+    }
+    pub fn passed(&self) -> bool {
+        Instant::now() >= self.deadline || self.cancelled()
+    }
+}
+
 /// How one stop through the 1.x CLI ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CliStop {
@@ -121,11 +145,11 @@ pub enum PipeStop {
 pub trait Legacy: Sync {
     /// Every server and database with its status, as 1.x reconciles it.
     fn list(&self) -> Result<Vec<Listed>, String>;
-    /// `stop <name> --timeout CLI_STOP_TIMEOUT_SECS`, the client terminated at `deadline`.
-    fn stop(&self, name: &str, deadline: Instant, log: &Log) -> CliStop;
+    /// `stop <name> --timeout CLI_STOP_TIMEOUT_SECS`, the client terminated at the cutoff.
+    fn stop(&self, name: &str, cut: &Cutoff, log: &Log) -> CliStop;
     /// Own client on the 1.x pipe after checking its owner is `entry.daemon_pid`; then waits for
-    /// the JVM until `deadline`. Never kills anything.
-    fn pipe_stop(&self, entry: &Listed, deadline: Instant, log: &Log) -> PipeStop;
+    /// the JVM until the cutoff. Never kills anything.
+    fn pipe_stop(&self, entry: &Listed, cut: &Cutoff, log: &Log) -> PipeStop;
     /// `start <name> --detach`, for the abort path.
     fn start(&self, name: &str, log: &Log) -> Result<(), String>;
 }
@@ -143,6 +167,8 @@ pub trait Tasks: Sync {
 pub struct Log {
     file: Mutex<Option<std::fs::File>>,
     echo: bool,
+    /// the installer page's view: the last lines, rewritten on every line
+    progress: Option<(PathBuf, Mutex<Vec<String>>)>,
 }
 
 impl Log {
@@ -156,13 +182,20 @@ impl Log {
         Log {
             file: Mutex::new(file),
             echo,
+            progress: None,
         }
     }
     pub fn none() -> Log {
         Log {
             file: Mutex::new(None),
             echo: false,
+            progress: None,
         }
+    }
+    /// Also keeps the last lines (without the 1.x CLI's own output) in `file`.
+    pub fn with_progress(mut self, file: PathBuf) -> Log {
+        self.progress = Some((file, Mutex::new(Vec::new())));
+        self
     }
     pub fn line(&self, msg: &str) {
         let text = format!("{} {msg}\n", time::iso_now());
@@ -173,6 +206,14 @@ impl Log {
         }
         if self.echo {
             let _ = std::io::stderr().write_all(text.as_bytes());
+        }
+        if let Some((file, lines)) = &self.progress
+            && !msg.starts_with("1.x")
+            && let Ok(mut lines) = lines.lock()
+        {
+            lines.push(msg.to_string());
+            let skip = lines.len().saturating_sub(12);
+            let _ = std::fs::write(file, lines[skip..].join("\r\n"));
         }
     }
 }
@@ -424,6 +465,8 @@ pub struct StopOptions {
     pub deadline: Duration,
     /// silent and passive installs: the blocked marker applies
     pub silent: bool,
+    /// the installer page's Cancel
+    pub cancel_file: Option<PathBuf>,
 }
 
 /// The outcome: the exit code and the record to write.
@@ -446,7 +489,10 @@ pub fn run_stop(
     log: &Log,
 ) -> StopOutcome {
     let started = Instant::now();
-    let deadline = started + opts.deadline;
+    let cut = Cutoff {
+        deadline: started + opts.deadline,
+        cancel_file: opts.cancel_file.clone(),
+    };
     let mode = if opts.silent { "silent" } else { "ui" };
     let mut record = Record::new(&opts.legacy_version, &opts.to_version, mode, data_root);
 
@@ -502,7 +548,7 @@ pub fn run_stop(
     }
 
     let mut seen: BTreeSet<String> = record.servers.iter().map(|e| e.name.clone()).collect();
-    stop_in_order(&active, &mut seen, &mut record, legacy, deadline, log);
+    stop_in_order(&active, &mut seen, &mut record, legacy, &cut, log);
 
     // Anything that started meanwhile (a task that fired before the disable landed).
     let after = legacy.list();
@@ -521,7 +567,7 @@ pub fn run_stop(
             if record.tasks_disabled.is_empty() {
                 disable_tasks(tasks, &mut record, log);
             }
-            stop_in_order(&newcomers, &mut seen, &mut record, legacy, deadline, log);
+            stop_in_order(&newcomers, &mut seen, &mut record, legacy, &cut, log);
         }
     }
 
@@ -578,6 +624,10 @@ pub fn run_stop(
         };
     }
 
+    let cancelled = cut.cancelled();
+    if cancelled {
+        log.line("cancelled: everything that was stopped is started again under 1.x");
+    }
     // Abort (2.3.3): put back what was stopped, databases first, and the tasks. The marker names
     // what was asked to stop and did not; what the deadline never reached is not to blame.
     let asked = |n: &str| {
@@ -595,12 +645,36 @@ pub fn run_stop(
     if names.is_empty() {
         names = still.iter().map(|s| s.name.clone()).collect();
     }
-    log.line(&format!(
-        "{} did not stop within the deadline: the update is abandoned and 1.x is left as it was",
-        names.join(", ")
-    ));
+    if !cancelled {
+        log.line(&format!(
+            "{} did not stop within the deadline: the update is abandoned and 1.x is left as it was",
+            names.join(", ")
+        ));
+    }
+    restore(&mut record, legacy, tasks, log);
+    let attempts = previous
+        .filter(|m| m.blocked_by == names)
+        .map(|m| m.attempts + 1)
+        .unwrap_or(1);
+    record.stop_exit = Some(EXIT_BLOCKED);
+    StopOutcome {
+        code: EXIT_BLOCKED,
+        record,
+        // the person cancelled: nothing to hold a silent retry back for
+        marker: (!cancelled).then(|| Marker {
+            blocked_by: names,
+            at_ms: time::now_ms(),
+            attempts,
+        }),
+    }
+}
+
+/// Starts again under 1.x, databases first, every entry the stop stopped and nothing has started
+/// since, and enables the tasks again: the abort path, and `handover restore` for an install that
+/// failed after a successful stop.
+pub fn restore(record: &mut Record, legacy: &dyn Legacy, tasks: &dyn Tasks, log: &Log) {
     let mut order: Vec<usize> = (0..record.servers.len())
-        .filter(|&i| record.servers[i].to_restart())
+        .filter(|&i| record.servers[i].to_restart() && record.servers[i].start.is_none())
         .collect();
     order.sort_by_key(|&i| std::cmp::Reverse(record.servers[i].kind));
     for i in order {
@@ -620,21 +694,7 @@ pub fn run_stop(
             }
         }
     }
-    reenable_tasks(tasks, &mut record, log);
-    let attempts = previous
-        .filter(|m| m.blocked_by == names)
-        .map(|m| m.attempts + 1)
-        .unwrap_or(1);
-    record.stop_exit = Some(EXIT_BLOCKED);
-    StopOutcome {
-        code: EXIT_BLOCKED,
-        record,
-        marker: Some(Marker {
-            blocked_by: names,
-            at_ms: time::now_ms(),
-            attempts,
-        }),
-    }
+    reenable_tasks(tasks, record, log);
 }
 
 fn disable_tasks(tasks: &dyn Tasks, record: &mut Record, log: &Log) {
@@ -674,7 +734,7 @@ fn stop_in_order(
     seen: &mut BTreeSet<String>,
     record: &mut Record,
     legacy: &dyn Legacy,
-    deadline: Instant,
+    cut: &Cutoff,
     log: &Log,
 ) {
     for kind in [Kind::Server, Kind::Database] {
@@ -686,7 +746,7 @@ fn stop_in_order(
             let results: Vec<Entry> = std::thread::scope(|s| {
                 let handles: Vec<_> = chunk
                     .iter()
-                    .map(|l| s.spawn(move || stop_one(l, legacy, deadline, log)))
+                    .map(|l| s.spawn(move || stop_one(l, legacy, cut, log)))
                     .collect();
                 handles
                     .into_iter()
@@ -708,16 +768,16 @@ fn stop_in_order(
     }
 }
 
-fn stop_one(l: &Listed, legacy: &dyn Legacy, deadline: Instant, log: &Log) -> Entry {
+fn stop_one(l: &Listed, legacy: &dyn Legacy, cut: &Cutoff, log: &Log) -> Entry {
     let t0 = Instant::now();
     log.line(&format!("stopping {} {} through 1.x", l.kind.as_str(), l.name));
     let mut e = Entry::new(&l.name, l.kind, "failed");
-    if Instant::now() >= deadline {
+    if cut.passed() {
         e.stop = "still-running".into();
         e.error = Some(NOT_REACHED.into());
         return e;
     }
-    match legacy.stop(&l.name, deadline, log) {
+    match legacy.stop(&l.name, cut, log) {
         CliStop::Exited { code: 0, output } => {
             e.stop = if output.contains("was not running") {
                 "was-stopped".into()
@@ -742,7 +802,7 @@ fn stop_one(l: &Listed, legacy: &dyn Legacy, deadline: Instant, log: &Log) -> En
                 CliStop::DeadlinePassed => unreachable!(),
             };
             log.line(&format!("{}: {why}; trying the control pipe", l.name));
-            match legacy.pipe_stop(l, deadline, log) {
+            match legacy.pipe_stop(l, cut, log) {
                 PipeStop::Stopped => e.stop = "stopped".into(),
                 PipeStop::DeadlinePassed => e.stop = "still-running".into(),
                 PipeStop::Failed(err) => {

@@ -4,11 +4,11 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::Value;
 
-use super::{CLI_STOP_TIMEOUT_SECS, CliStop, Kind, Legacy, Listed, Log, PipeStop};
+use super::{CLI_STOP_TIMEOUT_SECS, CliStop, Cutoff, Kind, Legacy, Listed, Log, PipeStop};
 use crate::procid;
 
 /// How long a `list`, `start` or `status` through the 1.x CLI may take.
@@ -53,7 +53,7 @@ impl CliLegacy {
         v.get("version")?.as_str().map(str::to_string)
     }
 
-    fn run(&self, args: &[&str], until: Instant, log: &Log) -> Ran {
+    fn run(&self, args: &[&str], cut: &Cutoff, log: &Log) -> Ran {
         static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let _ = std::fs::create_dir_all(&self.scratch);
@@ -88,7 +88,7 @@ impl CliLegacy {
         let result = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Some(status.code().unwrap_or(1)),
-                Ok(None) if Instant::now() >= until => break None,
+                Ok(None) if cut.passed() => break None,
                 Ok(None) => std::thread::sleep(Duration::from_millis(100)),
                 Err(_) => break Some(1),
             }
@@ -114,7 +114,7 @@ impl Legacy for CliLegacy {
     fn list(&self) -> Result<Vec<Listed>, String> {
         match self.run(
             &["list", "--json"],
-            Instant::now() + CLI_QUERY_TIMEOUT,
+            &Cutoff::after(CLI_QUERY_TIMEOUT),
             &Log::none(),
         ) {
             Ran::Exited(0, out) => parse_list(&out),
@@ -127,23 +127,23 @@ impl Legacy for CliLegacy {
         }
     }
 
-    fn stop(&self, name: &str, deadline: Instant, log: &Log) -> CliStop {
+    fn stop(&self, name: &str, cut: &Cutoff, log: &Log) -> CliStop {
         let timeout = CLI_STOP_TIMEOUT_SECS.to_string();
-        match self.run(&["stop", name, "--timeout", &timeout], deadline, log) {
+        match self.run(&["stop", name, "--timeout", &timeout], cut, log) {
             Ran::Exited(code, output) => CliStop::Exited { code, output },
             Ran::TimedOut => CliStop::DeadlinePassed,
             Ran::NotRun(e) => CliStop::NotRun(e),
         }
     }
 
-    fn pipe_stop(&self, entry: &Listed, deadline: Instant, log: &Log) -> PipeStop {
-        pipe_stop(entry, deadline, log)
+    fn pipe_stop(&self, entry: &Listed, cut: &Cutoff, log: &Log) -> PipeStop {
+        pipe_stop(entry, cut, log)
     }
 
     fn start(&self, name: &str, log: &Log) -> Result<(), String> {
         match self.run(
             &["start", name, "--detach"],
-            Instant::now() + CLI_QUERY_TIMEOUT,
+            &Cutoff::after(CLI_QUERY_TIMEOUT),
             log,
         ) {
             Ran::Exited(0, _) => Ok(()),
@@ -313,7 +313,7 @@ fn no_window(_cmd: &mut Command) {}
 /// after checking that the pipe's server is the daemon the state file names: the 1.x pipe name
 /// is machine-global and another user's server of the same name could be listening.
 #[cfg(windows)]
-fn pipe_stop(entry: &Listed, deadline: Instant, log: &Log) -> PipeStop {
+fn pipe_stop(entry: &Listed, cut: &Cutoff, log: &Log) -> PipeStop {
     use std::io::{BufRead, Write};
     let Some(daemon) = entry.daemon_pid else {
         return PipeStop::Failed("no daemon pid recorded".into());
@@ -361,7 +361,7 @@ fn pipe_stop(entry: &Listed, deadline: Instant, log: &Log) -> PipeStop {
             let _ = std::io::BufReader::new(reader).read_line(&mut line);
         });
     }
-    while Instant::now() < deadline {
+    while !cut.passed() {
         if !procid::alive(java) {
             return PipeStop::Stopped;
         }
@@ -371,7 +371,7 @@ fn pipe_stop(entry: &Listed, deadline: Instant, log: &Log) -> PipeStop {
 }
 
 #[cfg(not(windows))]
-fn pipe_stop(_entry: &Listed, _deadline: Instant, _log: &Log) -> PipeStop {
+fn pipe_stop(_entry: &Listed, _cut: &Cutoff, _log: &Log) -> PipeStop {
     PipeStop::Failed("the 1.x control pipe exists on Windows only".into())
 }
 

@@ -59,41 +59,75 @@ pub fn handover(rest: &[String]) -> Outcome {
     match rest.split_first() {
         Some((sub, rest)) if sub == "stop" => stop(rest),
         Some((sub, rest)) if sub == "resume" => resume_cmd(rest),
+        Some((sub, rest)) if sub == "restore" => restore_cmd(rest),
+        Some((sub, rest)) if sub == "cleanup" => cleanup_cmd(rest),
         _ => usage_error(
-            "usage: handover stop --legacy-dir <dir> [...] | handover resume [--pending] [--skip-start]",
+            "usage: handover stop --legacy-dir <dir> [...] | handover resume [--pending] [--skip-start] | handover restore --legacy-dir <dir> | handover cleanup",
         ),
     }
 }
 
-/// `handover stop --legacy-dir <dir> [--legacy-version <v>] [--deadline <s>] [--log <file>] [--silent]`
+/// `handover stop --legacy-dir <dir> [--legacy-version <v>] [--deadline <s>] [--log <file>]
+/// [--silent] [--status-dir <dir>]`. With `--status-dir` (the installer's stopping page) the
+/// last lines go to `handover-progress.txt`, a `handover-cancel` file there cancels, and the exit
+/// code and the blocking servers are written to `handover-exit.txt` at the end.
 fn stop(rest: &[String]) -> Outcome {
     let f = match flags(
         rest,
-        &["--legacy-dir", "--legacy-version", "--deadline", "--log"],
+        &[
+            "--legacy-dir",
+            "--legacy-version",
+            "--deadline",
+            "--log",
+            "--status-dir",
+        ],
         &["--silent"],
     ) {
         Ok(f) => f,
         Err(o) => return o,
     };
-    let Some(dir) = get(&f, "--legacy-dir") else {
+    let status_dir = get(&f, "--status-dir").map(PathBuf::from);
+    let out = stop_with(&f, status_dir.as_deref());
+    if let Some(dir) = &status_dir {
+        let blocked = spawnloft_lib::serde_json::from_str::<spawnloft_lib::serde_json::Value>(&out.stdout)
+            .ok()
+            .and_then(|v| {
+                v.get("blockedBy")?
+                    .as_array()
+                    .map(|a| a.iter().filter_map(|n| n.as_str()).collect::<Vec<_>>().join(", "))
+            })
+            .unwrap_or_default();
+        let _ = std::fs::write(
+            dir.join("handover-exit.txt"),
+            format!("{}\r\n{blocked}\r\n", out.code),
+        );
+    }
+    out
+}
+
+fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outcome {
+    let Some(dir) = get(f, "--legacy-dir") else {
         return usage_error("handover stop needs --legacy-dir <the 1.x install folder>");
     };
-    let deadline = match get(&f, "--deadline").map(str::parse::<u64>) {
+    let deadline = match get(f, "--deadline").map(str::parse::<u64>) {
         None => h::DEFAULT_DEADLINE,
         Some(Ok(s)) if s > 0 => Duration::from_secs(s),
         Some(_) => return usage_error("--deadline takes a whole number of seconds"),
     };
-    let silent = has(&f, "--silent");
+    let silent = has(f, "--silent");
     let data_root = paths::resolve_data_root();
     let files = Files::new(&data_root);
-    let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
-    let log = Log::open(Some(&log_path), true);
+    let log_path = get(f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
+    let mut log = Log::open(Some(&log_path), true);
+    if let Some(dir) = status_dir {
+        log = log.with_progress(dir.join("handover-progress.txt"));
+    }
     let legacy = CliLegacy {
         dir: PathBuf::from(dir),
         scratch: std::env::temp_dir(),
         data_root: data_root.clone(),
     };
-    let version = get(&f, "--legacy-version")
+    let version = get(f, "--legacy-version")
         .map(str::to_string)
         .filter(|v| !v.is_empty())
         .or_else(|| legacy.version())
@@ -103,6 +137,7 @@ fn stop(rest: &[String]) -> Outcome {
         to_version: build::current().version.to_string(),
         deadline,
         silent,
+        cancel_file: status_dir.map(|d| d.join("handover-cancel")),
     };
     log.line(&format!(
         "handover stop: 1.x {} in {dir}, data root {}, deadline {} s, {}",
@@ -287,6 +322,58 @@ fn resume_cmd(rest: &[String]) -> Outcome {
         }
     ));
     done(0, json!({ "exit": 0, "failed": failed }))
+}
+
+/// `handover restore --legacy-dir <dir>`: the installer failed after a successful stop (the 1.x
+/// uninstaller failed, the person cancelled on a later page): what the stop stopped is started
+/// again under the 1.x that is still installed, and the tasks are enabled again.
+fn restore_cmd(rest: &[String]) -> Outcome {
+    let f = match flags(rest, &["--legacy-dir", "--log"], &[]) {
+        Ok(f) => f,
+        Err(o) => return o,
+    };
+    let Some(dir) = get(&f, "--legacy-dir") else {
+        return usage_error("handover restore needs --legacy-dir <the 1.x install folder>");
+    };
+    let data_root = paths::resolve_data_root();
+    let files = Files::new(&data_root);
+    let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
+    let log = Log::open(Some(&log_path), true);
+    let Some(mut record) = Record::read(&files.record()) else {
+        return done(0, json!({ "exit": 0, "record": null }));
+    };
+    let legacy = CliLegacy {
+        dir: PathBuf::from(dir),
+        scratch: std::env::temp_dir(),
+        data_root: data_root.clone(),
+    };
+    log.line("handover restore: the update did not complete; starting the stopped servers again under 1.x");
+    h::restore(&mut record, &legacy, &WindowsTasks, &log);
+    if let Err(e) = record.write(&files.record()) {
+        log.line(&format!("could not write {}: {e}", files.record().display()));
+    }
+    done(0, json!({ "exit": 0 }))
+}
+
+/// `handover cleanup`: Electron's Chromium profile and electron-updater's cache removed from
+/// `<config>` by allowlist, once (design section 7). Windows only; elsewhere 1.x's profile is
+/// in its own folder and stays. The shell runs it at launch.
+fn cleanup_cmd(rest: &[String]) -> Outcome {
+    if let Err(o) = flags(rest, &[], &[]) {
+        return o;
+    }
+    if !cfg!(windows) {
+        return done(0, json!({ "skipped": true, "reason": "not windows" }));
+    }
+    let r = h::cleanup::run(
+        &paths::config_dir(),
+        &paths::local_base().join("spawnloft-desktop-updater"),
+        time::now_ms(),
+    );
+    done(
+        0,
+        json!({ "skipped": r.skipped, "removed": r.removed, "failed": r.failed }),
+    )
 }
 
 /// `repair [--quiet]`: task shims and server launchers rewritten for this install (the Node

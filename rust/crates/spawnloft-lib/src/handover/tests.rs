@@ -62,7 +62,7 @@ impl Legacy for FakeLegacy {
             })
             .collect())
     }
-    fn stop(&self, name: &str, deadline: Instant, _log: &Log) -> CliStop {
+    fn stop(&self, name: &str, cut: &Cutoff, _log: &Log) -> CliStop {
         self.events.lock().unwrap().push(format!("stop {name}"));
         let f = self.servers.lock().unwrap()[name].clone();
         if let Some((n, k)) = self.appears.lock().unwrap().take() {
@@ -83,7 +83,7 @@ impl Legacy for FakeLegacy {
             };
         }
         if f.refuses {
-            while Instant::now() < deadline {
+            while !cut.passed() {
                 std::thread::sleep(Duration::from_millis(5));
             }
             return CliStop::DeadlinePassed;
@@ -100,7 +100,7 @@ impl Legacy for FakeLegacy {
             output: format!("\"{name}\" stopped (exit code 0)."),
         }
     }
-    fn pipe_stop(&self, entry: &Listed, _deadline: Instant, _log: &Log) -> PipeStop {
+    fn pipe_stop(&self, entry: &Listed, _cut: &Cutoff, _log: &Log) -> PipeStop {
         self.events.lock().unwrap().push(format!("pipe {}", entry.name));
         self.tweak(&entry.name, |f| f.status = "stopped".into());
         PipeStop::Stopped
@@ -153,6 +153,7 @@ fn opts(silent: bool, deadline_ms: u64) -> StopOptions {
         to_version: "2.0.0".into(),
         deadline: Duration::from_millis(deadline_ms),
         silent,
+        cancel_file: None,
     }
 }
 
@@ -286,6 +287,42 @@ fn a_broken_cli_falls_back_to_the_pipe() {
     assert_eq!(out.code, EXIT_OK);
     assert!(l.events().contains(&"pipe a".to_string()));
     assert_eq!(entry(&out.record, "a").stop, "stopped");
+}
+
+#[test]
+fn cancel_puts_everything_back_and_leaves_no_marker() {
+    let l = FakeLegacy::with(&[
+        ("stuck", Kind::Server, "running"),
+        ("fine", Kind::Server, "running"),
+    ]);
+    l.tweak("stuck", |f| f.refuses = true);
+    let dir = std::env::temp_dir().join(format!("sl-cancel-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let cancel = dir.join("handover-cancel");
+    let c2 = cancel.clone();
+    let t = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(150));
+        std::fs::write(c2, "").unwrap();
+    });
+    let started = Instant::now();
+    let out = run_stop(
+        &StopOptions {
+            cancel_file: Some(cancel),
+            ..opts(false, 60_000)
+        },
+        l.list().unwrap(),
+        &l,
+        &FakeTasks::default(),
+        None,
+        "/d",
+        &Log::none(),
+    );
+    t.join().unwrap();
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert!(out.marker.is_none());
+    assert_eq!(l.status("fine"), "running");
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]

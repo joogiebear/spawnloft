@@ -13,9 +13,16 @@
 ;   (/S /KEEP_APP_DATA --updated --keep-shortcuts _?=<dir>): servers, tasks and data stay;
 ; - keep 1.x's uninstall behaviour: stop servers and remove scheduled tasks through
 ;   `uninstall --yes`, and ask (default no) whether to delete the data too;
-; - a running spawnloft-core (daemons) never blocks an update: the old binary is renamed aside;
+; - a running spawnloft-core (daemons) never blocks an update: the old binary is renamed aside
+;   into resources\bin\old-<stamp>\, keeping its file name (design section 4);
 ; - a 1.x installer can still roll back over this install (it finds the same keys and runs this
-;   uninstaller with --updated).
+;   uninstaller with --updated);
+; - over 1.x, servers are stopped gracefully through the installed 1.x CLI before the 1.x
+;   uninstaller runs (`spawnloft-core handover stop`, extracted first) and started again through
+;   2.0 afterwards (`handover resume`); a server that will not stop aborts the update and leaves
+;   1.x as it was (rust/INSTALLER-UPDATER-DESIGN.md sections 2 to 4 and 9);
+; - one setup and one uninstaller at a time (named mutexes), /ROLLBACK allows the one downgrade a
+;   rollback asks for, /NORESUME leaves the stopped servers stopped (tests).
 
 Unicode true
 ManifestDPIAware true
@@ -54,6 +61,12 @@ ${StrLoc}
 {{#if installer_hooks}}
 !include "{{installer_hooks}}"
 {{/if}}
+
+; SPAWNLOFT: the hooks file (written by spawnloft-shell/installer/installer-config.mjs) names the
+; core binary's source, which the installer extracts on its own before anything else (2.3 step 1)
+!ifndef SPAWNLOFT_CORE_SRC
+  !error "SPAWNLOFT_CORE_SRC is not defined: build with installer/installer-config.mjs"
+!endif
 
 !define WEBVIEW2APPGUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 
@@ -105,6 +118,14 @@ Var OldMainBinaryName
 Var LegacyMode
 Var LegacyDir
 Var ForceRun
+; SPAWNLOFT: the 1.x version found, the staged core, the stop's progress, and the new flags
+Var LegacyVersion
+Var CoreStaged
+Var StopDone
+Var StopRunning
+Var StopLabel
+Var Rollback
+Var NoResume
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -442,6 +463,10 @@ Function PageLeaveReinstall
   reinst_done:
 FunctionEnd
 
+; SPAWNLOFT: 4b. over 1.x in the full UI, the servers are stopped on a page of their own, with
+; progress and Cancel, before anything is changed (design 2.3.2)
+Page custom PageStopping PageLeaveStopping
+
 ; 5. Choose install directory page
 ; SPAWNLOFT: not when replacing 1.x, which must stay where its shims and launchers point
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassiveOrLegacy
@@ -524,6 +549,159 @@ FunctionEnd
 ; 2. Uninstalling Page
 !insertmacro MUI_UNPAGE_INSTFILES
 
+; SPAWNLOFT: the core binary, extracted once, run from a per-user folder under the install folder
+; (no AppLocker or SRP rule treats it as temp), $PLUGINSDIR when that cannot be written
+Function StageCore
+  ${If} $CoreStaged != ""
+    Return
+  ${EndIf}
+  InitPluginsDir
+  File "/oname=$PLUGINSDIR\spawnloft-core.exe" "${SPAWNLOFT_CORE_SRC}"
+  StrCpy $CoreStaged "$PLUGINSDIR\spawnloft-core.exe"
+  ${If} $LegacyMode = 1
+    ClearErrors
+    CreateDirectory "$LegacyDir\resources\bin\staging"
+    CopyFiles /SILENT "$PLUGINSDIR\spawnloft-core.exe" "$LegacyDir\resources\bin\staging"
+    ${IfNot} ${Errors}
+    ${AndIf} ${FileExists} "$LegacyDir\resources\bin\staging\spawnloft-core.exe"
+      StrCpy $CoreStaged "$LegacyDir\resources\bin\staging\spawnloft-core.exe"
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+; SPAWNLOFT: what 1.x was running is running again under 1.x, after an abort that came after the
+; stop (cancel, a failed 1.x uninstall). The copy in $PLUGINSDIR is used: staging may be gone.
+Function RestoreLegacyServers
+  ${If} $StopDone = 1
+    DetailPrint "Starting the stopped servers again under SpawnLoft 1"
+    nsExec::ExecToLog '"$PLUGINSDIR\spawnloft-core.exe" handover restore --legacy-dir "$LegacyDir"'
+    Pop $0
+    StrCpy $StopDone 0
+  ${EndIf}
+FunctionEnd
+
+Function PageStopping
+  ${If} $LegacyMode <> 1
+  ${OrIf} $PassiveMode = 1
+    Abort
+  ${EndIf}
+  ${If} $StopDone = 1
+    Abort
+  ${EndIf}
+  !insertmacro MUI_HEADER_TEXT "Stopping servers for the update" "Each running server is asked to stop and save. They start again after the update."
+  nsDialogs::Create 1018
+  Pop $0
+  ${NSD_CreateLabel} 0 0 100% 100% "Looking for running servers..."
+  Pop $StopLabel
+  GetDlgItem $0 $HWNDPARENT 1
+  EnableWindow $0 0
+  GetDlgItem $0 $HWNDPARENT 3
+  EnableWindow $0 0
+  Call StageCore
+  Delete "$PLUGINSDIR\handover-exit.txt"
+  Delete "$PLUGINSDIR\handover-cancel"
+  Delete "$PLUGINSDIR\handover-progress.txt"
+  StrCpy $StopRunning 1
+  ; not waited for: the page's timer follows it through the status files
+  ExecShell "" '"$CoreStaged"' 'handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" --status-dir "$PLUGINSDIR"' SW_HIDE
+  ${NSD_CreateTimer} StopTick 400
+  nsDialogs::Show
+FunctionEnd
+
+Function StopTick
+  ClearErrors
+  FileOpen $1 "$PLUGINSDIR\handover-progress.txt" r
+  ${IfNot} ${Errors}
+    StrCpy $2 ""
+    ${Do}
+      ClearErrors
+      FileRead $1 $3
+      ${IfThen} ${Errors} ${|} ${ExitDo} ${|}
+      StrCpy $2 "$2$3"
+    ${Loop}
+    FileClose $1
+    ${IfThen} $2 != "" ${|} SendMessage $StopLabel ${WM_SETTEXT} 0 "STR:$2" ${|}
+  ${EndIf}
+  ${IfNot} ${FileExists} "$PLUGINSDIR\handover-exit.txt"
+    Return
+  ${EndIf}
+  ${NSD_KillTimer} StopTick
+  StrCpy $StopRunning 0
+  FileOpen $1 "$PLUGINSDIR\handover-exit.txt" r
+  FileRead $1 $2
+  FileRead $1 $3
+  FileClose $1
+  IntOp $2 $2 + 0
+  ${If} $2 = 0
+    StrCpy $StopDone 1
+    GetDlgItem $0 $HWNDPARENT 1
+    EnableWindow $0 1
+    ; on to the next page by itself
+    SendMessage $HWNDPARENT 0x408 1 0
+  ${ElseIf} ${FileExists} "$PLUGINSDIR\handover-cancel"
+    SetErrorLevel 4
+    Quit
+  ${ElseIf} $2 = 3
+    MessageBox MB_ICONEXCLAMATION "$3 is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
+    SetErrorLevel 4
+    Quit
+  ${Else}
+    MessageBox MB_ICONSTOP "The servers could not be stopped for the update (code $2). Nothing was changed." /SD IDOK
+    SetErrorLevel 4
+    Quit
+  ${EndIf}
+FunctionEnd
+
+Function PageLeaveStopping
+  ${If} $StopDone <> 1
+    Abort
+  ${EndIf}
+FunctionEnd
+
+; Cancel: a stop in progress is told to stop (it starts again what it had stopped, under 1.x);
+; servers already stopped are started again; 1.x is left exactly as it was.
+Function .onUserAbort
+  ${If} $StopRunning = 1
+    FileOpen $1 "$PLUGINSDIR\handover-cancel" w
+    FileClose $1
+    StrCpy $0 0
+    ${DoUntil} ${FileExists} "$PLUGINSDIR\handover-exit.txt"
+      Sleep 250
+      IntOp $0 $0 + 1
+      ${IfThen} $0 > 2400 ${|} ${ExitDo} ${|}
+    ${Loop}
+    StrCpy $StopRunning 0
+  ${Else}
+    Call RestoreLegacyServers
+  ${EndIf}
+  SetErrorLevel 4
+FunctionEnd
+
+; SPAWNLOFT: one setup and one uninstaller at a time. A second one (the 1.x panel's install on
+; quit starting the pending setup again, a double-click) exits at once with error level 5.
+!macro SPAWNLOFT_SINGLE_INSTANCE NAME
+  System::Call 'kernel32::CreateMutexW(p 0, i 1, w "${NAME}") p .R9 ?e'
+  Pop $R8
+  ${If} $R8 = 183
+    SetErrorLevel 5
+    Quit
+  ${EndIf}
+!macroend
+
+; SPAWNLOFT: core binaries moved aside by earlier updates, once nothing runs them any more (a
+; held file is not deleted, so its folder stays for the next install)
+!macro SPAWNLOFT_CLEAN_OLD_CORES
+  Delete "$INSTDIR\resources\bin\spawnloft-core.old-*.exe"
+  ClearErrors
+  FindFirst $R7 $R8 "$INSTDIR\resources\bin\old-*"
+  ${DoWhile} $R8 != ""
+    Delete "$INSTDIR\resources\bin\$R8\spawnloft-core.exe"
+    RMDir "$INSTDIR\resources\bin\$R8"
+    FindNext $R7 $R8
+  ${Loop}
+  FindClose $R7
+!macroend
+
 ;Languages
 ; PageReinstall reads the misspelled `choowHowToInstall` as a fallback, and makensis warns
 ; about a language string that is read but never set, so default it to an empty string for
@@ -543,6 +721,8 @@ LangString choowHowToInstall 0 ""
 LangString deleteAppData ${LANG_ENGLISH} "Also delete servers, worlds, backups, jars and settings"
 
 Function .onInit
+  !insertmacro SPAWNLOFT_SINGLE_INSTANCE "Local\SpawnLoftSetup-${APPGUID}"
+
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
     StrCpy $PassiveMode 1
@@ -568,6 +748,17 @@ Function .onInit
   ${GetOptions} $R1 "--force-run" $R0
   ${IfNot} ${Errors}
     StrCpy $ForceRun 1
+  ${EndIf}
+  ; SPAWNLOFT: /ROLLBACK (the one downgrade a rollback asks for; the app is started again
+  ; through --force-run, so the flag never reaches it) and /NORESUME (tests)
+  ${GetOptions} $R1 "/ROLLBACK" $R0
+  ${IfNot} ${Errors}
+    StrCpy $Rollback 1
+    ${IfThen} $PassiveMode = 1 ${|} StrCpy $ForceRun 1 ${|}
+  ${EndIf}
+  ${GetOptions} $R1 "/NORESUME" $R0
+  ${IfNot} ${Errors}
+    StrCpy $NoResume 1
   ${EndIf}
 
   !if "${DISPLAYLANGUAGESELECTOR}" == "true"
@@ -604,6 +795,8 @@ Function .onInit
   ${If} ${FileExists} "$INSTDIR\${LEGACYUNINSTALLER}"
     StrCpy $LegacyMode 1
     StrCpy $LegacyDir $INSTDIR
+    ; "1.6.0-beta.413"; empty on a key without it (the core then reads resources\core\package.json)
+    ReadRegStr $LegacyVersion SHCTX "${UNINSTKEY}" "DisplayVersion"
   ${EndIf}
 
 
@@ -614,7 +807,9 @@ Function .onInit
   ; Abort downgrades if they are disabled, in the modes that skip the reinstall page choice:
   ; silent, passive and update
   !if "${ALLOWDOWNGRADES}" == "false"
-  ${If} ${Silent}
+  ${If} $Rollback = 1
+    ; SPAWNLOFT: a rollback the person asked for (design 5.6)
+  ${ElseIf} ${Silent}
   ${OrIf} $PassiveMode = 1
   ${OrIf} $UpdateMode = 1
     ; Compare with the same installation the reinstall page would: a WiX one first
@@ -744,29 +939,71 @@ Section Install
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif
 
-  ; SPAWNLOFT: replace 1.x the way its own updates do
+  ; SPAWNLOFT: the core first (2.3 step 1), then, over 1.x, the servers stopped through 1.x
+  ; before its uninstaller can kill them (step 2), then 1.x removed the way its own updates do
+  ; (step 3)
+  Call StageCore
+  !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
   ${If} $LegacyMode = 1
+    ${If} $StopDone <> 1
+      DetailPrint "Stopping servers for the update"
+      StrCpy $0 ""
+      ${If} ${Silent}
+      ${OrIf} $PassiveMode = 1
+        StrCpy $0 "--silent"
+      ${EndIf}
+      nsExec::ExecToLog '"$CoreStaged" handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" $0'
+      Pop $1
+      ${If} $1 = 0
+        StrCpy $StopDone 1
+      ${ElseIf} $1 = 3
+        DetailPrint "A server is still running and could not be stopped; SpawnLoft 1 was left as it was"
+        MessageBox MB_ICONEXCLAMATION "A server is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
+        SetErrorLevel 4
+        Quit
+      ${Else}
+        DetailPrint "The servers could not be stopped for the update (code $1); SpawnLoft 1 was left as it was"
+        MessageBox MB_ICONSTOP "The servers could not be stopped for the update (code $1). Nothing was changed." /SD IDOK
+        SetErrorLevel 4
+        Quit
+      ${EndIf}
+    ${EndIf}
     Call RemoveLegacyInstall
   ${EndIf}
 
   !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
+  ; SPAWNLOFT: a rollback (design 5.6) removes the newer version's files first; update mode keeps
+  ; keys, shortcuts, tasks and data
+  ${If} $Rollback = 1
+  ${AndIf} $LegacyMode = 0
+  ${AndIf} ${FileExists} "$INSTDIR\uninstall.exe"
+    DetailPrint "Removing the newer version's files"
+    ExecWait '"$INSTDIR\uninstall.exe" /S /UPDATE _?=$INSTDIR' $0
+  ${EndIf}
+
   ; SPAWNLOFT: servers' daemons run from resources\bin\spawnloft-core.exe and keep running
-  ; through an update. A running exe cannot be overwritten but can be renamed: move it aside
-  ; (cleaned up by the next install once nothing runs it) and install the new one in its place.
-  Delete "$INSTDIR\resources\bin\spawnloft-core.old-*.exe"
+  ; through an update. A running exe cannot be overwritten but can be renamed: move it into a
+  ; dated folder of its own, keeping its file name (design section 4), and install the new one in
+  ; its place; the folder goes at a later install once nothing runs it.
   ${If} ${FileExists} "$INSTDIR\resources\bin\spawnloft-core.exe"
     ClearErrors
     Delete "$INSTDIR\resources\bin\spawnloft-core.exe"
     ${If} ${Errors}
-      System::Call "kernel32::GetTickCount() i .r0"
+      ${GetTime} "" "L" $0 $1 $2 $3 $4 $5 $6
+      StrCpy $R6 "old-$2$1$0-$4$5$6"
+      ${If} ${FileExists} "$INSTDIR\resources\bin\$R6\*.*"
+        System::Call "kernel32::GetTickCount() i .r0"
+        StrCpy $R6 "$R6-$0"
+      ${EndIf}
       ClearErrors
-      Rename "$INSTDIR\resources\bin\spawnloft-core.exe" "$INSTDIR\resources\bin\spawnloft-core.old-$0.exe"
+      CreateDirectory "$INSTDIR\resources\bin\$R6"
+      Rename "$INSTDIR\resources\bin\spawnloft-core.exe" "$INSTDIR\resources\bin\$R6\spawnloft-core.exe"
       ${If} ${Errors}
         SetErrorLevel 2
         Abort "spawnloft-core.exe is in use and could not be moved aside"
       ${EndIf}
-      DetailPrint "spawnloft-core.exe is in use by running servers; the old copy stays until they stop"
+      DetailPrint "spawnloft-core.exe is in use by running servers; it was moved to resources\bin\$R6 until they restart"
     ${EndIf}
   ${EndIf}
 
@@ -861,6 +1098,17 @@ Section Install
     Call CreateOrUpdateDesktopShortcut
   ${EndIf}
 
+  ; SPAWNLOFT: the staged copy has done its job
+  RMDir /r "$INSTDIR\resources\bin\staging"
+
+  ; SPAWNLOFT: task shims and server launchers rewritten for this install before any server
+  ; starts again (2.3 step 8)
+  ${If} $LegacyMode = 2
+    DetailPrint "Updating scheduled tasks and server launchers"
+    nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" repair --quiet'
+    Pop $0
+  ${EndIf}
+
   !ifmacrodef NSIS_HOOK_POSTINSTALL
     !insertmacro NSIS_HOOK_POSTINSTALL
   !endif
@@ -876,8 +1124,16 @@ Function .onInstSuccess
   ; GUI installer has a toggle for the user to (re)start the app
   ${If} $PassiveMode = 1
   ${OrIf} ${Silent}
-    ${GetOptions} $CMDLINE "/R" $R0
-    ${IfNot} ${Errors}
+    ; SPAWNLOFT: "/R" also matches the start of "/ROLLBACK", which never asks for /R
+    StrCpy $R1 0
+    ${If} $Rollback <> 1
+      ClearErrors
+      ${GetOptions} $CMDLINE "/R" $R0
+      ${IfNot} ${Errors}
+        StrCpy $R1 1
+      ${EndIf}
+    ${EndIf}
+    ${If} $R1 = 1
       ${GetOptions} $CMDLINE "/ARGS" $R0
       nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" "$R0"
     ${ElseIf} $ForceRun = 1
@@ -885,9 +1141,22 @@ Function .onInstSuccess
       nsis_tauri_utils::RunAsUser "$INSTDIR\${MAINBINARYNAME}.exe" ""
     ${EndIf}
   ${EndIf}
+
+  ; SPAWNLOFT: after a handover, start again what was stopped, through 2.0: databases, then
+  ; servers (2.3 step 9). After the app is started on the Restart path, so the window is up
+  ; first; in every mode, so an install on quit with nobody there still brings them back.
+  ${If} $LegacyMode = 2
+    ${If} $NoResume = 1
+      nsExec::Exec '"$INSTDIR\resources\bin\spawnloft-core.exe" handover resume --skip-start'
+    ${Else}
+      nsExec::Exec '"$INSTDIR\resources\bin\spawnloft-core.exe" handover resume'
+    ${EndIf}
+    Pop $0
+  ${EndIf}
 FunctionEnd
 
 Function un.onInit
+  !insertmacro SPAWNLOFT_SINGLE_INSTANCE "Local\SpawnLoftUninstall-${APPGUID}"
   !insertmacro SetContext
 
   !if "${INSTALLMODE}" == "both"
@@ -912,6 +1181,11 @@ Function un.onInit
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
+  ; SPAWNLOFT: the data box for a silent uninstall (the full UI shows the box, default off)
+  ${GetOptions} $R1 "/DELETEAPPDATA" $R0
+  ${IfNot} ${Errors}
+    StrCpy $DeleteAppDataCheckboxState 1
+  ${EndIf}
 FunctionEnd
 
 Section Uninstall
@@ -931,8 +1205,8 @@ Section Uninstall
       StrCpy $R9 "--data"
     ${EndIf}
     DetailPrint "Stopping servers and removing scheduled tasks"
-    ; through the argv compatibility form, as every 1.x task shim runs it
-    nsExec::ExecToLog '"$INSTDIR\${MAINBINARYNAME}.exe" "$INSTDIR\resources\core\mcctl.mjs" uninstall --yes $R9'
+    ; SPAWNLOFT: through the core binary, never the Node core directly (D10, P0-F H3)
+    nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" uninstall --yes $R9'
     Pop $R8
   ${EndIf}
 
@@ -968,8 +1242,9 @@ Section Uninstall
 
   ; Delete uninstaller
   Delete "$INSTDIR\uninstall.exe"
-  ; SPAWNLOFT: core binaries renamed aside by updates, once nothing runs them
-  Delete "$INSTDIR\resources\bin\spawnloft-core.old-*.exe"
+  ; SPAWNLOFT: core binaries moved aside by updates, once nothing runs them
+  !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
+  RMDir /r "$INSTDIR\resources\bin\staging"
 
   {{#each resources_ancestors}}
   RMDir /REBOOTOK "$INSTDIR\\{{this}}"
@@ -1073,8 +1348,8 @@ FunctionEnd
 ; 1.x's registry keys; this installer then writes the same keys again.
 ;
 ; Its running-app check closes every process whose image is under $INSTDIR, which includes 1.x's
-; Node daemons (SpawnLoft.exe as Node) and Rust daemons (resources\bin\spawnloft-core.exe): the
-; servers they supervise lose them. Which policy applies to running servers is Q14 (PHASE0-FINDINGS.md).
+; Node daemons (SpawnLoft.exe as Node): by now `handover stop` has stopped every server they
+; supervised (design 2.3), so only the panel, MCP servers and the bot host are closed.
 Function RemoveLegacyInstall
   DetailPrint "Replacing SpawnLoft 1"
   InitPluginsDir
@@ -1110,6 +1385,8 @@ Function RemoveLegacyInstall
   Return
   legacy_failed:
     DetailPrint "SpawnLoft 1 could not be removed (exit code $R0)"
+    ; SPAWNLOFT: what the stop stopped runs again under the 1.x that is still there
+    Call RestoreLegacyServers
     MessageBox MB_ICONSTOP "SpawnLoft 1 could not be removed, so SpawnLoft 2 was not installed. Close SpawnLoft and try again." /SD IDOK
     SetErrorLevel 2
     Quit

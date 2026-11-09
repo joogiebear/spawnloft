@@ -1,0 +1,142 @@
+name: installer
+
+# The 2.0 Windows installer's scenarios (rust/INSTALLER-UPDATER-DESIGN.md section 11, items 1 to 5,
+# 8 and 9), internal only, v2 only; successor of tauri-spike.yml. Builds 2.x a and b with a
+# throwaway updater key, then runs each scenario on a fresh windows-latest machine against the
+# published 1.5.0 and 1.6.0-beta.413 setups. Nothing leaves the runners except workflow artifacts
+# kept 14 days; no secrets, no feed, no tag, no release. Every scenario prints its result JSON into
+# the job log.
+
+on:
+  push:
+    branches: [v2]
+    paths:
+      - 'rust/**'
+      - 'src/**'
+      - 'mcctl.mjs'
+      - 'spawnloft.mjs'
+      - 'package.json'
+      - 'test/fixtures/fake-mariadb/**'
+      - '.github/workflows/installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION_A: 2.0.0-internal.901
+  VERSION_B: 2.0.0-internal.902
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/v2'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-installer-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-installer-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+            rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+      - name: A throwaway updater key for this run
+        run: |
+          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/ci.key" -f
+      - name: Build 2.x a and b
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/ci.key")"
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          mkdir -p "$RUNNER_TEMP/feed"
+          for v in "$VERSION_A" "$VERSION_B"; do
+            node installer/installer-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --feed-http
+            SPAWNLOFT_VERSION="$v" "$tauri" build --ci --bundles nsis --config "$RUNNER_TEMP/cfg-$v/overlay.json"
+            cp ../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe* "$RUNNER_TEMP/feed/"
+          done
+          ls -la "$RUNNER_TEMP/feed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ github.run_number }}-setups
+          retention-days: 14
+          path: ${{ runner.temp }}/feed/
+
+  scenario:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        name: [s1, s2a, s2b, s3, s4, s5, s8, s9]
+    env:
+      RESULTS: ${{ github.workspace }}\installer-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-${{ github.run_number }}-setups
+          path: ${{ runner.temp }}/feed
+      - name: Download the published 1.5.0 and 1.6.0-beta.413 setups
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.6.0-beta.413 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/beta"
+          gh release download v1.5.0 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/stable"
+          ls -la "$RUNNER_TEMP/beta" "$RUNNER_TEMP/stable"
+      - name: Scenario ${{ matrix.name }}
+        shell: pwsh
+        run: |
+          $beta = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
+          $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
+          ./rust/crates/spawnloft-shell/installer/ci/scenario.ps1 -Name ${{ matrix.name }} -Feed "$env:RUNNER_TEMP\feed" `
+            -Beta $beta.FullName -Stable $stable.FullName -VersionA $env:VERSION_A -VersionB $env:VERSION_B
+      - name: Print the results and logs
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem $env:RESULTS -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "===== $($_.Name)"; Get-Content $_.FullName -Raw | Write-Host
+          }
+          foreach ($root in "$env:LOCALAPPDATA\spawnloft", "$env:LOCALAPPDATA\mcctl", 'S:\spawnloft-data') {
+            foreach ($f in 'run\handover.log', 'run\handover.json', 'run\handover-blocked.json') {
+              $p = Join-Path $root $f
+              if (Test-Path $p) { Write-Host "===== $p"; Get-Content $p -Raw | Write-Host }
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-${{ github.run_number }}-${{ matrix.name }}
+          retention-days: 14
+          if-no-files-found: ignore
+          path: installer-results/

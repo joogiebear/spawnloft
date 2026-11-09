@@ -88,6 +88,17 @@ fn data_base() -> PathBuf {
     }
 }
 
+/// The per-user config folder, `%APPDATA%\spawnloft` or `~/.config/spawnloft`. On Windows it
+/// is the same NTFS folder as Electron's `%APPDATA%\SpawnLoft` (installer design section 7).
+pub fn config_dir() -> PathBuf {
+    config_base().join("spawnloft")
+}
+
+/// The per-user local data base, `%LOCALAPPDATA%` or `~/.local/share`.
+pub fn local_base() -> PathBuf {
+    data_base()
+}
+
 /// `spawnloft/settings.json`, or the older `mcctl/settings.json` when only that one exists.
 pub fn settings_file() -> PathBuf {
     let base = config_base();

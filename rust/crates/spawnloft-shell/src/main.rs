@@ -56,6 +56,9 @@ fn main() -> ExitCode {
     if let Some(code) = argv_compat(&args) {
         return code;
     }
+    // Arguments the installer may pass (`/ARGS`, a stray `/ROLLBACK`) are not for the window:
+    // nothing below reads argv, so they are ignored by construction (design 5.6).
+    resume_pending_handover();
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -134,6 +137,36 @@ fn core_dir() -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
     Some(resources_dir()?.join("core"))
+}
+
+/// After a 1.x handover whose resume never ran (installer closed, power lost; design 2.5): the
+/// core starts what is still pending, under its lock, and exits at once when nothing is. Not
+/// waited for; the banner that reports it is the panel's (T5).
+fn resume_pending_handover() {
+    let Some(bin) = core_binary() else {
+        return;
+    };
+    // the pending resume, and the once-only cleanup of Electron's leftovers (design section 7);
+    // both exit at once when there is nothing to do
+    for args in [
+        &["handover", "resume", "--pending"][..],
+        &["handover", "cleanup"][..],
+    ] {
+        let mut cmd = Command::new(&bin);
+        cmd.args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        if let Err(e) = cmd.spawn() {
+            spike_log(&format!("{}: {e}", args.join(" ")));
+        }
+    }
 }
 
 fn start_core(app: tauri::AppHandle) {
