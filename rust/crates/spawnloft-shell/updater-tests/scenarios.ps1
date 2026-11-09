@@ -36,10 +36,11 @@ function Check($what, [bool] $ok, $detail = '') {
 }
 function Version { try { (Get-ItemProperty -Path $uninstKey -Name DisplayVersion).DisplayVersion } catch { '' } }
 function Variant($name) { Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$base`__variant/$name" | Out-Null }
-function CoreUpdate { param([string[]] $Args)
-  $text = & $core update @Args --json 2>&1 | Out-String
+# ($Args is PowerShell's own automatic variable: a parameter of that name stays empty)
+function CoreUpdate { param([Parameter(ValueFromRemainingArguments)] [string[]] $Words)
+  $text = & $core update @Words --json 2>&1 | Out-String
   $line = ($text -split "`n" | Where-Object { $_.Trim().StartsWith('{') } | Select-Object -Last 1)
-  if (-not $line) { throw "spawnloft-core update $Args printed no JSON: $text" }
+  if (-not $line) { throw "spawnloft-core update $Words printed no JSON: $text" }
   $line | ConvertFrom-Json
 }
 function UpdateLog { if (Test-Path (Join-Path $config 'update.log')) { Get-Content (Join-Path $config 'update.log') -Raw } else { '' } }
