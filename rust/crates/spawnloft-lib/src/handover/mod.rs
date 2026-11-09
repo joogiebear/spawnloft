@@ -43,6 +43,9 @@ pub const PARALLEL: usize = 4;
 pub const CLI_STOP_TIMEOUT_SECS: u64 = 2_000_000;
 /// The error of an entry whose turn came after the deadline: it was never asked to stop.
 pub const NOT_REACHED: &str = "the deadline had passed before its turn";
+/// How long an abort waits for servers that were sent `stop` and were still saving at the
+/// cutoff, so that one which finishes is started again with the rest.
+pub const RESTORE_WAIT: Duration = Duration::from_secs(10);
 /// A blocked marker older than this no longer holds a silent retry back.
 pub const MARKER_HOLD: Duration = Duration::from_secs(24 * 3600);
 
@@ -50,6 +53,8 @@ pub const MARKER_HOLD: Duration = Duration::from_secs(24 * 3600);
 pub const EXIT_OK: u8 = 0;
 pub const EXIT_INTERNAL: u8 = 2;
 pub const EXIT_BLOCKED: u8 = 3;
+/// Servers are running and the machine has no Node.js to start them again under 2.0 (until R4).
+pub const EXIT_NO_NODE: u8 = 5;
 
 /// A server or a database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -467,6 +472,8 @@ pub struct StopOptions {
     pub silent: bool,
     /// the installer page's Cancel
     pub cancel_file: Option<PathBuf>,
+    /// how long an abort waits for servers still saving at the cutoff (RESTORE_WAIT)
+    pub restore_wait: Duration,
 }
 
 /// The outcome: the exit code and the record to write.
@@ -496,6 +503,8 @@ pub fn run_stop(
     let mode = if opts.silent { "silent" } else { "ui" };
     let mut record = Record::new(&opts.legacy_version, &opts.to_version, mode, data_root);
 
+    let listed_names: Vec<String> = listed.iter().map(|l| l.name.clone()).collect();
+    let listed_kinds: Vec<(String, Kind)> = listed.iter().map(|l| (l.name.clone(), l.kind)).collect();
     let active: Vec<Listed> = listed.into_iter().filter(Listed::active).collect();
     log.line(&format!(
         "handover stop from {} to {}: {} active ({})",
@@ -530,6 +539,29 @@ pub fn run_stop(
             record,
             marker: Some(marker),
         };
+    }
+
+    // The servers that blocked an earlier attempt and are stopped now (they finished saving, or
+    // the person stopped them as the message asked): they were running when the update came, so
+    // they start again with the rest.
+    if let Some(m) = &previous
+        && time::now_ms() - m.at_ms < MARKER_HOLD.as_millis() as i64
+    {
+        for n in &m.blocked_by {
+            let known = listed_names.iter().any(|x| x == n);
+            if known && !active.iter().any(|l| &l.name == n) {
+                let kind = listed_kinds
+                    .iter()
+                    .find(|(x, _)| x == n)
+                    .map(|(_, k)| *k)
+                    .unwrap_or(Kind::Server);
+                log.line(&format!(
+                    "{n} blocked the attempt at {} and is stopped now: it starts again after the update",
+                    time::iso(m.at_ms)
+                ));
+                record.servers.push(Entry::new(n, kind, "was-stopped"));
+            }
+        }
     }
 
     for o in active.iter().filter(|l| l.orphaned()) {
@@ -581,7 +613,7 @@ pub fn run_stop(
             record
                 .servers
                 .iter()
-                .filter(|e| matches!(e.stop.as_str(), "still-running" | "failed"))
+                .filter(|e| matches!(e.stop.as_str(), "still-running" | "failed" | "stop-sent"))
                 .map(|e| Listed {
                     name: e.name.clone(),
                     kind: e.kind,
@@ -597,7 +629,7 @@ pub fn run_stop(
             if let Some(l) = now.iter().find(|l| l.name == e.name) {
                 if l.orphaned() && e.stop != "orphaned" {
                     e.stop = "orphaned".into();
-                } else if !l.active() && matches!(e.stop.as_str(), "still-running" | "failed") {
+                } else if !l.active() && matches!(e.stop.as_str(), "still-running" | "failed" | "stop-sent") {
                     // it finished on its own after all
                     e.stop = "was-stopped".into();
                 }
@@ -606,6 +638,8 @@ pub fn run_stop(
     }
     for s in &still {
         match record.entry_mut(&s.name) {
+            // asked to stop and still saving: the abort waits for it a little (restore)
+            Some(e) if e.stop == "stop-sent" => {}
             Some(e) => e.stop = "still-running".into(),
             None => record.servers.push(Entry::new(&s.name, s.kind, "still-running")),
         }
@@ -651,7 +685,7 @@ pub fn run_stop(
             names.join(", ")
         ));
     }
-    restore(&mut record, legacy, tasks, log);
+    restore_waiting(&mut record, legacy, tasks, log, opts.restore_wait);
     let attempts = previous
         .filter(|m| m.blocked_by == names)
         .map(|m| m.attempts + 1)
@@ -673,6 +707,40 @@ pub fn run_stop(
 /// since, and enables the tasks again: the abort path, and `handover restore` for an install that
 /// failed after a successful stop.
 pub fn restore(record: &mut Record, legacy: &dyn Legacy, tasks: &dyn Tasks, log: &Log) {
+    restore_waiting(record, legacy, tasks, log, RESTORE_WAIT)
+}
+
+pub fn restore_waiting(
+    record: &mut Record,
+    legacy: &dyn Legacy,
+    tasks: &dyn Tasks,
+    log: &Log,
+    wait: Duration,
+) {
+    // servers sent `stop` that were still saving at the cutoff: a short wait, then the ones that
+    // finished start again too; one still running keeps serving under 1.x
+    let until = Instant::now() + wait;
+    while record.servers.iter().any(|e| e.stop == "stop-sent") {
+        if let Ok(now) = legacy.list() {
+            for e in record.servers.iter_mut().filter(|e| e.stop == "stop-sent") {
+                if !now.iter().any(|l| l.name == e.name && l.active()) {
+                    log.line(&format!("{} finished stopping after the cutoff", e.name));
+                    e.stop = "was-stopped".into();
+                }
+            }
+        }
+        if Instant::now() >= until || !record.servers.iter().any(|e| e.stop == "stop-sent") {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    for e in record.servers.iter_mut().filter(|e| e.stop == "stop-sent") {
+        log.line(&format!(
+            "{} was asked to stop and is still running; it is left to 1.x",
+            e.name
+        ));
+        e.stop = "still-running".into();
+    }
     let mut order: Vec<usize> = (0..record.servers.len())
         .filter(|&i| record.servers[i].to_restart() && record.servers[i].start.is_none())
         .collect();
@@ -790,7 +858,7 @@ fn stop_one(l: &Listed, legacy: &dyn Legacy, cut: &Cutoff, log: &Log) -> Entry {
                 "{}: deadline passed; the 1.x client was closed, the server was left to finish",
                 l.name
             ));
-            e.stop = "still-running".into();
+            e.stop = "stop-sent".into();
         }
         other => {
             let why = match other {
@@ -804,7 +872,7 @@ fn stop_one(l: &Listed, legacy: &dyn Legacy, cut: &Cutoff, log: &Log) -> Entry {
             log.line(&format!("{}: {why}; trying the control pipe", l.name));
             match legacy.pipe_stop(l, cut, log) {
                 PipeStop::Stopped => e.stop = "stopped".into(),
-                PipeStop::DeadlinePassed => e.stop = "still-running".into(),
+                PipeStop::DeadlinePassed => e.stop = "stop-sent".into(),
                 PipeStop::Failed(err) => {
                     e.stop = "failed".into();
                     e.error = Some(format!("{why}; pipe: {err}"));

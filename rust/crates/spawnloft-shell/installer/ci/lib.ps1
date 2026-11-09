@@ -132,13 +132,16 @@ function Seed-Legacy($servers, $databases) {
   $seed
 }
 
-function List1 {
-  $r = Cli1 @('list', '--json')
-  $j = $r.out | ConvertFrom-Json
-  $all = @($j.data.instances) + @($j.data.databases)
+function Parse-List($r) {
   $map = @{}
-  foreach ($i in $all) { if ($i) { $map[$i.name] = $i } }
+  if ($r.code -ne 0) { Write-Host "list failed ($($r.code)): $($r.out)$($r.err)"; return $map }
+  foreach ($i in @((($r.out.Trim() -split "`n")[-1]) | ConvertFrom-Json)) { if ($i) { $map[$i.name] = $i } }
   $map
+}
+
+# 1.x's view of every server and database (its own readState, through SpawnLoft.exe as Node)
+function List1 {
+  Parse-List (Run-Captured "$inst\SpawnLoft.exe" @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120 @{ ELECTRON_RUN_AS_NODE = '1' })
 }
 
 # 2.0's CLI: the bundled Node core on the machine's Node until R4 (the core binary has no `list`)
@@ -149,13 +152,9 @@ function Cli2([string[]] $cliArgs, [switch] $AllowFail) {
   $r
 }
 
+# 2.0's view (the bundled Node core on the machine's Node, until R4)
 function Status2 {
-  $r = Cli2 @('list', '--json') -AllowFail
-  if ($r.code -ne 0) { return @{} }
-  $j = $r.out | ConvertFrom-Json
-  $map = @{}
-  foreach ($i in @($j.data.instances) + @($j.data.databases)) { if ($i) { $map[$i.name] = $i } }
-  $map
+  Parse-List (Run-Captured (Get-Command node).Source @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120)
 }
 
 function Wait-Until([scriptblock] $cond, $seconds = 60) {

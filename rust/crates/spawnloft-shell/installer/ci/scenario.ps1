@@ -56,12 +56,16 @@ function Starts($dir) {
   if (Test-Path $f) { @(Get-Content $f | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
 }
 
-function Check-Graceful($dir, $oldJava, $what) {
-  Check "$what's old JVM is gone" (Wait-Until { -not (Pid-Alive $oldJava) } 30) "pid $oldJava"
-  $exit = Read-Json (Join-Path $dir 'fake-exit.json')
-  # the fake writes fake-exit.json on a graceful stop and deletes it at its next start, so a
-  # running server has none: the 1.x console log is the evidence after a restart
-  Check "$what was stopped, not killed (1.x said Stopping)" ($null -ne $exit -or (Select-String -Path (Join-Path $dir 'logs\*.log'), (Join-Path $dir '*.log') -Pattern 'Saving worlds' -SimpleMatch -Quiet -ErrorAction SilentlyContinue))
+function Console-Has($dataRoot, $name, $text) {
+  $f = Join-Path $dataRoot "run\$name\console.log"
+  (Test-Path $f) -and [bool] (Select-String -LiteralPath $f -Pattern $text -SimpleMatch -Quiet)
+}
+
+function Check-Graceful($dataRoot, $name, $oldPid, $evidence = 'Saving worlds') {
+  Check "$name's old process is gone" (Wait-Until { -not (Pid-Alive $oldPid) } 30) "pid $oldPid"
+  # the fake java prints "Saving worlds" on a graceful stop, the fake MariaDB "Normal shutdown";
+  # a kill prints nothing
+  Check "$name was stopped, not killed ($evidence in its console log)" (Console-Has $dataRoot $name $evidence)
 }
 
 function Check-Rust-Daemon($dataRoot, $name) {
@@ -135,8 +139,8 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   Check 'the task folder was disabled for the stop' (@($rec.tasksDisabled) -contains $task.TaskName -or @($rec.tasksDisabled).Count -ge 1) "$($rec.tasksDisabled)"
   Check 'and enabled again' ([bool] $rec.tasksReenabled)
 
-  Check-Graceful $seed.servers.survival $survivalJava 'survival'
-  Check "mysql-main's old engine process is gone" (-not (Pid-Alive $dbJava))
+  Check-Graceful $dataRoot 'survival' $survivalJava
+  Check-Graceful $dataRoot 'mysql-main' $dbJava 'Normal shutdown'
   Check "lost's JVM was not touched" (Pid-Alive $lostJava) "pid $lostJava"
   $starts = Starts $seed.servers.survival
   Check 'survival was started again by Node, not by SpawnLoft.exe' ($starts.Count -ge 2 -and $starts[-1].runtime -notlike '*SpawnLoft.exe') "$($starts | ConvertTo-Json -Compress)"
@@ -152,7 +156,12 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   $script:result.shimAfter = $shimAfter
   Check 'the shim was rewritten for 2.0 (no Electron runner)' ($shimAfter -ne $shimBefore -and $shimAfter -notmatch 'ELECTRON_RUN_AS_NODE') $shimAfter
   $script:result.taskRun = Run-Task $taskName
-  Check 'the task runs green after the handover' ("$($script:result.taskRun.lastResult)" -eq '0') "$($script:result.taskRun.lastResult)"
+  if ($envRoot) {
+    # a subst drive belongs to this logon session, which Task Scheduler's need not share
+    Note 'task run with the data root on a subst drive' $script:result.taskRun
+  } else {
+    Check 'the task runs green after the handover' ("$($script:result.taskRun.lastResult)" -eq '0') "$($script:result.taskRun.lastResult)"
+  }
   Check 'handover.log written' (Test-Path (Join-Path $dataRoot 'run\handover.log'))
   $script:result.handoverLog = Get-Content (Join-Path $dataRoot 'run\handover.log') -Raw
 
@@ -202,7 +211,7 @@ switch ($Name) {
     Check 'the stuck server still runs, never signalled' ((Pid-Alive $stuckJava) -and -not (Test-Path (Join-Path $seed.servers.stuck 'fake-exit.json')))
     $l = List1
     Check 'the other server runs again under 1.x' ($l['good'].status -eq 'running') "$($l['good'].status)"
-    Check '  it was stopped gracefully first' (-not (Pid-Alive $goodJava))
+    Check-Graceful $dataRoot 'good' $goodJava
     $st = State $dataRoot 'good'
     Check '  and is run by 1.x again' ($st.daemonExe -like '*SpawnLoft*') "daemonExe $($st.daemonExe)"
     $marker = Read-Json (Join-Path $dataRoot 'run\handover-blocked.json')
@@ -259,6 +268,7 @@ switch ($Name) {
     $script:result.pageTexts = Texts (Window)
     Check 'the stopping page appears' $onStopping
     Check 'good is stopped by the page' (Wait-Until { -not (Pid-Alive $goodJava) } 120)
+    Check-Graceful $dataRoot 'good' $goodJava
     Start-Sleep -Seconds 2
     $script:result.pageTextsDuringStop = Texts (Window)
     $cancel = Button (Window) 'Cancel'
