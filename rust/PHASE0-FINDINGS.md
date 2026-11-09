@@ -123,17 +123,34 @@ makes the "orphaned" state and the data at risk real.
 
 | Step | Node daemon (1.6.0-beta.400 updated to .407, Victor's desktop, 2026-11-09 00:27 UTC) | Rust daemon (2.0.0-internal.N updated by the .407 installer run by hand with the updater's arguments) |
 | --- | --- | --- |
-| Panel quits | gone (`CloseMainWindow`, the on-quit install fired) | |
-| Installer's first `FIND_PROCESS` | not visible from outside; the kill followed 5 s after the quit | |
-| Daemon after the install | **killed**: pid 25540 last seen 18:27:19.669 local, gone at 18:27:20.301 | predicted killed / observed: |
-| JVM after the install | **killed in the same 0.6 s window** (pid 27948, child of the daemon) | predicted alive, orphaned / observed: |
-| Server console | **no Stopping or Saving lines**; last line 2 minutes before the update | observed: |
-| `state.json` after | unchanged: `running: true`, daemonPid 25540, javaPid 27948; `status --json` says **`stale`**, `list` shows stale | predicted `orphaned` / observed: |
-| Panel after | **did not relaunch**: the on-quit path is `install(true, false)`, no `--force-run` (`BaseUpdater.js` line 88) | observed: |
-| Installer duration | uninstall key showed 1.6.0-beta.407 9.7 s after the quit | observed: |
-| Leftovers | none new in `%TEMP%\ns*.tmp`; `mcctl-desktop-updater\pending\` kept the .407 exe and `update-info.json` | observed: |
+| Panel quits | gone (`CloseMainWindow`, the on-quit install fired) | gone (`CloseMainWindow`; updates are off in internal builds, so nothing fired); daemon and JVM still alive 10 s later |
+| Installer's first `FIND_PROCESS` | not visible from outside; the kill followed 5 s after the quit | not visible; see "Which check ran" below |
+| Daemon after the install | **killed**: pid 25540 last seen 18:27:19.669 local, gone at 18:27:20.301 | **alive**: pid 27916 present in all 67 snapshots across the install (18:31:23 to 18:32:05), running from `%TEMP%\nsoCFF.tmp\old-install\resources\bin\spawnloft-core.exe` after the uninstaller's rename; Windows still reports its original path |
+| JVM after the install | **killed in the same 0.6 s window** (pid 27948, child of the daemon) | **alive** (pid 28080) |
+| Server console | **no Stopping or Saving lines**; last line 2 minutes before the update | no new lines during the update; a later `stop` through the surviving daemon (with the 1.6.0-beta.407 CLI) produced "sending stop to console", "java exited code=0" and 10 Stopping/Saving lines |
+| `state.json` after | unchanged: `running: true`, daemonPid 25540, javaPid 27948; `status --json` says **`stale`**, `list` shows stale | unchanged and true: `status --json` says **`running`**, `list` shows 1m 36s uptime (`daemonExe` is `spawnloft-core.exe`, which `sameProcess` still matches) |
+| Panel after | **did not relaunch**: the on-quit path is `install(true, false)`, no `--force-run` (`BaseUpdater.js` line 88) | relaunched 19 s after the installer started (`--force-run` was passed by hand, as `quitAndInstall(true, true)` does) |
+| Installer duration | uninstall key showed 1.6.0-beta.407 9.7 s after the quit | exit 0 after 19.5 s |
+| Leftovers | none new in `%TEMP%\ns*.tmp`; `mcctl-desktop-updater\pending\` kept the .407 exe and `update-info.json` | `%TEMP%\nsoCFF.tmp\old-install\` kept (it holds the running binary); after the stop the folder can be deleted |
 | Also killed | the **MCP server** `SpawnLoft.exe resources\core\spawnloft.mjs mcp` left behind by the Claude desktop app, already by the .400 install that preceded the test: anything under the install folder is "the running app" | |
 | Differential download | the .400 blockmap was never published (404), so a full 112 MB download; harmless | |
+
+**Which check ran.** The two runs together say the installer matched processes by **image
+name** on Victor's machine: every `SpawnLoft.exe` died (the Node daemon, and the orphaned MCP
+server during the .400 install), `spawnloft-core.exe` under the same folder did not. That is
+electron-builder's fallback branch (`tasklist`/`taskkill /IM SpawnLoft.exe /FI "USERNAME eq
+%USERNAME%"`), which runs when `IS_POWERSHELL_AVAILABLE` fails its probe; the PowerShell
+branch would have matched the Rust binary by path. Why the probe failed on this machine is
+being checked (32-bit `powershell.exe` from `SysWOW64`, execution policy, AppLocker); the
+answer decides whether the image-name behaviour can be relied on for other users' machines.
+Until then the safe assumption for 2.0 is that **either** branch can run: the custom
+`customCheckAppRunning` macro, which replaces both, stays in the recommendation.
+
+**Extra observation.** The relaunched 1.6.0-beta.407 panel carried the stock GitHub
+`app-update.yml` and within a minute downloaded and, on its next quit, installed
+1.6.0-beta.413 from the real releases, while a `spawnloft-core` daemon from the internal build
+had just been stopped. Nothing broke, but it shows how quickly a test install re-attaches to
+the public feed once `app-update.yml` is back to stock.
 
 Where to look on the machine: the updater's log is at
 `%APPDATA%\SpawnLoft\logs\main.log` only if a logger is set (`main.js` sets `autoUpdater.logger
@@ -235,10 +252,15 @@ Based on the reading above, to be confirmed by 4a:
    handover case there are none left. P0-B's "never install a major on quit" item is the other
    half: a higher major is never installed silently on quit, only through the button, which
    is where the stop-and-record step runs.
-3. **2.x → 2.y (Tauri updater):** rename-under-running as the plan says. The Rust daemon has
-   no lazy imports and runs as `spawnloft-core.exe`; the custom template renames
-   `SpawnLoft.exe`/`spawnloft-core.exe` to `*.old.exe` when in use, the daemons keep running,
-   the next start cleans up. The custom check matches the panel by full path only.
+3. **2.x → 2.y (Tauri updater):** rename-under-running as the plan says, now **demonstrated**:
+   the Rust daemon kept supervising its server from a renamed binary through a whole
+   uninstall-and-reinstall cycle and stopped it cleanly afterwards. The custom template renames
+   `SpawnLoft.exe`/`spawnloft-core.exe` to `*.old.exe` when in use (or lets NSIS move them, as
+   electron-builder's uninstaller does today), the daemons keep running, the next start cleans
+   up. The custom check matches the panel by full path only. One caveat from the run: the
+   surviving daemon is the **old** build's daemon talking to the **new** build's CLI and panel,
+   so the control protocol must stay compatible across adjacent 2.x releases (the `protocol`
+   field in `ping` is for exactly this).
 4. **Job Object flag:** keep the Rust daemon's job **without** `KILL_ON_JOB_CLOSE`. With it a
    killed daemon takes the JVM down hard, mid-save, which is exactly what the Node daemon does
    today through libuv's own job; without it the server survives and is reported `orphaned`,
