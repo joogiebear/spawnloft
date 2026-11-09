@@ -14,10 +14,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const { main: envelopeMain, parsePublicKey, ENVELOPE_FILE } = await import(path.join(here, '..', '..', '..', '..', 'desktop', 'update-envelope.mjs'))
+const { main: envelopeMain, parsePublicKey, ENVELOPE_FILE } = await import(pathToFileURL(path.join(here, '..', '..', '..', '..', 'desktop', 'update-envelope.mjs')).href)
 
 const args = process.argv.slice(2)
 const opt = { releases: [] }
@@ -56,12 +56,20 @@ opt.releases.sort(byVersionDesc)
 const highest = opt.releases[0]
 const lower = opt.releases[1]
 
+// `--tauri` may point at npm's .bin shim, which is a shell script Windows cannot exec: run the
+// CLI's JS entry with this node instead.
+const tauriCommand = (() => {
+  const m = opt.tauri.match(/^(.*)[\\/]\.bin[\\/]tauri(\.cmd)?$/)
+  if (m) return [process.execPath, path.join(m[1], '@tauri-apps', 'cli', 'tauri.js')]
+  return [opt.tauri]
+})()
+
 function sign(file, version, keyFile) {
   const env = { ...process.env, TAURI_SIGNING_PRIVATE_KEY: fs.readFileSync(keyFile, 'utf8'), TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '' }
-  const cliArgs = ['signer', 'sign']
+  const cliArgs = [...tauriCommand.slice(1), 'signer', 'sign']
   if (version) cliArgs.push('--app-version', version)
   cliArgs.push(file)
-  execFileSync(opt.tauri, cliArgs, { env, stdio: ['ignore', 'pipe', 'inherit'] })
+  execFileSync(tauriCommand[0], cliArgs, { env, stdio: ['ignore', 'pipe', 'inherit'] })
   return fs.readFileSync(`${file}.sig`, 'utf8').trim()
 }
 
