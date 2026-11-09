@@ -6,10 +6,13 @@ P0-F adds the Tauri spike's numbers here.
 
 ## P0-E: experiments 4a and 4b (plan section 3 item 4, section 12 item 6)
 
-Status, 2026-11-08: the code reading is complete and is written up below as the predicted
-outcome. The live runs are **not done yet**: 4a needs a Windows machine with a 1.6 install, and
-4b needs a scratch repository on GitHub. Section "Running the experiments" is the runbook for
-both; the result tables below have an "observed" column to fill in.
+Status, 2026-11-09: the code reading is complete and is written up below. **Experiment 4a has
+run for the Node daemon on Victor's Windows desktop (00:27 UTC) and confirmed the prediction:
+the update killed the daemon and the JVM, with no stop and no save.** The Rust daemon run is
+in progress on the same machine; 4b still needs a scratch repository on GitHub. Section
+"Running the experiments" is the runbook; the result tables carry the observations. Raw files
+(process snapshots every 500 ms, feed log, state and status after) are in
+`S:\VMs\spawnloft-win\p0e\` on Victor's desktop.
 
 ### Summary
 
@@ -42,9 +45,9 @@ both; the result tables below have an "observed" column to fill in.
      `stop` refuse, and the only way out is `spawnloft kill <name>`.
 2. **The panel's update dialog promises the opposite.** `src/ui.html` says "Running servers
    keep running — SpawnLoft supervises them as separate processes", and `desktop/main.js`
-   repeats "Servers survive (detached daemons)". On the reading above that has been false on
-   Windows for every 1.x update. 4a confirms or refutes this on a real machine; if confirmed,
-   it is a 1.x bug to fix in 1.7 regardless of 2.0 (see Q14 below).
+   repeats "Servers survive (detached daemons)". **Confirmed false on Windows by the live run**
+   (Node daemon, 2026-11-09): the server was terminated with no save. Since Victor decided on
+   2026-11-08 to ship no further 1.x releases, the fix lives in the 2.0 installer (see Q14).
 3. **Locked files are not the problem.** The old uninstaller moves every file out of the
    install folder with `Rename` (`un.atomicRMDir`), which Windows allows on a running image;
    only a rename that fails aborts the update ("File is busy"). A daemon that somehow survived
@@ -118,17 +121,19 @@ makes the "orphaned" state and the data at risk real.
 
 **Predicted result table (fill "observed" from the live run):**
 
-| Step | Node daemon (1.6.0-beta.400 updated to .407) | Rust daemon (2.0.0-internal.N updated by the .407 installer run by hand with the updater's arguments) |
+| Step | Node daemon (1.6.0-beta.400 updated to .407, Victor's desktop, 2026-11-09 00:27 UTC) | Rust daemon (2.0.0-internal.N updated by the .407 installer run by hand with the updater's arguments) |
 | --- | --- | --- |
-| Panel quits | gone | gone |
-| Installer's first `FIND_PROCESS` | daemon found | daemon found |
-| Daemon after the install | **killed** (predicted) / observed: | **killed** (predicted) / observed: |
-| JVM after the install | **killed with the daemon** (libuv kill-on-close job) / observed: | **alive, orphaned** (predicted) / observed: |
-| `state.json` after relaunch | `running: true`, dead `daemonPid` and `javaPid`; `status` reads `stale` / observed: | `running: true`, dead `daemonPid`, live `javaPid`; `status` reads `orphaned` / observed: |
-| Panel after relaunch | server shown stopped, no crash record, world last saved whenever the server last autosaved / observed: | server shown orphaned; stop refused; `kill` required / observed: |
-| Installer exit code (updater log) | 0 / observed: | 0 / observed: |
-| Leftovers | none expected; `%TEMP%\ns*.tmp` removed / observed: | same / observed: |
-| Scheduled task present | survives (`customUnInstall` is skipped on `--updated`) / observed: | same / observed: |
+| Panel quits | gone (`CloseMainWindow`, the on-quit install fired) | |
+| Installer's first `FIND_PROCESS` | not visible from outside; the kill followed 5 s after the quit | |
+| Daemon after the install | **killed**: pid 25540 last seen 18:27:19.669 local, gone at 18:27:20.301 | predicted killed / observed: |
+| JVM after the install | **killed in the same 0.6 s window** (pid 27948, child of the daemon) | predicted alive, orphaned / observed: |
+| Server console | **no Stopping or Saving lines**; last line 2 minutes before the update | observed: |
+| `state.json` after | unchanged: `running: true`, daemonPid 25540, javaPid 27948; `status --json` says **`stale`**, `list` shows stale | predicted `orphaned` / observed: |
+| Panel after | **did not relaunch**: the on-quit path is `install(true, false)`, no `--force-run` (`BaseUpdater.js` line 88) | observed: |
+| Installer duration | uninstall key showed 1.6.0-beta.407 9.7 s after the quit | observed: |
+| Leftovers | none new in `%TEMP%\ns*.tmp`; `mcctl-desktop-updater\pending\` kept the .407 exe and `update-info.json` | observed: |
+| Also killed | the **MCP server** `SpawnLoft.exe resources\core\spawnloft.mjs mcp` left behind by the Claude desktop app, already by the .400 install that preceded the test: anything under the install folder is "the running app" | |
+| Differential download | the .400 blockmap was never published (404), so a full 112 MB download; harmless | |
 
 Where to look on the machine: the updater's log is at
 `%APPDATA%\SpawnLoft\logs\main.log` only if a logger is set (`main.js` sets `autoUpdater.logger

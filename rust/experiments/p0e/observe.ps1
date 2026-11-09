@@ -24,7 +24,7 @@ function Snapshot([string]$tag) {
   $pkg = Join-Path $inst 'resources\app-update.yml'
   if (Test-Path $pkg) { Get-Content $pkg | Write-Host } else { Write-Host "no app-update.yml (internal build)" }
   (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
-    Where-Object { $_.DisplayName -eq 'SpawnLoft' } | Select-Object DisplayVersion, InstallLocation | Format-List | Out-String).Trim() | Write-Host
+    Where-Object { $_.DisplayName -like 'SpawnLoft*' } | Select-Object DisplayVersion, InstallLocation | Format-List | Out-String).Trim() | Write-Host
   Write-Host "-- installer leftovers in %TEMP%:"
   Get-ChildItem $env:TEMP -Directory -Filter 'ns*.tmp' -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName } | Write-Host
   Get-ChildItem (Join-Path $env:LOCALAPPDATA 'mcctl-desktop-updater') -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName } | Write-Host
