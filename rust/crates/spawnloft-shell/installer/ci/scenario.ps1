@@ -70,8 +70,10 @@ function Console-Has($dataRoot, $name, $text) {
 function Check-Graceful($dataRoot, $name, $oldPid, $evidence = $null) {
   Check "$name's old process is gone" (Wait-Until { -not (Pid-Alive $oldPid) } 30) "pid $oldPid"
   if ($evidence) {
-    # the fake MariaDB prints "Normal shutdown" on a graceful stop; a kill prints nothing
-    Check "$name was stopped, not killed ($evidence in its console log)" (Console-Has $dataRoot $name $evidence)
+    # the fake MariaDB says "Normal shutdown" on a graceful stop and logs it in its data folder's
+    # fake-shutdowns.log (a restart starts the console log again); a kill does neither
+    $logs = @(Get-ChildItem (Join-Path $dataRoot "services\$name") -Recurse -Filter 'fake-shutdowns.log' -ErrorAction SilentlyContinue)
+    Check "$name was stopped, not killed (${evidence}: fake-shutdowns.log or console)" ($logs.Count -gt 0 -or (Console-Has $dataRoot $name $evidence))
     return
   }
   # the fake java logs each graceful stop by pid in fake-stops.log (a restart rotates the console
@@ -331,14 +333,38 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check 'tasks folder not left disabled' (@(Tasks-Under-Mcctl | Where-Object { $_.State -eq 'Disabled' }).Count -eq 0)
 
     # with the 1.x panel open: the update closes it and goes through
+    # slow is still holding the stop it was sent; let it finish, then start it again under 1.x
     Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
-    $panel = Start-Process "$inst\SpawnLoft.exe" -PassThru
-    Start-Sleep -Seconds 8
-    Check 'the 1.x panel is open' (-not $panel.HasExited)
+    Check 'slow finishes the stop it held' (Wait-Until { (List1)['slow'].status -ne 'running' } 60) "$((List1)['slow'].status)"
+    Cli1 @('start', 'slow', '--detach') | Out-Null
+    Check 'slow runs again under 1.x' (Wait-Until { (List1)['slow'].status -eq 'running' } 90)
+    # the app as a user starts it: no ELECTRON_RUN_AS_NODE, Electron's own log on stderr
+    [Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null)
+    $script:result.panelEnvRunAsNode = "$env:ELECTRON_RUN_AS_NODE"
+    $script:result.panelEnvSeen = @(foreach ($scope in 'Process', 'User', 'Machine') {
+      $vars = [Environment]::GetEnvironmentVariables($scope)
+      foreach ($k in $vars.Keys) { if ("$k" -match 'ELECTRON|^NODE_') { "$scope $k=$($vars[$k])" } }
+    })
+    # started from a direct launch it ran as Node (Electron saw ELECTRON_RUN_AS_NODE from somewhere):
+    # start it the way a user does, through the shell, which gives it the session's environment
+    $pOut = Join-Path $env:RUNNER_TEMP 'panel-out.txt'; $pErr = Join-Path $env:RUNNER_TEMP 'panel-err.txt'
+    Set-Content $pOut ''; Set-Content $pErr ''
+    $panel = Start-Process "$env:WINDIR\explorer.exe" -ArgumentList "`"$inst\SpawnLoft.exe`"" -PassThru
+    # the panel is an app window, whichever SpawnLoft.exe process shows it (Electron may hand
+    # over to another process of its own)
+    $panelOpen = Wait-Until { @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }).Count -gt 0 } 45
+    $panelPids = @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { Proc-Key $_.Id })
+    $script:result.panelProcesses = @(Get-Process SpawnLoft -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Id) window=$($_.MainWindowHandle) '$($_.MainWindowTitle)'" })
+    $script:result.panelFirstExited = $panel.HasExited
+    if ($panel.HasExited) { $script:result.panelFirstExit = $panel.ExitCode }
+    $script:result.panelStdout = "$(Get-Content $pOut -Raw -ErrorAction SilentlyContinue)"
+    $script:result.panelStderr = "$(Get-Content $pErr -Raw -ErrorAction SilentlyContinue)" -replace '(?s)^(.{0,6000}).*$', '$1'
+    $script:result.spawnloftCommandLines = @(Get-CimInstance Win32_Process -Filter "Name='SpawnLoft.exe'" | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" })
+    Check 'the 1.x panel is open' $panelOpen
     $run = Run-Installer $setupA @('--updated', '/S') 600
     $script:result.withPanel = $run
     Check 'the update goes through with the panel open' ($run.code -eq 0) "exit $($run.code)"
-    Check 'the 1.x panel was closed' ($panel.HasExited)
+    Check 'the 1.x panel was closed' (@($panelPids | Where-Object { Pid-Alive $_ }).Count -eq 0) "$($panelPids -join ',')"
     Check-Layout2
     $l2 = Status2
     Check 'both servers run under 2.0' ($l2['good'].status -eq 'running' -and $l2['slow'].status -eq 'running') "$($l2['good'].status) / $($l2['slow'].status)"
@@ -449,9 +475,13 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check '  task kept' (@(Tasks-Under-Mcctl).Count -eq 1)
     Check '  data kept' (Test-Path (Join-Path $dataRoot 'instances.json'))
     Get-Process SpawnLoft -ErrorAction SilentlyContinue | Stop-Process -Force
-    Cli1 @('repair') | Out-Null
+    # 1.x has no repair command: its repairAfterMove runs when the app starts (design 5.6)
+    $app = Start-Process "$inst\SpawnLoft.exe" -PassThru
+    $shimFixed = Wait-Until { $t = Get-Content (Join-Path $dataRoot 'tasks\*.cmd') -Raw; $t -match 'SpawnLoft\.exe' -and $t -match 'ELECTRON_RUN_AS_NODE' } 90
     $shim = Get-Content (Join-Path $dataRoot 'tasks\*.cmd') -Raw
-    Check "  1.x's repair rewrote the shim for SpawnLoft.exe" ($shim -match 'SpawnLoft\.exe' -and $shim -match 'ELECTRON_RUN_AS_NODE') $shim
+    Check "  1.x's first start rewrote the shim for SpawnLoft.exe" $shimFixed $shim
+    Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+    Get-Process SpawnLoft -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$inst\SpawnLoft.exe" -and $_.MainWindowHandle -ne 0 } | Stop-Process -Force -ErrorAction SilentlyContinue
     Cli1 @('start', 'keep', '--detach') | Out-Null
     Check '  1.x starts the server' (Wait-Until { (List1)['keep'].status -eq 'running' } 90)
     Cli1 @('stop', 'keep') | Out-Null
