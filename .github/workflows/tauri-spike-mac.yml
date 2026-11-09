@@ -67,20 +67,42 @@ jobs:
             fs.writeFileSync(f, JSON.stringify(o, null, 2))
           ' "$RUNNER_TEMP/overlay.json" "$RUNNER_TEMP/icons"
           cat "$RUNNER_TEMP/overlay.json"
+      - name: Import the Developer ID identity into a temporary keychain
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/spike-signing.keychain-db"
+          kcpw="$(uuidgen)"
+          echo "$MAC_CSC_LINK" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security create-keychain -p "$kcpw" "$kc"
+          security set-keychain-settings -lut 3600 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          security import "$RUNNER_TEMP/devid.p12" -k "$kc" -P "$MAC_CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kcpw" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/devid.p12"
+          identity="$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+          test -n "$identity"
+          echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: Sign spawnloft-core (Tauri signs the app, not binaries shipped as resources)
+        run: |
+          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" rust/target/release/spawnloft-core
+          codesign --verify --strict --verbose=2 rust/target/release/spawnloft-core
       - name: Build, sign and notarize the .app
         working-directory: rust/crates/spawnloft-shell
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
-          APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/spike.key")"
+          export APPLE_SIGNING_IDENTITY="$SIGNING_IDENTITY"
           tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
-          # Tauri imports APPLE_CERTIFICATE into a temporary keychain and picks the Developer ID
-          # identity from it; notarizing (and stapling) runs when APPLE_ID/PASSWORD/TEAM_ID are set
+          # notarizing (and stapling) runs when APPLE_ID/PASSWORD/TEAM_ID are set; the stapler
+          # fetch drops now and then, so a failed run is tried again
           for attempt in 1 2 3; do
             SPAWNLOFT_VERSION="$SPIKE_VERSION" "$tauri" build --ci --bundles app --config "$RUNNER_TEMP/overlay.json" && break
             echo "::warning::build, signing or notarization failed on attempt $attempt of 3"
@@ -98,6 +120,9 @@ jobs:
           ls -la "$app/Contents/Resources/resources/bin" | tee -a out/info.txt
           ditto -c -k --sequesterRsrc --keepParent "$app" "out/SpawnLoft-$SPIKE_VERSION-arm64-mac.zip"
           ls -la out
+      - name: Remove the temporary keychain
+        if: always()
+        run: '[ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true'
       - uses: actions/upload-artifact@v4
         with:
           name: tauri-spike-mac-${{ github.run_number }}
