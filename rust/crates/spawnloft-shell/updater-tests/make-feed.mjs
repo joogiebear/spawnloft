@@ -78,8 +78,12 @@ function atom(versions) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">\n${entries}\n</feed>\n`
 }
 
+// Every variant carries the same generatedAt: the scenarios check them in any order, and a feed
+// stamped a second before one already accepted would trip the replay floor.
+const stamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+
 // Puts a release into a feed folder: the renamed, re-signed setup and a signed envelope.
-function placeRelease(feedDir, release, { keyFile = opt.key, pubkeyFile = opt.pubkey, generatedAt, expiresAt, minVersion, envelopeEdit } = {}) {
+function placeRelease(feedDir, release, { keyFile = opt.key, pubkeyFile = opt.pubkey, generatedAt = stamp, expiresAt, minVersion, envelopeEdit } = {}) {
   const dist = path.join(feedDir, 'download', `v${release.version}`)
   fs.mkdirSync(dist, { recursive: true })
   const setup = path.join(dist, `SpawnLoft-Setup-${release.version}.exe`)
