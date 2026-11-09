@@ -446,10 +446,9 @@ spike-a to spike-b, and uninstalled. Every check passed. (Its final step reporte
 after all six uninstall checks passed: pwsh ended the step with the last `schtasks` exit code.
 Fixed in 959d7b9.)
 
-**The signed run on Victor's PC passed too (2026-11-09 01:28 UTC, details below).** Still to
-run: the Squirrel.Mac acceptance test on the Mac mini (same bundle id, signed and notarized,
-offered to an installed signed beta). Victor on the window at 1440p and 4K: "It looks ok right
-now."
+**The signed run on Victor's PC passed (2026-11-09 01:28 UTC), and so did the Squirrel.Mac
+acceptance test on the Mac mini (01:55 UTC); details below.** Victor on the window at 1440p and
+4K: "It looks ok right now." P0-F's done-when line is met.
 
 Q24 (does the plugin install `.deb` and `.rpm` on Linux) was not checked: the spike builds NSIS
 only.
@@ -565,6 +564,45 @@ The real electron-updater path, publisher check included. Raw files are in
   update mode also works for a rollback from 2.0 to a 1.x-style install.
 - The installed 1.6 calls its updater cache `spawnloft-desktop-updater`, not
   `mcctl-desktop-updater` as the P0-E runbook says.
+
+### Squirrel.Mac on the Mac mini (2026-11-09)
+
+The whole macOS handover: a signed, notarized 1.6 beta takes a Tauri 2 build through its own
+electron-updater / Squirrel.Mac update. Raw files are in `~/p0f-mac/` on the Mac mini and
+`S:\VMs\spawnloft-win\p0f-mac\` on Desktop-Main.
+
+- **Build.** `.github/workflows/tauri-spike-mac.yml` (v2 only; it runs when its own file
+  changes, because a workflow that is not on the default branch cannot be started by hand). It
+  builds `SpawnLoft.app` 2.0.0-spike.1 on `macos-15` with bundle id `io.github.joogiebear.mcctl`,
+  signs it with the release Developer ID (team 7R8YV3RVA8, from the `MAC_CSC_LINK` secret, in a
+  temporary keychain deleted after), notarizes and staples it, and uploads it as a workflow
+  artifact only. Victor chose CI signing; the Mac mini has the public certificate but not its
+  private key. **The first run was refused by notarization: Tauri signs the app but not a
+  binary shipped as a resource**, so `spawnloft-core` must be signed first, with hardened
+  runtime and a secure timestamp (run 42547487507 passed). 2.0's macOS build needs the same step,
+  or the core as a Tauri `externalBin`, which Tauri signs.
+- **Starting point.** The Mac's 1.6.0-beta.407 had just updated itself to 1.6.0-beta.413 through
+  the real GitHub feed (ShipIt "Installation completed successfully", 01:39 UTC). Its
+  `app-update.yml` was pointed at a loopback generic feed. That edit breaks the old bundle's
+  seal (`codesign`: file modified), but the app still launched and Squirrel did not check it.
+- **Update.** 1.6 fetched `latest-mac.yml`, downloaded the 4.4 MB zip about 20 s after launch,
+  and handed it to ShipIt. On quit (the install-on-quit path; no button was pressed):
+  `Detected this as an install request`, `Beginning installation`, `Moved bundle contents ...
+  to /Applications/SpawnLoft.app`, `Installation completed successfully`. **No code-requirement
+  error: Squirrel.Mac accepted the Tauri build** (same bundle id, same team). About 0.5 s from
+  quit to installed. The quit path does not relaunch the app; Restart and update (which does)
+  was not run.
+- **After.** `/Applications/SpawnLoft.app` was the Tauri build (CFBundleShortVersionString
+  2.0.0-spike.1, one arm64 Mach-O, no Frameworks folder), `codesign --verify --deep --strict`
+  passed, `spctl` said "Notarized Developer ID", the ticket was stapled, and the app started
+  `spawnloft-core ui` from `Contents/Resources/resources/bin`, listening within 0.6 s.
+- **Bug found: Node under a GUI launch.** Started from Finder, the app gets
+  `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, so the core did not find Node (installed in
+  `/usr/local/bin`) and served its 503 page. With `SPAWNLOFT_NODE` set, the panel loaded (200,
+  631 KB) and `/api/health` saw Java. Fixed for the spike: `find_node` also looks in
+  `/opt/homebrew/bin`, `/usr/local/bin`, Volta and nvm on macOS. 2.0 removes the Node dependency
+  altogether; until then every path that needs Node must not trust a GUI PATH.
+- The Mac was left on a clean, sealed 1.6.0-beta.413 with its original GitHub feed.
 
 ### Q21: Tauri's updater plugin or our own
 

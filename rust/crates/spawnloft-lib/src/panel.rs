@@ -148,9 +148,34 @@ pub fn find_node(explicit: Option<&Path>) -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
     let exe = if cfg!(windows) { "node.exe" } else { "node" };
-    std::env::split_paths(&std::env::var_os("PATH")?)
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .chain(gui_fallback_dirs())
         .map(|dir| dir.join(exe))
         .find(|p| p.is_file())
+}
+
+/// An app started from Finder or launchd gets PATH=/usr/bin:/bin:/usr/sbin:/sbin, without the
+/// places Node is installed (found on the Mac mini in P0-F); Electron never needed this because it
+/// carries Node. Checked after PATH, so a PATH entry still wins.
+fn gui_fallback_dirs() -> Vec<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+    let mut dirs = vec![
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+    ];
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        dirs.push(home.join(".volta/bin"));
+        // nvm keeps one folder per version; any of them will do for the spike (sorted by name)
+        if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
+            let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
+            versions.sort();
+            dirs.extend(versions.into_iter().rev());
+        }
+    }
+    dirs
 }
 
 fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<SocketAddr, String> {
