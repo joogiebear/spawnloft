@@ -3,6 +3,7 @@
 // told to, so the app under test keeps one base URL while the scenario changes the feed.
 //
 //   node feed-server.cjs <feed root> <port file> [<initial variant>]
+//   (FEED_PORT=<n> listens on that port instead of a free one: the macOS feed is built for a fixed base)
 //
 // GET /__variant            -> the folder being served
 // POST /__variant/<name>    -> serve <feed root>/<name> from now on (a test control, loopback only)
@@ -37,7 +38,7 @@ http.createServer((req, res) => {
   if (!file.startsWith(dir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end() }
   res.writeHead(200, { 'content-length': fs.statSync(file).size })
   fs.createReadStream(file).pipe(res)
-}).listen(0, '127.0.0.1', function () {
+}).listen(Number(process.env.FEED_PORT) || 0, '127.0.0.1', function () {
   fs.writeFileSync(portFile, String(this.address().port))
   console.log(`feed server on 127.0.0.1:${this.address().port} serving ${root} (${variant})`)
 })

@@ -11,11 +11,16 @@ name: installer-mac
 # except workflow artifacts kept 14 days: no feed, no tag, no release. Victor approved signing in
 # CI on 2026-11-09 (MAC_CSC_LINK / APPLE_* secrets).
 #
-# The a and b artifacts here are internal test builds, made with --feed-http so their updater
-# accepts a loopback (http) feed: that is what the Mac mini's 2.x -> 2.y plugin-cycle acceptance
-# needs (SPAWNLOFT_SPIKE_FEED pointed at a 127.0.0.1 manifest). The real release artifacts are the
-# HTTPS ones built by the release pipeline (desktop/release-feed.mjs, .github/workflows/release.yml),
-# never these. Everything else (signing, notarization, the Squirrel.Mac zip) is identical.
+# The a and b artifacts here are internal test builds for the 2.x -> 2.y plugin cycle (design
+# section 11 scenario 5, as updater.yml runs it on Windows): the core is built with the
+# `internal-feed` feature (it reads SPAWNLOFT_UPDATE_SOURCE, a loopback base) and both the core and
+# the shell trust only this run's throwaway key (SPAWNLOFT_UPDATE_PUBKEYS); the shell is built with
+# --feed-http. They are beta-numbered because an internal version has no update channel. The job
+# also writes the signed loopback feed (make-mac-feed.mjs, fixed port FEED_PORT) and runs the cycle
+# on the runner (mac-plugin-cycle.cjs); the Mac mini runs the same script on the same artifact. The
+# real release artifacts are the HTTPS ones the release pipeline builds with the release keys
+# (desktop/release-feed.mjs, .github/workflows/release.yml), never these. Everything else
+# (signing, notarization, the Squirrel.Mac zip) is identical.
 # Each run does two Developer ID notarizations on an expensive macOS runner, so the trigger is
 # kept narrow (the Rust core/shell and the Mac signing helper); push other changes through
 # workflow_dispatch.
@@ -42,8 +47,10 @@ defaults:
 
 env:
   CARGO_TERM_COLOR: always
-  VERSION_A: 2.0.0-internal.901
-  VERSION_B: 2.0.0-internal.902
+  VERSION_A: 2.0.0-beta.901
+  VERSION_B: 2.0.0-beta.902
+  # the loopback port the test feed's URLs name (make-mac-feed.mjs, mac-plugin-cycle.cjs)
+  FEED_PORT: '47613'
 
 jobs:
   build:
@@ -68,14 +75,16 @@ jobs:
           restore-keys: |
             rust-installer-mac-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
             rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core
-        working-directory: rust
-        run: cargo build --release --locked -p spawnloft-core
       - name: Install the Tauri CLI (pinned, from npm)
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
-      - name: A throwaway updater key for this run
+      - name: A throwaway updater key for this run, the only key a and b trust
         run: |
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/ci.key" -f
+          # the CLI writes the .pub as one base64 line holding the two-line minisign file
+          pub() { base64 -d "$1" 2>/dev/null || cat "$1"; }
+          id="$(pub "$RUNNER_TEMP/ci.key.pub" | sed -n 1p | awk '{print $NF}')"
+          line="$(pub "$RUNNER_TEMP/ci.key.pub" | sed -n 2p)"
+          echo "SPAWNLOFT_UPDATE_PUBKEYS=$id=$line" >> "$GITHUB_ENV"
       - name: Generate the macOS icon
         run: |
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" icon desktop/build/icon-mac.png -o "$RUNNER_TEMP/icons"
@@ -99,10 +108,6 @@ jobs:
           test -n "$identity"
           echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
           echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
-      - name: Sign spawnloft-core separately (Tauri does not sign resource binaries)
-        run: |
-          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" rust/target/release/spawnloft-core
-          codesign --verify --strict --verbose=2 rust/target/release/spawnloft-core
       - name: Build, sign, notarize, verify and package 2.x a and b
         working-directory: rust/crates/spawnloft-shell
         env:
@@ -117,6 +122,13 @@ jobs:
           app=../../target/release/bundle/macos/SpawnLoft.app
           mkdir -p "$RUNNER_TEMP/feed"
           for v in "$VERSION_A" "$VERSION_B"; do
+            # the core carries the installed version, so it is built once per version (as a release
+            # is), with the loopback feed override, then signed separately: Tauri does not sign
+            # resource binaries
+            (cd ../.. && SPAWNLOFT_VERSION="$v" cargo build --release --locked -p spawnloft-core --features spawnloft-lib/internal-feed)
+            codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" ../../target/release/spawnloft-core
+            codesign --verify --strict --verbose=2 ../../target/release/spawnloft-core
+            ../../target/release/spawnloft-core --version
             node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons" --feed-http
             # start from a clean bundle dir so a stale .app/.app.tar.gz (from the restored cache, or
             # from build a) is never mistaken for this build
@@ -132,6 +144,15 @@ jobs:
             node installer/mac-package.mjs "$app" "$v" "$RUNNER_TEMP/feed/$v"
           done
           ls -la "$RUNNER_TEMP/feed"/*/
+      - name: The signed loopback feed for the plugin cycle
+        run: |
+          node rust/crates/spawnloft-shell/installer/ci/make-mac-feed.mjs \
+            --out "$RUNNER_TEMP/feed/loopback" --base "http://127.0.0.1:$FEED_PORT/" \
+            --tauri "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" \
+            --key "$RUNNER_TEMP/ci.key" --pubkey "$RUNNER_TEMP/ci.key.pub" \
+            --release "$VERSION_A=$RUNNER_TEMP/feed/$VERSION_A" --release "$VERSION_B=$RUNNER_TEMP/feed/$VERSION_B"
+          find "$RUNNER_TEMP/feed/loopback" -type f | sort
+          cat "$RUNNER_TEMP/feed/loopback/good/download/v$VERSION_B/spawnloft-updates.json"
       - name: Remove the temporary keychain
         if: always()
         run: '[ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true'
@@ -163,3 +184,37 @@ jobs:
         run: |
           zip="$RUNNER_TEMP/feed/$VERSION_A/SpawnLoft-$VERSION_A-mac-arm64.zip"
           node rust/crates/spawnloft-shell/installer/ci/smoke-mac-handover.cjs "$zip" "$VERSION_A"
+
+  plugin-cycle:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-mac-${{ github.run_number }}-feed
+          path: ${{ runner.temp }}/feed
+      - name: 2.x a -> b through the signed envelope and tauri-plugin-updater
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          node rust/crates/spawnloft-shell/installer/ci/mac-plugin-cycle.cjs \
+            --zip-a "$RUNNER_TEMP/feed/$VERSION_A/SpawnLoft-$VERSION_A-mac-arm64.zip" --a "$VERSION_A" --b "$VERSION_B" \
+            --feed "$RUNNER_TEMP/feed/loopback" --port "$FEED_PORT" --apps "$RUNNER_TEMP/Applications" --out plugin-cycle-results
+      - name: Print the results
+        if: always()
+        run: |
+          for f in plugin-cycle-results/*.json plugin-cycle-results/*.log plugin-cycle-results/config/spawnloft/update.log; do
+            [ -f "$f" ] && { echo "===== $f"; cat "$f"; }
+          done
+          true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-mac-${{ github.run_number }}-plugin-cycle
+          retention-days: 14
+          path: plugin-cycle-results/
