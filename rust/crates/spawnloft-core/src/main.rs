@@ -5,6 +5,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 mod cli;
+mod handover_cmd;
+mod update_cmd;
 
 fn main() -> ExitCode {
     // args_os: an argument that is not valid UTF-8 is a usage error, not a panic (and with

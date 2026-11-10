@@ -1,0 +1,158 @@
+name: updater
+
+# The 2.x updater's scenarios (rust/INSTALLER-UPDATER-DESIGN.md section 11, items 5 to 7) on
+# windows-latest: a 2.x cycle a to b through the signed envelope and the plugin, a rollback b to a
+# with the hold, and every refusal (tampered or wrong-key envelope, moved signature, replayed
+# feed, wrong artifact signature, unsigned version, rotation). Internal only, v2 only. Throwaway
+# keys made in the job, a loopback feed, unsigned installers: nothing leaves the runner except
+# workflow artifacts kept 14 days. No secrets, no release, no tag.
+
+on:
+  push:
+    branches: [v2]
+    paths:
+      - 'rust/**'
+      - 'desktop/update-envelope.mjs'
+      - '.github/workflows/updater.yml'
+  pull_request:
+    branches: [v2]
+    paths:
+      - 'rust/**'
+      - 'desktop/update-envelope.mjs'
+      - '.github/workflows/updater.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: updater-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  updater:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      VER_A: 2.0.0-beta.1
+      VER_B: 2.0.0-beta.2
+      # a release build has no feed override; the scenario core is built with it
+      SPAWNLOFT_FEATURES: spawnloft-lib/internal-feed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-updater-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-updater-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+            rust-installer-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # the bundler fetches NSIS and its Tauri plugin from GitHub releases on first use; a cached
+      # toolset spares the job that download (and its outages)
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tauri/NSIS
+          key: tauri-nsis-${{ runner.os }}-cli-2.12.4
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+      - name: Throwaway keys for this run (release, next, and one nobody trusts)
+        run: |
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          for k in release next other; do
+            "$tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/$k.key" -f
+          done
+          # the CLI writes the .pub as one base64 line holding the two-line minisign file
+          pub() { base64 -d "$1" 2>/dev/null || cat "$1"; }
+          id() { pub "$1" | sed -n 1p | awk '{print $NF}'; }
+          line() { pub "$1" | sed -n 2p; }
+          echo "SPAWNLOFT_UPDATE_PUBKEYS=$(id "$RUNNER_TEMP/release.key.pub")=$(line "$RUNNER_TEMP/release.key.pub"),$(id "$RUNNER_TEMP/next.key.pub")=$(line "$RUNNER_TEMP/next.key.pub")" >> "$GITHUB_ENV"
+          echo "TAURI_CLI=$tauri" >> "$GITHUB_ENV"
+          ls -la "$RUNNER_TEMP"/*.key*
+      - name: Unit tests of the updater (lib and core)
+        working-directory: rust
+        run: cargo test --locked -p spawnloft-lib -p spawnloft-core
+      - name: Build the core and the shell for a and b
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/release.key")"
+          mkdir -p "$RUNNER_TEMP/setups"
+          for v in "$VER_A" "$VER_B"; do
+            # the core carries the installed version: built once per version, like a release
+            (cd ../.. && SPAWNLOFT_VERSION="$v" cargo build --release --locked -p spawnloft-core --features "$SPAWNLOFT_FEATURES")
+            ../../target/release/spawnloft-core.exe --version
+            ../../target/release/spawnloft-core.exe update status --json || true
+            node installer/installer-config.mjs "$v" "$RUNNER_TEMP/release.key.pub" "$RUNNER_TEMP/cfg-$v" --feed-http
+            SPAWNLOFT_VERSION="$v" "$TAURI_CLI" build --ci --bundles nsis --config "$RUNNER_TEMP/cfg-$v/overlay.json"
+            cp "../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe" "$RUNNER_TEMP/setups/"
+          done
+          ls -la "$RUNNER_TEMP/setups"
+      - name: Install version a
+        shell: pwsh
+        run: |
+          $p = Start-Process "$env:RUNNER_TEMP\setups\SpawnLoft_$($env:VER_A)_x64-setup.exe" -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit $($p.ExitCode)" }
+          $inst = "$env:LOCALAPPDATA\Programs\SpawnLoft"
+          & "$inst\resources\bin\spawnloft-core.exe" --version
+          # a configured data root, as a real install has
+          New-Item -ItemType Directory -Force "$env:APPDATA\spawnloft", "$env:LOCALAPPDATA\spawnloft" | Out-Null
+          @{ dataRoot = "$env:LOCALAPPDATA\spawnloft" } | ConvertTo-Json | Set-Content "$env:APPDATA\spawnloft\settings.json"
+      - name: Serve the loopback feeds
+        run: |
+          mkdir -p updater-results
+          node rust/crates/spawnloft-shell/updater-tests/feed-server.cjs "$RUNNER_TEMP/feeds" "$RUNNER_TEMP/feed-port.txt" good > updater-results/feed-server.log 2>&1 &
+          for i in $(seq 1 50); do [ -f "$RUNNER_TEMP/feed-port.txt" ] && break; sleep 0.2; done
+          port="$(cat "$RUNNER_TEMP/feed-port.txt")"
+          echo "FEED_PORT=$port" >> "$GITHUB_ENV"
+          node rust/crates/spawnloft-shell/updater-tests/make-feed.mjs \
+            --out "$RUNNER_TEMP/feeds" --base "http://127.0.0.1:$port/" --tauri "$TAURI_CLI" \
+            --key "$RUNNER_TEMP/release.key" --pubkey "$RUNNER_TEMP/release.key.pub" \
+            --next-key "$RUNNER_TEMP/next.key" --next-pubkey "$RUNNER_TEMP/next.key.pub" \
+            --other-key "$RUNNER_TEMP/other.key" --other-pubkey "$RUNNER_TEMP/other.key.pub" \
+            --release "$VER_A=$RUNNER_TEMP/setups/SpawnLoft_${VER_A}_x64-setup.exe" \
+            --release "$VER_B=$RUNNER_TEMP/setups/SpawnLoft_${VER_B}_x64-setup.exe"
+          find "$RUNNER_TEMP/feeds" -maxdepth 3 | head -50
+          curl -sS "http://127.0.0.1:$port/download/v$VER_B/spawnloft-updates.json"
+      - name: Scenarios 5 to 7
+        timeout-minutes: 30
+        shell: pwsh
+        run: ./rust/crates/spawnloft-shell/updater-tests/scenarios.ps1 -Port $env:FEED_PORT -A $env:VER_A -B $env:VER_B -Out updater-results
+      - name: Print the results (the artifacts cannot be fetched from every place that reads them)
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem updater-results -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "===== $($_.Name)"; Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue | Write-Host
+          }
+          $log = Join-Path $env:APPDATA 'spawnloft\update.log'
+          if (Test-Path $log) { Write-Host '===== update.log (final)'; Get-Content $log -Raw | Write-Host }
+      - name: Uninstall
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process SpawnLoft, spawnloft-core -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          $u = "$env:LOCALAPPDATA\Programs\SpawnLoft\uninstall.exe"
+          if (Test-Path $u) { Start-Process $u -ArgumentList '/S', '/currentuser', "_?=$env:LOCALAPPDATA\Programs\SpawnLoft" -Wait }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: updater-${{ github.run_number }}-results
+          retention-days: 14
+          path: updater-results/

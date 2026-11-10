@@ -8,6 +8,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-relocate-'))
 process.env.MCCTL_DATA_ROOT = scratch
@@ -79,4 +81,19 @@ test('a server whose folder is gone is skipped rather than failing the repair', 
   putInstance('ghost', { dir: path.join(INSTANCES_DIR, 'ghost'), jar: 'paper.jar', memory: '4G', port: 25566 })
   fs.rmSync(marker, { force: true })
   assert.deepEqual(repairAfterMove({ marker }), { moved: true, shims: 1, launchers: 1 })
+})
+
+test('spawnloft repair rewrites everything even when nothing looks moved', () => {
+  repairAfterMove()
+  fs.writeFileSync(shim, 'left alone\r\n')
+  const cli = fileURLToPath(new URL('../spawnloft.mjs', import.meta.url))
+  const out = execFileSync(process.execPath, [cli, 'repair', '--json'], { encoding: 'utf8', env: { ...process.env, MCCTL_DATA_ROOT: scratch } })
+  const line = JSON.parse(out.trim().split('\n').pop())
+  assert.equal(line.ok, true)
+  assert.equal(line.data.shims, 1)
+  assert.equal(line.data.launchers, 1)
+  assert.ok(fs.readFileSync(shim, 'utf8').includes(posix ? "task run 'nightly'" : 'task run nightly'))
+
+  const text = execFileSync(process.execPath, [cli, 'repair'], { encoding: 'utf8', env: { ...process.env, MCCTL_DATA_ROOT: scratch } })
+  assert.match(text, /Rewrote 1 task shim\(s\) and the launchers of 1 server\(s\)/)
 })

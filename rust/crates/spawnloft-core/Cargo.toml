@@ -14,6 +14,8 @@ path = "src/main.rs"
 
 [dependencies]
 spawnloft-lib.workspace = true
+semver = "1.0.28"
+serde_json = "1.0.154"
 
 [dev-dependencies]
 spawnloft-fakes.workspace = true

@@ -253,6 +253,15 @@ struct Daemon {
 }
 
 /// The daemon's process name as the state file records it, for the pid-reuse check.
+/// `daemonStartTime`: this process's kernel creation time, the half of its identity that survives
+/// an update renaming the binary it runs from (crate::procid). 1.x readers ignore the field. A
+/// string: a Windows FILETIME is above 2^53, and the Node core reads this file with JSON.parse.
+fn insert_start_time(state: &mut Map<String, Value>) {
+    if let Some(t) = crate::procid::own_start_time() {
+        state.insert("daemonStartTime".into(), json!(t.to_string()));
+    }
+}
+
 fn own_exe() -> String {
     std::env::current_exe()
         .ok()
@@ -356,6 +365,7 @@ impl Daemon {
             state.insert("javaPid".into(), json!(pid));
         }
         state.insert("daemonExe".into(), json!(own_exe()));
+        insert_start_time(&mut state);
         state.insert("javaExe".into(), json!(basename(&program.cmd)));
         state.insert("startedAt".into(), json!(time::now_ms()));
         if let Some(dir) = inst.get("dir") {
@@ -507,6 +517,7 @@ impl Daemon {
             );
             self.state.insert("daemonPid".into(), json!(std::process::id()));
             self.state.insert("daemonExe".into(), json!(own_exe()));
+            insert_start_time(&mut self.state);
             self.state.insert("startedAt".into(), json!(time::now_ms()));
             self.state.insert("control".into(), json!(self.control));
         }

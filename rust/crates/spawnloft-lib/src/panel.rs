@@ -148,9 +148,34 @@ pub fn find_node(explicit: Option<&Path>) -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
     let exe = if cfg!(windows) { "node.exe" } else { "node" };
-    std::env::split_paths(&std::env::var_os("PATH")?)
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .chain(gui_fallback_dirs())
         .map(|dir| dir.join(exe))
         .find(|p| p.is_file())
+}
+
+/// An app started from Finder or launchd gets PATH=/usr/bin:/bin:/usr/sbin:/sbin, without the
+/// places Node is installed (found on the Mac mini in P0-F); Electron never needed this because it
+/// carries Node. Checked after PATH, so a PATH entry still wins.
+fn gui_fallback_dirs() -> Vec<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return Vec::new();
+    }
+    let mut dirs = vec![
+        PathBuf::from("/opt/homebrew/bin"),
+        PathBuf::from("/usr/local/bin"),
+    ];
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        dirs.push(home.join(".volta/bin"));
+        // nvm keeps one folder per version; any of them will do for the spike (sorted by name)
+        if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
+            let mut versions: Vec<PathBuf> = entries.flatten().map(|e| e.path().join("bin")).collect();
+            versions.sort();
+            dirs.extend(versions.into_iter().rev());
+        }
+    }
+    dirs
 }
 
 fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<SocketAddr, String> {
@@ -232,7 +257,25 @@ impl Head {
     pub fn path(&self) -> &str {
         self.request_line.split(' ').nth(1).unwrap_or("/")
     }
+
+    pub fn method(&self) -> &str {
+        self.request_line.split(' ').next().unwrap_or("GET")
+    }
+
+    /// `Content-Length`, when the request announces a body.
+    pub fn content_length(&self) -> Option<usize> {
+        self.header("content-length").and_then(|v| v.trim().parse().ok())
+    }
 }
+
+/// Routes `spawnloft-core ui` answers itself instead of forwarding (the updater, design 5.1).
+pub fn is_local_route(path: &str) -> bool {
+    let route = path.split('?').next().unwrap_or(path);
+    route == "/api/update" || route.starts_with("/api/update/")
+}
+
+/// The largest body a locally answered route reads.
+const LOCAL_BODY_LIMIT: usize = 64 * 1024;
 
 /// Splits `buf` (which holds at least the head) into the head and how many bytes it took.
 pub fn parse_head(buf: &[u8]) -> Option<(Head, usize)> {
@@ -325,6 +368,28 @@ fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::
             br#"{"error":"this panel only answers requests addressed to localhost"}"#,
         );
     }
+    if is_local_route(head.path()) {
+        let want = head.content_length().unwrap_or(0);
+        if want > LOCAL_BODY_LIMIT {
+            return respond(
+                &mut conn,
+                413,
+                "application/json",
+                br#"{"error":"request body too large"}"#,
+            );
+        }
+        let mut body = buf[used..].to_vec();
+        while body.len() < want {
+            let n = conn.read(&mut chunk)?;
+            if n == 0 {
+                break;
+            }
+            body.extend_from_slice(&chunk[..n]);
+        }
+        body.truncate(want);
+        let (status, json) = crate::update::api::handle(head.method(), head.path(), &body);
+        return respond(&mut conn, status, "application/json", json.to_string().as_bytes());
+    }
     let addr = match upstream {
         Upstream::Node(addr) => *addr,
         Upstream::Missing(why) => return missing(&mut conn, &head, why),
@@ -383,6 +448,11 @@ fn respond(conn: &mut TcpStream, status: u16, kind: &str, body: &[u8]) -> std::i
     let reason = match status {
         400 => "Bad Request",
         403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        409 => "Conflict",
+        413 => "Payload Too Large",
+        500 => "Internal Server Error",
         502 => "Bad Gateway",
         503 => "Service Unavailable",
         _ => "OK",
@@ -542,5 +612,29 @@ mod tests {
             assert!(out.contains(kind));
             assert!(out.contains("no node"));
         }
+    }
+
+    #[test]
+    fn updater_routes_are_answered_here_even_without_node() {
+        // an unknown updater route is a 404 from this process, not a 503 from the missing upstream
+        let front = TcpListener::bind("127.0.0.1:0").unwrap();
+        let front_addr = front.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let (c, _) = front.accept().unwrap();
+            handle(c, front_addr, &Upstream::Missing("no node".into())).unwrap();
+        });
+        let mut c = TcpStream::connect(front_addr).unwrap();
+        write!(
+            c,
+            "POST /api/update/nothing HTTP/1.1\r\nHost: localhost:{p}\r\nOrigin: http://localhost:{p}\r\nContent-Length: 2\r\n\r\n{{}}",
+            p = front_addr.port()
+        )
+        .unwrap();
+        let mut out = String::new();
+        c.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 404"), "{out}");
+        assert!(out.contains("no updater route"), "{out}");
+        assert!(is_local_route("/api/update?x=1") && is_local_route("/api/update/log?n=3"));
+        assert!(!is_local_route("/api/updates") && !is_local_route("/api/servers"));
     }
 }

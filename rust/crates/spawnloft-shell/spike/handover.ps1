@@ -45,11 +45,33 @@ function Reg($key, $name) {
   try { (Get-ItemProperty -Path $key -Name $name -ErrorAction Stop).$name } catch { $null }
 }
 
+function Run($file, $argList, $seconds, [hashtable] $extra = @{}) {
+  # Start-Process -Wait also waits for every descendant: a daemon the CLI starts, or the app the
+  # installer's --force-run launches, would hold it forever. Wait for the process itself only.
+  Write-Host "run: $(Split-Path $file -Leaf) $argList"
+  $p = Start-Process -FilePath $file -ArgumentList $argList -PassThru @extra
+  $null = $p.Handle  # keeps ExitCode readable after it exits
+  if (-not $p.WaitForExit($seconds * 1000)) {
+    Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+    throw "handover: $(Split-Path $file -Leaf) $argList did not finish within $seconds s"
+  }
+  $p
+}
+
 function Cli16([string[]] $cliArgs) {
+  # SpawnLoft.exe is a GUI-subsystem program: PowerShell neither waits for it nor captures its
+  # output when called with &, so start it explicitly and read its output from files
   $env:ELECTRON_RUN_AS_NODE = '1'
+  # a fresh pair each call: a daemon the CLI started may still hold the previous pair open
+  $stamp = [guid]::NewGuid().ToString('N')
+  $o = Join-Path $env:RUNNER_TEMP "cli16-$stamp.out"
+  $e = Join-Path $env:RUNNER_TEMP "cli16-$stamp.err"
   try {
-    $output = & "$inst\SpawnLoft.exe" "$inst\resources\core\mcctl.mjs" @cliArgs 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "1.6 CLI $($cliArgs -join ' ') failed: $output" }
+    $argList = @("`"$inst\resources\core\mcctl.mjs`"") + ($cliArgs | ForEach-Object { "`"$_`"" })
+    $p = Run "$inst\SpawnLoft.exe" $argList 120 @{ NoNewWindow = $true; RedirectStandardOutput = $o; RedirectStandardError = $e }
+    $output = "$(Get-Content $o -Raw)$(Get-Content $e -Raw)"
+    if ($p.ExitCode -ne 0) { throw "1.6 CLI $($cliArgs -join ' ') failed ($($p.ExitCode)): $output" }
+    Write-Host $output
     $output
   } finally {
     Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
@@ -83,7 +105,7 @@ if (-not ($userPath -split ';' | Where-Object { $_ -eq $nodeDir })) {
 # 1. SpawnLoft 1.6, silently, per user
 if (-not $Uninstall) {
   if ($Setup16) {
-    $p = Start-Process -FilePath $Setup16 -ArgumentList '/S' -Wait -PassThru
+    $p = Run $Setup16 @('/S') 300
     Check '1.6 installer exit code 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
   }
   Check '1.6 is in %LOCALAPPDATA%\Programs\SpawnLoft' (Test-Path "$inst\SpawnLoft.exe")
@@ -117,7 +139,7 @@ if (-not $Uninstall) {
 
   # 3. the spike, the way electron-updater starts an NSIS update
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  $p = Start-Process -FilePath $SpikeA -ArgumentList '--updated', '/S', '--force-run' -Wait -PassThru
+  $p = Run $SpikeA @('--updated', '/S', '--force-run') 300
   $result.handoverSeconds = [math]::Round($sw.Elapsed.TotalSeconds, 1)
   Check 'spike installer exit code 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
 
@@ -161,7 +183,7 @@ if (-not $Uninstall) {
   # uninstall: in place (_?=) so this waits for it; silent means "keep the data"
   $taskName = (schtasks /Query /FO CSV /NH | ConvertFrom-Csv -Header 'TaskName', 'Next', 'Status' |
       Where-Object { $_.TaskName -like '\mcctl\*' } | Select-Object -First 1).TaskName
-  $p = Start-Process -FilePath "$inst\uninstall.exe" -ArgumentList '/S', "_?=$inst" -Wait -PassThru
+  $p = Run "$inst\uninstall.exe" @('/S', "_?=$inst") 300
   Check 'uninstaller exit code 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
   Remove-Item -Force "$inst\uninstall.exe" -ErrorAction SilentlyContinue
   Check 'SpawnLoft.exe removed' (-not (Test-Path "$inst\SpawnLoft.exe"))
@@ -173,3 +195,5 @@ if (-not $Uninstall) {
 
 $result | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Out ($(if ($Uninstall) { 'uninstall.json' } else { 'handover.json' })))
 Write-Host 'handover: all checks passed'
+# the last native command's exit code (schtasks on a task that is gone) is not the result
+exit 0

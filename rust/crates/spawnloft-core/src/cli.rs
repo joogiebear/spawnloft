@@ -22,7 +22,7 @@ fn ok(stdout: String) -> Outcome {
     }
 }
 
-fn usage_error(message: &str) -> Outcome {
+pub fn usage_error(message: &str) -> Outcome {
     Outcome {
         stdout: String::new(),
         stderr: format!(
@@ -50,9 +50,16 @@ pub fn help() -> String {
            {name} --version [--json]   print this build's version, commit and target\n  \
            {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
            {name} ui [--port n]        the panel on 127.0.0.1 (proxies to the Node panel for now)\n  \
-           {name} help                 this text\n",
+           {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
+           {name} repair [--quiet]      rewrite task shims and server launchers for this install\n  \
+           {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
+           {name} update <command>     the updater (check, status, apply, list, rollback, hold, channel, log)\n  \
+           {name} help                 this text\n\
+         \n\
+         Update commands:\n{update}\n",
         line = info.line(),
         name = build::NAME,
+        update = crate::update_cmd::HELP,
     )
 }
 
@@ -186,6 +193,25 @@ fn ui(rest: &[String]) -> Outcome {
     }
 }
 
+/// `probe-process <pid>`: what this binary sees of a process (installer tests, the image-name
+/// probe of design section 4). Not in `help`: a diagnostic, not a command people need.
+fn probe_process(rest: &[String]) -> Outcome {
+    let [pid] = rest else {
+        return usage_error("probe-process needs one pid");
+    };
+    let Ok(pid) = pid.parse::<u32>() else {
+        return usage_error(&format!("`{pid}` is not a pid"));
+    };
+    use spawnloft_lib::procid;
+    let out = spawnloft_lib::serde_json::json!({
+        "pid": pid,
+        "alive": procid::alive(pid),
+        "startTime": procid::start_time(pid).map(|t| t.to_string()),
+        "image": procid::image(pid),
+    });
+    ok(format!("{out}\n"))
+}
+
 pub fn run(args: &[String]) -> Outcome {
     let Some((command, rest)) = args.split_first() else {
         return Outcome {
@@ -199,6 +225,11 @@ pub fn run(args: &[String]) -> Outcome {
         "help" | "--help" | "-h" => ok(help()),
         "daemon" => daemon(rest),
         "ui" => ui(rest),
+        "probe-process" => probe_process(rest),
+        "handover" => crate::handover_cmd::handover(rest),
+        "repair" => crate::handover_cmd::repair(rest),
+        "uninstall" => crate::handover_cmd::uninstall(rest),
+        "update" => crate::update_cmd::run(rest),
         other => usage_error(&format!("unknown command `{other}`")),
     }
 }

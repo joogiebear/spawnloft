@@ -118,3 +118,4 @@ try {
   $result | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Out 'update-cycle.json')
 }
 Write-Host 'update cycle: all checks passed'
+exit 0

@@ -27,13 +27,14 @@ use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, TerminateJobObject,
 };
 use windows_sys::Win32::System::Pipes::{
-    ConnectNamedPipe, CreateNamedPipeW, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE,
-    PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
+    ConnectNamedPipe, CreateNamedPipeW, GetNamedPipeServerProcessId, PIPE_READMODE_BYTE,
+    PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
 };
 use windows_sys::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows_sys::Win32::System::Threading::{
     CREATE_NO_WINDOW, CREATE_SUSPENDED, GetCurrentProcess, GetExitCodeProcess, GetProcessTimes, OpenProcess,
-    OpenProcessToken, OpenThread, PROCESS_QUERY_LIMITED_INFORMATION, ResumeThread, THREAD_SUSPEND_RESUME,
+    OpenProcessToken, OpenThread, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    QueryFullProcessImageNameW, ResumeThread, THREAD_SUSPEND_RESUME,
 };
 
 use super::Probe;
@@ -265,6 +266,88 @@ impl ProcessProbe {
             identity: None,
         })
     }
+}
+
+fn open_query(pid: u32) -> Option<OwnedHandle> {
+    if pid == 0 {
+        return None;
+    }
+    // SAFETY: plain call; the result is checked and owned.
+    owned(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) })
+}
+
+/// Whether `pid` names a process that has not exited. A process this user may not open (another
+/// user's, a protected one) counts as alive: the pid is taken, which is all a caller can know.
+pub fn pid_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    let Some(h) = open_query(pid) else {
+        // ERROR_ACCESS_DENIED (5): exists but not ours; anything else (87, invalid parameter): gone
+        return std::io::Error::last_os_error().raw_os_error() == Some(5);
+    };
+    let mut code = 0u32;
+    // SAFETY: valid handle and out-pointer.
+    if unsafe { GetExitCodeProcess(h.as_raw_handle() as HANDLE, &mut code) } == 0 {
+        return true;
+    }
+    code == STILL_ACTIVE as u32
+}
+
+/// The kernel's creation time of `pid` (FILETIME, 100 ns since 1601), the half of a process
+/// identity that a reused pid cannot repeat. `None` when the process cannot be opened.
+pub fn process_start_time(pid: u32) -> Option<u64> {
+    let h = open_query(pid)?;
+    let zero = FILETIME {
+        dwLowDateTime: 0,
+        dwHighDateTime: 0,
+    };
+    let (mut created, mut exited, mut kernel, mut user) = (zero, zero, zero, zero);
+    // SAFETY: valid handle and four out-pointers.
+    if unsafe {
+        GetProcessTimes(
+            h.as_raw_handle() as HANDLE,
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
+        )
+    } == 0
+    {
+        return None;
+    }
+    Some(((created.dwHighDateTime as u64) << 32) | created.dwLowDateTime as u64)
+}
+
+/// `QueryFullProcessImageNameW`: the image path as the file object names it now (it follows a
+/// rename of the running file, unlike the path WMI and tasklist report; design section 4).
+pub fn process_image(pid: u32) -> Option<String> {
+    let h = open_query(pid)?;
+    let mut buf = vec![0u16; 32_768];
+    let mut len = buf.len() as u32;
+    // SAFETY: valid handle; buf holds len UTF-16 units and len is updated to the length written.
+    if unsafe {
+        QueryFullProcessImageNameW(
+            h.as_raw_handle() as HANDLE,
+            PROCESS_NAME_WIN32,
+            buf.as_mut_ptr(),
+            &mut len,
+        )
+    } == 0
+    {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..len as usize]))
+}
+
+/// The process id of the server end of a pipe this process has open as a client.
+pub fn pipe_server_pid(pipe: &std::fs::File) -> Option<u32> {
+    let mut pid = 0u32;
+    // SAFETY: a valid pipe handle owned by `pipe`, and an out-pointer.
+    if unsafe { GetNamedPipeServerProcessId(pipe.as_raw_handle() as HANDLE, &mut pid) } == 0 {
+        return None;
+    }
+    Some(pid)
 }
 
 fn wide(s: &str) -> Vec<u16> {

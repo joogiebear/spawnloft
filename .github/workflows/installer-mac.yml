@@ -1,0 +1,165 @@
+name: installer-mac
+
+# The 2.0 macOS packaging (rust/INSTALLER-UPDATER-DESIGN.md section 6; design section 14 thread
+# T3), internal only, v2 only; successor of tauri-spike-mac.yml. Builds 2.x a and b signed with
+# the release Developer ID and notarized, packages each into the two update artifacts from the one
+# notarized bundle (the Squirrel.Mac zip + 1.x feeds, and Tauri's .app.tar.gz + .sig), asserts the
+# build with verify-mac-build, then runs the cross-generation Squirrel.Mac smoke (a published 1.x
+# install updates to the 2.0 Tauri app). The 2.x -> 2.y plugin cycle and the acceptance on Victor's
+# Mac mini are the hands-on steps (design section 6: the Mac plugin path is "verify on the mini");
+# the a and b artifacts this workflow uploads are what the mini takes. Nothing leaves the runners
+# except workflow artifacts kept 14 days: no feed, no tag, no release. Victor approved signing in
+# CI on 2026-11-09 (MAC_CSC_LINK / APPLE_* secrets).
+#
+# The a and b artifacts here are internal test builds, made with --feed-http so their updater
+# accepts a loopback (http) feed: that is what the Mac mini's 2.x -> 2.y plugin-cycle acceptance
+# needs (SPAWNLOFT_SPIKE_FEED pointed at a 127.0.0.1 manifest). The real release artifacts are the
+# HTTPS ones built by the release pipeline (desktop/release-feed.mjs, .github/workflows/release.yml),
+# never these. Everything else (signing, notarization, the Squirrel.Mac zip) is identical.
+# Each run does two Developer ID notarizations on an expensive macOS runner, so the trigger is
+# kept narrow (the Rust core/shell and the Mac signing helper); push other changes through
+# workflow_dispatch.
+
+on:
+  push:
+    branches: [v2]
+    paths:
+      - 'rust/**'
+      - 'desktop/mac-signing.cjs'
+      - '.github/workflows/installer-mac.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-mac-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION_A: 2.0.0-internal.901
+  VERSION_B: 2.0.0-internal.902
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/v2'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-installer-mac-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-installer-mac-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+            rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+      - name: A throwaway updater key for this run
+        run: |
+          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/ci.key" -f
+      - name: Generate the macOS icon
+        run: |
+          "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" icon desktop/build/icon-mac.png -o "$RUNNER_TEMP/icons"
+      - name: Import the Developer ID identity into a temporary keychain
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/installer-mac-signing.keychain-db"
+          kcpw="$(uuidgen)"
+          echo "$MAC_CSC_LINK" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security create-keychain -p "$kcpw" "$kc"
+          # covers a cold-cache compile of the shell before the first codesign, within the 90-min job
+          security set-keychain-settings -lut 7200 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          security import "$RUNNER_TEMP/devid.p12" -k "$kc" -P "$MAC_CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kcpw" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/devid.p12"
+          identity="$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+          test -n "$identity"
+          echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: Sign spawnloft-core separately (Tauri does not sign resource binaries)
+        run: |
+          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" rust/target/release/spawnloft-core
+          codesign --verify --strict --verbose=2 rust/target/release/spawnloft-core
+      - name: Build, sign, notarize, verify and package 2.x a and b
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/ci.key")"
+          export APPLE_SIGNING_IDENTITY="$SIGNING_IDENTITY"
+          tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
+          app=../../target/release/bundle/macos/SpawnLoft.app
+          mkdir -p "$RUNNER_TEMP/feed"
+          for v in "$VERSION_A" "$VERSION_B"; do
+            node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons" --feed-http
+            # start from a clean bundle dir so a stale .app/.app.tar.gz (from the restored cache, or
+            # from build a) is never mistaken for this build
+            rm -rf ../../target/release/bundle/macos
+            # notarizing (and stapling) runs when APPLE_ID/PASSWORD/TEAM_ID are set; the stapler
+            # fetch drops now and then, so a failed run is tried again
+            for attempt in 1 2 3; do
+              SPAWNLOFT_VERSION="$v" "$tauri" build --ci --bundles app --config "$RUNNER_TEMP/cfg-$v/overlay.json" && break
+              echo "::warning::build, signing or notarization of $v failed on attempt $attempt of 3"
+              [ "$attempt" -lt 3 ] && sleep 30 || exit 1
+            done
+            node installer/verify-mac-build.cjs "$app" "$v"
+            node installer/mac-package.mjs "$app" "$v" "$RUNNER_TEMP/feed/$v"
+          done
+          ls -la "$RUNNER_TEMP/feed"/*/
+      - name: Remove the temporary keychain
+        if: always()
+        run: '[ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-mac-${{ github.run_number }}-feed
+          retention-days: 14
+          path: ${{ runner.temp }}/feed/
+
+  squirrel-smoke:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-mac-${{ github.run_number }}-feed
+          path: ${{ runner.temp }}/feed
+      - name: Install Playwright for driving the installed 1.x app
+        run: npm install --prefix "$RUNNER_TEMP/mac-smoke" --no-save --no-package-lock playwright@1.63.0
+      - name: Cross-generation handover (1.x -> 2.0 a) through Squirrel.Mac
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NODE_PATH: ${{ runner.temp }}/mac-smoke/node_modules
+        run: |
+          zip="$RUNNER_TEMP/feed/$VERSION_A/SpawnLoft-$VERSION_A-mac-arm64.zip"
+          node rust/crates/spawnloft-shell/installer/ci/smoke-mac-handover.cjs "$zip" "$VERSION_A"

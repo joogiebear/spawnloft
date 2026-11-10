@@ -1,0 +1,145 @@
+name: release
+
+# The 2.x release pipeline and gate (rust/INSTALLER-UPDATER-DESIGN.md section 14, T4), as a dry
+# run: it builds the Tauri shell and the Rust core, assembles the full update asset set of 5.2
+# from the built bytes (rename to the release names, re-sign on those names, write the signed
+# envelope + latest.json + the 1.x electron-updater feeds), runs the release gate, and exercises
+# the publish ordering in dry mode. Nothing is tagged, released, or sent anywhere: the assets go
+# into a workflow artifact kept 14 days.
+#
+# Internal only, v2 only. A throwaway signing key is generated in the job, so the pipeline runs
+# end to end without the real TAURI_SIGNING_PRIVATE_KEY secret (still pending from Victor); the
+# envelope a dry run produces is refused by real clients, which is the point. The real release
+# workflow (dev/main, with the secret) reuses these same scripts; release-publish.mjs is the
+# publish step and is never run here.
+#
+# Windows is the platform built here (T1's installer path). macOS (T3) and Linux (T6) feed their
+# built bytes into the same desktop/release-feed.mjs; the gate already checks their assets.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [v2]
+    paths:
+      - 'desktop/release-feed.mjs'
+      - 'desktop/release-gate.mjs'
+      - 'desktop/release-publish.mjs'
+      - 'desktop/release-feed.test.mjs'
+      - 'desktop/update-envelope.mjs'
+      - 'desktop/update-envelope.test.mjs'
+      - 'desktop/preview-artifacts.mjs'
+      - 'rust/crates/spawnloft-shell/**'
+      - '.github/workflows/release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # a throwaway beta version: a real channel so the pipeline builds a feed, never a real release
+  DRY_VERSION: 2.0.0-beta.9000
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The release tooling's own tests
+        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs
+
+  dry-run:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-release-dry-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-release-dry-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+            rust-updater-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # the bundler fetches NSIS and its Tauri plugin on first use; a cached toolset spares the job
+      # that download and its outages (updater.yml hit a GitHub release 504 window on 2026-11-09)
+      - uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/tauri/NSIS
+          key: tauri-nsis-${{ runner.os }}-cli-2.12.4
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+          echo "TAURI_CLI=$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" >> "$GITHUB_ENV"
+      - name: A throwaway release key for this run
+        run: |
+          "$TAURI_CLI" signer generate --ci -p "" -w "$RUNNER_TEMP/release.key" -f
+          # the CLI writes the .pub as one base64 line holding the two-line minisign file
+          base64 -d "$RUNNER_TEMP/release.key.pub" > "$RUNNER_TEMP/release.pub" 2>/dev/null || cp "$RUNNER_TEMP/release.key.pub" "$RUNNER_TEMP/release.pub"
+          cat "$RUNNER_TEMP/release.pub"
+      - name: Build the Rust core for this version
+        working-directory: rust
+        env:
+          SPAWNLOFT_VERSION: ${{ env.DRY_VERSION }}
+        run: |
+          cargo build --release --locked -p spawnloft-core
+          ./target/release/spawnloft-core.exe --version
+      - name: Build the Tauri shell installer (signed with the throwaway key)
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/release.key")"
+          # the Tauri updater plugin wants the base64 form the CLI writes (.key.pub), not the
+          # decoded two-line minisign file; release-feed/gate accept either (parsePublicKey)
+          node installer/installer-config.mjs "$DRY_VERSION" "$RUNNER_TEMP/release.key.pub" "$RUNNER_TEMP/cfg"
+          SPAWNLOFT_VERSION="$DRY_VERSION" "$TAURI_CLI" build --ci --bundles nsis --config "$RUNNER_TEMP/cfg/overlay.json"
+          setup="../../target/release/bundle/nsis/SpawnLoft_${DRY_VERSION}_x64-setup.exe"
+          test -f "$setup" || { echo "::error::the installer was not produced at $setup"; ls -la ../../target/release/bundle/nsis || true; exit 1; }
+          echo "DRY_SETUP=$GITHUB_WORKSPACE/rust/target/release/bundle/nsis/SpawnLoft_${DRY_VERSION}_x64-setup.exe" >> "$GITHUB_ENV"
+      - name: Assemble the release asset set (rename, re-sign, envelope, electron feeds)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/release.key")"
+          node desktop/release-feed.mjs \
+            --out "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
+            --tauri "$TAURI_CLI" --win "$DRY_SETUP" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ls -la "$RUNNER_TEMP/release"
+      - name: The release gate
+        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-binary-versions
+      - name: The publish ordering, in dry mode (nothing is published)
+        run: |
+          node desktop/release-publish.mjs \
+            --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
+            --commit "$GITHUB_SHA" --check-binary-versions
+      - name: Show the assembled feed
+        run: |
+          echo "===== spawnloft-updates.json"; cat "$RUNNER_TEMP/release/spawnloft-updates.json"
+          echo "===== latest.yml"; cat "$RUNNER_TEMP/release/latest.yml"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/release/
