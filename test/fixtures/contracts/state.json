@@ -29,6 +29,7 @@
         "daemonPid": "integer",
         "javaPid?": "integer",
         "daemonExe": "string",
+        "daemonStartTime?": "string",
         "javaExe": "string",
         "startedAt": "integer",
         "dir": "string",
@@ -68,6 +69,7 @@
   "fieldNotes": {
     "startedAt": "wall clock in ms when this java was spawned, not the OS process start time; a crash restart writes a new one",
     "daemonExe": "base name of the daemon's own executable (node, node.exe, SpawnLoft.exe, spawnloft-desktop)",
+    "daemonStartTime": "Rust daemon only: its own kernel creation time as a decimal string (a Windows FILETIME is above 2^53), the half of its identity that survives an update renaming its binary; absent where the platform gives none. Node readers ignore it, so the examples leave it out",
     "javaExe": "base name of the program run: java, java.exe, mariadbd, GarnetServer, or node for a .mjs stand-in",
     "jar": "null for a database",
     "memory": "null for a database",

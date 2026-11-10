@@ -77,7 +77,9 @@ function stateLike(name, id) {
   const state = readJson(stateFile(name), null)
   assert.ok(state, `no state.json for ${name}`)
   fits(state, states.shapes[ex.shape], states.shapes, `state.json as ${id}`)
-  assert.deepEqual(Object.keys(state).sort(), Object.keys(ex.state).sort(), `state.json fields as ${id}`)
+  // daemonStartTime is the Rust daemon's alone (see the fieldNote); the examples are daemon.mjs's set
+  const fields = Object.keys(state).filter((k) => !(k === 'daemonStartTime' && RUST))
+  assert.deepEqual(fields.sort(), Object.keys(ex.state).sort(), `state.json fields as ${id}`)
   assert.equal(readState(name).status, ex.status, `status as ${id}`)
   return state
 }
