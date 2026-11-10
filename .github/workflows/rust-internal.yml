@@ -143,7 +143,7 @@ jobs:
         env:
           TMPDIR: /tmp
         run: |
-          files="lifecycle active-guard active-guard-uninstall databases databases-garnet metrics metrics-linux crashguard notify daemon-contract"
+          files="lifecycle active-guard active-guard-uninstall databases databases-garnet metrics metrics-linux crashguard notify daemon-contract contracts-daemon"
           for i in $(seq 1 "$REPEAT"); do
             echo "::group::run $i of $REPEAT"
             for f in $files; do

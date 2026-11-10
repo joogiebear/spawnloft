@@ -1,0 +1,210 @@
+{
+  "about": "<data root>/instances.json, the registry (src/registry.mjs). Written whole as JSON.stringify(data, null, 2) plus a newline, by temp file and rename under instances.json.lock, owner-only (it holds RCON, database and webhook secrets). putInstance replaces a record; updateInstance merges one level deep, so nested objects (rcon, root, attachments) are replaced whole and a field set to null stays as null. The daemon reads it without the lock (safe only because of the rename) at each launch and again at each exit. Readers must accept unknown fields. Shapes use the language in shape.mjs; test/contracts.test.mjs checks the examples and what adopt writes, test/contracts-daemon.test.mjs runs a daemon on the fullest server record and checks what a database create writes.",
+  "file": {
+    "object": {
+      "version": { "const": 1 },
+      "instances": { "map": { "oneOf": [{ "ref": "server" }, { "ref": "database" }] } }
+    }
+  },
+  "shapes": {
+    "server": {
+      "object": {
+        "kind?": { "const": "server" },
+        "dir": "string",
+        "jar": "string",
+        "java": "string",
+        "memory": "string",
+        "loader?": { "enum": ["paper", "folia", "purpur", "asp", "vanilla", "spigot", "craftbukkit", "fabric", "neoforge"] },
+        "mcVersion?": "string",
+        "port": "integer",
+        "rcon": { "object": { "port": "integer", "password": "string" } },
+        "createdAt?": "string",
+        "origin?": {
+          "oneOf": [
+            { "object": { "scratch": { "const": true } } },
+            { "object": { "template": "string" } },
+            { "object": { "clonedFrom": "string", "withWorlds": "boolean" } },
+            { "object": { "adopted": "string" } }
+          ]
+        },
+        "label?": "string|null",
+        "autoRestart?": "boolean",
+        "jvmFlags?": { "oneOf": [{ "array": "string" }, "null"] },
+        "webhook?": "string|null",
+        "backupExclude?": { "oneOf": [{ "array": "string" }, "null"] },
+        "bind?": "string"
+      }
+    },
+    "database": {
+      "object": {
+        "kind": { "const": "database" },
+        "engine": { "enum": ["mysql", "garnet", "mariadb"] },
+        "version?": "string",
+        "dir?": "string",
+        "external?": { "const": true },
+        "host?": "string",
+        "port": "integer",
+        "root": { "object": { "user?": "string", "password": "string" } },
+        "tools?": { "object": { "dir": "string" } },
+        "autoRestart?": "boolean",
+        "attachments?": {
+          "map": {
+            "oneOf": [
+              { "object": { "database": "string", "user": "string", "password": "string", "createdAt": "string" } },
+              { "object": { "database": "null", "user": "null", "password": "string", "keyPrefix": "string", "createdAt": "string" } }
+            ]
+          }
+        },
+        "createdAt?": "string",
+        "label?": "string|null",
+        "memory?": "string",
+        "java?": "string",
+        "jar?": "string",
+        "jvmFlags?": { "oneOf": [{ "array": "string" }, "null"] },
+        "webhook?": "string|null",
+        "rcon?": { "object": { "port?": "integer", "password?": "string" } }
+      }
+    }
+  },
+  "fieldNotes": {
+    "kind": "absent means server; nothing writes \"server\", but it is accepted",
+    "dir": "absolute; a server's default is <data root>/instances/<name>, a managed database's <data root>/services/<name>",
+    "jar": "a file name inside dir (a value typed into `set jar=` is stored as typed)",
+    "java": "an executable path, or the bare java; a path ending .js/.mjs is a test stand-in run by the daemon's own runtime",
+    "memory": "like 4G or 6144M (^\\d+(\\.\\d+)?\\s*[GgMm]$); gives -Xms and -Xmx; CLI `set memory=` does not validate",
+    "loader": "absent in records older than the field; read as paper",
+    "mcVersion": "absent when unknown; readers derive it from the jar name",
+    "rcon": "the supervisor writes rcon.port and rcon.password into server.properties at every start; the tick sampler logs in with them",
+    "origin": "how the server was made; uninstall keeps an adopted folder",
+    "jvmFlags": "null or absent means the recommended flags (registry.mjs jvmFlagsFor); at most 60, each starting with -, never -Xms/-Xmx/-jar/-cp",
+    "backupExclude": "relative /-separated paths, at most 40",
+    "bind": "read (server-ip in server.properties) but never written by SpawnLoft; only a hand edit sets it",
+    "autoRestart": "absent means off; the daemon re-reads it at every exit",
+    "webhook": "an http(s) URL; see webhook.json",
+    "engine": "new databases are mysql or garnet; mariadb is an older engine still run",
+    "root": "a managed database has no root.user (read as root); an external one has both",
+    "external": "a database that runs elsewhere; never started or stopped here",
+    "attachments": "keyed by server name: database and user equal the server name for MySQL/MariaDB; Garnet shares root's password and gives a key prefix. Renaming a server does not rewrite the keys.",
+    "databaseStrays": "neither `spawnloft set` nor the panel settings route checks the kind, so server fields (memory, java, jar, jvmFlags, webhook, a partial rcon) can land on a database"
+  },
+  "example": {
+    "version": 1,
+    "instances": {
+      "survival": {
+        "dir": "/home/v/.local/share/spawnloft/instances/survival",
+        "jar": "paper-1.21.4-123.jar",
+        "java": "/usr/lib/jvm/java-21/bin/java",
+        "memory": "6G",
+        "loader": "paper",
+        "mcVersion": "1.21.4",
+        "port": 25565,
+        "rcon": { "port": 25575, "password": "Kq7mWx2pRt9vBn4cHs3z" },
+        "createdAt": "2026-10-01T18:00:00.000Z",
+        "origin": { "scratch": true },
+        "label": "Survival SMP",
+        "autoRestart": true,
+        "jvmFlags": ["-XX:+UseZGC", "-Dfile.encoding=UTF-8"],
+        "webhook": "https://discord.com/api/webhooks/1/abc?wait=true",
+        "backupExclude": ["logs", "plugins/dynmap/web"]
+      },
+      "creative": {
+        "dir": "/home/v/.local/share/spawnloft/instances/creative",
+        "jar": "server.jar",
+        "java": "java",
+        "memory": "4G",
+        "loader": "fabric",
+        "port": 25566,
+        "rcon": { "port": 25576, "password": "Pz8nQw3eRt5yUi7oPa2s" },
+        "createdAt": "2026-10-02T18:00:00.000Z",
+        "origin": { "template": "my-modpack" },
+        "label": null,
+        "autoRestart": false,
+        "jvmFlags": null,
+        "webhook": null,
+        "backupExclude": null
+      },
+      "copy": {
+        "dir": "/home/v/.local/share/spawnloft/instances/copy",
+        "jar": "purpur-1.21.4-2400.jar",
+        "java": "java",
+        "memory": "6144M",
+        "loader": "purpur",
+        "mcVersion": "1.21.4",
+        "port": 25567,
+        "rcon": { "port": 25577, "password": "Mn4bVc6xZa8sDf2gHj5k" },
+        "createdAt": "2026-10-03T18:00:00.000Z",
+        "origin": { "clonedFrom": "survival", "withWorlds": true }
+      },
+      "old-world": {
+        "dir": "D:\\Servers\\old-world",
+        "jar": "spigot-1.8.8.jar",
+        "java": "C:\\Program Files\\Java\\jdk-8\\bin\\java.exe",
+        "memory": "2G",
+        "port": 25568,
+        "rcon": { "port": 25578, "password": "from-server-properties" },
+        "createdAt": "2026-10-04T18:00:00.000Z",
+        "origin": { "adopted": "D:\\Servers\\old-world" },
+        "bind": "0.0.0.0"
+      },
+      "legacy": {
+        "dir": "/srv/minecraft/legacy",
+        "jar": "paper.jar",
+        "java": "java",
+        "memory": "4G",
+        "port": 25569,
+        "rcon": { "port": 25579, "password": "Ab3cDe4fGh5jKm6nPq7r" }
+      },
+      "luckperms-db": {
+        "kind": "database",
+        "engine": "mysql",
+        "version": "8.4.11",
+        "dir": "/home/v/.local/share/spawnloft/services/luckperms-db",
+        "port": 3306,
+        "root": { "password": "Xy7zAb8cDe9fGh2jKm3nPq4r" },
+        "autoRestart": true,
+        "attachments": {
+          "survival": { "database": "survival", "user": "survival", "password": "Rt5yUi6oPa7sDf8gHj9kLz2x", "createdAt": "2026-10-05T18:00:00.000Z" }
+        },
+        "createdAt": "2026-10-05T17:00:00.000Z",
+        "label": "Survival SMP database"
+      },
+      "cache": {
+        "kind": "database",
+        "engine": "garnet",
+        "version": "2.1.7",
+        "dir": "/home/v/.local/share/spawnloft/services/cache",
+        "port": 6379,
+        "root": { "password": "Cv2bNm3qWe4rTy5uIo6pAs7d" },
+        "autoRestart": true,
+        "attachments": {
+          "survival": { "database": null, "user": null, "password": "Cv2bNm3qWe4rTy5uIo6pAs7d", "keyPrefix": "survival:", "createdAt": "2026-10-06T18:00:00.000Z" }
+        },
+        "createdAt": "2026-10-06T17:00:00.000Z"
+      },
+      "xampp": {
+        "kind": "database",
+        "engine": "mysql",
+        "external": true,
+        "host": "127.0.0.1",
+        "port": 3307,
+        "root": { "user": "root", "password": "" },
+        "attachments": {},
+        "createdAt": "2026-10-07T18:00:00.000Z",
+        "tools": { "dir": "C:\\xampp\\mysql\\bin" }
+      },
+      "old-mariadb": {
+        "kind": "database",
+        "engine": "mariadb",
+        "version": "11.4.4",
+        "dir": "/home/v/.local/share/spawnloft/services/old-mariadb",
+        "port": 3308,
+        "root": { "password": "Lk9jHg8fDs7aPo6iUy5tRe4w" },
+        "autoRestart": false,
+        "attachments": {},
+        "createdAt": "2025-06-01T18:00:00.000Z",
+        "memory": "2G",
+        "rcon": { "port": 25580 }
+      }
+    }
+  }
+}

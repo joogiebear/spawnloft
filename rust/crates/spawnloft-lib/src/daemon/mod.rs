@@ -354,6 +354,38 @@ impl Daemon {
         program::minecraft(inst, self.node.as_deref())
     }
 
+    /// The state file at a launch (daemon.mjs `state = {...}`); `pid` is None when the spawn failed.
+    fn launch_state(&self, inst: &Instance, program: &Program, pid: Option<u32>) -> Map<String, Value> {
+        let mut state = Map::new();
+        state.insert("name".into(), json!(self.name));
+        state.insert("kind".into(), json!(inst.kind()));
+        state.insert("daemonPid".into(), json!(std::process::id()));
+        // javaPid/javaExe describe the child, whatever it runs
+        if let Some(pid) = pid {
+            state.insert("javaPid".into(), json!(pid));
+        }
+        state.insert("daemonExe".into(), json!(own_exe()));
+        insert_start_time(&mut state);
+        state.insert("javaExe".into(), json!(basename(&program.cmd)));
+        state.insert("startedAt".into(), json!(time::now_ms()));
+        if let Some(dir) = inst.get("dir") {
+            state.insert("dir".into(), dir.clone());
+        }
+        state.insert("jar".into(), inst.get("jar").cloned().unwrap_or(Value::Null));
+        state.insert(
+            "memory".into(),
+            inst.get("memory").cloned().unwrap_or(Value::Null),
+        );
+        if let Some(port) = inst.get("port") {
+            state.insert("port".into(), port.clone());
+        }
+        state.insert("rconPort".into(), inst.rcon_port_value());
+        state.insert("control".into(), json!(self.control));
+        state.insert("running".into(), json!(true));
+        state.insert("restarts".into(), json!(self.crashes.len()));
+        state
+    }
+
     fn launch(&mut self, first: bool) -> Result<(), LaunchError> {
         // re-read each launch so edits apply at the next respawn
         let inst =
@@ -378,6 +410,8 @@ impl Daemon {
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
+                // as daemon.mjs: the launch's state, with no javaPid since there is no process
+                self.state = self.launch_state(&inst, &program, None);
                 self.inst = Some(inst);
                 return Err(LaunchError::Spawn(spawn_message(&program.cmd, &e)));
             }
@@ -422,32 +456,7 @@ impl Daemon {
             .take()
             .and_then(|s| ConsoleInput::start(s, self.log.clone()));
 
-        let mut state = Map::new();
-        state.insert("name".into(), json!(self.name));
-        state.insert("kind".into(), json!(inst.kind()));
-        state.insert("daemonPid".into(), json!(std::process::id()));
-        // javaPid/javaExe describe the child, whatever it runs
-        state.insert("javaPid".into(), json!(pid));
-        state.insert("daemonExe".into(), json!(own_exe()));
-        insert_start_time(&mut state);
-        state.insert("javaExe".into(), json!(basename(&program.cmd)));
-        state.insert("startedAt".into(), json!(time::now_ms()));
-        if let Some(dir) = inst.get("dir") {
-            state.insert("dir".into(), dir.clone());
-        }
-        state.insert("jar".into(), inst.get("jar").cloned().unwrap_or(Value::Null));
-        state.insert(
-            "memory".into(),
-            inst.get("memory").cloned().unwrap_or(Value::Null),
-        );
-        if let Some(port) = inst.get("port") {
-            state.insert("port".into(), port.clone());
-        }
-        state.insert("rconPort".into(), inst.rcon_port_value());
-        state.insert("control".into(), json!(self.control));
-        state.insert("running".into(), json!(true));
-        state.insert("restarts".into(), json!(self.crashes.len()));
-        self.state = state;
+        self.state = self.launch_state(&inst, &program, Some(pid));
 
         let ticks = if inst.is_database() {
             TickSampler::none()
@@ -498,6 +507,8 @@ impl Daemon {
         self.console.say(&format!(
             "\n{CONSOLE_PREFIX} failed to launch server: {message}\n"
         ));
+        // launch() fills the launch's state before a spawn error reaches here; this is only for a
+        // caller that fails before any launch
         if self.state.is_empty() {
             self.state.insert("name".into(), json!(self.name));
             self.state.insert(

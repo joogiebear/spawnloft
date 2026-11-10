@@ -1,0 +1,107 @@
+{
+  "about": "<data root>/schedules.json, the scheduled task definitions (src/schedule.mjs, steps in src/task-steps.mjs). Read-modify-written under schedules.lock by the panel, CLI and MCP server; the OS scheduler (Task Scheduler folder mcctl, launchd, systemd timers) only holds a trigger that runs `spawnloft task run <id>`. Only normalised fields are stored, since the file makes code run on a timer. test/contracts.test.mjs checks that every example survives normaliseAction/normaliseSchedule unchanged and that what create() stores fits the shapes.",
+  "file": {
+    "object": {
+      "version": { "const": 1 },
+      "tasks": { "map": { "ref": "task" } }
+    }
+  },
+  "idFormat": "<instance>-<action type>, then -2, -3 and so on for the next of the same type; renaming the instance renames the ids. The id keys the run log (run/<instance>/tasks.log) and the trigger.",
+  "shapes": {
+    "task": {
+      "object": {
+        "instance": "string",
+        "name": "string",
+        "action": { "ref": "action" },
+        "schedule": { "ref": "schedule" },
+        "enabled": "boolean",
+        "owner": { "oneOf": [{ "const": "backups" }, "null"] },
+        "createdAt": { "match": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" }
+      }
+    },
+    "action": {
+      "oneOf": [
+        { "object": { "type": { "const": "backup" }, "keep": "integer|null" } },
+        { "object": { "type": { "const": "verify" } } },
+        { "object": { "type": { "const": "command" }, "line": "string" } },
+        { "object": { "type": { "const": "restart" }, "warnMinutes": "integer" } },
+        { "object": { "type": { "const": "stop" } } },
+        { "object": { "type": { "const": "start" } } },
+        { "object": { "type": { "const": "steps" }, "steps": { "array": { "ref": "step" } }, "onlyWhenRunning": "boolean", "keepGoing": "boolean" } }
+      ]
+    },
+    "step": {
+      "oneOf": [
+        { "object": { "do": { "const": "say" }, "text": "string" } },
+        { "object": { "do": { "const": "command" }, "line": "string" } },
+        { "object": { "do": { "const": "wait" }, "seconds": "integer" } },
+        { "object": { "do": { "const": "countdown" }, "minutes": "integer", "message": "string" } },
+        { "object": { "do": { "const": "backup" }, "keep": "integer|null" } },
+        { "object": { "do": { "const": "verify" } } },
+        { "object": { "do": { "const": "stop" } } },
+        { "object": { "do": { "const": "start" } } },
+        { "object": { "do": { "const": "restart" } } }
+      ]
+    },
+    "schedule": {
+      "oneOf": [
+        { "object": { "kind": { "const": "minutes" }, "every": "integer" } },
+        { "object": { "kind": { "const": "hourly" }, "every": "integer" } },
+        { "object": { "kind": { "const": "daily" }, "at": { "match": "^([01]\\d|2[0-3]):[0-5]\\d$" } } },
+        { "object": { "kind": { "const": "weekly" }, "day": { "enum": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] }, "at": { "match": "^([01]\\d|2[0-3]):[0-5]\\d$" } } },
+        { "object": { "kind": { "const": "onlogon" } } }
+      ]
+    }
+  },
+  "limits": {
+    "name": "at most 60 characters; empty becomes the action's label",
+    "minutes.every": "1 to 1439",
+    "hourly.every": "1 to 23",
+    "backup.keep": "1 to 365, or null for no pruning",
+    "restart.warnMinutes": "0 to 60",
+    "command.line": "at most 400 characters",
+    "steps": "1 to 12 steps; waits and countdowns together at most 2 hours",
+    "wait.seconds": "5 to 3600",
+    "countdown.minutes": "1 to 60",
+    "countdown.message": "at most 120 characters, default Server restarting",
+    "say.text / step command.line": "at most 400 characters; a step command loses a leading /",
+    "owner": "backups marks the task the Backups toggle manages; editing it into another action type clears it"
+  },
+  "example": {
+    "version": 1,
+    "tasks": {
+      "survival-backup": { "instance": "survival", "name": "Automatic backup", "action": { "type": "backup", "keep": 14 }, "schedule": { "kind": "daily", "at": "03:00" }, "enabled": true, "owner": "backups", "createdAt": "2026-10-01T18:00:00.000Z" },
+      "survival-backup-2": { "instance": "survival", "name": "Take a backup", "action": { "type": "backup", "keep": null }, "schedule": { "kind": "hourly", "every": 6 }, "enabled": false, "owner": null, "createdAt": "2026-10-01T18:01:00.000Z" },
+      "survival-verify": { "instance": "survival", "name": "Verify the backups", "action": { "type": "verify" }, "schedule": { "kind": "weekly", "day": "SUN", "at": "04:30" }, "enabled": true, "owner": null, "createdAt": "2026-10-01T18:02:00.000Z" },
+      "survival-command": { "instance": "survival", "name": "Save the world", "action": { "type": "command", "line": "save-all flush" }, "schedule": { "kind": "minutes", "every": 30 }, "enabled": true, "owner": null, "createdAt": "2026-10-01T18:03:00.000Z" },
+      "survival-restart": { "instance": "survival", "name": "Nightly restart", "action": { "type": "restart", "warnMinutes": 5 }, "schedule": { "kind": "daily", "at": "05:00" }, "enabled": true, "owner": null, "createdAt": "2026-10-01T18:04:00.000Z" },
+      "survival-stop": { "instance": "survival", "name": "Stop the server", "action": { "type": "stop" }, "schedule": { "kind": "daily", "at": "23:59" }, "enabled": true, "owner": null, "createdAt": "2026-10-01T18:05:00.000Z" },
+      "survival-start": { "instance": "survival", "name": "Start the server", "action": { "type": "start" }, "schedule": { "kind": "onlogon" }, "enabled": true, "owner": null, "createdAt": "2026-10-01T18:06:00.000Z" },
+      "survival-steps": {
+        "instance": "survival",
+        "name": "Back up and restart",
+        "action": {
+          "type": "steps",
+          "steps": [
+            { "do": "say", "text": "Restart in five minutes" },
+            { "do": "countdown", "minutes": 5, "message": "Server restarting" },
+            { "do": "command", "line": "save-all flush" },
+            { "do": "wait", "seconds": 30 },
+            { "do": "backup", "keep": 7 },
+            { "do": "verify" },
+            { "do": "stop" },
+            { "do": "start" },
+            { "do": "restart" },
+            { "do": "backup", "keep": null }
+          ],
+          "onlyWhenRunning": true,
+          "keepGoing": false
+        },
+        "schedule": { "kind": "weekly", "day": "MON", "at": "06:00" },
+        "enabled": true,
+        "owner": null,
+        "createdAt": "2026-10-01T18:07:00.000Z"
+      }
+    }
+  }
+}

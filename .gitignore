@@ -11,6 +11,8 @@ instances/
 
 # instances.json holds RCON passwords - never commit it
 instances.json
+# the registry contract fixture holds only made-up values
+!test/fixtures/contracts/instances.json
 
 node_modules/
 *.log

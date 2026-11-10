@@ -1,0 +1,72 @@
+{
+  "about": "<data root>/activity.jsonl, the audit log every process appends to one JSON line at a time (src/activity.mjs record). Past maxBytes it is renamed to activity.1.jsonl before the next append, so history is about twice that. A writer that died mid-line left no newline, so an append first adds one. Readers skip lines that do not parse. test/contracts.test.mjs checks record() and readActivity against this file and that the action catalog matches every action the source writes; test/contracts-daemon.test.mjs checks the daemon's crash entry.",
+  "files": { "current": "activity.jsonl", "previous": "activity.1.jsonl", "maxBytes": 2097152 },
+  "entry": {
+    "object": {
+      "at": { "match": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+      "server": "string",
+      "action": "string",
+      "by": { "object": { "kind": { "enum": ["panel", "cli", "assistant", "schedule", "spawnloft"] }, "name?": "string" } },
+      "detail?": "string",
+      "snapshot?": "string",
+      "ok?": { "const": false }
+    }
+  },
+  "rules": {
+    "by.kind": "panel and cli are a person; assistant (MCP), schedule (a scheduled task) and spawnloft (the daemon and anything else) are automation. An unknown kind is written as spawnloft.",
+    "by.name": "free text (assistant app, task name): \\r, \\n and \\t runs become one space, cut to 80 characters",
+    "detail": "\\r and \\n runs become one space, cut to 500 characters; absent when empty",
+    "ok": "present, and false, only for a failure; a success has no ok field",
+    "order": "appended in time order; readActivity returns newest first"
+  },
+  "daemon": {
+    "about": "The only entries the daemon writes: action crash, ok false, by its default actor, detail the same message as the webhook (webhook.json daemonMessages) with no server name.",
+    "entry": {
+      "object": {
+        "at": { "match": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+        "server": "string",
+        "action": { "const": "crash" },
+        "by": { "const": { "kind": "spawnloft" } },
+        "detail": "string",
+        "ok": { "const": false }
+      }
+    }
+  },
+  "actions": [
+    "adopt", "backup", "backup-delete", "backup-lock", "backup-note", "backup-prune", "backup-unlock",
+    "command", "config-create", "config-edit", "crash", "create", "delete",
+    "file-create", "file-delete", "file-edit", "file-move", "file-replace", "file-unzip", "file-upload", "file-zip", "folder-create",
+    "kill", "player-ban", "player-deop", "player-forget", "player-op", "player-unban",
+    "plugin-disable", "plugin-enable", "plugin-install", "plugin-remove", "plugin-update",
+    "rebuild", "rename", "restore",
+    "schedule-add", "schedule-change", "schedule-disable", "schedule-enable", "schedule-remove", "schedule-run",
+    "settings", "start", "stop", "undo", "upgrade",
+    "world-activate", "world-delete", "world-import"
+  ],
+  "record": [
+    {
+      "call": { "server": "survival", "action": "start", "actor": { "kind": "cli" } },
+      "entry": { "server": "survival", "action": "start", "by": { "kind": "cli" } }
+    },
+    {
+      "call": { "server": "survival", "action": "start", "options": { "ok": false, "detail": "process exited (code 1)" }, "actor": { "kind": "panel" } },
+      "entry": { "server": "survival", "action": "start", "by": { "kind": "panel" }, "detail": "process exited (code 1)", "ok": false }
+    },
+    {
+      "call": { "server": "survival", "action": "restore", "options": { "detail": "2026-11-08_0300", "snapshot": "2026-11-08_1200-pre-restore" }, "actor": { "kind": "assistant", "name": "Claude\tDesktop\r\nApp" } },
+      "entry": { "server": "survival", "action": "restore", "by": { "kind": "assistant", "name": "Claude Desktop App" }, "detail": "2026-11-08_0300", "snapshot": "2026-11-08_1200-pre-restore" }
+    },
+    {
+      "call": { "server": "survival", "action": "backup", "options": { "detail": "line one\r\nline two" }, "actor": { "kind": "schedule", "name": "Nightly backup" } },
+      "entry": { "server": "survival", "action": "backup", "by": { "kind": "schedule", "name": "Nightly backup" }, "detail": "line one line two" }
+    },
+    {
+      "call": { "server": "survival", "action": "crash", "options": { "ok": false, "detail": "crashed (exit 3). Restarting in 10s." } },
+      "entry": { "server": "survival", "action": "crash", "by": { "kind": "spawnloft" }, "detail": "crashed (exit 3). Restarting in 10s.", "ok": false }
+    },
+    {
+      "call": { "server": "survival", "action": "stop", "actor": { "kind": "hacker", "name": "" } },
+      "entry": { "server": "survival", "action": "stop", "by": { "kind": "spawnloft" } }
+    }
+  ]
+}

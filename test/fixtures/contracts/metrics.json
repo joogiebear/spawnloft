@@ -1,0 +1,58 @@
+{
+  "about": "run/<name>/metrics.log, appended by the daemon's sampler (src/metrics.mjs sampleLine) every 10 s while the process runs, removed at each launch so a graph never joins two processes. Read by readSamples (whole file) and latestSample (last line, null when older than 30 s). test/contracts.test.mjs checks the writer and both readers against this file.",
+  "format": {
+    "line": "space-separated, one sample per line, \\n-terminated, no header",
+    "columns": [
+      { "name": "at", "type": "integer", "meaning": "unix seconds" },
+      { "name": "cpu", "type": "number with exactly one decimal", "meaning": "share of the whole machine, 0.0 to 100.0 (all cores together are 100)" },
+      { "name": "rss", "type": "integer", "meaning": "resident memory in MiB, rounded" },
+      { "name": "tps", "type": "number or -", "meaning": "server ticks per second over RCON; - when the server did not answer" },
+      { "name": "online", "type": "integer or -", "meaning": "players online over RCON" },
+      { "name": "max", "type": "integer or -", "meaning": "player limit over RCON" }
+    ],
+    "threeOrSix": "a database, or a server whose tick sampler never started, writes the first three columns only; otherwise all six. Columns are only ever appended, so a reader of the first three keeps working.",
+    "intervalSeconds": 10,
+    "keep": 1800,
+    "trimAt": 2400,
+    "trim": "every 60 samples, if the file holds more than trimAt lines it is rewritten with the last keep lines",
+    "firstSample": "the first line needs two readings, so it lands about 20 s after launch",
+    "lineRegex": "^\\d+ \\d{1,3}\\.\\d \\d+( (\\d+(\\.\\d+)?|-) (\\d+|-) (\\d+|-))?$"
+  },
+  "writer": [
+    { "sample": { "at": 1762646410, "cpu": 12.345, "rss": 2048 }, "server": null, "line": "1762646410 12.3 2048" },
+    { "sample": { "at": 1762646420, "cpu": 0, "rss": 0 }, "server": null, "line": "1762646420 0.0 0" },
+    { "sample": { "at": 1762646430, "cpu": 100, "rss": 6144 }, "server": { "tps": 20, "online": 3, "max": 20 }, "line": "1762646430 100.0 6144 20 3 20" },
+    { "sample": { "at": 1762646440, "cpu": 47.25, "rss": 3900 }, "server": { "tps": 19.87, "online": 0, "max": 50 }, "line": "1762646440 47.3 3900 19.87 0 50" },
+    { "sample": { "at": 1762646450, "cpu": 5, "rss": 3901 }, "server": { "tps": null, "online": null, "max": null }, "line": "1762646450 5.0 3901 - - -" },
+    { "sample": { "at": 1762646460, "cpu": 5, "rss": 3902 }, "server": { "tps": 20, "online": null, "max": 20 }, "line": "1762646460 5.0 3902 20 - 20" }
+  ],
+  "reader": {
+    "file": [
+      "1762646410 12.3 2048",
+      "1762646420 0.0 0",
+      "",
+      "1762646430 100.0 6144 20 3 20",
+      "1762646440 47.3 3900 19.87 0 50",
+      "1762646450 5.0 3901 - - -",
+      "1762646460 5.0 3902 20 - 20",
+      "garbage line",
+      "1762646470 101.0 10",
+      "0 1.0 10",
+      "1762646480 -1.0 10",
+      "1762646490 1.0 -5",
+      "1762646500 2.0 4000 20 1 20 extra-column-ignored"
+    ],
+    "rows": [
+      { "at": 1762646410, "cpu": 12.3, "rss": 2048 },
+      { "at": 1762646420, "cpu": 0, "rss": 0 },
+      { "at": 1762646430, "cpu": 100, "rss": 6144, "tps": 20, "players": 3, "maxPlayers": 20 },
+      { "at": 1762646440, "cpu": 47.3, "rss": 3900, "tps": 19.87, "players": 0, "maxPlayers": 50 },
+      { "at": 1762646450, "cpu": 5, "rss": 3901 },
+      { "at": 1762646460, "cpu": 5, "rss": 3902, "tps": 20, "maxPlayers": 20 },
+      { "at": 1762646500, "cpu": 2, "rss": 4000, "tps": 20, "players": 1, "maxPlayers": 20 }
+    ],
+    "latest": { "at": 1762646500, "cpu": 2, "rss": 4000, "tps": 20, "players": 1, "maxPlayers": 20 },
+    "latestNow": 1762646510000,
+    "latestStaleNow": 1762646600000
+  }
+}
