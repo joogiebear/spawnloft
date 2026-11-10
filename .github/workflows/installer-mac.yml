@@ -11,8 +11,11 @@ name: installer-mac
 # except workflow artifacts kept 14 days: no feed, no tag, no release. Victor approved signing in
 # CI on 2026-11-09 (MAC_CSC_LINK / APPLE_* secrets).
 #
-# The a and b artifacts are built without --feed-http, so their updater pubkey expects an HTTPS
-# feed: the mini's 2.x -> 2.y plugin cycle serves them over HTTPS (or rebuilds with --feed-http).
+# The a and b artifacts here are internal test builds, made with --feed-http so their updater
+# accepts a loopback (http) feed: that is what the Mac mini's 2.x -> 2.y plugin-cycle acceptance
+# needs (SPAWNLOFT_SPIKE_FEED pointed at a 127.0.0.1 manifest). The real release artifacts are the
+# HTTPS ones built by the release pipeline (desktop/release-feed.mjs, .github/workflows/release.yml),
+# never these. Everything else (signing, notarization, the Squirrel.Mac zip) is identical.
 # Each run does two Developer ID notarizations on an expensive macOS runner, so the trigger is
 # kept narrow (the Rust core/shell and the Mac signing helper); push other changes through
 # workflow_dispatch.
@@ -114,7 +117,7 @@ jobs:
           app=../../target/release/bundle/macos/SpawnLoft.app
           mkdir -p "$RUNNER_TEMP/feed"
           for v in "$VERSION_A" "$VERSION_B"; do
-            node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons"
+            node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons" --feed-http
             # start from a clean bundle dir so a stale .app/.app.tar.gz (from the restored cache, or
             # from build a) is never mistaken for this build
             rm -rf ../../target/release/bundle/macos
