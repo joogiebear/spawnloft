@@ -80,11 +80,14 @@ jobs:
       - name: A throwaway updater key for this run, the only key a and b trust
         run: |
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/ci.key" -f
-          # the CLI writes the .pub as one base64 line holding the two-line minisign file
-          pub() { base64 -d "$1" 2>/dev/null || cat "$1"; }
-          id="$(pub "$RUNNER_TEMP/ci.key.pub" | sed -n 1p | awk '{print $NF}')"
-          line="$(pub "$RUNNER_TEMP/ci.key.pub" | sed -n 2p)"
-          echo "SPAWNLOFT_UPDATE_PUBKEYS=$id=$line" >> "$GITHUB_ENV"
+          # the CLI writes the .pub as one base64 line holding the two-line minisign file (decoded
+          # with Node: macOS base64 -d refuses it and the fallback would pass the base64 through)
+          keys="$(node -e '
+            const t = Buffer.from(require("fs").readFileSync(process.argv[1], "utf8").trim(), "base64").toString("utf8").trim().split("\n")
+            const id = t[0].trim().split(" ").pop(), line = t[1].trim()
+            if (!/^[0-9A-F]{16}$/i.test(id) || !/^RW[A-Za-z0-9+/=]{54}$/.test(line)) throw new Error("unexpected .pub: " + t.join(" | "))
+            console.log(`${id}=${line}`)' "$RUNNER_TEMP/ci.key.pub")"
+          echo "SPAWNLOFT_UPDATE_PUBKEYS=$keys" >> "$GITHUB_ENV"
       - name: Generate the macOS icon
         run: |
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" icon desktop/build/icon-mac.png -o "$RUNNER_TEMP/icons"
