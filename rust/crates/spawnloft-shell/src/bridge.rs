@@ -900,6 +900,12 @@ mod manifest {
                 "{cmd} missing from build.rs"
             );
         }
-        assert_eq!(build.matches("\",\n").count(), super::COMMANDS.len());
+        // the list itself, whatever the checkout's line endings
+        let list = build
+            .split("commands(&[")
+            .nth(1)
+            .and_then(|r| r.split("])").next())
+            .unwrap_or("");
+        assert_eq!(list.matches('"').count(), super::COMMANDS.len() * 2);
     }
 }
