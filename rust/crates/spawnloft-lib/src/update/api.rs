@@ -50,6 +50,19 @@ pub fn handle(method: &str, path: &str, body: &[u8]) -> (u16, Value) {
         ("GET", "/api/update") => (200, ctx.status()),
         ("POST", "/api/update/check") => (200, ctx.check().to_json()),
         ("POST", "/api/update/install") => {
+            // Linux: the package manager installs updates (design 5.7, Q-F); say what to run
+            if cfg!(target_os = "linux") {
+                return match super::pending_install_command(&store) {
+                    Some(cmd) => (
+                        409,
+                        json!({ "error": format!("SpawnLoft does not install packages on Linux. Install the verified update with: {cmd}"), "installCommand": cmd }),
+                    ),
+                    None => (
+                        409,
+                        json!({ "error": "SpawnLoft does not install packages on Linux. Run `spawnloft update apply` to download and verify the update; it prints the command to install it." }),
+                    ),
+                };
+            }
             let state = store.state();
             let Some(pending) = state.pending else {
                 return (
@@ -102,6 +115,11 @@ pub fn handle(method: &str, path: &str, body: &[u8]) -> (u16, Value) {
                 );
             }
             match ctx.plan_rollback(&version, false) {
+                // Linux: planned and held; the package manager installs it (Q-F)
+                Ok(pinned) if cfg!(target_os = "linux") => (
+                    200,
+                    json!({ "ok": true, "update": pinned.to_json(), "manual": "Run `spawnloft update apply` to download and verify it; it prints the command that installs it." }),
+                ),
                 Ok(pinned) => {
                     if let Err(e) = store.write_request(&Request {
                         action: "rollback".into(),

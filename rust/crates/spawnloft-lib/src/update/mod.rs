@@ -54,13 +54,106 @@ pub fn target() -> &'static str {
     }
 }
 
-/// On Linux the envelope lists `-deb` and `-rpm` entries; the package family of this machine.
+/// How this Linux install was made: `deb` or `rpm`. The packages write it beside the core's
+/// folder (`/opt/SpawnLoft/resources/package-type`, `/opt/spawnloft-cli/package-type`, both
+/// `<core dir>/../package-type`); a build run from elsewhere goes by the distribution.
+pub fn linux_package_kind() -> &'static str {
+    let marker = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.join("package-type")))
+        .and_then(|p| std::fs::read_to_string(p).ok());
+    match marker.as_deref().map(str::trim) {
+        Some("deb") => "deb",
+        Some("rpm") => "rpm",
+        _ if std::path::Path::new("/etc/debian_version").exists() => "deb",
+        _ => "rpm",
+    }
+}
+
+/// On Linux the envelope lists `-deb` and `-rpm` entries; the package family of this install.
 fn linux_package_suffix() -> &'static str {
-    if std::path::Path::new("/etc/debian_version").exists() {
+    if linux_package_kind() == "deb" {
         "-deb"
     } else {
         "-rpm"
     }
+}
+
+/// A `spawnloft-cli` install (`/opt/spawnloft-cli/bin/spawnloft-core`): its marker sits beside
+/// `bin/`, and there is no window two levels up (the desktop package has
+/// `/opt/SpawnLoft/spawnloft-desktop` beside `resources/`).
+pub fn linux_cli_install() -> bool {
+    let Some(prefix) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.to_path_buf()))
+    else {
+        return false;
+    };
+    prefix.join("package-type").is_file()
+        && !prefix
+            .parent()
+            .is_some_and(|p| p.join("spawnloft-desktop").exists())
+}
+
+/// What a headless `spawnloft-cli` box is told: the envelope names only the desktop packages (whose
+/// `Conflicts:` would remove the CLI and pull in a GUI stack), so the CLI package of the same
+/// release is named for the user to fetch and install with the package manager.
+pub fn linux_cli_notice(pinned: &Pinned, kind: &str) -> String {
+    let arch = match (std::env::consts::ARCH, kind) {
+        ("aarch64", "deb") => "arm64",
+        ("aarch64", _) => "aarch64",
+        (_, "deb") => "amd64",
+        _ => "x86_64",
+    };
+    let file = format!("spawnloft-cli-{}-linux-{arch}.{kind}", pinned.version);
+    let url = match pinned.url.rsplit_once('/') {
+        Some((base, _)) => format!("{base}/{file}"),
+        None => file.clone(),
+    };
+    let manager = if kind == "deb" { "apt" } else { "dnf" };
+    format!(
+        "spawnloft-cli {} is available. Download {url} and install it with: sudo {manager} install ./{file}",
+        pinned.version
+    )
+}
+
+/// Linux updates are installed by the package manager, never by SpawnLoft (design 5.7, Q-F): the
+/// command a user runs for a verified download at `path`. A rollback installs a lower version,
+/// which both managers only do when told to.
+pub fn linux_install_command(kind: &str, path: &std::path::Path, rollback: bool) -> String {
+    let p = path.display().to_string();
+    let quoted = if p
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "/._-+~".contains(c))
+    {
+        p
+    } else {
+        format!("'{}'", p.replace('\'', "'\\''"))
+    };
+    match (kind, rollback) {
+        ("deb", false) => format!("sudo apt install {quoted}"),
+        ("deb", true) => format!("sudo apt install --allow-downgrades {quoted}"),
+        (_, false) => format!("sudo dnf install {quoted}"),
+        (_, true) => format!("sudo dnf downgrade {quoted}"),
+    }
+}
+
+/// The install command for the pending offer, when this is Linux and it is downloaded and verified.
+pub fn pending_install_command(store: &Store) -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let state = store.state();
+    let pending = state.pending.as_ref()?;
+    if linux_cli_install() {
+        return Some(linux_cli_notice(pending, linux_package_kind()));
+    }
+    if !state.downloaded {
+        return None;
+    }
+    let file = store.cache_file(&pending.version, &pending.file);
+    file.is_file()
+        .then(|| linux_install_command(linux_package_kind(), &file, pending.rollback))
 }
 
 /// The envelope entry for this build's target.
@@ -807,6 +900,8 @@ impl<'a> Context<'a> {
             "staleFeed": state.stale_feed,
             "hold": self.store.hold().map(|v| v.to_string()),
             "sources": self.sources.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
+            // Linux: what to run to install the verified download (the app never installs it)
+            "installCommand": pending_install_command(self.store),
         })
     }
 }
@@ -896,6 +991,10 @@ pub fn verify_artifact(bytes: &[u8], pinned: &Pinned, keys: &[TrustedKey]) -> Re
 /// Headless install (`spawnloft update apply`, design 5.1): download, verify, cache, and on
 /// Windows run the installer silently. Returns what was done.
 pub fn apply(ctx: &Context<'_>, pinned: &Pinned, run_installer: bool) -> Result<String, String> {
+    // a headless spawnloft-cli box never downloads the desktop package the envelope names
+    if cfg!(target_os = "linux") && linux_cli_install() {
+        return Ok(linux_cli_notice(pinned, linux_package_kind()));
+    }
     let cached = ctx.store.cache_file(&pinned.version, &pinned.file);
     let bytes = match std::fs::read(&cached) {
         Ok(b) if verify_artifact(&b, pinned, &ctx.keys).is_ok() => {
@@ -964,6 +1063,14 @@ pub fn apply(ctx: &Context<'_>, pinned: &Pinned, run_installer: bool) -> Result<
         cmd.spawn()
             .map_err(|e| format!("could not start the installer: {e}"))?;
         Ok(format!("installing {} ({} bytes)", pinned.version, bytes.len()))
+    } else if cfg!(target_os = "linux") {
+        // the package manager installs it (Q-F); the bytes are verified, so the command names them
+        Ok(format!(
+            "{} verified and kept at {}; install it with: {}",
+            pinned.version,
+            cached.display(),
+            linux_install_command(linux_package_kind(), &cached, pinned.rollback)
+        ))
     } else {
         Ok(format!(
             "{} verified and kept at {}; open SpawnLoft to install it (the window replaces the app bundle)",
@@ -1463,6 +1570,50 @@ mod tests {
                 || !cfg!(target_os = "linux")
                 || !std::path::Path::new("/etc/debian_version").exists()
         );
+    }
+
+    #[test]
+    fn linux_install_command_names_the_verified_file_and_quotes_it() {
+        use std::path::Path;
+        assert_eq!(
+            linux_install_command(
+                "deb",
+                Path::new("/home/a/.config/spawnloft/updates/2.0.1/SpawnLoft-2.0.1-linux-amd64.deb"),
+                false
+            ),
+            "sudo apt install /home/a/.config/spawnloft/updates/2.0.1/SpawnLoft-2.0.1-linux-amd64.deb"
+        );
+        assert_eq!(
+            linux_install_command("rpm", Path::new("/home/a b/it's.rpm"), false),
+            "sudo dnf install '/home/a b/it'\\''s.rpm'"
+        );
+        assert_eq!(
+            linux_install_command("rpm", Path::new("/t/x.rpm"), true),
+            "sudo dnf downgrade /t/x.rpm"
+        );
+        assert_eq!(
+            linux_install_command("deb", Path::new("/t/x.deb"), true),
+            "sudo apt install --allow-downgrades /t/x.deb"
+        );
+    }
+
+    #[test]
+    fn a_cli_box_is_pointed_at_the_cli_package_of_the_same_release() {
+        let key = TestKey::generate();
+        let env = envelope::parse(&envelope_json(&key.trusted.id, "2.0.0-beta.3", |_| {}), beta()).unwrap();
+        let (target, entry) = platform_entry(&env, "windows-x86_64").unwrap();
+        let p = Pinned::from(&env, &key.trusted, target, entry, false);
+        let notice = linux_cli_notice(&p, "deb");
+        let (base, _) = p.url.rsplit_once('/').unwrap();
+        assert!(
+            notice.contains(&format!("{base}/spawnloft-cli-2.0.0-beta.3-linux-")),
+            "{notice}"
+        );
+        assert!(
+            notice.contains(".deb and install it with: sudo apt install ./spawnloft-cli-2.0.0-beta.3-linux-"),
+            "{notice}"
+        );
+        assert!(linux_cli_notice(&p, "rpm").contains("sudo dnf install ./spawnloft-cli-"));
     }
 
     #[test]

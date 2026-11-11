@@ -1,0 +1,307 @@
+name: installer-linux
+
+# The 2.0 Linux packages (rust/INSTALLER-UPDATER-DESIGN.md 5.7; PLAN-2.0-REMAINING.md D3 / W3),
+# internal only, v2 only. Builds the `spawnloft` desktop .deb and .rpm and the `spawnloft-cli`
+# .deb and .rpm for x64 and arm64, then proves them where users have them:
+#
+# - build: the shell on the oldest supported distribution (Ubuntu 22.04, so the glibc floor is
+#   22.04's), the core static (musl), packaged by linux-package.mjs and build-cli-package.mjs;
+# - upgrade: in clean containers with no Node, a published 1.x package is installed, runs a
+#   server, and the 2.0 package goes over it (installer/ci/linux-upgrade.sh, linux-cli-upgrade.sh),
+#   on Ubuntu 22.04 and 24.04, Debian 12 and Fedora 42 (spawnloft-cli also on Rocky Linux 9),
+#   both architectures;
+# - window: on the runner itself (Ubuntu 24.04, real AppArmor), the installed app opens its window
+#   under Xvfb and loads the panel the core serves;
+# - feed: the four Linux packages and the command-line packages are assembled into a release
+#   folder by release-feed.mjs with a throwaway key (the envelope, latest.json and the four 1.x
+#   electron-updater Linux feeds) and pass the release gate, Linux package check included.
+#
+# Nothing leaves the runners except workflow artifacts kept 14 days: no feed, no tag, no release.
+# The version is beta-numbered (an internal version has no update channel, so no feed could be
+# assembled for it); these packages are never published.
+
+on:
+  push:
+    branches: [v2]
+    paths:
+      - 'rust/**'
+      - 'src/**'
+      - 'desktop/build-cli-package.mjs'
+      - 'desktop/smoke-cli-package.sh'
+      - 'desktop/release-feed.mjs'
+      - 'desktop/release-gate.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
+      - 'desktop/update-envelope.mjs'
+      - 'desktop/linux-package.test.mjs'
+      - '.github/workflows/installer-linux.yml'
+  pull_request:
+    branches: [v2]
+    paths:
+      - 'rust/crates/spawnloft-shell/installer/**'
+      - 'rust/crates/spawnloft-shell/src/updater.rs'
+      - 'rust/crates/spawnloft-lib/src/update/**'
+      - 'desktop/build-cli-package.mjs'
+      - 'desktop/smoke-cli-package.sh'
+      - 'desktop/release-gate.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
+      - 'desktop/linux-package.test.mjs'
+      - '.github/workflows/installer-linux.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: installer-linux-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: 2.0.0-beta.901
+  # the published 1.x releases the packages must upgrade (stable and the last beta)
+  OLD_STABLE: 1.5.0
+  OLD_BETA: 1.6.0-beta.413
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+            triple: x86_64-unknown-linux-musl
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            triple: aarch64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: The packaging's own tests
+        run: node --test desktop/linux-package.test.mjs
+      - name: Install the pinned toolchain and the static target
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+      - name: Install the shell's build libraries, the musl C compiler and rpmbuild
+        # WebKitGTK 4.1 and GTK 3 for the window; musl-gcc for ring (under rustls) in the static
+        # core; rpm for rpmbuild
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev musl-tools rpm
+          triple='${{ matrix.triple }}'
+          echo "CC_${triple//-/_}=musl-gcc" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-installer-linux-${{ matrix.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-installer-linux-${{ matrix.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+          echo "TAURI_CLI=$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" >> "$GITHUB_ENV"
+      - name: Build the Rust core (static) for this version
+        working-directory: rust
+        env:
+          SPAWNLOFT_VERSION: ${{ env.VERSION }}
+        run: |
+          cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
+          core="$GITHUB_WORKSPACE/rust/target/${{ matrix.triple }}/release/spawnloft-core"
+          "$core" --version
+          echo "CORE=$core" >> "$GITHUB_ENV"
+      - name: Build the shell (tauri build, no bundle)
+        # the release public key is compiled in, as in a release; the packages are laid out by
+        # linux-package.mjs, not the bundler (the script's header says why)
+        working-directory: rust/crates/spawnloft-shell
+        run: |
+          node installer/linux-package.mjs config "$VERSION" release.pub "$RUNNER_TEMP/cfg"
+          SPAWNLOFT_VERSION="$VERSION" "$TAURI_CLI" build --ci --no-bundle --config "$RUNNER_TEMP/cfg/overlay.json"
+          test -x ../../target/release/SpawnLoft
+          echo "SHELL_BIN=$GITHUB_WORKSPACE/rust/target/release/SpawnLoft" >> "$GITHUB_ENV"
+      - name: Stage the bundled Node runtime (pinned, checked)
+        run: |
+          node rust/crates/spawnloft-shell/installer/stage-runtime.mjs "$RUNNER_TEMP/runtime" --platform linux --arch ${{ matrix.arch }}
+          node -e "import('./desktop/payload-gate.mjs').then(m => { const p = m.checkRuntime(process.argv[1]); if (p.length) { console.error(p.join('\\n')); process.exit(1) } })" "$RUNNER_TEMP/runtime"
+      - name: Package spawnloft (.deb and .rpm)
+        run: |
+          node rust/crates/spawnloft-shell/installer/linux-package.mjs package --version "$VERSION" --arch ${{ matrix.arch }} \
+            --shell "$SHELL_BIN" --core "$CORE" --runtime "$RUNNER_TEMP/runtime" --commit "$GITHUB_SHA" --out dist-linux
+      - name: Package spawnloft-cli (.deb and .rpm)
+        run: node desktop/build-cli-package.mjs --dist dist-linux --core "$CORE"
+      - name: Show what was built
+        run: |
+          ls -la dist-linux
+          dpkg-deb -I dist-linux/SpawnLoft-*-linux-*.deb
+          rpm -qip --requires dist-linux/SpawnLoft-*-linux-*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            dist-linux/*.deb
+            dist-linux/*.rpm
+
+  upgrade:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        case: [desktop-deb, desktop-rpm, cli]
+    runs-on: ${{ matrix.arch == 'x64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-linux-${{ matrix.arch }}
+          path: pkg
+      - name: Download the published 1.x packages
+        run: |
+          deb=$([ "${{ matrix.arch }}" = x64 ] && echo amd64 || echo arm64)
+          rpm=$([ "${{ matrix.arch }}" = x64 ] && echo x86_64 || echo aarch64)
+          for v in "$OLD_STABLE" "$OLD_BETA"; do
+            for name in "SpawnLoft-$v-linux-$deb.deb" "SpawnLoft-$v-linux-$rpm.rpm" "spawnloft-cli-$v-linux-$deb.deb" "spawnloft-cli-$v-linux-$rpm.rpm"; do
+              curl -fsSL --retry 6 --retry-all-errors -o "pkg/$name" "https://github.com/joogiebear/spawnloft/releases/download/v$v/$name"
+            done
+          done
+          ls -la pkg
+      - name: The desktop .deb over 1.x (Ubuntu 22.04 and 24.04, Debian 12)
+        if: matrix.case == 'desktop-deb'
+        run: |
+          script=/repo/rust/crates/spawnloft-shell/installer/ci/linux-upgrade.sh
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:22.04 sh $script deb "$OLD_STABLE" "$VERSION"
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:24.04 sh $script deb "$OLD_BETA" "$VERSION"
+          # the way 1.x's electron-updater installs it: dpkg -i, then apt-get install -f for what is missing
+          docker run --rm -e INSTALL_WITH=dpkg -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:24.04 sh $script deb "$OLD_STABLE" "$VERSION"
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" debian:12 sh $script deb "$OLD_STABLE" "$VERSION"
+      - name: The desktop .rpm over 1.x (Fedora 42, as 1.x's desktop rpm was tested)
+        if: matrix.case == 'desktop-rpm'
+        run: |
+          script=/repo/rust/crates/spawnloft-shell/installer/ci/linux-upgrade.sh
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" fedora:42 sh $script rpm "$OLD_BETA" "$VERSION"
+      - name: Whether the desktop .rpm's window libraries exist on Rocky Linux 9 (informational)
+        # RHEL-family servers are spawnloft-cli's (tested below); this records whether the desktop
+        # package could install there at all
+        if: matrix.case == 'desktop-rpm'
+        run: docker run --rm rockylinux:9 sh -c 'dnf -q repoquery --whatprovides webkit2gtk4.1 gtk3 || true; dnf install --assumeno webkit2gtk4.1 2>&1 | tail -3 || true'
+      - name: spawnloft-cli over 1.x, then a server end to end on the 2.0 package
+        if: matrix.case == 'cli'
+        run: |
+          script=/repo/rust/crates/spawnloft-shell/installer/ci/linux-cli-upgrade.sh
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:22.04 sh $script deb "$OLD_BETA" "$VERSION"
+          docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" rockylinux:9 sh $script rpm "$OLD_STABLE" "$VERSION"
+          # smoke-cli-package.sh installs desktop/dist/spawnloft-cli-*; only the 2.0 packages go there
+          mkdir -p desktop/dist && cp pkg/spawnloft-cli-"$VERSION"-* desktop/dist/
+          docker run --rm -v "$PWD:/repo:ro" debian:12 sh /repo/desktop/smoke-cli-package.sh deb db
+          docker run --rm -v "$PWD:/repo:ro" fedora:42 sh /repo/desktop/smoke-cli-package.sh rpm db
+
+  window:
+    # The installed app on a real Ubuntu 24.04 (AppArmor's user-namespace restriction, which
+    # WebKitGTK's sandbox meets), upgraded from 1.x as a user's would be, opens its window and
+    # loads the panel. The shell writes SPAWNLOFT_SPIKE_MEASURE when the panel page has loaded.
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    runs-on: ${{ matrix.arch == 'x64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-linux-${{ matrix.arch }}
+          path: pkg
+      - name: Install 1.x, then the 2.0 package over it
+        run: |
+          deb=$([ "${{ matrix.arch }}" = x64 ] && echo amd64 || echo arm64)
+          curl -fsSL --retry 6 --retry-all-errors -o "pkg/old.deb" "https://github.com/joogiebear/spawnloft/releases/download/v$OLD_STABLE/SpawnLoft-$OLD_STABLE-linux-$deb.deb"
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./pkg/old.deb
+          sudo apt-get install -y ./pkg/SpawnLoft-"$VERSION"-linux-$deb.deb
+          dpkg-query -W -f='${Package} ${Version} ${Status}\n' spawnloft
+          test ! -e /opt/SpawnLoft/resources/app.asar
+      - name: Open the window and wait for the panel
+        env:
+          SPAWNLOFT_UPDATES: 'off'
+          SPAWNLOFT_SPIKE_MEASURE: ${{ runner.temp }}/measure.json
+          SPAWNLOFT_SPIKE_LOG: ${{ runner.temp }}/shell.log
+          SPAWNLOFT_DATA_ROOT: ${{ runner.temp }}/data
+        run: |
+          # 1 is what a stock Ubuntu 24.04 desktop has; at 0 this check would not meet the restriction
+          sysctl kernel.apparmor_restrict_unprivileged_userns || true
+          xvfb-run -a /usr/bin/spawnloft-desktop > "$RUNNER_TEMP/window.log" 2>&1 &
+          for i in $(seq 1 90); do [ -s "$SPAWNLOFT_SPIKE_MEASURE" ] && break; sleep 1; done
+          pkill -f spawnloft-desktop || true
+          echo "--- window output"; cat "$RUNNER_TEMP/window.log" || true
+          echo "--- shell log"; cat "$SPAWNLOFT_SPIKE_LOG" 2>/dev/null || true
+          test -s "$SPAWNLOFT_SPIKE_MEASURE" || { echo "::error::the window never loaded the panel"; exit 1; }
+          cat "$SPAWNLOFT_SPIKE_MEASURE"
+
+  feed:
+    # The Linux half of a release folder, assembled and gated as the release workflow will.
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-linux-*
+          path: pkg
+          merge-multiple: true
+      - name: Install the Tauri CLI (pinned, from npm) and rpm
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+          echo "TAURI_CLI=$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" >> "$GITHUB_ENV"
+          sudo apt-get update && sudo apt-get install -y rpm
+      - name: A throwaway release key for this run
+        run: |
+          "$TAURI_CLI" signer generate --ci -p "" -w "$RUNNER_TEMP/release.key" -f
+          base64 -d "$RUNNER_TEMP/release.key.pub" > "$RUNNER_TEMP/release.pub"
+      - name: Assemble the release folder (envelope, latest.json, the four Linux feeds)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/release.key")"
+          args=()
+          for f in pkg/spawnloft-cli-*; do args+=(--cli "$f"); done
+          node desktop/release-feed.mjs --out "$RUNNER_TEMP/release" --version "$VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
+            --tauri "$TAURI_CLI" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --deb pkg/SpawnLoft-"$VERSION"-linux-amd64.deb --rpm pkg/SpawnLoft-"$VERSION"-linux-x86_64.rpm \
+            --deb-arm64 pkg/SpawnLoft-"$VERSION"-linux-arm64.deb --rpm-arm64 pkg/SpawnLoft-"$VERSION"-linux-aarch64.rpm \
+            "${args[@]}"
+          for f in latest-linux.yml beta-linux.yml latest-linux-arm64.yml beta-linux-arm64.yml; do
+            test -s "$RUNNER_TEMP/release/$f" || { echo "::error::$f was not written"; exit 1; }
+          done
+          ls -la "$RUNNER_TEMP/release"
+      - name: The release gate, with the Linux package check
+        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-linux-packages
+      - name: Show the feeds
+        run: |
+          for f in latest-linux.yml latest-linux-arm64.yml spawnloft-updates.json; do echo "===== $f"; cat "$RUNNER_TEMP/release/$f"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-release-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/release/
