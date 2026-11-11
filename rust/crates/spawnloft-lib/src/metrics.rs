@@ -369,8 +369,13 @@ mod tests {
             || None,
             move |e| seen.lock().unwrap().push(e),
         );
+        // the file appears before its first line is written: wait for a whole line, not the file
         let deadline = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < deadline && !file.exists() {
+        while Instant::now() < deadline
+            && std::fs::read_to_string(&file)
+                .map(|t| !t.contains('\n'))
+                .unwrap_or(true)
+        {
             std::thread::sleep(Duration::from_millis(50));
         }
         s.stop();
