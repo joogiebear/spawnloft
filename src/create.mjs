@@ -1,12 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { JARS_DIR, TEMPLATES_DIR, INSTANCES_DIR, ROOT } from './paths.mjs'
+import { JARS_DIR, TEMPLATES_DIR, INSTANCES_DIR } from './paths.mjs'
 import { getInstance, hasInstance, putInstance, usedPorts, defaultDir, parseMemoryGb } from './registry.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, findFreePort, randomPassword, validateName, humanBytes } from './util.mjs'
 import { guessLoader } from './software.mjs'
 import { defaultJava } from './java.mjs'
 import * as activity from './activity.mjs'
+import { cliCommand, windowsRun } from './entry.mjs'
 
 const DEFAULT_PORT = 25565
 const DEFAULT_RCON_PORT = 25575
@@ -65,16 +66,15 @@ export function importJar(src, { as = null } = {}) {
   return dest
 }
 
-// How a .bat invokes the CLI on this installation. `node` is only on PATH if the person installed
-// it, but the desktop app carries its own runtime, so use whatever is running right now. The
-// launchers just call the CLI by absolute path and hold no logic of their own.
+// How a .bat invokes the CLI on this installation: spawnloft-core in a 2.0 install (entry.mjs),
+// else whatever is running right now (`node` is only on PATH if the person installed it, but the
+// 1.x desktop app carries its own runtime). The launchers just call the CLI by absolute path and
+// hold no logic of their own.
 function launcherRuntime() {
-  const exe = process.execPath
-  // Electron runs scripts as Node only with this variable; plain node ignores it
-  const viaElectron = Boolean(process.versions.electron)
+  const lines = windowsRun(cliCommand(), '')
   return {
-    prelude: viaElectron ? 'set ELECTRON_RUN_AS_NODE=1\r\n' : '',
-    exe: /[\\\/]node(?:\.exe)?$/i.test(exe) ? 'node' : `"${exe}"`,
+    prelude: lines.slice(0, -1).map((l) => l + '\r\n').join(''),
+    run: lines.at(-1).trimEnd(),
   }
 }
 
@@ -82,9 +82,9 @@ function launcherRuntime() {
 // with a space would otherwise be split.
 function writeShellLaunchers(inst) {
   const quote = (value) => "'" + String(value).replaceAll("'", "'\\''") + "'"
-  const run = `${quote(process.execPath)} ${quote(path.join(ROOT, 'mcctl.mjs'))}`
-  // Electron runs scripts as Node only with this variable; plain node ignores it
-  const head = ['#!/bin/sh', ...(process.versions.electron ? ['export ELECTRON_RUN_AS_NODE=1'] : [])]
+  const cli = cliCommand()
+  const run = [cli.exe, ...cli.args].map(quote).join(' ')
+  const head = ['#!/bin/sh', ...Object.entries(cli.env).map(([key, value]) => `export ${key}=${quote(value)}`)]
   const name = quote(inst.name)
   const script = (...lines) => [...head, ...lines, ''].join('\n')
   const files = {
@@ -103,9 +103,8 @@ function writeShellLaunchers(inst) {
 
 export function writeLaunchers(inst) {
   if (process.platform === 'linux') return writeShellLaunchers(inst)
-  const cli = path.join(ROOT, 'mcctl.mjs')
   const rt = launcherRuntime()
-  const run = `${rt.exe} "${cli}"`
+  const run = rt.run
   const files = {
     // start, then attach to the console
     'start.bat': `@echo off

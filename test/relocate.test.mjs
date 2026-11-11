@@ -97,3 +97,29 @@ test('spawnloft repair rewrites everything even when nothing looks moved', () =>
   const text = execFileSync(process.execPath, [cli, 'repair'], { encoding: 'utf8', env: { ...process.env, MCCTL_DATA_ROOT: scratch } })
   assert.match(text, /Rewrote 1 task shim\(s\) and the launchers of 1 server\(s\)/)
 })
+
+test('under spawnloft-core (SPAWNLOFT_ENTRY) shims, launchers and the record name the core, never Node', () => {
+  // a stand-in for <install>/resources/bin/spawnloft-core: only its path is used
+  const bin = path.join(scratch, 'install', 'resources', 'bin', posix ? 'spawnloft-core' : 'spawnloft-core.exe')
+  fs.mkdirSync(path.dirname(bin), { recursive: true })
+  fs.writeFileSync(bin, '')
+  const cli = fileURLToPath(new URL('../spawnloft.mjs', import.meta.url))
+  const env = { ...process.env, MCCTL_DATA_ROOT: scratch, SPAWNLOFT_ENTRY: bin }
+  const out = execFileSync(process.execPath, [cli, 'repair', '--json'], { encoding: 'utf8', env })
+  assert.equal(JSON.parse(out.trim().split('\n').pop()).ok, true)
+
+  const shimBody = fs.readFileSync(shim, 'utf8')
+  assert.ok(shimBody.includes(bin), shimBody)
+  assert.ok(!shimBody.includes('mcctl.mjs'), shimBody)
+  assert.ok(!shimBody.includes(process.execPath), shimBody)
+  assert.ok(!shimBody.includes('ELECTRON_RUN_AS_NODE'), shimBody)
+  assert.ok(shimBody.includes(posix ? "task run 'nightly'" : 'task run nightly'), shimBody)
+
+  const startBody = fs.readFileSync(path.join(INSTANCES_DIR, 'smp', launcher('start')), 'utf8')
+  assert.ok(startBody.includes(bin) && !startBody.includes('mcctl.mjs'), startBody)
+  assert.ok(!/(^|\s)node(\.exe)?\s/m.test(startBody), startBody)
+
+  const record = JSON.parse(fs.readFileSync(path.join(DATA_ROOT, 'run', 'runtime.json'), 'utf8'))
+  assert.equal(record.format, 2)
+  assert.equal(record.exe, bin)
+})

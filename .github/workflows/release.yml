@@ -28,6 +28,8 @@ on:
       - 'desktop/update-envelope.mjs'
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
       - 'desktop/set-version.mjs'
       - 'desktop/version-stamp.test.mjs'
       - 'package.json'
@@ -60,7 +62,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: The release tooling's own tests
-        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs desktop/version-stamp.test.mjs
+        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs desktop/version-stamp.test.mjs desktop/payload-gate.test.mjs
 
   dry-run:
     runs-on: windows-latest
@@ -138,7 +140,8 @@ jobs:
       - name: The release gate
         run: |
           node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
-            --check-binary-versions --installed "$DRY_INSTALLED"
+            --check-binary-versions --installed "$DRY_INSTALLED" \
+            --runtime "$DRY_INSTALLED/resources/runtime" --payload "$DRY_INSTALLED"
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \

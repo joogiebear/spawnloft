@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The bundled Node.js under the hardened runtime (PLAN-2.0-REMAINING.md A7): V8 compiles code
+     at run time, so without these Node dies at start, and notarization still passes. Only for
+     resources/runtime/node-<ver>/bin/node; the core and the shell are signed without entitlements. -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+</dict>
+</plist>

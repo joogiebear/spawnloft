@@ -158,19 +158,8 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         Err(why) => return unreadable_root(&data_root, why, &log),
     };
 
-    // Nothing is stopped that 2.0 could not start again: until R4 the restart goes through the
-    // bundled Node core, so without Node the update waits (design 2.3, the NodeCore seam).
-    if listed.iter().any(h::Listed::stoppable)
-        && let Err(e) = spawnloft_lib::nodecore::node()
-    {
-        log.line(&format!(
-            "SpawnLoft 2 needs Node.js to start the servers again ({e}); nothing was stopped"
-        ));
-        return done(
-            h::EXIT_NO_NODE,
-            json!({ "exit": h::EXIT_NO_NODE, "error": "node.js not found", "record": null }),
-        );
-    }
+    // No Node check here (PLAN-2.0-REMAINING.md A8): this runs from staging\ before the payload
+    // is extracted, and the payload carries the Node that starts the servers again.
 
     let previous = Marker::read(&files.marker());
     let out = h::run_stop(

@@ -139,14 +139,18 @@ pub fn parse_upstream(url: &str) -> Option<SocketAddr> {
     Some(SocketAddr::from(([127, 0, 0, 1], port)))
 }
 
-/// Node from `--node`, `SPAWNLOFT_NODE`, or the first `node` on PATH.
-pub fn find_node(explicit: Option<&Path>) -> Option<PathBuf> {
+/// Node from `--node`, else [`crate::runtime::node`]: `SPAWNLOFT_NODE`, the bundled runtime, or
+/// (a development build only) the first `node` on PATH.
+pub fn find_node(explicit: Option<&Path>) -> Result<PathBuf, String> {
     if let Some(p) = explicit {
-        return Some(p.to_path_buf());
+        return Ok(p.to_path_buf());
     }
-    if let Some(p) = std::env::var_os("SPAWNLOFT_NODE").filter(|p| !p.is_empty()) {
-        return Some(PathBuf::from(p));
-    }
+    crate::runtime::node()
+}
+
+/// The first `node` on PATH (then the places a GUI-started app misses on macOS): what a
+/// development build with no bundled runtime runs on.
+pub fn path_node() -> Option<PathBuf> {
     let exe = if cfg!(windows) { "node.exe" } else { "node" };
     let path = std::env::var_os("PATH").unwrap_or_default();
     std::env::split_paths(&path)
@@ -187,16 +191,16 @@ fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<Socke
     if !entry.is_file() {
         return Err(format!("{} is missing", entry.display()));
     }
-    let node =
-        find_node(opts.node.as_deref()).ok_or("Node.js was not found (install it, or set SPAWNLOFT_NODE)")?;
+    let node = find_node(opts.node.as_deref())?;
     let mut cmd = Command::new(&node);
     cmd.arg(&entry)
         .args(["ui", "--port", "0", "--no-open"])
         .current_dir(&core_dir)
-        .env_remove("ELECTRON_RUN_AS_NODE")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+    // the panel names this binary in what it writes to disk (shims, launchers, MCP config)
+    crate::runtime::prepare(&mut cmd);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -434,9 +438,9 @@ fn missing(conn: &mut TcpStream, head: &Head, why: &str) -> std::io::Result<()> 
     let page = format!(
         "<!doctype html><meta charset=utf-8><title>SpawnLoft</title>\
          <body style=\"font:15px system-ui;margin:3em;color:#ddd;background:#1b1d22\">\
-         <h1 style=\"font-size:20px\">SpawnLoft (internal spike)</h1>\
+         <h1 style=\"font-size:20px\">SpawnLoft could not start</h1>\
          <p>The window works, but the panel behind it could not start: {}</p>\
-         <p>This build still runs the panel on Node.js; install Node 20 or later and reopen SpawnLoft.</p>",
+         <p>Reinstalling SpawnLoft usually fixes this. Your servers and worlds are not affected.</p>",
         html_escape(why)
     );
     respond(conn, 503, "text/html; charset=utf-8", page.as_bytes())

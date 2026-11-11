@@ -1,4 +1,4 @@
-# Once a week: is the Node runtime SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION,
+# Once a week: is the Node runtime SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, re-exported by build-cli-package.mjs,
 # nodejs.org sha256s pinned in source) still the newest LTS, and does CI test on it
 # (.node-version)? Dependabot cannot see that pin (plan D7, Q-X). A newer LTS opens (or adds to)
 # one issue, "Node runtime pin is behind", with the sha256 lines the bump needs; the next green
@@ -18,6 +18,7 @@ on:
     paths:
       - .node-version
       - desktop/build-cli-package.mjs
+      - desktop/node-pin.mjs
       - tools/check-node-pin.mjs
       - .github/workflows/node-pin.yml
 

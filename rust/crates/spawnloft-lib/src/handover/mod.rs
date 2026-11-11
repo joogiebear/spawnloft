@@ -54,8 +54,8 @@ pub const MARKER_HOLD: Duration = Duration::from_secs(24 * 3600);
 pub const EXIT_OK: u8 = 0;
 pub const EXIT_INTERNAL: u8 = 2;
 pub const EXIT_BLOCKED: u8 = 3;
-/// Servers are running and the machine has no Node.js to start them again under 2.0 (until R4).
-pub const EXIT_NO_NODE: u8 = 5;
+// 5 was "no Node.js to start the servers again" until 2.0 bundled its own (PLAN-2.0-REMAINING.md
+// A8); not reused, so an older installer never reads a new meaning into it.
 
 /// A server or a database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

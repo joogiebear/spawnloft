@@ -2,13 +2,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync, execFile } from 'node:child_process'
 
-import { DATA_ROOT, ROOT, RUN_DIR } from './paths.mjs'
+import { DATA_ROOT, RUN_DIR } from './paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock } from './util.mjs'
 import { platformCapabilities, PREVIEW_LIMITS } from './platform.mjs'
 import * as mac from './schedule-mac.mjs'
 import * as linux from './schedule-linux.mjs'
 import * as activity from './activity.mjs'
 import { normaliseSteps } from './task-steps.mjs'
+import { cliCommand, windowsRun } from './entry.mjs'
 
 // launchd and systemd are driven through the same five calls; Windows is the code in this file.
 const native = process.platform === 'darwin' ? mac : process.platform === 'linux' ? linux : null
@@ -241,24 +242,16 @@ function queryWindows() {
   return query
 }
 
-// The batch file a task runs. A scheduled task starts with no environment, so
-// ELECTRON_RUN_AS_NODE has to be set here or the desktop build would relaunch the app instead
-// of running the CLI. It also keeps a multi-path command line out of the task definition.
+// The batch file a task runs. In a 2.0 install it runs spawnloft-core (entry.mjs). Otherwise a
+// scheduled task starts with no environment, so ELECTRON_RUN_AS_NODE has to be set here or the
+// desktop build would relaunch the app instead of running the CLI. It also keeps a multi-path
+// command line out of the task definition.
 function writeShim(id) {
   if (native) return native.writeShim(id)
   const dir = path.join(DATA_ROOT, 'tasks')
   fs.mkdirSync(dir, { recursive: true })
   const shim = path.join(dir, `${id}.cmd`)
-  const cli = path.join(ROOT, 'mcctl.mjs')
-  const exe = process.execPath
-  const viaElectron = Boolean(process.versions.electron)
-  const runner = /[\\/]node(?:\.exe)?$/i.test(exe) ? 'node' : `"${exe}"`
-  const lines = [
-    '@echo off',
-    viaElectron ? 'set ELECTRON_RUN_AS_NODE=1' : null,
-    `${runner} "${cli}" task run ${id}`,
-    'exit /b %errorlevel%',
-  ].filter(Boolean)
+  const lines = ['@echo off', ...windowsRun(cliCommand(), `task run ${id}`), 'exit /b %errorlevel%']
   fs.writeFileSync(shim, lines.join('\r\n') + '\r\n')
   return shim
 }
