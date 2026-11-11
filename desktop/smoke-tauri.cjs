@@ -245,6 +245,12 @@ async function main() {
     // and the window starts the core again and shows the panel on its new port
     await until(async () => { const u = new URL(await url()); return u.port !== panel.port && u.pathname === '/' }, 'the panel again after the core was killed', 60000)
     record(`restart: the window started the core again (port ${new URL(await url()).port})`)
+    // a Node panel that dies takes its core along, and the window brings both back
+    const second = new URL(await url())
+    const node2 = await until(() => { const n = pids(NODE_PANEL); return n.length && n }, 'the new Node panel')
+    for (const p of node2) process.kill(p, 'SIGKILL')
+    await until(async () => { const u = new URL(await url()); return u.port !== second.port && u.pathname === '/' }, 'the panel again after the Node panel was killed', 60000)
+    record(`restart: a killed Node panel brought the core down and the window started both again (port ${new URL(await url()).port})`)
 
     await wd('DELETE', '')
     sid = null

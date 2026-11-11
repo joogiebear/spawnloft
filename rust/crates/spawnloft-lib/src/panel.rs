@@ -119,7 +119,11 @@ enum Upstream {
     Missing(String),
 }
 
+/// Set once this process is stopping the Node panel on purpose, so its end is not a crash.
+static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn stop_child(child: &Mutex<Option<Child>>) {
+    STOPPING.store(true, std::sync::atomic::Ordering::SeqCst);
     if let Ok(mut guard) = child.lock()
         && let Some(mut c) = guard.take()
     {
@@ -244,6 +248,11 @@ fn start_node_panel(
         }
         if !sent {
             let _ = tx.send(None);
+        } else if !STOPPING.load(std::sync::atomic::Ordering::SeqCst) {
+            // the Node panel died under a running proxy: end too, so the window (which starts the
+            // core again when it ends by itself) brings both back instead of serving 502s for ever
+            eprintln!("spawnloft-core ui: the Node panel exited; stopping so the window can start it again");
+            std::process::exit(70);
         }
     });
     match rx.recv_timeout(UPSTREAM_START_TIMEOUT) {
@@ -367,8 +376,14 @@ pub fn rewrite_head(head: &Head, upstream: SocketAddr) -> Vec<u8> {
 fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
-    conn.set_read_timeout(Some(HEAD_TIMEOUT))?;
+    // one deadline for the whole head, not per read: a byte every 29 s would otherwise hold on
+    let deadline = std::time::Instant::now() + HEAD_TIMEOUT;
     let (head, used) = loop {
+        let left = deadline.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() {
+            return Ok(());
+        }
+        conn.set_read_timeout(Some(left))?;
         let n = conn.read(&mut chunk)?;
         if n == 0 {
             return Ok(());

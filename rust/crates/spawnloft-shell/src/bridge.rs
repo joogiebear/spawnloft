@@ -153,9 +153,11 @@ fn same_origin(a: &Url, b: &Url) -> bool {
 
 /// The window's own start page (`dist/index.html`), shown until the panel answers.
 fn is_start_page(url: &Url) -> bool {
+    // Windows serves it at http://tauri.localhost; elsewhere that is an ordinary name a local
+    // server could answer, and the start page is tauri://localhost
     match url.scheme() {
-        "tauri" => url.host_str() == Some("localhost"),
-        "http" | "https" => url.host_str() == Some("tauri.localhost"),
+        "tauri" => !cfg!(windows) && url.host_str() == Some("localhost"),
+        "http" | "https" => cfg!(windows) && url.host_str() == Some("tauri.localhost"),
         _ => false,
     }
 }
@@ -210,6 +212,21 @@ pub fn set_panel<R: Runtime>(app: &AppHandle<R>, url: &Url) -> Result<(), String
         *p = Some(url.clone());
     }
     Ok(())
+}
+
+/// The core has gone: no origin is the panel until the next one prints its address, and the
+/// main window shows its start page meanwhile.
+pub fn clear_panel<R: Runtime>(app: &AppHandle<R>) {
+    if let Ok(mut p) = app.state::<Shell>().panel.lock() {
+        *p = None;
+    }
+    for (label, w) in app.webview_windows() {
+        if label == MAIN {
+            let _ = w.navigate(start_page());
+        } else {
+            let _ = w.close();
+        }
+    }
 }
 
 /// Every command starts here: the webview asking must be showing the panel right now.
@@ -317,14 +334,18 @@ fn open_external<R: Runtime>(webview: Webview<R>, url: String) -> Result<Value, 
 }
 
 fn open_https(url: &str) -> bool {
-    let ok = url.len() <= 8192
-        && Url::parse(url)
-            .is_ok_and(|u| u.scheme() == "https" && u.username().is_empty() && u.password().is_none());
-    if ok && let Err(e) = tauri_plugin_opener::open_url(url, None::<&str>) {
+    // the parsed form is what is opened: parsing drops control characters, so the string checked
+    // and the string handed to the system are the same
+    let Some(parsed) = Url::parse(url).ok().filter(|u| {
+        url.len() <= 8192 && u.scheme() == "https" && u.username().is_empty() && u.password().is_none()
+    }) else {
+        return false;
+    };
+    if let Err(e) = tauri_plugin_opener::open_url(parsed.as_str(), None::<&str>) {
         local::log(&format!("could not open the browser: {e}"));
         return false;
     }
-    ok
+    true
 }
 
 /// A launcher profile's folder in the file manager. The folder comes from the panel, never from
@@ -406,14 +427,7 @@ fn restart_core(webview: Webview) -> Result<Value, String> {
     let app = webview.app_handle().clone();
     // off this thread: the core takes up to a second to stop, and the page waits for nothing
     std::thread::spawn(move || {
-        for (label, w) in app.webview_windows() {
-            if label != MAIN {
-                let _ = w.close();
-            }
-        }
-        if let Some(w) = app.get_webview_window(MAIN) {
-            let _ = w.navigate(start_page());
-        }
+        clear_panel(&app);
         app.state::<crate::Core>().stop();
         crate::start_core(app.clone());
     });
@@ -862,8 +876,11 @@ mod tests {
         assert!(same_origin(&u("http://127.0.0.1:4100/api/x?y#z"), &p));
         assert!(!same_origin(&u("http://127.0.0.1:41000/"), &p));
         assert!(!same_origin(&u("https://127.0.0.1:4100/"), &p));
-        assert!(is_start_page(&u("tauri://localhost/index.html")));
-        assert!(is_start_page(&u("http://tauri.localhost/index.html")));
+        assert_eq!(is_start_page(&u("tauri://localhost/index.html")), !cfg!(windows));
+        assert_eq!(
+            is_start_page(&u("http://tauri.localhost/index.html")),
+            cfg!(windows)
+        );
         assert!(!is_start_page(&u("http://tauri.localhost.evil.example/")));
     }
 

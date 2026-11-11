@@ -12,6 +12,8 @@ process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.LOCALAPPDATA = path.join(scratch, 'local')
 process.env.XDG_DATA_HOME = path.join(scratch, 'local')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
+// what the Tauri window sets for the core and so for this panel
+process.env.SPAWNLOFT_SHELL = 'tauri'
 fs.mkdirSync(process.env.MCCTL_DATA_ROOT, { recursive: true })
 const settings = await import('../src/settings.mjs')
 const firstRun = await import('../src/first-run.mjs')
@@ -67,4 +69,20 @@ test('another site cannot save locations', async () => {
 test('the Java check answers with where to get Java', async () => {
   const body = await (await fetch(new URL('/api/setup/java', url))).json()
   assert.ok(typeof body.downloadUrl === 'string' && body.downloadUrl.startsWith('https://'))
+})
+
+test('outside the window the wizard is not served and locations cannot be changed over HTTP', async () => {
+  delete process.env.SPAWNLOFT_SHELL
+  try {
+    assert.equal((await fetch(new URL('/setup', url))).status, 404)
+    const res = await fetch(new URL('/api/setup', url), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin },
+      body: JSON.stringify({ dataRoot: path.join(scratch, 'browser') }),
+    })
+    assert.equal(res.status, 403)
+    assert.notEqual(settings.load().dataRoot, path.join(scratch, 'browser'))
+  } finally {
+    process.env.SPAWNLOFT_SHELL = 'tauri'
+  }
 })

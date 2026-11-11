@@ -47,10 +47,31 @@ pub struct Core {
 
 /// How many times a core that ends by itself is started again before the window gives up.
 const CORE_RESTARTS: u32 = 3;
+/// A core up this long before it ended counts as having worked: the restart count starts over.
+const CORE_STABLE: std::time::Duration = std::time::Duration::from_secs(300);
 
 impl Core {
     pub fn is_running(&self) -> bool {
         self.child.lock().is_ok_and(|g| g.is_some())
+    }
+
+    /// Whether the core with this pid is the one the window uses now (a restart may have
+    /// replaced it while its address line was on the way).
+    fn is_current(&self, pid: u32) -> bool {
+        self.child
+            .lock()
+            .is_ok_and(|g| g.as_ref().is_some_and(|(c, _)| c.id() == pid))
+    }
+
+    /// Puts a new core in the slot; one already there (two starts that overlapped) is stopped
+    /// and reaped, never left running unowned.
+    fn replace(&self, child: Child, stdin: ChildStdin) {
+        let old = self.child.lock().ok().and_then(|mut g| g.replace((child, stdin)));
+        if let Some((mut c, stdin)) = old {
+            drop(stdin);
+            let _ = c.kill();
+            let _ = c.wait();
+        }
     }
 
     /// The core with this pid ended by itself (it is still the one in the slot, so nobody stopped
@@ -257,9 +278,8 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
         return;
     };
     let pid = child.id();
-    if let Ok(mut guard) = app.state::<Core>().child.lock() {
-        *guard = Some((child, stdin));
-    }
+    let started = std::time::Instant::now();
+    app.state::<Core>().replace(child, stdin);
     let (tx, rx) = std::sync::mpsc::channel::<()>();
     let watchdog = app.clone();
     std::thread::spawn(move || {
@@ -279,7 +299,10 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
             };
             opened = true;
             let _ = tx.send(());
-            open_panel(&app, url.trim());
+            // a core replaced in the meantime must not point the window at its port
+            if app.state::<Core>().is_current(pid) {
+                open_panel(&app, url.trim());
+            }
         }
         // stdout ended: the core exited, or was stopped (quit, restart), which takes it out of
         // the slot first
@@ -293,6 +316,10 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
         }
         // it was serving the window: start it again, a few times, and open the panel once more
         // (servers are separate processes and never noticed)
+        // a core that served for a while before it ended starts the count again
+        if started.elapsed() > CORE_STABLE {
+            core.restarts.store(0, std::sync::atomic::Ordering::SeqCst);
+        }
         let n = core.restarts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
         if n > CORE_RESTARTS {
             return cannot_start(&app, "the core keeps stopping; see panel.log");
@@ -300,11 +327,7 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
         local::log(&format!(
             "the core ended by itself; starting it again ({n} of {CORE_RESTARTS})"
         ));
-        for (label, w) in app.webview_windows() {
-            if label != bridge::MAIN {
-                let _ = w.close();
-            }
-        }
+        bridge::clear_panel(&app);
         start_core(app.clone());
     });
 }
@@ -393,11 +416,16 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
         local::log("argv compatibility: Node.js not found");
         return Some(ExitCode::from(127));
     };
+    // a forwarder that is killed takes its Node along on Windows too (plan 3C, A6)
     let status = Command::new(node)
         .arg(script)
         .args(&args[2..])
         .env_remove("ELECTRON_RUN_AS_NODE")
-        .status();
+        .spawn()
+        .and_then(|mut child| {
+            spawnloft_lib::platform::end_with_this_process(&child);
+            child.wait()
+        });
     Some(match status {
         Ok(s) => ExitCode::from(u8::try_from(s.code().unwrap_or(1)).unwrap_or(1)),
         Err(e) => {
