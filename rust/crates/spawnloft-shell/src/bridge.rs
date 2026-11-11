@@ -196,9 +196,14 @@ pub fn set_panel<R: Runtime>(app: &AppHandle<R>, url: &Url) -> Result<(), String
     let shell = app.state::<Shell>();
     let fresh = shell.granted.lock().map(|g| !g.contains(&port)).unwrap_or(true);
     if fresh {
+        // local as well: right after the window moves from its start page (tauri://localhost) to
+        // the panel, webkit2gtk can still name the old origin on the first IPC request, and the
+        // ACL then refuses the panel itself. The start page is static and has no script, and
+        // every command checks the window's live URL against the panel (from_panel), so this
+        // grants nothing a non-panel page can use.
         let mut cap = CapabilityBuilder::new(format!("panel-{port}"))
             .remote(format!("http://127.0.0.1:{port}"))
-            .local(false)
+            .local(true)
             .windows([MAIN, LAUNCHER, "console-*"]);
         for cmd in COMMANDS {
             cap = cap.permission(format!("allow-{}", cmd.replace('_', "-")));
@@ -234,7 +239,11 @@ fn from_panel<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
     let shell = webview.state::<Shell>();
     match (shell.panel(), webview.url()) {
         (Some(p), Ok(u)) if same_origin(&p, &u) => Ok(()),
-        _ => Err("not the panel".into()),
+        (_, u) => {
+            let at = u.map_or_else(|e| e.to_string(), |u| redact(&u));
+            local::log(&format!("bridge refused a call from {at} (not the panel)"));
+            Err("not the panel".into())
+        }
     }
 }
 

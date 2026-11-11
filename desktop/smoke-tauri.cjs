@@ -262,9 +262,11 @@ async function main() {
     if (sid) await wd('DELETE', '').catch(() => {})
     driver.kill()
     fs.writeFileSync(path.join(outDir, 'smoke-tauri.log'), log.join('\n') + '\n')
-    for (const f of ['shell.log', 'panel.log']) {
-      const p = path.join(dataRoot, 'run', f)
-      if (fs.existsSync(p)) fs.copyFileSync(p, path.join(outDir, f))
+    // every run folder: the chosen root's, and the default one the first core used before setup
+    for (const p of fs.readdirSync(scratch, { recursive: true }).map((r) => path.join(scratch, r))) {
+      if (!/^(shell|panel)\.log$/.test(path.basename(p)) || path.basename(path.dirname(p)) !== 'run') continue
+      const name = path.relative(scratch, p).replace(/[\\/ ]+/g, '_')
+      try { fs.copyFileSync(p, path.join(outDir, name)) } catch { /* gone with its folder */ }
     }
   }
 }
