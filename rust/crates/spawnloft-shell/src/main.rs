@@ -8,8 +8,8 @@
 //!
 //! Also here, because they are what the spike has to prove:
 //! - the argv compatibility form (REVIEW-REV3 B1): `SpawnLoft.exe <...>\mcctl.mjs <command...>`,
-//!   which every 1.x task shim, server launcher and MCP config runs, is forwarded to the Node core
-//!   so those keep working after the shell replaces Electron;
+//!   which every 1.x task shim, server launcher and MCP config runs, is forwarded to
+//!   `spawnloft-core` so those keep working after the shell replaces Electron;
 //! - start-time numbers, written when `SPAWNLOFT_SPIKE_MEASURE` names a file.
 //!
 //! Updates (2.x to 2.y) are in `updater.rs`: the core verifies the signed feed, the plugin
@@ -18,7 +18,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, ExitCode, Stdio};
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -234,35 +234,45 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
 
 /// `SpawnLoft.exe <path ending in mcctl.mjs or spawnloft.mjs> <command...>`: what 1.x task shims,
 /// server launchers and MCP configs run (with ELECTRON_RUN_AS_NODE, ignored here). Forwarded to
-/// Node with the same arguments; `None` when the command line is not that form.
+/// `spawnloft-core <command...>`, the install's one entry point, which runs it on the bundled
+/// Node; `None` when the command line is not that form. The first `repair` rewrites those files
+/// to name `spawnloft-core` directly (RUNTIME_FORMAT 2), so this form only carries the time
+/// between the handover and that repair, and MCP configs a user copied from 1.x.
 fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
     let first = args.get(1)?.to_string_lossy().to_ascii_lowercase();
     if !(first.ends_with("mcctl.mjs") || first.ends_with("spawnloft.mjs")) {
         return None;
     }
-    let script = Path::new(&args[1]);
-    // the shim names the 1.x path; the same file ships at the same place in this install
-    let script = if script.is_file() {
-        script.to_path_buf()
-    } else {
-        core_dir()?.join(script.file_name()?)
-    };
-    let Some(node) = spawnloft_lib::panel::find_node(None) else {
-        spike_log("argv compatibility: Node.js not found");
+    let Some(core) = core_binary() else {
+        spike_log("argv compatibility: no core binary path");
         return Some(ExitCode::from(127));
     };
-    let status = Command::new(node)
-        .arg(script)
-        .args(&args[2..])
+    let mut cmd = Command::new(&core);
+    cmd.args(&args[2..])
         .env_remove("ELECTRON_RUN_AS_NODE")
-        .status();
-    Some(match status {
-        Ok(s) => ExitCode::from(u8::try_from(s.code().unwrap_or(1)).unwrap_or(1)),
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    Some(match run_forwarder(cmd) {
+        Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(e) => {
-            spike_log(&format!("argv compatibility: {e}"));
+            spike_log(&format!("argv compatibility: {}: {e}", core.display()));
             ExitCode::from(1)
         }
     })
+}
+
+/// The forwarded core in a kill-on-close job on Windows (a killed `SpawnLoft.exe` takes the core
+/// and its Node with it; PLAN-2.0-REMAINING.md A6), a plain child elsewhere.
+#[cfg(windows)]
+fn run_forwarder(cmd: Command) -> std::io::Result<i32> {
+    spawnloft_lib::platform::ignore_ctrl_c();
+    spawnloft_lib::platform::run_in_kill_job(cmd)
+}
+
+#[cfg(not(windows))]
+fn run_forwarder(mut cmd: Command) -> std::io::Result<i32> {
+    Ok(cmd.status()?.code().unwrap_or(1))
 }
 
 fn epoch_ms() -> u128 {

@@ -78,6 +78,24 @@ Mac:
 window. The `spawnloft.cmd` launcher in `resources\bin` does the same, but an app that starts
 programs without a shell cannot run a `.cmd` file on Windows, so point at the executable.
 
+SpawnLoft 2.0 (not released yet) needs no environment variable: the entry is the one console
+binary every 2.x release keeps, and Settings shows it ready to copy. The 1.x entry above keeps
+working after the update to 2.0.
+
+```json
+{
+  "mcpServers": {
+    "spawnloft": {
+      "command": "C:\\Users\\YOU\\AppData\\Local\\Programs\\SpawnLoft\\resources\\bin\\spawnloft-core.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+On a Mac the command is
+`/Applications/SpawnLoft.app/Contents/Resources/resources/bin/spawnloft-core`.
+
 ### Claude Code
 
 ```bash

@@ -12,6 +12,11 @@ $script:fixtures = Join-Path $env:RUNNER_TEMP 'installer-fixtures'
 $script:result = [ordered]@{}
 $script:scenario = 'scenario'
 $script:failures = 0
+# the harness's own Node (setup-node), by full path: seeding, list.mjs and the fake JVM stand-in
+# run on it; nothing of 2.0 may (the scenarios hide every other Node from 2.0, see Set-NodeMode)
+$script:harnessNode = (Get-Command node).Source
+$script:nodeMode = 'none'
+$script:decoyLog = Join-Path $env:RUNNER_TEMP 'decoy-node.log'
 
 function Start-Scenario($name) {
   $script:scenario = $name
@@ -22,12 +27,59 @@ function Start-Scenario($name) {
   New-Item -ItemType Directory -Force -Path $fixtures | Out-Null
   Copy-Item -Force "$PSScriptRoot\fake-java.mjs" $fixtures
   Copy-Item -Recurse -Force (Join-Path $env:GITHUB_WORKSPACE 'test\fixtures\fake-mariadb') $fixtures
-  # scheduled tasks and the 2.0 core find Node on the user PATH, as on a machine with Node
-  $nodeDir = Split-Path (Get-Command node).Source
-  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-  if (-not ($userPath -split ';' | Where-Object { $_ -eq $nodeDir })) {
-    [Environment]::SetEnvironmentVariable('Path', "$nodeDir;$userPath", 'User')
+  Set-NodeMode $script:nodeMode
+}
+
+# 2.0 runs on the Node it carries (PLAN-2.0-REMAINING.md section 4), so every scenario runs with
+# no Node.js on any PATH 2.0 could read: this process's (which the installer, the core and the
+# CLI inherit) and the persisted user and machine PATH (which Task Scheduler and the app read).
+#   none   no node.exe on any PATH
+#   decoy  a node.exe first on every PATH that logs each run to $decoyLog and fails; Finish
+#          fails the scenario if anything ran it
+function Set-NodeMode([string] $mode) {
+  $script:result.nodeMode = $mode
+  $strip = {
+    param($value)
+    @("$value" -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'node.exe')) }) -join ';'
   }
+  $env:Path = & $strip $env:Path
+  foreach ($scope in 'User', 'Machine') {
+    $v = [Environment]::GetEnvironmentVariable('Path', $scope)
+    $nv = & $strip $v
+    if ($nv -ne $v) { [Environment]::SetEnvironmentVariable('Path', $nv, $scope) }
+  }
+  if ($mode -eq 'decoy') {
+    $dir = Join-Path $env:RUNNER_TEMP 'decoy-node'
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $src = Join-Path $dir 'decoy.cs'
+    Set-Content $src @"
+class Decoy {
+  static int Main() {
+    System.IO.File.AppendAllText(@"$($script:decoyLog)", System.Environment.CommandLine + "\r\n");
+    System.Console.Error.WriteLine("decoy node.exe: SpawnLoft 2 must run its own Node");
+    return 1;
+  }
+}
+"@
+    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    & $csc /nologo /target:exe "/out:$dir\node.exe" $src | Out-Host
+    if (-not (Test-Path "$dir\node.exe")) { throw 'could not build the decoy node.exe' }
+    $env:Path = "$dir;$env:Path"
+    foreach ($scope in 'User', 'Machine') {
+      [Environment]::SetEnvironmentVariable('Path', "$dir;" + [Environment]::GetEnvironmentVariable('Path', $scope), $scope)
+    }
+  }
+  $seen = (Get-Command node -ErrorAction SilentlyContinue).Source
+  $script:result.nodeOnPath = $seen
+  if ($mode -eq 'none' -and $seen) { throw "a node.exe is still on PATH: $seen" }
+  if ($mode -eq 'decoy' -and $seen -notlike '*decoy-node*') { throw "the decoy is not first on PATH: $seen" }
+}
+
+# The decoy logs every run; 2.0 must never have started it
+function Check-No-Decoy {
+  if ($script:nodeMode -ne 'decoy') { return }
+  $ran = if (Test-Path $script:decoyLog) { (Get-Content $script:decoyLog -Raw).Trim() } else { '' }
+  Check 'nothing ran the decoy node.exe on PATH (the bundled Node ran)' (-not $ran) $ran
 }
 
 function Save-Result {
@@ -53,6 +105,7 @@ function Note($what, $value) {
 }
 
 function Finish {
+  Check-No-Decoy
   $script:result.finishedAt = (Get-Date).ToString('o')
   Save-Result
   Write-Host "$scenario`: all checks passed"
@@ -144,17 +197,71 @@ function List1 {
   Parse-List (Run-Captured "$inst\SpawnLoft.exe" @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120 @{ ELECTRON_RUN_AS_NODE = '1' })
 }
 
-# 2.0's CLI: the bundled Node core on the machine's Node until R4 (the core binary has no `list`)
+# 2.0's CLI: spawnloft-core, which forwards the commands it does not own to the Node core on the
+# bundled Node
 function Cli2([string[]] $cliArgs, [switch] $AllowFail) {
-  $r = Run-Captured (Get-Command node).Source (@("$inst\resources\core\spawnloft.mjs") + $cliArgs) 240
+  $r = Run-Captured "$inst\resources\bin\spawnloft-core.exe" $cliArgs 240
   Write-Host "2.0 $($cliArgs -join ' ') -> $($r.code)`n$($r.out)$($r.err)"
   if ($r.code -ne 0 -and -not $AllowFail) { throw "2.0 CLI $($cliArgs -join ' ') failed ($($r.code)): $($r.out)$($r.err)" }
   $r
 }
 
-# 2.0's view (the bundled Node core on the machine's Node, until R4)
+# 2.0's view (its own readState, run on the harness's Node: orphaned and stale included)
 function Status2 {
-  Parse-List (Run-Captured (Get-Command node).Source @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120)
+  Parse-List (Run-Captured $script:harnessNode @("$PSScriptRoot\list.mjs", "$inst\resources\core") 120)
+}
+
+# `spawnloft list --json` the way a person runs it in a terminal: the 1.x path's spawnloft.cmd
+function Terminal-List {
+  $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', "$inst\resources\bin\spawnloft.cmd", 'list', '--json') 120
+  Write-Host "spawnloft list --json -> $($r.code)`n$($r.out)$($r.err)"
+  $r
+}
+
+# `spawnloft-core mcp` held open, as an AI client runs it: stdin and stdout are pipes
+function Start-Mcp {
+  $si = New-Object System.Diagnostics.ProcessStartInfo "$inst\resources\bin\spawnloft-core.exe", 'mcp'
+  $si.UseShellExecute = $false
+  $si.RedirectStandardInput = $true
+  $si.RedirectStandardOutput = $true
+  $si.RedirectStandardError = $true
+  $si.CreateNoWindow = $true
+  $p = [System.Diagnostics.Process]::Start($si)
+  $null = $p.StandardError.ReadToEndAsync()
+  $p
+}
+
+# One JSON-RPC request to a Start-Mcp process; the parsed answer, or $null after $seconds
+function Mcp-Call($p, [int] $id, [string] $method, $params = @{}) {
+  $req = @{ jsonrpc = '2.0'; id = $id; method = $method; params = $params } | ConvertTo-Json -Compress -Depth 6
+  $p.StandardInput.WriteLine($req)
+  $p.StandardInput.Flush()
+  $read = $p.StandardOutput.ReadLineAsync()
+  if (-not $read.Wait(60000)) { return $null }
+  try { $read.Result | ConvertFrom-Json } catch { $null }
+}
+
+function Mcp-Initialize($p) {
+  Mcp-Call $p 1 'initialize' @{ protocolVersion = '2025-06-18'; capabilities = @{}; clientInfo = @{ name = 'installer-ci'; version = '1' } }
+}
+
+# The node.exe children of a process (the forwarder's Node)
+function Node-Children([int] $parent) {
+  @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $parent" | Where-Object { $_.Name -eq 'node.exe' })
+}
+
+# What 2.0 writes to disk names spawnloft-core, never a Node (A5): the files, and the record
+function Check-Entry-Point($dataRoot) {
+  $core = "$inst\resources\bin\spawnloft-core.exe"
+  $ok = Wait-Until { $r = Read-Json (Join-Path $dataRoot 'run\runtime.json'); $r.format -eq 2 -and $r.exe -eq $core } 60
+  $rt = Read-Json (Join-Path $dataRoot 'run\runtime.json')
+  Check 'run\runtime.json is format 2 and names spawnloft-core' $ok "$($rt | ConvertTo-Json -Compress)"
+  $shims = @(Get-ChildItem (Join-Path $dataRoot 'tasks') -Filter *.cmd -ErrorAction SilentlyContinue)
+  Check 'there is a task shim to look at' ($shims.Count -ge 1)
+  foreach ($f in $shims) {
+    $t = Get-Content $f.FullName -Raw
+    Check "task shim $($f.Name) runs spawnloft-core" ($t.Contains("`"$core`"") -and $t -notmatch 'node(\.exe)?\b' -and $t -notmatch '\.mjs') $t
+  }
 }
 
 function Wait-Until([scriptblock] $cond, $seconds = 60) {
@@ -233,6 +340,9 @@ function Check-Layout2 {
   Check '2.0 uninstaller present' (Test-Path "$inst\uninstall.exe")
   Check 'core at resources\bin\spawnloft-core.exe' (Test-Path "$inst\resources\bin\spawnloft-core.exe")
   Check 'Node core at resources\core\mcctl.mjs' (Test-Path "$inst\resources\core\mcctl.mjs")
+  $rt = Read-Json "$inst\resources\runtime\runtime.json"
+  Check 'bundled Node at resources\runtime\node-<ver>\node.exe' ($rt -and $rt.exe -match '^node-[\d.]+/node\.exe$' -and (Test-Path (Join-Path "$inst\resources\runtime" $rt.exe))) "$($rt | ConvertTo-Json -Compress)"
+  Check 'the CLI forwarders at 1.x''s paths' ((Test-Path "$inst\resources\bin\spawnloft.cmd") -and (Test-Path "$inst\resources\bin\mcctl.cmd"))
   Check 'staging folder removed' (-not (Test-Path "$inst\resources\bin\staging"))
   $v2 = Reg $uninstKey 'DisplayVersion'
   Check 'same uninstall key, 2.x version' ($v2 -like '2.*') "DisplayVersion $v2"

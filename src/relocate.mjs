@@ -5,6 +5,7 @@ import { ROOT, RUN_DIR } from './paths.mjs'
 import { listInstances } from './registry.mjs'
 import { writeLaunchers } from './create.mjs'
 import { rewriteShims } from './schedule.mjs'
+import { cliCommand } from './entry.mjs'
 
 // Scheduled-task shims and the per-server launchers embed the installation's absolute path and
 // are only read by Windows or a double-click, so nothing notices when that path goes stale. The
@@ -14,10 +15,12 @@ import { rewriteShims } from './schedule.mjs'
 // `format` is the version of the text those files hold. Bump it in any release that changes what a
 // shim or launcher runs (another entry file, another executable, new environment), so an update in
 // place - same exe, same folder - still rewrites them. A record without it is an older release's.
-export const RUNTIME_FORMAT = 1
+// 2: 2.0's files run spawnloft-core, the install's one entry point (entry.mjs), instead of Node.
+export const RUNTIME_FORMAT = 2
 
+// `exe` is what those files run: spawnloft-core in a 2.0 install, else the running executable.
 export function runtimeSignature() {
-  return { format: RUNTIME_FORMAT, exe: process.execPath, root: ROOT }
+  return { format: RUNTIME_FORMAT, exe: cliCommand().exe, root: ROOT }
 }
 
 export function markerFile() {

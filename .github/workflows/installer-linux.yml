@@ -30,6 +30,8 @@ on:
       - 'desktop/smoke-cli-package.sh'
       - 'desktop/release-feed.mjs'
       - 'desktop/release-gate.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
       - 'desktop/update-envelope.mjs'
       - 'desktop/linux-package.test.mjs'
       - '.github/workflows/installer-linux.yml'
@@ -42,6 +44,8 @@ on:
       - 'desktop/build-cli-package.mjs'
       - 'desktop/smoke-cli-package.sh'
       - 'desktop/release-gate.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
       - 'desktop/linux-package.test.mjs'
       - '.github/workflows/installer-linux.yml'
   workflow_dispatch:
@@ -129,10 +133,14 @@ jobs:
           SPAWNLOFT_VERSION="$VERSION" "$TAURI_CLI" build --ci --no-bundle --config "$RUNNER_TEMP/cfg/overlay.json"
           test -x ../../target/release/SpawnLoft
           echo "SHELL_BIN=$GITHUB_WORKSPACE/rust/target/release/SpawnLoft" >> "$GITHUB_ENV"
+      - name: Stage the bundled Node runtime (pinned, checked)
+        run: |
+          node rust/crates/spawnloft-shell/installer/stage-runtime.mjs "$RUNNER_TEMP/runtime" --platform linux --arch ${{ matrix.arch }}
+          node -e "import('./desktop/payload-gate.mjs').then(m => { const p = m.checkRuntime(process.argv[1]); if (p.length) { console.error(p.join('\\n')); process.exit(1) } })" "$RUNNER_TEMP/runtime"
       - name: Package spawnloft (.deb and .rpm)
         run: |
           node rust/crates/spawnloft-shell/installer/linux-package.mjs package --version "$VERSION" --arch ${{ matrix.arch }} \
-            --shell "$SHELL_BIN" --core "$CORE" --commit "$GITHUB_SHA" --out dist-linux
+            --shell "$SHELL_BIN" --core "$CORE" --runtime "$RUNNER_TEMP/runtime" --commit "$GITHUB_SHA" --out dist-linux
       - name: Package spawnloft-cli (.deb and .rpm)
         run: node desktop/build-cli-package.mjs --dist dist-linux --core "$CORE"
       - name: Show what was built

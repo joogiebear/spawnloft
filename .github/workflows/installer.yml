@@ -5,7 +5,10 @@ name: installer
 # throwaway updater key, then runs each scenario on a fresh windows-latest machine against the
 # published 1.5.0 and 1.6.0-beta.413 setups. Nothing leaves the runners except workflow artifacts
 # kept 14 days; no secrets, no feed, no tag, no release. Every scenario prints its result JSON into
-# the job log.
+# the job log. Every scenario runs with no Node.js on PATH (2.0 carries its own,
+# PLAN-2.0-REMAINING.md section 4); s1, s5 and s8 run again with a decoy node.exe first on PATH
+# that fails and logs, to show the bundled Node is the one that ran. workflow_dispatch runs on any
+# branch, so a branch can be tried before it merges.
 
 on:
   push:
@@ -16,6 +19,7 @@ on:
       - 'mcctl.mjs'
       - 'spawnloft.mjs'
       - 'package.json'
+      - 'desktop/node-pin.mjs'
       - 'test/fixtures/fake-mariadb/**'
       - '.github/workflows/installer.yml'
   workflow_dispatch:
@@ -34,7 +38,7 @@ env:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/v2'
+    if: github.ref == 'refs/heads/v2' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -95,6 +99,11 @@ jobs:
       fail-fast: false
       matrix:
         name: [s1, s2a, s2b, s3, s4, s5, s8, s9]
+        node: [none]
+        include:
+          - { name: s1, node: decoy }
+          - { name: s5, node: decoy }
+          - { name: s8, node: decoy }
     env:
       RESULTS: ${{ github.workspace }}\installer-results
     steps:
@@ -114,17 +123,17 @@ jobs:
           gh release download v1.6.0-beta.413 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/beta"
           gh release download v1.5.0 -R "$GITHUB_REPOSITORY" -p 'SpawnLoft-Setup-*.exe' -D "$RUNNER_TEMP/stable"
           ls -la "$RUNNER_TEMP/beta" "$RUNNER_TEMP/stable"
-      - name: Scenario ${{ matrix.name }}
+      - name: Scenario ${{ matrix.name }} (Node on PATH ${{ matrix.node }})
         shell: pwsh
         run: |
           $beta = Get-ChildItem "$env:RUNNER_TEMP\beta" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           $stable = Get-ChildItem "$env:RUNNER_TEMP\stable" -Filter 'SpawnLoft-Setup-*.exe' | Where-Object Name -notmatch 'arm64' | Select-Object -First 1
           ./rust/crates/spawnloft-shell/installer/ci/scenario.ps1 -Name ${{ matrix.name }} -Feed "$env:RUNNER_TEMP\feed" `
-            -Beta $beta.FullName -Stable $stable.FullName -VersionA $env:VERSION_A -VersionB $env:VERSION_B
+            -Beta $beta.FullName -Stable $stable.FullName -VersionA $env:VERSION_A -VersionB $env:VERSION_B -NodeMode ${{ matrix.node }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installer-${{ github.run_number }}-${{ matrix.name }}
+          name: installer-${{ github.run_number }}-${{ matrix.name }}-${{ matrix.node }}
           retention-days: 14
           if-no-files-found: ignore
           path: installer-results/

@@ -5,7 +5,7 @@
 //   node linux-package.mjs config <version> <pubkey file> <out dir>
 //       writes <out dir>/overlay.json for `tauri build --no-bundle --config` (version, updater key)
 //   node linux-package.mjs package --version <v> --arch x64|arm64 --shell <SpawnLoft binary>
-//       --core <spawnloft-core> --out <dir> [--runtime <dir>] [--commit <sha>] [--deb-only]
+//       --core <spawnloft-core> --out <dir> --runtime <dir> [--commit <sha>] [--deb-only]
 //       writes SpawnLoft-<v>-linux-<deb arch>.deb, SpawnLoft-<v>-linux-<rpm arch>.rpm and
 //       build-info.json into <dir>
 //
@@ -26,7 +26,7 @@
 //   /opt/SpawnLoft/resources/bin/spawnloft       1.x's command-line launchers, now forwarders to
 //   /opt/SpawnLoft/resources/bin/mcctl           the core (design A4 / Q-W)
 //   /opt/SpawnLoft/resources/core/...            the Node core (until 2.1)
-//   /opt/SpawnLoft/resources/runtime/...         the bundled Node runtime (W1), when --runtime
+//   /opt/SpawnLoft/resources/runtime/...         the bundled Node runtime (stage-runtime.mjs)
 //   /opt/SpawnLoft/resources/package-type        deb | rpm: how 1.x's updater, and the core's,
 //                                                tell which kind of install this is
 //   /usr/bin/spawnloft                           runs the core
@@ -41,6 +41,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { packageVersion } from '../../../../desktop/build-cli-package.mjs'
 import { setPackageVersion } from '../../../../desktop/set-version.mjs'
+import { checkRuntime } from '../../../../desktop/payload-gate.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '../../../..')
@@ -275,12 +276,15 @@ export function buildPackages(opts) {
     const found = elfArch(fs.readFileSync(file))
     if (found !== arch) throw new Error(`${file} is a ${found ?? 'non-ELF'} binary, not ${arch}`)
   }
-  if (runtime && !fs.existsSync(path.join(runtime, 'runtime.json'))) throw new Error(`${runtime} has no runtime.json`)
-  const binaries = [shell]
-  if (runtime) {
-    const { exe } = JSON.parse(fs.readFileSync(path.join(runtime, 'runtime.json'), 'utf8'))
-    binaries.push(path.join(runtime, exe))
-  }
+  // the Node core runs every command the Rust core forwards, so a package without its runtime is
+  // a broken package; the folder must be what stage-runtime.mjs staged for this architecture
+  if (!runtime) throw new Error('--runtime is required (stage it with installer/stage-runtime.mjs)')
+  const runtimeProblems = checkRuntime(runtime, { run: false })
+  if (runtimeProblems.length) throw new Error(`${runtime}:\n  ${runtimeProblems.join('\n  ')}`)
+  const record = JSON.parse(fs.readFileSync(path.join(runtime, 'runtime.json'), 'utf8'))
+  if (record.platform !== 'linux' || record.arch !== arch) throw new Error(`${runtime} holds Node for ${record.platform}-${record.arch}, not linux-${arch}`)
+  // the glibc floor covers Node too, which needs a newer one than the shell
+  const binaries = [shell, path.join(runtime, record.exe)]
   const glibc = glibcFloor(binaries.map(f => fs.readFileSync(f)))
   const info = {
     version,

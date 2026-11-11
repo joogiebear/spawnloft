@@ -25,11 +25,13 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { setPackageVersion } from './set-version.mjs'
 
-export const NODE_VERSION = '24.21.0'
-// sha256 of node-v<version>-linux-<arch>.tar.xz, from https://nodejs.org/dist/v<version>/SHASUMS256.txt
+import { NODE_VERSION, NODE_ARCHIVES } from './node-pin.mjs'
+
+export { NODE_VERSION }
+// sha256 of node-v<version>-linux-<arch>.tar.xz (the pins live in node-pin.mjs)
 export const NODE_SHA256 = {
-  x64: 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6',
-  arm64: '6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2',
+  x64: NODE_ARCHIVES['linux-x64.tar.xz'],
+  arm64: NODE_ARCHIVES['linux-arm64.tar.xz'],
 }
 export const PACKAGE = 'spawnloft-cli'
 export const PREFIX = '/opt/spawnloft-cli'
@@ -61,8 +63,10 @@ exec ${PREFIX}/bin/spawnloft-core "$@"
 
 export const isTwoX = version => Number(String(version).split('.')[0]) >= 2
 
-// What the core reads to find the bundled Node (the desktop packages carry the same file)
-export const runtimeJson = () => JSON.stringify({ node: NODE_VERSION, exe: `node-${NODE_VERSION}/bin/node` }, null, 2) + '\n'
+// 2.x: runtime/ is what stage-runtime.mjs stages for the desktop packages, record and all, so
+// the core finds Node the same way and the release gate can check it the same way
+const stageRuntime = async (opts) =>
+  (await import('../rust/crates/spawnloft-shell/installer/stage-runtime.mjs')).stageRuntime(opts)
 
 const SUMMARY = 'Minecraft servers from the command line, for a machine with no screen'
 const DESCRIPTION = [
@@ -163,18 +167,13 @@ function kilobytes(dir) {
   return Math.ceil(bytes / 1024)
 }
 
-function stage2x(work, kind, node, info, rustCore) {
+function stage2x(work, kind, runtime, info, rustCore) {
   const root = path.join(work, `root-${kind}`)
   const prefix = path.join(root, PREFIX)
-  const runtime = path.join(prefix, 'runtime', `node-${NODE_VERSION}`)
-  fs.mkdirSync(path.join(runtime, 'bin'), { recursive: true })
   fs.mkdirSync(path.join(prefix, 'bin'), { recursive: true })
-  fs.copyFileSync(path.join(node, 'bin', 'node'), path.join(runtime, 'bin', 'node'))
-  fs.chmodSync(path.join(runtime, 'bin', 'node'), 0o755)
-  fs.copyFileSync(path.join(node, 'LICENSE'), path.join(runtime, 'LICENSE'))
-  fs.writeFileSync(path.join(prefix, 'runtime', 'runtime.json'), runtimeJson())
+  fs.cpSync(runtime.dir, path.join(prefix, 'runtime'), { recursive: true })
   // the 1.x path, for shims and MCP configs it wrote; relative, so the staging root can move
-  fs.symlinkSync(`../runtime/node-${NODE_VERSION}/bin/node`, path.join(prefix, 'bin', 'node'))
+  fs.symlinkSync(`../runtime/${runtime.exe}`, path.join(prefix, 'bin', 'node'))
   fs.copyFileSync(rustCore, path.join(prefix, 'bin', 'spawnloft-core'))
   fs.chmodSync(path.join(prefix, 'bin', 'spawnloft-core'), 0o755)
   copyCore(path.join(prefix, 'core'), info.version)
@@ -231,10 +230,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const twoX = isTwoX(info.version)
   const rustCore = path.resolve(argValue('--core') ?? path.join(HERE, 'build', 'bin', `linux-${arch}`, 'spawnloft-core'))
   if (twoX && !fs.existsSync(rustCore)) throw new Error(`${rustCore} is missing: a 2.x command-line package runs on the Rust core`)
-  const stageKind = (kind, node) => (twoX ? stage2x(work, kind, node, info, rustCore) : stage(work, kind, node, info))
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-cli-'))
   try {
-    const node = await fetchNode(arch, work)
+    const node = twoX
+      ? await stageRuntime({ platform: 'linux', arch, out: path.join(work, 'runtime') })
+      : await fetchNode(arch, work)
+    const stageKind = (kind, node) => (twoX ? stage2x(work, kind, node, info, rustCore) : stage(work, kind, node, info))
 
     const debRoot = stageKind('deb', node)
     fs.mkdirSync(path.join(debRoot, 'DEBIAN'))

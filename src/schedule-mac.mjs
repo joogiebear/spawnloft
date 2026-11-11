@@ -3,8 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync, execFile } from 'node:child_process'
-import { DATA_ROOT, ROOT } from './paths.mjs'
+import { DATA_ROOT } from './paths.mjs'
 import { fail } from './util.mjs'
+import { cliCommand } from './entry.mjs'
 
 // namespaced per data folder so separate installs don't replace each other's agents
 const namespace = crypto.createHash('sha256').update(DATA_ROOT).digest('hex').slice(0, 16)
@@ -64,11 +65,13 @@ export function writeShim(id) {
   label(id)
   const file = shimFile(id)
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  const env = { SPAWNLOFT_DATA_ROOT: DATA_ROOT, ELECTRON_RUN_AS_NODE: '1' }
+  // in a 2.0 install the shim runs spawnloft-core (entry.mjs), which needs no Electron switch
+  const cli = cliCommand({ electron: true })
+  const env = { SPAWNLOFT_DATA_ROOT: DATA_ROOT, ...cli.env }
   // pass only the settings locations, not the caller's whole environment
   for (const key of ['HOME', 'APPDATA', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME']) if (process.env[key]) env[key] = process.env[key]
   const script = '#!/bin/sh\n' + Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}\n`).join('') +
-    `exec ${quote(process.execPath)} ${quote(path.join(ROOT, 'mcctl.mjs'))} task run ${quote(id)}\n`
+    `exec ${[cli.exe, ...cli.args].map(quote).join(' ')} task run ${quote(id)}\n`
   fs.writeFileSync(file, script, { mode: 0o700 })
   return file
 }

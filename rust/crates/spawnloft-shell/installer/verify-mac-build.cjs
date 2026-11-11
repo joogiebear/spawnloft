@@ -7,6 +7,9 @@
 //                                                    stapled ticket; spctl "Notarized Developer ID"
 //   core (Contents/Resources/resources/bin/...)      Developer ID authority, team, timestamp,
 //                                                    hardened runtime (signed before `tauri build`)
+//   node (Contents/Resources/resources/runtime/...)  the same, plus the JIT entitlements; arm64;
+//                                                    the pinned version; `node -e 1` runs, and
+//                                                    `spawnloft --version` through the forwarder
 //
 //   node verify-mac-build.cjs <app path> <expected version>
 //   APPLE_TEAM_ID must be set to the 10-character team id.
@@ -23,6 +26,7 @@ const teamId = process.env.APPLE_TEAM_ID
 if (!/^[A-Z0-9]{10}$/.test(teamId || '')) throw new Error('APPLE_TEAM_ID must be the 10-character team id')
 
 const core = path.join(app, 'Contents', 'Resources', 'resources', 'bin', 'spawnloft-core')
+const runtimeDir = path.join(app, 'Contents', 'Resources', 'resources', 'runtime')
 
 function signatureOf(target) {
   // codesign writes its metadata to stderr even on success
@@ -51,6 +55,31 @@ async function main() {
     throw new Error(`the core does not run: --version exited ${ran.status ?? ran.error?.message}${ran.stderr ? ` (${ran.stderr.trim()})` : ''}`)
   }
   console.log(`core: Developer ID, team, timestamp, hardened runtime; arm64, runs as ${printed.name} ${printed.version}`)
+
+  // --- the bundled Node (A7): signed with the JIT entitlements, or V8 dies at start under the
+  // hardened runtime while notarization still passes ---
+  const { NODE_VERSION } = await import(path.resolve(__dirname, '../../../../desktop/node-pin.mjs'))
+  const record = JSON.parse(require('node:fs').readFileSync(path.join(runtimeDir, 'runtime.json'), 'utf8'))
+  if (record.node !== NODE_VERSION) throw new Error(`runtime.json says Node ${record.node}, the pin is ${NODE_VERSION}`)
+  const node = path.join(runtimeDir, record.exe)
+  execFileSync('codesign', ['--verify', '--strict', node], { stdio: 'inherit' })
+  verifySignatureDetails(signatureOf(node), 'signed', teamId)
+  const ent = spawnSync('codesign', ['--display', '--entitlements', '-', '--xml', node], { encoding: 'utf8' })
+  for (const key of ['com.apple.security.cs.allow-jit', 'com.apple.security.cs.allow-unsigned-executable-memory']) {
+    if (!`${ent.stdout}`.includes(key)) throw new Error(`the bundled Node is not signed with ${key}: ${ent.stdout || ent.stderr}`)
+  }
+  const nodeArchs = spawnSync('/usr/bin/lipo', ['-archs', node], { encoding: 'utf8' })
+  if (nodeArchs.status !== 0 || !/\barm64\b/.test(nodeArchs.stdout)) throw new Error(`the bundled Node is not arm64: ${nodeArchs.stdout || nodeArchs.stderr}`)
+  const nodeRan = spawnSync(node, ['-e', 'process.stdout.write(process.version)'], { encoding: 'utf8', timeout: 30000 })
+  if (nodeRan.status !== 0 || nodeRan.stdout !== `v${NODE_VERSION}`) {
+    throw new Error(`the bundled Node does not run: exited ${nodeRan.status ?? nodeRan.error?.message}, printed ${nodeRan.stdout} ${nodeRan.stderr}`)
+  }
+  console.log(`node: Developer ID, team, timestamp, hardened runtime, JIT entitlements; arm64, runs as ${nodeRan.stdout}`)
+  // the CLI through the 1.x path, on the bundled Node with nothing on PATH
+  const cli = path.join(app, 'Contents', 'Resources', 'bin', 'spawnloft')
+  const help = spawnSync(cli, ['help'], { encoding: 'utf8', timeout: 60000, env: { HOME: process.env.HOME, PATH: '/usr/bin:/bin' } })
+  if (help.status !== 0 || !/spawnloft/i.test(help.stdout)) throw new Error(`Contents/Resources/bin/spawnloft help failed (${help.status}): ${help.stderr}`)
+  console.log('cli: Contents/Resources/bin/spawnloft runs the CLI on the bundled Node with no Node on PATH')
 
   // --- the app ---
   execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' })

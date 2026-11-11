@@ -3,12 +3,15 @@
 // and runs in installer-linux.yml; these checks run everywhere.
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {
   desktopPackageNames, layout, debControl, rpmSpec, glibcFloor, elfArch, debPostrm, forwarder,
   USR_BIN, DESKTOP_ENTRY, CORE, INSTALL_DIR, overlay,
 } from '../rust/crates/spawnloft-shell/installer/linux-package.mjs'
 import { releaseNames } from './release-feed.mjs'
-import { cliPackageNames, isTwoX, runtimeJson, WRAPPER_2X, NODE_VERSION } from './build-cli-package.mjs'
+import { cliPackageNames, isTwoX, WRAPPER_2X } from './build-cli-package.mjs'
 
 const V = '2.0.0-beta.3'
 
@@ -94,10 +97,26 @@ test('the overlay carries the version and the updater key in the plugin\'s base6
   assert.equal(overlay(V, ' abc ').plugins.updater.pubkey, 'abc')
 })
 
-test('the 2.x command-line package runs the core and names the runtime as the desktop packages do', () => {
+test('the 2.x command-line package runs the core', () => {
   assert.ok(isTwoX('2.0.0-beta.1') && isTwoX('2.0.0-internal.5') && !isTwoX('1.6.0-beta.413'))
   assert.match(WRAPPER_2X, /^exec \/opt\/spawnloft-cli\/bin\/spawnloft-core "\$@"$/m)
-  assert.deepEqual(JSON.parse(runtimeJson()), { node: NODE_VERSION, exe: `node-${NODE_VERSION}/bin/node` })
+})
+
+test('a desktop package is not built without a staged runtime for its architecture', async () => {
+  const { buildPackages } = await import('../rust/crates/spawnloft-shell/installer/linux-package.mjs')
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lp-'))
+  try {
+    // a minimal x64 ELF header is enough for the architecture check
+    const elf = Buffer.alloc(64); elf.writeUInt32BE(0x7f454c46, 0); elf.writeUInt16LE(0x3e, 18)
+    for (const f of ['shell', 'core']) fs.writeFileSync(path.join(tmp, f), elf)
+    const opts = { version: V, arch: 'x64', shell: path.join(tmp, 'shell'), core: path.join(tmp, 'core'), out: path.join(tmp, 'out') }
+    assert.throws(() => buildPackages(opts), /--runtime is required/)
+    fs.mkdirSync(path.join(tmp, 'rt'))
+    fs.writeFileSync(path.join(tmp, 'rt', 'runtime.json'), '{"node":"0.0.1"}')
+    assert.throws(() => buildPackages({ ...opts, runtime: path.join(tmp, 'rt') }), /the pin/)
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
 })
 
 test('the release gate reads each Linux package against its release name', async () => {
