@@ -231,6 +231,11 @@ jobs:
             rust/target
           key: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Install the musl C compiler (ring, under rustls, builds C for the static target)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y musl-tools
+          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
       - name: Build spawnloft-core
         working-directory: rust
         run: cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
