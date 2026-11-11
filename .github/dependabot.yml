@@ -1,0 +1,35 @@
+# Dependency bumps (plan D7). Cargo for the Rust workspace, grouped into one monthly pull request
+# into v2, where the Rust code lives. Security updates are not grouped or delayed: GitHub opens
+# those as soon as an advisory lands, when Dependabot security updates are on in the repository's
+# settings. Every bump still has to pass cargo deny (rust/deny.toml) in rust-internal.yml.
+#
+# Not covered here, on purpose:
+# - the Node runtime SpawnLoft ships: its nodejs.org sha256s are pinned in source, which
+#   Dependabot cannot update; .github/workflows/node-pin.yml checks it weekly instead;
+# - the Tauri CLI (@tauri-apps/cli, installed by version in the workflows) and the NSIS template
+#   fork (rust/crates/spawnloft-shell/windows/installer.nsi), which must move together (plan D7);
+# - GitHub Actions: the repository's Actions policy allows a fixed list of first-party actions.
+#
+# Dependabot reads this file from the default branch only, so it takes effect once it is there.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /rust
+    target-branch: v2
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      cargo:
+        patterns: ['*']
+    # Tauri's crates take patch releases here; a minor or major bump moves with the Tauri CLI pin
+    # and the NSIS template re-sync, by hand
+    ignore:
+      - dependency-name: 'tauri'
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
+      - dependency-name: 'tauri-build'
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
+      - dependency-name: 'tauri-plugin-*'
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
+    commit-message:
+      prefix: 'v2: cargo'

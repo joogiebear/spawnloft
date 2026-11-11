@@ -88,6 +88,6 @@ jobs:
       # Nothing in this job noticed, because this job only ran 22.
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .node-version
       - name: Test on the runtime the packages carry
         run: npm test

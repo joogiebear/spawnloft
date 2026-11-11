@@ -28,6 +28,9 @@ on:
       - 'desktop/update-envelope.mjs'
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
+      - 'desktop/set-version.mjs'
+      - 'desktop/version-stamp.test.mjs'
+      - 'package.json'
       - 'rust/crates/spawnloft-shell/**'
       - '.github/workflows/release.yml'
 
@@ -55,9 +58,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: The release tooling's own tests
-        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs
+        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs desktop/version-stamp.test.mjs
 
   dry-run:
     runs-on: windows-latest
@@ -67,7 +70,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: Install the pinned toolchain
         working-directory: rust
         run: rustup toolchain install
@@ -126,13 +129,21 @@ jobs:
             --out "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
             --tauri "$TAURI_CLI" --win "$DRY_SETUP" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ls -la "$RUNNER_TEMP/release"
+      - name: Install the built setup, so the gate can ask both cores their version
+        shell: pwsh
+        run: |
+          $p = Start-Process $env:DRY_SETUP -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit $($p.ExitCode)" }
+          "DRY_INSTALLED=$env:LOCALAPPDATA\Programs\SpawnLoft" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: The release gate
-        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-binary-versions
+        run: |
+          node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
+            --check-binary-versions --installed "$DRY_INSTALLED"
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \
             --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
-            --commit "$GITHUB_SHA" --check-binary-versions
+            --commit "$GITHUB_SHA" --check-binary-versions --installed "$DRY_INSTALLED"
       - name: Show the assembled feed
         run: |
           echo "===== spawnloft-updates.json"; cat "$RUNNER_TEMP/release/spawnloft-updates.json"

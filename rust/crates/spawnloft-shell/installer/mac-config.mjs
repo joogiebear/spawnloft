@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeCorePackage } from './core-package.mjs'
 
 const args = process.argv.slice(2)
 const feedHttp = args.includes('--feed-http')
@@ -36,6 +37,9 @@ if (!existsSync(core)) {
 }
 const out = resolve(outDir)
 mkdirSync(out, { recursive: true })
+
+// the Node core's package.json, stamped with this build's version (the repository's says 1.x)
+const corePackage = writeCorePackage(version, out)
 
 // the Node core still starts Rust daemons on first launch until R4 (design 2.3), so it ships
 // beside the Rust core, exactly as the Windows build does
@@ -61,7 +65,7 @@ const overlay = {
       [core]: 'resources/bin/spawnloft-core',
       '../../../mcctl.mjs': 'resources/core/mcctl.mjs',
       '../../../spawnloft.mjs': 'resources/core/spawnloft.mjs',
-      '../../../package.json': 'resources/core/package.json',
+      [corePackage]: 'resources/core/package.json',
       '../../../src/': 'resources/core/src/',
       [defaults]: 'resources/core/internal-defaults.json',
     },

@@ -20,12 +20,19 @@
 //     CFBundleShortVersionString, checked when --check-binary-versions is set (the numeric
 //     resources carry no prerelease tag, so major.minor.patch is what must agree),
 //
+//   - both cores inside an installed copy of the build report the release version, when one or
+//     more --installed folders are given (W4, plan D4): `spawnloft-core --version --json` and the
+//     Node core's resources/core/package.json, which the panel, data-format.json's writtenBy, the
+//     diagnostics bundle and the launcher read. The folder is an install folder (Windows, Linux
+//     /opt/...) or a macOS .app.
+//
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
 //        [--check-linux-packages]     (read every .deb/.rpm with dpkg-deb / rpm: name, version,
 //                                      architecture, the 1.x paths; on a Linux host)
+//        [--installed <dir>]...       (an installed copy: both cores must report the version)
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
@@ -106,6 +113,7 @@ function parseArgs(argv) {
       // architecture must be what its file name says, and the desktop package must carry the
       // paths 1.x installs and other programs remember (design 5.7); needs both tools
       case '--check-linux-packages': out.checkLinuxPackages = true; break
+      case '--installed': (out.installed ??= []).push(value()); break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -115,7 +123,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, checkLinuxPackages }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, installed, checkLinuxPackages }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -267,6 +275,20 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     }
   }
 
+  // Both cores of an installed copy report the release version (plan D4).
+  for (const root of installed ?? []) {
+    const found = installedVersions(root)
+    problems.push(...found.problems)
+    if (found.core !== undefined) {
+      if (found.core !== version) problems.push(`${found.corePath}: spawnloft-core reports ${found.core}, expected ${version}`)
+      else notes.push(`${found.corePath}: spawnloft-core reports ${version}`)
+    }
+    if (found.node !== undefined) {
+      if (found.node !== version) problems.push(`${found.nodePath}: the Node core says ${found.node}, expected ${version}`)
+      else notes.push(`${found.nodePath}: the Node core says ${version}`)
+    }
+  }
+
   // Assets not named by the update envelope: the mac .dmg (manual install) and the command-line
   // packages (the package manager installs and verifies them). Present and non-empty is enough.
   const manual = [`SpawnLoft-${version}-mac-arm64.dmg`, ...fs.readdirSync(dir).filter(n => /^spawnloft-cli-/.test(n))]
@@ -290,7 +312,6 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
 // What a Linux package says about itself, against what its release name promises. The package
 // manager compares versions with `~` for a prerelease (1.x did the same), and 1.x installs upgrade
 // in place only because the name is `spawnloft`. Desktop packages must ship the two 1.x paths.
-export const LINUX_ARCH = { amd64: 'amd64', x86_64: 'x86_64', arm64: 'arm64', aarch64: 'aarch64' }
 export const LINUX_1X_PATHS = ['/opt/SpawnLoft/spawnloft-desktop', '/opt/SpawnLoft/resources/bin/spawnloft', '/usr/bin/spawnloft']
 export function expectedLinuxPackage(name, version) {
   const m = /^(SpawnLoft|spawnloft-cli)-(.+)-linux-(amd64|arm64|x86_64|aarch64)\.(deb|rpm)$/.exec(name)
@@ -315,6 +336,36 @@ export function linuxPackageProblems(file, name, version, run = (cmd, args) => e
   for (const k of ['package', 'version', 'arch']) if (got[k] !== want[k]) problems.push(`${k} is ${got[k]}, the release name says ${want[k]}`)
   if (want.desktop) for (const p of LINUX_1X_PATHS) if (!files.includes(p)) problems.push(`does not ship ${p}`)
   return problems
+}
+
+// The versions the two cores in an installed copy report: the Rust core's `--version --json`
+// and the Node core's package.json. `root` is an install folder (resources/ directly under it) or
+// a macOS .app (Contents/Resources/resources/). Returns { core, corePath, node, nodePath,
+// problems }; a version is undefined when it could not be read, with the reason in problems.
+export function installedVersions(root) {
+  const problems = []
+  const bases = [path.join(root, 'resources'), path.join(root, 'Contents', 'Resources', 'resources')]
+  const base = bases.find(b => fs.existsSync(b))
+  if (!base) return { problems: [`${root}: no resources folder, so it is not an installed SpawnLoft`] }
+  const out = { problems }
+  out.corePath = ['spawnloft-core.exe', 'spawnloft-core'].map(n => path.join(base, 'bin', n)).find(p => fs.existsSync(p))
+  if (!out.corePath) problems.push(`${base}: no bin/spawnloft-core`)
+  else {
+    try {
+      const text = execFileSync(out.corePath, ['--version', '--json'], { encoding: 'utf8', windowsHide: true, timeout: 30000 })
+      out.core = JSON.parse(text).version
+      if (typeof out.core !== 'string') { problems.push(`${out.corePath}: --version --json has no version`); out.core = undefined }
+    } catch (e) {
+      problems.push(`${out.corePath}: --version --json failed (${e.message.split('\n')[0]})`)
+    }
+  }
+  out.nodePath = path.join(base, 'core', 'package.json')
+  try {
+    out.node = JSON.parse(fs.readFileSync(out.nodePath, 'utf8')).version
+  } catch (e) {
+    problems.push(`${out.nodePath}: unreadable (${e.code ?? e.message})`)
+  }
+  return out
 }
 
 // A Windows installer's Authenticode signature: valid, timestamped, and the signer's CN. A missing

@@ -1,0 +1,66 @@
+# Once a week: is the Node runtime SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION,
+# nodejs.org sha256s pinned in source) still the newest LTS, and does CI test on it
+# (.node-version)? Dependabot cannot see that pin (plan D7, Q-X). A newer LTS opens (or adds to)
+# one issue, "Node runtime pin is behind", with the sha256 lines the bump needs; the next green
+# run closes it. The bump itself is a commit of its own through the full installer workflows.
+# A pull request that changes the pin or the check runs it too, without touching the issue, and
+# fails only when .node-version and NODE_VERSION disagree or the pin is not an LTS release.
+#
+# GitHub runs schedules from the default branch only: until this file is there, run it by hand
+# (Run workflow, branch v2).
+name: node-pin
+
+on:
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .node-version
+      - desktop/build-cli-package.mjs
+      - tools/check-node-pin.mjs
+      - .github/workflows/node-pin.yml
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Check the pinned Node against nodejs.org's LTS releases
+        id: check
+        run: node tools/check-node-pin.mjs --report node-pin-report.md ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+      - name: Open or update the pin issue
+        if: failure() && steps.check.outcome == 'failure' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # exit 2 (nodejs.org unreachable) writes no report: that run's log says why, no issue
+          [ -f node-pin-report.md ] || { echo "::warning::no report was written, so no issue is opened"; exit 0; }
+          {
+            echo "The [weekly Node pin check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found a newer Node LTS than the runtime SpawnLoft ships."
+            echo
+            cat node-pin-report.md
+          } > issue.md
+          n=$(gh issue list --state open --search 'in:title "Node runtime pin is behind"' --json number,title --jq '[.[] | select(.title == "Node runtime pin is behind")][0].number')
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --body-file issue.md
+          else
+            gh issue create --title "Node runtime pin is behind" --body-file issue.md
+          fi
+      - name: Close the pin issue once current
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh issue list --state open --search 'in:title "Node runtime pin is behind"' --json number,title --jq '[.[] | select(.title == "Node runtime pin is behind")][0].number')
+          if [ -n "$n" ]; then
+            gh issue close "$n" --comment "The [pin check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) is green again."
+          fi

@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: The packaging's own tests
         run: node --test desktop/linux-package.test.mjs
       - name: Install the pinned toolchain and the static target
@@ -249,7 +249,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - uses: actions/download-artifact@v4
         with:
           pattern: installer-linux-*
