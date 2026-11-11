@@ -33,7 +33,7 @@
 //   /usr/share/applications/spawnloft-desktop.desktop, the 256px icon: same names as 1.x
 // /usr/bin/spawnloft-desktop is an update-alternatives link, as 1.x made it; it is not a packaged
 // file because 1.x's own removal script deletes that path during the upgrade (deb: before our
-// postinst; rpm: after our %post, hence %posttrans).
+// postinst; rpm: after our %post, hence %posttrans), through update-alternatives --remove.
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -113,7 +113,9 @@ command -v "$ua" >/dev/null 2>&1 || ua=alternatives
 if command -v "$ua" >/dev/null 2>&1; then
   "$ua" --remove ${EXECUTABLE} ${INSTALL_DIR}/${EXECUTABLE} >/dev/null 2>&1 || true
 fi
-if [ -L /usr/bin/${EXECUTABLE} ] && [ ! -e /usr/bin/${EXECUTABLE} ]; then rm -f /usr/bin/${EXECUTABLE}; fi
+# the ln -s fallback (no alternatives tool): ours when it points at the app; on rpm this runs in
+# %preun, while the app is still there, so test the target rather than whether it resolves
+if [ -L /usr/bin/${EXECUTABLE} ] && [ "$(readlink /usr/bin/${EXECUTABLE})" = ${INSTALL_DIR}/${EXECUTABLE} ]; then rm -f /usr/bin/${EXECUTABLE}; fi
 exit 0
 `
 

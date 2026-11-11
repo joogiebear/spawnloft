@@ -76,11 +76,12 @@ if kill -0 "$pid" 2>/dev/null; then fail "the 1.x daemon (pid $pid) is still ali
 step "the desktop package is refused beside spawnloft-cli"
 desk=$(pkg_file "$new" SpawnLoft)
 if [ "$kind" = deb ]; then
-  if dpkg -i "$desk" >/dev/null 2>&1; then fail "dpkg installed spawnloft beside spawnloft-cli"; fi
+  if out=$(dpkg -i "$desk" 2>&1); then fail "dpkg installed spawnloft beside spawnloft-cli"; fi
   dpkg --configure -a >/dev/null 2>&1 || true
 else
-  if rpm -i --nodeps "$desk" >/dev/null 2>&1; then fail "rpm installed spawnloft beside spawnloft-cli"; fi
+  if out=$(rpm -i --nodeps "$desk" 2>&1); then fail "rpm installed spawnloft beside spawnloft-cli"; fi
 fi
+echo "$out" | grep -qi conflict || fail "the refusal was not the declared conflict: $out"
 test "$(installed_version)" = "$(pkgver "$new")" || fail "the refused install changed spawnloft-cli"
 
 echo

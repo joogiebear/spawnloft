@@ -644,8 +644,11 @@ core and the window still download and verify the update (envelope, minisign, si
 the command names verified bytes: `GET /api/update` carries `installCommand`
 (`sudo apt install <cache>/SpawnLoft-<v>-linux-amd64.deb`, or `sudo dnf install ...`),
 `POST /api/update/install` answers 409 with that command, `spawnloft update apply` prints it, and
-the window never stages a Linux update for quit. Headless `spawnloft-cli` boxes: the same command
-from `spawnloft update apply`.
+the window never stages a Linux update for quit. A rollback's command is the downgrade form
+(`apt install --allow-downgrades`, `dnf downgrade`). Headless `spawnloft-cli` boxes: the envelope
+names only the desktop packages (whose `Conflicts:` would remove the CLI and pull in a GUI stack),
+so `spawnloft update apply` downloads nothing there and names the `spawnloft-cli` package of the
+same release, with the `apt`/`dnf` command to install it.
 
 ## 6. macOS
 

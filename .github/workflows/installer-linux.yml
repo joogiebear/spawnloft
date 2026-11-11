@@ -37,6 +37,8 @@ on:
     branches: [v2]
     paths:
       - 'rust/crates/spawnloft-shell/installer/**'
+      - 'rust/crates/spawnloft-shell/src/updater.rs'
+      - 'rust/crates/spawnloft-lib/src/update/**'
       - 'desktop/build-cli-package.mjs'
       - 'desktop/smoke-cli-package.sh'
       - 'desktop/release-gate.mjs'
@@ -178,6 +180,8 @@ jobs:
           script=/repo/rust/crates/spawnloft-shell/installer/ci/linux-upgrade.sh
           docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:22.04 sh $script deb "$OLD_STABLE" "$VERSION"
           docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:24.04 sh $script deb "$OLD_BETA" "$VERSION"
+          # the way 1.x's electron-updater installs it: dpkg -i, then apt-get install -f for what is missing
+          docker run --rm -e INSTALL_WITH=dpkg -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" ubuntu:24.04 sh $script deb "$OLD_STABLE" "$VERSION"
           docker run --rm -v "$PWD:/repo:ro" -v "$PWD/pkg:/pkg:ro" debian:12 sh $script deb "$OLD_STABLE" "$VERSION"
       - name: The desktop .rpm over 1.x (Fedora 42, as 1.x's desktop rpm was tested)
         if: matrix.case == 'desktop-rpm'
@@ -188,7 +192,7 @@ jobs:
         # RHEL-family servers are spawnloft-cli's (tested below); this records whether the desktop
         # package could install there at all
         if: matrix.case == 'desktop-rpm'
-        run: docker run --rm rockylinux:9 sh -c 'dnf -q repoquery --whatprovides webkit2gtk4.1 gtk3 || true; dnf -q install -y --assumeno webkit2gtk4.1 2>&1 | tail -3 || true'
+        run: docker run --rm rockylinux:9 sh -c 'dnf -q repoquery --whatprovides webkit2gtk4.1 gtk3 || true; dnf install --assumeno webkit2gtk4.1 2>&1 | tail -3 || true'
       - name: spawnloft-cli over 1.x, then a server end to end on the 2.0 package
         if: matrix.case == 'cli'
         run: |
@@ -232,9 +236,11 @@ jobs:
           SPAWNLOFT_SPIKE_LOG: ${{ runner.temp }}/shell.log
           SPAWNLOFT_DATA_ROOT: ${{ runner.temp }}/data
         run: |
+          # 1 is what a stock Ubuntu 24.04 desktop has; at 0 this check would not meet the restriction
+          sysctl kernel.apparmor_restrict_unprivileged_userns || true
           xvfb-run -a /usr/bin/spawnloft-desktop > "$RUNNER_TEMP/window.log" 2>&1 &
           for i in $(seq 1 90); do [ -s "$SPAWNLOFT_SPIKE_MEASURE" ] && break; sleep 1; done
-          pkill -f /opt/SpawnLoft/spawnloft-desktop || true
+          pkill -f spawnloft-desktop || true
           echo "--- window output"; cat "$RUNNER_TEMP/window.log" || true
           echo "--- shell log"; cat "$SPAWNLOFT_SPIKE_LOG" 2>/dev/null || true
           test -s "$SPAWNLOFT_SPIKE_MEASURE" || { echo "::error::the window never loaded the panel"; exit 1; }

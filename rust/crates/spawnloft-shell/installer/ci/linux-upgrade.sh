@@ -35,7 +35,10 @@ pkg_file() { # <version> <glob prefix>
 }
 
 install_pkg() {
-  if [ "$kind" = deb ]; then
+  if [ "$kind" = deb ] && [ "${INSTALL_WITH:-}" = dpkg ]; then
+    # electron-updater's DebUpdater: dpkg -i, and apt-get install -f when dependencies are missing
+    dpkg -i "$1" >/dev/null 2>&1 || DEBIAN_FRONTEND=noninteractive apt-get install -f -y -qq >/dev/null
+  elif [ "$kind" = deb ]; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$1" >/dev/null
   else
     dnf install -y -q "$1" >/dev/null
@@ -143,11 +146,12 @@ spawnloft stop pkgtest
 step "spawnloft-cli is refused beside the desktop package"
 cli=$(pkg_file "$new" spawnloft-cli)
 if [ "$kind" = deb ]; then
-  if dpkg -i "$cli" >/dev/null 2>&1; then fail "dpkg installed spawnloft-cli beside spawnloft"; fi
+  if out=$(dpkg -i "$cli" 2>&1); then fail "dpkg installed spawnloft-cli beside spawnloft"; fi
   dpkg --configure -a >/dev/null 2>&1 || true
 else
-  if rpm -i "$cli" >/dev/null 2>&1; then fail "rpm installed spawnloft-cli beside spawnloft"; fi
+  if out=$(rpm -i "$cli" 2>&1); then fail "rpm installed spawnloft-cli beside spawnloft"; fi
 fi
+echo "$out" | grep -qi conflict || fail "the refusal was not the declared conflict: $out"
 test "$(installed_version)" = "$(pkgver "$new")" || fail "the refused CLI install changed spawnloft"
 
 step "remove"
