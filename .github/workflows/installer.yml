@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - name: Install the pinned toolchain
         working-directory: rust
         run: rustup toolchain install
@@ -58,15 +58,12 @@ jobs:
           restore-keys: |
             rust-installer-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
             rust-spike-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core
-        working-directory: rust
-        run: cargo build --release --locked -p spawnloft-core
       - name: Install the Tauri CLI (pinned, from npm)
         run: npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
       - name: A throwaway updater key for this run
         run: |
           "$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" signer generate --ci -p "" -w "$RUNNER_TEMP/ci.key" -f
-      - name: Build 2.x a and b
+      - name: Build 2.x a and b (the core and the installer, each stamped with its version)
         working-directory: rust/crates/spawnloft-shell
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
@@ -75,6 +72,10 @@ jobs:
           tauri="$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri"
           mkdir -p "$RUNNER_TEMP/feed"
           for v in "$VERSION_A" "$VERSION_B"; do
+            # the core carries the installed version, so it is built once per version (as a release
+            # is); unstamped it reports the workspace's 2.0.0-internal.0
+            (cd ../.. && SPAWNLOFT_VERSION="$v" cargo build --release --locked -p spawnloft-core)
+            ../../target/release/spawnloft-core.exe --version | grep -F " $v " || { echo "::error::spawnloft-core does not report $v"; exit 1; }
             node installer/installer-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --feed-http
             SPAWNLOFT_VERSION="$v" "$tauri" build --ci --bundles nsis --config "$RUNNER_TEMP/cfg-$v/overlay.json"
             cp ../../target/release/bundle/nsis/SpawnLoft_${v}_x64-setup.exe* "$RUNNER_TEMP/feed/"
@@ -100,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
       - uses: actions/download-artifact@v4
         with:
           name: installer-${{ github.run_number }}-setups

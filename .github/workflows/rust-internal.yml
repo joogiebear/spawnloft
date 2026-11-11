@@ -3,7 +3,8 @@ name: rust-internal
 # Internal builds of the v2 branch: the Rust core inside the Electron app, for Victor's own
 # machines only (PLAN-RUST-TAURI.md section 13). Nothing here reaches a beta or a release:
 #
-# - it runs on pushes to v2 (and by hand, on v2 only), never on dev, main or a pull request;
+# - its packages are built on pushes to v2 (and by hand, on v2 only), never on dev or main;
+# - a pull request into v2 runs the checks (rust, deny, daemons, node) and never the package job;
 # - it has no publish job, writes no feed, makes no tag and no release, and holds no secrets;
 # - its packages are workflow artifacts kept for 14 days, versioned 2.0.0-internal.<run>;
 # - Windows builds are unsigned and Mac builds ad-hoc signed (CI signing only trusts dev pushes);
@@ -15,6 +16,8 @@ name: rust-internal
 on:
   push:
     branches: [v2]
+  pull_request:
+    branches: [v2]
   workflow_dispatch:
     inputs:
       repeat:
@@ -24,9 +27,11 @@ on:
 permissions:
   contents: read
 
+# A pull request's newer push replaces its older run. A push to v2 is keyed by its commit and never
+# cancelled, so a push two minutes after a merge does not erase the merge's run.
 concurrency:
-  group: rust-internal-${{ github.ref }}
-  cancel-in-progress: true
+  group: rust-internal-${{ github.event_name == 'pull_request' && github.ref || format('{0}-{1}', github.event_name, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -40,7 +45,9 @@ env:
 
 jobs:
   rust:
-    if: github.ref == 'refs/heads/v2'
+    # on a pull request github.ref is refs/pull/<n>/merge: without the event test these jobs would
+    # skip, and a skipped job reports as passed
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
       matrix:
@@ -77,7 +84,7 @@ jobs:
         run: cargo test --workspace --locked
 
   deny:
-    if: github.ref == 'refs/heads/v2'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -103,7 +110,7 @@ jobs:
     # R1 (P0-D): the daemon suites under both daemons, on Windows and Linux. The rust leg builds
     # spawnloft-core and points the supervisor at it; daemon-contract.test.mjs checks that the
     # daemon answering ping really is the Rust one, so a silent fallback to daemon.mjs fails here.
-    if: github.ref == 'refs/heads/v2'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
       matrix:
@@ -118,7 +125,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # the Node SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION, plan D7)
+          node-version-file: .node-version
       - name: Install the pinned toolchain
         if: matrix.daemon == 'rust'
         working-directory: rust
@@ -155,7 +163,7 @@ jobs:
 
   node:
     # The whole Node suite, once per platform, on the default daemon.
-    if: github.ref == 'refs/heads/v2'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
       matrix:
@@ -166,7 +174,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # the Node SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION, plan D7)
+          node-version-file: .node-version
       - name: Core and desktop tests
         env:
           TMPDIR: /tmp
@@ -176,7 +185,8 @@ jobs:
           npm --prefix desktop test
 
   package:
-    if: github.ref == 'refs/heads/v2'
+    # packages are built from v2 itself, never from a pull request
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v2'
     needs: [rust, deny, node, daemons]
     strategy:
       fail-fast: false
@@ -217,6 +227,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
+          # the Electron internal line's build tooling, retired with W5; the checks above test on
+          # the pinned .node-version
           node-version: 22
       - name: Install the pinned toolchain and target
         working-directory: rust

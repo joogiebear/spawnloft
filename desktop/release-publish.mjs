@@ -18,7 +18,7 @@
 //
 //   node release-publish.mjs --dir <assembled dir> --version <v> --commit <sha>
 //        [--channel stable|beta] [--make-latest true|false] [--repo joogiebear/spawnloft]
-//        [--notes <file>] [--check-binary-versions] [--confirm]
+//        [--notes <file>] [--check-binary-versions] [--installed <dir>]... [--confirm]
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -47,6 +47,7 @@ function parseArgs(argv) {
       case '--notes': out.notes = value(); break
       case '--pubkey': out.pubkey = value(); break
       case '--check-binary-versions': out.checkBinaryVersions = true; break
+      case '--installed': (out.installed ??= []).push(value()); break
       case '--confirm': out.confirm = true; break
       default: throw new Error(`unknown argument ${a}`)
     }
@@ -68,7 +69,7 @@ export function main(argv) {
   const { prerelease, makeLatest } = releaseFlags(opts.channel, opts.makeLatest)
 
   // 1. the gate, on the exact bytes about to be published
-  const result = gate({ dir: opts.dir, version: opts.version, pubkey: opts.pubkey, channel: opts.channel, makeLatest: opts.makeLatest, checkBinaryVersions: opts.checkBinaryVersions })
+  const result = gate({ dir: opts.dir, version: opts.version, pubkey: opts.pubkey, channel: opts.channel, makeLatest: opts.makeLatest, checkBinaryVersions: opts.checkBinaryVersions, installed: opts.installed })
   if (!result.ok) {
     for (const p of result.problems) console.error(`  FAIL ${p}`)
     throw new Error('the release gate did not pass; nothing was published')
