@@ -2,7 +2,8 @@
 //! lands: the seam through which `handover resume`, `repair` and `uninstall` reach the business
 //! core today. When R4 lands these calls become in-process and this module goes.
 //!
-//! It runs on the system Node (found as the panel finds it); the shell has no Node of its own.
+//! It runs on the Node the package carries (`crate::runtime`), and names this binary as the entry
+//! point, so what `repair` writes runs `spawnloft-core`, never a Node path.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -26,20 +27,7 @@ pub struct NodeCore {
 
 /// `SPAWNLOFT_CORE_DIR`, else `<this binary's folder>/../core` (resources\bin -> resources\core).
 pub fn core_dir() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
-        return Some(PathBuf::from(p));
-    }
-    let exe = std::env::current_exe().ok()?;
-    Some(exe.parent()?.parent()?.join("core"))
-}
-
-/// The Node.js a 2.0 install will run its Node core on, or why there is none. Checked before
-/// the handover stops anything (the 2.0 core folder itself is not installed yet then).
-pub fn node() -> Result<PathBuf, String> {
-    crate::panel::find_node(None).ok_or_else(|| {
-        "Node.js was not found (needed until the Rust core port lands; install it, or set SPAWNLOFT_NODE)"
-            .to_string()
-    })
+    crate::runtime::core_dir()
 }
 
 impl NodeCore {
@@ -48,8 +36,7 @@ impl NodeCore {
         if !dir.join("spawnloft.mjs").is_file() {
             return Err(format!("{} is missing", dir.join("spawnloft.mjs").display()));
         }
-        let node = crate::panel::find_node(None)
-            .ok_or("Node.js was not found (needed until the Rust core port lands; install it, or set SPAWNLOFT_NODE)")?;
+        let node = crate::runtime::node()?;
         Ok(NodeCore {
             node,
             dir,
@@ -62,8 +49,8 @@ impl NodeCore {
         cmd.arg(self.dir.join("spawnloft.mjs"))
             .args(args)
             .current_dir(&self.dir)
-            .env_remove("ELECTRON_RUN_AS_NODE")
             .stdin(Stdio::null());
+        crate::runtime::prepare(&mut cmd);
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;

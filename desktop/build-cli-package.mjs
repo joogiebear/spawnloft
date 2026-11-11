@@ -17,11 +17,13 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { setPackageVersion } from './set-version.mjs'
 
-export const NODE_VERSION = '24.21.0'
-// sha256 of node-v<version>-linux-<arch>.tar.xz, from https://nodejs.org/dist/v<version>/SHASUMS256.txt
+import { NODE_VERSION, NODE_ARCHIVES } from './node-pin.mjs'
+
+export { NODE_VERSION }
+// sha256 of node-v<version>-linux-<arch>.tar.xz (the pins live in node-pin.mjs)
 export const NODE_SHA256 = {
-  x64: 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6',
-  arm64: '6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2',
+  x64: NODE_ARCHIVES['linux-x64.tar.xz'],
+  arm64: NODE_ARCHIVES['linux-arm64.tar.xz'],
 }
 export const PACKAGE = 'spawnloft-cli'
 export const PREFIX = '/opt/spawnloft-cli'

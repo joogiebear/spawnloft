@@ -2,7 +2,10 @@
 # machine (installer.yml runs each in a job of its own).
 #
 #   scenario.ps1 -Name s1|s2a|s2b|s3|s4|s5|s8|s9 -Feed <dir with the 2.0 installers> -Beta <1.6 setup>
-#                -Stable <1.5.0 setup> -VersionA <2.x a> -VersionB <2.x b>
+#                -Stable <1.5.0 setup> -VersionA <2.x a> -VersionB <2.x b> [-NodeMode none|decoy]
+#
+# Every scenario runs with no Node.js on PATH (2.0 carries its own); -NodeMode decoy puts a
+# node.exe on PATH that fails and logs each run, and the scenario fails if anything ran it.
 #
 # Writes $env:RESULTS\<name>.json; exits non-zero on the first broken expectation.
 param(
@@ -11,13 +14,15 @@ param(
   [string] $Beta = '',
   [string] $Stable = '',
   [Parameter(Mandatory)] [string] $VersionA,
-  [Parameter(Mandatory)] [string] $VersionB
+  [Parameter(Mandatory)] [string] $VersionB,
+  [ValidateSet('none', 'decoy')] [string] $NodeMode = 'none'
 )
 . "$PSScriptRoot\lib.ps1"
+$script:nodeMode = $NodeMode
 
 $setupA = Join-Path $Feed "SpawnLoft_${VersionA}_x64-setup.exe"
 $setupB = Join-Path $Feed "SpawnLoft_${VersionB}_x64-setup.exe"
-$nodeExe = (Get-Command node).Source
+$nodeExe = $script:harnessNode
 
 function Use-Layout([string] $layout, [string] $dataRoot = '') {
   # new: %APPDATA%\spawnloft\settings.json, data in %LOCALAPPDATA%\spawnloft (since the rename)
@@ -39,7 +44,7 @@ function Start-Running1([string[]] $names) {
 function Make-Orphan($dataRoot, $name, $dir) {
   # what a crashed 1.x daemon leaves: java still running, the daemon gone, state.json saying
   # running. (Killing a real 1.x daemon takes its JVM with it: the JVM is in the daemon's job.)
-  $java = Start-Process (Get-Command node).Source -ArgumentList "`"$fixtures\fake-java.mjs`"" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
+  $java = Start-Process $script:harnessNode -ArgumentList "`"$fixtures\fake-java.mjs`"" -WorkingDirectory $dir -PassThru -WindowStyle Hidden
   $gone = Start-Process "$env:WINDIR\System32\cmd.exe" -ArgumentList '/c', 'exit' -PassThru -WindowStyle Hidden
   $gone.WaitForExit()
   $runDir = Join-Path $dataRoot "run\$name"
@@ -159,7 +164,7 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   Check-Graceful $dataRoot 'mysql-main' $dbJava 'Normal shutdown'
   Check "lost's JVM was not touched" (Pid-Alive $lostJava) "pid $lostJava"
   $starts = Starts $seed.servers.survival
-  Check 'survival was started again by Node, not by SpawnLoft.exe' ($starts.Count -ge 2 -and $starts[-1].runtime -notlike '*SpawnLoft.exe') "$($starts | ConvertTo-Json -Compress)"
+  Check 'survival was started again on the bundled Node, not by SpawnLoft.exe or a system Node' ($starts.Count -ge 2 -and $starts[-1].runtime -like "$inst\resources\runtime\node-*\node.exe") "$($starts | ConvertTo-Json -Compress)"
   Check-Rust-Daemon $dataRoot 'survival' | Out-Null
   Check-Rust-Daemon $dataRoot 'mysql-main' | Out-Null
   $l2 = Status2
@@ -171,6 +176,7 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   $shimAfter = Get-Content (Join-Path $dataRoot 'tasks\*.cmd') -Raw
   $script:result.shimAfter = $shimAfter
   Check 'the shim was rewritten for 2.0 (no Electron runner)' ($shimAfter -ne $shimBefore -and $shimAfter -notmatch 'ELECTRON_RUN_AS_NODE') $shimAfter
+  Check-Entry-Point $dataRoot
   $script:result.taskRun = Run-Task $taskName
   if ($envRoot) {
     # a subst drive belongs to this logon session, which Task Scheduler's need not share
@@ -178,6 +184,16 @@ function Handover-Scenario([string] $setup1, [string] $layout, [string[]] $insta
   } else {
     Check 'the task runs green after the handover' ("$($script:result.taskRun.lastResult)" -eq '0') "$($script:result.taskRun.lastResult)"
   }
+  # the command line from a terminal, and an MCP server, both with no Node on PATH
+  $tl = Terminal-List
+  $listed = try { (($tl.out.Trim() -split "`n")[-1] | ConvertFrom-Json) } catch { $null }
+  Check 'spawnloft list --json from a terminal lists the servers' ($tl.code -eq 0 -and $listed.ok -and @($listed.data.instances | Where-Object { $_.name -eq 'survival' }).Count -eq 1) "$($tl.code) $($tl.out)$($tl.err)"
+  $mcp = Start-Mcp
+  $init = Mcp-Initialize $mcp
+  Check 'spawnloft-core mcp answers initialize' ($init.result.serverInfo.name -eq 'spawnloft') "$($init | ConvertTo-Json -Compress -Depth 6)"
+  $mcp.StandardInput.Close()
+  Check '  and ends when its client closes stdin' ($mcp.WaitForExit(30000))
+
   Check 'handover.log written' (Test-Path (Join-Path $dataRoot 'run\handover.log'))
   $script:result.handoverLog = Get-Content (Join-Path $dataRoot 'run\handover.log') -Raw
 
@@ -409,6 +425,12 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $probe.newNameAfter = Probe $pa.Id
     $probe.folderAfter = Probe $pb.Id
 
+    # an MCP server running through the update holds the bundled node.exe (A6, design scenario 5)
+    $mcp = Start-Mcp
+    Check 'an MCP server answers before the update' ((Mcp-Initialize $mcp).result.serverInfo.name -eq 'spawnloft')
+    $mcpNode = @(Node-Children $mcp.Id)[0]
+    Check '  on the bundled Node' ($mcpNode -and $mcpNode.ExecutablePath -like "$inst\resources\runtime\node-*\node.exe") "$($mcpNode.ExecutablePath)"
+
     $run = Run-Installer $setupB @('/P', '/UPDATE', '/R') 600
     $script:result.update = $run
     Check '2.x a -> b exit 0' ($run.code -eq 0) "exit $($run.code)"
@@ -419,6 +441,17 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check 'the daemon survived' (Pid-Alive $daemon)
     Check 'the JVM survived' (Pid-Alive $java)
     Check 'status says running through the update' ((Status2)['live'].status -eq 'running')
+    $heldNode = @(Get-ChildItem "$inst\resources\runtime" -Directory -Filter 'old-*')
+    Check 'the held node.exe sits in resources\runtime\old-<stamp>\node.exe' ($heldNode.Count -eq 1 -and (Test-Path (Join-Path $heldNode[0].FullName 'node.exe'))) "$($heldNode.Name)"
+    $rt = Read-Json "$inst\resources\runtime\runtime.json"
+    Check 'and the new one is in place' (Test-Path (Join-Path "$inst\resources\runtime" $rt.exe))
+    $tools = Mcp-Call $mcp 2 'tools/list'
+    Check 'the MCP server still answers after the update' (@($tools.result.tools).Count -gt 0) "$($tools | ConvertTo-Json -Compress -Depth 3)"
+    # a killed forwarder takes its Node with it (the kill-on-close job, A6)
+    $mcpNodePid = Proc-Key $mcpNode.ProcessId
+    Stop-Process -Id $mcp.Id -Force
+    Check 'killing spawnloft-core mcp ends its Node too' (Wait-Until { -not (Pid-Alive $mcpNodePid) } 30) "node $mcpNodePid"
+    Check-Entry-Point $dataRoot
     $probe.daemonAfterUpdate = Probe $daemon
     $script:result.probe = $probe
     Stop-Process -Id $pa.Id, $pb.Id -Force -ErrorAction SilentlyContinue
@@ -435,6 +468,7 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $run = Run-Installer $setupB @('/P', '/UPDATE') 600
     Check 'the next install (b again) exit 0' ($run.code -eq 0) "exit $($run.code)"
     Check 'and it removed the old-<stamp> folder' (@(Get-ChildItem "$inst\resources\bin" -Directory -Filter 'old-*').Count -eq 0)
+    Check 'and the old node.exe folder' (@(Get-ChildItem "$inst\resources\runtime" -Directory -Filter 'old-*').Count -eq 0)
   }
 
   's8' {

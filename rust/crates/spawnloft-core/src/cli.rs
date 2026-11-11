@@ -1,5 +1,11 @@
-//! Argument handling. Hand-written while there are three commands; `clap` replaces it when the
+//! Argument handling. Hand-written while there are few commands; `clap` replaces it when the
 //! command table grows (R6).
+//!
+//! `spawnloft-core` is the one entry point of an install (PLAN-2.0-REMAINING.md section 4): the
+//! commands below are its own, and every other command line is the SpawnLoft CLI, forwarded to
+//! the Node core on the bundled Node ([`forwards`], `spawnloft_lib::runtime::forward`) until the
+//! core port (2.1) answers it here instead. The `spawnloft` and `mcctl` launchers, task shims,
+//! server launchers and MCP configs all run this binary.
 
 use spawnloft_lib::build;
 
@@ -26,7 +32,7 @@ pub fn usage_error(message: &str) -> Outcome {
     Outcome {
         stdout: String::new(),
         stderr: format!(
-            "{}: {message}\nRun `{} help` for the commands.\n",
+            "{}: {message}\nRun `{} --core-help` for this binary's commands.\n",
             build::NAME,
             build::NAME
         ),
@@ -39,22 +45,45 @@ pub fn not_utf8() -> Outcome {
     usage_error("an argument is not valid UTF-8")
 }
 
+/// Whether this command line belongs to the SpawnLoft CLI (forwarded to the Node core) rather
+/// than to this binary. Overlapping names go to the Node core unless the form is the one only
+/// the installer and the window use: `ui` with a window flag, `repair --quiet`.
+pub fn forwards(args: &[std::ffi::OsString]) -> bool {
+    let Some((command, rest)) = args.split_first() else {
+        // no arguments: the CLI's own usage
+        return true;
+    };
+    let has = |flag: &str| rest.iter().any(|a| a == flag);
+    match command.to_str() {
+        Some(
+            "--version" | "-V" | "version" | "--core-help" | "daemon" | "probe-process" | "handover"
+            | "uninstall" | "update",
+        ) => false,
+        Some("ui") => !["--exit-with-stdin", "--core-dir", "--upstream", "--node"]
+            .iter()
+            .any(|f| has(f)),
+        Some("repair") => !has("--quiet"),
+        _ => true,
+    }
+}
+
 pub fn help() -> String {
     let info = build::current();
     format!(
         "{line}\n\
          \n\
-         Internal build: not for release.\n\
+         This binary's own commands; every other command is the SpawnLoft command line\n\
+         (`{name} help` lists those).\n\
          \n\
          Usage:\n  \
            {name} --version [--json]   print this build's version, commit and target\n  \
            {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
-           {name} ui [--port n]        the panel on 127.0.0.1 (proxies to the Node panel for now)\n  \
+           {name} ui --exit-with-stdin [--port n] [--core-dir d]  the window's panel on 127.0.0.1\n  \
            {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
-           {name} repair [--quiet]      rewrite task shims and server launchers for this install\n  \
+           {name} repair --quiet        rewrite task shims and server launchers (run by the installer)\n  \
            {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
            {name} update <command>     the updater (check, status, apply, list, rollback, hold, channel, log)\n  \
-           {name} help                 this text\n\
+           {name} --core-help          this text\n\
          \n\
          Update commands:\n{update}\n",
         line = info.line(),
@@ -222,7 +251,7 @@ pub fn run(args: &[String]) -> Outcome {
     };
     match command.as_str() {
         "--version" | "-V" | "version" => version(rest),
-        "help" | "--help" | "-h" => ok(help()),
+        "--core-help" => ok(help()),
         "daemon" => daemon(rest),
         "ui" => ui(rest),
         "probe-process" => probe_process(rest),
@@ -316,9 +345,64 @@ mod tests {
     }
 
     #[test]
+    fn core_help_has_no_internal_wording() {
+        let out = run(&args(&["--core-help"]));
+        assert_eq!(out.code, 0);
+        assert!(out.stdout.contains("Usage:"));
+        // past the version line, which carries a dev build's `-internal.0`
+        let lower = out.stdout.split_once('\n').unwrap().1.to_ascii_lowercase();
+        assert!(
+            !lower.contains("internal") && !lower.contains("spike"),
+            "{}",
+            out.stdout
+        );
+    }
+
+    #[test]
     fn unknown_command() {
         let out = run(&args(&["frobnicate"]));
         assert_eq!(out.code, EXIT_USAGE);
         assert!(out.stderr.contains("unknown command `frobnicate`"));
+    }
+
+    fn os(list: &[&str]) -> Vec<std::ffi::OsString> {
+        list.iter().map(|s| s.into()).collect()
+    }
+
+    #[test]
+    fn what_is_forwarded_to_the_node_core() {
+        for line in [
+            &[][..],
+            &["help"],
+            &["--help"],
+            &["list", "--json"],
+            &["start", "survival"],
+            &["mcp"],
+            &["task", "run", "abc"],
+            &["console", "survival"],
+            &["ui"],
+            &["ui", "--port", "8080"],
+            &["repair"],
+            &["repair", "--json"],
+            &["frobnicate"],
+        ] {
+            assert!(forwards(&os(line)), "{line:?} should be forwarded");
+        }
+        for line in [
+            &["--version"][..],
+            &["-V"],
+            &["version", "--json"],
+            &["--core-help"],
+            &["daemon", "s"],
+            &["probe-process", "1"],
+            &["handover", "stop"],
+            &["uninstall", "--yes"],
+            &["update", "check"],
+            &["ui", "--port", "0", "--exit-with-stdin", "--core-dir", "/c"],
+            &["ui", "--upstream", "http://127.0.0.1:1/"],
+            &["repair", "--quiet"],
+        ] {
+            assert!(!forwards(&os(line)), "{line:?} is this binary's own");
+        }
     }
 }

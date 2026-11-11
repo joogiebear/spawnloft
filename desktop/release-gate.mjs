@@ -20,10 +20,15 @@
 //     CFBundleShortVersionString, checked when --check-binary-versions is set (the numeric
 //     resources carry no prerelease tag, so major.minor.patch is what must agree),
 //
+//   - the payload (desktop/payload-gate.mjs), when given: the bundled Node runtime folder is the
+//     pinned version from the pinned nodejs.org archive (--runtime), and no shipped file carries a
+//     test build's wording such as "internal spike" (--payload, repeatable: files or folders),
+//
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
+//        [--runtime <resources/runtime dir>] [--payload <file or dir>]...
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
@@ -33,6 +38,7 @@ import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
+import { checkRuntime, checkNoInternalStrings } from './payload-gate.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const U = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
@@ -100,6 +106,8 @@ function parseArgs(argv) {
       // the mac app's Info.plist) must equal the release version; the real workflow sets it, the
       // unit tests that use placeholder bytes do not (design 11)
       case '--check-binary-versions': out.checkBinaryVersions = true; break
+      case '--runtime': out.runtime = value(); break
+      case '--payload': (out.payload ??= []).push(value()); break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -109,7 +117,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, runtime, payload }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -263,6 +271,18 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
   for (const name of fs.readdirSync(dir)) {
     if (!fs.statSync(path.join(dir, name)).isFile()) { problems.push(`${name} is a directory; a release folder is flat`); continue }
     if (!seen.has(name)) problems.push(`${name} is in the release folder but no check accounts for it`)
+  }
+
+  // The payload, before it was bundled (PLAN-2.0-REMAINING.md A3, W1).
+  if (runtime) {
+    const found = checkRuntime(runtime)
+    problems.push(...found)
+    if (!found.length) notes.push(`the bundled Node in ${runtime} is the pinned version from the pinned archive`)
+  }
+  if (payload?.length) {
+    const found = checkNoInternalStrings(payload)
+    problems.push(...found)
+    if (!found.length) notes.push(`no test-build wording in ${payload.length} payload path(s)`)
   }
 
   const targets = envelope ? Object.keys(envelope.platforms) : []

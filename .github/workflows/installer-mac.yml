@@ -54,7 +54,7 @@ env:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/v2'
+    if: github.ref == 'refs/heads/v2' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -132,6 +132,13 @@ jobs:
             codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" ../../target/release/spawnloft-core
             codesign --verify --strict --verbose=2 ../../target/release/spawnloft-core
             ../../target/release/spawnloft-core --version
+            # the bundled Node (PLAN-2.0-REMAINING.md A7): pinned and hash-checked, then signed with
+            # the Developer ID and the JIT entitlements, which V8 needs under the hardened runtime
+            node installer/mac-config.mjs --stage-runtime "$RUNNER_TEMP/cfg-$v"
+            nodebin="$(node -p 'const d=process.argv[1]; d + "/" + require(d + "/runtime.json").exe' "$RUNNER_TEMP/cfg-$v/runtime")"
+            codesign --force --options runtime --timestamp --entitlements installer/node.entitlements --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" "$nodebin"
+            codesign --verify --strict --verbose=2 "$nodebin"
+            "$nodebin" -e 'console.log("bundled node", process.version, process.arch)'
             node installer/mac-config.mjs "$v" "$RUNNER_TEMP/ci.key.pub" "$RUNNER_TEMP/cfg-$v" --icons="$RUNNER_TEMP/icons" --feed-http
             # start from a clean bundle dir so a stale .app/.app.tar.gz (from the restored cache, or
             # from build a) is never mistaken for this build

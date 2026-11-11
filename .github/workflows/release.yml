@@ -28,6 +28,8 @@ on:
       - 'desktop/update-envelope.mjs'
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
+      - 'desktop/payload-gate.mjs'
+      - 'desktop/node-pin.mjs'
       - 'rust/crates/spawnloft-shell/**'
       - '.github/workflows/release.yml'
 
@@ -57,7 +59,7 @@ jobs:
         with:
           node-version: 22
       - name: The release tooling's own tests
-        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs
+        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs desktop/payload-gate.test.mjs
 
   dry-run:
     runs-on: windows-latest
@@ -127,7 +129,10 @@ jobs:
             --tauri "$TAURI_CLI" --win "$DRY_SETUP" --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           ls -la "$RUNNER_TEMP/release"
       - name: The release gate
-        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-binary-versions
+        run: |
+          node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-binary-versions \
+            --runtime "$RUNNER_TEMP/cfg/runtime" --payload rust/target/release/spawnloft-core.exe --payload rust/target/release/SpawnLoft.exe \
+            --payload src --payload mcctl.mjs --payload spawnloft.mjs
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \

@@ -15,6 +15,9 @@
 ;   `uninstall --yes`, and ask (default no) whether to delete the data too;
 ; - a running spawnloft-core (daemons) never blocks an update: the old binary is renamed aside
 ;   into resources\bin\old-<stamp>\, keeping its file name (design section 4);
+; - the bundled Node lives in a versioned folder, resources\runtime\node-<ver>\; a held node.exe
+;   of the same version is renamed aside into resources\runtime\old-<stamp>\, and other
+;   versions' folders go once nothing runs them (PLAN-2.0-REMAINING.md A6);
 ; - a 1.x installer can still roll back over this install (it finds the same keys and runs this
 ;   uninstaller with --updated);
 ; - over 1.x, servers are stopped gracefully through the installed 1.x CLI before the 1.x
@@ -67,6 +70,10 @@ ${StrLoc}
 ; core binary's source, which the installer extracts on its own before anything else (2.3 step 1)
 !ifndef SPAWNLOFT_CORE_SRC
   !error "SPAWNLOFT_CORE_SRC is not defined: build with installer/installer-config.mjs"
+!endif
+; and the bundled Node's folder under resources\runtime\ (node-<version>)
+!ifndef SPAWNLOFT_NODE_DIR
+  !error "SPAWNLOFT_NODE_DIR is not defined: build with installer/installer-config.mjs"
 !endif
 
 !define WEBVIEW2APPGUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
@@ -643,10 +650,6 @@ Function StopTick
   ${ElseIf} ${FileExists} "$PLUGINSDIR\handover-cancel"
     SetErrorLevel 4
     Quit
-  ${ElseIf} $2 == "5"
-    MessageBox MB_ICONEXCLAMATION "This version of SpawnLoft needs Node.js (nodejs.org) to start your servers again after the update. Install Node.js and run the update again. Nothing was changed." /SD IDOK
-    SetErrorLevel 4
-    Quit
   ${ElseIf} $2 == "3"
     MessageBox MB_ICONEXCLAMATION "$3 is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
     SetErrorLevel 4
@@ -706,6 +709,58 @@ FunctionEnd
     FindNext $R7 $R8
   ${Loop}
   FindClose $R7
+!macroend
+
+; SPAWNLOFT: Node runtimes moved aside by earlier updates, and other versions' runtime folders,
+; once nothing runs them (a held node.exe is not deleted, so its folder stays for the next
+; install). The folder of this build's version is the payload's own and is left to it.
+!macro SPAWNLOFT_CLEAN_OLD_RUNTIMES
+  ClearErrors
+  FindFirst $R7 $R8 "$INSTDIR\resources\runtime\old-*"
+  ${DoWhile} $R8 != ""
+    Delete "$INSTDIR\resources\runtime\$R8\node.exe"
+    RMDir "$INSTDIR\resources\runtime\$R8"
+    FindNext $R7 $R8
+  ${Loop}
+  FindClose $R7
+  ClearErrors
+  FindFirst $R7 $R8 "$INSTDIR\resources\runtime\node-*"
+  ${DoWhile} $R8 != ""
+    ${If} $R8 != "${SPAWNLOFT_NODE_DIR}"
+      Delete "$INSTDIR\resources\runtime\$R8\node.exe"
+      Delete "$INSTDIR\resources\runtime\$R8\LICENSE"
+      RMDir "$INSTDIR\resources\runtime\$R8"
+    ${EndIf}
+    FindNext $R7 $R8
+  ${Loop}
+  FindClose $R7
+!macroend
+
+; SPAWNLOFT: this build's node.exe, when the same version is installed already and a long-lived
+; process runs it (`spawnloft mcp`, the bot host, a console): a running exe cannot be overwritten
+; but can be renamed, so it moves into a dated folder of its own, as the core does, and the new
+; copy is written in its place (PLAN-2.0-REMAINING.md A6).
+!macro SPAWNLOFT_MOVE_HELD_NODE
+  ${If} ${FileExists} "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe"
+    ClearErrors
+    Delete "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe"
+    ${If} ${Errors}
+      ${GetTime} "" "L" $0 $1 $2 $3 $4 $5 $6
+      StrCpy $R6 "old-$2$1$0-$4$5$6"
+      ${If} ${FileExists} "$INSTDIR\resources\runtime\$R6\*.*"
+        System::Call "kernel32::GetTickCount() i .r0"
+        StrCpy $R6 "$R6-$0"
+      ${EndIf}
+      ClearErrors
+      CreateDirectory "$INSTDIR\resources\runtime\$R6"
+      Rename "$INSTDIR\resources\runtime\${SPAWNLOFT_NODE_DIR}\node.exe" "$INSTDIR\resources\runtime\$R6\node.exe"
+      ${If} ${Errors}
+        SetErrorLevel 2
+        Abort "node.exe is in use and could not be moved aside"
+      ${EndIf}
+      DetailPrint "node.exe is in use; it was moved to resources\runtime\$R6 until that program ends"
+    ${EndIf}
+  ${EndIf}
 !macroend
 
 !define MUI_CUSTOMFUNCTION_ABORT SpawnLoftUserAbort
@@ -951,6 +1006,7 @@ Section Install
   ; (step 3)
   Call StageCore
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
+  !insertmacro SPAWNLOFT_CLEAN_OLD_RUNTIMES
   ${If} $LegacyMode = 1
     ${If} $StopDone <> 1
       DetailPrint "Stopping servers for the update"
@@ -965,11 +1021,6 @@ Section Install
       ; integer compare would read as 0 (stopped) and let the 1.x uninstaller kill the servers
       ${If} $1 == "0"
         StrCpy $StopDone 1
-      ${ElseIf} $1 == "5"
-        DetailPrint "SpawnLoft 2 needs Node.js to start the servers again; SpawnLoft 1 was left as it was"
-        MessageBox MB_ICONEXCLAMATION "This version of SpawnLoft needs Node.js (nodejs.org) to start your servers again after the update. Install Node.js and run the update again. Nothing was changed." /SD IDOK
-        SetErrorLevel 4
-        Quit
       ${ElseIf} $1 == "3"
         DetailPrint "A server is still running and could not be stopped; SpawnLoft 1 was left as it was"
         MessageBox MB_ICONEXCLAMATION "A server is still running and could not be stopped in 5 minutes. Stop it and run the update again. Nothing was changed." /SD IDOK
@@ -1020,6 +1071,7 @@ Section Install
       DetailPrint "spawnloft-core.exe is in use by running servers; it was moved to resources\bin\$R6 until they restart"
     ${EndIf}
   ${EndIf}
+  !insertmacro SPAWNLOFT_MOVE_HELD_NODE
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
@@ -1275,8 +1327,9 @@ Section Uninstall
 
   ; Delete uninstaller
   Delete "$INSTDIR\uninstall.exe"
-  ; SPAWNLOFT: core binaries moved aside by updates, once nothing runs them
+  ; SPAWNLOFT: core binaries and Node runtimes moved aside by updates, once nothing runs them
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
+  !insertmacro SPAWNLOFT_CLEAN_OLD_RUNTIMES
   RMDir /r "$INSTDIR\resources\bin\staging"
 
   {{#each resources_ancestors}}
