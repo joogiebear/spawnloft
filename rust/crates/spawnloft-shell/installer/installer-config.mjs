@@ -2,6 +2,8 @@
 //   overlay.json            passed to `tauri build --config`
 //   hooks.nsh               the template's installer_hooks: defines SPAWNLOFT_CORE_SRC, the
 //                           core binary the template extracts to staging before anything else
+//   core-package.json       the repository package.json with this version (core-package.mjs),
+//                           shipped as resources\core\package.json
 //   internal-defaults.json  shipped as resources\core\internal-defaults.json: the bundled Node
 //                           core starts Rust daemons (design 2.3, until R4)
 //   runtime\                the pinned Node.js (stage-runtime.mjs), shipped as resources\runtime\
@@ -16,6 +18,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeCorePackage } from './core-package.mjs'
 
 import { stageRuntime, runtimeFolder } from './stage-runtime.mjs'
 
@@ -56,6 +59,9 @@ mkdirSync(join(out, 'bin'), { recursive: true })
 const forwarder = ['@echo off', '"%~dp0spawnloft-core.exe" %*', 'exit /b %errorlevel%', ''].join('\r\n')
 for (const name of ['spawnloft', 'mcctl']) writeFileSync(join(out, 'bin', `${name}.cmd`), forwarder)
 
+// the Node core's package.json, stamped with this build's version (the repository's says 1.x)
+const corePackage = writeCorePackage(version, out)
+
 const defaults = join(out, 'internal-defaults.json')
 writeFileSync(defaults, JSON.stringify({ daemon: 'rust' }, null, 2) + '\n')
 
@@ -70,7 +76,7 @@ const overlay = {
       [core]: 'resources/bin/spawnloft-core.exe',
       '../../../mcctl.mjs': 'resources/core/mcctl.mjs',
       '../../../spawnloft.mjs': 'resources/core/spawnloft.mjs',
-      '../../../package.json': 'resources/core/package.json',
+      [corePackage]: 'resources/core/package.json',
       '../../../src/': 'resources/core/src/',
       [defaults]: 'resources/core/internal-defaults.json',
       [join(out, 'bin', 'spawnloft.cmd')]: 'resources/bin/spawnloft.cmd',

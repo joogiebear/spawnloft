@@ -23,11 +23,17 @@
 //   - the payload (desktop/payload-gate.mjs), when given: the bundled Node runtime folder is the
 //     pinned version from the pinned nodejs.org archive (--runtime), and no shipped file carries a
 //     test build's wording such as "internal spike" (--payload, repeatable: files or folders),
+//   - both cores inside an installed copy of the build report the release version, when one or
+//     more --installed folders are given (W4, plan D4): `spawnloft-core --version --json` and the
+//     Node core's resources/core/package.json, which the panel, data-format.json's writtenBy, the
+//     diagnostics bundle and the launcher read. The folder is an install folder (Windows, Linux
+//     /opt/...) or a macOS .app.
 //
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
+//        [--installed <dir>]...       (an installed copy: both cores must report the version)
 //        [--runtime <resources/runtime dir>] [--payload <file or dir>]...
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
@@ -108,6 +114,7 @@ function parseArgs(argv) {
       case '--check-binary-versions': out.checkBinaryVersions = true; break
       case '--runtime': out.runtime = value(); break
       case '--payload': (out.payload ??= []).push(value()); break
+      case '--installed': (out.installed ??= []).push(value()); break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -117,7 +124,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, runtime, payload }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, installed, runtime, payload }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -257,6 +264,20 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     }
   }
 
+  // Both cores of an installed copy report the release version (plan D4).
+  for (const root of installed ?? []) {
+    const found = installedVersions(root)
+    problems.push(...found.problems)
+    if (found.core !== undefined) {
+      if (found.core !== version) problems.push(`${found.corePath}: spawnloft-core reports ${found.core}, expected ${version}`)
+      else notes.push(`${found.corePath}: spawnloft-core reports ${version}`)
+    }
+    if (found.node !== undefined) {
+      if (found.node !== version) problems.push(`${found.nodePath}: the Node core says ${found.node}, expected ${version}`)
+      else notes.push(`${found.nodePath}: the Node core says ${version}`)
+    }
+  }
+
   // Assets not named by the update envelope: the mac .dmg (manual install) and the command-line
   // packages (the package manager installs and verifies them). Present and non-empty is enough.
   const manual = [`SpawnLoft-${version}-mac-arm64.dmg`, ...fs.readdirSync(dir).filter(n => /^spawnloft-cli-/.test(n))]
@@ -287,6 +308,36 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
 
   const targets = envelope ? Object.keys(envelope.platforms) : []
   return { ok: problems.length === 0, problems, notes, flags, targets, channel, version }
+}
+
+// The versions the two cores in an installed copy report: the Rust core's `--version --json`
+// and the Node core's package.json. `root` is an install folder (resources/ directly under it) or
+// a macOS .app (Contents/Resources/resources/). Returns { core, corePath, node, nodePath,
+// problems }; a version is undefined when it could not be read, with the reason in problems.
+export function installedVersions(root) {
+  const problems = []
+  const bases = [path.join(root, 'resources'), path.join(root, 'Contents', 'Resources', 'resources')]
+  const base = bases.find(b => fs.existsSync(b))
+  if (!base) return { problems: [`${root}: no resources folder, so it is not an installed SpawnLoft`] }
+  const out = { problems }
+  out.corePath = ['spawnloft-core.exe', 'spawnloft-core'].map(n => path.join(base, 'bin', n)).find(p => fs.existsSync(p))
+  if (!out.corePath) problems.push(`${base}: no bin/spawnloft-core`)
+  else {
+    try {
+      const text = execFileSync(out.corePath, ['--version', '--json'], { encoding: 'utf8', windowsHide: true, timeout: 30000 })
+      out.core = JSON.parse(text).version
+      if (typeof out.core !== 'string') { problems.push(`${out.corePath}: --version --json has no version`); out.core = undefined }
+    } catch (e) {
+      problems.push(`${out.corePath}: --version --json failed (${e.message.split('\n')[0]})`)
+    }
+  }
+  out.nodePath = path.join(base, 'core', 'package.json')
+  try {
+    out.node = JSON.parse(fs.readFileSync(out.nodePath, 'utf8')).version
+  } catch (e) {
+    problems.push(`${out.nodePath}: unreadable (${e.code ?? e.message})`)
+  }
+  return out
 }
 
 // A Windows installer's Authenticode signature: valid, timestamped, and the signer's CN. A missing

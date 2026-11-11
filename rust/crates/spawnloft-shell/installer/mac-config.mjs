@@ -21,6 +21,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeCorePackage } from './core-package.mjs'
 
 import { stageRuntime } from './stage-runtime.mjs'
 
@@ -70,6 +71,9 @@ exec "$SCRIPT_DIR/../resources/bin/spawnloft-core" "$@"
 `
 for (const name of ['spawnloft', 'mcctl']) writeFileSync(join(out, 'bin', name), forwarder, { mode: 0o755 })
 
+// the Node core's package.json, stamped with this build's version (the repository's says 1.x)
+const corePackage = writeCorePackage(version, out)
+
 // the Node core still starts Rust daemons on first launch until R4 (design 2.3), so it ships
 // beside the Rust core, exactly as the Windows build does
 const defaults = join(out, 'internal-defaults.json')
@@ -94,7 +98,7 @@ const overlay = {
       [core]: 'resources/bin/spawnloft-core',
       '../../../mcctl.mjs': 'resources/core/mcctl.mjs',
       '../../../spawnloft.mjs': 'resources/core/spawnloft.mjs',
-      '../../../package.json': 'resources/core/package.json',
+      [corePackage]: 'resources/core/package.json',
       '../../../src/': 'resources/core/src/',
       [defaults]: 'resources/core/internal-defaults.json',
       [join(out, 'bin', 'spawnloft')]: 'bin/spawnloft',
