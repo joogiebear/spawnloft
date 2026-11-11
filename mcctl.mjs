@@ -1265,6 +1265,12 @@ async function cmdUi(positional, flags) {
     fail(`port ${port} is already in use${panel ? ` by a SpawnLoft panel: open ${running}` : ''}. Pick another with --port <n>.`)
   }
   if (launcher && open) ui.openBrowser(url + 'launcher')
+  // spawnloft-core's proxy holds a pipe to stdin: when it ends, however it ends, so does this panel
+  if (flags.exitWithStdin === true) {
+    process.stdin.on('end', () => process.exit(0))
+    process.stdin.on('error', () => process.exit(0))
+    process.stdin.resume()
+  }
   out(`SpawnLoft panel: ${url}`)
   if (launcher) out(`Game launcher: ${url}launcher`)
   out('Bound to 127.0.0.1 only — it can start servers and type console commands, so it is')

@@ -13849,7 +13849,7 @@ api('/health').then((health) => {
 // The same page runs in a plain browser, where window.spawnloftDesktop does not exist. Everything here
 // is additive and silent when it is absent.
 
-if (desktop) {
+if (desktop && typeof desktop.appInfo === 'function') {
   desktop.appInfo().then((info) => {
     state.appInfo = info;
     $('#bUpdate').hidden = false;

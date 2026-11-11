@@ -1,7 +1,7 @@
 export const BOOLEAN_FLAGS = [
   'json', 'csv', 'follow', 'f', 'thorough', 'setAsidePrivateCopies',
   'yes', 'force', 'purge', 'all', 'drop', 'check', 'raw', 'unstable', 'offline', 'acceptEula',
-  'withWorlds', 'wipePlugins', 'data', 'detach', 'wait', 'sync', 'open', 'flush', 'onLogon', 'showIps', 'allowDestructive', 'harness', 'latest', 'launcher',
+  'withWorlds', 'wipePlugins', 'data', 'detach', 'wait', 'sync', 'open', 'flush', 'onLogon', 'showIps', 'allowDestructive', 'harness', 'latest', 'launcher', 'exitWithStdin',
 ]
 
 // Separate from the CLI because importing mcctl.mjs runs the command.

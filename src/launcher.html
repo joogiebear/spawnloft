@@ -584,7 +584,10 @@
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
   const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
   // the desktop app's bridge; null in a browser tab
-  const desktop = window.spawnloftDesktop ?? null
+  // Embedded in the panel, the Tauri bridge exists only on the parent frame; Electron injects its own here.
+  const desktop = window.spawnloftDesktop ?? (() => {
+    try { return window.self !== window.top ? window.parent.spawnloftDesktop ?? null : null } catch { return null }
+  })()
   // Inside the panel's Play page, a frame of the panel's own origin, rather than a window or tab
   // of its own: the top bar becomes a page head (CSS), and the two lines that speak of closing
   // "this window" speak of leaving the page. Nothing else here knows the difference.
@@ -1234,12 +1237,20 @@
 
   function waitingStrip(login) {
     const where = desktop?.openMicrosoftLogin ? 'the window that opened. It closes itself.' : 'the tab that opened, then come back here.'
+    if (login.external && login.status !== 'finishing') {
+      return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
+        h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
+          'Finish signing in in your browser, then come back here. This page updates by itself.'),
+        h('span', { class: 'acts' },
+          h('button', { class: 'linkbtn', onclick: () => openMicrosoft(login) }, 'Open Microsoft\'s page again'),
+          h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
+    }
     return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
       h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
         login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in window did not open, maybe because of a pop-up blocker. ' : `Finish signing in in ${where}`,
         login.blocked && h('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open Microsoft\'s sign-in page')),
       h('span', { class: 'acts' },
-        desktop?.openExternal && !login.blocked && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
+        desktop?.openExternal && !login.blocked && !login.external && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
         login.status !== 'finishing' && h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
   }
 
@@ -2060,7 +2071,13 @@
       try { out = await desktop.openMicrosoftLogin(login.url) } catch { /* refused */ }
       if (S.login !== login) return
       if (!out?.ok) {
-        login.blocked = true
+        // an again-press that is refused leaves the waiting state as it was
+        if (!login.external) login.blocked = true
+        return render()
+      }
+      if (out.external) {
+        // the system browser has the page and there is no closed signal: the stream reports the outcome
+        login.external = true
         return render()
       }
       // resolves when the window has closed; a moment for a "finishing" already on its way

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Nothing yet: the panel is a remote origin (http://127.0.0.1:<port>) and the spike gives it no Tauri API. Pickers, zoom and open-in-folder arrive with a remote.urls entry in step 3.",
+  "description": "Nothing for the window's own start page. The panel is a remote origin (http://127.0.0.1:<port>) whose port is known only at run time; bridge.rs adds a capability for exactly that origin when the core prints it, granting the bridge's commands and nothing else.",
   "windows": ["main"],
   "permissions": []
 }

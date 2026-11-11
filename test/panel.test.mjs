@@ -195,11 +195,11 @@ function tokensOf(file, website = false) {
 }
 
 test('the panel and the setup wizard share one token block, values included', () => {
-  assert.deepEqual(tokensOf('../src/ui.html'), tokensOf('../desktop/setup.html'))
+  assert.deepEqual(tokensOf('../src/ui.html'), tokensOf('../src/setup.html'))
 })
 
 test('the website palette stays consistent between the panel and setup wizard', () => {
-  assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../desktop/setup.html', true))
+  assert.deepEqual(tokensOf('../src/ui.html', true), tokensOf('../src/setup.html', true))
 })
 
 test('the game launcher carries the same token block as the panel, both palettes', () => {

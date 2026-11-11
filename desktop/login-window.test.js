@@ -35,7 +35,8 @@ function authorize(params = {}) {
 
 test('the callback path is the panel\'s', () => {
   const ui = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui.mjs'), 'utf8')
-  assert.ok(ui.includes(`http://localhost:\${panelPort}${CALLBACK_PATH}`))
+  // publicPort() is panelPort in Electron (no proxy in front), the proxy's port behind spawnloft-core
+  assert.ok(ui.includes(`http://localhost:\${publicPort()}${CALLBACK_PATH}`))
 })
 
 test('the panel\'s authorize URL is accepted', () => {
