@@ -6,7 +6,12 @@
 // in the pinned line include a security release and printing the sha256 lines the bump needs.
 // It also fails when .node-version and NODE_VERSION disagree.
 //
-//   node tools/check-node-pin.mjs [--report <file.md>]
+// With --pr (a pull request) it fails only on what the change itself can get wrong: the two pins
+// disagree, or the pin is not an LTS release. Newer releases are reported, not failed: the
+// scheduled run's issue tracks them, and a PR that bumps to the newest in the line stays green
+// while a newer major waits on its own decision.
+//
+//   node tools/check-node-pin.mjs [--report <file.md>] [--pr]
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -46,9 +51,11 @@ async function shasums(version) {
 export async function main(argv) {
   const reportAt = argv.indexOf('--report')
   const report = reportAt >= 0 ? argv[reportAt + 1] : null
+  const pr = argv.includes('--pr')
   const { NODE_VERSION } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'build-cli-package.mjs')).href)
   const lines = []
   let failed = false
+  let behind = false
 
   const file = fs.readFileSync(NODE_VERSION_FILE, 'utf8').trim()
   if (file !== NODE_VERSION) {
@@ -64,20 +71,22 @@ export async function main(argv) {
     lines.push(`- **${NODE_VERSION} is not an LTS release** in nodejs.org's index.`)
   }
   if (found.newestInLine) {
-    failed = true
+    behind = true
     const sec = found.security.length ? ` It includes ${found.security.length === 1 ? 'a security release' : 'security releases'}: ${found.security.join(', ')}.` : ''
     lines.push(`- **Node ${found.newestInLine.version}** (${found.newestInLine.lts}, ${found.newestInLine.date}) is newer than the pinned ${NODE_VERSION} in the same line.${sec}`)
   }
   if (found.newest && (!found.newestInLine || found.newest.version !== found.newestInLine.version)) {
-    failed = true
+    behind = true
     lines.push(`- **Node ${found.newest.version}** (${found.newest.lts}, ${found.newest.date}) is the newest LTS line. Moving to a new major is a decision of its own: test the core and the packages on it first.`)
   }
-  if (failed && (found.newestInLine || found.newest)) {
+  if (behind && !pr) failed = true
+  if (behind) {
     const target = (found.newestInLine ?? found.newest).version
     const sums = await shasums(target).catch(() => null)
     lines.push('', `The bump is one commit: \`NODE_VERSION\` and \`NODE_SHA256\` in desktop/build-cli-package.mjs, \`.node-version\`, then the full installer workflows. The sha256 lines for ${target}:`, '', '```', sums || `(could not fetch https://nodejs.org/dist/v${target}/SHASUMS256.txt)`, '```')
   }
-  if (!failed) lines.push(`Node ${NODE_VERSION} is the newest LTS release, and CI tests on it.`)
+  if (!behind && !failed) lines.push(`Node ${NODE_VERSION} is the newest LTS release, and CI tests on it.`)
+  else if (!failed) lines.push('', 'A pull request is not failed for newer releases; the weekly run tracks them in an issue.')
 
   const text = lines.join('\n') + '\n'
   process.stdout.write(text)

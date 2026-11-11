@@ -3,7 +3,8 @@
 # (.node-version)? Dependabot cannot see that pin (plan D7, Q-X). A newer LTS opens (or adds to)
 # one issue, "Node runtime pin is behind", with the sha256 lines the bump needs; the next green
 # run closes it. The bump itself is a commit of its own through the full installer workflows.
-# A pull request that changes the pin or the check runs it too, without touching the issue.
+# A pull request that changes the pin or the check runs it too, without touching the issue, and
+# fails only when .node-version and NODE_VERSION disagree or the pin is not an LTS release.
 #
 # GitHub runs schedules from the default branch only: until this file is there, run it by hand
 # (Run workflow, branch v2).
@@ -35,12 +36,14 @@ jobs:
           node-version-file: .node-version
       - name: Check the pinned Node against nodejs.org's LTS releases
         id: check
-        run: node tools/check-node-pin.mjs --report node-pin-report.md
+        run: node tools/check-node-pin.mjs --report node-pin-report.md ${{ github.event_name == 'pull_request' && '--pr' || '' }}
       - name: Open or update the pin issue
         if: failure() && steps.check.outcome == 'failure' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # exit 2 (nodejs.org unreachable) writes no report: that run's log says why, no issue
+          [ -f node-pin-report.md ] || { echo "::warning::no report was written, so no issue is opened"; exit 0; }
           {
             echo "The [weekly Node pin check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found a newer Node LTS than the runtime SpawnLoft ships."
             echo

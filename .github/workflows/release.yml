@@ -29,6 +29,8 @@ on:
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
       - 'desktop/set-version.mjs'
+      - 'desktop/version-stamp.test.mjs'
+      - 'package.json'
       - 'rust/crates/spawnloft-shell/**'
       - '.github/workflows/release.yml'
 
@@ -58,7 +60,7 @@ jobs:
         with:
           node-version-file: .node-version
       - name: The release tooling's own tests
-        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs
+        run: node --test desktop/update-envelope.test.mjs desktop/release-feed.test.mjs desktop/version-stamp.test.mjs
 
   dry-run:
     runs-on: windows-latest
