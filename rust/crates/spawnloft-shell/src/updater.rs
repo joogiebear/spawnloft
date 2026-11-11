@@ -234,11 +234,19 @@ fn check(app: &AppHandle, core: &PathBuf, reason: &str) -> Result<(), String> {
     };
     let pinned = Pinned::from_json(update).ok_or("the core's update record is malformed")?;
     let bytes = fetch_artifact(core, &pinned)?;
+    // Linux: downloaded and verified, so the panel can show the package manager command; the
+    // window never installs a package (design 5.7, Q-F), so nothing is staged for quit
+    if cfg!(target_os = "linux") {
+        return Ok(());
+    }
     app.state::<Ready>().put(pinned, bytes);
     Ok(())
 }
 
 fn serve(app: &AppHandle, core: &PathBuf, req: Request) -> Result<(), String> {
+    if cfg!(target_os = "linux") && matches!(req.action.as_str(), "install" | "rollback") {
+        return Err("the package manager installs updates on Linux".to_string());
+    }
     match req.action.as_str() {
         "check" => check(app, core, "panel"),
         "install" => {

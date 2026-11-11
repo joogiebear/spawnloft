@@ -54,13 +54,62 @@ pub fn target() -> &'static str {
     }
 }
 
-/// On Linux the envelope lists `-deb` and `-rpm` entries; the package family of this machine.
+/// How this Linux install was made: `deb` or `rpm`. The packages write it beside the core's
+/// folder (`/opt/SpawnLoft/resources/package-type`, `/opt/spawnloft-cli/package-type`, both
+/// `<core dir>/../package-type`); a build run from elsewhere goes by the distribution.
+pub fn linux_package_kind() -> &'static str {
+    let marker = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.join("package-type")))
+        .and_then(|p| std::fs::read_to_string(p).ok());
+    match marker.as_deref().map(str::trim) {
+        Some("deb") => "deb",
+        Some("rpm") => "rpm",
+        _ if std::path::Path::new("/etc/debian_version").exists() => "deb",
+        _ => "rpm",
+    }
+}
+
+/// On Linux the envelope lists `-deb` and `-rpm` entries; the package family of this install.
 fn linux_package_suffix() -> &'static str {
-    if std::path::Path::new("/etc/debian_version").exists() {
+    if linux_package_kind() == "deb" {
         "-deb"
     } else {
         "-rpm"
     }
+}
+
+/// Linux updates are installed by the package manager, never by SpawnLoft (design 5.7, Q-F): the
+/// command a user runs for a verified download at `path`.
+pub fn linux_install_command(kind: &str, path: &std::path::Path) -> String {
+    let p = path.display().to_string();
+    let quoted = if p
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "/._-+~".contains(c))
+    {
+        p
+    } else {
+        format!("'{}'", p.replace('\'', "'\\''"))
+    };
+    match kind {
+        "deb" => format!("sudo apt install {quoted}"),
+        _ => format!("sudo dnf install {quoted}"),
+    }
+}
+
+/// The install command for the pending offer, when this is Linux and it is downloaded and verified.
+pub fn pending_install_command(store: &Store) -> Option<String> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let state = store.state();
+    let pending = state.pending.as_ref()?;
+    if !state.downloaded {
+        return None;
+    }
+    let file = store.cache_file(&pending.version, &pending.file);
+    file.is_file()
+        .then(|| linux_install_command(linux_package_kind(), &file))
 }
 
 /// The envelope entry for this build's target.
@@ -807,6 +856,8 @@ impl<'a> Context<'a> {
             "staleFeed": state.stale_feed,
             "hold": self.store.hold().map(|v| v.to_string()),
             "sources": self.sources.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
+            // Linux: what to run to install the verified download (the app never installs it)
+            "installCommand": pending_install_command(self.store),
         })
     }
 }
@@ -964,6 +1015,14 @@ pub fn apply(ctx: &Context<'_>, pinned: &Pinned, run_installer: bool) -> Result<
         cmd.spawn()
             .map_err(|e| format!("could not start the installer: {e}"))?;
         Ok(format!("installing {} ({} bytes)", pinned.version, bytes.len()))
+    } else if cfg!(target_os = "linux") {
+        // the package manager installs it (Q-F); the bytes are verified, so the command names them
+        Ok(format!(
+            "{} verified and kept at {}; install it with: {}",
+            pinned.version,
+            cached.display(),
+            linux_install_command(linux_package_kind(), &cached)
+        ))
     } else {
         Ok(format!(
             "{} verified and kept at {}; open SpawnLoft to install it (the window replaces the app bundle)",
@@ -1462,6 +1521,22 @@ mod tests {
             platform_entry(&env, "linux-x86_64").is_some()
                 || !cfg!(target_os = "linux")
                 || !std::path::Path::new("/etc/debian_version").exists()
+        );
+    }
+
+    #[test]
+    fn linux_install_command_names_the_verified_file_and_quotes_it() {
+        use std::path::Path;
+        assert_eq!(
+            linux_install_command(
+                "deb",
+                Path::new("/home/a/.config/spawnloft/updates/2.0.1/SpawnLoft-2.0.1-linux-amd64.deb")
+            ),
+            "sudo apt install /home/a/.config/spawnloft/updates/2.0.1/SpawnLoft-2.0.1-linux-amd64.deb"
+        );
+        assert_eq!(
+            linux_install_command("rpm", Path::new("/home/a b/it's.rpm")),
+            "sudo dnf install '/home/a b/it'\\''s.rpm'"
         );
     }
 
