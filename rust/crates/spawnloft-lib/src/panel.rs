@@ -271,9 +271,7 @@ impl Head {
 /// Routes `spawnloft-core ui` answers itself instead of forwarding (the updater, design 5.1).
 pub fn is_local_route(path: &str) -> bool {
     let route = path.split('?').next().unwrap_or(path);
-    route == "/api/update"
-        || route.starts_with("/api/update/")
-        || crate::handover::api::is_route(route)
+    route == "/api/update" || route.starts_with("/api/update/") || crate::handover::api::is_route(route)
 }
 
 /// The largest body a locally answered route reads.

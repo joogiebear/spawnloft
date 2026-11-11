@@ -73,7 +73,11 @@ fn legacy_servers(root: &Path) -> Vec<Value> {
 
 /// `daemonExe` of a 1.x daemon: the Electron app, running the core as Node.
 fn is_legacy_exe(path: &str) -> bool {
-    let file = path.rsplit(['\\', '/']).next().unwrap_or(path).to_ascii_lowercase();
+    let file = path
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(path)
+        .to_ascii_lowercase();
     let stem = file.strip_suffix(".exe").unwrap_or(&file);
     matches!(stem, "spawnloft" | "spawnloft-desktop")
 }
@@ -84,7 +88,8 @@ fn dismiss(root: &Path) -> Result<(), String> {
         return Ok(());
     };
     rec.shown = true;
-    rec.write(&file).map_err(|e| format!("could not save the record: {e}"))
+    rec.write(&file)
+        .map_err(|e| format!("could not save the record: {e}"))
 }
 
 #[cfg(test)]
@@ -103,7 +108,9 @@ mod tests {
         assert!(is_route("/api/handover") && is_route("/api/handover/dismiss"));
         assert!(!is_route("/api/handovers"));
         assert!(is_legacy_exe(r"C:\Program Files\SpawnLoft\SpawnLoft.exe"));
-        assert!(is_legacy_exe("/Applications/SpawnLoft.app/Contents/MacOS/spawnloft-desktop"));
+        assert!(is_legacy_exe(
+            "/Applications/SpawnLoft.app/Contents/MacOS/spawnloft-desktop"
+        ));
         assert!(!is_legacy_exe(r"C:\x\resources\bin\spawnloft-core.exe"));
     }
 
