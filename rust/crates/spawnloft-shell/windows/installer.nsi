@@ -711,9 +711,8 @@ FunctionEnd
   FindClose $R7
 !macroend
 
-; SPAWNLOFT: Node runtimes moved aside by earlier updates, and other versions' runtime folders,
-; once nothing runs them (a held node.exe is not deleted, so its folder stays for the next
-; install). The folder of this build's version is the payload's own and is left to it.
+; SPAWNLOFT: Node runtimes moved aside by earlier updates, once nothing runs them (a held
+; node.exe is not deleted, so its folder stays for the next install)
 !macro SPAWNLOFT_CLEAN_OLD_RUNTIMES
   ClearErrors
   FindFirst $R7 $R8 "$INSTDIR\resources\runtime\old-*"
@@ -723,6 +722,12 @@ FunctionEnd
     FindNext $R7 $R8
   ${Loop}
   FindClose $R7
+!macroend
+
+; SPAWNLOFT: other versions' runtime folders, once nothing runs them. Only after this build's
+; runtime and runtime.json are in place: until then the installed copy still runs the old one,
+; and an install that stops early (cancelled, a held file) must leave it working.
+!macro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
   ClearErrors
   FindFirst $R7 $R8 "$INSTDIR\resources\runtime\node-*"
   ${DoWhile} $R8 != ""
@@ -1166,6 +1171,8 @@ Section Install
 
   ; SPAWNLOFT: the staged copy has done its job
   RMDir /r "$INSTDIR\resources\bin\staging"
+  ; and the Node runtimes of other versions, now that this one is in place
+  !insertmacro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
 
   ; SPAWNLOFT: task shims and server launchers rewritten for this install before any server
   ; starts again (2.3 step 8)
@@ -1327,9 +1334,11 @@ Section Uninstall
 
   ; Delete uninstaller
   Delete "$INSTDIR\uninstall.exe"
-  ; SPAWNLOFT: core binaries and Node runtimes moved aside by updates, once nothing runs them
+  ; SPAWNLOFT: core binaries and Node runtimes moved aside by updates, and other versions'
+  ; runtime folders, once nothing runs them
   !insertmacro SPAWNLOFT_CLEAN_OLD_CORES
   !insertmacro SPAWNLOFT_CLEAN_OLD_RUNTIMES
+  !insertmacro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
   RMDir /r "$INSTDIR\resources\bin\staging"
 
   {{#each resources_ancestors}}

@@ -398,6 +398,7 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $r = Run-Captured $nodeExe @("$PSScriptRoot\seed-1x.mjs", "$inst\resources\core", (Join-Path $env:RUNNER_TEMP 'seed2.json')) 120
     Check 'seeded through 2.0' ($r.code -eq 0) "$($r.out)$($r.err)"
     $seed = ($r.out.Trim() -split "`n")[-1] | ConvertFrom-Json
+    Cli2 @('task', 'add', 'live', '--do', 'backup', '--daily', '03:00') | Out-Null
     Cli2 @('start', 'live', '--detach') | Out-Null
     Check 'live runs' (Wait-Until { (Status2)['live'].status -eq 'running' } 90)
     $st = Check-Rust-Daemon $dataRoot 'live'
@@ -451,6 +452,8 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $mcpNodePid = Proc-Key $mcpNode.ProcessId
     Stop-Process -Id $mcp.Id -Force
     Check 'killing spawnloft-core mcp ends its Node too' (Wait-Until { -not (Pid-Alive $mcpNodePid) } 30) "node $mcpNodePid"
+    # a 2.x update runs no repair itself; the app's first start (or this) writes the record
+    Cli2 @('repair', '--json') | Out-Null
     Check-Entry-Point $dataRoot
     $probe.daemonAfterUpdate = Probe $daemon
     $script:result.probe = $probe

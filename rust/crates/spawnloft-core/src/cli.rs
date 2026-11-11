@@ -47,7 +47,9 @@ pub fn not_utf8() -> Outcome {
 
 /// Whether this command line belongs to the SpawnLoft CLI (forwarded to the Node core) rather
 /// than to this binary. Overlapping names go to the Node core unless the form is the one only
-/// the installer and the window use: `ui` with a window flag, `repair --quiet`.
+/// the installer and the window use: `ui` with a window flag, `repair --quiet`, `uninstall --yes`
+/// (whose fallback removes the scheduled tasks when the Node core cannot run, so it must never be
+/// reached by a person asking what `uninstall` does).
 pub fn forwards(args: &[std::ffi::OsString]) -> bool {
     let Some((command, rest)) = args.split_first() else {
         // no arguments: the CLI's own usage
@@ -57,12 +59,13 @@ pub fn forwards(args: &[std::ffi::OsString]) -> bool {
     match command.to_str() {
         Some(
             "--version" | "-V" | "version" | "--core-help" | "daemon" | "probe-process" | "handover"
-            | "uninstall" | "update",
+            | "update",
         ) => false,
         Some("ui") => !["--exit-with-stdin", "--core-dir", "--upstream", "--node"]
             .iter()
             .any(|f| has(f)),
         Some("repair") => !has("--quiet"),
+        Some("uninstall") => !has("--yes"),
         _ => true,
     }
 }
@@ -384,6 +387,8 @@ mod tests {
             &["ui", "--port", "8080"],
             &["repair"],
             &["repair", "--json"],
+            &["uninstall"],
+            &["uninstall", "--data"],
             &["frobnicate"],
         ] {
             assert!(forwards(&os(line)), "{line:?} should be forwarded");

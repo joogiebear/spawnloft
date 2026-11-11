@@ -16,9 +16,10 @@
 //! overwriting a `node.exe` a long-lived process (`spawnloft mcp`, the bot host, a console) still
 //! runs; the installer removes old folders once nothing holds them (A6).
 //!
-//! Which Node runs, in order: `SPAWNLOFT_NODE`; the bundled one; and only when there is no
-//! `resources/runtime` folder at all (a `cargo build` run from the repository) the first `node` on
-//! PATH. An installed copy never falls back to PATH: a stray system Node is not what was tested.
+//! Which Node runs: the bundled one whenever there is a `resources/runtime` folder, whatever the
+//! environment says (an installed copy runs only what was tested; a stray `SPAWNLOFT_NODE` or
+//! system Node is never picked up). Only without that folder (a `cargo build` run from the
+//! repository, the 1.x Electron internal builds) `SPAWNLOFT_NODE`, then the first `node` on PATH.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -81,14 +82,14 @@ pub fn node() -> Result<PathBuf, String> {
 
 /// [`node`] with its inputs given, for tests.
 pub fn node_with(env: Option<PathBuf>, runtime: Option<PathBuf>) -> Result<PathBuf, String> {
-    if let Some(p) = env {
-        return Ok(p);
-    }
     if let Some(runtime) = runtime
         && runtime.exists()
     {
         return bundled_node(&runtime)
             .map_err(|e| format!("the bundled Node.js is damaged ({e}); reinstall SpawnLoft"));
+    }
+    if let Some(p) = env {
+        return Ok(p);
     }
     crate::panel::path_node().ok_or_else(|| {
         "Node.js was not found: this is a development build with no bundled runtime \
@@ -97,21 +98,29 @@ pub fn node_with(env: Option<PathBuf>, runtime: Option<PathBuf>) -> Result<PathB
     })
 }
 
-/// The Node core's folder: `SPAWNLOFT_CORE_DIR`, else `resources/core` beside this binary's folder.
+/// The Node core's folder: `resources/core` beside this binary's folder; `SPAWNLOFT_CORE_DIR`
+/// only counts without a bundled runtime (a development build), as `SPAWNLOFT_NODE` does.
 pub fn core_dir() -> Option<PathBuf> {
-    if let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
+    let installed = runtime_dir().is_some_and(|r| r.exists());
+    if !installed && let Some(p) = std::env::var_os("SPAWNLOFT_CORE_DIR").filter(|p| !p.is_empty()) {
         return Some(PathBuf::from(p));
     }
     Some(resources_dir()?.join("core"))
 }
 
-/// Sets what every Node core started by this binary needs: who to name as the entry point, and
-/// no Electron switch left over from a 1.x environment.
+/// Sets what every Node core started by this binary needs: who to name as the entry point, no
+/// Electron switch left over from a 1.x environment, and none of the machine's own Node settings
+/// (`NODE_OPTIONS` could `--require` foreign code or open an inspector port in every SpawnLoft
+/// process; `NODE_PATH` changes what resolves).
 pub fn prepare(cmd: &mut Command) {
-    if let Ok(exe) = std::env::current_exe() {
-        cmd.env(ENTRY_ENV, exe);
+    match std::env::current_exe() {
+        Ok(exe) => cmd.env(ENTRY_ENV, exe),
+        // never pass on an entry inherited from someone else
+        Err(_) => cmd.env_remove(ENTRY_ENV),
+    };
+    for var in ["ELECTRON_RUN_AS_NODE", "NODE_OPTIONS", "NODE_PATH"] {
+        cmd.env_remove(var);
     }
-    cmd.env_remove("ELECTRON_RUN_AS_NODE");
 }
 
 /// `spawnloft-core <command...>` for a command the Rust core does not own (the CLI, `mcp`,
@@ -187,10 +196,14 @@ mod tests {
     }
 
     #[test]
-    fn env_wins() {
+    fn env_counts_only_without_a_runtime_folder() {
         let rt = temp("env");
-        let got = node_with(Some("/x/node".into()), Some(rt.clone())).unwrap();
+        let missing = rt.join("no-runtime-here");
+        let got = node_with(Some("/x/node".into()), Some(missing)).unwrap();
         assert_eq!(got, PathBuf::from("/x/node"));
+        // an installed copy ignores it: a damaged runtime is reported, not replaced
+        let e = node_with(Some("/x/node".into()), Some(rt.clone())).unwrap_err();
+        assert!(e.contains("damaged"), "{e}");
         let _ = std::fs::remove_dir_all(rt);
     }
 

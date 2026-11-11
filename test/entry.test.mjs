@@ -40,3 +40,8 @@ test('a bundled Node under an entry point is never shortened to a PATH lookup', 
   const cli = { exe: 'C:\\SpawnLoft\\resources\\runtime\\node-24.21.0\\node.exe', args: [], env: {}, viaEntry: true }
   assert.deepEqual(windowsRun(cli, 'mcp'), [`"${cli.exe}" mcp`])
 })
+
+test('a % in a path is doubled for the batch file', () => {
+  const cli = { exe: 'C:\\Users\\a%b%\\spawnloft-core.exe', args: [], env: {}, viaEntry: true }
+  assert.deepEqual(windowsRun(cli, 'task run x'), ['"C:\\Users\\a%%b%%\\spawnloft-core.exe" task run x'])
+})

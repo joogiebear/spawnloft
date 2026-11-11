@@ -253,9 +253,12 @@ function Node-Children([int] $parent) {
 # What 2.0 writes to disk names spawnloft-core, never a Node (A5): the files, and the record
 function Check-Entry-Point($dataRoot) {
   $core = "$inst\resources\bin\spawnloft-core.exe"
+  $ok = Wait-Until { $r = Read-Json (Join-Path $dataRoot 'run\runtime.json'); $r.format -eq 2 -and $r.exe -eq $core } 60
   $rt = Read-Json (Join-Path $dataRoot 'run\runtime.json')
-  Check 'run\runtime.json is format 2 and names spawnloft-core' ($rt.format -eq 2 -and $rt.exe -eq $core) "$($rt | ConvertTo-Json -Compress)"
-  foreach ($f in @(Get-ChildItem (Join-Path $dataRoot 'tasks') -Filter *.cmd -ErrorAction SilentlyContinue)) {
+  Check 'run\runtime.json is format 2 and names spawnloft-core' $ok "$($rt | ConvertTo-Json -Compress)"
+  $shims = @(Get-ChildItem (Join-Path $dataRoot 'tasks') -Filter *.cmd -ErrorAction SilentlyContinue)
+  Check 'there is a task shim to look at' ($shims.Count -ge 1)
+  foreach ($f in $shims) {
     $t = Get-Content $f.FullName -Raw
     Check "task shim $($f.Name) runs spawnloft-core" ($t.Contains("`"$core`"") -and $t -notmatch 'node(\.exe)?\b' -and $t -notmatch '\.mjs') $t
   }

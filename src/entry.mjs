@@ -39,10 +39,13 @@ export function cliCommand({ env = process.env, execPath = process.execPath, ele
 // The lines of a .cmd that run `<cli> <rest>`: any environment the runner needs, then the command.
 // A plain Node checkout keeps the bare `node` (a PATH lookup), as it always did; a bundled or
 // entry-point runner is named by its full path.
+// Paths are written with `%` doubled: in a batch file a single `%` starts a variable, so a folder
+// named `100%` would otherwise break the line.
 export function windowsRun(cli, rest) {
-  const runner = !cli.viaEntry && /[\\/]node(?:\.exe)?$/i.test(cli.exe) ? 'node' : `"${cli.exe}"`
+  const batch = (text) => String(text).replaceAll('%', '%%')
+  const runner = !cli.viaEntry && /[\\/]node(?:\.exe)?$/i.test(cli.exe) ? 'node' : `"${batch(cli.exe)}"`
   return [
-    ...Object.entries(cli.env).map(([key, value]) => `set ${key}=${value}`),
-    [runner, ...cli.args.map((a) => `"${a}"`), rest].join(' '),
+    ...Object.entries(cli.env).map(([key, value]) => `set ${key}=${batch(value)}`),
+    [runner, ...cli.args.map((a) => `"${batch(a)}"`), rest].join(' '),
   ]
 }
