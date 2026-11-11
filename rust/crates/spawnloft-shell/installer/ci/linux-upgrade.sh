@@ -63,11 +63,12 @@ install_pkg "$(pkg_file "$old" SpawnLoft)"
 test "$(installed_version)" = "$(pkgver "$old")" || fail "installed $(installed_version), not $old"
 test -e /opt/SpawnLoft/resources/app.asar || fail "$old has no app.asar: not an Electron build?"
 test "$(readlink -f /usr/bin/spawnloft-desktop)" = /opt/SpawnLoft/spawnloft-desktop || fail "1.x made no /usr/bin/spawnloft-desktop"
-# 1.x's Electron loads libasound without declaring it (every desktop has it, a container does not)
+# 1.x's Electron loads libasound and libgbm without declaring them (every desktop has them, a
+# container does not)
 if [ "$kind" = deb ]; then
-  apt-get install -y -qq libasound2t64 >/dev/null 2>&1 || apt-get install -y -qq libasound2 >/dev/null
+  apt-get install -y -qq libasound2t64 libgbm1 >/dev/null 2>&1 || apt-get install -y -qq libasound2 libgbm1 >/dev/null
 else
-  dnf install -y -q alsa-lib >/dev/null
+  dnf install -y -q alsa-lib mesa-libgbm >/dev/null
 fi
 
 # A server for 1.x to run: the test suite's fake one, on 1.x's own runtime (Electron as Node).
