@@ -3,15 +3,15 @@
 // port (2.1) takes Node out of the package. Bump the version and every hash together, from
 // https://nodejs.org/dist/v<version>/SHASUMS256.txt; the release gate checks the staged copy
 // against these.
-export const NODE_VERSION = '24.21.0'
+export const NODE_VERSION = '24.22.2'
 
 // archive file name (after node-v<version>-) -> sha256
 export const NODE_ARCHIVES = {
-  'win-x64.zip': '158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541',
-  'win-arm64.zip': '8779b1bde1d39f8d420e3b57aa657b39891af434d3de44a919044cec06785921',
-  'darwin-arm64.tar.xz': '6239d4cf92d864487ec8cd3615038f7b67e7f58b77b21cd2f09ea9fbd68065fe',
-  'linux-x64.tar.xz': 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6',
-  'linux-arm64.tar.xz': '6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2',
+  'win-x64.zip': 'ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2',
+  'win-arm64.zip': 'f47968c213105077f64c6510f007632c0ca2574802a0b5067c327c49abe1c468',
+  'darwin-arm64.tar.xz': '1f5ac075be50bed4780ea3be19a007fda95ea4d527d28d76d0b91de47d915115',
+  'linux-x64.tar.xz': '48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75',
+  'linux-arm64.tar.xz': 'eb187837a2230d4047161ac0be008584e16b46f726e9c9490ee35dc6b17d9ba8',
 }
 
 // Node's names for a platform and architecture (process.platform / process.arch values)

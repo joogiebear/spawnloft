@@ -138,7 +138,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION, plan D7)
+          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
           node-version-file: .node-version
       - name: Install the pinned toolchain
         if: matrix.daemon == 'rust'
@@ -198,7 +198,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # the Node SpawnLoft ships (desktop/build-cli-package.mjs NODE_VERSION, plan D7)
+          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
           node-version-file: .node-version
       - name: Core and desktop tests
         env:
