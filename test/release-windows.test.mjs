@@ -51,6 +51,8 @@ test('the bundler runs the signing script once per file, through Windows PowerSh
   assert.equal(c.cmd, 'powershell.exe')
   assert.deepEqual(c.args.slice(-3), ['-File', 'C:\\repo\\sign-windows.ps1', '%1'])
   assert.throws(() => signCommand('C:\\100%\\s.ps1'), /cannot hold/)
+  assert.equal(signCommand('C:\\s.ps1', 'pwsh.exe').cmd, 'pwsh.exe')
+  assert.throws(() => signCommand('C:\\s.ps1', 'cmd.exe'), /unknown PowerShell/)
 })
 
 test('nothing in the signed build path publishes', () => {

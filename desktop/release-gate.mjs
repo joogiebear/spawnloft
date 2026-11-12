@@ -50,6 +50,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
 import { checkRuntime, checkNoInternalStrings } from './payload-gate.mjs'
+import { windowsPowerShellEnv } from './windows-powershell.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const U = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
@@ -419,7 +420,8 @@ function authenticode(file) {
     const literal = file.replaceAll("'", "''")
     const out = execFileSync('powershell', ['-NoProfile', '-Command',
       `$s = Get-AuthenticodeSignature -LiteralPath '${literal}'; Write-Output $s.Status; Write-Output $s.SignerCertificate.Subject; Write-Output ($s.TimeStamperCertificate -ne $null)`],
-      { encoding: 'utf8', windowsHide: true, timeout: 60000 })
+      // started from PowerShell 7, 5.1 would inherit its module path and read every file as unsigned
+      { encoding: 'utf8', windowsHide: true, timeout: 60000, env: windowsPowerShellEnv() })
     const [status, subject, stamped] = String(out).trim().split(/\r?\n/)
     if (status !== 'Valid') return { ok: false, why: `Authenticode status is ${status || 'unreadable'}` }
     if (String(stamped).trim() !== 'True') return { ok: false, why: 'the Authenticode signature has no timestamp, so it dies when the certificate expires' }

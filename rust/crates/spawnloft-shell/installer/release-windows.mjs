@@ -36,7 +36,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SHELL = path.resolve(HERE, '..')
@@ -44,6 +44,7 @@ const RUST = path.resolve(SHELL, '../..')
 const ROOT = path.resolve(RUST, '..')
 export const TAURI_CLI_VERSION = '2.12.4'
 export const OPENJS_CN = 'OpenJS Foundation'
+const { windowsPowerShellEnv } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'windows-powershell.mjs')).href)
 
 export function parseArgs(argv) {
   const out = {}
@@ -94,12 +95,23 @@ function read(cmd, args, { cwd = ROOT, shell = false, allowFail = false } = {}) 
   return res.stdout.trim()
 }
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
-const ps = script => ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
+const psFile = script => ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
+// Which PowerShell has the signing module: PowerShell 7 first (Install-Module from a PowerShell 7
+// prompt puts it there), then Windows PowerShell 5.1. Each is asked with its own module path.
+function signingHost() {
+  for (const host of ['pwsh.exe', 'powershell.exe']) {
+    const res = spawnSync(host, ['-NoProfile', '-NonInteractive', '-Command', "if (Get-Module -ListAvailable -Name TrustedSigning, ArtifactSigning) { 'yes' }"],
+      { encoding: 'utf8', windowsHide: true, env: windowsPowerShellEnv() })
+    if (!res.error && res.stdout.trim() === 'yes') return host
+  }
+  return null
+}
 
 function signer(file) {
   const literal = file.replaceAll("'", "''")
-  const out = read('powershell', ['-NoProfile', '-Command', `$s = Get-AuthenticodeSignature -LiteralPath '${literal}'; Write-Output $s.Status; Write-Output $s.SignerCertificate.Subject; Write-Output $s.SignerCertificate.Thumbprint`], { allowFail: true })
-  const [status, subject, thumbprint] = String(out ?? '').split(/\r?\n/)
+  const res = spawnSync('powershell', ['-NoProfile', '-Command', `$s = Get-AuthenticodeSignature -LiteralPath '${literal}'; Write-Output $s.Status; Write-Output $s.SignerCertificate.Subject; Write-Output $s.SignerCertificate.Thumbprint`],
+    { encoding: 'utf8', windowsHide: true, env: windowsPowerShellEnv() })
+  const [status, subject, thumbprint] = String(res.stdout ?? '').trim().split(/\r?\n/)
   return { status: status?.trim() || 'unreadable', cn: /CN=([^,]+)/.exec(subject || '')?.[1] ?? null, thumbprint: thumbprint?.trim() || null }
 }
 
@@ -123,13 +135,14 @@ async function main(argv) {
   const desktopPackage = JSON.parse(fs.readFileSync(path.join(ROOT, 'desktop', 'package.json'), 'utf8'))
   const settings = signingSettings(desktopPackage)
   const publisher = settings.SPAWNLOFT_SIGN_PUBLISHER
-  const hasModule = read('powershell', ['-NoProfile', '-Command', "if (Get-Module -ListAvailable -Name TrustedSigning, ArtifactSigning) { 'yes' }"], { allowFail: true })
-  if (hasModule !== 'yes') stop('no signing module. Install it once: Install-Module -Name TrustedSigning -Scope CurrentUser')
+  const host = signingHost()
+  if (!host) stop('no signing module. Install it once: Install-Module -Name TrustedSigning -Scope CurrentUser')
   if (fs.existsSync(out) && fs.readdirSync(out).length) stop(`${out} already holds a build. Move it away or pick another --out.`)
-  console.log(`${version} from ${branch} at ${commit.slice(0, 12)}, signed as "${publisher}"`)
+  console.log(`${version} from ${branch} at ${commit.slice(0, 12)}, signed as "${publisher}" (through ${host})`)
 
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-signed-'))
-  const env = { ...process.env, ...settings, SPAWNLOFT_VERSION: version, SPAWNLOFT_COMMIT: commit }
+  // no PSModulePath: each PowerShell builds its own (desktop/windows-powershell.mjs)
+  const env = { ...windowsPowerShellEnv(), ...settings, SPAWNLOFT_SIGN_HOST: host, SPAWNLOFT_VERSION: version, SPAWNLOFT_COMMIT: commit }
   const signScript = path.join(HERE, 'sign-windows.ps1')
 
   step('Installing the pinned Tauri CLI')
@@ -166,7 +179,7 @@ async function main(argv) {
   if (!reported.includes(version)) stop(`spawnloft-core.exe reports "${reported}", not ${version}`)
 
   step('Signing the Rust core (the bundler does not sign resources)')
-  run('powershell', [...ps(signScript), coreExe], { env })
+  run(host, [...psFile(signScript), coreExe], { env })
 
   step('Staging the installer configuration and the bundled Node')
   const cfg = path.join(work, 'cfg')

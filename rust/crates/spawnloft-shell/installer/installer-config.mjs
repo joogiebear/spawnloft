@@ -31,6 +31,8 @@ const args = process.argv.slice(2)
 const feedHttp = args.includes('--feed-http')
 const signAt = args.indexOf('--sign-script')
 const signScript = signAt >= 0 ? args[signAt + 1] : null
+// the PowerShell that runs it: release-windows.mjs passes the one that has the signing module
+const signHost = process.env.SPAWNLOFT_SIGN_HOST || 'powershell.exe'
 if (signAt >= 0 && !signScript) {
   console.error('--sign-script needs the path of the signing script')
   process.exit(64)
@@ -96,7 +98,7 @@ const overlay = {
     },
     windows: {
       nsis: { installerHooks: hooks },
-      ...(signScript ? { signCommand: signCommand(resolve(signScript)) } : {}),
+      ...(signScript ? { signCommand: signCommand(resolve(signScript), signHost) } : {}),
     },
   },
   plugins: {
