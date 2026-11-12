@@ -117,6 +117,11 @@ reconstruction from a month of commit messages.
 
 ### Betas
 
+> **The 2.0 line (`v2`) retires this pipeline.** `desktop-preview` and `desktop-stable` are
+> removed on `v2` so that merging it into `dev` cannot publish an Electron build to 1.6 beta
+> users. 2.x betas are published only from the Tauri release workflow, on Victor's confirmation.
+> What follows describes 1.x as it still runs on `dev` and `main`.
+
 The `desktop-preview` workflow builds the same `dev` commit natively on Windows x64, Apple
 Silicon Mac, Linux x64 and Linux arm64. It publishes one numbered beta only after all four
 pass core tests, bundle verification and the packaged-app smoke checks; on Linux the `.deb` is

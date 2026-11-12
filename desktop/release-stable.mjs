@@ -15,6 +15,12 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
+// Retired on the 2.0 line (v2): no further 1.x release is made (design 1 and 12), and the
+// desktop-stable workflow this drives was removed so that merging v2 can never ship an Electron
+// build. 1.x stables are made from main, which still carries the 1.x tree.
+console.error('The Electron stable release is retired on the 2.0 line. 2.x releases go through the Tauri release workflow.')
+process.exit(1)
+
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(HERE, '..')
 const REPO = 'joogiebear/spawnloft'
