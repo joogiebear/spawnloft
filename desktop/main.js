@@ -638,7 +638,7 @@ if (!app.requestSingleInstanceLock()) {
     const openApp = async () => {
       if (await needsSetup()) {
         const theme = appearance.readTheme()
-        const setupUrl = pathToFileURL(path.join(__dirname, 'setup.html'))
+        const setupUrl = pathToFileURL(path.join(core.dir, 'src', 'setup.html'))
         setupUrl.searchParams.set('theme', theme)
         createWindow(setupUrl.href, theme)
       } else {

@@ -46,6 +46,12 @@ pub fn uid() -> u32 {
 /// Unix programs have no console window to hide.
 pub fn hide_window(_cmd: &mut Command) {}
 
+/// Windows only (a kill-on-close job, see platform/windows.rs). Here the children this is used
+/// for end when the pipe to their stdin closes, which a kill of this process closes too.
+pub fn end_with_this_process(_child: &Child) -> bool {
+    false
+}
+
 /// Puts the server in a process group of its own, led by it, so `kill(-pid)` reaches its forks.
 pub fn prepare_server(cmd: &mut Command) {
     cmd.process_group(0);

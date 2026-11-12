@@ -3,8 +3,9 @@
 //!
 //! It spawns `spawnloft-core ui --port 0` and opens one window on the address that prints,
 //! exactly as step 2's Electron will, so step 3 changes nothing below the window. Everything the
-//! panel does goes through that HTTP endpoint; the window itself has no Tauri API exposed to the
-//! page (capabilities/default.json).
+//! panel does goes through that HTTP endpoint; what only a window can do (pickers, the interface
+//! size, the system browser, the file manager, extra windows, downloads) is `bridge.rs`, granted
+//! to exactly the panel's origin.
 //!
 //! Also here, because they are what the spike has to prove:
 //! - the argv compatibility form (REVIEW-REV3 B1): `SpawnLoft.exe <...>\mcctl.mjs <command...>`,
@@ -17,26 +18,75 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, ExitCode, Stdio};
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::webview::PageLoadEvent;
-use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+mod bridge;
+mod local;
 mod updater;
+mod winstate;
+mod zoom;
+
+/// How long the core may take to print its address before the window says it could not start.
+const CORE_READY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 
 /// The running `spawnloft-core ui` and the pipe that keeps it alive (it exits when stdin closes).
 #[derive(Debug, Default)]
 pub struct Core {
     child: Mutex<Option<(Child, ChildStdin)>>,
+    /// Times the core was started again after it ended by itself (a crash, a kill).
+    restarts: std::sync::atomic::AtomicU32,
 }
+
+/// How many times a core that ends by itself is started again before the window gives up.
+const CORE_RESTARTS: u32 = 3;
+/// A core up this long before it ended counts as having worked: the restart count starts over.
+const CORE_STABLE: std::time::Duration = std::time::Duration::from_secs(300);
 
 impl Core {
     pub fn is_running(&self) -> bool {
         self.child.lock().is_ok_and(|g| g.is_some())
+    }
+
+    /// Whether the core with this pid is the one the window uses now (a restart may have
+    /// replaced it while its address line was on the way).
+    fn is_current(&self, pid: u32) -> bool {
+        self.child
+            .lock()
+            .is_ok_and(|g| g.as_ref().is_some_and(|(c, _)| c.id() == pid))
+    }
+
+    /// Puts a new core in the slot; one already there (two starts that overlapped) is stopped
+    /// and reaped, never left running unowned.
+    fn replace(&self, child: Child, stdin: ChildStdin) {
+        let old = self.child.lock().ok().and_then(|mut g| g.replace((child, stdin)));
+        if let Some((mut c, stdin)) = old {
+            drop(stdin);
+            let _ = c.kill();
+            let _ = c.wait();
+        }
+    }
+
+    /// The core with this pid ended by itself (it is still the one in the slot, so nobody stopped
+    /// it): reap it and say so.
+    fn ended_by_itself(&self, pid: u32) -> bool {
+        let Ok(mut guard) = self.child.lock() else {
+            return false;
+        };
+        if guard.as_ref().is_none_or(|(c, _)| c.id() != pid) {
+            return false;
+        }
+        if let Some((mut child, _)) = guard.take() {
+            let _ = child.wait();
+        }
+        true
     }
 
     pub fn stop(&self) {
@@ -67,23 +117,35 @@ fn main() -> ExitCode {
     // nothing below reads argv, so they are ignored by construction (design 5.6).
     resume_pending_handover();
 
+    local::carry_over_electron_files();
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
+            if let Some(w) = app.get_webview_window(bridge::MAIN) {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
             }
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // used from Rust only: no capability grants the page any of its commands
+        .plugin(tauri_plugin_dialog::init())
         .manage(Core::default())
         .manage(updater::Ready::default())
+        .manage(bridge::Shell::new())
+        .invoke_handler(bridge::handler())
         .setup(move |app| {
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("SpawnLoft")
-                .inner_size(1280.0, 800.0)
-                .min_inner_size(900.0, 600.0)
-                .build()?;
+            if let Err(e) = bridge::build_main(app.handle()) {
+                // on Windows this is where a missing WebView2 runtime ends up (design 2.6)
+                fatal(
+                    "SpawnLoft could not open its window",
+                    &format!(
+                        "{e}\n\nOn Windows, SpawnLoft needs Microsoft Edge WebView2. Install the \
+                         Evergreen runtime from https://developer.microsoft.com/microsoft-edge/webview2/ \
+                         and open SpawnLoft again. Your servers keep running either way."
+                    ),
+                );
+            }
             start_core(app.handle().clone());
             if let Some(core) = core_binary() {
                 updater::start(app.handle().clone(), core);
@@ -98,10 +160,7 @@ fn main() -> ExitCode {
         .build(tauri::generate_context!());
     let app = match app {
         Ok(a) => a,
-        Err(e) => {
-            spike_log(&format!("could not start: {e}"));
-            return ExitCode::from(1);
-        }
+        Err(e) => fatal("SpawnLoft could not start", &e.to_string()),
     };
     app.run(|app, event| match event {
         // the last window closed: a verified, downloaded update installs now (on Windows the
@@ -111,7 +170,10 @@ fn main() -> ExitCode {
                 api.prevent_exit();
             }
         }
-        RunEvent::Exit => app.state::<Core>().stop(),
+        RunEvent::Exit => {
+            app.state::<bridge::Shell>().flush();
+            app.state::<Core>().stop();
+        }
         _ => {}
     });
     ExitCode::SUCCESS
@@ -172,23 +234,30 @@ fn resume_pending_handover() {
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        if let Err(e) = cmd.spawn() {
-            spike_log(&format!("{}: {e}", args.join(" ")));
+        match cmd.spawn() {
+            // reaped when it ends, so no zombie stays behind on macOS and Linux
+            Ok(mut child) => {
+                std::thread::spawn(move || child.wait());
+            }
+            Err(e) => local::log(&format!("{}: {e}", args.join(" "))),
         }
     }
 }
 
 pub(crate) fn start_core(app: tauri::AppHandle) {
     let (Some(bin), Some(dir)) = (core_binary(), core_dir()) else {
-        spike_log("no core binary path");
+        cannot_start(&app, "this installation has no core program (resources/bin)");
         return;
     };
     let mut cmd = Command::new(&bin);
+    // the core's stderr, and the Node panel's under it, go where `doctor` already looks
+    let stderr = local::panel_log().map_or_else(Stdio::null, Stdio::from);
     cmd.args(["ui", "--port", "0", "--exit-with-stdin", "--core-dir"])
         .arg(&dir)
+        .env("SPAWNLOFT_SHELL", "tauri")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(stderr);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -198,17 +267,26 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
-            spike_log(&format!("could not start {}: {e}", bin.display()));
+            cannot_start(&app, &format!("{} did not start: {e}", bin.display()));
             return;
         }
     };
+    // Windows: the core also ends if this process is killed before it can close the pipe
+    spawnloft_lib::platform::end_with_this_process(&child);
     let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
         let _ = child.kill();
         return;
     };
-    if let Ok(mut guard) = app.state::<Core>().child.lock() {
-        *guard = Some((child, stdin));
-    }
+    let pid = child.id();
+    let started = std::time::Instant::now();
+    app.state::<Core>().replace(child, stdin);
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let watchdog = app.clone();
+    std::thread::spawn(move || {
+        if rx.recv_timeout(CORE_READY_TIMEOUT) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+            cannot_start(&watchdog, "the core did not print its address within 90 seconds");
+        }
+    });
     std::thread::spawn(move || {
         let mut opened = false;
         for line in BufReader::new(stdout).lines() {
@@ -220,16 +298,103 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
                 continue;
             };
             opened = true;
-            match (url.trim().parse(), app.get_webview_window("main")) {
-                (Ok(url), Some(w)) => {
-                    if let Err(e) = w.navigate(url) {
-                        spike_log(&format!("navigate: {e}"));
-                    }
-                }
-                _ => spike_log(&format!("bad panel address `{url}`")),
+            let _ = tx.send(());
+            // a core replaced in the meantime must not point the window at its port
+            if app.state::<Core>().is_current(pid) {
+                open_panel(&app, url.trim());
             }
         }
+        // stdout ended: the core exited, or was stopped (quit, restart), which takes it out of
+        // the slot first
+        let core = app.state::<Core>();
+        if !core.ended_by_itself(pid) {
+            return;
+        }
+        if !opened {
+            let _ = tx.send(());
+            return cannot_start(&app, "the core exited before the panel was ready; see panel.log");
+        }
+        // it was serving the window: start it again, a few times, and open the panel once more
+        // (servers are separate processes and never noticed)
+        // a core that served for a while before it ended starts the count again
+        if started.elapsed() > CORE_STABLE {
+            core.restarts.store(0, std::sync::atomic::Ordering::SeqCst);
+        }
+        let n = core.restarts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        if n > CORE_RESTARTS {
+            return cannot_start(&app, "the core keeps stopping; see panel.log");
+        }
+        local::log(&format!(
+            "the core ended by itself; starting it again ({n} of {CORE_RESTARTS})"
+        ));
+        bridge::clear_panel(&app);
+        start_core(app.clone());
     });
+}
+
+/// The panel answers at `url`: grant it the bridge, then show the first-run wizard if the panel
+/// says this machine has no locations yet, the panel otherwise.
+fn open_panel(app: &tauri::AppHandle, url: &str) {
+    let parsed: tauri::Url = match url.parse() {
+        Ok(u) => u,
+        Err(_) => return cannot_start(app, &format!("the core printed a bad address `{url}`")),
+    };
+    if let Err(e) = bridge::set_panel(app, &parsed) {
+        return cannot_start(app, &e);
+    }
+    let mut target = parsed.clone();
+    if let Some(addr) = app.state::<bridge::Shell>().panel_addr() {
+        match local::panel_get(addr, "/api/setup") {
+            Ok(v) if v["needed"] == serde_json::Value::Bool(true) => target.set_path("/setup"),
+            Ok(_) => {}
+            Err(e) => local::log(&format!("could not ask the panel about first-run setup: {e}")),
+        }
+    }
+    match app.get_webview_window(bridge::MAIN) {
+        Some(w) => {
+            if let Err(e) = w.navigate(target) {
+                local::log(&format!("navigate: {e}"));
+            }
+        }
+        None => local::log("no main window to show the panel in"),
+    }
+}
+
+/// The window is up but the core is not: say so in a dialog (1.x showed one too), with where
+/// to look. Servers are separate processes and are not affected.
+fn cannot_start(app: &tauri::AppHandle, why: &str) {
+    local::log(&format!("could not start the panel: {why}"));
+    let log = local::run_dir().join("panel.log");
+    app.dialog()
+        .message(format!(
+            "{why}\n\nRunning servers are not affected. Details are in {}.",
+            log.display()
+        ))
+        .title("SpawnLoft could not start its panel")
+        .kind(MessageDialogKind::Error)
+        .show(|_| {});
+}
+
+/// Before there is an event loop (no window could be made): a native message box, then exit.
+fn fatal(title: &str, text: &str) -> ! {
+    local::log(&format!("{title}: {text}"));
+    message_box(title, text);
+    std::process::exit(1);
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn message_box(title: &str, text: &str) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
+    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let (t, m) = (wide(title), wide(text));
+    // SAFETY: two NUL-terminated UTF-16 strings that outlive the call, and no owner window.
+    unsafe { MessageBoxW(std::ptr::null_mut(), m.as_ptr(), t.as_ptr(), MB_OK | MB_ICONERROR) };
+}
+
+#[cfg(not(windows))]
+fn message_box(title: &str, text: &str) {
+    eprintln!("{title}\n{text}");
 }
 
 /// `SpawnLoft.exe <path ending in mcctl.mjs or spawnloft.mjs> <command...>`: what 1.x task shims,
@@ -244,7 +409,7 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
         return None;
     }
     let Some(core) = core_binary() else {
-        spike_log("argv compatibility: no core binary path");
+        local::log("argv compatibility: no core binary path");
         return Some(ExitCode::from(127));
     };
     let mut cmd = Command::new(&core);
@@ -256,7 +421,7 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
     Some(match run_forwarder(cmd) {
         Ok(code) => ExitCode::from(u8::try_from(code).unwrap_or(1)),
         Err(e) => {
-            spike_log(&format!("argv compatibility: {}: {e}", core.display()));
+            local::log(&format!("argv compatibility: {}: {e}", core.display()));
             ExitCode::from(1)
         }
     })
@@ -292,13 +457,4 @@ fn measure(started: Instant) {
         started.elapsed().as_millis()
     );
     let _ = std::fs::write(path, line);
-}
-
-fn spike_log(msg: &str) {
-    let Some(path) = std::env::var_os("SPAWNLOFT_SPIKE_LOG") else {
-        return;
-    };
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(f, "{} {msg}", epoch_ms());
-    }
 }

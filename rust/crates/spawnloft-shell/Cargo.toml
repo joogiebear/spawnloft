@@ -24,6 +24,14 @@ tauri = { version = "=2.12.5", features = [] }
 serde_json = "1.0.154"
 tauri-plugin-updater = "=2.14.1"
 tauri-plugin-single-instance = "=2.5.5"
+# native pickers and message boxes, used from Rust only: the page gets none of their commands
+tauri-plugin-dialog = "=2.8.4"
+# the system browser, the file manager and "show in folder", Rust only like the dialog plugin
+tauri-plugin-opener = "=2.7.3"
+
+[target.'cfg(windows)'.dependencies]
+# the message box for a window that cannot open at all (no WebView2): there is no event loop yet
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging"] }
 
 [lints]
 workspace = true

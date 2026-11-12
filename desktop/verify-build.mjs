@@ -150,7 +150,7 @@ if (!fs.existsSync(asar)) {
 } else {
   // package.json's `files` is an allowlist; anything added to desktop/ and not listed is silently left out
   const bytes = fs.readFileSync(asar)
-  for (const name of ['main.js', 'preload.js', 'setup.html', 'window-state.js', 'ui-zoom.js', 'update-channel.js', 'major-update.js', 'launcher-window.js', 'login-window.js']) {
+  for (const name of ['main.js', 'preload.js', 'window-state.js', 'ui-zoom.js', 'update-channel.js', 'major-update.js', 'launcher-window.js', 'login-window.js']) {
     if (!bytes.includes(Buffer.from(name))) problems.push(`${name} is not in app.asar - check the "files" list in package.json`)
   }
   // internal builds: the update check is off in the packaged package.json, and no feed config ships
@@ -163,7 +163,7 @@ if (!fs.existsSync(asar)) {
       notes.push('updates: off in this internal build, and no app-update.yml')
     }
   }
-  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js, major-update.js, launcher-window.js, login-window.js and setup.html are packaged')
+  if (!problems.some((p) => p.includes('app.asar'))) notes.push('app: main.js, preload.js, window-state.js, ui-zoom.js, update-channel.js, major-update.js, launcher-window.js, login-window.js are packaged')
 }
 
 // Artifact Signing certificates live about three days, so without a timestamp every signature
@@ -188,7 +188,7 @@ function checkSignature(file) {
   return { ok: true, publisher: cn ? cn[1] : subject }
 }
 
-// setup.html loads from disk before the panel server exists, so it can't share a stylesheet with
+// src/setup.html loads from disk (Electron) before the panel server exists, so it can't share a stylesheet with
 // ui.html; the two :root token blocks are duplicated and must stay identical.
 function checkTokensMatch() {
   const grab = (file) => {
@@ -203,7 +203,7 @@ function checkTokensMatch() {
     return m ? m[1] : null
   }
   const panel = grab(path.join(HERE, '..', 'src', 'ui.html'))
-  const wizard = grab(path.join(HERE, 'setup.html'))
+  const wizard = grab(path.join(HERE, '..', 'src', 'setup.html'))
   if (!panel || !wizard) return { ok: false, why: 'a :root block could not be found in one of them' }
   if (panel === wizard) return { ok: true, count: (panel.match(/^ {4}--/gm) || []).length }
 
@@ -235,7 +235,7 @@ if (LINUX) {
 
 const tokens = checkTokensMatch()
 if (tokens.ok) notes.push(`tokens: the panel and the wizard share the same ${tokens.count}`)
-else problems.push(`the design tokens in src/ui.html and desktop/setup.html have drifted - ${tokens.why}.`)
+else problems.push(`the design tokens in src/ui.html and src/setup.html have drifted - ${tokens.why}.`)
 
 for (const note of notes) process.stdout.write(`  ok   ${note}\n`)
 if (problems.length) {

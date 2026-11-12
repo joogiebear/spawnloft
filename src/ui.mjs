@@ -37,6 +37,7 @@ import * as configFiles from './config-files.mjs'
 import * as files from './files.mjs'
 import * as activity from './activity.mjs'
 import * as client from './client.mjs'
+import * as firstRun from './first-run.mjs'
 import { platformRefusal } from './client-meta.mjs'
 import * as clientAuth from './client-auth.mjs'
 import * as clientLogin from './client-login.mjs'
@@ -108,6 +109,11 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
 }
 
 let panelPort = null
+
+// the panel runs behind the desktop window (spawnloft-core ui, started by the Tauri shell)
+function behindWindow() {
+  return process.env.SPAWNLOFT_SHELL === 'tauri'
+}
 
 // The panel process's own log. Never rotated: it only gets a line when something is wrong.
 export function panelLog(msg) {
@@ -1339,9 +1345,17 @@ async function handleAccounts(req, res, seg, url) {
   return json(res, 405, { error: 'method not allowed' })
 }
 
+// Behind spawnloft-core's proxy (the Tauri window) the browser must come back through the
+// proxy's port, the one the window knows and checks the authorize URL against; the core says
+// which in SPAWNLOFT_PANEL_PUBLIC_PORT. Microsoft matches localhost redirects on any port.
+function publicPort() {
+  const p = Number(process.env.SPAWNLOFT_PANEL_PUBLIC_PORT)
+  return Number.isInteger(p) && p > 0 && p < 65536 ? p : panelPort
+}
+
 function callbackUri() {
   if (!panelPort) fail('the panel has no port yet; try again')
-  return `http://localhost:${panelPort}/api/client/accounts/login/callback`
+  return `http://localhost:${publicPort()}/api/client/accounts/login/callback`
 }
 
 // What Microsoft's window shows after the redirect: a few words and no script. The window is
@@ -1434,7 +1448,35 @@ async function route(req, res) {
     return
   }
 
+  // the first-run wizard, for the Tauri window (Electron loads the same file from disk); the theme
+  // goes in as on / so the first frame has the right colours
+  // only behind the Tauri window, which sets SPAWNLOFT_SHELL for the core and so for this panel:
+  // a panel in a browser moves its data with `spawnloft config set-root`, never over HTTP
+  if (url.pathname === '/setup' && !behindWindow()) return json(res, 404, { error: 'not found' })
+  if (url.pathname === '/setup') {
+    const html = readFileSync(path.join(HERE, 'setup.html'), 'utf8')
+      .replace("new URLSearchParams(location.search).get('theme')", JSON.stringify(readTheme()))
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-frame-options': 'DENY',
+      'content-security-policy': "frame-ancestors 'none'",
+    })
+    res.end(html)
+    return
+  }
+
   if (seg[0] !== 'api') return json(res, 404, { error: 'not found' })
+
+  if (seg[1] === 'setup') {
+    if (seg.length === 2 && req.method === 'GET') return json(res, 200, firstRun.getSetup())
+    if (seg.length === 2 && req.method === 'POST') {
+      if (!behindWindow()) return json(res, 403, { error: 'only the SpawnLoft window can change where SpawnLoft keeps its files; use spawnloft config set-root' })
+      return json(res, 200, firstRun.saveSetup(await readBody(req)))
+    }
+    if (seg.length === 3 && seg[2] === 'java' && req.method === 'GET') return json(res, 200, await firstRun.checkJava())
+    return json(res, 405, { error: 'method not allowed' })
+  }
 
   // separate from /settings so a palette change can't touch data locations
   if (seg[1] === 'appearance' && seg.length === 2) {

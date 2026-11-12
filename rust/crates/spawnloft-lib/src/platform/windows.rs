@@ -54,6 +54,44 @@ pub fn prepare_server(cmd: &mut Command) {
     cmd.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
 }
 
+/// Ends `child` when this process ends, however it ends (a kill included): the child goes into a
+/// kill-on-close job whose only handle this process holds, on purpose, until it exits. Silent
+/// breakaway is set, so nothing the child starts is in the job: the Node panel's server daemons
+/// must outlive the panel, the window and this process. Used for the window's core and the core's
+/// Node panel (P0-F review M3/L4); `false` when the job could not be made, which only loses the
+/// belt: both children also end when the pipe to their stdin closes.
+pub fn end_with_this_process(child: &Child) -> bool {
+    // SAFETY: default security, no name; the result is checked.
+    let Some(job) = owned(unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) }) else {
+        return false;
+    };
+    // SAFETY: a zeroed limit structure is valid; only LimitFlags is set.
+    let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
+    info.BasicLimitInformation.LimitFlags =
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+    // SAFETY: a valid job handle, and the structure and size the information class documents.
+    let set = unsafe {
+        SetInformationJobObject(
+            job.as_raw_handle() as HANDLE,
+            JobObjectExtendedLimitInformation,
+            (&raw const info).cast(),
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        )
+    };
+    if set == 0 {
+        return false;
+    }
+    // SAFETY: both handles are valid for the duration of the call.
+    let assigned =
+        unsafe { AssignProcessToJobObject(job.as_raw_handle() as HANDLE, child.as_raw_handle() as HANDLE) };
+    if assigned == 0 {
+        return false;
+    }
+    // held until this process exits; closing it is what ends the child
+    std::mem::forget(job);
+    true
+}
+
 /// Resumes every thread of a process started with CREATE_SUSPENDED (it has just the one).
 fn resume(pid: u32) -> std::io::Result<()> {
     // SAFETY: a thread snapshot of the system; the handle is checked and owned below.

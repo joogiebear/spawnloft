@@ -43,6 +43,10 @@ pub const READY_PREFIX: &str = "SpawnLoft panel: ";
 
 const HEAD_LIMIT: usize = 64 * 1024;
 const UPSTREAM_START_TIMEOUT: Duration = Duration::from_secs(60);
+/// How long a client may take to send a request head (P0-F review L5): a connection that never
+/// finishes one would otherwise hold a thread for ever. Bodies and responses have no limit, since
+/// uploads are slow and the panel's event streams stay open for hours.
+const HEAD_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Runs until killed (or stdin closes with `exit_with_stdin`). Returns an exit code only when it
 /// could not start.
@@ -74,7 +78,7 @@ pub fn run(opts: Options) -> i32 {
                 return 64;
             }
         },
-        None => match start_node_panel(&opts, &child) {
+        None => match start_node_panel(&opts, &child, local.port()) {
             Ok(addr) => Upstream::Node(addr),
             Err(why) => {
                 eprintln!("spawnloft-core ui: no Node panel: {why}");
@@ -115,7 +119,11 @@ enum Upstream {
     Missing(String),
 }
 
+/// Set once this process is stopping the Node panel on purpose, so its end is not a crash.
+static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn stop_child(child: &Mutex<Option<Child>>) {
+    STOPPING.store(true, std::sync::atomic::Ordering::SeqCst);
     if let Ok(mut guard) = child.lock()
         && let Some(mut c) = guard.take()
     {
@@ -182,7 +190,14 @@ fn gui_fallback_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<SocketAddr, String> {
+/// `public_port` is this proxy's port: the Node panel puts it in the Microsoft sign-in's redirect
+/// URI (`SPAWNLOFT_PANEL_PUBLIC_PORT`), so the browser comes back through the address the window
+/// knows and can check, not the upstream's.
+fn start_node_panel(
+    opts: &Options,
+    slot: &Mutex<Option<Child>>,
+    public_port: u16,
+) -> Result<SocketAddr, String> {
     let core_dir = opts
         .core_dir
         .clone()
@@ -194,9 +209,12 @@ fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<Socke
     let node = find_node(opts.node.as_deref())?;
     let mut cmd = Command::new(&node);
     cmd.arg(&entry)
-        .args(["ui", "--port", "0", "--no-open"])
+        // --exit-with-stdin: the panel ends when this process does, a kill included, because the
+        // pipe closes with it (no Node panel left behind by a killed core)
+        .args(["ui", "--port", "0", "--no-open", "--exit-with-stdin"])
         .current_dir(&core_dir)
-        .stdin(Stdio::null())
+        .env("SPAWNLOFT_PANEL_PUBLIC_PORT", public_port.to_string())
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
     // the panel names this binary in what it writes to disk (shims, launchers, MCP config)
@@ -210,6 +228,12 @@ fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<Socke
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not start {}: {e}", node.display()))?;
+    // Windows: also a kill-on-close job, for a Node that is busy and not reading its stdin
+    crate::platform::end_with_this_process(&child);
+    // the write end stays open as long as this process lives; never written to
+    if let Some(stdin) = child.stdin.take() {
+        std::mem::forget(stdin);
+    }
     let stdout = child.stdout.take().ok_or("no stdout from the Node panel")?;
     if let Ok(mut guard) = slot.lock() {
         *guard = Some(child);
@@ -228,6 +252,11 @@ fn start_node_panel(opts: &Options, slot: &Mutex<Option<Child>>) -> Result<Socke
         }
         if !sent {
             let _ = tx.send(None);
+        } else if !STOPPING.load(std::sync::atomic::Ordering::SeqCst) {
+            // the Node panel died under a running proxy: end too, so the window (which starts the
+            // core again when it ends by itself) brings both back instead of serving 502s for ever
+            eprintln!("spawnloft-core ui: the Node panel exited; stopping so the window can start it again");
+            std::process::exit(70);
         }
     });
     match rx.recv_timeout(UPSTREAM_START_TIMEOUT) {
@@ -351,7 +380,14 @@ pub fn rewrite_head(head: &Head, upstream: SocketAddr) -> Vec<u8> {
 fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
+    // one deadline for the whole head, not per read: a byte every 29 s would otherwise hold on
+    let deadline = std::time::Instant::now() + HEAD_TIMEOUT;
     let (head, used) = loop {
+        let left = deadline.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() {
+            return Ok(());
+        }
+        conn.set_read_timeout(Some(left))?;
         let n = conn.read(&mut chunk)?;
         if n == 0 {
             return Ok(());
@@ -399,6 +435,7 @@ fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::
         };
         return respond(&mut conn, status, "application/json", json.to_string().as_bytes());
     }
+    conn.set_read_timeout(None)?;
     let addr = match upstream {
         Upstream::Node(addr) => *addr,
         Upstream::Missing(why) => return missing(&mut conn, &head, why),

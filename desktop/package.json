@@ -27,7 +27,6 @@
     "files": [
       "main.js",
       "preload.js",
-      "setup.html",
       "window-state.js",
       "ui-zoom.js",
       "update-channel.js",

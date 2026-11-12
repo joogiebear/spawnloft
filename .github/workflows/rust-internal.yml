@@ -95,6 +95,24 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Tests
         run: cargo test --workspace --locked
+      # The Tauri window itself, driven through WebDriver (desktop/smoke-tauri.cjs): Linux only,
+      # where WebKitWebDriver exists; Windows would need an msedgedriver matching the runner's
+      # WebView2, and WKWebView has none.
+      - name: Drive the Tauri window (WebDriver, Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y webkit2gtk-driver xvfb
+          cargo install tauri-driver --version 2.1.0 --locked
+          cargo build -p spawnloft-core -p spawnloft-shell --locked
+          cd ..
+          xvfb-run -a -s "-screen 0 1920x1080x24" node desktop/smoke-tauri.cjs rust/target/debug/SpawnLoft rust/target/debug/spawnloft-core . smoke-tauri
+      - name: Keep the window smoke's logs
+        if: failure() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-tauri-${{ github.run_number }}
+          path: smoke-tauri
+          retention-days: 14
 
   deny:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
