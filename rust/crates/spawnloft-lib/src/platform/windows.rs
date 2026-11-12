@@ -597,99 +597,6 @@ fn close(h: HANDLE) {
     unsafe { CloseHandle(h) };
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use windows_sys::Win32::Security::Authorization::{
-        ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SE_KERNEL_OBJECT,
-    };
-    use windows_sys::Win32::Security::DACL_SECURITY_INFORMATION;
-
-    #[test]
-    fn the_pipe_admits_this_user_alone() {
-        let sid = user_sid().unwrap();
-        assert!(sid.starts_with("S-1-"), "{sid}");
-        let name = format!(r"\\.\pipe\spawnloft-dacl-test-{}", std::process::id());
-        let server = PipeServer::new(&name).unwrap();
-        let pipe = server.instance(true).unwrap();
-        // a second claim of the same name is refused while this one is held
-        assert!(server.instance(true).is_err());
-        let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
-        let rc = unsafe {
-            GetSecurityInfo(
-                pipe.as_raw_handle() as HANDLE,
-                SE_KERNEL_OBJECT,
-                DACL_SECURITY_INFORMATION,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                &mut sd,
-            )
-        };
-        assert_eq!(rc, 0);
-        let mut text: *mut u16 = std::ptr::null_mut();
-        let ok = unsafe {
-            ConvertSecurityDescriptorToStringSecurityDescriptorW(
-                sd,
-                SDDL_REVISION_1,
-                DACL_SECURITY_INFORMATION,
-                &mut text,
-                std::ptr::null_mut(),
-            )
-        };
-        assert_ne!(ok, 0);
-        let sddl = unsafe { from_wide(text) };
-        unsafe {
-            LocalFree(text as _);
-            LocalFree(sd as _);
-        }
-        assert!(sddl.starts_with("D:P"), "{sddl}");
-        assert_eq!(sddl.matches("(A;").count(), 1, "{sddl}");
-        // SDDL prints a well-known account by its alias: the built-in Administrator (RID 500,
-        // which the CI runners use) as LA
-        let trustee = if sid.ends_with("-500") {
-            "LA".to_string()
-        } else {
-            sid.clone()
-        };
-        assert!(sddl.ends_with(&format!(";;;{trustee})")), "{sddl} for {sid}");
-    }
-
-    #[test]
-    fn a_job_kill_takes_the_tree() {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", "ping -n 30 127.0.0.1 >NUL"]);
-        prepare_server(&mut cmd);
-        let mut child = cmd.spawn().unwrap();
-        let tree = Tree::attach(&child);
-        assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
-        tree.kill();
-        let status = child.wait().unwrap();
-        assert_eq!(status.code(), Some(1));
-    }
-
-    #[test]
-    fn a_suspended_server_runs_once_attached() {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", "exit 7"]);
-        prepare_server(&mut cmd);
-        let mut child = cmd.spawn().unwrap();
-        let tree = Tree::attach(&child);
-        assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
-        assert_eq!(child.wait().unwrap().code(), Some(7));
-    }
-
-    #[test]
-    fn probes_this_process() {
-        let mut p = ProcessProbe::open(std::process::id()).unwrap();
-        match p.sample().unwrap() {
-            Probe::Alive { bytes, .. } => assert!(bytes > 0),
-            Probe::Gone => panic!("this process is alive"),
-        }
-    }
-}
-
 /// The user's `Path` as stored under `HKCU\Environment`: its text and whether it is
 /// `REG_EXPAND_SZ`. `Ok(None)` when the user has no `Path` value of their own.
 pub fn read_user_path() -> std::io::Result<Option<(String, bool)>> {
@@ -843,5 +750,98 @@ pub fn expand_env(s: &str) -> String {
             return String::from_utf16_lossy(&buf);
         }
         buf.resize(n, 0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SE_KERNEL_OBJECT,
+    };
+    use windows_sys::Win32::Security::DACL_SECURITY_INFORMATION;
+
+    #[test]
+    fn the_pipe_admits_this_user_alone() {
+        let sid = user_sid().unwrap();
+        assert!(sid.starts_with("S-1-"), "{sid}");
+        let name = format!(r"\\.\pipe\spawnloft-dacl-test-{}", std::process::id());
+        let server = PipeServer::new(&name).unwrap();
+        let pipe = server.instance(true).unwrap();
+        // a second claim of the same name is refused while this one is held
+        assert!(server.instance(true).is_err());
+        let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
+        let rc = unsafe {
+            GetSecurityInfo(
+                pipe.as_raw_handle() as HANDLE,
+                SE_KERNEL_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                &mut sd,
+            )
+        };
+        assert_eq!(rc, 0);
+        let mut text: *mut u16 = std::ptr::null_mut();
+        let ok = unsafe {
+            ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                sd,
+                SDDL_REVISION_1,
+                DACL_SECURITY_INFORMATION,
+                &mut text,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_ne!(ok, 0);
+        let sddl = unsafe { from_wide(text) };
+        unsafe {
+            LocalFree(text as _);
+            LocalFree(sd as _);
+        }
+        assert!(sddl.starts_with("D:P"), "{sddl}");
+        assert_eq!(sddl.matches("(A;").count(), 1, "{sddl}");
+        // SDDL prints a well-known account by its alias: the built-in Administrator (RID 500,
+        // which the CI runners use) as LA
+        let trustee = if sid.ends_with("-500") {
+            "LA".to_string()
+        } else {
+            sid.clone()
+        };
+        assert!(sddl.ends_with(&format!(";;;{trustee})")), "{sddl} for {sid}");
+    }
+
+    #[test]
+    fn a_job_kill_takes_the_tree() {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "ping -n 30 127.0.0.1 >NUL"]);
+        prepare_server(&mut cmd);
+        let mut child = cmd.spawn().unwrap();
+        let tree = Tree::attach(&child);
+        assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
+        tree.kill();
+        let status = child.wait().unwrap();
+        assert_eq!(status.code(), Some(1));
+    }
+
+    #[test]
+    fn a_suspended_server_runs_once_attached() {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "exit 7"]);
+        prepare_server(&mut cmd);
+        let mut child = cmd.spawn().unwrap();
+        let tree = Tree::attach(&child);
+        assert!(tree.fallback_reason.is_none(), "{:?}", tree.fallback_reason);
+        assert_eq!(child.wait().unwrap().code(), Some(7));
+    }
+
+    #[test]
+    fn probes_this_process() {
+        let mut p = ProcessProbe::open(std::process::id()).unwrap();
+        match p.sample().unwrap() {
+            Probe::Alive { bytes, .. } => assert!(bytes > 0),
+            Probe::Gone => panic!("this process is alive"),
+        }
     }
 }
