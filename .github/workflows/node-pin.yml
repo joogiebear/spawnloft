@@ -3,6 +3,8 @@
 # (.node-version)? Dependabot cannot see that pin (plan D7, Q-X). A newer LTS opens (or adds to)
 # one issue, "Node runtime pin is behind", with the sha256 lines the bump needs; the next green
 # run closes it. The bump itself is a commit of its own through the full installer workflows.
+# A newer major line (Node 26) is only mentioned while desktop/node-pin.mjs NODE_HELD_MAJOR holds
+# the pinned one: 2.0 stays on Node 24 (Victor, 2026-11-12).
 # A pull request that changes the pin or the check runs it too, without touching the issue, and
 # fails only when .node-version and NODE_VERSION disagree or the pin is not an LTS release.
 #

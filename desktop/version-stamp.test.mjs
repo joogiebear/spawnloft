@@ -97,6 +97,19 @@ test('the Node pin check finds newer LTS releases and security releases in the l
   assert.equal(current.newest, null)
   assert.equal(current.newestInLine, null)
   assert.equal(compare('25.0.0', rows).pinnedIsLts, false)
+  // a held line: the newer major is still found, and marked as held so main() does not fail on it
+  assert.equal(r.held, false)
+  const held = compare('24.22.2', rows, { heldMajor: 24 })
+  assert.equal(held.held, true)
+  assert.equal(held.newest.version, '26.1.0')
+  assert.equal(held.newestInLine, null)
+  assert.equal(compare('24.22.2', rows, { heldMajor: 26 }).held, false)
+})
+
+test('2.0 stays on Node 24 until the line is moved on purpose', async () => {
+  const { NODE_VERSION, NODE_HELD_MAJOR } = await import(pathToFileURL(path.join(HERE, 'node-pin.mjs')).href)
+  // the hold is the pinned line, so a bump to a new major has to move it too
+  assert.equal(NODE_HELD_MAJOR, Number(NODE_VERSION.split('.')[0]))
 })
 
 test('the Node pin check prints the sha256 line of every pinned archive', async () => {

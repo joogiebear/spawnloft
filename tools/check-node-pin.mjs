@@ -11,6 +11,10 @@
 // scheduled run's issue tracks them, and a PR that bumps to the newest in the line stays green
 // while a newer major waits on its own decision.
 //
+// A newer major LTS line is never a failure while desktop/node-pin.mjs NODE_HELD_MAJOR holds the
+// pinned major (2.0 stays on Node 24): it is mentioned in the output and nothing more, so the
+// weekly run neither fails nor opens the issue for it.
+//
 //   node tools/check-node-pin.mjs [--report <file.md>] [--pr]
 import fs from 'node:fs'
 import path from 'node:path'
@@ -26,7 +30,7 @@ const newer = (a, b) => { const x = key(a), y = key(b); for (let i = 0; i < 3; i
 // From nodejs.org's index rows ({ version: 'v24.22.2', lts: 'Krypton' | false, security, date }),
 // what is newer than `pinned`: the newest LTS overall, the newest in the pinned major, and whether
 // any release between the pin and that one is a security release.
-export function compare(pinned, rows) {
+export function compare(pinned, rows, { heldMajor } = {}) {
   const lts = rows.filter(r => r.lts).map(r => ({ ...r, version: r.version.replace(/^v/, '') }))
   const major = key(pinned)[0]
   const sameLine = lts.filter(r => key(r.version)[0] === major && newer(r.version, pinned))
@@ -38,6 +42,8 @@ export function compare(pinned, rows) {
     newestInLine,
     security: sameLine.filter(r => r.security).map(r => r.version).sort((a, b) => (newer(a, b) ? -1 : 1)),
     pinnedIsLts: lts.some(r => r.version === pinned),
+    // the newer major is someone else's decision while the pinned line is held
+    held: heldMajor === major,
   }
 }
 
@@ -58,7 +64,7 @@ export async function main(argv) {
   const reportAt = argv.indexOf('--report')
   const report = reportAt >= 0 ? argv[reportAt + 1] : null
   const pr = argv.includes('--pr')
-  const { NODE_VERSION, NODE_ARCHIVES } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'node-pin.mjs')).href)
+  const { NODE_VERSION, NODE_ARCHIVES, NODE_HELD_MAJOR } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'node-pin.mjs')).href)
   const lines = []
   let failed = false
   let behind = false
@@ -71,7 +77,7 @@ export async function main(argv) {
 
   const res = await fetch(INDEX_URL)
   if (!res.ok) throw new Error(`${INDEX_URL}: HTTP ${res.status}`)
-  const found = compare(NODE_VERSION, await res.json())
+  const found = compare(NODE_VERSION, await res.json(), { heldMajor: NODE_HELD_MAJOR })
   if (!found.pinnedIsLts) {
     failed = true
     lines.push(`- **${NODE_VERSION} is not an LTS release** in nodejs.org's index.`)
@@ -81,7 +87,11 @@ export async function main(argv) {
     const sec = found.security.length ? ` It includes ${found.security.length === 1 ? 'a security release' : 'security releases'}: ${found.security.join(', ')}.` : ''
     lines.push(`- **Node ${found.newestInLine.version}** (${found.newestInLine.lts}, ${found.newestInLine.date}) is newer than the pinned ${NODE_VERSION} in the same line.${sec}`)
   }
-  if (found.newest && (!found.newestInLine || found.newest.version !== found.newestInLine.version)) {
+  const newerMajor = found.newest && (!found.newestInLine || found.newest.version !== found.newestInLine.version)
+  const notes = []
+  if (newerMajor && found.held) {
+    notes.push(`Node ${found.newest.version} (${found.newest.lts}) is a newer LTS line. The packages are held on Node ${NODE_HELD_MAJOR} (desktop/node-pin.mjs NODE_HELD_MAJOR), so this is not a failure; moving lines is a decision of its own.`)
+  } else if (newerMajor) {
     behind = true
     lines.push(`- **Node ${found.newest.version}** (${found.newest.lts}, ${found.newest.date}) is the newest LTS line. Moving to a new major is a decision of its own: test the core and the packages on it first.`)
   }
@@ -91,9 +101,10 @@ export async function main(argv) {
     const sums = await shasums(target, Object.keys(NODE_ARCHIVES)).catch(() => null)
     lines.push('', `The bump is one commit: \`NODE_VERSION\` and every hash in \`NODE_ARCHIVES\` in desktop/node-pin.mjs, \`.node-version\`, then the full installer workflows. The sha256 lines for ${target}:`, '', '```', sums || `(could not fetch https://nodejs.org/dist/v${target}/SHASUMS256.txt)`, '```')
   }
-  if (!behind && !failed) lines.push(`Node ${NODE_VERSION} is the newest LTS release, and CI tests on it.`)
+  if (!behind && !failed) lines.push(`Node ${NODE_VERSION} is the newest LTS release${found.held ? ` in the held Node ${NODE_HELD_MAJOR} line` : ''}, and CI tests on it.`)
   else if (!failed) lines.push('', 'A pull request is not failed for newer releases; the weekly run tracks them in an issue.')
 
+  if (notes.length) lines.push('', ...notes)
   const text = lines.join('\n') + '\n'
   process.stdout.write(text)
   if (report) fs.writeFileSync(report, text)

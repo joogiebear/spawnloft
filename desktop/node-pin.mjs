@@ -5,6 +5,12 @@
 // against these.
 export const NODE_VERSION = '24.22.2'
 
+// The major line the packages stay on. Victor (2026-11-12): 2.0 ships on Node 24; moving to a newer
+// LTS line (26) is a later decision of its own. tools/check-node-pin.mjs tracks releases in this
+// line and only mentions a newer major, without failing or opening an issue for it. Raise it in
+// the same commit that moves NODE_VERSION to the new line.
+export const NODE_HELD_MAJOR = 24
+
 // archive file name (after node-v<version>-) -> sha256
 export const NODE_ARCHIVES = {
   'win-x64.zip': 'ca1bff5d8ead13c9f2ea404a176db46bd430704d5b5113734049fa365e7799e2',
