@@ -13,12 +13,10 @@ test('the packages are named for their own packaging system, and never match the
   // The workflows hand `SpawnLoft-*-linux-<arch>.deb` to apt. A second match would be installed
   // with the desktop package, and the two conflict.
   for (const name of cliPackageNames({ arch: 'x64', version: '1.2.0' })) assert.doesNotMatch(name, /^SpawnLoft-/)
-  for (const file of ['desktop-preview.yml', 'desktop-stable.yml']) {
-    const text = fs.readFileSync(path.join(root, '.github', 'workflows', file), 'utf8')
-    assert.match(text, /node desktop\/build-cli-package\.mjs/, `${file} builds them`)
-    assert.match(text, /desktop\/dist\/spawnloft-cli-\*\.deb/, `${file} uploads the .deb`)
-    assert.match(text, /desktop\/dist\/spawnloft-cli-\*\.rpm/, `${file} uploads the .rpm`)
-  }
+  // The Electron workflows that used to build them are retired on the 2.0 line; the Linux installer
+  // workflow builds the packages now.
+  const text = fs.readFileSync(path.join(root, '.github', 'workflows', 'installer-linux.yml'), 'utf8')
+  assert.match(text, /node desktop\/build-cli-package\.mjs/, 'installer-linux.yml builds them')
 })
 
 test('a beta sorts before its release for a package manager', () => {

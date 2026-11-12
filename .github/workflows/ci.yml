@@ -32,9 +32,9 @@ jobs:
             exit 1
           fi
           case "$BASE:$version" in
-            dev:*-beta.*) echo "dev <- $version: a prerelease, so merging this publishes a beta." ;;
+            dev:*-beta.*) echo "dev <- $version: a prerelease. On the 2.0 line a merge publishes nothing; betas go out from the release workflow." ;;
             dev:*)
-              echo "::error::dev has to carry a prerelease version, or the beta pipeline stays switched off. Start the month: node desktop/set-version.mjs <next minor>.0-beta.1"
+              echo "::error::dev has to carry a prerelease version. Start the month: node desktop/set-version.mjs <next minor>.0-beta.1"
               exit 1 ;;
             main:*-*)
               echo "::error::main only takes stable versions. On the release branch: node desktop/set-version.mjs X.Y.Z"
