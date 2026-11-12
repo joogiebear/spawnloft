@@ -430,6 +430,11 @@ pub fn repair(rest: &[String]) -> Outcome {
     };
     if has(&f, "--quiet") {
         let log = Log::open(Some(&Files::new(&data_root).log()), false);
+        // `spawnloft` in a new terminal, as soon as the install is done (Windows; user_path.rs)
+        match spawnloft_lib::user_path::add() {
+            Ok(c) => log.line(&format!("repair: user PATH {c:?}")),
+            Err(e) => log.line(&format!("repair: user PATH not changed: {e}")),
+        }
         let code = match core.run_logged(&["repair", "--json"], Duration::from_secs(120), &log) {
             Ok((c, _)) => c,
             Err(e) => {
@@ -452,6 +457,12 @@ pub fn uninstall(rest: &[String]) -> Outcome {
         .chain(rest.iter().map(String::as_str))
         .collect();
     let data_root = paths::resolve_data_root();
+    // the uninstaller runs this only when the install is going away, never for an update
+    if rest.iter().any(|a| a == "--yes")
+        && let Err(e) = spawnloft_lib::user_path::remove()
+    {
+        eprintln!("{}: uninstall: user PATH not changed: {e}", build::NAME);
+    }
     match NodeCore::find(&data_root) {
         Ok(core) => exit_of(core.run_inherit(&args)),
         Err(e) => {
