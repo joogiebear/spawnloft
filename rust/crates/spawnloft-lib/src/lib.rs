@@ -22,6 +22,7 @@ pub mod procid;
 pub mod rcon;
 pub mod registry;
 pub mod resp;
+pub mod runtime;
 pub mod sha256;
 pub mod tick;
 pub mod time;

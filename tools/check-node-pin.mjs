@@ -1,5 +1,5 @@
 // Is the pinned Node runtime still the newest LTS? (plan D7, Q-X.) The Node that SpawnLoft ships
-// (desktop/build-cli-package.mjs NODE_VERSION, with its nodejs.org sha256s pinned in source) and
+// (desktop/node-pin.mjs NODE_VERSION, with its nodejs.org sha256s pinned in NODE_ARCHIVES) and
 // that CI tests on (.node-version) is bumped by hand, in its own commit, through the full
 // installer workflows. Dependabot cannot see a pin like that, so this check does: it reads
 // nodejs.org's release index and fails when a newer LTS exists, saying whether the newer releases
@@ -41,18 +41,24 @@ export function compare(pinned, rows) {
   }
 }
 
-async function shasums(version) {
+// The SHASUMS256.txt lines of `version` for exactly the archives the pin carries (`archives`:
+// the NODE_ARCHIVES keys, such as 'win-x64.zip'), in that order.
+export function pinnedSums(text, version, archives) {
+  const lines = text.split('\n').map(l => l.trim())
+  return archives.map(a => lines.find(l => l.endsWith(`  node-v${version}-${a}`)) ?? `(no line for node-v${version}-${a})`).join('\n')
+}
+
+async function shasums(version, archives) {
   const res = await fetch(`https://nodejs.org/dist/v${version}/SHASUMS256.txt`)
   if (!res.ok) return null
-  const text = await res.text()
-  return text.split('\n').filter(l => /node-v[\d.]+-linux-(x64|arm64)\.tar\.xz$|node-v[\d.]+-win-x64\.zip$|node-v[\d.]+-darwin-arm64\.tar\.gz$/.test(l)).join('\n')
+  return pinnedSums(await res.text(), version, archives)
 }
 
 export async function main(argv) {
   const reportAt = argv.indexOf('--report')
   const report = reportAt >= 0 ? argv[reportAt + 1] : null
   const pr = argv.includes('--pr')
-  const { NODE_VERSION } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'build-cli-package.mjs')).href)
+  const { NODE_VERSION, NODE_ARCHIVES } = await import(pathToFileURL(path.join(ROOT, 'desktop', 'node-pin.mjs')).href)
   const lines = []
   let failed = false
   let behind = false
@@ -60,7 +66,7 @@ export async function main(argv) {
   const file = fs.readFileSync(NODE_VERSION_FILE, 'utf8').trim()
   if (file !== NODE_VERSION) {
     failed = true
-    lines.push(`- **.node-version says ${file} but desktop/build-cli-package.mjs pins ${NODE_VERSION}.** CI must test on the Node that ships; set both.`)
+    lines.push(`- **.node-version says ${file} but desktop/node-pin.mjs pins ${NODE_VERSION}.** CI must test on the Node that ships; set both.`)
   }
 
   const res = await fetch(INDEX_URL)
@@ -82,8 +88,8 @@ export async function main(argv) {
   if (behind && !pr) failed = true
   if (behind) {
     const target = (found.newestInLine ?? found.newest).version
-    const sums = await shasums(target).catch(() => null)
-    lines.push('', `The bump is one commit: \`NODE_VERSION\` and \`NODE_SHA256\` in desktop/build-cli-package.mjs, \`.node-version\`, then the full installer workflows. The sha256 lines for ${target}:`, '', '```', sums || `(could not fetch https://nodejs.org/dist/v${target}/SHASUMS256.txt)`, '```')
+    const sums = await shasums(target, Object.keys(NODE_ARCHIVES)).catch(() => null)
+    lines.push('', `The bump is one commit: \`NODE_VERSION\` and every hash in \`NODE_ARCHIVES\` in desktop/node-pin.mjs, \`.node-version\`, then the full installer workflows. The sha256 lines for ${target}:`, '', '```', sums || `(could not fetch https://nodejs.org/dist/v${target}/SHASUMS256.txt)`, '```')
   }
   if (!behind && !failed) lines.push(`Node ${NODE_VERSION} is the newest LTS release, and CI tests on it.`)
   else if (!failed) lines.push('', 'A pull request is not failed for newer releases; the weekly run tracks them in an issue.')

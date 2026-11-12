@@ -122,6 +122,64 @@ fn resume(pid: u32) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Ctrl+C and Ctrl+Break are left to the program this process forwards to (it shares the console
+/// and gets them itself); a console close still ends this process. A handler, not
+/// `SetConsoleCtrlHandler(NULL, TRUE)`, because the latter is inherited by children.
+pub fn ignore_ctrl_c() {
+    unsafe extern "system" fn handler(kind: u32) -> i32 {
+        use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+        i32::from(kind == CTRL_C_EVENT || kind == CTRL_BREAK_EVENT)
+    }
+    // SAFETY: registers a function with the documented signature that lives for the process.
+    unsafe {
+        windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(handler), 1);
+    }
+}
+
+/// Runs `cmd` to its end inside a job object that kills it when this process ends, however it
+/// ends (the forwarder of `spawnloft-core <command>` and of the shell's argv compatibility form,
+/// PLAN-2.0-REMAINING.md A6). Only that child is in the job: its own children break away
+/// silently, so a server daemon a `start` spawns outlives the command, as it must. Started
+/// suspended so it is in the job before it runs. Returns its exit code.
+pub fn run_in_kill_job(mut cmd: Command) -> std::io::Result<i32> {
+    cmd.creation_flags(CREATE_SUSPENDED);
+    let mut child = cmd.spawn()?;
+    let job = kill_on_close_job();
+    if let Some(job) = &job {
+        // SAFETY: both handles are valid for the duration of the call.
+        let _ = unsafe {
+            AssignProcessToJobObject(job.as_raw_handle() as HANDLE, child.as_raw_handle() as HANDLE)
+        };
+    }
+    if let Err(e) = resume(child.id()) {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(e);
+    }
+    let status = child.wait()?;
+    drop(job);
+    Ok(status.code().unwrap_or(1))
+}
+
+fn kill_on_close_job() -> Option<OwnedHandle> {
+    // SAFETY: default security, no name; the result is checked.
+    let job = owned(unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) })?;
+    // SAFETY: a zeroed limit structure is the documented "no limits" starting point.
+    let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
+    info.BasicLimitInformation.LimitFlags =
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+    // SAFETY: a valid job handle and a correctly sized structure of the class named.
+    let set = unsafe {
+        SetInformationJobObject(
+            job.as_raw_handle() as HANDLE,
+            JobObjectExtendedLimitInformation,
+            (&raw const info).cast(),
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        )
+    };
+    (set != 0).then_some(job)
+}
+
 /// Windows has no SIGTERM; a stop always comes over the control pipe.
 pub fn install_signal_handlers() {}
 

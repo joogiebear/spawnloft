@@ -3,12 +3,20 @@
 //
 //   node desktop/build-cli-package.mjs              # after electron-builder, on the native Linux host
 //   node desktop/build-cli-package.mjs --deb-only   # without rpmbuild; not a release
+//   node desktop/build-cli-package.mjs --dist <dir> [--core <spawnloft-core>]
+//                                                   # 2.x: beside linux-package.mjs's packages in <dir>
 //
 // The package is the core plus one pinned official Node binary (checked against the hash from
 // nodejs.org), avoiding Electron's browser and graphical libraries. Node is bundled because
 // distro Node is too old (Ubuntu 22.04 ships 12). It is built with dpkg-deb and rpmbuild directly
 // rather than electron-builder's private fpm. It conflicts with the desktop package since both
 // own /usr/bin/spawnloft. There is no updater; the package manager owns these files.
+//
+// From 2.0 (rust/INSTALLER-UPDATER-DESIGN.md 5.7) /usr/bin/spawnloft runs the Rust core, which
+// forwards what it does not own yet to the Node core on the same pinned Node, laid out as the
+// desktop packages carry it: bin/spawnloft-core, core/, runtime/runtime.json and
+// runtime/node-<version>/bin/node. bin/node stays, as a link to that runtime, because task shims
+// and MCP configs written by the 1.x package name /opt/spawnloft-cli/bin/node.
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -17,11 +25,13 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { setPackageVersion } from './set-version.mjs'
 
-export const NODE_VERSION = '24.21.0'
-// sha256 of node-v<version>-linux-<arch>.tar.xz, from https://nodejs.org/dist/v<version>/SHASUMS256.txt
+import { NODE_VERSION, NODE_ARCHIVES } from './node-pin.mjs'
+
+export { NODE_VERSION }
+// sha256 of node-v<version>-linux-<arch>.tar.xz (the pins live in node-pin.mjs)
 export const NODE_SHA256 = {
-  x64: 'fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6',
-  arm64: '6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2',
+  x64: NODE_ARCHIVES['linux-x64.tar.xz'],
+  arm64: NODE_ARCHIVES['linux-arm64.tar.xz'],
 }
 export const PACKAGE = 'spawnloft-cli'
 export const PREFIX = '/opt/spawnloft-cli'
@@ -43,6 +53,20 @@ export const WRAPPER = `#!/bin/sh
 # /usr/bin/spawnloft: the command line, on the Node this package carries. No Node needed on PATH.
 exec ${PREFIX}/bin/node ${PREFIX}/core/mcctl.mjs "$@"
 `
+
+// 2.x: the Rust core is the entry point (it finds runtime/ and core/ beside its own folder)
+export const WRAPPER_2X = `#!/bin/sh
+# /usr/bin/spawnloft: the command line. The Rust core runs it, forwarding what it does not own yet
+# to the Node core on the runtime this package carries. No Node needed on PATH.
+exec ${PREFIX}/bin/spawnloft-core "$@"
+`
+
+export const isTwoX = version => Number(String(version).split('.')[0]) >= 2
+
+// 2.x: runtime/ is what stage-runtime.mjs stages for the desktop packages, record and all, so
+// the core finds Node the same way and the release gate can check it the same way
+const stageRuntime = async (opts) =>
+  (await import('../rust/crates/spawnloft-shell/installer/stage-runtime.mjs')).stageRuntime(opts)
 
 const SUMMARY = 'Minecraft servers from the command line, for a machine with no screen'
 const DESCRIPTION = [
@@ -143,6 +167,29 @@ function kilobytes(dir) {
   return Math.ceil(bytes / 1024)
 }
 
+function stage2x(work, kind, runtime, info, rustCore) {
+  const root = path.join(work, `root-${kind}`)
+  const prefix = path.join(root, PREFIX)
+  fs.mkdirSync(path.join(prefix, 'bin'), { recursive: true })
+  fs.cpSync(runtime.dir, path.join(prefix, 'runtime'), { recursive: true })
+  // the 1.x path, for shims and MCP configs it wrote; relative, so the staging root can move
+  fs.symlinkSync(`../runtime/${runtime.exe}`, path.join(prefix, 'bin', 'node'))
+  fs.copyFileSync(rustCore, path.join(prefix, 'bin', 'spawnloft-core'))
+  fs.chmodSync(path.join(prefix, 'bin', 'spawnloft-core'), 0o755)
+  copyCore(path.join(prefix, 'core'), info.version)
+  // 2.0 runs servers on the Rust daemon (the Node core reads this, as in the desktop packages)
+  fs.writeFileSync(path.join(prefix, 'core', 'internal-defaults.json'), JSON.stringify({ daemon: 'rust' }, null, 2) + '\n')
+  fs.writeFileSync(path.join(prefix, 'build-info.json'), JSON.stringify({ ...info, package: PACKAGE, node: NODE_VERSION }, null, 2) + '\n')
+  fs.writeFileSync(path.join(prefix, 'package-type'), kind)
+  fs.mkdirSync(path.join(root, 'usr', 'bin'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'usr', 'bin', 'spawnloft'), WRAPPER_2X, { mode: 0o755 })
+  fs.chmodSync(path.join(root, 'usr', 'bin', 'spawnloft'), 0o755)
+  for (const entry of fs.readdirSync(root, { withFileTypes: true, recursive: true })) {
+    if (entry.isDirectory()) fs.chmodSync(path.join(entry.parentPath, entry.name), 0o755)
+  }
+  return root
+}
+
 function stage(work, kind, node, info) {
   const root = path.join(work, `root-${kind}`)
   const prefix = path.join(root, PREFIX)
@@ -174,16 +221,23 @@ function stage(work, kind, node, info) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.platform !== 'linux' || !NODE_SHA256[process.arch]) throw new Error('The CLI packages are built on their native Linux host')
   const arch = process.arch
-  const dist = path.join(HERE, 'dist')
+  const argValue = flag => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : undefined }
+  const dist = path.resolve(argValue('--dist') ?? path.join(HERE, 'dist'))
   // reuse the identity after-pack recorded so these match the desktop packages built beside them
   const built = JSON.parse(fs.readFileSync(path.join(dist, 'build-info.json'), 'utf8'))
   const info = { version: built.version, sourceVersion: built.sourceVersion, commit: built.commit, shortCommit: built.shortCommit, dirty: built.dirty, builtAt: built.builtAt, platform: 'linux', arch }
   const [debName, rpmName] = cliPackageNames(info)
+  const twoX = isTwoX(info.version)
+  const rustCore = path.resolve(argValue('--core') ?? path.join(HERE, 'build', 'bin', `linux-${arch}`, 'spawnloft-core'))
+  if (twoX && !fs.existsSync(rustCore)) throw new Error(`${rustCore} is missing: a 2.x command-line package runs on the Rust core`)
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-cli-'))
   try {
-    const node = await fetchNode(arch, work)
+    const node = twoX
+      ? await stageRuntime({ platform: 'linux', arch, out: path.join(work, 'runtime') })
+      : await fetchNode(arch, work)
+    const stageKind = (kind, node) => (twoX ? stage2x(work, kind, node, info, rustCore) : stage(work, kind, node, info))
 
-    const debRoot = stage(work, 'deb', node, info)
+    const debRoot = stageKind('deb', node)
     fs.mkdirSync(path.join(debRoot, 'DEBIAN'))
     fs.writeFileSync(path.join(debRoot, 'DEBIAN', 'control'), debControl({ ...info, installedKb: kilobytes(debRoot) }))
     run('dpkg-deb', ['--root-owner-group', '-Zxz', '--build', debRoot, path.join(dist, debName)])
@@ -191,7 +245,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // not releasable: the manifest step requires both files
     if (process.argv.includes('--deb-only')) { console.log(debName); process.exit(0) }
 
-    const rpmRoot = stage(work, 'rpm', node, info)
+    const rpmRoot = stageKind('rpm', node)
     const spec = path.join(work, `${PACKAGE}.spec`)
     fs.writeFileSync(spec, rpmSpec({ ...info, staging: rpmRoot }))
     const out = path.join(work, 'rpms')

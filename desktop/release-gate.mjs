@@ -20,6 +20,9 @@
 //     CFBundleShortVersionString, checked when --check-binary-versions is set (the numeric
 //     resources carry no prerelease tag, so major.minor.patch is what must agree),
 //
+//   - the payload (desktop/payload-gate.mjs), when given: the bundled Node runtime folder is the
+//     pinned version from the pinned nodejs.org archive (--runtime), and no shipped file carries a
+//     test build's wording such as "internal spike" (--payload, repeatable: files or folders),
 //   - both cores inside an installed copy of the build report the release version, when one or
 //     more --installed folders are given (W4, plan D4): `spawnloft-core --version --json` and the
 //     Node core's resources/core/package.json, which the panel, data-format.json's writtenBy, the
@@ -30,7 +33,10 @@
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
+//        [--check-linux-packages]     (read every .deb/.rpm with dpkg-deb / rpm: name, version,
+//                                      architecture, the 1.x paths; on a Linux host)
 //        [--installed <dir>]...       (an installed copy: both cores must report the version)
+//        [--runtime <resources/runtime dir>] [--payload <file or dir>]...
 //
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
@@ -40,6 +46,7 @@ import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
+import { checkRuntime, checkNoInternalStrings } from './payload-gate.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const U = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
@@ -107,6 +114,12 @@ function parseArgs(argv) {
       // the mac app's Info.plist) must equal the release version; the real workflow sets it, the
       // unit tests that use placeholder bytes do not (design 11)
       case '--check-binary-versions': out.checkBinaryVersions = true; break
+      // when set, every Linux package is opened with dpkg-deb / rpm and its name, version and
+      // architecture must be what its file name says, and the desktop package must carry the
+      // paths 1.x installs and other programs remember (design 5.7); needs both tools
+      case '--check-linux-packages': out.checkLinuxPackages = true; break
+      case '--runtime': out.runtime = value(); break
+      case '--payload': (out.payload ??= []).push(value()); break
       case '--installed': (out.installed ??= []).push(value()); break
       default: throw new Error(`unknown argument ${a}`)
     }
@@ -117,7 +130,7 @@ function parseArgs(argv) {
 }
 
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, installed }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -257,6 +270,18 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     }
   }
 
+  if (checkLinuxPackages) {
+    for (const name of fs.readdirSync(dir).filter(n => /\.(deb|rpm)$/.test(n)).sort()) {
+      try {
+        const found = linuxPackageProblems(path.join(dir, name), name, version)
+        if (found.length) problems.push(...found.map(p => `${name}: ${p}`))
+        else notes.push(`${name}: package name, version and architecture match its release name${expectedLinuxPackage(name, version)?.desktop ? ', and it ships the 1.x paths' : ''}`)
+      } catch (e) {
+        problems.push(`${name}: could not be read (${e.message})`)
+      }
+    }
+  }
+
   // Both cores of an installed copy report the release version (plan D4).
   for (const root of installed ?? []) {
     const found = installedVersions(root)
@@ -287,8 +312,49 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     if (!seen.has(name)) problems.push(`${name} is in the release folder but no check accounts for it`)
   }
 
+  // The payload, before it was bundled (PLAN-2.0-REMAINING.md A3, W1).
+  if (runtime) {
+    const found = checkRuntime(runtime)
+    problems.push(...found)
+    if (!found.length) notes.push(`the bundled Node in ${runtime} is the pinned version from the pinned archive`)
+  }
+  if (payload?.length) {
+    const found = checkNoInternalStrings(payload)
+    problems.push(...found)
+    if (!found.length) notes.push(`no test-build wording in ${payload.length} payload path(s)`)
+  }
+
   const targets = envelope ? Object.keys(envelope.platforms) : []
   return { ok: problems.length === 0, problems, notes, flags, targets, channel, version }
+}
+
+// What a Linux package says about itself, against what its release name promises. The package
+// manager compares versions with `~` for a prerelease (1.x did the same), and 1.x installs upgrade
+// in place only because the name is `spawnloft`. Desktop packages must ship the two 1.x paths.
+export const LINUX_1X_PATHS = ['/opt/SpawnLoft/spawnloft-desktop', '/opt/SpawnLoft/resources/bin/spawnloft', '/usr/bin/spawnloft']
+export function expectedLinuxPackage(name, version) {
+  const m = /^(SpawnLoft|spawnloft-cli)-(.+)-linux-(amd64|arm64|x86_64|aarch64)\.(deb|rpm)$/.exec(name)
+  if (!m || m[2] !== version) return null
+  return { package: m[1] === 'SpawnLoft' ? 'spawnloft' : 'spawnloft-cli', version: version.replace('-', '~'), arch: m[3], kind: m[4], desktop: m[1] === 'SpawnLoft' }
+}
+export function linuxPackageProblems(file, name, version, run = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20 })) {
+  const want = expectedLinuxPackage(name, version)
+  if (!want) return [`not a release package name for ${version}`]
+  let got
+  let files
+  if (want.kind === 'deb') {
+    const [pkg, ver, arch] = run('dpkg-deb', ['-f', file, 'Package', 'Version', 'Architecture']).trim().split('\n').map(l => l.slice(l.indexOf(':') + 1).trim())
+    got = { package: pkg, version: ver, arch }
+    files = run('dpkg-deb', ['-c', file]).split('\n').map(l => l.split(/\s+/).slice(5).join(' ').replace(/^\.\//, '/').replace(/ -> .*$/, ''))
+  } else {
+    const [pkg, ver, arch] = run('rpm', ['-qp', '--nosignature', '--qf', '%{NAME}\n%{VERSION}\n%{ARCH}\n', file]).trim().split('\n')
+    got = { package: pkg, version: ver, arch }
+    files = run('rpm', ['-qlp', '--nosignature', file]).split('\n')
+  }
+  const problems = []
+  for (const k of ['package', 'version', 'arch']) if (got[k] !== want[k]) problems.push(`${k} is ${got[k]}, the release name says ${want[k]}`)
+  if (want.desktop) for (const p of LINUX_1X_PATHS) if (!files.includes(p)) problems.push(`does not ship ${p}`)
+  return problems
 }
 
 // The versions the two cores in an installed copy report: the Rust core's `--version --json`

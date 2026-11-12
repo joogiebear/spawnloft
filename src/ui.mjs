@@ -9,6 +9,7 @@ import * as supervisor from './supervisor.mjs'
 import * as registry from './registry.mjs'
 import * as create from './create.mjs'
 import * as manage from './manage.mjs'
+import { cliCommand } from './entry.mjs'
 import { LAYOUT, BACKUPS_DIR } from './paths.mjs'
 import * as java from './java.mjs'
 import * as backup from './backup.mjs'
@@ -1489,13 +1490,15 @@ async function route(req, res) {
     return json(res, 200, create.listJars().map((j) => ({ name: j.name, size: j.sizeHuman })))
   }
 
-  // real executable and script paths for an MCP client config; the .cmd launcher can't be started
-  // by a client that spawns without a shell on Windows
+  // real executable paths for an MCP client config; the .cmd launcher can't be started by a
+  // client that spawns without a shell on Windows. In a 2.0 install that is spawnloft-core, a path
+  // 2.1 keeps (entry.mjs); otherwise the running executable and the script.
   if (seg[1] === 'mcp' && seg.length === 2 && req.method === 'GET') {
+    const cli = cliCommand()
     return json(res, 200, {
-      command: process.execPath,
-      args: [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
-      env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {},
+      command: cli.exe,
+      args: cli.viaEntry ? ['mcp'] : [path.join(HERE, '..', 'spawnloft.mjs'), 'mcp'],
+      env: cli.env,
     })
   }
 

@@ -592,18 +592,63 @@ over the spike, task and data intact) and leaves the folder and keys 1.x expects
 `data-format.json` makes 1.x say what happened (the P0-B warning is in `v2` only; 1.5.0 and
 1.6.0-beta.413 do not read it, so they say nothing. Accepted: the formats are the same.)
 
-### 5.7 Linux (outline; Q24 open)
+### 5.7 Linux (Q24 answered; built by W3)
 
-Tauri-built `spawnloft` deb and rpm, Depends webkit2gtk 4.1 and GTK 3 (floor Ubuntu 22.04 /
-Debian 12), providing `/opt/SpawnLoft/spawnloft-desktop` (what 1.x's `.desktop` entry and
-electron-updater's relaunch run) and `/opt/SpawnLoft/resources/bin/spawnloft` (what the
-`/usr/bin/spawnloft` wrapper execs and what MCP configs may hold) as the shell and core or
-symlinks to them, through the bundler's extra-files mapping; `spawnloft-cli` as now with
-`Conflicts: spawnloft`. 1.x's electron-updater installs the 2.0 deb or rpm through `pkexec`
-(as today); 1.x Node daemons keep running from deleted files and are handled as section 8
-describes for macOS. 2.x updates on Linux: the app and the CLI notify and show the
-`apt`/`dnf` command; no `pkexec` from the app (Q-F), unless the Linux thread verifies the
-plugin's deb/rpm path and Victor wants it. Headless `spawnloft-cli` boxes: notify only, as today.
+**Packages.** `spawnloft` as a `.deb` and an `.rpm`, x64 and arm64, built by
+`rust/crates/spawnloft-shell/installer/linux-package.mjs` with `dpkg-deb` and `rpmbuild` from
+`tauri build --no-bundle` (the shell with its frontend, custom protocol and config compiled in,
+exactly as a bundled build). Not the Tauri bundler's deb/rpm targets: in tauri-bundler 2.10.4 (the
+one @tauri-apps/cli 2.12.4 carries) the package name is the kebab-cased product name
+(`spawn-loft`, which would install beside 1.x's `spawnloft` instead of upgrading it), the binary
+goes to `/usr/bin` and the resources to `/usr/lib/SpawnLoft` (1.x's paths are under
+`/opt/SpawnLoft`), and the semver prerelease goes into the rpm `Version` as-is. The package
+version uses `~` for the prerelease (`2.0.0~beta.1`), as 1.x's packages and `spawnloft-cli` do,
+so a beta sorts below its stable in both dpkg and rpm.
+
+| Path | What |
+| --- | --- |
+| `/opt/SpawnLoft/spawnloft-desktop` | the shell (1.x: Electron); what 1.x's `.desktop` entry, electron-updater's relaunch and 1.x task shims (`spawnloft-desktop .../mcctl.mjs ...`, argv compatibility) run |
+| `/opt/SpawnLoft/resources/bin/spawnloft-core` | the Rust core |
+| `/opt/SpawnLoft/resources/bin/spawnloft`, `mcctl` | 1.x's launchers, now `exec spawnloft-core "$@"` (Q-W) |
+| `/opt/SpawnLoft/resources/core/` | the Node core (until 2.1), `internal-defaults.json` |
+| `/opt/SpawnLoft/resources/runtime/` | the bundled Node (W1's layout: `runtime.json`, `node-<v>/bin/node`) |
+| `/opt/SpawnLoft/resources/package-type` | `deb` or `rpm`, as 1.x: electron-updater picks the file by it, and the core picks the envelope's `-deb`/`-rpm` entry by it |
+| `/usr/bin/spawnloft` | `exec /opt/SpawnLoft/resources/bin/spawnloft-core "$@"` |
+| `/usr/share/applications/spawnloft-desktop.desktop`, the 256 px icon | 1.x's names, `Exec=/opt/SpawnLoft/spawnloft-desktop %U` |
+| `/usr/bin/spawnloft-desktop` | an alternatives link, as 1.x made it, **not** a packaged file: 1.x's removal script deletes that path during the upgrade (deb: before our `postinst`; rpm: after our `%post`, so the rpm makes it in `%posttrans`) |
+
+Depends: WebKitGTK 4.1 and GTK 3 (floor Ubuntu 22.04 / Debian 12; Fedora on the rpm side; the
+shell is built on Ubuntu 22.04 and the `libc6`/`glibc` floor is read from the binaries' versioned
+symbols), `libstdc++` for the bundled Node, `tar`/`xz` for the database engines, `xdg-utils`.
+`Conflicts: spawnloft-cli` (both own `/usr/bin/spawnloft`). RHEL-family servers have
+`spawnloft-cli`; whether the desktop rpm's libraries exist on Rocky 9 is recorded by
+`installer-linux.yml`, not promised.
+
+`spawnloft-cli` (desktop/build-cli-package.mjs), for 2.x versions: `/usr/bin/spawnloft` execs
+`/opt/spawnloft-cli/bin/spawnloft-core`, with `core/` and `runtime/` beside it (the same shape,
+so the core finds both relative to itself); `bin/node` stays as a link into the runtime because
+task shims and MCP configs written by the 1.x package name it. `Conflicts: spawnloft`.
+
+**The upgrade from 1.x.** 1.x's electron-updater installs the 2.0 deb or rpm through `pkexec`
+(as today), or the user does with `apt`/`dnf`. The package manager removes every Electron file the
+2.0 package does not ship; 1.x Node daemons keep running from deleted files (verified in
+`installer-linux.yml`) and the 2.0 command line sees and stops them, as section 8 describes.
+
+**Q24 (does the plugin install `.deb` and `.rpm`?): yes, but not for us.** tauri-plugin-updater
+2.14.1 installs a `.deb` with `dpkg -i` and an `.rpm` with `rpm -U`, through `pkexec`, then a
+graphical sudo, then `sudo` (`install_deb`/`install_rpm`), choosing by
+`tauri::utils::platform::bundle_type()`, a marker the Tauri bundler patches into the binary when
+it bundles. Our packages are not made by the bundler, so the marker is absent and the plugin would
+refuse. That matches Q-F as decided: **2.x updates on Linux notify and show the command.** The
+core and the window still download and verify the update (envelope, minisign, size, sha512), so
+the command names verified bytes: `GET /api/update` carries `installCommand`
+(`sudo apt install <cache>/SpawnLoft-<v>-linux-amd64.deb`, or `sudo dnf install ...`),
+`POST /api/update/install` answers 409 with that command, `spawnloft update apply` prints it, and
+the window never stages a Linux update for quit. A rollback's command is the downgrade form
+(`apt install --allow-downgrades`, `dnf downgrade`). Headless `spawnloft-cli` boxes: the envelope
+names only the desktop packages (whose `Conflicts:` would remove the CLI and pull in a GUI stack),
+so `spawnloft update apply` downloads nothing there and names the `spawnloft-cli` package of the
+same release, with the `apt`/`dnf` command to install it.
 
 ## 6. macOS
 
@@ -840,8 +885,16 @@ published 1.6.0-beta.413 to the candidate through a loopback generic feed (as
 `smoke-mac-update.cjs`); plugin cycle a to b with a Rust daemon running; rollback; the first
 launch banner for a 1.x daemon left running (simulated by a state file naming `SpawnLoft`).
 
-**Linux (`installer-linux.yml`, later, with Q24):** deb and rpm over the 1.x packages in
-containers; the two paths exist; `/usr/bin/spawnloft` is the core; `spawnloft-cli` conflicts.
+**Linux (`installer-linux.yml`):** on x64 and arm64, in containers with no Node: the desktop deb
+over published 1.5.0 and 1.6.0-beta.413 on Ubuntu 22.04 and 24.04 and Debian 12, the rpm on
+Fedora 42, each with a 1.x server running through the upgrade; the two 1.x paths exist;
+`/usr/bin/spawnloft` is the core and sees and stops the 1.x server; removal leaves user data;
+`spawnloft-cli` over 1.x on Ubuntu 22.04 and Rocky 9, refused beside the desktop package and vice
+versa, then `smoke-cli-package.sh` on the 2.0 package. On the runner (real Ubuntu 24.04, AppArmor)
+the installed app opens its window under Xvfb and loads the panel. The four Linux packages and the
+CLI packages assemble into a release folder with the four 1.x Linux feeds and pass the gate with
+`--check-linux-packages` (name, `~` version and architecture read from each package, 1.x paths
+present).
 
 **On Victor's machines, through Remote Control, before "push to beta":** the real
 electron-updater handover on his PC from a signed 1.5.0 install (stable path, servers running,
@@ -952,7 +1005,7 @@ Fable reviews T1 and T2 before they are called done.
 5. **T5, Sonnet: panel and shell UX.** Handover banner, 1.x-daemon banner, Updates section
    (channel, check, install, hold, rollback list), the installer's stopping page strings,
    release-notes text. Done when: every state in section 8 has a screenshot in the project files.
-6. **T6, Opus, after Q24: Linux packages** (5.7).
+6. **T6, Opus: Linux packages** (5.7; done as W3 of PLAN-2.0-REMAINING.md, Q24 answered there).
 
 **Needs Victor's own hands (nothing else is blocked on these; T2 can use a throwaway key until
 they are done):**

@@ -98,3 +98,12 @@ test('the Node pin check finds newer LTS releases and security releases in the l
   assert.equal(current.newestInLine, null)
   assert.equal(compare('25.0.0', rows).pinnedIsLts, false)
 })
+
+test('the Node pin check prints the sha256 line of every pinned archive', async () => {
+  const { pinnedSums } = await import(pathToFileURL(path.join(HERE, '..', 'tools', 'check-node-pin.mjs')).href)
+  const { NODE_ARCHIVES } = await import(pathToFileURL(path.join(HERE, 'node-pin.mjs')).href)
+  const archives = Object.keys(NODE_ARCHIVES)
+  const text = [...archives, 'darwin-arm64.tar.gz', 'linux-x64.tar.gz'].map((a, i) => `${String(i).repeat(64)}  node-v1.2.3-${a}`).reverse().join('\n') + '\n'
+  assert.equal(pinnedSums(text, '1.2.3', archives), archives.map((a, i) => `${String(i).repeat(64)}  node-v1.2.3-${a}`).join('\n'))
+  assert.match(pinnedSums('', '1.2.3', ['win-x64.zip']), /no line for node-v1\.2\.3-win-x64\.zip/)
+})
