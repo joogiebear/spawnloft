@@ -10,7 +10,11 @@
 //   bin\spawnloft.cmd, bin\mcctl.cmd   the command-line forwarders at 1.x's paths, which run
 //                           resources\bin\spawnloft-core.exe (PLAN-2.0-REMAINING.md A4)
 //
-//   node installer-config.mjs <version> <pubkey file> <out dir> [--feed-http]
+//   node installer-config.mjs <version> <pubkey file> <out dir> [--feed-http] [--sign-script <ps1>]
+//
+// --sign-script makes the bundler Authenticode-sign what it builds (the shell, the uninstaller and
+// the setup) by running that script once per file: sign-windows.ps1 on the signing machine
+// (release-windows.mjs). Resources are not signed by the bundler; the core is signed before this.
 //
 // The base tauri.conf.json stays buildable with plain `cargo build`; everything that needs a
 // built core binary, a signing key or a test feed is added here. Paths in `resources` are
@@ -21,10 +25,17 @@ import { fileURLToPath } from 'node:url'
 import { writeCorePackage } from './core-package.mjs'
 
 import { stageRuntime, runtimeFolder } from './stage-runtime.mjs'
+import { signCommand } from './sign-command.mjs'
 
 const args = process.argv.slice(2)
 const feedHttp = args.includes('--feed-http')
-const [version, pubkeyFile, outDir] = args.filter((a) => !a.startsWith('--'))
+const signAt = args.indexOf('--sign-script')
+const signScript = signAt >= 0 ? args[signAt + 1] : null
+if (signAt >= 0 && !signScript) {
+  console.error('--sign-script needs the path of the signing script')
+  process.exit(64)
+}
+const [version, pubkeyFile, outDir] = args.filter((a, i) => !a.startsWith('--') && (signAt < 0 || i !== signAt + 1))
 if (!version || !pubkeyFile || !outDir) {
   console.error('usage: node installer-config.mjs <version> <pubkey file> <out dir> [--feed-http]')
   process.exit(64)
@@ -85,6 +96,7 @@ const overlay = {
     },
     windows: {
       nsis: { installerHooks: hooks },
+      ...(signScript ? { signCommand: signCommand(resolve(signScript)) } : {}),
     },
   },
   plugins: {

@@ -32,6 +32,9 @@
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
+//        [--signed <file>[=<cn>]]...  (Windows: this built file must carry a valid, timestamped
+//                                      Authenticode signature by <cn>, or by --authenticode-cn;
+//                                      the shell, the core, node.exe=OpenJS Foundation)
 //        [--check-binary-versions]    (require VIProductVersion / Info.plist to equal the version)
 //        [--check-linux-packages]     (read every .deb/.rpm with dpkg-deb / rpm: name, version,
 //                                      architecture, the 1.x paths; on a Linux host)
@@ -110,6 +113,10 @@ function parseArgs(argv) {
       // subject CN is this name, or 1.x installs refuse the update forever (design 10, PHASE0 S195);
       // omitted for the unsigned dry run
       case '--authenticode-cn': out.authenticodeCn = value(); break
+      // a built binary that must be Authenticode-signed (the installer is checked by itself): the
+      // bundler signs the shell, installer and uninstaller, but not resources, so the core and the
+      // bundled node.exe (which keeps OpenJS's signature) are named here (PLAN-2.0-REMAINING D2)
+      case '--signed': (out.signed ??= []).push(parseSigned(value())); break
       // when set, the version compiled into each built binary (the installer's VIProductVersion,
       // the mac app's Info.plist) must equal the release version; the real workflow sets it, the
       // unit tests that use placeholder bytes do not (design 11)
@@ -125,12 +132,21 @@ function parseArgs(argv) {
     }
   }
   for (const k of ['dir', 'version', 'pubkey']) if (!out[k]) throw new Error(`--${k} is required`)
+  if (out.signed?.some(s => !s.cn) && !out.authenticodeCn) throw new Error('--signed without =<cn> needs --authenticode-cn')
   out.channel ??= channelOf(out.version)
   return out
 }
 
+// `--signed C:\x\node.exe=OpenJS Foundation` -> { file, cn }: the file is everything up to the
+// first .exe or .dll, so a path may hold = and the CN may hold spaces.
+export function parseSigned(text) {
+  const m = /^(.*?\.(?:exe|dll))(?:=(.+))?$/i.exec(text)
+  if (!m) throw new Error(`--signed takes <file.exe>[=<cn>], not ${text}`)
+  return { file: m[1], cn: m[2]?.trim() || null }
+}
+
 // Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages }) {
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, signed, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages }) {
   const problems = []
   const notes = []
   const seen = new Set()
@@ -212,6 +228,15 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
         else if (r.cn !== authenticodeCn) problems.push(`${installer}: signed by "${r.cn}", expected "${authenticodeCn}"`)
         else notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`)
       }
+    }
+    for (const { file, cn } of signed ?? []) {
+      const want = cn ?? authenticodeCn
+      if (process.platform !== 'win32') { notes.push(`authenticode: not checked off Windows (${file})`); continue }
+      if (!fs.existsSync(file)) { problems.push(`${file}: missing, so its signature cannot be checked`); continue }
+      const r = authenticode(file)
+      if (!r.ok) problems.push(`${file}: ${r.why}`)
+      else if (r.cn !== want) problems.push(`${file}: signed by "${r.cn}", expected "${want}"`)
+      else notes.push(`${path.basename(file)}: Authenticode valid, timestamped, signed by "${r.cn}"`)
     }
 
     // latest.json must be exactly what the envelope derives.
