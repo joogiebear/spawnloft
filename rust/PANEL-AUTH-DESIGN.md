@@ -1,6 +1,6 @@
 # Panel access: design for authenticating the local panel API
 
-Status: **design for review, no code yet** (2026-11-13, revised after a second-look review). Target: `v2` only, internal until Victor
+Status: **design accepted, no code yet** (2026-11-13, revised after a second-look review). Target: `v2` only, internal until Victor
 says "push to beta". Answers the decision owed in `rust/beta-review/REVIEW.md` section 3.
 
 ## 1. The problem, as the code stands
@@ -207,8 +207,7 @@ check because it runs before the route split (`panel.rs:403`).
   second browser gets in without restarting the panel. `--launcher` with a panel already running
   does the same and opens `/launcher`.
 - No new command prints the key itself. A script can still call the API: it reads the key file and
-  signs an `api` token, which the README security section will describe in a few lines. See open
-  question 3.
+  signs an `api` token, which the README security section will describe in a few lines. See decision 3.
 
 ### 3.8 Upgrade from 1.x
 
@@ -259,7 +258,7 @@ Proposed threads, in order, all into `v2`:
    upstream token, the 401 page, test helpers. The window still works at the end of this PR
    because it includes the minimal shell change (3.6 first two bullets).
 2. **Handoffs and words** (Opus, Sonnet for the texts): the open-file flow, `--link`,
-   the page's "session ended" notice, the Electron `main.js` line, README security section,
+   the page's "session ended" notice, removing the Electron job (decision 5), README security section,
    CLIENT.md, release-notes draft, beta checklist line 16.
 3. **Hardware checks** (Victor, with a thread driving): the cookie-sharing proof on Windows and
    the Mac mini, a second account on Desktop-Main or the Linux VM trying `curl` against both
@@ -273,26 +272,19 @@ is expected); no GET route writes; the Node port refuses a direct
 caller while the window keeps working; `smoke-tauri.cjs` passes with the console and launcher
 windows open; the diagnostics bundle does not contain the key.
 
-## 5. Open questions for Victor
+## 5. Decisions (Victor, 2026-11-13)
 
-1. **When.** The review said "before 2.0.0 stable, a beta blocker only if shared machines are a
-   target". Recommendation: build it now, before the public beta. It changes what `spawnloft ui`
-   prints and what a bookmark does, and a major version's first beta is the cheapest place for
-   that; doing it between beta and stable means changing it under beta users.
-2. **No "remember this browser".** With this design a browser tab works until the panel process
-   stops; after a restart the person needs a new link (`spawnloft ui` opens one by itself). A
-   remembered browser would be friendlier for the headless SSH-tunnel case and weaker on a shared
-   machine. Recommendation: no remembering in 2.0.
-3. **Scripts against the API.** The HTTP API was never documented as public, but `curl` worked.
-   Options: (a) say in the README how to sign a token from the key file, no helper (recommended);
-   (b) add `spawnloft ui --token` that prints a 60-second token for scripts; (c) say the API is
-   internal and offer nothing.
-4. **1.x.** 1.5.x has the same gap and keeps it. Recommendation: no backport; the Electron line
-   is retired and 2.0 is the fix. Say so in the 2.0 release notes. Different answer only if 2.0
-   stable is months away.
-5. **The Electron job on `v2`.** If the Electron package and `smoke-desktop.cjs` jobs in
-   `rust-internal.yml` are going away soon anyway, thread 2 skips the `main.js` change and removes
-   the job's panel checks instead. Keep or drop?
+1. **When: now**, before the public beta.
+2. **No "remember this browser".** The browser path exists only for `spawnloft ui` without the
+   desktop app (a headless Linux box, usually through an SSH tunnel); people using the app never
+   see it. A tab works until the panel stops, and `spawnloft ui` gives a new link.
+3. **Scripts against the API**: the README says in a few lines how to sign a token from the key
+   file. No helper command.
+4. **1.x: no backport.** 2.0 is the fix; the release notes say so.
+5. **The Electron job on `v2`** (`rust-internal.yml` package job and `smoke-desktop.cjs`): 2.0
+   does not ship Electron and the workflow itself calls the line retired. Recommended and
+   assumed unless Victor says otherwise: thread 2 removes the job after confirming no check in it
+   is the only cover for something 2.0 ships, and `desktop/main.js` is left alone.
 
 ## 6. Checked while reading, not part of this work
 
