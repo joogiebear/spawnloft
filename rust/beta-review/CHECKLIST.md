@@ -11,7 +11,8 @@ undone. Findings are numbered as in [REVIEW.md](REVIEW.md).
       enabled and the stopped servers start.
 - [ ] B2: `.onInstFailed` restores or resumes; a failed WebView2 bootstrapper no longer aborts
       over 1.x.
-- [ ] B7: bundled Node 24.22.3 (PR #194), all three installer workflows green on it.
+- [x] B7: bundled Node 24.22.3 (#194, merged as 35124db).
+- [ ] All three installer workflows green on the Node 24.22.3 commit.
 - [ ] Decision recorded on the panel's local authentication (REVIEW section 3): fix now, or ship
       the beta with the note in the release notes.
 - [ ] Recommended before the beta although not blocking: the backups-folder uninstall fix

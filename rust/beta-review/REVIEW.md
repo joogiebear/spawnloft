@@ -13,7 +13,8 @@ no macOS release build, nothing assembles the three platforms into one release, 
 let a partial or wrongly keyed release through. On the product side one handover bug can silently
 switch a user's scheduled tasks off for good, and it should be fixed first.
 
-Seven blockers remain open (section 2). Eight small bugs were fixed in this branch (section 1),
+Six blockers remain open (section 2; the seventh, the Node bump, merged while this was being
+written). Eight small bugs were fixed in this branch (section 1),
 three of which would have been blockers.
 
 How the review was done: four independent read-throughs (security; upgrade from 1.5.0; update and
@@ -98,9 +99,9 @@ the accidental path on Windows; the check itself is still missing, and B3's buil
 would catch. Needed in the gate: `keysOverridden: false` and the expected key ids for the core, the
 `release.pub` key and no `dangerousInsecureTransportProtocol` in the shell.
 
-**B7. The bundled Node is one security release behind (24.22.2, 24.22.3 is out).** Beta users get
-Node fixes only through an app update, so the first public build should not start behind. PR #194
-is open for this; merge it and let the installer workflows run.
+**B7. Closed: the bundled Node was one security release behind (24.22.2).** #194 moved it to
+24.22.3 and merged into `v2` as 35124db during this review. What is left is to see the three
+installer workflows green on that commit.
 
 Two process items belong beside the blockers because getting them wrong breaks 1.x users:
 
