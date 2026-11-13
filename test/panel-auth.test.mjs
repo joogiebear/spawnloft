@@ -407,7 +407,7 @@ test('the panel behind the desktop window prints no link', async () => {
 test('spawnloft ui --launcher finds this user\'s panel already on the port', async () => {
   const p = await panel()
   const res = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [path.join(HERE, '..', 'mcctl.mjs'), 'ui', '--port', String(p.port), '--launcher'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(process.execPath, [path.join(HERE, '..', 'mcctl.mjs'), 'ui', '--port', String(p.port), '--launcher', '--no-open'], { stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
     child.stdout.on('data', (c) => { out += c })
     child.stderr.on('data', (c) => { out += c })

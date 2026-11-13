@@ -183,6 +183,13 @@ export function checkToken(key, token, { purpose, port, now, started }) {
   return { ok: true, issued, nonce }
 }
 
+// { url, nonce }: a one-use link for the panel on `port` of this machine, and the nonce it spends
+export function loginLink(key, port, to = null, now = Date.now()) {
+  const nonce = crypto.randomBytes(16).toString('base64url')
+  const token = makeToken(key, 'login', port, { now, nonce })
+  return { url: `http://127.0.0.1:${port}/auth?t=${token}${LOGIN_TARGETS.includes(to) ? `&to=${to}` : ''}`, nonce }
+}
+
 export function cookieName(port) {
   return `spawnloft_${port}`
 }
@@ -210,7 +217,7 @@ export class PanelAuth {
   // Answers one of
   //   { kind: 'forbidden' }                 not addressed to this panel from this panel (403)
   //   { kind: 'open' }                      a route that carries its own proof; route it
-  //   { kind: 'login', session, to }        /auth with a good token: set the cookie, go to `to`
+  //   { kind: 'login', session, to, nonce } /auth with a good token: set the cookie, go to `to`
   //   { kind: 'login-refused' }             /auth with a bad, used or expired token (401 page)
   //   { kind: 'allow', session }            route it; `session` goes to release() when it ends
   //   { kind: 'unauthorized', api }         401, JSON for /api/..., the page otherwise
@@ -273,7 +280,7 @@ export class PanelAuth {
     }
     if (this.used.has(checked.nonce)) return { kind: 'login-refused' }
     this.used.set(checked.nonce, { issued: checked.issued, spent: idleNow })
-    return { kind: 'login', session: this.newSession(idleNow), to: LOGIN_TARGETS.includes(to) ? to : '/' }
+    return { kind: 'login', session: this.newSession(idleNow), to: LOGIN_TARGETS.includes(to) ? to : '/', nonce: checked.nonce }
   }
 
   newSession(idleNow) {
@@ -310,8 +317,7 @@ export class PanelAuth {
 
   // a link that signs one browser in, once, within five minutes; `to` is /launcher or /setup
   loginUrl(to = null, now = Date.now()) {
-    const token = makeToken(this.key, 'login', this.port, { now })
-    return `http://127.0.0.1:${this.port}/auth?t=${token}${LOGIN_TARGETS.includes(to) ? `&to=${to}` : ''}`
+    return loginLink(this.key, this.port, to, now).url
   }
 }
 

@@ -335,7 +335,7 @@ Where the code is more exact than, or differs from, the text above:
   shaped like a sign-in token from log text, and `doctor` checks the key file's permissions.
 - **`spawnloft ui`** (until thread 2): prints the one-use sign-in link and does not open a
   browser; `--launcher` onto a running panel prints a link to that panel's launcher. The
-  open-file flow, `--link` and the pages' "session ended" notice are thread 2.
+  open-file flow, `--link` and the pages' "session ended" notice are thread 2 (section 8).
 - **Electron on `v2`**: `desktop/main.js` got the three lines that load the sign-in link, and its
   smoke scripts sign their own requests, so the retired package job keeps passing until thread 2
   removes it. That leg runs only on pushes to `v2`, so it could not be run before the merge.
@@ -369,3 +369,59 @@ Known limits, accepted:
 
 Not done here and still owed: the test that no GET route writes (3.4 step 3 depends on it), which
 needs a route table or a sweep of `ui.mjs` and goes with thread 2.
+
+## 8. As built (thread 2, handoffs and texts)
+
+- **`spawnloft ui`** (`mcctl.mjs` `cmdUi`, `src/panel-open.mjs`) writes the sign-in page to
+  `<config>/open/<name>.html` and hands that path, never the link, to the browser: `$BROWSER` when
+  set (the convention Python and Jupyter follow; the smoke test uses it), else `xdg-open`, `open`,
+  or `explorer.exe` on Windows (a path goes to it as one argument, where `cmd /c start` would parse
+  it). The folder is made 0700 and must be a folder of this user (Unix); the page is created
+  exclusively, made private before the link goes in, and holds a refresh and a link, no script.
+  Its name is a hash of the link's nonce, so the panel that takes the link deletes the page; pages
+  older than a link lives are swept by the next `spawnloft ui` and by every panel start. The link
+  is always printed too. `--no-open` only prints.
+- **Onto a running panel.** `spawnloft ui` (and `--launcher`) with this user's panel on the port
+  (the proven check of section 7) signs the browser in to it instead of failing; another program
+  on the port is still an error. **`ui --link`** starts nothing and opens nothing: it prints a new
+  link for the running panel, or fails when no panel of this user answers there.
+- **`serve()` no longer opens a browser** at the bare address (it would only show the sign-in
+  page); its `open` option is gone.
+- **The pages' "session ended" notice** is one block of script that `ui.html` and `launcher.html`
+  hold word for word (test/panel-session.test.mjs checks they match and runs it). Rather than edit
+  the two `api()` wrappers, the five direct `fetch` calls and the nine `EventSource` call sites,
+  it wraps `window.fetch` and `window.EventSource` once, before the page's first request: a
+  same-origin `401` with `code: "auth"` shows the notice, closes every open stream, and every later
+  request waits for ever instead of failing (no retries, no error toasts behind the notice). A
+  stream that errors asks `GET /api/appearance` once whether the sign-in holds; a panel that is
+  only down answers nothing, and the stream keeps reconnecting. `setup.html` makes no HTTP request
+  (it talks to the window's bridge) and needs nothing. Its scope is requests the page makes: a
+  download link or a navigation after the end shows the server's 401 page, and once ended every
+  `fetch` waits for ever, a cross-origin one or one with its own timeout included.
+- **After the independent review**: no test reaches a real browser (`tools/run-tests.mjs` sets
+  `BROWSER` to Node); a `BROWSER` that cannot be run falls back to the system opener; on Linux
+  with no `DISPLAY` or `WAYLAND_DISPLAY` (and no `BROWSER`) `spawnloft ui` only prints the link.
+  The GET test redirects and compares the home folders too. Accepted: GETs that refresh download
+  caches (Minecraft's version list, the harness index) write those caches; a running server's
+  GETs are not walked (they read RCON and the daemon); a page that `spawnloft ui` wrote for the
+  desktop window's proxy port is swept rather than deleted on use (the Rust proxy does not
+  delete open pages).
+- **No GET writes** is a test on both listeners: `test/panel-get-writes.test.mjs` builds its
+  requests from every literal the Node router compares a path segment with, in every position, on
+  a seeded server, database and client profile, and compares the data and config folders after
+  each; `spawnloft-core/tests/binary.rs` does the same for the routes the proxy answers itself.
+  It found two GETs that made empty folders (`/api/jars`, a server's backups list); both now make
+  nothing.
+- **The Electron package job is removed** from `rust-internal.yml`. Its smoke
+  (`desktop/smoke-desktop.cjs`) was the only cover for a good part of the panel's own behaviour,
+  so before removal those checks moved to `desktop/smoke-panel.cjs`, which drives the panel in
+  Chromium on all three platforms on the Rust daemon, signing in through `spawnloft ui` (the
+  open-file flow end to end, which section 4 asked to be scripted), and also checks the signed-out
+  page, a link working once, the session-ended notice after a panel restart, and `ui --link`.
+  Dropped with Electron: the Electron-only checks (its menus, preload bridge, updater and beta
+  setting, `ELECTRON_RUN_AS_NODE`, the packaged launchers and packages). The `spawnloft-cli`
+  packages stay covered by installer-linux.yml. `desktop/main.js` and `smoke-desktop.cjs` stay in
+  the tree for the 1.x line.
+- **Texts**: README "Security posture" (the old "unauthenticated local HTTP server" text) and a
+  new "Panel access" section (browser, SSH tunnel, the script recipe, the cookie limit of 3.3),
+  CLIENT.md, the release notes draft, and the beta checklist line.

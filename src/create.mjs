@@ -47,7 +47,8 @@ export function strayJars(dir, currentJar) {
 }
 
 export function listJars() {
-  fs.mkdirSync(JARS_DIR, { recursive: true })
+  // a listing makes nothing: the panel answers it on a GET (test/panel-get-writes.test.mjs)
+  if (!fs.existsSync(JARS_DIR)) return []
   return fs
     .readdirSync(JARS_DIR)
     .filter((f) => f.endsWith('.jar'))

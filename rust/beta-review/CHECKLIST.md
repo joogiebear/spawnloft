@@ -13,8 +13,9 @@ undone. Findings are numbered as in [REVIEW.md](REVIEW.md).
       over 1.x. (#198, scenario s11)
 - [x] B7: bundled Node 24.22.3 (#194, merged as 35124db).
 - [ ] All three installer workflows green on the Node 24.22.3 commit.
-- [ ] Decision recorded on the panel's local authentication (REVIEW section 3): fix now, or ship
-      the beta with the note in the release notes.
+- [x] Decision recorded on the panel's local authentication (REVIEW section 3): fixed before the
+      beta (rust/PANEL-AUTH-DESIGN.md; #200 mechanism, the handoffs and texts after it). Still owed:
+      the hardware checks of its section 4, thread 3.
 - [ ] Recommended before the beta although not blocking: the backups-folder uninstall fix
       (should-fix 1) and the Linux update texts in the panel (should-fix 2).
 

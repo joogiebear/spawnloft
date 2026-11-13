@@ -1,14 +1,14 @@
 name: rust-internal
 
-# Internal builds of the v2 branch: the Rust core inside the Electron app, for Victor's own
-# machines only (PLAN-RUST-TAURI.md section 13). Nothing here reaches a beta or a release:
+# The checks of the v2 branch (the 2.0 line): the Rust workspace, cargo deny, the daemon suites
+# under both daemons, the Node suite, the Tauri window driven over WebDriver (Linux) and the panel
+# in a real browser on all three platforms. It runs on pull requests into v2 and on pushes to v2.
+# It packages nothing and publishes nothing; the 2.0 packages are built by installer.yml,
+# installer-mac.yml and installer-linux.yml.
 #
-# - its packages are built on pushes to v2 (and by hand, on v2 only), never on dev or main;
-# - a pull request into v2 runs the checks (rust, deny, daemons, node) and never the package job;
-# - it has no publish job, writes no feed, makes no tag and no release, and holds no secrets;
-# - its packages are workflow artifacts kept for 14 days, versioned 2.0.0-internal.<run>;
-# - Windows builds are unsigned and Mac builds ad-hoc signed (CI signing only trusts dev pushes);
-# - the app's update check is off in these builds (desktop/internal.config.cjs).
+# The Electron internal package job that used to end this workflow is gone (panel sign-in design,
+# decision 5): 2.0 does not ship Electron, and the panel checks its smoke ran moved to the
+# panel-smoke job.
 #
 # desktop-preview.yml and desktop-stable.yml (the Electron beta and stable pipelines) are retired
 # on v2, so merging v2 into dev or main publishes nothing by itself
@@ -227,159 +227,67 @@ jobs:
           npm test
           npm --prefix desktop test
 
-  package:
-    # packages are built from v2 itself, never from a pull request
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v2'
-    needs: [rust, deny, node, daemons]
+  panel-smoke:
+    # The panel in a real browser on each platform (desktop/smoke-panel.cjs): signing in through
+    # `spawnloft ui`, the console, live performance charts, backups, the file editor, the console
+    # window, managed MySQL and Redis, the scheduler on macOS, a restart that ends the old tab's
+    # session, and `spawnloft ui --link`, on the Rust daemon. It took these checks over from the
+    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: windows-latest
-            platform: win32
-            target: win
-            arch: x64
-            triple: x86_64-pc-windows-msvc
-            exe: spawnloft-core.exe
-            app: desktop/dist/win-unpacked
-          - runner: macos-15
-            platform: darwin
-            target: mac
-            arch: arm64
-            triple: aarch64-apple-darwin
-            exe: spawnloft-core
-            app: desktop/dist/mac-arm64/SpawnLoft.app
-          # musl: one static binary with no glibc floor, so it runs on the oldest distribution
-          # the spawnloft-cli package claims (glibc 2.28) as well as on this runner
-          - runner: ubuntu-24.04
-            platform: linux
-            target: linux
-            arch: x64
-            triple: x86_64-unknown-linux-musl
-            exe: spawnloft-core
-            app: desktop/dist/linux-unpacked
-            wrap: xvfb-run -a
+        runner: [ubuntu-24.04, windows-latest, macos-15]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    env:
-      MAC_SIGNING_MODE: ad-hoc
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          # the Electron internal line's build tooling, retired with W5; the checks above test on
-          # the pinned .node-version
-          node-version: 22
-      - name: Install the pinned toolchain and target
+          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          node-version-file: .node-version
+      - name: Install the pinned toolchain
         working-directory: rust
-        run: |
-          rustup toolchain install
-          rustup target add ${{ matrix.triple }}
+        run: rustup toolchain install
+      # a pull request restores v2's cache but saves none: a PR's cache is scoped to its own ref,
+      # so it would only take space (10 GB per repository) from v2's
       - uses: actions/cache@v4
+        if: github.event_name != 'pull_request'
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
-          restore-keys: rust-release-${{ matrix.triple }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Install the musl C compiler (ring, under rustls, builds C for the static target)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update && sudo apt-get install -y musl-tools
-          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - uses: actions/cache/restore@v4
+        if: github.event_name == 'pull_request'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Build spawnloft-core
         working-directory: rust
-        run: cargo build --release --locked -p spawnloft-core --target ${{ matrix.triple }}
-      - name: Stage it for packaging
-        run: node desktop/stage-core.mjs "rust/target/${{ matrix.triple }}/release/${{ matrix.exe }}"
-      - name: Install the desktop toolchain
-        run: npm ci --prefix desktop
-      - name: A new major never installs on quit (the shipped updater against a local feed)
-        run: node --test desktop/major-update-feed.test.cjs
-      - name: Install the rpm build tool
-        if: matrix.platform == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
-      - name: Package the internal build
-        working-directory: desktop
-        run: npx electron-builder --config internal.config.cjs --${{ matrix.target }} --${{ matrix.arch }} --publish never
-      - name: Verify the packaged app
-        run: node desktop/verify-build.mjs "${{ matrix.app }}" --platform=${{ matrix.platform }} --config=desktop/internal.config.cjs
-      - name: Verify the Mac ad-hoc signature covers the core
-        if: matrix.platform == 'darwin'
         run: |
-          node desktop/verify-mac-signing.cjs "${{ matrix.app }}"
-          codesign --verify --strict --verbose=2 "${{ matrix.app }}/Contents/MacOS/spawnloft-core"
-          "${{ matrix.app }}/Contents/MacOS/spawnloft-core" --version
-      - name: Nothing to publish was produced
-        # no feed files: an internal build must never be something an updater could be pointed at
+          cargo build --release --locked -p spawnloft-core
+          exe=spawnloft-core; [ "$RUNNER_OS" = Windows ] && exe=spawnloft-core.exe
+          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/release/$exe" >> "$GITHUB_ENV"
+      - name: Install the isolated browser test tool and its Chromium
         run: |
-          if ls desktop/dist/*.yml 2>/dev/null | grep -v builder-; then
-            echo "::error::an updater feed file was written"; exit 1
-          fi
-      - name: Install the desktop package the way a user would
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get install -y xvfb ./desktop/dist/SpawnLoft-*-linux-amd64.deb
-          test -x /opt/SpawnLoft/resources/bin/spawnloft-core
-          grep -q '"daemon":"rust"' /opt/SpawnLoft/resources/core/internal-defaults.json
-          /opt/SpawnLoft/resources/bin/spawnloft-core --version
-          /usr/bin/spawnloft config
-      - name: Build the command-line packages
-        if: matrix.platform == 'linux'
-        run: node desktop/build-cli-package.mjs
-      - name: Install the command-line package where there is no Node, and run a server
-        if: matrix.platform == 'linux'
-        run: |
-          docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04 sh -ec '
-            sh /repo/desktop/smoke-cli-package.sh deb
-            /opt/spawnloft-cli/bin/spawnloft-core --version
-          '
-          docker run --rm -v "$PWD:/repo:ro" rockylinux:9 sh -ec '
-            dnf install -y -q /repo/desktop/dist/spawnloft-cli-*.rpm
-            /opt/spawnloft-cli/bin/spawnloft-core --version
-          '
-      - name: Install the isolated UI test tool
-        run: npm install --prefix "$RUNNER_TEMP/desktop-smoke" --no-save --no-package-lock playwright@1.63.0
-      - name: Open the packaged app and exercise the shared regressions
+          npm install --prefix "$RUNNER_TEMP/panel-smoke" --no-save --no-package-lock playwright@1.63.0
+          deps=; [ "$RUNNER_OS" = Linux ] && deps=--with-deps
+          "$RUNNER_TEMP/panel-smoke/node_modules/.bin/playwright" install $deps chromium
+      - name: The panel in a browser
         env:
-          NODE_PATH: ${{ runner.temp }}/desktop-smoke/node_modules
-        run: ${{ matrix.wrap }} node desktop/smoke-desktop.cjs "${{ matrix.platform == 'linux' && '/opt/SpawnLoft' || matrix.app }}" "desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: spawnloft-internal-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
-          retention-days: 14
-          if-no-files-found: error
-          path: |
-            desktop/dist/SpawnLoft-Setup-*.exe
-            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.dmg
-            desktop/dist/SpawnLoft-*-mac-${{ matrix.arch }}.zip
-            desktop/dist/SpawnLoft-*-linux-*.deb
-            desktop/dist/SpawnLoft-*-linux-*.rpm
-            desktop/dist/spawnloft-cli-*.deb
-            desktop/dist/spawnloft-cli-*.rpm
-            desktop/dist/build-info.json
-      - name: Keep the unpacked Windows app (runs without installing over the 1.x beta)
-        if: matrix.platform == 'win32'
-        uses: actions/upload-artifact@v4
-        with:
-          name: spawnloft-internal-${{ github.run_number }}-win32-x64-portable
-          retention-days: 14
-          if-no-files-found: error
-          path: desktop/dist/win-unpacked/
-      - name: Keep the bare core binary too
-        uses: actions/upload-artifact@v4
-        with:
-          name: spawnloft-core-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
-          retention-days: 14
-          if-no-files-found: error
-          path: rust/target/${{ matrix.triple }}/release/${{ matrix.exe }}
+          NODE_PATH: ${{ runner.temp }}/panel-smoke/node_modules
+          SPAWNLOFT_DAEMON: rust
+        run: node desktop/smoke-panel.cjs "smoke-panel-${{ runner.os }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: spawnloft-internal-smoke-${{ github.run_number }}-${{ matrix.platform }}-${{ matrix.arch }}
+          name: smoke-panel-${{ github.run_number }}-${{ runner.os }}
           retention-days: 14
-          path: desktop/dist/smoke-${{ matrix.platform }}-${{ matrix.arch }}/
+          path: smoke-panel-${{ runner.os }}/

@@ -105,8 +105,8 @@ spawnloft new survival --paper 1.21.4 --accept-eula && spawnloft start survival
 Two things matter more there than at a desk. **Scheduled tasks stop when you log out** unless
 lingering is on for your account, so a nightly backup made over SSH never runs;
 `spawnloft task linger on` turns it on, and `task add` warns when it is off. And **the panel
-still works**: `spawnloft ui --no-open` serves it on `127.0.0.1:8770`, which
-`ssh -L 8770:127.0.0.1:8770 you@server` brings to your own browser without opening a port.
+still works** through an SSH tunnel, without opening a port; see
+[Panel access](#panel-access) for the three commands.
 Updates are a newer package installed the same way; there is no updater on a machine with
 nobody to prompt.
 
@@ -417,19 +417,34 @@ This is built for **localhost and LAN only**.
   days after it was last opened, and everything else - player names, plugin output - goes as is.
   The delete token comes back and is kept in `run/mclogs.json`. Everything else SpawnLoft does stays
   on this machine.
-- **The panel cannot be bound to another address.** There is no `--host` flag, on purpose:
-  the panel has no login, and a panel reachable from another machine is a server console
-  reachable from another machine. If you want to manage a server from elsewhere, remote into
-  the machine that runs it. A remote panel is out of scope (see [ROADMAP.md](ROADMAP.md)).
-- The panel is an **unauthenticated local HTTP server that can start processes and type into a
-  server console**. Binding to `127.0.0.1` stops other machines reaching it; it does not stop the
-  browser already on this one. So every request must also carry a loopback `Host` — which is what
-  defeats DNS rebinding, since the attacker's own hostname is what arrives in that header — and an
-  `Origin`, when there is one, must match that `Host` exactly, **port included**. Comparing only the
-  hostname was not enough: this machine is full of pages served from loopback, and dynmap, BlueMap
-  and Plan all serve web UIs on their own ports while rendering names and chat that players chose.
-  Requests with no `Origin` (the panel's own fetches, curl, the CLI) are allowed, because that is
-  what a first-party request looks like.
+- **The panel cannot be bound to another address.** There is no `--host` flag, on purpose: a
+  panel reachable from another machine is a server console reachable from another machine. If you
+  want to manage a server from elsewhere, remote into the machine that runs it, or tunnel to it
+  over SSH (see [Panel access](#panel-access)). A remote panel is out of scope (see
+  [ROADMAP.md](ROADMAP.md)).
+- **The panel only answers you.** It is a local HTTP server that can start processes and type
+  into a server console, and `127.0.0.1` is shared with every program and every account on this
+  computer. So every request must prove it comes from this user: the desktop window and a browser
+  you signed in with `spawnloft ui` carry a session cookie, and a program carries a short token it
+  signs with this install's key, `panel.key` in the SpawnLoft settings folder, readable by you
+  alone. Without one the API answers `401` and a page shows "Open SpawnLoft from the app, or run
+  `spawnloft ui`". The key itself never leaves the file: not in a request, a URL, a cookie, a
+  log or the diagnostics bundle. On top of that, every request must carry a loopback `Host`
+  (which defeats DNS rebinding, since the attacker's own hostname is what arrives in that header),
+  an `Origin`, when there is one, must match that `Host` exactly, port included, and a browser's
+  `Sec-Fetch-Site`, when it sends one, must say the request came from the panel itself. Pages of
+  plugin web maps (dynmap, BlueMap, Plan) run on other loopback ports and render names and chat
+  players chose; they get none of this. No `GET` changes your servers, settings or accounts (a
+  test walks every route; a few refresh download caches), so a request another page fires blind
+  cannot either.
+- **One limit of the browser path.** Browsers scope cookies to the host, not the port, so the
+  session cookie of a browser signed in with `spawnloft ui` is also sent to any other web server
+  on `127.0.0.1` that browser visits while the panel runs. A plugin web map runs as you and learns
+  nothing new from it. A server another account on this computer runs on loopback, opened in that
+  same browser, would receive a live session until the panel stops or the tab has been closed for
+  15 minutes. If other people have accounts here, use the desktop app (its window only ever visits
+  the panel) or close the panel's browser tab when you are done. The desktop window is not
+  affected.
 - **Scheduled tasks are code that runs on a timer**, so what a task may be is an allowlist rather
   than a command string: back up, send a console command, restart, stop, start. Windows holds only
   a trigger calling `spawnloft task run <id>`; what that id means lives in SpawnLoft's own file, and a value
@@ -460,7 +475,7 @@ banner artwork partner sites embed lives there too, under `public/banner/`.
 ## The panel
 
 ```bash
-node mcctl.mjs ui        # opens http://127.0.0.1:8770 in your browser
+spawnloft ui        # starts the panel on 127.0.0.1:8770 and signs your browser in to it
 ```
 
 One HTML file, served by Node's own http module. No framework, no build step, no npm packages —
@@ -582,6 +597,74 @@ serving web pages on loopback. It can start processes and type into a server con
 has to mean local rather than merely reachable — see [Security posture](#security-posture).
 
 ---
+
+## Panel access
+
+The desktop app signs its own window in; there is nothing to do. This section is for the panel
+without the app: in a browser, on a machine with no screen, and for scripts.
+
+**In a browser.** `spawnloft ui` starts the panel and opens your browser on it, already signed in.
+It does that through a small page it writes in the SpawnLoft settings folder (`open/`, readable by
+you alone), never by putting the link on a command line, where other accounts on the machine can
+read it. `BROWSER`, when set, names the one program to open it with. On Linux with no display
+(over SSH) nothing is opened. The link is printed as well, and works once, within five minutes. A browser installed as
+a Snap or a Flatpak (Ubuntu's Firefox, for one) cannot read the settings folder and shows an
+error: use the printed link instead.
+
+| Command | Does |
+| --- | --- |
+| `spawnloft ui` | starts the panel and signs your browser in; with your panel already running on the port, signs the browser in to that one |
+| `spawnloft ui --no-open` | starts the panel and only prints the link |
+| `spawnloft ui --link` | starts nothing; prints a new link for the panel already running, for a lost tab or a second browser |
+| `spawnloft ui --launcher` | the same, for the game launcher's page |
+| `--port <n>` | any of the above on another port |
+
+A browser stays signed in until the panel stops, or until its tab has been closed for 15 minutes.
+There is no "remember this browser": after that, `spawnloft ui --link` gives a new link. A tab
+whose session ended says so ("This panel session has ended") and stops asking the panel anything.
+
+**Over SSH**, from your own computer to a server with no screen, without opening a port:
+
+```bash
+ssh -L 8770:127.0.0.1:8770 you@server     # on your computer: forward the panel's port
+spawnloft ui --no-open                    # on the server, in that SSH session
+```
+
+Open the printed link in your own browser; it goes through the tunnel. The tunnel may use another
+local port (`ssh -L 9000:127.0.0.1:8770 ...`): change the port in the link to match. For a second
+browser, or after the link has expired, run `spawnloft ui --link` on the server.
+
+**From a script.** The panel's HTTP API is what its pages use, not a stable interface; the command
+line (`--json` on most commands) and the MCP server are. If you call the API anyway, sign each
+request with the install's key: an `api` token, good for 60 seconds, for one port, in an
+`Authorization: SpawnLoft <token>` header. Anything running as you can read the key, and nothing
+else should.
+
+```js
+// node sign.mjs 8770   (prints a header value good for 60 seconds)
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+const config = process.platform === 'win32'
+  ? process.env.APPDATA
+  : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
+const key = Buffer.from(fs.readFileSync(path.join(config, 'spawnloft', 'panel.key'), 'utf8').trim(), 'base64url')
+const port = Number(process.argv[2] ?? 8770)
+const body = `v1.api.${port}.${Date.now()}.`
+console.log(`SpawnLoft ${body}.${crypto.createHmac('sha256', key).update(body).digest('base64url')}`)
+```
+
+```bash
+curl -H "Authorization: $(node sign.mjs 8770)" http://127.0.0.1:8770/api/instances
+```
+
+The token is `v1.api.<port>.<milliseconds since 1970>.` followed by a dot and the HMAC-SHA256 of
+everything before that dot under the key, in unpadded base64url. A panel refuses a token made for
+another port, one older than 60 seconds, and one made before the panel started. The key file is
+made the first time a panel starts; never paste its contents anywhere, as anyone with it can use
+your panels. The full rule is in [rust/PANEL-AUTH-DESIGN.md](rust/PANEL-AUTH-DESIGN.md).
 
 ## Desktop app
 

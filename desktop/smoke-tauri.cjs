@@ -134,7 +134,17 @@ async function main() {
       await fill()
       await shot(`${process.env.SMOKE_SCREENSHOT}-first-run`)
     }
-    const saved = (await bridge(`window.spawnloftDesktop.saveSetup(${JSON.stringify({ dataRoot, separate: false })})`))
+    // Saving restarts the core, and the window navigates to the new panel. When that navigation
+    // wins the race with the call's answer, WebDriver reports the page gone ("Callback was not
+    // called before the unload event"): the save went through, and the checks below prove it.
+    let saved
+    try {
+      saved = await bridge(`window.spawnloftDesktop.saveSetup(${JSON.stringify({ dataRoot, separate: false })})`)
+    } catch (err) {
+      if (!/before the unload event|no such frame/.test(err.message)) throw err
+      saved = { ok: true }
+      record('setup: the window moved on before the save answered')
+    }
     assert.deepEqual(saved.v ?? saved, { ok: true })
     // the core restarts on the new location: a new port, and the panel itself
     await until(async () => { const u = new URL(await url()); return u.port !== first.port && u.pathname === '/' }, 'the panel after setup', 60000)

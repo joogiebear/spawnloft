@@ -49,13 +49,16 @@ import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
 import { activeBlock } from './control.mjs'
 import * as panelAuth from './panel-auth.mjs'
+import * as panelOpen from './panel-open.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
 // Local control panel. Keep it on 127.0.0.1: it can start/stop servers and type into their
 // consoles. Every request also has to prove it comes from this user (panel-auth.mjs): loopback is
 // shared with the other accounts on the machine and with anything a port is forwarded to.
-export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
+// It never opens a browser itself: the bare address would only show the sign-in page. A caller
+// that wants a browser in hands it `auth.loginUrl()` (spawnloft ui does, through panel-open.mjs).
+export function serve({ port = 8770, host = '127.0.0.1' } = {}) {
   guardProcess()
   watchEventLoop()
   // synchronous on purpose (see util.mjs); do it now rather than inside the first poll
@@ -77,6 +80,8 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   // who may call: see panel-auth.mjs. Made once the port is known; no request arrives before.
   const key = panelAuth.loadKey()
   let auth = null
+  // the sign-in pages `spawnloft ui` left behind whose links have died since
+  panelOpen.sweepOpenFiles()
   // Session idle time is counted in ticks this process lived through, not wall time, so a
   // computer that slept overnight has not idled the open window's session out.
   let ticks = 0
@@ -89,6 +94,8 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       const headers = []
       for (let i = 0; i + 1 < req.rawHeaders.length; i += 2) headers.push([req.rawHeaders[i], req.rawHeaders[i + 1]])
       const verdict = auth.decide({ method: req.method, target: req.url, headers }, { now: Date.now(), idleNow: idleNow() })
+      // the page that carried this link (spawnloft ui) has done its job
+      if (verdict.kind === 'login') panelOpen.removeOpenFile(verdict.nonce)
       if (panelAuth.answer(res, verdict, auth.port)) return
       if (verdict.session) {
         // released once, when the response or its connection ends, whichever is first: a
@@ -137,7 +144,6 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       // the sign-in callback's redirect URI carries this port (Microsoft matches localhost on any port)
       panelPort = bound
       const url = `http://${host}:${bound}/`
-      if (open) openBrowser(url)
       // `auth` signs this caller in: a header for a program, a one-use link for a browser
       resolve({ server, url, port: bound, auth })
     })
@@ -2099,17 +2105,4 @@ async function route(req, res) {
   }
 
   return json(res, 404, { error: 'not found' })
-}
-
-export function openBrowser(url) {
-  import('node:child_process').then(({ spawn }) => {
-    const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
-      : process.platform === 'darwin' ? ['open', [url]]
-      : ['xdg-open', [url]]
-    try {
-      spawn(cmd[0], cmd[1], { detached: true, stdio: 'ignore' }).unref()
-    } catch {
-      // no browser is fine; the URL is printed anyway
-    }
-  })
 }
