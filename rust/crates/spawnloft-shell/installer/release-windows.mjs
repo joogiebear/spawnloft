@@ -31,8 +31,10 @@
 // installed-copy checks (--installed, the uninstaller's signature) belong to the W8 runs on a
 // clean VM, with this folder's setup.
 //
-// The release key: without --key a throwaway minisign key is made for the run, and the build's
-// updater trusts only that key, so these builds can never take or offer a real update. With the
+// The release key: without --key a throwaway minisign key is made for the run and signs this
+// run's feed and artifacts, so nothing here can be offered to a real install. The build itself
+// still trusts the release keys compiled into the core (update/keys.rs), like every build: what
+// keeps a pre-beta install from taking a public beta is only its higher beta number. With the
 // real key (UPDATER-KEYS.md), pass --key/--pubkey and put the password in
 // TAURI_SIGNING_PRIVATE_KEY_PASSWORD; it is read from the environment and never written down.
 import crypto from 'node:crypto'
@@ -85,7 +87,11 @@ export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, n
     '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--runtime', runtime, '--payload', payload]
 }
 
-const withoutKey = e => Object.fromEntries(Object.entries(e).filter(([k]) => !/^TAURI_SIGNING_PRIVATE_KEY/i.test(k)))
+// Left out of every build step: the release key (only the two signing steps get it), and the
+// build-time switches of the test builds. SPAWNLOFT_UPDATE_PUBKEYS is compiled into the core
+// (spawnloft-lib build.rs) and would make a signed build trust a test key list; the other two
+// belong to the CI feed scenarios. A terminal that still has one set must not shape a signed build.
+const withoutKey = e => Object.fromEntries(Object.entries(e).filter(([k]) => !/^(TAURI_SIGNING_PRIVATE_KEY|SPAWNLOFT_UPDATE_PUBKEYS$|SPAWNLOFT_UPDATE_SOURCE$|SPAWNLOFT_FEED_BASELINE$)/i.test(k)))
 const step = title => console.log(`\n== ${title}`)
 const stop = message => { console.error(`\nStopped: ${message}`); process.exit(1) }
 function run(cmd, args, { cwd = ROOT, env = process.env, shell = false } = {}) {
@@ -212,7 +218,7 @@ async function main(argv) {
     keyFile = path.join(work, 'throwaway.key')
     run(process.execPath, [tauri, 'signer', 'generate', '--ci', '-p', '', '-w', keyFile, '-f'], { env })
     pubB64File = `${keyFile}.pub`
-    console.log('a THROWAWAY key: this build trusts only it, so it can never take or offer a real update')
+    console.log('a THROWAWAY key signs this run: nothing built here can be offered to a real install')
   }
   // the CLI writes the .pub as one base64 line of the two-line minisign file; the gate takes the decoded form
   const pubText = fs.readFileSync(pubB64File, 'utf8')
