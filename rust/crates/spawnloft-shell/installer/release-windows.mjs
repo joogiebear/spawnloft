@@ -105,6 +105,22 @@ const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file))
 const psFile = script => ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script]
 // Which PowerShell has the signing module: PowerShell 7 first (Install-Module from a PowerShell 7
 // prompt puts it there), then Windows PowerShell 5.1. Each is asked with its own module path.
+export function parseKitsRoot(regOutput) {
+  const m = /KitsRoot10\s+REG_\w+\s+(.+?)\s*$/m.exec(regOutput || '')
+  return m ? m[1] : null
+}
+
+function kitsRoot() {
+  const out = read('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots', '/v', 'KitsRoot10', '/reg:64'], { allowFail: true })
+  return parseKitsRoot(out)
+}
+
+function signtoolUnder(root) {
+  const bin = path.join(root, 'bin')
+  if (!fs.existsSync(bin)) return false
+  return fs.readdirSync(bin).some((v) => fs.existsSync(path.join(bin, v, 'x64', 'signtool.exe')))
+}
+
 function signingHost() {
   for (const host of ['pwsh.exe', 'powershell.exe']) {
     const res = spawnSync(host, ['-NoProfile', '-NonInteractive', '-Command', "if (Get-Module -ListAvailable -Name TrustedSigning) { 'yes' }"],
@@ -150,6 +166,13 @@ async function main(argv) {
   const publisher = settings.SPAWNLOFT_SIGN_PUBLISHER
   const host = signingHost()
   if (!host) stop('no signing module. Install it once: Install-Module -Name TrustedSigning -Scope CurrentUser')
+  // tauri's NSIS bundler looks for signtool.exe under KitsRoot10 in the 64-bit registry view and
+  // stops with "SignTool not found" when that value points at a folder without it
+  const kits = kitsRoot()
+  if (!kits || !signtoolUnder(kits)) {
+    stop(`the bundler cannot find signtool.exe: HKLM\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots KitsRoot10 is ${kits ? `"${kits}"` : 'missing'}. ` +
+      "Install or repair the Windows SDK, or (elevated) Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots' KitsRoot10 'C:\\Program Files (x86)\\Windows Kits\\10\\'")
+  }
   if (fs.existsSync(out) && fs.readdirSync(out).length) stop(`${out} already holds a build. Move it away or pick another --out.`)
   console.log(`${version} from ${branch} at ${commit.slice(0, 12)}, signed as "${publisher}" (through ${host})`)
 

@@ -115,3 +115,13 @@ The thread then reports the gate's output and the signing report.
   `desktop/package.json` `build.win.azureSignOptions`. That file is the one source of them.
 - **`node.exe` is not signed by OpenJS Foundation**: the staged runtime is not the pinned nodejs.org
   archive. `desktop/node-pin.mjs` and the gate's `--runtime` check say which part differs.
+- **"the bundler cannot find signtool.exe"** (or `tauri build` stops with "SignTool not found"):
+  Tauri's NSIS bundler finds `signtool.exe` through `KitsRoot10` under
+  `HKLM\SOFTWARE\Microsoft\Windows Kits\Installed Roots` in the 64-bit registry view, even with a
+  custom sign command. On Desktop-Main that value once pointed at `C:\Program Files\Windows Kits\10\`
+  (no bin folder) while the SDK is under `C:\Program Files (x86)\Windows Kits\10\`. Repair the
+  Windows SDK, or set the value (elevated) to the folder whose `bin\<version>\x64` holds
+  `signtool.exe`. The script checks this before it builds anything.
+- **A resource path "doesn't exist" in `tauri-build`**: the work folder must be on the checkout's
+  drive (it is, under `rust\target\signed-work`); tauri-build drops the drive letter of absolute
+  resource paths.

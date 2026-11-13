@@ -70,3 +70,11 @@ test('the signed build stages its files on the checkout\'s drive', () => {
   assert.doesNotMatch(text, /mkdtempSync\(path\.join\(os\.tmpdir\(\)/)
   assert.match(text, /path\.join\(RUST, 'target', 'signed-work'\)/)
 })
+
+test('KitsRoot10 is read from reg query output', async () => {
+  const { parseKitsRoot } = await import('../rust/crates/spawnloft-shell/installer/release-windows.mjs')
+  const out = '\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots\r\n    KitsRoot10    REG_SZ    C:\\Program Files (x86)\\Windows Kits\\10\\\r\n\r\n'
+  assert.equal(parseKitsRoot(out), 'C:\\Program Files (x86)\\Windows Kits\\10\\')
+  assert.equal(parseKitsRoot(''), null)
+  assert.equal(parseKitsRoot(null), null)
+})
