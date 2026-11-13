@@ -322,6 +322,17 @@ test('a write through the registry keeps the file in the fixture\'s shape', asyn
   assert.equal(fs.readFileSync(REGISTRY_FILE, 'utf8'), JSON.stringify(file, null, 2) + '\n', 'two-space JSON with a newline')
 })
 
+test('adopt takes a jar inside the folder and refuses one that climbs out of it', async () => {
+  const dir = path.join(scratch, 'adopt-jar')
+  fs.mkdirSync(path.join(dir, 'sub'), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'sub', 'server.jar'), '')
+  fs.writeFileSync(path.join(scratch, 'outside.jar'), '')
+  await assert.rejects(adoptInstance('climber', dir, { java: 'java', memory: '3G', jar: '../outside.jar' }), /inside/)
+  await assert.rejects(adoptInstance('climber', dir, { java: 'java', memory: '3G', jar: path.join(scratch, 'outside.jar') }), /inside/)
+  const made = await adoptInstance('nested', dir, { java: 'java', memory: '3G', jar: path.join('sub', 'server.jar') })
+  assert.equal(made.jar, path.join('sub', 'server.jar'))
+})
+
 // --- schedules.json ---
 
 test('every scheduled task example is stored exactly as the normalisers would store it', () => {

@@ -311,6 +311,10 @@ export async function adoptInstance(name, dir, { jar = null, memory = '4G', java
     if (pool.length > 1) fail(`multiple jars in ${abs} - pass --jar <one of: ${pool.join(', ')}>`)
     chosen = pool[0]
   }
+  // the jar is a file of the adopted folder: a name that climbs out of it would start some other
+  // program under this server's name
+  const rel = path.relative(abs, path.resolve(abs, chosen))
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) fail(`the jar must be a file inside ${abs}: ${chosen}`)
   if (!fs.existsSync(path.join(abs, chosen))) fail(`jar not found: ${path.join(abs, chosen)}`)
 
   const props = readProps(path.join(abs, 'server.properties'))
