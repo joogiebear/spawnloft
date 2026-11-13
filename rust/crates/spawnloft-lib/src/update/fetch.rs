@@ -12,6 +12,15 @@
 use std::fmt;
 use std::time::Duration;
 
+/// Which feed code this build carries, as `update status` reports it (`feed`). The release gate
+/// (desktop/release-gate.mjs) also reads it straight out of the binary, so a test build with the
+/// `internal-feed` feature (loopback HTTP feeds, `SPAWNLOFT_UPDATE_SOURCE`) can never pass for a
+/// release. Exactly one of the two strings is compiled into a binary.
+#[cfg(not(feature = "internal-feed"))]
+pub const FEED_KIND: &str = "spawnloft-feed:release";
+#[cfg(feature = "internal-feed")]
+pub const FEED_KIND: &str = "spawnloft-feed:internal";
+
 /// Where releases are.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
@@ -258,6 +267,16 @@ mod tests {
         let t = Source::from_base("http://127.0.0.1:8123/");
         assert_eq!(t.atom, "http://127.0.0.1:8123/releases.atom");
         assert_eq!(t.download, "http://127.0.0.1:8123/download/");
+    }
+
+    #[test]
+    fn the_feed_kind_names_the_feature() {
+        let want = if cfg!(feature = "internal-feed") {
+            "spawnloft-feed:internal"
+        } else {
+            "spawnloft-feed:release"
+        };
+        assert_eq!(FEED_KIND, want);
     }
 
     #[test]

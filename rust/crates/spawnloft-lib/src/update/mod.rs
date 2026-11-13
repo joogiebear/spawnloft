@@ -891,6 +891,7 @@ impl<'a> Context<'a> {
             "target": self.target,
             "keys": self.keys.iter().map(|k| json!({ "id": k.id, "from": k.from })).collect::<Vec<_>>(),
             "keysOverridden": keys::is_overridden(),
+            "feed": fetch::FEED_KIND,
             "feedBaseline": policy::FEED_BASELINE,
             "dataFormat": Store::data_format(&self.data_root).ok(),
             "lastCheckAt": state.last_check_at,

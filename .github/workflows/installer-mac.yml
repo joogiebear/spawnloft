@@ -24,6 +24,18 @@ name: installer-mac
 # Each run does two Developer ID notarizations on an expensive macOS runner, so the trigger is
 # kept narrow (the Rust core/shell and the Mac signing helper); push other changes through
 # workflow_dispatch.
+#
+# The RELEASE build (rust/beta-review/REVIEW.md B3): dispatched with `release_version` set, the
+# test jobs are skipped and the `release` job builds the macOS half of a release at that version
+# instead: the core without the internal-feed feature and with no key override (it trusts the
+# release keys of update/keys.rs), the shell from release.pub without --feed-http, an app AND a
+# .dmg, the app notarized and stapled by `tauri build`, the .dmg signed, notarized and stapled
+# here. The updater tarball's own .sig is made with a throwaway key: the release assembly
+# (desktop/release-assemble.mjs) re-signs it on its release name with the release key, so the
+# real key never reaches a macOS runner. The job proves the build (verify-mac-build, what the core
+# and shell trust, `update status` of the built core) and runs the release gate on the mac half
+# (--release --partial --throwaway-key). The artifact `installer-mac-release-<version>` holds the
+# three release-named files the assembly takes. Nothing is tagged or published.
 
 on:
   push:
@@ -33,6 +45,11 @@ on:
       - 'desktop/mac-signing.cjs'
       - '.github/workflows/installer-mac.yml'
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Build the RELEASE macOS app at this version (2.0.0-beta.N or 2.0.0) instead of the test builds. Nothing is published.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -54,7 +71,7 @@ env:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/v2' || github.event_name == 'workflow_dispatch'
+    if: (github.ref == 'refs/heads/v2' || github.event_name == 'workflow_dispatch') && !inputs.release_version
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -228,3 +245,161 @@ jobs:
           name: installer-mac-${{ github.run_number }}-plugin-cycle
           retention-days: 14
           path: plugin-cycle-results/
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_version
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      RELEASE_VERSION: ${{ inputs.release_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: The version is a release version (beta or stable, never internal)
+        run: |
+          node -e '
+            import("./desktop/update-envelope.mjs").then(({ channelOf }) => {
+              const v = process.env.RELEASE_VERSION
+              if (!/^2\.\d+\.\d+(-beta\.\d+)?$/.test(v)) throw new Error(`${v} is not 2.x.y or 2.x.y-beta.N`)
+              console.log(`${v}: ${channelOf(v)} channel`)
+            })'
+          # nothing that shapes a test build may reach this job
+          for v in SPAWNLOFT_UPDATE_PUBKEYS SPAWNLOFT_UPDATE_SOURCE SPAWNLOFT_FEED_BASELINE; do
+            [ -z "${!v:-}" ] || { echo "::error::$v is set; a release build trusts only the compiled-in release keys"; exit 1; }
+          done
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-release-mac-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: |
+            rust-release-mac-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Install the Tauri CLI (pinned, from npm)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
+          echo "TAURI_CLI=$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" >> "$GITHUB_ENV"
+      - name: A throwaway key for the bundler's own tarball .sig (the assembly re-signs it)
+        run: |
+          "$TAURI_CLI" signer generate --ci -p "" -w "$RUNNER_TEMP/bundler.key" -f
+          node -e 'process.stdout.write(Buffer.from(require("fs").readFileSync(process.argv[1], "utf8").trim(), "base64"))' "$RUNNER_TEMP/bundler.key.pub" > "$RUNNER_TEMP/bundler.pub"
+      - name: Generate the macOS icon
+        run: '"$TAURI_CLI" icon desktop/build/icon-mac.png -o "$RUNNER_TEMP/icons"'
+      - name: Import the Developer ID identity into a temporary keychain
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          for v in MAC_CSC_LINK MAC_CSC_KEY_PASSWORD; do [ -n "${!v}" ] || { echo "::error::the $v secret is not available to this workflow"; exit 1; }; done
+          kc="$RUNNER_TEMP/release-mac-signing.keychain-db"
+          kcpw="$(uuidgen)"
+          echo "$MAC_CSC_LINK" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security create-keychain -p "$kcpw" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          security unlock-keychain -p "$kcpw" "$kc"
+          security import "$RUNNER_TEMP/devid.p12" -k "$kc" -P "$MAC_CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kcpw" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/devid.p12"
+          identity="$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)"
+          test -n "$identity"
+          echo "SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$kc" >> "$GITHUB_ENV"
+      - name: Build, sign, notarize and verify the release app and dmg
+        working-directory: rust/crates/spawnloft-shell
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for v in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do [ -n "${!v}" ] || { echo "::error::$v is empty: the release app must be notarized"; exit 1; }; done
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/bundler.key")"
+          export APPLE_SIGNING_IDENTITY="$SIGNING_IDENTITY"
+          v="$RELEASE_VERSION"
+          cfg="$RUNNER_TEMP/cfg"
+          # the release core: no internal-feed feature, no key override
+          (cd ../.. && SPAWNLOFT_VERSION="$v" cargo build --release --locked -p spawnloft-core)
+          codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" ../../target/release/spawnloft-core
+          codesign --verify --strict --verbose=2 ../../target/release/spawnloft-core
+          ../../target/release/spawnloft-core --version
+          node installer/mac-config.mjs --stage-runtime "$cfg"
+          # the pinned archive's bytes, before the Developer ID signature changes them
+          node -e "import('../../../desktop/payload-gate.mjs').then(m => { const p = m.checkRuntime(process.argv[1]); if (p.length) { console.error(p.join('\\n')); process.exit(1) } console.log('bundled Node is the pinned archive') })" "$cfg/runtime"
+          nodebin="$(node -p 'const d=process.argv[1]; d + "/" + require(d + "/runtime.json").exe' "$cfg/runtime")"
+          codesign --force --options runtime --timestamp --entitlements installer/node.entitlements --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" "$nodebin"
+          codesign --verify --strict --verbose=2 "$nodebin"
+          # release.pub, no --feed-http: the shell trusts the release key and speaks HTTPS only
+          node installer/mac-config.mjs "$v" release.pub "$cfg" --icons="$RUNNER_TEMP/icons"
+          if grep -q dangerousInsecureTransportProtocol "$cfg/overlay.json"; then echo "::error::the release overlay allows an HTTP feed"; exit 1; fi
+          rm -rf ../../target/release/bundle/macos ../../target/release/bundle/dmg
+          for attempt in 1 2 3; do
+            SPAWNLOFT_VERSION="$v" "$TAURI_CLI" build --ci --bundles app,dmg --config "$cfg/overlay.json" && break
+            echo "::warning::build, signing or notarization of $v failed on attempt $attempt of 3"
+            [ "$attempt" -lt 3 ] && sleep 30 || exit 1
+          done
+          app=../../target/release/bundle/macos/SpawnLoft.app
+          node installer/verify-mac-build.cjs "$app" "$v"
+          # the Squirrel.Mac zip and the updater tarball, from the one notarized bundle
+          node installer/mac-package.mjs "$app" "$v" "$RUNNER_TEMP/pkg"
+          dmg="$(ls ../../target/release/bundle/dmg/*.dmg | head -1)"
+          test -f "$dmg" || { echo "::error::no .dmg was produced"; exit 1; }
+          out="$RUNNER_TEMP/mac-release"
+          mkdir -p "$out"
+          cp "$dmg" "$out/SpawnLoft-$v-mac-arm64.dmg"
+          cp "$RUNNER_TEMP/pkg/SpawnLoft-$v-mac-arm64.zip" "$RUNNER_TEMP/pkg/SpawnLoft-$v-mac-arm64.app.tar.gz" "$out/"
+          echo "APP=$GITHUB_WORKSPACE/rust/target/release/bundle/macos/SpawnLoft.app" >> "$GITHUB_ENV"
+          echo "MAC_OUT=$out" >> "$GITHUB_ENV"
+      - name: Sign, notarize and staple the dmg
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          dmg="$MAC_OUT/SpawnLoft-$RELEASE_VERSION-mac-arm64.dmg"
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN" "$dmg"
+          codesign --verify --strict --verbose=2 "$dmg"
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 30m | tee "$RUNNER_TEMP/notary.txt"
+          grep -q 'status: Accepted' "$RUNNER_TEMP/notary.txt" || { echo "::error::the dmg was not accepted by the notary service"; exit 1; }
+          # the stapler's fetch drops now and then (known flake, exit 68)
+          for attempt in 1 2 3 4 5; do xcrun stapler staple "$dmg" && break; [ "$attempt" -lt 5 ] && sleep 30 || exit 1; done
+          xcrun stapler validate "$dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
+          # the app inside the dmg is the notarized, stapled one
+          mnt="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" > /dev/null
+          codesign --verify --deep --strict "$mnt/SpawnLoft.app"
+          xcrun stapler validate "$mnt/SpawnLoft.app"
+          short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$mnt/SpawnLoft.app/Contents/Info.plist")"
+          hdiutil detach "$mnt" > /dev/null
+          [ "$short" = "$RELEASE_VERSION" ] || { echo "::error::the dmg holds $short, not $RELEASE_VERSION"; exit 1; }
+      - name: Remove the temporary keychain
+        if: always()
+        run: '[ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true'
+      - name: What the built core and shell trust (release keys only, release feed code)
+        run: |
+          node desktop/build-trust.mjs "$APP/Contents/MacOS/SpawnLoft" "$APP/Contents/Resources/resources/bin/spawnloft-core"
+      - name: The release gate on the mac half (feed signed by a throwaway key; the assembly re-signs)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/bundler.key")"
+          v="$RELEASE_VERSION"
+          node desktop/release-feed.mjs --out "$RUNNER_TEMP/gate" --version "$v" --pubkey "$RUNNER_TEMP/bundler.pub" --tauri "$TAURI_CLI" \
+            --mac-updater "$MAC_OUT/SpawnLoft-$v-mac-arm64.app.tar.gz" --mac-dmg "$MAC_OUT/SpawnLoft-$v-mac-arm64.dmg" --mac-zip "$MAC_OUT/SpawnLoft-$v-mac-arm64.zip" \
+            --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          node desktop/release-gate.mjs --dir "$RUNNER_TEMP/gate" --version "$v" --pubkey "$RUNNER_TEMP/bundler.pub" \
+            --release --partial --throwaway-key --installed "$APP" --payload "$APP"
+          ls -la "$MAC_OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-mac-release-${{ inputs.release_version }}
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ env.MAC_OUT }}/

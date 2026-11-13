@@ -29,7 +29,29 @@
 //     diagnostics bundle and the launcher read. The folder is an install folder (Windows, Linux
 //     /opt/...) or a macOS .app.
 //
+//   - the release is complete (rust/beta-review/REVIEW.md B4): Windows, macOS and both Linux
+//     architectures, every asset each one needs (the 1.x feeds, the mac .dmg and .zip, the
+//     spawnloft-cli packages), unless --partial says a one-platform folder is wanted on purpose;
+//     even then a platform that is there must be whole,
+//   - what each build trusts (B6, --check-trust): the core and the shell inside every platform's
+//     build carry exactly the release keys of spawnloft-lib update/keys.rs and the core was built
+//     without the internal-feed feature (desktop/build-trust.mjs). The mac binaries are read out of
+//     the updater tarball, the Linux ones out of each package (dpkg-deb, rpm2cpio); the Windows
+//     setup is compressed, so its proof is an --installed copy, the built --binary files, or an
+//     --evidence record from the machine that built it. An installed core is also asked
+//     (`update status --json`),
+//   - --release turns on every check a publish needs (B5): the two above, the binary versions,
+//     the Linux packages, the setup's Authenticode publisher (desktop/package.json's publisherName
+//     unless --authenticode-cn names another), and that the feed is signed by a release key. A
+//     check that this host cannot make (Authenticode off Windows, the Linux packages without
+//     dpkg-deb/rpm) is a FAILURE in release mode, unless an --evidence record written by a passing
+//     gate elsewhere covers that check for the same file with the same sha256. --throwaway-key
+//     (a dry run's feed key) and --unsigned (a dry run's unsigned setup) waive one check each and
+//     say so; the publish step refuses both with --confirm.
+//
 //   node release-gate.mjs --dir <dir> --version <v> --pubkey <file.pub>
+//        [--release] [--partial] [--throwaway-key] [--unsigned] [--check-trust]
+//        [--binary <built core or shell>]... [--evidence <record.json>]... [--write-record <file>]
 //        [--channel stable|beta] [--make-latest true|false] [--data-format <n>]
 //        [--authenticode-cn <name>]   (require the Windows installer's publisher CN; real releases)
 //        [--signed <file>[=<cn>]]...  (Windows: this built file must carry a valid, timestamped
@@ -44,6 +66,7 @@
 // Exits non-zero and prints every problem if the folder is not fit to publish.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
@@ -51,6 +74,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
 import { checkRuntime, checkNoInternalStrings } from './payload-gate.mjs'
 import { windowsPowerShellEnv } from './windows-powershell.mjs'
+import { binaryKind, binaryProblems, statusProblems, releaseKeys, macTarballTrust, archiveTrust, tarFiles, cpioFiles } from './build-trust.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const U = await import(pathToFileURL(path.join(HERE, 'update-envelope.mjs')).href)
@@ -129,6 +153,20 @@ function parseArgs(argv) {
       case '--runtime': out.runtime = value(); break
       case '--payload': (out.payload ??= []).push(value()); break
       case '--installed': (out.installed ??= []).push(value()); break
+      // every check a publish needs (see the header)
+      case '--release': out.release = true; break
+      // a folder with fewer than all platforms, on purpose (one machine's half of a release)
+      case '--partial': out.partial = true; break
+      // a dry run: the feed is signed by a throwaway key, not a release key
+      case '--throwaway-key': out.throwawayKey = true; break
+      // a dry run: the Windows setup is not Authenticode-signed
+      case '--unsigned': out.unsigned = true; break
+      case '--check-trust': out.checkTrust = true; break
+      // a built core or shell, read for what it trusts (Windows: the setup's binaries)
+      case '--binary': (out.binaries ??= []).push(value()); break
+      // a record a passing gate wrote on another host (--write-record)
+      case '--evidence': (out.evidence ??= []).push(value()); break
+      case '--write-record': out.writeRecord = value(); break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -146,13 +184,84 @@ export function parseSigned(text) {
   return { file: m[1], cn: m[2]?.trim() || null }
 }
 
-// Returns { ok, problems, notes, flags, targets }. Pure: reads the folder, touches no network.
-export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, signed, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages }) {
+// The publisher 1.x signs as and checks for (desktop/package.json azureSignOptions.publisherName).
+export function defaultPublisher() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(HERE, 'package.json'), 'utf8'))
+  const name = pkg?.build?.win?.azureSignOptions?.publisherName
+  if (!name) throw new Error('desktop/package.json has no build.win.azureSignOptions.publisherName')
+  return name
+}
+
+// The files each platform of a complete release ships (design 5.2; REVIEW.md B4).
+export function platformAssets(version) {
+  return {
+    windows: [`SpawnLoft-Setup-${version}.exe`, `SpawnLoft-Setup-${version}.exe.sig`, 'latest.yml', 'beta.yml'],
+    mac: [`SpawnLoft-${version}-mac-arm64.app.tar.gz`, `SpawnLoft-${version}-mac-arm64.app.tar.gz.sig`, `SpawnLoft-${version}-mac-arm64.zip`,
+      `SpawnLoft-${version}-mac-arm64.dmg`, 'latest-mac.yml', 'beta-mac.yml'],
+    'linux-x64': [`SpawnLoft-${version}-linux-amd64.deb`, `SpawnLoft-${version}-linux-x86_64.rpm`, 'latest-linux.yml', 'beta-linux.yml',
+      `spawnloft-cli-${version}-linux-amd64.deb`, `spawnloft-cli-${version}-linux-x86_64.rpm`],
+    'linux-arm64': [`SpawnLoft-${version}-linux-arm64.deb`, `SpawnLoft-${version}-linux-aarch64.rpm`, 'latest-linux-arm64.yml', 'beta-linux-arm64.yml',
+      `spawnloft-cli-${version}-linux-arm64.deb`, `spawnloft-cli-${version}-linux-aarch64.rpm`],
+  }
+}
+
+const sha256hex = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
+
+// Records a passing gate wrote elsewhere (--write-record), as { check, file, sha256 } entries for
+// this version. A record for another version is a problem, not silently ignored.
+export function loadEvidence(files, version, problems) {
+  const entries = []
+  for (const file of files ?? []) {
+    let rec
+    try { rec = JSON.parse(fs.readFileSync(file, 'utf8')) } catch (e) { problems.push(`evidence ${file}: unreadable (${e.message})`); continue }
+    if (rec.format !== 1 || !Array.isArray(rec.checks)) { problems.push(`evidence ${file}: not a release-gate record`); continue }
+    if (rec.version !== version) { problems.push(`evidence ${file} is for ${rec.version}, not ${version}`); continue }
+    for (const c of rec.checks) entries.push({ ...c, from: `${path.basename(file)} (${rec.host ?? 'unknown host'})` })
+  }
+  return entries
+}
+
+// Whether `cmd` is on this host's PATH (the Linux package tools).
+function hasTool(cmd) {
+  const exts = process.platform === 'win32' ? ['.exe', '.cmd', ''] : ['']
+  return (process.env.PATH ?? '').split(path.delimiter).some(d => d && exts.some(e => fs.existsSync(path.join(d, cmd + e))))
+}
+
+// Returns { ok, problems, notes, flags, targets, checks }. Reads the folder, touches no network.
+// `checks` lists the per-file checks that passed here ({ check, file, sha256 }), for --write-record.
+export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, authenticodeCn, signed, checkBinaryVersions, installed, runtime, payload, checkLinuxPackages,
+  release, partial, throwawayKey, unsigned, checkTrust, binaries, evidence, tools }) {
   const problems = []
   const notes = []
+  const passed = []
   const seen = new Set()
   const read = name => { seen.add(name); return fs.readFileSync(path.join(dir, name)) }
   const has = name => fs.existsSync(path.join(dir, name))
+  // which host-bound checks can run here (tests inject this)
+  tools ??= {
+    windows: process.platform === 'win32',
+    dpkg: hasTool('dpkg-deb'),
+    rpm: hasTool('rpm') && hasTool('rpm2cpio'),
+  }
+  if (release) {
+    checkBinaryVersions = true
+    checkLinuxPackages = true
+    checkTrust = true
+    if (!unsigned) authenticodeCn ??= defaultPublisher()
+  }
+  const proof = loadEvidence(evidence, version, problems)
+  const sumOf = name => sha256hex(fs.readFileSync(path.join(dir, name)))
+  // a check this host cannot make: covered by an evidence entry for the same bytes, else a problem
+  // in release mode and a note otherwise
+  const elsewhere = (check, name, why) => {
+    const sum = sumOf(name)
+    const hit = proof.find(e => e.check === check && e.file === name && e.sha256 === sum)
+    if (hit) { notes.push(`${name}: ${check} checked on ${hit.from}, same sha256`); passed.push({ check, file: name, sha256: sum, by: hit.from }); return }
+    const text = `${name}: ${check} not checked (${why}) and no --evidence record covers these bytes`
+    if (release) problems.push(text)
+    else notes.push(text)
+  }
+  const pass = (check, name) => passed.push({ check, file: name, sha256: sumOf(name) })
 
   channel ??= channelOf(version)
   let flags = null
@@ -176,6 +285,12 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     if (envelope.version !== version) problems.push(`the envelope says ${envelope.version}, this release is ${version}`)
     if (envelope.channel !== channel) problems.push(`the envelope channel is ${envelope.channel}, expected ${channel}`)
     if (envelope.keyId !== key.keyId) problems.push(`the envelope names key ${envelope.keyId}, the public key is ${key.keyId}`)
+    if (release) {
+      const ids = releaseKeys().map(k => k.id)
+      if (ids.includes(key.keyId)) notes.push(`the feed is signed by release key ${key.keyId}`)
+      else if (throwawayKey) notes.push(`the feed is signed by ${key.keyId}, a throwaway key (--throwaway-key dry run): no install would take it; a publish refuses this`)
+      else problems.push(`the feed is signed by ${key.keyId}, which is not a release key (${ids.join(', ')}); no install would take this release`)
+    }
     if (envelope.product !== PRODUCT) problems.push(`the envelope product is ${envelope.product}, expected ${PRODUCT}`)
     if (envelope.format !== FORMAT) problems.push(`the envelope format is ${envelope.format}, this build knows ${FORMAT}`)
     if (envelope.tag !== tag) problems.push(`the envelope tag is ${envelope.tag}, expected ${tag}`)
@@ -222,17 +337,19 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     // releases). Skipped on the unsigned dry run (no --authenticode-cn) and off Windows.
     const installer = `SpawnLoft-Setup-${version}.exe`
     if (authenticodeCn && has(installer)) {
-      if (process.platform !== 'win32') notes.push(`authenticode: not checked off Windows (${installer})`)
+      if (!tools.windows) elsewhere('authenticode', installer, 'Authenticode is read on Windows')
       else {
         const r = authenticode(path.join(dir, installer))
         if (!r.ok) problems.push(`${installer}: ${r.why}`)
         else if (r.cn !== authenticodeCn) problems.push(`${installer}: signed by "${r.cn}", expected "${authenticodeCn}"`)
-        else notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`)
+        else { notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`); pass('authenticode', installer) }
       }
+    } else if (release && unsigned && has(installer)) {
+      notes.push(`${installer}: Authenticode NOT required (--unsigned dry run); a publish refuses this`)
     }
     for (const { file, cn } of signed ?? []) {
       const want = cn ?? authenticodeCn
-      if (process.platform !== 'win32') { notes.push(`authenticode: not checked off Windows (${file})`); continue }
+      if (!tools.windows) { notes.push(`authenticode: not checked off Windows (${file})`); continue }
       if (!fs.existsSync(file)) { problems.push(`${file}: missing, so its signature cannot be checked`); continue }
       const r = authenticode(file)
       if (!r.ok) problems.push(`${file}: ${r.why}`)
@@ -298,13 +415,77 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
 
   if (checkLinuxPackages) {
     for (const name of fs.readdirSync(dir).filter(n => /\.(deb|rpm)$/.test(n)).sort()) {
+      if (!(name.endsWith('.deb') ? tools.dpkg : tools.rpm)) { elsewhere('linux-package', name, `no ${name.endsWith('.deb') ? 'dpkg-deb' : 'rpm'} on this host`); continue }
       try {
         const found = linuxPackageProblems(path.join(dir, name), name, version)
         if (found.length) problems.push(...found.map(p => `${name}: ${p}`))
-        else notes.push(`${name}: package name, version and architecture match its release name${expectedLinuxPackage(name, version)?.desktop ? ', and it ships the 1.x paths' : ''}`)
+        else { notes.push(`${name}: package name, version and architecture match its release name${expectedLinuxPackage(name, version)?.desktop ? ', and it ships the 1.x paths' : ''}`); pass('linux-package', name) }
       } catch (e) {
         problems.push(`${name}: could not be read (${e.message})`)
       }
+    }
+  }
+
+  // Completeness (B4): every platform, each one whole. --partial allows platforms to be missing,
+  // never half a platform.
+  const groups = platformAssets(version)
+  const present = Object.keys(groups).filter(g => groups[g].some(has))
+  for (const g of Object.keys(groups)) {
+    const missing = groups[g].filter(n => !has(n))
+    if (!missing.length) continue
+    if (present.includes(g)) problems.push(`the ${g} part of the release is incomplete: ${missing.join(', ')} missing`)
+    else if (partial) notes.push(`${g}: not in this folder (--partial)`)
+    else problems.push(`a complete release needs ${g} (${missing.join(', ')} missing); pass --partial only for one machine's half of a release`)
+  }
+  if (!present.length) problems.push('no platform is in the folder')
+
+  // What each build trusts (B6).
+  if (checkTrust) {
+    const rel = releaseKeys()
+    const macTar = `SpawnLoft-${version}-mac-arm64.app.tar.gz`
+    if (has(macTar)) {
+      try {
+        const r = macTarballTrust(read(macTar), rel)
+        if (r.problems.length) problems.push(...r.problems.map(p => `${macTar}: ${p}`))
+        else { notes.push(`${macTar}: core and shell trust exactly the release keys, release feed code`); pass('trust', macTar) }
+      } catch (e) { problems.push(`${macTar}: could not be read for its keys (${e.message})`) }
+    }
+    for (const name of fs.readdirSync(dir).filter(n => /\.(deb|rpm)$/.test(n)).sort()) {
+      const deb = name.endsWith('.deb')
+      if (!(deb ? tools.dpkg : tools.rpm)) { elsewhere('trust', name, `no ${deb ? 'dpkg-deb' : 'rpm2cpio'} on this host`); continue }
+      try {
+        const want = n => binaryKind(n) !== null
+        const stream = execFileSync(deb ? 'dpkg-deb' : 'rpm2cpio', deb ? ['--fsys-tarfile', path.join(dir, name)] : [path.join(dir, name)], { maxBuffer: 1 << 30 })
+        const files = deb ? tarFiles(stream, want) : cpioFiles(stream, want)
+        const r = archiveTrust(files, name.startsWith('spawnloft-cli-') ? ['core'] : ['core', 'shell'], rel)
+        if (r.problems.length) problems.push(...r.problems.map(p => `${name}: ${p}`))
+        else { notes.push(`${name}: ${r.checked.length} binaries trust exactly the release keys`); pass('trust', name) }
+      } catch (e) { problems.push(`${name}: could not be read for its keys (${e.message.split('\n')[0]})`) }
+    }
+    // Windows: the setup is compressed, so the proof is the built binaries or an installed copy
+    if (has(installer)) {
+      const seenKinds = new Set()
+      let bad = false
+      const winFiles = [...(binaries ?? [])]
+      for (const root of installed ?? []) {
+        for (const p of [path.join(root, 'SpawnLoft.exe'), path.join(root, 'resources', 'bin', 'spawnloft-core.exe')]) if (fs.existsSync(p)) winFiles.push(p)
+      }
+      for (const file of winFiles) {
+        const kind = binaryKind(file.replaceAll('\\', '/'))
+        if (!kind) { problems.push(`${file}: not a core or shell binary (--binary)`); bad = true; continue }
+        let found
+        try { found = binaryProblems(fs.readFileSync(file), kind, rel) } catch (e) { problems.push(`${file}: unreadable (${e.code ?? e.message})`); bad = true; continue }
+        if (found.length) { problems.push(...found.map(p => `${file} ${p}`)); bad = true }
+        else { notes.push(`${path.basename(file)}: trusts exactly the release keys${kind === 'core' ? ', release feed code' : ''}`); if (/\.exe$/i.test(file)) seenKinds.add(kind) }
+      }
+      if (seenKinds.has('core') && seenKinds.has('shell')) { if (!bad) pass('trust', installer) }
+      else if (!bad) elsewhere('trust', installer, 'the setup is compressed: pass its built --binary files or an --installed copy')
+    }
+    // a runnable installed core is asked as well
+    for (const root of installed ?? []) {
+      const r = installedStatus(root, rel)
+      problems.push(...r.problems)
+      if (r.ok) notes.push(`${r.corePath}: update status trusts exactly the release keys and reads the release feed`)
     }
   }
 
@@ -351,7 +532,33 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
   }
 
   const targets = envelope ? Object.keys(envelope.platforms) : []
-  return { ok: problems.length === 0, problems, notes, flags, targets, channel, version }
+  return { ok: problems.length === 0, problems, notes, flags, targets, channel, version, checks: passed, platforms: present }
+}
+
+// The record --write-record leaves for a gate on another host (--evidence): which per-file checks
+// passed here, each bound to the sha256 of the bytes it read.
+export function gateRecord(result, extra = {}) {
+  return { format: 1, version: result.version, host: `${os.hostname()} (${process.platform})`, writtenAt: new Date().toISOString(), ...extra,
+    checks: result.checks.filter(c => !c.by).map(({ check, file, sha256 }) => ({ check, file, sha256 })) }
+}
+
+// An installed core's own answer: `update status --json`, run against a scratch config and data
+// folder so the machine's own SpawnLoft settings are neither read nor touched.
+export function installedStatus(root, release = releaseKeys()) {
+  const base = [path.join(root, 'resources'), path.join(root, 'Contents', 'Resources', 'resources')].find(b => fs.existsSync(b))
+  const corePath = base && ['spawnloft-core.exe', 'spawnloft-core'].map(n => path.join(base, 'bin', n)).find(p => fs.existsSync(p))
+  if (!corePath) return { ok: false, problems: [`${root}: no resources/bin/spawnloft-core to ask what it trusts`] }
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-gate-'))
+  try {
+    const env = { ...process.env, HOME: scratch, USERPROFILE: scratch, APPDATA: scratch, LOCALAPPDATA: scratch, XDG_CONFIG_HOME: scratch, XDG_DATA_HOME: scratch, SPAWNLOFT_DATA_ROOT: path.join(scratch, 'data'), SPAWNLOFT_UPDATES: 'off' }
+    const text = execFileSync(corePath, ['update', 'status', '--json'], { encoding: 'utf8', windowsHide: true, timeout: 30000, env })
+    const found = statusProblems(JSON.parse(text), release).map(p => `${corePath}: ${p}`)
+    return { ok: !found.length, problems: found, corePath }
+  } catch (e) {
+    return { ok: false, problems: [`${corePath}: update status --json failed (${e.message.split('\n')[0]})`], corePath }
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true })
+  }
 }
 
 // What a Linux package says about itself, against what its release name promises. The package
@@ -488,8 +695,13 @@ export function main(argv) {
     process.stdout.write('\nThis release must not be published.\n')
     process.exit(1)
   }
+  if (opts.writeRecord) {
+    fs.writeFileSync(opts.writeRecord, JSON.stringify(gateRecord(result), null, 2) + '\n')
+    process.stdout.write(`  ok   wrote ${opts.writeRecord} (${result.checks.length} checks, for --evidence elsewhere)\n`)
+  }
   const { prerelease, makeLatest } = result.flags
-  process.stdout.write(`\nRelease ${result.version} (${result.channel}) is fit to publish: ${result.targets.length} platform(s), prerelease=${prerelease}, make_latest=${makeLatest}.\n`)
+  const scope = opts.partial ? ` PARTIAL (${result.platforms.join(', ')} only)` : ''
+  process.stdout.write(`\nRelease ${result.version} (${result.channel})${scope} is fit to publish: ${result.targets.length} update target(s), prerelease=${prerelease}, make_latest=${makeLatest}.\n`)
   return result
 }
 

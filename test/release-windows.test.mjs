@@ -40,6 +40,13 @@ test('the gate is asked for the publisher on the setup, the shell and the core, 
   const signed = args.flatMap((a, i) => (a === '--signed' ? [parseSigned(args[i + 1])] : []))
   assert.deepEqual(signed, [{ file: 'S.exe', cn: null }, { file: 'C.exe', cn: null }, { file: 'N\\node.exe', cn: OPENJS_CN }])
   assert.ok(args.includes('--check-binary-versions'))
+  // release mode on the Windows half, the built shell and core read for their keys
+  assert.ok(args.includes('--release') && args.includes('--partial'))
+  assert.deepEqual(args.flatMap((a, i) => (a === '--binary' ? [args[i + 1]] : [])), ['S.exe', 'C.exe'])
+  assert.ok(!args.includes('--throwaway-key') && !args.includes('--write-record'))
+  const more = gateArgs({ out: 'O', version: '2.0.0-beta.1', pubkey: 'P', publisher: 'p', shellExe: 'S.exe', coreExe: 'C.exe', nodeExe: 'N', runtime: 'R', payload: 'Y', record: 'O.gate-record.json', throwaway: true })
+  assert.ok(more.includes('--throwaway-key'))
+  assert.equal(more[more.indexOf('--write-record') + 1], 'O.gate-record.json')
 })
 
 test('--signed splits the file from the signer', () => {

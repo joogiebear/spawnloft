@@ -20,8 +20,11 @@
 //   4. `tauri build` with bundle.windows.signCommand = sign-windows.ps1, which signs the shell,
 //      the uninstaller (inside makensis) and the setup;
 //   5. assembles the update asset set (desktop/release-feed.mjs), the same step as release.yml;
-//   6. runs the release gate with --authenticode-cn "victor zemeckis" and --signed for the
-//      shell, the core and node.exe, --check-binary-versions, --runtime and --payload;
+//   6. runs the release gate in release mode on this Windows half (--release --partial) with
+//      --authenticode-cn "victor zemeckis" and --signed for the shell, the core and node.exe,
+//      --binary for the shell and core (what they trust), --runtime and --payload, and has it
+//      write <out>.gate-record.json: the Authenticode and trust checks bound to the setup's
+//      sha256, which the assembly and the publish step take as --evidence;
 //   7. writes <out>.signing-report.json beside the folder (commit, version, key, each file's
 //      sha256 and signer), so the folder itself holds only the release assets.
 //
@@ -81,10 +84,15 @@ export function signingSettings(desktopPackage) {
   return { SPAWNLOFT_SIGN_ENDPOINT: o.endpoint, SPAWNLOFT_SIGN_ACCOUNT: o.codeSigningAccountName, SPAWNLOFT_SIGN_PROFILE: o.certificateProfileName, SPAWNLOFT_SIGN_PUBLISHER: o.publisherName }
 }
 
-// The gate's command line for the assembled folder.
-export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, nodeExe, runtime, payload }) {
-  return ['--dir', out, '--version', version, '--pubkey', pubkey, '--authenticode-cn', publisher, '--check-binary-versions',
-    '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--runtime', runtime, '--payload', payload]
+// The gate's command line for the assembled folder: release mode on the Windows half of a release
+// (--partial), the built shell and core read for what they trust (the setup is compressed, so this
+// is the machine that can prove it), and the record of the checks only Windows can make written
+// for the assembly and the publish step (--evidence there). A throwaway-key run says so.
+export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, nodeExe, runtime, payload, record, throwaway }) {
+  return ['--dir', out, '--version', version, '--pubkey', pubkey, '--release', '--partial', ...(throwaway ? ['--throwaway-key'] : []),
+    '--authenticode-cn', publisher, '--check-binary-versions',
+    '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--binary', shellExe, '--binary', coreExe,
+    '--runtime', runtime, '--payload', payload, ...(record ? ['--write-record', record] : [])]
 }
 
 // Left out of every build step: the release key (only the two signing steps get it), and the
@@ -257,7 +265,8 @@ async function main(argv) {
     '--tauri', tauri, '--win', setup, '--min-version', '2.0.0-beta.1', '--date', new Date().toISOString().replace(/\.\d+Z$/, 'Z')], { env: keyEnv })
 
   step('The release gate')
-  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg })])
+  const record = `${out}.gate-record.json`
+  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg, record, throwaway: !opts.key })])
 
   // beside the folder, not in it: the folder holds exactly the release assets, so the gate (and a
   // later publish step) find nothing unaccounted for

@@ -20,17 +20,21 @@ undone. Findings are numbered as in [REVIEW.md](REVIEW.md).
 
 ## B. Release path
 
-- [ ] B3: a macOS release job: no `internal-feed`, no `SPAWNLOFT_UPDATE_PUBKEYS`, `release.pub`,
-      no `--feed-http`, `--bundles app,dmg`, version as an input.
-- [ ] B4: `installer-linux.yml` takes the version as an input.
-- [ ] B4: one written sequence (script or runbook) that runs `release-feed.mjs` once, with the
-      real key, over the Windows setup, the mac updater tarball, zip and dmg, the four Linux
-      packages and the CLI packages.
-- [ ] B4: the gate requires the full platform set unless `--partial` is passed.
-- [ ] B5: the publish step requires the Authenticode publisher check when a setup is present and
-      the Linux package check when packages are present.
-- [ ] B6: the gate asserts `keysOverridden: false` and the release key ids for the core, and the
-      release key and no insecure-transport switch for the shell.
+- [x] B3: a macOS release job: no `internal-feed`, no `SPAWNLOFT_UPDATE_PUBKEYS`, `release.pub`,
+      no `--feed-http`, `--bundles app,dmg`, version as an input (`installer-mac.yml`
+      `release_version`; see [../RELEASE.md](../RELEASE.md)).
+- [x] B4: `installer-linux.yml` takes the version as an input (`version`).
+- [x] B4: one written sequence that runs `release-feed.mjs` once, with the real key, over every
+      platform: `desktop/release-assemble.mjs`, steps in [../RELEASE.md](../RELEASE.md).
+- [x] B4: the gate requires the full platform set unless `--partial` is passed.
+- [x] B5: the publish step runs the gate in release mode: Authenticode publisher, Linux packages,
+      binary versions, trust, a release feed key; a check the host cannot make needs an
+      `--evidence` record for the same bytes, or the publish stops.
+- [x] B6: the gate reads every core and shell (mac tarball, Linux packages, the Windows binaries
+      or an installed copy) for exactly the release keys and the release feed code, and asks an
+      installed core `update status --json` (`keysOverridden`, keys, `feed`, sources).
+- [ ] The first real run of steps 1 to 4 of [../RELEASE.md](../RELEASE.md) at a pre-beta number
+      (nothing published), so every piece has run once on the real machines.
 - [ ] A real-key run of `release-windows.mjs --key` on Desktop-Main (it has only ever run with a
       throwaway key). The password is typed into that terminal, never written to a file.
 - [ ] Release notes file ready ([RELEASE-NOTES-DRAFT.md](RELEASE-NOTES-DRAFT.md)) and passed with
@@ -43,8 +47,7 @@ undone. Findings are numbered as in [REVIEW.md](REVIEW.md).
       "victor zemeckis"; `node.exe` keeps its OpenJS signature.
 - [ ] macOS (Apple Silicon): core and Node signed, app notarised and stapled, dmg made.
 - [ ] Linux: deb and rpm, x64 and arm64; `spawnloft-cli` packages.
-- [ ] Assembled into one folder; gate green with `--authenticode-cn`, `--check-binary-versions`,
-      `--check-linux-packages`, on the machine that can run each check.
+- [ ] Assembled into one folder with `release-assemble.mjs`; the release-mode gate green.
 - [ ] `spawnloft-core update status --json` from each platform's build says
       `keysOverridden: false`.
 
