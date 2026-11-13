@@ -20,14 +20,16 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-get-writes-'))
 const config = path.join(scratch, 'config')
 const data = path.join(scratch, 'data')
 const home = path.join(scratch, 'home')
-fs.mkdirSync(home, { recursive: true })
+// a Windows profile always has these; a program started with USERPROFILE pointed at an empty
+// folder makes them, which is the profile being filled in, not a write of the panel's
+for (const dir of [['AppData', 'Local'], ['AppData', 'Roaming']]) fs.mkdirSync(path.join(home, ...dir), { recursive: true })
 process.env.APPDATA = config
 process.env.XDG_CONFIG_HOME = config
 process.env.MCCTL_DATA_ROOT = data
 // everywhere else a write could land is in the scratch folder too, and compared
 process.env.HOME = home
 process.env.USERPROFILE = home
-process.env.LOCALAPPDATA = path.join(home, 'local')
+process.env.LOCALAPPDATA = path.join(home, 'AppData', 'Local')
 process.env.XDG_DATA_HOME = path.join(home, 'share')
 process.env.XDG_CACHE_HOME = path.join(home, 'cache')
 process.env.SPAWNLOFT_HARNESS_INDEX_FETCH = 'off'
