@@ -150,6 +150,9 @@ public static string Dump(int pid) {
   return sb.ToString();
 }
 public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
+// what the dialog gets from a click on its button `id` (WM_COMMAND, BN_CLICKED): unlike BM_CLICK it
+// does not need the dialog to be the active window
+public static void Command(IntPtr dialog, int id, IntPtr button) { PostMessage(dialog, 0x0111, (IntPtr)id, button); }
 '@
 }
 
@@ -752,11 +755,16 @@ switch ($Name) {
         $t = [Ci.Win]::Dump($p.Id)
         if ($script:result.pageTrail -notcontains $t) { $script:result.pageTrail += , $t }
         $n = Button $w 1
-        if ($n -and [Ci.Win]::IsWindowEnabled($n)) { [Ci.Win]::Click($n); Start-Sleep -Milliseconds 700 }
+        # by now other windows have come and gone (the 1.x uninstaller, the core): the setup is
+        # not the active window, where BM_CLICK may do nothing
+        if ($n -and [Ci.Win]::IsWindowEnabled($n)) { [Ci.Win]::Command($w, 1, $n); Start-Sleep -Milliseconds 700 }
       }
       $false
     } 600
-    if (-not $ended) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+    if (-not $ended) {
+      $script:result.stuck = @{ window = [bool] (Window); texts = [Ci.Win]::Dump($p.Id); processes = @(Get-Process | Where-Object { $_.Name -match 'SpawnLoft|spawnloft|setup|nsis|msedge|Edge' } | ForEach-Object { "$($_.Name) $($_.Id)" }) }
+      Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+    }
     Check 'the setup runs to its end in the full UI' $ended "$($script:result.pageTrail[-1])"
     Check '  exit code 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
     Check '  it stopped good on the way' (-not (Pid-Alive $goodJava))
