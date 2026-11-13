@@ -52,6 +52,12 @@ Each of these should be closed, or consciously waived by Victor, before `2.0.0-b
 `desktop/build-trust.mjs`; the sequence is in [../RELEASE.md](../RELEASE.md)). What is left of
 them is the first real run on the machines.*
 
+*Update: B1 and B2 are fixed (#198). The handover record is a journal written before each change,
+an unfinished one is taken over by the next attempt, put back by `handover restore`, and put back
+at the next sign-in; the installer restores when an install fails, and a WebView2 failure over 1.x
+no longer aborts. Installer scenarios s10 and s11 cover both. What is left is the hardware run
+(a real shutdown mid-stop; a PC without WebView2 and without network).*
+
 **B1. An interrupted handover leaves scheduled tasks disabled for good and forgets the servers it
 stopped.** `handover/mod.rs:579` disables the `\mcctl` task folder before the stops start, but
 which tasks were disabled lives only in memory until `run_stop` returns
