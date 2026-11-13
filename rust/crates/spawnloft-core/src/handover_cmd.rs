@@ -63,14 +63,20 @@ impl Journal for FileJournal<'_> {
 }
 
 /// `"<this exe>" handover restore --legacy-dir "<dir>" --logon`, to run once at the next sign-in.
+/// Where that is too long for RunOnce (a long profile name, a custom folder) the folder is left
+/// out: the record names it too.
 fn sign_in_command(exe: &Path, legacy_dir: &Path) -> String {
     let dir = legacy_dir.to_string_lossy();
     // no trailing backslash before the closing quote: `\"` would escape it
     let dir = dir.trim_end_matches(['\\', '/']);
-    format!(
+    let full = format!(
         "\"{}\" handover restore --legacy-dir \"{dir}\" --logon",
         exe.display()
-    )
+    );
+    if full.encode_utf16().count() <= platform::RUN_ONCE_MAX {
+        return full;
+    }
+    format!("\"{}\" handover restore --logon", exe.display())
 }
 
 fn arm_sign_in(legacy_dir: &Path, log: &Log) {
@@ -93,6 +99,20 @@ fn disarm_sign_in(log: &Log) {
     if let Err(e) = platform::run_once_remove(SIGN_IN_NAME) {
         log.line(&format!("could not remove the sign-in restore: {e}"));
     }
+}
+
+/// The folder of the record takes a file, flushed, and lets it go again.
+fn journal_writable(record: &Path) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = record.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir)?;
+    let probe = dir.join("handover.probe");
+    let mut f = std::fs::File::create(&probe)?;
+    f.write_all(b"\n")?;
+    f.sync_all()?;
+    drop(f);
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
 }
 
 /// Yes once the installer `pid` (by pid and creation time) no longer runs.
@@ -240,6 +260,7 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     let opts = h::StopOptions {
         legacy_version: version,
         to_version: build::current().version.to_string(),
+        legacy_dir: Some(dir.to_string()),
         deadline,
         silent,
         cancel_file: status_dir.map(|d| d.join("handover-cancel")),
@@ -260,6 +281,22 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         log.line("another handover step is still running: not updating now");
         return done(h::EXIT_INTERNAL, json!({ "exit": 2, "busy": true }));
     };
+
+    // Not into a shutdown (install on quit as Windows goes down): the servers would be stopped
+    // for an update nobody is there to finish.
+    if platform::session_ending() {
+        log.line("Windows is shutting down: not updating now; nothing was changed");
+        return done(h::EXIT_INTERNAL, json!({ "exit": 2, "sessionEnding": true }));
+    }
+    // The record must be writable before anything is changed: without it a cut-short stop could
+    // not be put back.
+    if let Err(e) = journal_writable(&files.record()) {
+        log.line(&format!(
+            "cannot write the handover record in {}: {e}; not updating now, nothing was changed",
+            data_root.join("run").display()
+        ));
+        return done(h::EXIT_INTERNAL, json!({ "exit": 2, "record": "unwritable" }));
+    }
 
     // 1.x's own view, from the files its `readState` reads (no shipped 1.x lists as JSON)
     let listed = match legacy::read_state_files(&data_root) {
@@ -316,6 +353,9 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     // After a stop that went through it stays until `handover resume` or `restore` has run.
     if out.record.settled() {
         disarm_sign_in(&log);
+    } else if !journal.armed.get() {
+        // owed without a save on the way (only servers an earlier blocked attempt left stopped)
+        arm_sign_in(&legacy.dir, &log);
     }
     log.line(&format!("handover stop exits {}", out.code));
     done(
@@ -519,9 +559,6 @@ fn restore_cmd(rest: &[String]) -> Outcome {
         Ok(f) => f,
         Err(o) => return o,
     };
-    let Some(dir) = get(&f, "--legacy-dir") else {
-        return usage_error("handover restore needs --legacy-dir <the 1.x install folder>");
-    };
     let logon = has(&f, "--logon");
     if logon {
         // Windows gives a console program it starts at sign-in a window of its own
@@ -531,19 +568,39 @@ fn restore_cmd(rest: &[String]) -> Outcome {
     let files = Files::new(&data_root);
     let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
     let log = Log::open(Some(&log_path), !logon);
-    if Record::read(&files.record()).is_none_or(|r| r.settled()) {
-        disarm_sign_in(&log);
-        return done(0, json!({ "exit": 0, "record": null }));
-    }
+    // the folder as given, or as the stop wrote it down (a sign-in command too long to carry it)
+    let dir_of = |r: Option<&Record>| {
+        get(&f, "--legacy-dir")
+            .map(str::to_string)
+            .or_else(|| r.and_then(|r| r.legacy_dir.clone()))
+    };
+    // Everything under the lock, the sign-in command too: a stop that has just registered it
+    // must not lose it to a restore that looked a moment earlier.
     let Some(_lock) = wait_lock(&files.lock(), STEP_WAIT) else {
         log.line("handover restore: another handover step is running; leaving it to that one");
+        // Windows has already removed a sign-in command it is running: if that step is cut short
+        // too, the next sign-in must still find one.
+        let seen = Record::read(&files.record()).filter(|r| !r.settled());
+        if let Some(dir) = dir_of(seen.as_ref()).filter(|_| seen.is_some()) {
+            let legacy = CliLegacy {
+                dir: PathBuf::from(dir),
+                scratch: std::env::temp_dir(),
+                data_root: data_root.clone(),
+            };
+            if legacy_intact(&legacy) {
+                arm_sign_in(&legacy.dir, &log);
+            }
+        }
         return done(0, json!({ "exit": 0, "busy": true }));
     };
-    // read again under the lock: the other step may have settled it meanwhile
     let Some(mut record) = Record::read(&files.record()).filter(|r| !r.settled()) else {
         disarm_sign_in(&log);
         return done(0, json!({ "exit": 0, "record": null }));
     };
+    let Some(dir) = dir_of(Some(&record)) else {
+        return usage_error("handover restore needs --legacy-dir <the 1.x install folder>");
+    };
+    let dir = dir.as_str();
     let legacy = CliLegacy {
         dir: PathBuf::from(dir),
         scratch: std::env::temp_dir(),
@@ -575,8 +632,13 @@ fn restore_cmd(rest: &[String]) -> Outcome {
     }
     if record.settled() {
         disarm_sign_in(&log);
+        log.line("handover restore done");
+    } else {
+        // Windows removed the sign-in command as it ran it: something is still owed (a task that
+        // would not enable, a shutdown under way), so the next sign-in tries again.
+        arm_sign_in(&legacy.dir, &log);
+        log.line("handover restore: not everything could be put back; the next sign-in tries again");
     }
-    log.line("handover restore done");
     done(0, json!({ "exit": 0 }))
 }
 
@@ -753,12 +815,19 @@ mod tests {
             slashed.contains(r#"--legacy-dir "C:\Programs\SpawnLoft" --logon"#),
             "{slashed}"
         );
-        // and the command reads back as the flags `handover restore` takes
-        let args: Vec<String> = ["--legacy-dir", "x", "--logon"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        assert!(flags(&args, &["--legacy-dir", "--log"], &["--logon"]).is_ok());
+        // too long for RunOnce with the folder (a long profile name): the record names it instead
+        let long = "N".repeat(60);
+        let exe = PathBuf::from(format!(
+            r"C:\Users\{long}\AppData\Local\Programs\SpawnLoft\resources\bin\staging\spawnloft-core.exe"
+        ));
+        let dir = PathBuf::from(format!(r"C:\Users\{long}\AppData\Local\Programs\SpawnLoft"));
+        let cmd = sign_in_command(&exe, &dir);
+        assert_eq!(cmd, format!("\"{}\" handover restore --logon", exe.display()));
+        assert!(
+            cmd.encode_utf16().count() <= platform::RUN_ONCE_MAX,
+            "{}",
+            cmd.len()
+        );
     }
 
     #[test]

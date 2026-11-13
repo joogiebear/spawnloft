@@ -21,6 +21,8 @@ struct FakeLegacy {
     events: Arc<Mutex<Vec<String>>>,
     /// a server that appears (running) after the first stop, as a task would start one
     appears: Mutex<Option<(String, Kind)>>,
+    /// 1.x cannot say what runs (its state file unreadable)
+    blind: Mutex<bool>,
 }
 
 impl FakeLegacy {
@@ -67,6 +69,9 @@ impl FakeLegacy {
 
 impl Legacy for FakeLegacy {
     fn list(&self) -> Result<Vec<Listed>, String> {
+        if *self.blind.lock().unwrap() {
+            return Err("unreadable".into());
+        }
         let mut servers = self.servers.lock().unwrap();
         for f in servers.values_mut() {
             if f.finish_at.is_some_and(|t| Instant::now() >= t) {
@@ -250,6 +255,7 @@ fn opts(silent: bool, deadline_ms: u64) -> StopOptions {
     StopOptions {
         legacy_version: "1.6.0-beta.413".into(),
         to_version: "2.0.0".into(),
+        legacy_dir: None,
         deadline: Duration::from_millis(deadline_ms),
         silent,
         cancel_file: None,
@@ -888,6 +894,54 @@ fn during_a_shutdown_nothing_is_started_and_the_sign_in_puts_it_back() {
     assert_eq!(l2.running(), RAN);
     assert_eq!(t.on(), TASKS_ON);
     assert!(rec.settled());
+}
+
+#[test]
+fn a_shutdown_with_the_installer_still_there_starts_nothing_either() {
+    let (l, t) = world();
+    l.servers.lock().unwrap().get_mut("creative").unwrap().refuses = true;
+    let j = Shots::new(&l, &t);
+    let out = run_stop(
+        &StopOptions {
+            session_ending: Some(Watch::new(|| true)),
+            ..opts(true, 600)
+        },
+        l.list().unwrap(),
+        ctx(&l, &t, &j, &Log::none()),
+        Found::default(),
+        "/d",
+    );
+    // creative did not stop: an abort, but not one that starts servers into the shutdown
+    assert!(out.interrupted);
+    assert_eq!(out.code, EXIT_INTERNAL);
+    assert!(l.events().iter().all(|e| !e.starts_with("start ")));
+    assert!(!out.record.settled(), "what was stopped is still owed");
+    assert!(out.record.servers.iter().all(|e| e.start.is_none()));
+    // the next sign-in
+    let l2 = FakeLegacy::again(&l.servers.lock().unwrap());
+    let mut rec = j.shots.borrow().last().unwrap().record.clone();
+    put_back(&mut rec, &l2, &t);
+    assert_eq!(l2.running(), RAN);
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(rec.settled());
+}
+
+#[test]
+fn a_restore_that_cannot_list_keeps_what_it_cannot_judge() {
+    let (l, t) = world();
+    let mut rec = Record::new("1.5.0", "2.0.0", "silent", "/d");
+    // cut right after survival was asked to stop: it went down, nobody wrote that
+    rec.servers.push(Entry::new("survival", Kind::Server, "stopping"));
+    l.servers.lock().unwrap().get_mut("survival").unwrap().status = "stopped".into();
+    *l.blind.lock().unwrap() = true;
+    put_back(&mut rec, &l, &t);
+    assert!(!rec.settled(), "running or not, nobody could say: still owed");
+    assert!(l.events().iter().all(|e| !e.starts_with("start ")));
+    *l.blind.lock().unwrap() = false;
+    put_back(&mut rec, &l, &t);
+    assert!(rec.settled());
+    assert_eq!(entry(&rec, "survival").start.as_deref(), Some("restored-1x"));
+    assert!(l.running().iter().any(|n| n == "survival"));
 }
 
 #[test]

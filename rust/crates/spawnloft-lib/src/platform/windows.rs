@@ -762,6 +762,29 @@ const RUN_ONCE: &str = r"Software\Microsoft\Windows\CurrentVersion\RunOnce";
 /// The longest command line Windows runs from a `Run` or `RunOnce` value.
 pub const RUN_ONCE_MAX: usize = 260;
 
+/// Renames over `to` and does not return before the change is on the disk, so the new name
+/// survives a power cut (`MOVEFILE_WRITE_THROUGH`).
+pub fn rename_durable(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+    };
+    let w = |p: &std::path::Path| -> Vec<u16> { p.as_os_str().encode_wide().chain(Some(0)).collect() };
+    let (from, to) = (w(from), w(to));
+    // SAFETY: two NUL-terminated paths.
+    let ok = unsafe {
+        MoveFileExW(
+            from.as_ptr(),
+            to.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if ok == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
+
 /// A command Windows runs once at this user's next sign-in (`HKCU\...\RunOnce`, removed by
 /// Windows as it runs it). Setting the same name again replaces the command.
 pub fn run_once_set(name: &str, command: &str) -> std::io::Result<()> {

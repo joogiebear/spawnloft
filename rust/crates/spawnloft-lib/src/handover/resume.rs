@@ -31,13 +31,15 @@ pub struct ResumeOptions {
 
 /// Which entries this run starts.
 pub fn candidates(record: &Record, opts: ResumeOptions, now_ms: i64) -> Vec<usize> {
-    if opts.pending_only && now_ms.saturating_sub(record.started_ms) >= PENDING_WINDOW.as_millis() as i64 {
-        return Vec::new();
-    }
+    // measured from the real stop: an attempt that took over an earlier one carries its times
+    let old = |e: &crate::handover::Entry| {
+        now_ms.saturating_sub(e.stopped_at.unwrap_or(record.started_ms)) >= PENDING_WINDOW.as_millis() as i64
+    };
     (0..record.servers.len())
         .filter(|&i| {
             let e = &record.servers[i];
             e.to_restart()
+                && !(opts.pending_only && old(e))
                 && match e.start.as_deref() {
                     None => true,
                     Some("skipped") => opts.pending_only && !opts.skip_start,

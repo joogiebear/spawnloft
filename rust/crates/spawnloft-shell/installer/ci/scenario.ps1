@@ -620,6 +620,7 @@ switch ($Name) {
       Check '  and the record on disk already names both servers and the task, unfinished' ($rec -and $null -eq $rec.stopExit -and (Entry $rec 'good') -and (Entry $rec 'slow') -and @($rec.tasksDisabled) -contains $task.TaskName -and -not $rec.tasksReenabled) "$($rec | ConvertTo-Json -Compress -Depth 5)"
       Check '  the task is off for the stop' (-not (Task-Enabled))
       Check '  the sign-in restore is registered' ("$(Reg $runOnce 'SpawnLoftHandover')" -match 'handover restore .*--logon')
+      Check '  slow was sent its stop and holds it' (Wait-Until { Console-Has $dataRoot 'slow' 'holding the stop' } 90)
       Check '  the stop still runs (it waits on slow)' ((Staged-Core).Count -ge 1 -and -not $setup.HasExited)
       $setup
     }
@@ -646,7 +647,7 @@ switch ($Name) {
     # 1. the setup is ended (Task Manager) while servers are being stopped: the stop notices that
     #    nobody is left to finish the update and puts everything back itself
     $setup = Begin-Stop
-    Stop-Process -Id $setup.Id -Force
+    Stop-Process -Id $setup.Id -Force -ErrorAction SilentlyContinue
     Check 'the stop ends by itself once the setup is gone' (Wait-Until { (Staged-Core).Count -eq 0 } 120)
     $script:result.afterSetupEnded = Good-Back-Under-1x 'setup ended'
     Check '  no blocked marker (nothing refused; nobody was there)' (-not (Test-Path (Join-Path $dataRoot 'run\handover-blocked.json')))
@@ -655,7 +656,8 @@ switch ($Name) {
     #    sign-in does it
     Reset-Slow
     $setup = Begin-Stop
-    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force
+    # the core may end by itself between the listing and the kill
+    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 3
     Check 'cut: good is down and the task is off (what blocker B1 left for good)' ((List1)['good'].status -ne 'running' -and -not (Task-Enabled))
     $rec = Record $dataRoot
@@ -678,7 +680,8 @@ switch ($Name) {
     #    over what the cut attempt left, and both servers come back under 2.0
     Reset-Slow
     $setup = Begin-Stop
-    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force
+    # the core may end by itself between the listing and the kill
+    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 3
     # slow finishes the stop it was holding: now both are down and only the record knows why
     Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
@@ -720,10 +723,12 @@ switch ($Name) {
     foreach ($k in $wvKeys) { if (Reg $k 'pv') { Rename-ItemProperty -Path $k -Name 'pv' -NewName 'pv-hidden-by-ci' } }
     function WebView2-Registered { @($wvKeys | Where-Object { Reg $_ 'pv' }).Count -gt 0 }
     Check 'no WebView2 is registered' (-not (WebView2-Registered))
-    Add-Content -Path "$env:WINDIR\System32\drivers\etc\hosts" -Value "`r`n0.0.0.0 go.microsoft.com"
+    # both families: with only an IPv4 line Windows still asks DNS for the IPv6 address
+    Add-Content -Path "$env:WINDIR\System32\drivers\etc\hosts" -Value "`r`n127.0.0.1 go.microsoft.com`r`n::1 go.microsoft.com"
     ipconfig /flushdns | Out-Null
-    $reach = try { [bool] (Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -UseBasicParsing -TimeoutSec 15 -MaximumRedirection 0 -ErrorAction Stop) } catch { $_.Exception.Response -ne $null }
-    Check 'the WebView2 download link cannot be reached' (-not $reach)
+    $addrs = @(try { [System.Net.Dns]::GetHostAddresses('go.microsoft.com') } catch { @() })
+    $away = @($addrs | Where-Object { -not [System.Net.IPAddress]::IsLoopback($_) })
+    Check 'the WebView2 download link leads nowhere' ($away.Count -eq 0) "resolves to $($addrs -join ', ')"
 
     Load-Win32
     $p = Start-Process $setupA -PassThru

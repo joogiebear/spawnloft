@@ -688,6 +688,19 @@ Function SpawnLoftUserAbort
       ${IfThen} $0 > 2400 ${|} ${ExitDo} ${|}
     ${Loop}
     StrCpy $StopRunning 0
+    ; A stop that had already ended with everything stopped (its answer not read yet by the
+    ; page's timer) never saw the Cancel: its servers are started again here.
+    ClearErrors
+    FileOpen $1 "$PLUGINSDIR\handover-exit.txt" r
+    ${IfNot} ${Errors}
+      FileRead $1 $2
+      FileClose $1
+      IntOp $2 $2 + 0
+      ${If} $2 = 0
+        StrCpy $StopDone 1
+        Call RestoreLegacyServers
+      ${EndIf}
+    ${EndIf}
   ${Else}
     Call RestoreLegacyServers
   ${EndIf}

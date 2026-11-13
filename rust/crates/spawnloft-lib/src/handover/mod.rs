@@ -390,6 +390,8 @@ pub struct Record {
     pub started_ms: i64,
     pub mode: String,
     pub data_root: String,
+    /// Where SpawnLoft 1.x is installed: what a restore at sign-in starts the servers through.
+    pub legacy_dir: Option<String>,
     pub servers: Vec<Entry>,
     pub tasks_disabled: Vec<String>,
     pub tasks_reenabled: bool,
@@ -408,6 +410,7 @@ impl Record {
             started_ms: ms,
             mode: mode.into(),
             data_root: data_root.into(),
+            legacy_dir: None,
             servers: Vec::new(),
             tasks_disabled: Vec::new(),
             tasks_reenabled: false,
@@ -436,6 +439,7 @@ impl Record {
             "startedMs": self.started_ms,
             "mode": self.mode,
             "dataRoot": self.data_root,
+            "legacyDir": self.legacy_dir,
             "servers": self.servers.iter().map(Entry::to_json).collect::<Vec<_>>(),
             "tasksDisabled": self.tasks_disabled,
             "tasksReenabled": self.tasks_reenabled,
@@ -462,6 +466,7 @@ impl Record {
             started_ms: v.get("startedMs").and_then(Value::as_i64).unwrap_or(0),
             mode: s("mode"),
             data_root: s("dataRoot"),
+            legacy_dir: v.get("legacyDir").and_then(Value::as_str).map(str::to_string),
             servers: v
                 .get("servers")
                 .and_then(Value::as_array)
@@ -564,6 +569,8 @@ impl Marker {
 pub struct StopOptions {
     pub legacy_version: String,
     pub to_version: String,
+    /// the 1.x install folder, for the record
+    pub legacy_dir: Option<String>,
     pub deadline: Duration,
     /// silent and passive installs: the blocked marker applies
     pub silent: bool,
@@ -573,9 +580,8 @@ pub struct StopOptions {
     pub restore_wait: Duration,
     /// yes once the installer that runs the stop is gone: the stop then ends like a Cancel
     pub installer_gone: Option<Watch>,
-    /// yes while Windows shuts down or signs the person out. With the installer gone as well,
-    /// nothing is started again (it would be ended at once) and the record is left as it is for
-    /// the next sign-in.
+    /// yes while Windows shuts down or signs the person out: nothing is started again then (it
+    /// would be ended at once) and the record is left as it is for the next sign-in.
     pub session_ending: Option<Watch>,
 }
 
@@ -624,6 +630,7 @@ pub fn run_stop(
     };
     let mode = if opts.silent { "silent" } else { "ui" };
     let mut record = Record::new(&opts.legacy_version, &opts.to_version, mode, data_root);
+    record.legacy_dir = opts.legacy_dir.clone();
 
     // An attempt that never finished (the PC shut down, the installer was ended): what it stopped
     // and switched off is this attempt's to put back, whichever way this one ends.
@@ -801,10 +808,12 @@ pub fn run_stop(
         };
     }
 
-    if cut.installer_gone() && opts.session_ending.as_ref().is_some_and(Watch::yes) {
-        // whatever is started now is ended by the shutdown a moment later
+    if opts.session_ending.as_ref().is_some_and(Watch::yes) {
+        // Whatever is started now is ended by the shutdown a moment later (and a start that
+        // fails because of it must not be written down as tried). With the installer still
+        // there or not: nothing carries this update on.
         log.line(
-            "the installer is gone and Windows is shutting down: nothing is started again now; \
+            "Windows is shutting down: nothing is started again now; \
              the next sign-in (or the next update attempt) puts back what was stopped",
         );
         journal.save(&record);
@@ -934,8 +943,10 @@ pub fn restore_waiting(record: &mut Record, ctx: Ctx<'_>, wait: Duration) {
     // servers sent `stop` that were still saving at the cutoff: a short wait, then the ones that
     // finished start again too; one still running keeps serving under 1.x
     let until = Instant::now() + wait;
+    let mut listed_once = false;
     while record.servers.iter().any(|e| e.stop == "stop-sent") {
         if let Ok(now) = legacy.list() {
+            listed_once = true;
             for e in record.servers.iter_mut().filter(|e| e.stop == "stop-sent") {
                 if !now.iter().any(|l| l.name == e.name && l.active()) {
                     log.line(&format!("{} finished stopping after the cutoff", e.name));
@@ -948,12 +959,18 @@ pub fn restore_waiting(record: &mut Record, ctx: Ctx<'_>, wait: Duration) {
         }
         std::thread::sleep(Duration::from_millis(500));
     }
-    for e in record.servers.iter_mut().filter(|e| e.stop == "stop-sent") {
-        log.line(&format!(
-            "{} was asked to stop and is still running; it is left to 1.x",
-            e.name
-        ));
-        e.stop = "still-running".into();
+    let unknown = !listed_once && record.servers.iter().any(|e| e.stop == "stop-sent");
+    if unknown {
+        // Running or stopped, nobody could tell: they stay owed, for the next restore to settle.
+        log.line("1.x could not say which servers run: the ones asked to stop are left for the next restore");
+    } else {
+        for e in record.servers.iter_mut().filter(|e| e.stop == "stop-sent") {
+            log.line(&format!(
+                "{} was asked to stop and is still running; it is left to 1.x",
+                e.name
+            ));
+            e.stop = "still-running".into();
+        }
     }
     let mut order: Vec<usize> = (0..record.servers.len())
         .filter(|&i| record.servers[i].to_restart() && record.servers[i].start.is_none())
@@ -980,7 +997,20 @@ pub fn restore_waiting(record: &mut Record, ctx: Ctx<'_>, wait: Duration) {
             e.started_at = Some(now_ms);
             continue;
         }
+        if crate::platform::session_ending() {
+            log.line("Windows is shutting down: the rest is put back at the next sign-in");
+            journal.save(record);
+            return;
+        }
         let res = legacy.start(&name, log);
+        if res.is_err() && crate::platform::session_ending() {
+            // it failed because the session is ending: not a start that was tried
+            log.line(&format!(
+                "{name} could not be started while Windows shuts down: put back at the next sign-in"
+            ));
+            journal.save(record);
+            return;
+        }
         let e = &mut record.servers[i];
         e.started_at = Some(time::now_ms());
         match res {
