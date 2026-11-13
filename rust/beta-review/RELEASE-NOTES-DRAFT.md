@@ -34,6 +34,14 @@ SpawnLoft 1 until you restart them; the panel shows a banner with a Restart butt
 - **`spawnloft` on your PATH on Windows.** Open a new terminal after installing and
   `spawnloft list` works. `mcctl` still works too.
 - **Linux arm64** packages, beside x64.
+- **The panel only answers you.** SpawnLoft 1's panel answered any program on the same computer,
+  including programs of other accounts on it. 2.0's panel needs a sign-in: the app's window signs
+  itself in, and nothing changes for you there. Without the app, `spawnloft ui` opens your
+  browser already signed in and prints a one-use link (`spawnloft ui --link` makes a new one). A
+  bookmark or an open tab at `http://127.0.0.1:8770/` now shows "Open SpawnLoft from the app, or
+  run `spawnloft ui`", and scripts calling the panel's HTTP API get `401` until they sign their
+  requests (the README's "Panel access" has the recipe). SpawnLoft 1 is not changed: updating to
+  2.0 is the fix.
 - Nothing to install first: the app brings the runtime it needs. You still need Java for the
   Minecraft servers themselves.
 
@@ -66,10 +74,6 @@ Intel Macs are not supported.
   example the PC was shut down while it ran), opening SpawnLoft finishes starting your servers and
   tells you what happened. Check that your scheduled tasks are still enabled afterwards.
   **[confirm: remove the last sentence once B1 is fixed]**
-- **The panel trusts programs on this computer.** As in SpawnLoft 1, any program running on the
-  same machine can talk to the panel. Web pages cannot. If other people have accounts on your
-  computer, keep that in mind until this is tightened before 2.0.0. **[confirm: Victor's decision
-  in REVIEW section 3]**
 - **Uninstalling with "delete app data" removes the whole backups folder you chose** in
   Preferences, including anything else in it. If your backups folder holds other files, move them
   first or leave the box unticked. **[confirm: remove once fixed]**

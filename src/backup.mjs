@@ -369,7 +369,9 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
 }
 
 export function listSnapshots(name) {
-  const dir = backupDir(name)
+  // a listing makes nothing: the panel answers it on a GET (test/panel-get-writes.test.mjs)
+  const dir = path.join(BACKUPS_DIR, name)
+  if (!fs.existsSync(dir)) return []
   return fs
     .readdirSync(dir)
     .filter((f) => f.endsWith('.tar.gz'))

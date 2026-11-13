@@ -25,7 +25,8 @@ import * as backup from './src/backup.mjs'
 import * as create from './src/create.mjs'
 import * as paper from './src/paper.mjs'
 import * as ui from './src/ui.mjs'
-import { PROBE_HEADER, PROOF_HEADER, apiAuthorization, loadKey, makeToken, probeNonce, proofMatches } from './src/panel-auth.mjs'
+import { PROBE_HEADER, PROOF_HEADER, apiAuthorization, loadKey, loginLink, probeNonce, proofMatches } from './src/panel-auth.mjs'
+import { openInBrowser, writeOpenFile } from './src/panel-open.mjs'
 import * as manage from './src/manage.mjs'
 import * as settings from './src/settings.mjs'
 import * as java from './src/java.mjs'
@@ -1246,29 +1247,35 @@ function cmdLaunchers(positional) {
 
 async function cmdUi(positional, flags) {
   const port = Number(flags.port ?? 8770)
-  // --no-open is still taken and changes nothing for now: the sign-in link is printed either
-  // way, and opening it without putting it on a command line comes with the next change.
-  // --launcher opens the game launcher's page instead of the panel's. A second panel cannot bind the
-  // port, so with one already running it opens that panel's launcher and stops there.
+  // --launcher signs in to the game launcher's page instead of the panel's. --no-open only
+  // prints the link (a machine reached over SSH, section "Panel access" in the README). --link
+  // starts nothing: it prints a fresh link for the panel already running on the port.
   const launcher = flags.launcher === true
+  const open = flags.open !== false && flags.link !== true
+  const to = launcher ? '/launcher' : null
   // started by spawnloft-core's proxy, which signs its own requests: no link is made or printed
   const behindProxy = flags.exitWithStdin === true
+  if (flags.link === true) {
+    const running = `http://127.0.0.1:${port}/`
+    if (!(await isPanelAt(running))) {
+      fail(`no SpawnLoft panel of yours is running on port ${port}. Start one with: spawnloft ui${port === 8770 ? '' : ` --port ${port}`}`)
+    }
+    handOver(loginLink(loadKey(), port, to), { open: false, what: launcher ? 'the launcher' : 'the panel' })
+    return
+  }
   let url, auth
   try {
-    // The browser is not opened at the bare address any more: it would only show the sign-in
-    // page. The link below signs a browser in; it never goes on a command line, where other
-    // accounts could read it.
-    ({ url, auth } = await ui.serve({ port, open: false }))
+    ({ url, auth } = await ui.serve({ port }))
   } catch (err) {
     if (err?.code !== 'EADDRINUSE') throw err
     const running = `http://127.0.0.1:${port}/`
-    const panel = await isPanelAt(running)
-    if (launcher && panel) {
-      out(`SpawnLoft launcher, on the panel already running on port ${port}. Open this link to sign in (it works once, for 5 minutes):`)
-      out(`  ${running}auth?t=${makeToken(loadKey(), 'login', port)}&to=/launcher`)
+    // this user's own panel holds the port: sign this browser in to it rather than start another
+    if (!behindProxy && (await isPanelAt(running))) {
+      out(`A SpawnLoft panel is already running on port ${port}.`)
+      handOver(loginLink(loadKey(), port, to), { open, what: launcher ? 'its launcher' : 'it' })
       return
     }
-    fail(`port ${port} is already in use${panel ? ` by a SpawnLoft panel: open ${running}` : ''}. Pick another with --port <n>.`)
+    fail(`port ${port} is already in use by another program. Pick another with --port <n>.`)
   }
   // spawnloft-core's proxy holds a pipe to stdin: when it ends, however it ends, so does this panel
   if (behindProxy) {
@@ -1278,11 +1285,34 @@ async function cmdUi(positional, flags) {
   }
   out(`SpawnLoft panel: ${url}`)
   if (!behindProxy) {
-    out(`Open this link in your browser to sign in (it works once, for 5 minutes):`)
-    out(`  ${auth.loginUrl(launcher ? '/launcher' : null)}`)
+    handOver(loginLink(auth.key, auth.port, to), { open, what: launcher ? 'the launcher' : 'the panel' })
   }
   out('Bound to 127.0.0.1 only — it can start servers and type console commands, so it is')
   out('for this machine, not the network. Ctrl+C to stop the panel (servers keep running).')
+  if (!behindProxy) out('Lost the tab, or want another browser in? Run: spawnloft ui --link' + (port === 8770 ? '' : ` --port ${port}`))
+}
+
+// Gives a browser a one-use sign-in link. Opening it goes through a private page in the config
+// folder (panel-open.mjs), never through a command line other accounts can read. The link is
+// printed as well: a browser installed as a Snap or Flatpak cannot read that folder, and over
+// SSH there is no browser to open.
+function handOver(link, { open, what }) {
+  if (open) {
+    let file = null
+    try {
+      file = writeOpenFile(link.url, link.nonce)
+    } catch (err) {
+      out(`Could not open a browser for you (${err.message}).`)
+    }
+    if (file) {
+      openInBrowser(file)
+      out(`Opening ${what} in your browser. If it does not open, use this link (it works once, for 5 minutes):`)
+      out(`  ${link.url}`)
+      return
+    }
+  }
+  out(`Open this link in your browser to sign in to ${what} (it works once, for 5 minutes):`)
+  out(`  ${link.url}`)
 }
 
 // This user's SpawnLoft panel is what holds the port. Anything can answer 200 there, so the
@@ -1979,8 +2009,11 @@ OTHER
   spawnloft templates                    List templates
   spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template
   spawnloft ui [--port n] [--no-open] [--launcher]
-                                    Serve the local control panel (and open it in a browser);
+                                    Serve the local control panel and sign a browser in to it
+                                    (--no-open only prints the one-use link);
                                     --launcher opens the game launcher instead
+  spawnloft ui --link [--port n] [--launcher]
+                                    Print a new sign-in link for the panel already running
   spawnloft paper versions               Paper versions available to download
   spawnloft paper fetch <version>        Download a Paper build into the jar store
   spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,

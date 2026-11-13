@@ -222,7 +222,8 @@ client (Linux arm64, for one), or the panel refused the version itself. The old 
 `#accounts` links open the setups menu and the account menu.
 
 Everything the page does goes through the panel's `/api/client/...` routes (profiles, versions,
-launch, stop, log, diag, accounts), behind the panel's localhost Host and Origin check. A launch
+launch, stop, log, diag, accounts), behind the panel's sign-in and its localhost Host and Origin
+check ([README: Panel access](README.md#panel-access)). A launch
 is a job: the page posts it with a job id, opens `/api/jobs/<id>/stream` and shows the download
 and start-up lines, which end in `running` or an `error`. `GET /api/client/launcher` is the one
 read the page polls (profiles with their running state, accounts, the default account, the
@@ -238,8 +239,8 @@ diagnostics bundle hides them). No route returns a token.
 | --- | --- |
 | The panel | The **Play** button at the bottom of the sidebar shows the launcher as the panel's **Play** page, in place of the server. Opening a server afterwards keeps it loaded: a launch under way keeps going, and Play brings it back as it was. |
 | macOS | **Window → Play** in the menu bar does the same. (Windows and Linux have no app menu bar; use the sidebar button.) |
-| The command line | `spawnloft ui --launcher` starts the panel and opens `/launcher`, the launcher as a page of its own, in the browser. If a panel is already running on the port, it opens that panel's launcher instead of failing. `--no-open` prints the address (`http://127.0.0.1:8770/launcher`) without opening it. |
-| A browser | Go to `/launcher` on a running panel for the page of its own; the panel's sidebar Play shows the Play page there too. |
+| The command line | `spawnloft ui --launcher` starts the panel and signs the browser in to `/launcher`, the launcher as a page of its own. If your panel is already running on the port, it signs the browser in to that panel's launcher instead of failing. `--no-open` prints the one-use sign-in link without opening it; `spawnloft ui --link --launcher` prints a new one for a running panel. |
+| A browser | Go to `/launcher` on a panel the browser is signed in to for the page of its own; the panel's sidebar Play shows the Play page there too. |
 | A server card | The **Play** on a server card (and its ⋯ menu) opens the Play page with that server and its Minecraft version pre-filled. |
 
 In the desktop app the Microsoft sign-in opens in a small window of its own (not your browser)
@@ -335,8 +336,9 @@ useless without the state that exists only in the panel's memory. Nothing from t
 code, the state, Microsoft's error text) is written to `panel.log`; the log line is "signed in
 <name>".
 
-The accounts routes, all behind the panel's localhost Host and Origin check and none of them ever
-carrying a token:
+The accounts routes, all behind the panel's sign-in and its localhost Host and Origin check, and
+none of them ever carrying a token (the sign-in callback alone needs no panel sign-in: Microsoft's
+redirect brings no cookie, and its one-time `state` is its proof):
 
 | Route | Does |
 | --- | --- |
