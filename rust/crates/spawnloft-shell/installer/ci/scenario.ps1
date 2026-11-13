@@ -561,9 +561,21 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $run = Run-Installer $setupA @('/S') 300
     Check 'install again exit 0' ($run.code -eq 0) "exit $($run.code)"
     Kill-Everything
+    # a backups folder the person chose, holding other things too: only SpawnLoft's subfolders go
+    $backups = Join-Path $env:RUNNER_TEMP 'chosen-backups'
+    New-Item -ItemType Directory -Force (Join-Path $backups 'keep'), (Join-Path $backups 'family photos') | Out-Null
+    Set-Content (Join-Path $backups 'keep\2026-11-13_120000.tar.gz') 'x'
+    Set-Content (Join-Path $backups 'family photos\beach.jpg') 'x'
+    Set-Content (Join-Path $backups 'tax-2025.pdf') 'x'
+    $cfgFile = Join-Path $env:APPDATA 'spawnloft\settings.json'
+    $cfg = Get-Content $cfgFile -Raw | ConvertFrom-Json
+    $cfg | Add-Member -Force -NotePropertyName backupsDir -NotePropertyValue $backups
+    $cfg | ConvertTo-Json | Set-Content $cfgFile
     $p = Run "$inst\uninstall.exe" @('/S', '/DELETEAPPDATA', "_?=$inst") 300
     Check 'uninstall with data exit 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
     Check '  data removed' (-not (Test-Path (Join-Path $dataRoot 'instances.json')))
+    Check "  the server's backups in the chosen folder removed" (-not (Test-Path (Join-Path $backups 'keep')))
+    Check '  other files in the chosen backups folder kept' ((Test-Path (Join-Path $backups 'family photos\beach.jpg')) -and (Test-Path (Join-Path $backups 'tax-2025.pdf')))
     Check '  WebView2 profile folder removed' (-not (Test-Path (Join-Path $env:LOCALAPPDATA 'io.github.joogiebear.mcctl')))
   }
 
