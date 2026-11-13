@@ -33,7 +33,7 @@ installs for itself.
 1. Git, Node (any current LTS), the GitHub CLI signed in (`gh auth status`).
 2. Rust through rustup. `rust/rust-toolchain.toml` pins the compiler; rustup installs it on first use.
    The MSVC build tools (Visual Studio Build Tools, "Desktop development with C++").
-3. The Azure CLI and the signing module:
+3. The Azure CLI and the signing module, from the PowerShell you sign in (PowerShell 7 on Desktop-Main):
    ```powershell
    Install-Module -Name TrustedSigning -Scope CurrentUser
    ```
@@ -62,15 +62,21 @@ It stops at the first problem and says what to do. In order: it checks the machi
 clean checkout at `origin/v2`, an Azure session, the signing module, a free output folder),
 installs the pinned Tauri CLI into a temporary folder, makes a throwaway release key, builds and
 signs the core, stages the bundled Node, builds and signs the shell, uninstaller and setup, assembles
-the asset set, runs the gate, and writes `SIGNING-REPORT.json`.
+the asset set, runs the gate, and writes the signing report beside the output folder.
 
 The result is in `desktop\dist\v2-signed\<version>\`:
 
 - `SpawnLoft-Setup-<version>.exe` and its `.sig`
 - `spawnloft-updates.json` and `.sig`, `latest.json`, `latest.yml` and `beta.yml` (the update feeds)
-- `SIGNING-REPORT.json`: version, commit, which release key, and each signed file's sha256, signer
-  and certificate thumbprint
-- `throwaway-release.pub` when the throwaway key was used
+
+and beside it, so the folder holds only release assets:
+
+- `<version>.signing-report.json`: version, commit, which release key, and each signed file's
+  sha256, signer and certificate thumbprint
+- `<version>.throwaway-release.pub` when the throwaway key was used
+
+It signs only from `v2` (the branch the checkout tracks on GitHub). To try a pull request's branch
+before it merges, pass `--any-branch`.
 
 It never installs the build. On Desktop-Main that would replace the installed SpawnLoft. Copy the
 setup to a clean Windows VM for the W8 runs.
@@ -98,7 +104,7 @@ separate, deliberate step through `desktop/release-publish.mjs --confirm`, on Vi
 
 A thread can run this on Desktop-Main through Remote Control once Victor approves the session. The
 Azure sign-in is interactive, so Victor runs `az login` himself first if `az account show` fails.
-The thread then reports the gate's output and `SIGNING-REPORT.json`.
+The thread then reports the gate's output and the signing report.
 
 ## When it fails
 

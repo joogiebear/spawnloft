@@ -26,11 +26,9 @@ $account = Setting 'ACCOUNT' 'Mcctl'
 $profileName = Setting 'PROFILE' 'MCCTL'
 $publisher = Setting 'PUBLISHER' 'victor zemeckis'
 
-# Microsoft renamed Trusted Signing to Artifact Signing in 2025; either module signs the same way.
-foreach ($module in @('TrustedSigning', 'ArtifactSigning')) {
-  if (Get-Module -ListAvailable -Name $module) { Import-Module $module -ErrorAction SilentlyContinue }
-}
-$command = @('Invoke-TrustedSigning', 'Invoke-ArtifactSigning') | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } | Select-Object -First 1
+# The TrustedSigning module (PowerShell Gallery), the one electron-builder used for 1.x.
+if (Get-Module -ListAvailable -Name TrustedSigning) { Import-Module TrustedSigning -ErrorAction SilentlyContinue }
+$command = if (Get-Command Invoke-TrustedSigning -ErrorAction SilentlyContinue) { 'Invoke-TrustedSigning' } else { $null }
 if (-not $command) {
   Write-Error 'No signing module. Install it once: Install-Module -Name TrustedSigning -Scope CurrentUser'
   exit 1
@@ -39,6 +37,8 @@ if (-not $command) {
 $paths = @()
 foreach ($f in $Files) {
   $full = (Resolve-Path -LiteralPath $f).Path
+  # the module takes one comma-separated list
+  if ($full.Contains(',')) { Write-Error "cannot sign a path with a comma: $full"; exit 1 }
   $paths += $full
 }
 

@@ -18,6 +18,8 @@ test('only a 2.x beta version is built, and a public key comes only with its key
   assert.equal(parseArgs(['--version', '2.0.0-beta.1', '--key', 'k']).pubkey, undefined)
   assert.throws(() => parseArgs(['--version', '2.0.0-beta.1', '--pubkey', 'p']), /pass both/)
   assert.throws(() => parseArgs(['--version', '2.0.0-beta.1', '--publish']), /unknown argument --publish/)
+  assert.equal(parseArgs(['--version', '2.0.0-beta.1']).anyBranch, undefined)
+  assert.equal(parseArgs(['--version', '2.0.0-beta.1', '--any-branch']).anyBranch, true)
 })
 
 test('the signing account is the one 1.x stables are signed with', () => {
@@ -51,6 +53,7 @@ test('the bundler runs the signing script once per file, through Windows PowerSh
   assert.equal(c.cmd, 'powershell.exe')
   assert.deepEqual(c.args.slice(-3), ['-File', 'C:\\repo\\sign-windows.ps1', '%1'])
   assert.throws(() => signCommand('C:\\100%\\s.ps1'), /cannot hold/)
+  assert.throws(() => signCommand("C:\\it's\\s.ps1"), /cannot hold/)
   assert.equal(signCommand('C:\\s.ps1', 'pwsh.exe').cmd, 'pwsh.exe')
   assert.throws(() => signCommand('C:\\s.ps1', 'cmd.exe'), /unknown PowerShell/)
 })

@@ -8,10 +8,11 @@
 //        [--key <minisign secret key file> [--pubkey <its .pub>]]  (default: a throwaway key;
 //                                                     --pubkey defaults to the shell's release.pub)
 //        [--out <dir>]                                          (default: desktop/dist/v2-signed/<version>)
+//        [--any-branch]                                         (sign a branch other than v2, on purpose)
 //
 // In order, stopping at the first problem:
-//   1. checks: Windows, a clean checkout at the commit its upstream branch is at, an `az login`
-//      session, a signing module, a beta version;
+//   1. checks: Windows, a clean checkout at the commit its upstream branch (v2) is at, an
+//      `az login` session, a signing module, a beta version;
 //   2. builds spawnloft-core.exe at that version and signs it (sign-windows.ps1): the bundler
 //      copies resources as they are, so the core is signed before it is bundled;
 //   3. stages the bundled Node (installer-config.mjs); node.exe keeps the OpenJS Foundation
@@ -21,7 +22,10 @@
 //   5. assembles the update asset set (desktop/release-feed.mjs), the same step as release.yml;
 //   6. runs the release gate with --authenticode-cn "victor zemeckis" and --signed for the
 //      shell, the core and node.exe, --check-binary-versions, --runtime and --payload;
-//   7. writes SIGNING-REPORT.json (commit, version, key, each file's sha256 and signer).
+//   7. writes <out>.signing-report.json beside the folder (commit, version, key, each file's
+//      sha256 and signer), so the folder itself holds only the release assets.
+//
+// It signs from v2 only (the branch the checkout tracks), unless --any-branch says otherwise.
 //
 // It never installs the build: on this machine that would replace the installed SpawnLoft. The
 // installed-copy checks (--installed, the uninstaller's signature) belong to the W8 runs on a
@@ -56,6 +60,8 @@ export function parseArgs(argv) {
       case '--key': out.key = value(); break
       case '--pubkey': out.pubkey = value(); break
       case '--out': out.out = value(); break
+      // a branch other than v2 (a PR's branch, to try the script itself before it merges)
+      case '--any-branch': out.anyBranch = true; break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -79,6 +85,7 @@ export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, n
     '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--runtime', runtime, '--payload', payload]
 }
 
+const withoutKey = e => Object.fromEntries(Object.entries(e).filter(([k]) => !/^TAURI_SIGNING_PRIVATE_KEY/i.test(k)))
 const step = title => console.log(`\n== ${title}`)
 const stop = message => { console.error(`\nStopped: ${message}`); process.exit(1) }
 function run(cmd, args, { cwd = ROOT, env = process.env, shell = false } = {}) {
@@ -100,7 +107,7 @@ const psFile = script => ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', '
 // prompt puts it there), then Windows PowerShell 5.1. Each is asked with its own module path.
 function signingHost() {
   for (const host of ['pwsh.exe', 'powershell.exe']) {
-    const res = spawnSync(host, ['-NoProfile', '-NonInteractive', '-Command', "if (Get-Module -ListAvailable -Name TrustedSigning, ArtifactSigning) { 'yes' }"],
+    const res = spawnSync(host, ['-NoProfile', '-NonInteractive', '-Command', "if (Get-Module -ListAvailable -Name TrustedSigning) { 'yes' }"],
       { encoding: 'utf8', windowsHide: true, env: windowsPowerShellEnv() })
     if (!res.error && res.stdout.trim() === 'yes') return host
   }
@@ -126,9 +133,15 @@ async function main(argv) {
   if (read('git', ['status', '--porcelain'])) stop('the working tree has changes. A signed build is made from a clean commit, and its report says which.')
   const branch = read('git', ['branch', '--show-current'])
   if (!branch) stop('check out a branch (v2): a detached checkout has no upstream to compare with')
-  run('git', ['fetch', '--quiet', 'origin', branch])
+  // the branch it tracks on GitHub, whatever the local branch is called
+  const upstream = read('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], { allowFail: true })
+  const slash = upstream ? upstream.indexOf('/') : -1
+  if (slash < 0) stop(`${branch} tracks no branch on GitHub. Set one: git branch --set-upstream-to=origin/v2`)
+  const [remote, remoteBranch] = [upstream.slice(0, slash), upstream.slice(slash + 1)]
+  if (remoteBranch !== 'v2' && !opts.anyBranch) stop(`${upstream} is not v2. Signed builds come from v2; pass --any-branch to sign another branch on purpose.`)
+  run('git', ['fetch', '--quiet', remote, remoteBranch])
   const commit = read('git', ['rev-parse', 'HEAD'])
-  if (commit !== read('git', ['rev-parse', `origin/${branch}`])) stop(`this checkout is not at origin/${branch}. Pull (or push) first, so the build names a commit everyone can see.`)
+  if (commit !== read('git', ['rev-parse', '@{u}'])) stop(`this checkout is not at ${upstream}. Pull (or push) first, so the build names a commit everyone can see.`)
   if (read('az', ['account', 'show', '--query', 'user.name', '-o', 'tsv'], { shell: true, allowFail: true }) === null) {
     stop('there is no Azure session to sign with. Run: az login --tenant <the tenant holding the signing account>')
   }
@@ -141,13 +154,21 @@ async function main(argv) {
   console.log(`${version} from ${branch} at ${commit.slice(0, 12)}, signed as "${publisher}" (through ${host})`)
 
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-signed-'))
-  // no PSModulePath: each PowerShell builds its own (desktop/windows-powershell.mjs)
-  const env = { ...windowsPowerShellEnv(), ...settings, SPAWNLOFT_SIGN_HOST: host, SPAWNLOFT_VERSION: version, SPAWNLOFT_COMMIT: commit }
+  // the throwaway key and the staged files go with the folder, on success or not
+  process.on('exit', () => { try { fs.rmSync(work, { recursive: true, force: true }) } catch {} })
+  // no PSModulePath: each PowerShell builds its own (desktop/windows-powershell.mjs). No release
+  // key either: only the two steps that sign with it (tauri build, release-feed.mjs) get keyEnv.
+  const password = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+  const env = { ...withoutKey(windowsPowerShellEnv()), ...settings, SPAWNLOFT_SIGN_HOST: host, SPAWNLOFT_VERSION: version, SPAWNLOFT_COMMIT: commit }
   const signScript = path.join(HERE, 'sign-windows.ps1')
 
   step('Installing the pinned Tauri CLI')
   const cliPrefix = path.join(work, 'tauri-cli')
-  run('npm', ['install', '--prefix', cliPrefix, '--no-save', '--no-package-lock', '--no-audit', '--no-fund', `@tauri-apps/cli@${TAURI_CLI_VERSION}`], { shell: true })
+  // npm's own JS through this node: no shell, so a profile path with a space is one argument;
+  // no install scripts run on the signing machine
+  const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+  if (!fs.existsSync(npmCli)) stop(`npm is not beside this node (${npmCli})`)
+  run(process.execPath, [npmCli, 'install', '--prefix', cliPrefix, '--no-save', '--no-package-lock', '--no-audit', '--no-fund', '--ignore-scripts', `@tauri-apps/cli@${TAURI_CLI_VERSION}`], { env })
   const tauri = path.join(cliPrefix, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
   if (!fs.existsSync(tauri)) stop(`the Tauri CLI is not at ${tauri}`)
 
@@ -157,20 +178,19 @@ async function main(argv) {
     keyFile = path.resolve(opts.key)
     // installer-config.mjs and the gate take the two-line minisign file as well as its base64
     pubB64File = path.resolve(opts.pubkey ?? path.join(SHELL, 'release.pub'))
-    if (process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD === undefined) stop('set TAURI_SIGNING_PRIVATE_KEY_PASSWORD for the real key (in this terminal, not in a file)')
+    if (password === undefined) stop('set TAURI_SIGNING_PRIVATE_KEY_PASSWORD for the real key (in this terminal, not in a file)')
     console.log(`the release key ${keyFile}`)
   } else {
     keyFile = path.join(work, 'throwaway.key')
     run(process.execPath, [tauri, 'signer', 'generate', '--ci', '-p', '', '-w', keyFile, '-f'], { env })
     pubB64File = `${keyFile}.pub`
-    env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ''
     console.log('a THROWAWAY key: this build trusts only it, so it can never take or offer a real update')
   }
   // the CLI writes the .pub as one base64 line of the two-line minisign file; the gate takes the decoded form
   const pubText = fs.readFileSync(pubB64File, 'utf8')
   pubFile = path.join(work, 'release.pub')
   fs.writeFileSync(pubFile, pubText.includes('\n') && pubText.trim().includes('\n') ? pubText : Buffer.from(pubText.trim(), 'base64').toString('utf8'))
-  env.TAURI_SIGNING_PRIVATE_KEY = fs.readFileSync(keyFile, 'utf8')
+  const keyEnv = { ...env, TAURI_SIGNING_PRIVATE_KEY: fs.readFileSync(keyFile, 'utf8'), TAURI_SIGNING_PRIVATE_KEY_PASSWORD: opts.key ? password : '' }
 
   step(`Building the Rust core at ${version}`)
   run('cargo', ['build', '--release', '--locked', '-p', 'spawnloft-core'], { cwd: RUST, env })
@@ -188,7 +208,7 @@ async function main(argv) {
   const nodeExe = path.join(cfg, 'runtime', runtimeRecord.exe)
 
   step('Building and signing the shell, uninstaller and setup')
-  run(process.execPath, [tauri, 'build', '--ci', '--bundles', 'nsis', '--config', path.join(cfg, 'overlay.json')], { cwd: SHELL, env })
+  run(process.execPath, [tauri, 'build', '--ci', '--bundles', 'nsis', '--config', path.join(cfg, 'overlay.json')], { cwd: SHELL, env: keyEnv })
   const shellExe = path.join(RUST, 'target', 'release', 'SpawnLoft.exe')
   const setup = path.join(RUST, 'target', 'release', 'bundle', 'nsis', `SpawnLoft_${version}_x64-setup.exe`)
   if (!fs.existsSync(setup)) stop(`the setup was not produced at ${setup}`)
@@ -196,12 +216,15 @@ async function main(argv) {
   step('Assembling the update asset set')
   fs.mkdirSync(out, { recursive: true })
   run(process.execPath, [path.join(ROOT, 'desktop', 'release-feed.mjs'), '--out', out, '--version', version, '--pubkey', pubFile,
-    '--tauri', tauri, '--win', setup, '--min-version', '2.0.0-beta.1', '--date', new Date().toISOString().replace(/\.\d+Z$/, 'Z')], { env })
+    '--tauri', tauri, '--win', setup, '--min-version', '2.0.0-beta.1', '--date', new Date().toISOString().replace(/\.\d+Z$/, 'Z')], { env: keyEnv })
 
   step('The release gate')
   run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg })])
 
-  step('Writing SIGNING-REPORT.json')
+  // beside the folder, not in it: the folder holds exactly the release assets, so the gate (and a
+  // later publish step) find nothing unaccounted for
+  const reportFile = `${out}.signing-report.json`
+  step(`Writing ${reportFile}`)
   const files = {
     [`SpawnLoft-Setup-${version}.exe`]: path.join(out, `SpawnLoft-Setup-${version}.exe`),
     'SpawnLoft.exe': shellExe,
@@ -214,9 +237,8 @@ async function main(argv) {
     files: Object.fromEntries(Object.entries(files).map(([name, file]) => [name, { sha256: sha256(file), ...signer(file) }])),
     published: false,
   }
-  fs.writeFileSync(path.join(out, 'SIGNING-REPORT.json'), JSON.stringify(report, null, 2) + '\n')
-  if (!opts.key) fs.copyFileSync(pubFile, path.join(out, 'throwaway-release.pub'))
-  fs.rmSync(work, { recursive: true, force: true })
+  fs.writeFileSync(reportFile, JSON.stringify(report, null, 2) + '\n')
+  if (!opts.key) fs.copyFileSync(pubFile, `${out}.throwaway-release.pub`)
 
   console.log(`\nSigned ${version} is in ${out}. Nothing has been published.`)
   console.log('Next: install that setup on a clean Windows VM for the W8 runs (that is where the installed copy and the uninstaller are checked).')
