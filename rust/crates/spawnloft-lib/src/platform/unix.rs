@@ -119,13 +119,20 @@ pub fn process_image(pid: u32) -> Option<String> {
     {
         std::fs::read_link(format!("/proc/{pid}/exe"))
             .ok()
-            .map(|p| p.to_string_lossy().into_owned())
+            .map(|p| without_deleted(&p.to_string_lossy()).to_string())
     }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = pid;
         None
     }
+}
+
+/// Linux names a replaced binary `<path> (deleted)`: a 1.x daemon that outlived a package upgrade
+/// still runs from that image, and its name is the path without the suffix (as `src/util.mjs`
+/// reads it).
+fn without_deleted(image: &str) -> &str {
+    image.strip_suffix(" (deleted)").unwrap_or(image)
 }
 
 /// The server's process tree, for killing it. Unix needs no handle beyond the group id.
@@ -257,6 +264,14 @@ impl ProcessProbe {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_replaced_binary_keeps_its_name() {
+        let image = without_deleted("/opt/SpawnLoft/spawnloft-desktop (deleted)");
+        assert_eq!(image, "/opt/SpawnLoft/spawnloft-desktop");
+        assert!(crate::procid::same_image(image, "spawnloft-desktop"));
+        assert_eq!(without_deleted("/usr/bin/java"), "/usr/bin/java");
+    }
 
     #[test]
     fn group_kill_reaches_a_fork() {
