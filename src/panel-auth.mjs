@@ -53,7 +53,8 @@ function parseKey(text) {
 // or a copy can leave it so) is made private again before it is used. On Windows the ACL is set
 // when the file is made, and `doctor` checks it.
 function checkKeyFile(file) {
-  if (process.platform === 'win32') return
+  // asked of the runtime, not of process.platform: Windows has no owner ids or modes to read
+  if (typeof process.getuid !== 'function') return
   let stat
   try {
     stat = fs.lstatSync(file)
