@@ -40,7 +40,10 @@ const { main: envelopeMain, artifactTargets, ENVELOPE_FILE, parsePublicKey, veri
 // cannot exec on Windows, so point at the CLI's JS entry run by this node instead.
 export function resolveTauriCommand(tauriArg = process.env.TAURI_CLI || 'tauri') {
   const m = String(tauriArg).match(/^(.*)[\\/]\.bin[\\/]tauri(\.cmd)?$/)
-  return m ? [process.execPath, path.join(m[1], '@tauri-apps', 'cli', 'tauri.js')] : [tauriArg]
+  if (m) return [process.execPath, path.join(m[1], '@tauri-apps', 'cli', 'tauri.js')]
+  // the CLI's JS entry itself (release-windows.mjs passes it): Windows cannot exec a .js file
+  if (/\.[cm]?js$/i.test(String(tauriArg))) return [process.execPath, String(tauriArg)]
+  return [tauriArg]
 }
 
 export function makeTauriSigner(tauriArg = process.env.TAURI_CLI || 'tauri') {

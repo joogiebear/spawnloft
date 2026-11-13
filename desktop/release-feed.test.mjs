@@ -182,6 +182,9 @@ test('resolveTauriCommand turns npm\'s .bin shim into a node invocation', () => 
   assert.equal(r.length, 2)
   assert.ok(r[1].endsWith(path.join('@tauri-apps', 'cli', 'tauri.js')))
   assert.deepEqual(resolveTauriCommand('/usr/local/bin/tauri'), ['/usr/local/bin/tauri'])
+  // the CLI's JS entry (release-windows.mjs passes it) runs through this node: Windows cannot exec a .js
+  const js = 'S:\\x\\tauri-cli\\node_modules\\@tauri-apps\\cli\\tauri.js'
+  assert.deepEqual(resolveTauriCommand(js), [process.execPath, js])
 })
 
 test('semver helpers order betas below their stable and 1.x below 2.x', () => {
