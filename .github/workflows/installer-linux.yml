@@ -18,7 +18,17 @@ name: installer-linux
 #
 # Nothing leaves the runners except workflow artifacts kept 14 days: no feed, no tag, no release.
 # The version is beta-numbered (an internal version has no update channel, so no feed could be
-# assembled for it); these packages are never published.
+# assembled for it).
+#
+# The RELEASE packages (rust/beta-review/REVIEW.md B4): dispatched with `version`, the same jobs
+# build, test and gate the packages at that version. The packages are already release-grade (the
+# core and shell trust the compiled-in release keys; no test switch is set), so the only
+# difference is the version. The feed job then runs the release gate in release mode on the Linux
+# half (--release --partial --throwaway-key: the real feed is signed at the assembly) and writes
+# `release-gate-record.json`: the package and trust checks that need dpkg-deb and rpm, bound to
+# each package's sha256, which the assembly and the publish step on Windows take as --evidence.
+# The artifact `installer-linux-release-<run>` holds the eight packages and that record, the input
+# desktop/release-assemble.mjs takes. Nothing is published from here.
 
 on:
   push:
@@ -49,6 +59,11 @@ on:
       - 'desktop/linux-package.test.mjs'
       - '.github/workflows/installer-linux.yml'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Build the packages at this version (2.0.0-beta.N or 2.0.0); the default is the internal test number'
+        required: false
+        default: '2.0.0-beta.901'
 
 permissions:
   contents: read
@@ -63,7 +78,7 @@ defaults:
 
 env:
   CARGO_TERM_COLOR: always
-  VERSION: 2.0.0-beta.901
+  VERSION: ${{ inputs.version || '2.0.0-beta.901' }}
   # the published 1.x releases the packages must upgrade (stable and the last beta)
   OLD_STABLE: 1.5.0
   OLD_BETA: 1.6.0-beta.413
@@ -269,11 +284,11 @@ jobs:
           pattern: installer-linux-*
           path: pkg
           merge-multiple: true
-      - name: Install the Tauri CLI (pinned, from npm) and rpm
+      - name: Install the Tauri CLI (pinned, from npm), rpm and rpm2cpio
         run: |
           npm install --prefix "$RUNNER_TEMP/tauri-cli" --no-save --no-package-lock @tauri-apps/cli@2.12.4
           echo "TAURI_CLI=$RUNNER_TEMP/tauri-cli/node_modules/.bin/tauri" >> "$GITHUB_ENV"
-          sudo apt-get update && sudo apt-get install -y rpm
+          sudo apt-get update && sudo apt-get install -y rpm rpm2cpio
       - name: A throwaway release key for this run
         run: |
           "$TAURI_CLI" signer generate --ci -p "" -w "$RUNNER_TEMP/release.key" -f
@@ -294,14 +309,33 @@ jobs:
             test -s "$RUNNER_TEMP/release/$f" || { echo "::error::$f was not written"; exit 1; }
           done
           ls -la "$RUNNER_TEMP/release"
-      - name: The release gate, with the Linux package check
-        run: node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$VERSION" --pubkey "$RUNNER_TEMP/release.pub" --check-linux-packages
+      - name: The release gate on the Linux half (release mode; a throwaway key signs this feed)
+        run: |
+          mkdir -p "$RUNNER_TEMP/linux-release"
+          node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
+            --release --partial --throwaway-key --write-record "$RUNNER_TEMP/linux-release/release-gate-record.json"
+          # the assembly's input: the eight packages as built, and the record of their checks
+          cp pkg/*.deb pkg/*.rpm "$RUNNER_TEMP/linux-release/"
+          node -e '
+            const fs = require("fs"), path = require("path"), crypto = require("crypto")
+            const dir = process.argv[1], rec = JSON.parse(fs.readFileSync(path.join(dir, "release-gate-record.json"), "utf8"))
+            for (const name of fs.readdirSync(dir).filter(n => /\.(deb|rpm)$/.test(n))) {
+              const sum = crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, name))).digest("hex")
+              for (const check of ["linux-package", "trust"]) if (!rec.checks.some(c => c.check === check && c.file === name && c.sha256 === sum)) throw new Error(`${name}: no ${check} entry in the record`)
+            }
+            console.log(`record covers ${rec.checks.length} checks`)' "$RUNNER_TEMP/linux-release"
       - name: Show the feeds
         run: |
           for f in latest-linux.yml latest-linux-arm64.yml spawnloft-updates.json; do echo "===== $f"; cat "$RUNNER_TEMP/release/$f"; done
       - uses: actions/upload-artifact@v4
         with:
           name: installer-linux-release-${{ github.run_number }}
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/linux-release/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-linux-feed-${{ github.run_number }}
           retention-days: 14
           if-no-files-found: error
           path: ${{ runner.temp }}/release/

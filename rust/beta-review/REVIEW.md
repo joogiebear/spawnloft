@@ -47,6 +47,11 @@ is a known flake).
 
 Each of these should be closed, or consciously waived by Victor, before `2.0.0-beta.1`.
 
+*Update: B3 to B6 are addressed in the release tooling (`installer-mac.yml` release job,
+`installer-linux.yml` version input, `desktop/release-assemble.mjs`, the release-mode gate and
+`desktop/build-trust.mjs`; the sequence is in [../RELEASE.md](../RELEASE.md)). What is left of
+them is the first real run on the machines.*
+
 **B1. An interrupted handover leaves scheduled tasks disabled for good and forgets the servers it
 stopped.** `handover/mod.rs:579` disables the `\mcctl` task folder before the stops start, but
 which tasks were disabled lives only in memory until `run_stop` returns
