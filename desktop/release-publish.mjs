@@ -19,6 +19,7 @@
 //   node release-publish.mjs --dir <assembled dir> --version <v> --commit <sha>
 //        [--channel stable|beta] [--make-latest true|false] [--repo joogiebear/spawnloft]
 //        [--notes <file>] [--check-binary-versions] [--installed <dir>]... [--confirm]
+//        [--allow-prebeta-number]   (beta.1000 and up are pre-beta build numbers; refused otherwise)
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -49,6 +50,7 @@ function parseArgs(argv) {
       case '--check-binary-versions': out.checkBinaryVersions = true; break
       case '--installed': (out.installed ??= []).push(value()); break
       case '--confirm': out.confirm = true; break
+      case '--allow-prebeta-number': out.allowPrebetaNumber = true; break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -83,6 +85,13 @@ export function main(argv) {
     console.log(`DRY: would publish ${tag} to ${opts.repo} from ${opts.commit.slice(0, 12)}: ${assets.length} assets, prerelease=${prerelease}, make_latest=${makeLatest}.`)
     console.log('Pass --confirm (with gh authenticated and the signing already done) to publish.')
     return { tag, prerelease, makeLatest, assets: local.map(a => a.name) }
+  }
+
+  // Pre-beta builds made on the signing machine are numbered beta.1001 and up so they never take
+  // a public number (rust/SIGNING-WINDOWS.md). One of them published would sit above every real
+  // beta: the ordering rule below would then refuse 2.0.0-beta.1 for good.
+  if (isPrebetaNumber(opts.version) && !opts.allowPrebetaNumber) {
+    throw new Error(`${opts.version} is a pre-beta build number (beta.1000 and up are never published); nothing was published`)
   }
 
   const gh = args => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 }).trim()
@@ -120,6 +129,12 @@ export function main(argv) {
   gh(['release', 'edit', tag, '--repo', opts.repo, `--draft=false`, `--prerelease=${prerelease}`, `--latest=${makeLatest}`])
   console.log(`Published ${tag}: ${local.length} assets, prerelease=${prerelease}, make_latest=${makeLatest}.`)
   return { tag, prerelease, makeLatest, assets: local.map(a => a.name) }
+}
+
+// `X.Y.Z-beta.N` with N of 1000 or more: the numbers the pre-beta builds use.
+export function isPrebetaNumber(version) {
+  const m = /-beta\.(\d+)$/.exec(version)
+  return !!m && Number(m[1]) >= 1000
 }
 
 // Ordering (P0-E 4b / design 11): a 2.x release must be a higher version than every published

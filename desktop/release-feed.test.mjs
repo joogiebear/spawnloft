@@ -8,7 +8,7 @@ import { test } from 'node:test'
 
 import { assemble, singleFileFeed, linuxFeed, linuxFeedNames, writeElectronFeeds, resolveTauriCommand } from './release-feed.mjs'
 import { gate, releaseFlags, semverKey, semverLess, peVersionInfo, infoPlistShortVersion } from './release-gate.mjs'
-import { main as publishMain } from './release-publish.mjs'
+import { main as publishMain, isPrebetaNumber } from './release-publish.mjs'
 import { parsePublicKey } from './update-envelope.mjs'
 import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
 
@@ -211,6 +211,19 @@ test('release-publish in dry mode gates the dir and reports the ordering flags, 
   // a failed gate stops it before any gh call
   fs.writeFileSync(path.join(out, 'stray.txt'), 'x')
   assert.throws(() => publishMain(['--dir', out, '--version', '2.0.0-beta.3', '--commit', 'a'.repeat(40), '--pubkey', pubFile(key)]), /gate did not pass/)
+})
+
+test('release-publish refuses a pre-beta build number before any gh call', () => {
+  assert.equal(isPrebetaNumber('2.0.0-beta.1'), false)
+  assert.equal(isPrebetaNumber('2.0.0-beta.999'), false)
+  assert.equal(isPrebetaNumber('2.0.0-beta.1000'), true)
+  assert.equal(isPrebetaNumber('2.0.0-beta.1002'), true)
+  assert.equal(isPrebetaNumber('2.0.0'), false)
+  const { key, out } = buildRelease('2.0.0-beta.1002')
+  const args = ['--dir', out, '--version', '2.0.0-beta.1002', '--commit', 'a'.repeat(40), '--pubkey', pubFile(key)]
+  // the dry run still works for such a number (release.yml's dry run uses one)
+  assert.equal(publishMain(args).tag, 'v2.0.0-beta.1002')
+  assert.throws(() => publishMain([...args, '--confirm']), /pre-beta build number/)
 })
 
 test('the gate fails on a tampered envelope', () => {

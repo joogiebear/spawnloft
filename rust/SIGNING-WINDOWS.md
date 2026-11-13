@@ -83,9 +83,10 @@ setup to a clean Windows VM for the W8 runs.
 
 ### The release key
 
-By default the update files are signed with a throwaway key made for the run, and the build's
-updater trusts only that key. Such a build can never take or offer a real update, which is what
-a pre-beta build should be.
+By default the update files are signed with a throwaway key made for the run, so nothing built
+here can be offered to a real install. The build itself still trusts the release keys compiled
+into the core, like every build; what keeps a pre-beta install from taking a public beta is its
+higher beta number (1001 and up), and `release-publish.mjs --confirm` refuses such a number.
 
 For the W8 updater runs, which need the real key, pass it. The password goes in the terminal's
 environment for that run only, never in a file:
