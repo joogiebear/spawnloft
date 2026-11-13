@@ -606,7 +606,10 @@ the app.
 Installers and the update feeds live on **this repository's releases**. Windows, macOS and
 Linux are always one release, built from one commit.
 
-**Betas are published by CI.** `dev` carries a prerelease version. Every push to it builds
+**On the 2.0 line (`v2`) the Electron pipelines below are retired:** nothing is published by a
+push, and 2.x releases go out only from the Tauri release workflow on the maintainer's word.
+
+**Betas are published by CI (1.x).** `dev` carries a prerelease version. Every push to it builds
 Windows x64, Apple Silicon Mac, Linux x64 and Linux arm64, opens each packaged app and runs the same
 smoke test against it - on Linux the `.deb` is installed with apt on Ubuntu 24.04 first - and
 publishes one release, numbered from the workflow run, only if all four pass. A pull request

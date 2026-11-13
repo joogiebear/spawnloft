@@ -10,8 +10,9 @@ name: rust-internal
 # - Windows builds are unsigned and Mac builds ad-hoc signed (CI signing only trusts dev pushes);
 # - the app's update check is off in these builds (desktop/internal.config.cjs).
 #
-# desktop-preview.yml is untouched: its push trigger is dev only and its publish job checks
-# refs/heads/dev, so a push here cannot reach it.
+# desktop-preview.yml and desktop-stable.yml (the Electron beta and stable pipelines) are retired
+# on v2, so merging v2 into dev or main publishes nothing by itself
+# (test/no-electron-publish.test.mjs).
 
 on:
   push:
