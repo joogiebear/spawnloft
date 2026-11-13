@@ -64,6 +64,8 @@ function parseArgs(argv) {
       case '--evidence': (out.evidence ??= []).push(value()); break
       case '--authenticode-cn': out.authenticodeCn = value(); break
       case '--partial': out.partial = true; break
+      // a real publish of fewer than all platforms: 1.x installs on the missing ones get no update
+      case '--allow-partial-publish': out.allowPartialPublish = true; break
       case '--throwaway-key': out.throwawayKey = true; break
       case '--unsigned': out.unsigned = true; break
       case '--confirm': out.confirm = true; break
@@ -96,6 +98,7 @@ export function main(argv, inject = {}) {
   }
   // the two dry-run waivers never reach a real publish
   if (opts.confirm && opts.throwawayKey) throw new Error('--throwaway-key is for dry runs: a release is signed by a release key; nothing was published')
+  if (opts.confirm && opts.partial && !opts.allowPartialPublish) throw new Error('--partial is for dry runs: a published release carries every platform (pass --allow-partial-publish only on purpose); nothing was published')
   if (opts.confirm && opts.unsigned) throw new Error('--unsigned is for dry runs: every 1.x Windows install checks the publisher; nothing was published')
 
   // 1. the gate in release mode, on the exact bytes about to be published (B5)

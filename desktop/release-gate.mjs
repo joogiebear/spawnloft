@@ -216,6 +216,8 @@ export function loadEvidence(files, version, problems) {
     try { rec = JSON.parse(fs.readFileSync(file, 'utf8')) } catch (e) { problems.push(`evidence ${file}: unreadable (${e.message})`); continue }
     if (rec.format !== 1 || !Array.isArray(rec.checks)) { problems.push(`evidence ${file}: not a release-gate record`); continue }
     if (rec.version !== version) { problems.push(`evidence ${file} is for ${rec.version}, not ${version}`); continue }
+    // only a gate in release mode vouches for anything (a plain gate's checks are opt-in)
+    if (rec.release !== true) { problems.push(`evidence ${file} was not written by a release-mode gate (--release)`); continue }
     for (const c of rec.checks) entries.push({ ...c, from: `${path.basename(file)} (${rec.host ?? 'unknown host'})` })
   }
   return entries
@@ -253,15 +255,16 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
   const sumOf = name => sha256hex(fs.readFileSync(path.join(dir, name)))
   // a check this host cannot make: covered by an evidence entry for the same bytes, else a problem
   // in release mode and a note otherwise
-  const elsewhere = (check, name, why) => {
+  // `detail`, when given, must match too (the Authenticode publisher the record saw)
+  const elsewhere = (check, name, why, detail) => {
     const sum = sumOf(name)
-    const hit = proof.find(e => e.check === check && e.file === name && e.sha256 === sum)
-    if (hit) { notes.push(`${name}: ${check} checked on ${hit.from}, same sha256`); passed.push({ check, file: name, sha256: sum, by: hit.from }); return }
+    const hit = proof.find(e => e.check === check && e.file === name && e.sha256 === sum && (detail === undefined || e.detail === detail))
+    if (hit) { notes.push(`${name}: ${check} checked on ${hit.from}, same sha256${detail ? `, ${detail}` : ''}`); passed.push({ check, file: name, sha256: sum, by: hit.from }); return }
     const text = `${name}: ${check} not checked (${why}) and no --evidence record covers these bytes`
     if (release) problems.push(text)
     else notes.push(text)
   }
-  const pass = (check, name) => passed.push({ check, file: name, sha256: sumOf(name) })
+  const pass = (check, name, detail) => passed.push({ check, file: name, sha256: sumOf(name), ...(detail !== undefined ? { detail } : {}) })
 
   channel ??= channelOf(version)
   let flags = null
@@ -286,8 +289,9 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     if (envelope.channel !== channel) problems.push(`the envelope channel is ${envelope.channel}, expected ${channel}`)
     if (envelope.keyId !== key.keyId) problems.push(`the envelope names key ${envelope.keyId}, the public key is ${key.keyId}`)
     if (release) {
-      const ids = releaseKeys().map(k => k.id)
-      if (ids.includes(key.keyId)) notes.push(`the feed is signed by release key ${key.keyId}`)
+      // the key line, not its id: the id inside a key file is whatever its maker wrote
+      const rel = releaseKeys(); const ids = rel.map(k => k.id)
+      if (rel.some(k => k.line === key.keyLine)) notes.push(`the feed is signed by release key ${key.keyId}`)
       else if (throwawayKey) notes.push(`the feed is signed by ${key.keyId}, a throwaway key (--throwaway-key dry run): no install would take it; a publish refuses this`)
       else problems.push(`the feed is signed by ${key.keyId}, which is not a release key (${ids.join(', ')}); no install would take this release`)
     }
@@ -337,12 +341,12 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
     // releases). Skipped on the unsigned dry run (no --authenticode-cn) and off Windows.
     const installer = `SpawnLoft-Setup-${version}.exe`
     if (authenticodeCn && has(installer)) {
-      if (!tools.windows) elsewhere('authenticode', installer, 'Authenticode is read on Windows')
+      if (!tools.windows) elsewhere('authenticode', installer, 'Authenticode is read on Windows', `publisher ${authenticodeCn}`)
       else {
         const r = authenticode(path.join(dir, installer))
         if (!r.ok) problems.push(`${installer}: ${r.why}`)
         else if (r.cn !== authenticodeCn) problems.push(`${installer}: signed by "${r.cn}", expected "${authenticodeCn}"`)
-        else { notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`); pass('authenticode', installer) }
+        else { notes.push(`${installer}: Authenticode valid, timestamped, published as "${r.cn}"`); pass('authenticode', installer, `publisher ${r.cn}`) }
       }
     } else if (release && unsigned && has(installer)) {
       notes.push(`${installer}: Authenticode NOT required (--unsigned dry run); a publish refuses this`)
@@ -462,7 +466,18 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
         else { notes.push(`${name}: ${r.checked.length} binaries trust exactly the release keys`); pass('trust', name) }
       } catch (e) { problems.push(`${name}: could not be read for its keys (${e.message.split('\n')[0]})`) }
     }
-    // Windows: the setup is compressed, so the proof is the built binaries or an installed copy
+    // macOS: the .dmg (manual installs) and the .zip (1.x's Squirrel.Mac path) are read and
+    // proven notarized only on a Mac, by the mac release job, which records them
+    if (release) {
+      for (const name of [`SpawnLoft-${version}-mac-arm64.dmg`, `SpawnLoft-${version}-mac-arm64.zip`, macTar]) {
+        if (!has(name)) continue
+        elsewhere('mac-notarized', name, 'notarization and stapling are checked by the mac release job')
+        if (name !== macTar) elsewhere('trust', name, 'the app inside is read by the mac release job')
+      }
+    }
+    // Windows: the setup is compressed, so the proof is the built binaries or an installed copy.
+    // They are the files the signing run built; nothing here ties them to the setup's bytes, which
+    // is why the installed-copy check on a clean VM (CHECKLIST D) stays on the list.
     if (has(installer)) {
       const seenKinds = new Set()
       let bad = false
@@ -474,11 +489,11 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
         const kind = binaryKind(file.replaceAll('\\', '/'))
         if (!kind) { problems.push(`${file}: not a core or shell binary (--binary)`); bad = true; continue }
         let found
-        try { found = binaryProblems(fs.readFileSync(file), kind, rel) } catch (e) { problems.push(`${file}: unreadable (${e.code ?? e.message})`); bad = true; continue }
+        try { found = binaryProblems(fs.readFileSync(file), kind, rel, { shellKeys: true }) } catch (e) { problems.push(`${file}: unreadable (${e.code ?? e.message})`); bad = true; continue }
         if (found.length) { problems.push(...found.map(p => `${file} ${p}`)); bad = true }
         else { notes.push(`${path.basename(file)}: trusts exactly the release keys${kind === 'core' ? ', release feed code' : ''}`); if (/\.exe$/i.test(file)) seenKinds.add(kind) }
       }
-      if (seenKinds.has('core') && seenKinds.has('shell')) { if (!bad) pass('trust', installer) }
+      if (seenKinds.has('core') && seenKinds.has('shell')) { if (!bad) pass('trust', installer, winFiles.filter(f => /\.exe$/i.test(f)).map(f => `${path.basename(f)} ${sha256hex(fs.readFileSync(f))}`).join(', ')) }
       else if (!bad) elsewhere('trust', installer, 'the setup is compressed: pass its built --binary files or an --installed copy')
     }
     // a runnable installed core is asked as well
@@ -532,14 +547,14 @@ export function gate({ dir, version, pubkey, channel, makeLatest, dataFormat, au
   }
 
   const targets = envelope ? Object.keys(envelope.platforms) : []
-  return { ok: problems.length === 0, problems, notes, flags, targets, channel, version, checks: passed, platforms: present }
+  return { ok: problems.length === 0, problems, notes, flags, targets, channel, version, checks: passed, platforms: present, release: release === true }
 }
 
 // The record --write-record leaves for a gate on another host (--evidence): which per-file checks
 // passed here, each bound to the sha256 of the bytes it read.
 export function gateRecord(result, extra = {}) {
-  return { format: 1, version: result.version, host: `${os.hostname()} (${process.platform})`, writtenAt: new Date().toISOString(), ...extra,
-    checks: result.checks.filter(c => !c.by).map(({ check, file, sha256 }) => ({ check, file, sha256 })) }
+  return { format: 1, version: result.version, release: result.release === true, host: `${os.hostname()} (${process.platform})`, writtenAt: new Date().toISOString(), ...extra,
+    checks: result.checks.filter(c => !c.by).map(({ check, file, sha256, detail }) => ({ check, file, sha256, ...(detail !== undefined ? { detail } : {}) })) }
 }
 
 // An installed core's own answer: `update status --json`, run against a scratch config and data

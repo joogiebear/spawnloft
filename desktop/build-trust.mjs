@@ -54,13 +54,15 @@ export function embeddedKeys(bytes) {
 }
 
 // The problems with one binary. `kind` is 'core' (also checks the feed code) or 'shell'.
-export function binaryProblems(bytes, kind, release = releaseKeys()) {
+// `shellKeys`: the shell must carry the release keys too (Windows and macOS shells verify updates
+// themselves, updater.rs); a Linux shell, which never installs an update, may carry none.
+export function binaryProblems(bytes, kind, release = releaseKeys(), { shellKeys = false } = {}) {
   const problems = []
   const keys = embeddedKeys(bytes)
   const ids = new Set(release.map(k => k.id))
   // the core always reaches the key list (it verifies every feed); a shell whose platform never
   // verifies an update itself may carry none, but never a partial or foreign list
-  if (kind === 'core' || keys.size) for (const k of release) if (keys.get(k.id) !== k.line) problems.push(`does not carry release key ${k.id}`)
+  if (kind === 'core' || shellKeys || keys.size) for (const k of release) if (keys.get(k.id) !== k.line) problems.push(`does not carry release key ${k.id}`)
   for (const id of keys.keys()) if (!ids.has(id)) problems.push(`trusts key ${id}, which is not a release key (built with SPAWNLOFT_UPDATE_PUBKEYS, a test key list)`)
   if (kind === 'core') {
     const text = bytes.toString('latin1')
@@ -97,7 +99,8 @@ export function tarFiles(tar, want) {
     const type = String.fromCharCode(header[156] || 48)
     const data = tar.subarray(off + 512, off + 512 + size)
     let name = field(0, 100)
-    const prefix = field(257, 263).startsWith('ustar') ? field(345, 500) : ''
+    // POSIX ustar only: old GNU tars ("ustar  ") keep times where the prefix would be
+    const prefix = header.toString('latin1', 257, 263) === 'ustar\0' ? field(345, 500) : ''
     if (prefix) name = `${prefix}/${name}`
     if (longName !== null) { name = longName; longName = null }
     if (type === 'L') longName = data.toString('utf8').replace(/\0.*$/s, '')
@@ -142,17 +145,17 @@ export function binaryKind(name) {
 // The trust problems of a macOS updater tarball (gzipped tar of SpawnLoft.app), and what was read.
 export function macTarballTrust(tgz, release = releaseKeys()) {
   const files = tarFiles(zlib.gunzipSync(tgz), n => binaryKind(n) !== null)
-  return archiveTrust(files, ['core', 'shell'], release)
+  return archiveTrust(files, ['core', 'shell'], release, { shellKeys: true })
 }
 
 // `files` from tarFiles/cpioFiles; `need` the kinds that must be present.
-export function archiveTrust(files, need, release = releaseKeys()) {
+export function archiveTrust(files, need, release = releaseKeys(), opts = {}) {
   const problems = []
   const checked = []
   for (const kind of need) if (!files.some(f => binaryKind(f.name) === kind)) problems.push(`holds no ${kind} binary`)
   for (const f of files) {
     const kind = binaryKind(f.name)
-    const found = binaryProblems(f.data, kind, release)
+    const found = binaryProblems(f.data, kind, release, opts)
     problems.push(...found.map(p => `${f.name} ${p}`))
     checked.push(f.name)
   }
@@ -166,7 +169,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const arg of process.argv.slice(2)) {
     const m = /^(.*?)(?:=(core|shell))?$/.exec(arg)
     const kind = m[2] ?? binaryKind(m[1].replaceAll('\\', '/')) ?? 'shell'
-    const problems = binaryProblems(fs.readFileSync(m[1]), kind, release)
+    // run on the Windows and macOS builds: their shells verify updates, so must carry the keys
+    const problems = binaryProblems(fs.readFileSync(m[1]), kind, release, { shellKeys: true })
     if (problems.length) { bad++; for (const p of problems) console.error(`  FAIL ${m[1]} ${p}`) }
     else console.log(`  ok   ${m[1]} (${kind}): trusts exactly the release keys ${release.map(k => k.id).join(', ')}${kind === 'core' ? `, ${FEED_RELEASE}` : ''}`)
   }

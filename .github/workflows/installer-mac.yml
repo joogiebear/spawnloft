@@ -377,6 +377,7 @@ jobs:
           codesign --verify --deep --strict "$mnt/SpawnLoft.app"
           xcrun stapler validate "$mnt/SpawnLoft.app"
           short="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$mnt/SpawnLoft.app/Contents/Info.plist")"
+          node desktop/build-trust.mjs "$mnt/SpawnLoft.app/Contents/MacOS/SpawnLoft" "$mnt/SpawnLoft.app/Contents/Resources/resources/bin/spawnloft-core"
           hdiutil detach "$mnt" > /dev/null
           [ "$short" = "$RELEASE_VERSION" ] || { echo "::error::the dmg holds $short, not $RELEASE_VERSION"; exit 1; }
       - name: Remove the temporary keychain
@@ -385,6 +386,27 @@ jobs:
       - name: What the built core and shell trust (release keys only, release feed code)
         run: |
           node desktop/build-trust.mjs "$APP/Contents/MacOS/SpawnLoft" "$APP/Contents/Resources/resources/bin/spawnloft-core"
+          # the 1.x Squirrel.Mac zip: the same notarized, stapled app
+          z="$(mktemp -d)"
+          ditto -x -k "$MAC_OUT/SpawnLoft-$RELEASE_VERSION-mac-arm64.zip" "$z"
+          codesign --verify --deep --strict "$z/SpawnLoft.app"
+          xcrun stapler validate "$z/SpawnLoft.app"
+          spctl --assess --type execute --verbose=2 "$z/SpawnLoft.app"
+          node desktop/build-trust.mjs "$z/SpawnLoft.app/Contents/MacOS/SpawnLoft" "$z/SpawnLoft.app/Contents/Resources/resources/bin/spawnloft-core"
+      - name: The mac record (what only a Mac can check, bound to each file's sha256)
+        run: |
+          # every step above passed for these exact bytes: notarized and stapled (dmg, zip, and the
+          # tarball made from the same app), and the app inside the dmg and the zip trusts the
+          # release keys. The assembly and the publish step take this as --evidence.
+          node -e '
+            const fs = require("fs"), path = require("path"), crypto = require("crypto"), os = require("os")
+            const [dir, v] = process.argv.slice(1)
+            const sum = n => crypto.createHash("sha256").update(fs.readFileSync(path.join(dir, n))).digest("hex")
+            const dmg = `SpawnLoft-${v}-mac-arm64.dmg`, zip = `SpawnLoft-${v}-mac-arm64.zip`, tar = `SpawnLoft-${v}-mac-arm64.app.tar.gz`
+            const checks = [...[dmg, zip, tar].map(file => ({ check: "mac-notarized", file, sha256: sum(file) })), ...[dmg, zip].map(file => ({ check: "trust", file, sha256: sum(file) }))]
+            const rec = { format: 1, version: v, release: true, host: `${os.hostname()} (darwin, installer-mac run ${process.env.GITHUB_RUN_ID})`, writtenAt: new Date().toISOString(), commit: process.env.GITHUB_SHA, checks }
+            fs.writeFileSync(path.join(dir, "mac-release-record.json"), JSON.stringify(rec, null, 2) + "\n")
+            console.log(`${checks.length} checks recorded`)' "$MAC_OUT" "$RELEASE_VERSION"
       - name: The release gate on the mac half (feed signed by a throwaway key; the assembly re-signs)
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
@@ -395,7 +417,7 @@ jobs:
             --mac-updater "$MAC_OUT/SpawnLoft-$v-mac-arm64.app.tar.gz" --mac-dmg "$MAC_OUT/SpawnLoft-$v-mac-arm64.dmg" --mac-zip "$MAC_OUT/SpawnLoft-$v-mac-arm64.zip" \
             --min-version 2.0.0-beta.1 --date "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           node desktop/release-gate.mjs --dir "$RUNNER_TEMP/gate" --version "$v" --pubkey "$RUNNER_TEMP/bundler.pub" \
-            --release --partial --throwaway-key --installed "$APP" --payload "$APP"
+            --release --partial --throwaway-key --installed "$APP" --payload "$APP" --evidence "$MAC_OUT/mac-release-record.json"
           ls -la "$MAC_OUT"
       - uses: actions/upload-artifact@v4
         with:

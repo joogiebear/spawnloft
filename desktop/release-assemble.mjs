@@ -7,14 +7,14 @@
 //            Authenticode and trust checks, bound to the setup's sha256);
 //   macOS    installer-mac.yml dispatched with release_version=<v>: artifact
 //            installer-mac-release-<v> (the notarized .dmg, the Squirrel.Mac .zip, the updater
-//            tarball);
+//            tarball, and mac-release-record.json: notarization and trust, bound to each sha256);
 //   Linux    installer-linux.yml dispatched with version=<v>: artifact installer-linux-release-<n>
 //            (the four desktop and four spawnloft-cli packages and release-gate-record.json, the
 //            dpkg/rpm checks bound to each package's sha256).
 //
 // This script takes the three, signs the update set ONCE with the release key on the release names
 // (desktop/release-feed.mjs: the installer and mac tarball signatures, the envelope, latest.json,
-// every 1.x feed), and runs the release gate in release mode over the whole folder, with the two
+// every 1.x feed), and runs the release gate in release mode over the whole folder, with the three
 // records as --evidence for the checks this machine cannot make. It publishes nothing; the folder
 // it leaves is what release-publish.mjs takes (dry run first, then --confirm, Victor's call).
 //
@@ -42,6 +42,7 @@ const { assemble, makeTauriSigner, releaseNames } = await import(pathToFileURL(p
 const { gate } = await import(pathToFileURL(path.join(HERE, 'release-gate.mjs')).href)
 export const TAURI_CLI_VERSION = '2.12.4'
 export const LINUX_RECORD = 'release-gate-record.json'
+export const MAC_RECORD = 'mac-release-record.json'
 
 export function parseArgs(argv) {
   const out = { repo: 'joogiebear/spawnloft', minVersion: '2.0.0-beta.1' }
@@ -95,7 +96,7 @@ export function collectInputs({ version, windows, mac, linux }) {
     'rpm-arm64': need(linux, names['rpm-arm64'].name),
     cli: ['amd64.deb', 'x86_64.rpm', 'arm64.deb', 'aarch64.rpm'].map(s => need(linux, `spawnloft-cli-${version}-linux-${s}`)),
   }
-  const evidence = [need(path.dirname(path.resolve(windows)), `${path.basename(path.resolve(windows))}.gate-record.json`), need(linux, LINUX_RECORD)]
+  const evidence = [need(path.dirname(path.resolve(windows)), `${path.basename(path.resolve(windows))}.gate-record.json`), need(linux, LINUX_RECORD), need(mac, MAC_RECORD)]
   const report = path.join(path.dirname(path.resolve(windows)), `${path.basename(path.resolve(windows))}.signing-report.json`)
   if (missing.length) throw new Error(`these inputs are missing:\n  ${missing.join('\n  ')}`)
   return { inputs, evidence, signingReport: fs.existsSync(report) ? JSON.parse(fs.readFileSync(report, 'utf8')) : null }
@@ -154,7 +155,8 @@ async function main(argv) {
       opts.linux = d.dir; commits.linux = d.commit
     }
     const collected = collectInputs(opts)
-    if (collected.signingReport?.commit) commits.windows = collected.signingReport.commit
+    if (!collected.signingReport) throw new Error(`no ${opts.windows}.signing-report.json beside the Windows folder: was it made by release-windows.mjs?`)
+    if (collected.signingReport.commit) commits.windows = collected.signingReport.commit
     if (collected.signingReport && collected.signingReport.releaseKey !== 'release') {
       throw new Error('the Windows build was signed for a throwaway key run (its signing report says so); build it again with --key')
     }

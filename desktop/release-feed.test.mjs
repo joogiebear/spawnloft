@@ -15,10 +15,10 @@ import { verifyWindowsFeed, verifyLinuxFeed } from './preview-artifacts.mjs'
 // A minisign key pair and signer in Node, in the prehashed-Ed25519 form `tauri signer` writes, so
 // the pipeline is tested end to end without the Tauri CLI. `sign(file, version)` writes <file>.sig
 // and returns it, the contract release-feed.mjs expects of its signer.
-function makeKey() {
+function makeKey(idHex) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519')
   const raw = publicKey.export({ format: 'der', type: 'spki' }).subarray(-32)
-  const keyIdLe = crypto.randomBytes(8)
+  const keyIdLe = idHex ? Buffer.from(idHex, 'hex').reverse() : crypto.randomBytes(8)
   const keyLine = Buffer.concat([Buffer.from('Ed'), keyIdLe, raw]).toString('base64')
   const pub = `untrusted comment: minisign public key: ${Buffer.from(keyIdLe).reverse().toString('hex').toUpperCase()}\n${keyLine}\n`
   const signBytes = (bytes, trustedComment) => {
@@ -212,14 +212,21 @@ function dryPublishArgs(out, version, key, extra = []) {
   const ev = evidenceFor(out, version, n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : /\.exe$/.test(n) ? ['trust'] : [])
   return ['--dir', out, '--version', version, '--commit', 'a'.repeat(40), '--pubkey', pubFile(key), '--partial', '--unsigned', '--throwaway-key', '--evidence', ev, ...extra]
 }
+// what a real record carries beside the check: the publisher an Authenticode check saw
+const withDetail = c => (c.check === 'authenticode' ? { ...c, detail: 'publisher victor zemeckis' } : c)
+// every check a full release needs from elsewhere, by file
+const ALL_ELSEWHERE = n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust']
+  : /\.exe$/.test(n) ? ['authenticode', 'trust']
+  : /mac-arm64\.(dmg|zip)$/.test(n) ? ['mac-notarized', 'trust']
+  : /mac-arm64\.app\.tar\.gz$/.test(n) ? ['mac-notarized'] : []
 function evidenceFor(out, version, checksOf) {
   const checks = []
   for (const name of fs.readdirSync(out).sort()) {
     const sha256 = crypto.createHash('sha256').update(fs.readFileSync(path.join(out, name))).digest('hex')
-    for (const check of checksOf(name)) checks.push({ check, file: name, sha256 })
+    for (const check of checksOf(name)) checks.push(withDetail({ check, file: name, sha256 }))
   }
   const f = path.join(tmp(), 'record.json')
-  fs.writeFileSync(f, JSON.stringify({ format: 1, version, host: 'test', checks }))
+  fs.writeFileSync(f, JSON.stringify({ format: 1, version, release: true, host: 'test', checks }))
   return f
 }
 
@@ -473,7 +480,7 @@ test('B5: release mode fails what this host cannot check, and evidence for the s
   // the same gate outside release mode only notes them (the old behaviour of a plain gate)
   assert.ok(gate({ ...base, release: false, checkTrust: true }).ok)
 
-  const ev = evidenceFor(out, v, n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : /\.exe$/.test(n) ? ['authenticode', 'trust'] : [])
+  const ev = evidenceFor(out, v, ALL_ELSEWHERE)
   const covered = gate({ ...base, evidence: [ev] })
   assert.ok(covered.ok, covered.problems.join('; '))
   assert.ok(covered.notes.some(n => /authenticode checked on record\.json \(test\), same sha256/.test(n)), covered.notes.join('; '))
@@ -492,7 +499,7 @@ test('B5: release mode fails what this host cannot check, and evidence for the s
 test('B5: release mode wants a release key on the feed, unless a dry run says it is a throwaway', () => {
   const v = '2.0.0-beta.3'
   const { key, out } = releaseGrade(v)
-  const ev = evidenceFor(out, v, n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : /\.exe$/.test(n) ? ['authenticode', 'trust'] : [])
+  const ev = evidenceFor(out, v, ALL_ELSEWHERE)
   const r = gate({ dir: out, version: v, pubkey: pubFile(key), release: true, evidence: [ev], tools: { windows: false, dpkg: false, rpm: false } })
   assert.ok(r.problems.some(p => /is not a release key/.test(p)), r.problems.join('; '))
   assert.equal(r.problems.length, 1)
@@ -517,12 +524,21 @@ test('B6: the Windows setup is proven by its built binaries, and the record carr
   const opts = { dir: out, version: v, pubkey: pubFile(key), partial: true, checkTrust: true, tools: { windows: false, dpkg: false, rpm: false } }
   const onlyCore = gate({ ...opts, release: true, unsigned: true, throwawayKey: true, binaries: [path.join(bin, 'spawnloft-core.exe')] })
   assert.ok(onlyCore.problems.some(p => /Setup-2\.0\.0-beta\.3\.exe: trust not checked/.test(p)), onlyCore.problems.join('; '))
-  const both = gate({ ...opts, binaries: [path.join(bin, 'SpawnLoft.exe'), path.join(bin, 'spawnloft-core.exe')] })
+  const linuxEv = evidenceFor(out, v, n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : [])
+  const both = gate({ ...opts, release: true, unsigned: true, throwawayKey: true, evidence: [linuxEv], binaries: [path.join(bin, 'SpawnLoft.exe'), path.join(bin, 'spawnloft-core.exe')] })
   assert.ok(both.ok, both.problems.join('; '))
   const record = gateRecord(both)
   assert.deepEqual(record.checks.map(c => c.check + ':' + c.file), [`trust:SpawnLoft-Setup-${v}.exe`])
+  assert.match(record.checks[0].detail, /SpawnLoft\.exe [0-9a-f]{64}, spawnloft-core\.exe [0-9a-f]{64}/)
+  // a shell with no key lines is not a Windows shell's proof
+  fs.writeFileSync(path.join(bin, 'SpawnLoft.exe'), fakeBinary({ kind: 'shell', keys: [] }))
+  assert.ok(!gate({ ...opts, binaries: [path.join(bin, 'SpawnLoft.exe'), path.join(bin, 'spawnloft-core.exe')] }).ok)
+  fs.writeFileSync(path.join(bin, 'SpawnLoft.exe'), fakeBinary({ kind: 'shell' }))
+  // a record from a gate that was not in release mode vouches for nothing
+  const plain = path.join(tmp(), 'plain.json'); fs.writeFileSync(plain, JSON.stringify({ ...gateRecord(both), release: false }))
+  assert.ok(gate({ ...opts, release: true, unsigned: true, throwawayKey: true, evidence: [plain, linuxEv] }).problems.some(p => /not written by a release-mode gate/.test(p)))
   const rf = path.join(tmp(), 'win.json'); fs.writeFileSync(rf, JSON.stringify(record))
-  const later = gate({ ...opts, release: true, unsigned: true, throwawayKey: true, evidence: [rf, evidenceFor(out, v, n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : [])] })
+  const later = gate({ ...opts, release: true, unsigned: true, throwawayKey: true, evidence: [rf, linuxEv] })
   assert.ok(later.ok, later.problems.join('; '))
   // a test build's core among the binaries fails, whatever else is given
   fs.writeFileSync(path.join(bin, 'spawnloft-core.exe'), fakeBinary({ feed: FEED_INTERNAL }))
@@ -534,13 +550,28 @@ test('B5: release-publish --confirm refuses the dry-run waivers before any gh ca
   const { key, out } = buildRelease(v, { winBytes: fakePeVersion(2, 0, 0, 3) })
   const args = dryPublishArgs(out, v, key)
   assert.throws(() => publishMain([...args.filter(a => a !== '--unsigned'), '--confirm'], NO_TOOLS), /--throwaway-key is for dry runs/)
-  assert.throws(() => publishMain([...args.filter(a => a !== '--throwaway-key'), '--confirm'], NO_TOOLS), /--unsigned is for dry runs/)
-  // without the waivers the release-mode gate stops it: an unsigned setup on a host that cannot read
-  // Authenticode, and a feed key that is not a release key
-  assert.throws(() => publishMain([...args.filter(a => a !== '--unsigned' && a !== '--throwaway-key'), '--confirm'], NO_TOOLS), /gate did not pass/)
+  assert.throws(() => publishMain([...args.filter(a => a !== '--throwaway-key'), '--confirm'], NO_TOOLS), /--partial is for dry runs/)
+  assert.throws(() => publishMain([...args.filter(a => a !== '--throwaway-key'), '--allow-partial-publish', '--confirm'], NO_TOOLS), /--unsigned is for dry runs/)
+  // without the waivers the release-mode gate stops it on the one thing left: the setup's
+  // Authenticode on a host that cannot read it (the evidence here covers trust only)
+  const lines = []; const err = console.error; console.error = l => lines.push(String(l))
+  try {
+    assert.throws(() => publishMain([...args.filter(a => a !== '--unsigned' && a !== '--throwaway-key'), '--allow-partial-publish', '--confirm'], NO_TOOLS), /gate did not pass/)
+  } finally { console.error = err }
+  assert.ok(lines.some(l => /authenticode not checked/.test(l)), lines.join('\n'))
 })
 
-import { parseArgs as assembleArgs, collectInputs, assembleRelease, LINUX_RECORD } from './release-assemble.mjs'
+test('B5: a key file that claims a release key id is not a release key', () => {
+  const v = '2.0.0-beta.3'
+  // a fresh key pair whose key line and signatures carry the release key's id
+  const spoof = makeKey(RELEASE[0].id)
+  assert.equal(spoof.parsed.keyId, RELEASE[0].id)
+  const { out } = releaseGrade(v, { key: spoof })
+  const r = gate({ dir: out, version: v, pubkey: pubFile(spoof), release: true, evidence: [evidenceFor(out, v, ALL_ELSEWHERE)], tools: { windows: false, dpkg: false, rpm: false } })
+  assert.deepEqual(r.problems.map(p => p.replace(/ \(.*$/, '')), [`the feed is signed by ${RELEASE[0].id}, which is not a release key`])
+})
+
+import { parseArgs as assembleArgs, collectInputs, assembleRelease, LINUX_RECORD, MAC_RECORD } from './release-assemble.mjs'
 
 // The three platform folders as release-windows.mjs and the two release workflows leave them.
 function platformFolders(version) {
@@ -556,11 +587,12 @@ function platformFolders(version) {
   const linuxNames = ['amd64.deb', 'x86_64.rpm', 'arm64.deb', 'aarch64.rpm'].flatMap(s => [`SpawnLoft-${version}-linux-${s}`, `spawnloft-cli-${version}-linux-${s}`])
   for (const n of linuxNames) write(linux, n, crypto.randomBytes(1500))
   const record = (dir, file, checksOf) => {
-    const checks = fs.readdirSync(dir).flatMap(n => checksOf(n).map(check => ({ check, file: n, sha256: crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, n))).digest('hex') })))
-    fs.writeFileSync(file, JSON.stringify({ format: 1, version, host: 'ci', checks }))
+    const checks = fs.readdirSync(dir).flatMap(n => checksOf(n).map(check => withDetail({ check, file: n, sha256: crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, n))).digest('hex') })))
+    fs.writeFileSync(file, JSON.stringify({ format: 1, version, release: true, host: 'ci', checks }))
   }
   record(win, `${win}.gate-record.json`, n => n.endsWith('.exe') ? ['authenticode', 'trust'] : [])
   record(linux, path.join(linux, LINUX_RECORD), n => /\.(deb|rpm)$/.test(n) ? ['linux-package', 'trust'] : [])
+  record(mac, path.join(mac, MAC_RECORD), ALL_ELSEWHERE)
   return { root, win, mac, linux }
 }
 
@@ -570,7 +602,7 @@ test('B4: release-assemble takes the three platforms into one complete, gated re
   const f = platformFolders(v)
   const opts = assembleArgs(['--version', v, '--key', 'k', '--windows', f.win, '--mac', f.mac, '--linux', f.linux, '--out', path.join(f.root, 'out'), '--pubkey', pubFile(key)])
   const collected = collectInputs(opts)
-  assert.equal(collected.evidence.length, 2)
+  assert.equal(collected.evidence.length, 3)
   const r = assembleRelease({ ...opts, date: '2026-12-01T00:00:00Z' }, collected, { sign: key.sign, tools: { windows: false, dpkg: false, rpm: false } })
   // everything holds except the one thing a test key cannot be: a release key
   assert.deepEqual(r.problems.filter(p => !/is not a release key/.test(p)), [])
