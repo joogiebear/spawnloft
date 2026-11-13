@@ -12,6 +12,8 @@ process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 process.env.MCCTL_FAKE_CLIENT = path.resolve(process.cwd(), 'test', 'fixtures', 'fake-client.mjs')
 process.env.NODE_ENV = 'test'
 const { serve } = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch, authorization } = await import('./helpers/panel.mjs')
 const registry = await import('../src/registry.mjs')
 const client = await import('../src/client.mjs')
 const clientPaths = await import('../src/client-paths.mjs')
@@ -104,7 +106,7 @@ async function jobEvents(jobId, start) {
 
 function request(route, { method = 'GET', headers = {} }) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port: panel.port, path: '/api/' + route, method, headers }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port: panel.port, path: '/api/' + route, method, headers: { authorization: authorization(panel.port), ...headers } }, (res) => {
       res.resume()
       res.on('end', () => resolve(res.statusCode))
     })

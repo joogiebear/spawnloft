@@ -18,6 +18,12 @@ function configBase() {
     : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
 }
 
+// The per-user config folder itself, always spawnloft/ (the Rust side's paths::config_dir): where
+// the panel key lives, next to the window's own files.
+export function configDir() {
+  return path.join(configBase(), 'spawnloft')
+}
+
 export function settingsFile() {
   const base = configBase()
   const current = path.join(base, 'spawnloft', 'settings.json')

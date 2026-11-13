@@ -46,6 +46,8 @@ function loadCore(rel) {
 }
 
 let panelUrl = null
+// signs the window in to the panel (src/panel-auth.mjs); set with panelUrl
+let panelAuth = null
 let win = null
 // the game launcher's window while it is open; one at a time
 let launcher = null
@@ -53,7 +55,8 @@ let launcher = null
 async function startPanel() {
   const ui = await loadCore('src/ui.mjs')
   // port 0: a fixed port would collide with a CLI panel already running
-  const { url } = await ui.serve({ port: 0, host: '127.0.0.1', open: false })
+  const { url, auth } = await ui.serve({ port: 0, host: '127.0.0.1', open: false })
+  panelAuth = auth
   return url
 }
 
@@ -194,7 +197,9 @@ function createWindow(loadUrl, theme = 'classic') {
     require('electron').screen.on('display-metrics-changed', () => { lastDisplayId = null; followDisplay() })
   }
 
-  win.loadURL(loadUrl)
+  // the panel takes no request without a credential: the window goes in through a one-use
+  // sign-in link, which leaves the session cookie that its console and launcher windows share
+  win.loadURL(loadUrl === panelUrl && panelAuth ? panelAuth.loginUrl() : loadUrl)
   win.once('ready-to-show', () => win.show())
   // otherwise a failed load leaves a hidden window and no UI
   win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {

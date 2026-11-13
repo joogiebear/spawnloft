@@ -13,6 +13,7 @@ PLAN-RUST-TAURI.md section 3 item 2 and section 12 (P0-A).
 | `webhook.json` | the crash/recovery webhook request and every daemon message | `src/notify.mjs`, `src/daemon.mjs` | Discord or any http(s) endpoint |
 | `instances.json` | the registry, every field the code has written, servers and databases | `src/registry.mjs` and its callers | the daemon (unlocked), everyone |
 | `schedules.json` | scheduled task definitions, every action, step and schedule kind | `src/schedule.mjs`, `src/task-steps.mjs` | `spawnloft task run` |
+| `panel-auth.json` | who may call the panel's HTTP API: the sign-in tokens, and the answer to whole requests in order | `tools/make-panel-auth-fixture.mjs` | `src/panel-auth.mjs` (the Node panel) and `rust/crates/spawnloft-lib/src/panel_auth.rs` (`spawnloft-core ui`), which must agree |
 
 Shapes are written in the small language described at the top of `shape.mjs`, which also checks
 them. Examples are concrete values; the tests substitute live pids and paths where needed.
@@ -31,6 +32,12 @@ them. Examples are concrete values; the tests substitute live pids and paths whe
   It runs under whichever daemon `SPAWNLOFT_DAEMON` picks; `rust-internal.yml` runs it under both.
   Cases marked `"asserted": "source"` need a real engine failure or a race to reach and are checked
   against `src/daemon.mjs` instead.
+
+`panel-auth.json` is different in kind: it is not a file format but a rule two listeners apply,
+and it is generated (its tokens carry real HMACs, made with test keys and `node:crypto` alone).
+`test/panel-auth.test.mjs` and the `panel_auth` tests under `cargo test` run every token and
+every request in it; a request the two sides would answer differently is a hole in one of them.
+Design: `rust/PANEL-AUTH-DESIGN.md`.
 
 ## Changing a contract
 

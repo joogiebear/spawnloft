@@ -37,6 +37,16 @@ pub fn with_private_umask<T>(f: impl FnOnce() -> T) -> T {
     out
 }
 
+/// A new file only this user can open (mode 0600 from the start), failing when the name exists.
+pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+}
+
 /// This process's user id.
 pub fn uid() -> u32 {
     // SAFETY: getuid has no preconditions and cannot fail.

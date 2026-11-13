@@ -18,6 +18,8 @@ fs.mkdirSync(process.env.MCCTL_DATA_ROOT, { recursive: true })
 const settings = await import('../src/settings.mjs')
 const firstRun = await import('../src/first-run.mjs')
 const ui = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 const { server, url } = await ui.serve({ port: 0, open: false })
 after(() => {
   server.close()

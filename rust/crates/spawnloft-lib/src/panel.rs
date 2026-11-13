@@ -11,9 +11,11 @@
 //! each. Request and response bodies are copied byte for byte after the head, so event streams,
 //! uploads and chunked bodies need nothing special.
 //!
-//! The same Host and Origin rule as `ui.mjs` is applied here before anything is forwarded,
-//! because the proxy rewrites both headers for the upstream: without its own check a page on
-//! another origin would reach the Node panel through it with a "same-origin" request.
+//! Who may call is decided here, before anything is forwarded (`panel_auth`, the same rule the
+//! Node panel applies to itself): the request must be addressed to this panel from this panel,
+//! and carry a session cookie or a signed token. What is forwarded gets a fresh token for the
+//! upstream's own port in place of the caller's credential, so the Node panel checks every
+//! request as it would standing alone; there is no "trust the proxy" mode.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
@@ -21,6 +23,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use crate::panel_auth::{self, PanelAuth, Verdict};
 
 /// What `ui` was asked to do.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -69,6 +73,17 @@ pub fn run(opts: Options) -> i32 {
         }
     };
 
+    // the install's key, before anything listens for long: without it nobody could be let in
+    let key = match panel_auth::load_key() {
+        Ok(k) => k,
+        Err(e) => {
+            eprintln!("spawnloft-core ui: {e}");
+            return 1;
+        }
+    };
+    let auth = Arc::new(PanelAuth::new(key, local.port(), panel_auth::now_ms()));
+    panel_auth::start_idle_clock();
+
     let child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
     let upstream = match &opts.upstream {
         Some(u) => match parse_upstream(u) {
@@ -105,8 +120,9 @@ pub fn run(opts: Options) -> i32 {
     for conn in listener.incoming() {
         let Ok(conn) = conn else { continue };
         let upstream = Arc::clone(&upstream);
+        let auth = Arc::clone(&auth);
         std::thread::spawn(move || {
-            let _ = handle(conn, local, &upstream);
+            let _ = handle(conn, &auth, &upstream);
         });
     }
     stop_child(&child);
@@ -311,18 +327,37 @@ pub fn is_local_route(path: &str) -> bool {
 const LOCAL_BODY_LIMIT: usize = 64 * 1024;
 
 /// Splits `buf` (which holds at least the head) into the head and how many bytes it took.
+///
+/// Strict on purpose. The rule is decided on this reading of the head and the head is then sent
+/// on with a token for the upstream added, so the upstream must not be able to read it any other
+/// way: no line break but CRLF, no control characters, no folded lines, header names that are
+/// plain tokens. Anything else is not a head (the caller answers 400).
 pub fn parse_head(buf: &[u8]) -> Option<(Head, usize)> {
     let end = buf.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
     let text = std::str::from_utf8(&buf[..end - 4]).ok()?;
     let mut lines = text.split("\r\n");
     let request_line = lines.next()?.to_string();
-    if request_line.split(' ').count() != 3 {
+    let parts: Vec<&str> = request_line.split(' ').collect();
+    if parts.len() != 3
+        || parts[0].is_empty()
+        || !parts[0].bytes().all(|b| b.is_ascii_uppercase())
+        || parts[1].is_empty()
+        || !parts[1].bytes().all(|b| b.is_ascii_graphic())
+        || !matches!(parts[2], "HTTP/1.1" | "HTTP/1.0")
+    {
         return None;
     }
     let mut headers = Vec::new();
     for line in lines {
         let (k, v) = line.split_once(':')?;
-        headers.push((k.trim().to_string(), v.trim().to_string()));
+        let name_ok = !k.is_empty()
+            && k.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b));
+        // a bare CR or LF, a NUL or any other control character never belongs in a value
+        if !name_ok || v.chars().any(|c| c.is_control() && c != '\t') {
+            return None;
+        }
+        headers.push((k.to_string(), v.trim().to_string()));
     }
     Some((
         Head {
@@ -333,35 +368,11 @@ pub fn parse_head(buf: &[u8]) -> Option<(Head, usize)> {
     ))
 }
 
-/// The same rule as `isLocalRequest` in `src/ui.mjs`: the Host header names a loopback address
-/// (defeats DNS rebinding), and an Origin, when there is one, has exactly that host and port.
-pub fn is_local_request(head: &Head) -> bool {
-    let Some(host) = head.header("host") else {
-        return false;
-    };
-    let hostname = match host.rsplit_once(':') {
-        Some((h, port)) if port.chars().all(|c| c.is_ascii_digit()) => h,
-        _ => host,
-    };
-    let loopback = matches!(
-        hostname.to_ascii_lowercase().as_str(),
-        "127.0.0.1" | "localhost" | "[::1]"
-    );
-    if !loopback {
-        return false;
-    }
-    match head.header("origin") {
-        None => true,
-        Some(origin) => origin
-            .split_once("://")
-            .map(|(_, rest)| rest.trim_end_matches('/'))
-            .is_some_and(|o| o.eq_ignore_ascii_case(host)),
-    }
-}
-
 /// The head as sent upstream: Host and Origin name the upstream (the Node panel applies its own
-/// check to them), and the connection closes after one exchange.
-pub fn rewrite_head(head: &Head, upstream: SocketAddr) -> Vec<u8> {
+/// check to them), the caller's credential is replaced by `authorization` (a token for the
+/// upstream's port; the caller's own token names this port and its session lives here), and the
+/// connection closes after one exchange.
+pub fn rewrite_head(head: &Head, upstream: SocketAddr, authorization: &str) -> Vec<u8> {
     let up = format!("127.0.0.1:{}", upstream.port());
     let mut out = format!("{}\r\n", head.request_line);
     for (k, v) in &head.headers {
@@ -369,15 +380,35 @@ pub fn rewrite_head(head: &Head, upstream: SocketAddr) -> Vec<u8> {
         match lower.as_str() {
             "host" => out.push_str(&format!("Host: {up}\r\n")),
             "origin" => out.push_str(&format!("Origin: http://{up}\r\n")),
-            "connection" | "keep-alive" | "proxy-connection" => {}
+            "connection" | "keep-alive" | "proxy-connection" | "authorization" => {}
+            "cookie" => {
+                if let Some(rest) = panel_auth::strip_session_cookies(v) {
+                    out.push_str(&format!("{k}: {rest}\r\n"));
+                }
+            }
             _ => out.push_str(&format!("{k}: {v}\r\n")),
         }
     }
+    out.push_str(&format!("Authorization: {authorization}\r\n"));
     out.push_str("Connection: close\r\n\r\n");
     out.into_bytes()
 }
 
-fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::io::Result<()> {
+/// Tells the listener a session's request has ended, however `handle` returns.
+struct InUse<'a> {
+    auth: &'a PanelAuth,
+    session: Option<String>,
+}
+
+impl Drop for InUse<'_> {
+    fn drop(&mut self) {
+        if let Some(session) = &self.session {
+            self.auth.release(session, panel_auth::idle_now());
+        }
+    }
+}
+
+fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
     // one deadline for the whole head, not per read: a byte every 29 s would otherwise hold on
@@ -400,14 +431,64 @@ fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::
             return respond(&mut conn, 400, "text/plain", b"bad request\n");
         }
     };
-    if !is_local_request(&head) {
-        return respond(
-            &mut conn,
-            403,
-            "application/json",
-            br#"{"error":"this panel only answers requests addressed to localhost"}"#,
-        );
-    }
+    let verdict = auth.decide(
+        head.method(),
+        head.path(),
+        &head.headers,
+        panel_auth::now_ms(),
+        panel_auth::idle_now(),
+    );
+    let _in_use = match verdict {
+        Verdict::Forbidden => {
+            return respond(
+                &mut conn,
+                403,
+                "application/json",
+                br#"{"error":"this panel only answers requests addressed to localhost"}"#,
+            );
+        }
+        Verdict::Login { session, to } => {
+            let cookie = panel_auth::session_cookie(auth.port(), &session);
+            return respond_with(
+                &mut conn,
+                200,
+                "text/html; charset=utf-8",
+                &[
+                    ("Set-Cookie", &cookie),
+                    PAGE_HEADERS[0],
+                    PAGE_HEADERS[1],
+                    PAGE_HEADERS[2],
+                ],
+                panel_auth::login_page(to).as_bytes(),
+            );
+        }
+        Verdict::LoginRefused | Verdict::Unauthorized { api: false } => {
+            return respond_with(
+                &mut conn,
+                401,
+                "text/html; charset=utf-8",
+                &[
+                    WWW_AUTHENTICATE,
+                    PAGE_HEADERS[0],
+                    PAGE_HEADERS[1],
+                    PAGE_HEADERS[2],
+                ],
+                panel_auth::unauthorized_page().as_bytes(),
+            );
+        }
+        Verdict::Unauthorized { api: true } => {
+            let body = serde_json::json!({ "error": panel_auth::UNAUTHORIZED_ERROR, "code": "auth" });
+            return respond_with(
+                &mut conn,
+                401,
+                "application/json",
+                &[WWW_AUTHENTICATE],
+                body.to_string().as_bytes(),
+            );
+        }
+        Verdict::Open => InUse { auth, session: None },
+        Verdict::Allow { session } => InUse { auth, session },
+    };
     if is_local_route(head.path()) {
         let want = head.content_length().unwrap_or(0);
         if want > LOCAL_BODY_LIMIT {
@@ -447,7 +528,7 @@ fn handle(mut conn: TcpStream, _local: SocketAddr, upstream: &Upstream) -> std::
             return respond(&mut conn, 502, "application/json", body.as_bytes());
         }
     };
-    up.write_all(&rewrite_head(&head, addr))?;
+    up.write_all(&rewrite_head(&head, addr, &auth.authorization_for(addr.port())))?;
     up.write_all(&buf[used..])?;
 
     // request body (if any) up, response down; each side closes its half when its source ends
@@ -490,9 +571,28 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+const WWW_AUTHENTICATE: (&str, &str) = ("WWW-Authenticate", panel_auth::AUTH_SCHEME);
+/// What the two pages this listener writes itself are sent with.
+const PAGE_HEADERS: [(&str, &str); 3] = [
+    ("Content-Security-Policy", panel_auth::PAGE_CSP),
+    ("Referrer-Policy", "no-referrer"),
+    ("X-Content-Type-Options", "nosniff"),
+];
+
 fn respond(conn: &mut TcpStream, status: u16, kind: &str, body: &[u8]) -> std::io::Result<()> {
+    respond_with(conn, status, kind, &[], body)
+}
+
+fn respond_with(
+    conn: &mut TcpStream,
+    status: u16,
+    kind: &str,
+    extra: &[(&str, &str)],
+    body: &[u8],
+) -> std::io::Result<()> {
     let reason = match status {
         400 => "Bad Request",
+        401 => "Unauthorized",
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
@@ -503,11 +603,15 @@ fn respond(conn: &mut TcpStream, status: u16, kind: &str, body: &[u8]) -> std::i
         503 => "Service Unavailable",
         _ => "OK",
     };
-    let head = format!(
+    let mut head = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\
-         Cache-Control: no-store\r\nConnection: close\r\n\r\n",
+         Cache-Control: no-store\r\n",
         body.len()
     );
+    for (name, value) in extra {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    head.push_str("Connection: close\r\n\r\n");
     conn.write_all(head.as_bytes())?;
     conn.write_all(body)?;
     conn.flush()
@@ -545,22 +649,27 @@ mod tests {
     }
 
     #[test]
-    fn local_rule_matches_ui_mjs() {
-        assert!(is_local_request(&head(
-            "GET / HTTP/1.1\r\nHost: 127.0.0.1:9000\r\n\r\n"
-        )));
-        assert!(is_local_request(&head(
-            "GET / HTTP/1.1\r\nHost: localhost:9000\r\nOrigin: http://localhost:9000\r\n\r\n"
-        )));
-        // DNS rebinding: a loopback address under someone else's name
-        assert!(!is_local_request(&head(
-            "GET / HTTP/1.1\r\nHost: evil.example:9000\r\n\r\n"
-        )));
-        // another local origin (a plugin web UI on another port) is not this panel
-        assert!(!is_local_request(&head(
-            "POST /api/x HTTP/1.1\r\nHost: 127.0.0.1:9000\r\nOrigin: http://127.0.0.1:9001\r\n\r\n"
-        )));
-        assert!(!is_local_request(&head("GET / HTTP/1.1\r\nX: y\r\n\r\n")));
+    fn a_head_the_upstream_could_read_differently_is_not_a_head() {
+        let ok = "GET /a?b=c HTTP/1.1\r\nHost: x\r\nX-Tab: a\tb\r\n\r\n";
+        assert!(parse_head(ok.as_bytes()).is_some());
+        for bad in [
+            // a bare line feed could end the head early for a parser that takes it as a line end
+            "GET / HTTP/1.1\r\nHost: x\r\nX: a\n\nGET /api/x HTTP/1.1\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: x\nX: y\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: x\rX: y\r\n\r\n",
+            // a folded line, a name with a space, an empty name
+            "GET / HTTP/1.1\r\nHost: x\r\n Authorization: SpawnLoft y\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost : x\r\n\r\n",
+            "GET / HTTP/1.1\r\n: x\r\n\r\n",
+            "GET / HTTP/1.1\r\nHost: x\0y\r\n\r\n",
+            // the request line
+            "GET  / HTTP/1.1\r\nHost: x\r\n\r\n",
+            "get / HTTP/1.1\r\nHost: x\r\n\r\n",
+            "GET /a\tb HTTP/1.1\r\nHost: x\r\n\r\n",
+            "GET / HTTP/2\r\nHost: x\r\n\r\n",
+        ] {
+            assert!(parse_head(bad.as_bytes()).is_none(), "{bad:?}");
+        }
     }
 
     #[test]
@@ -569,13 +678,233 @@ mod tests {
             "POST /api/x HTTP/1.1\r\nHost: 127.0.0.1:9000\r\nOrigin: http://127.0.0.1:9000\r\n\
              Connection: keep-alive\r\nContent-Length: 2\r\n\r\n",
         );
-        let out = String::from_utf8(rewrite_head(&h, SocketAddr::from(([127, 0, 0, 1], 7)))).unwrap();
+        let out = String::from_utf8(rewrite_head(
+            &h,
+            SocketAddr::from(([127, 0, 0, 1], 7)),
+            "SpawnLoft up",
+        ))
+        .unwrap();
         assert!(out.starts_with("POST /api/x HTTP/1.1\r\n"));
         assert!(out.contains("Host: 127.0.0.1:7\r\n"));
         assert!(out.contains("Origin: http://127.0.0.1:7\r\n"));
         assert!(out.contains("Content-Length: 2\r\n"));
         assert!(!out.contains("keep-alive"));
-        assert!(out.ends_with("Connection: close\r\n\r\n"));
+        assert!(out.ends_with("Authorization: SpawnLoft up\r\nConnection: close\r\n\r\n"));
+    }
+
+    #[test]
+    fn the_callers_credential_is_not_forwarded() {
+        let h = head(
+            "GET /api/x HTTP/1.1\r\nHost: 127.0.0.1:9000\r\nauthorization: SpawnLoft theirs\r\n\
+             Cookie: theme=dark; spawnloft_9000=session\r\ncookie: spawnloft_9000=again\r\n\r\n",
+        );
+        let out = String::from_utf8(rewrite_head(
+            &h,
+            SocketAddr::from(([127, 0, 0, 1], 7)),
+            "SpawnLoft up",
+        ))
+        .unwrap();
+        assert!(
+            !out.contains("theirs") && !out.contains("session") && !out.contains("again"),
+            "{out}"
+        );
+        assert!(out.contains("Cookie: theme=dark\r\n"), "{out}");
+        assert_eq!(
+            out.to_ascii_lowercase().matches("authorization:").count(),
+            1,
+            "{out}"
+        );
+        assert_eq!(out.to_ascii_lowercase().matches("cookie:").count(), 1, "{out}");
+    }
+
+    const TEST_KEY: [u8; 32] = [9; 32];
+
+    fn api_header(port: u16) -> String {
+        format!(
+            "Authorization: {}\r\n",
+            panel_auth::authorization(&panel_auth::Key::from_bytes(TEST_KEY), port)
+        )
+    }
+
+    /// A listener that answers `requests` connections through `handle`, and its address.
+    fn front(upstream: Upstream, requests: usize) -> SocketAddr {
+        let front = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = front.local_addr().unwrap();
+        let auth = PanelAuth::new(panel_auth::Key::from_bytes(TEST_KEY), addr.port(), 0);
+        std::thread::spawn(move || {
+            for _ in 0..requests {
+                let (c, _) = front.accept().unwrap();
+                handle(c, &auth, &upstream).unwrap();
+            }
+        });
+        addr
+    }
+
+    fn exchange(addr: SocketAddr, request: &str) -> String {
+        let mut c = TcpStream::connect(addr).unwrap();
+        c.write_all(request.as_bytes()).unwrap();
+        let mut out = String::new();
+        c.read_to_string(&mut out).unwrap();
+        out
+    }
+
+    /// An upstream that answers each of `requests` connections with the head it was sent.
+    fn echo_upstream(requests: usize) -> SocketAddr {
+        let up = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = up.local_addr().unwrap();
+        std::thread::spawn(move || {
+            for _ in 0..requests {
+                let (mut s, _) = up.accept().unwrap();
+                let mut buf = vec![0u8; 8192];
+                let n = s.read(&mut buf).unwrap();
+                let body = String::from_utf8_lossy(&buf[..n]).to_string();
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                s.write_all(resp.as_bytes()).unwrap();
+            }
+        });
+        addr
+    }
+
+    #[test]
+    fn nobody_gets_through_without_a_credential() {
+        // an upstream that does not exist: a forwarded request would be a 502, not a 401
+        let nowhere = SocketAddr::from(([127, 0, 0, 1], 9));
+        let addr = front(Upstream::Node(nowhere), 5);
+        let p = addr.port();
+        let api = exchange(
+            addr,
+            &format!("GET /api/servers HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(api.starts_with("HTTP/1.1 401 Unauthorized\r\n"), "{api}");
+        assert!(api.contains("WWW-Authenticate: SpawnLoft\r\n"), "{api}");
+        assert!(api.contains(r#""code":"auth""#), "{api}");
+        // the routes this process answers itself are behind the same check
+        let update = exchange(
+            addr,
+            &format!(
+                "POST /api/update/check HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 2\r\n\r\n{{}}"
+            ),
+        );
+        assert!(update.starts_with("HTTP/1.1 401"), "{update}");
+        let page = exchange(addr, &format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"));
+        assert!(page.starts_with("HTTP/1.1 401"), "{page}");
+        assert!(page.contains("Content-Type: text/html"), "{page}");
+        assert!(
+            page.contains("Content-Security-Policy: default-src 'none'"),
+            "{page}"
+        );
+        assert!(page.contains("run <code>spawnloft ui</code>"), "{page}");
+        // a token for another port, and one signed with another key
+        let elsewhere = if p == u16::MAX { 1 } else { p + 1 };
+        let other = exchange(
+            addr,
+            &format!(
+                "GET /api/servers HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
+                api_header(elsewhere)
+            ),
+        );
+        assert!(other.starts_with("HTTP/1.1 401"), "{other}");
+        let forged = panel_auth::authorization(&panel_auth::Key::from_bytes([1; 32]), p);
+        let wrong = exchange(
+            addr,
+            &format!("GET /api/servers HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nAuthorization: {forged}\r\n\r\n"),
+        );
+        assert!(wrong.starts_with("HTTP/1.1 401"), "{wrong}");
+    }
+
+    #[test]
+    fn a_login_link_gives_a_session_and_the_upstream_gets_its_own_token() {
+        let up = echo_upstream(2);
+        let addr = front(Upstream::Node(up), 4);
+        let p = addr.port();
+        let key = panel_auth::Key::from_bytes(TEST_KEY);
+        let link = panel_auth::login_path(&key, p, Some("/setup")).unwrap();
+        let signed = exchange(
+            addr,
+            &format!("GET {link} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(signed.starts_with("HTTP/1.1 200 OK\r\n"), "{signed}");
+        assert!(signed.contains("Referrer-Policy: no-referrer\r\n"), "{signed}");
+        assert!(signed.contains("Cache-Control: no-store\r\n"), "{signed}");
+        assert!(
+            signed.contains(r#"<meta http-equiv="refresh" content="0; url=/setup">"#),
+            "{signed}"
+        );
+        let cookie = signed
+            .lines()
+            .find_map(|l| l.strip_prefix("Set-Cookie: "))
+            .expect("a session cookie");
+        assert!(cookie.starts_with(&format!("spawnloft_{p}=")), "{cookie}");
+        assert!(
+            cookie.ends_with("; HttpOnly; SameSite=Strict; Path=/"),
+            "{cookie}"
+        );
+        let pair = cookie.split(';').next().unwrap();
+
+        // the link a second time
+        let again = exchange(
+            addr,
+            &format!("GET {link} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(
+            again.starts_with("HTTP/1.1 401") && !again.contains("Set-Cookie"),
+            "{again}"
+        );
+
+        // with the cookie the request is forwarded: no cookie, and a token for the upstream's port
+        let seen = exchange(
+            addr,
+            &format!("GET /api/a HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nCookie: {pair}\r\n\r\n"),
+        );
+        assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
+        assert!(
+            !seen.contains(pair) && !seen.to_ascii_lowercase().contains("cookie:"),
+            "{seen}"
+        );
+        let token = seen
+            .lines()
+            .find_map(|l| l.strip_prefix("Authorization: SpawnLoft "))
+            .expect("a token for the upstream");
+        let now = panel_auth::now_ms();
+        assert!(panel_auth::check_token(&key, token, panel_auth::Purpose::Api, up.port(), now, 0).is_some());
+        assert!(panel_auth::check_token(&key, token, panel_auth::Purpose::Api, p, now, 0).is_none());
+
+        // an api token gets through the same way, and is replaced too
+        let mine = api_header(p);
+        let seen = exchange(
+            addr,
+            &format!("GET /api/b HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{mine}\r\n"),
+        );
+        assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
+        assert!(!seen.contains(mine.trim()), "{seen}");
+    }
+
+    #[test]
+    fn the_sign_in_callback_is_forwarded_without_a_credential() {
+        let up = echo_upstream(1);
+        let addr = front(Upstream::Node(up), 2);
+        let p = addr.port();
+        let seen = exchange(
+            addr,
+            &format!(
+                "GET /api/client/accounts/login/callback?code=x&state=y HTTP/1.1\r\nHost: localhost:{p}\r\n\
+                 Sec-Fetch-Site: cross-site\r\n\r\n"
+            ),
+        );
+        assert!(seen.starts_with("HTTP/1.1 200 OK"), "{seen}");
+        assert!(
+            seen.contains("GET /api/client/accounts/login/callback?code=x&state=y HTTP/1.1"),
+            "{seen}"
+        );
+        // nothing else is open: the same request one path over
+        let other = exchange(
+            addr,
+            &format!("GET /api/client/accounts/login/callbacks HTTP/1.1\r\nHost: localhost:{p}\r\n\r\n"),
+        );
+        assert!(other.starts_with("HTTP/1.1 401"), "{other}");
     }
 
     #[test]
@@ -595,65 +924,50 @@ mod tests {
             );
             s.write_all(resp.as_bytes()).unwrap();
         });
-        let front = TcpListener::bind("127.0.0.1:0").unwrap();
-        let front_addr = front.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (c, _) = front.accept().unwrap();
-            handle(c, front_addr, &Upstream::Node(up_addr)).unwrap();
-        });
-        let mut c = TcpStream::connect(front_addr).unwrap();
-        write!(
-            c,
-            "GET /api/a HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n\r\n",
-            front_addr.port()
-        )
-        .unwrap();
-        let mut out = String::new();
-        c.read_to_string(&mut out).unwrap();
+        let addr = front(Upstream::Node(up_addr), 1);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/a HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
         assert!(out.starts_with("HTTP/1.1 200 OK"));
         assert!(out.ends_with(&format!("127.0.0.1:{}", up_addr.port())));
     }
 
     #[test]
     fn refuses_a_foreign_origin_before_forwarding() {
-        let front = TcpListener::bind("127.0.0.1:0").unwrap();
-        let front_addr = front.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (c, _) = front.accept().unwrap();
-            // an upstream that does not exist: a forwarded request would be a 502, not a 403
-            let nowhere = SocketAddr::from(([127, 0, 0, 1], 9));
-            handle(c, front_addr, &Upstream::Node(nowhere)).unwrap();
-        });
-        let mut c = TcpStream::connect(front_addr).unwrap();
-        write!(
-            c,
-            "POST /api/x HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nOrigin: http://evil.example\r\n\r\n",
-            p = front_addr.port()
-        )
-        .unwrap();
-        let mut out = String::new();
-        c.read_to_string(&mut out).unwrap();
-        assert!(out.starts_with("HTTP/1.1 403"));
+        // an upstream that does not exist: a forwarded request would be a 502, not a 403
+        let nowhere = SocketAddr::from(([127, 0, 0, 1], 9));
+        let addr = front(Upstream::Node(nowhere), 2);
+        let p = addr.port();
+        // a good token does not help a request from another origin, or one from another site
+        for line in ["Origin: http://evil.example", "Sec-Fetch-Site: same-site"] {
+            let out = exchange(
+                addr,
+                &format!(
+                    "POST /api/x HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{line}\r\n{}\r\n",
+                    api_header(p)
+                ),
+            );
+            assert!(out.starts_with("HTTP/1.1 403"), "{line}: {out}");
+        }
     }
 
     #[test]
     fn without_node_the_page_says_so_and_the_api_is_503() {
         for (path, kind) in [("/", "text/html"), ("/api/servers", "application/json")] {
-            let front = TcpListener::bind("127.0.0.1:0").unwrap();
-            let front_addr = front.local_addr().unwrap();
-            std::thread::spawn(move || {
-                let (c, _) = front.accept().unwrap();
-                handle(c, front_addr, &Upstream::Missing("no node".into())).unwrap();
-            });
-            let mut c = TcpStream::connect(front_addr).unwrap();
-            write!(
-                c,
-                "GET {path} HTTP/1.1\r\nHost: localhost:{}\r\n\r\n",
-                front_addr.port()
-            )
-            .unwrap();
-            let mut out = String::new();
-            c.read_to_string(&mut out).unwrap();
+            let addr = front(Upstream::Missing("no node".into()), 1);
+            let p = addr.port();
+            let out = exchange(
+                addr,
+                &format!(
+                    "GET {path} HTTP/1.1\r\nHost: localhost:{p}\r\n{}\r\n",
+                    api_header(p)
+                ),
+            );
             assert!(out.starts_with("HTTP/1.1 503"), "{out}");
             assert!(out.contains(kind));
             assert!(out.contains("no node"));
@@ -663,21 +977,16 @@ mod tests {
     #[test]
     fn updater_routes_are_answered_here_even_without_node() {
         // an unknown updater route is a 404 from this process, not a 503 from the missing upstream
-        let front = TcpListener::bind("127.0.0.1:0").unwrap();
-        let front_addr = front.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let (c, _) = front.accept().unwrap();
-            handle(c, front_addr, &Upstream::Missing("no node".into())).unwrap();
-        });
-        let mut c = TcpStream::connect(front_addr).unwrap();
-        write!(
-            c,
-            "POST /api/update/nothing HTTP/1.1\r\nHost: localhost:{p}\r\nOrigin: http://localhost:{p}\r\nContent-Length: 2\r\n\r\n{{}}",
-            p = front_addr.port()
-        )
-        .unwrap();
-        let mut out = String::new();
-        c.read_to_string(&mut out).unwrap();
+        let addr = front(Upstream::Missing("no node".into()), 1);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "POST /api/update/nothing HTTP/1.1\r\nHost: localhost:{p}\r\nOrigin: http://localhost:{p}\r\n\
+                 {}Content-Length: 2\r\n\r\n{{}}",
+                api_header(p)
+            ),
+        );
         assert!(out.starts_with("HTTP/1.1 404"), "{out}");
         assert!(out.contains("no updater route"), "{out}");
         assert!(is_local_route("/api/update?x=1") && is_local_route("/api/update/log?n=3"));

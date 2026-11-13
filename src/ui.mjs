@@ -48,11 +48,13 @@ import { rconExposure } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
 import { activeBlock } from './control.mjs'
+import * as panelAuth from './panel-auth.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
 // Local control panel. Keep it on 127.0.0.1: it can start/stop servers and type into their
-// consoles, so exposing it on a LAN address would hand out an unauthenticated server console.
+// consoles. Every request also has to prove it comes from this user (panel-auth.mjs): loopback is
+// shared with the other accounts on the machine and with anything a port is forwarded to.
 export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   guardProcess()
   watchEventLoop()
@@ -72,11 +74,23 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
   const newerData = dataFormatWarning()
   if (newerData) panelLog(`warning: ${newerData}`)
 
+  // who may call: see panel-auth.mjs. Made once the port is known; no request arrives before.
+  const key = panelAuth.loadKey()
+  let auth = null
+  // Session idle time is counted in ticks this process lived through, not wall time, so a
+  // computer that slept overnight has not idled the open window's session out.
+  let ticks = 0
+  const idleNow = () => ticks * IDLE_TICK_MS
+  const ticker = setInterval(() => { ticks += 1 }, IDLE_TICK_MS)
+  ticker.unref()
+
   const server = http.createServer(async (req, res) => {
     try {
-      if (!isLocalRequest(req)) {
-        return json(res, 403, { error: 'this panel only answers requests addressed to localhost' })
-      }
+      const headers = []
+      for (let i = 0; i + 1 < req.rawHeaders.length; i += 2) headers.push([req.rawHeaders[i], req.rawHeaders[i + 1]])
+      const verdict = auth.decide({ method: req.method, target: req.url, headers }, { now: Date.now(), idleNow: idleNow() })
+      if (panelAuth.answer(res, verdict, auth.port)) return
+      if (verdict.session) res.once('close', () => auth.release(verdict.session, idleNow()))
       await activity.asActor({ kind: 'panel' }, () => route(req, res))
     } catch (err) {
       // SSE routes write their headers first; writeHead here would throw ERR_HTTP_HEADERS_SENT
@@ -90,23 +104,32 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       json(res, refusal ? 400 : 500, { error: err?.message ?? String(err), ...(err?.code ? { code: err.code } : {}) })
     }
   })
+  server.once('close', () => clearInterval(ticker))
 
   clientLogin.setLoginHooks({ log: panelLog })
   return new Promise((resolve, reject) => {
     // a port already taken (another panel, usually) rejects instead of crashing the process
-    server.once('error', reject)
+    const failed = (err) => {
+      clearInterval(ticker)
+      reject(err)
+    }
+    server.once('error', failed)
     server.listen(port, host, () => {
-      server.off('error', reject)
+      server.off('error', failed)
       // the desktop app passes port 0, so report the port actually bound
       const bound = server.address().port
+      auth = new panelAuth.PanelAuth({ key, port: bound })
       // the sign-in callback's redirect URI carries this port (Microsoft matches localhost on any port)
       panelPort = bound
       const url = `http://${host}:${bound}/`
       if (open) openBrowser(url)
-      resolve({ server, url, port: bound })
+      // `auth` signs this caller in: a header for a program, a one-use link for a browser
+      resolve({ server, url, port: bound, auth })
     })
   })
 }
+
+const IDLE_TICK_MS = 10000
 
 let panelPort = null
 
@@ -1376,25 +1399,6 @@ function callbackPage(res, ok) {
     'x-content-type-options': 'nosniff',
   })
   res.end(html)
-}
-
-// Binding to 127.0.0.1 doesn't stop web pages in the local browser from calling this, and DNS
-// rebinding lets a page reach it under its own origin. So: the Host header must be loopback
-// (defeats rebinding), and any Origin must match Host exactly, port included. Plugin web UIs
-// (dynmap, BlueMap, Plan) run on other loopback ports and render player-chosen text, so a
-// hostname-only check would trust them. Requests with no Origin (own fetches, curl, CLI) pass.
-const LOOPBACK_HOST = /^(?:127\.\d+\.\d+\.\d+|\[::1\]|localhost)(?::\d+)?$/i
-
-function isLocalRequest(req) {
-  const host = req.headers.host
-  if (!host || !LOOPBACK_HOST.test(host)) return false
-  const origin = req.headers.origin
-  if (!origin) return true
-  try {
-    return new URL(origin).host.toLowerCase() === host.toLowerCase()
-  } catch {
-    return false
-  }
 }
 
 function json(res, code, body) {

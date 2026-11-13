@@ -9,6 +9,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 const { _electron: electron } = require('playwright')
+const { authorization } = require('./smoke-panel-auth.cjs')
 
 async function main() {
   assert.ok(['darwin', 'win32', 'linux'].includes(process.platform), 'Packaged desktop smoke tests require macOS, Windows or Linux')
@@ -204,9 +205,11 @@ async function main() {
   }
 
   async function api(route, body, timeout = 30000) {
-    const response = await fetch(new URL(`/api/${route}`, page.url()), {
+    const target = new URL(`/api/${route}`, page.url())
+    const response = await fetch(target, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // asked from outside the page, so signed with the app's key (smoke-panel-auth.cjs)
+      headers: { 'Content-Type': 'application/json', Authorization: authorization(path.join(config, 'spawnloft'), target.port) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: AbortSignal.timeout(timeout),
     })

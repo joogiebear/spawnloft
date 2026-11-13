@@ -44,15 +44,21 @@ test('--launcher is a boolean flag', () => {
 test('ui --launcher with a panel already on the port points at that panel\'s launcher', async () => {
   const seen = []
   const { server, port } = await listener((req, res) => {
-    seen.push(req.url)
+    seen.push([req.url, req.headers.authorization])
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ profiles: [], accounts: [], servers: [] }))
   })
   try {
     const r = await cli(['ui', '--port', String(port), '--launcher', '--no-open'])
     assert.equal(r.code, 0, r.stderr)
-    assert.match(r.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}/launcher`))
-    assert.deepEqual(seen, ['/api/client/launcher'])
+    // a link that signs a browser in to that panel and lands on its launcher
+    assert.match(r.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}/auth\\?t=v1\\.login\\.${port}\\.\\d+\\.[\\w-]{22}\\.[\\w-]{43}&to=/launcher`))
+    // the question "is that a panel" is asked with a token for that port, never with the key
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0][0], '/api/client/launcher')
+    assert.match(seen[0][1], new RegExp(`^SpawnLoft v1\\.api\\.${port}\\.\\d+\\.\\.[\\w-]{43}$`))
+    const key = fs.readFileSync(path.join(scratch, 'config', 'spawnloft', 'panel.key'), 'utf8').trim()
+    assert.ok(!seen[0][1].includes(key) && !r.stdout.includes(key))
   } finally {
     server.close()
   }

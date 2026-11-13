@@ -25,6 +25,7 @@ import * as backup from './src/backup.mjs'
 import * as create from './src/create.mjs'
 import * as paper from './src/paper.mjs'
 import * as ui from './src/ui.mjs'
+import { apiAuthorization, loadKey, makeToken } from './src/panel-auth.mjs'
 import * as manage from './src/manage.mjs'
 import * as settings from './src/settings.mjs'
 import * as java from './src/java.mjs'
@@ -1245,42 +1246,55 @@ function cmdLaunchers(positional) {
 
 async function cmdUi(positional, flags) {
   const port = Number(flags.port ?? 8770)
-  // --no-open arrives as { open: false }.
-  const open = flags.open !== false
+  // --no-open is still taken and changes nothing for now: the sign-in link is printed either
+  // way, and opening it without putting it on a command line comes with the next change.
   // --launcher opens the game launcher's page instead of the panel's. A second panel cannot bind the
   // port, so with one already running it opens that panel's launcher and stops there.
   const launcher = flags.launcher === true
-  let url
+  // started by spawnloft-core's proxy, which signs its own requests: no link is made or printed
+  const behindProxy = flags.exitWithStdin === true
+  let url, auth
   try {
-    ({ url } = await ui.serve({ port, open: open && !launcher }))
+    // The browser is not opened at the bare address any more: it would only show the sign-in
+    // page. The link below signs a browser in; it never goes on a command line, where other
+    // accounts could read it.
+    ({ url, auth } = await ui.serve({ port, open: false }))
   } catch (err) {
     if (err?.code !== 'EADDRINUSE') throw err
     const running = `http://127.0.0.1:${port}/`
     const panel = await isPanelAt(running)
     if (launcher && panel) {
-      if (open) ui.openBrowser(running + 'launcher')
-      out(`SpawnLoft launcher: ${running}launcher (the panel already running on port ${port})`)
+      out(`SpawnLoft launcher, on the panel already running on port ${port}. Open this link to sign in (it works once, for 5 minutes):`)
+      out(`  ${running}auth?t=${makeToken(loadKey(), 'login', port)}&to=/launcher`)
       return
     }
     fail(`port ${port} is already in use${panel ? ` by a SpawnLoft panel: open ${running}` : ''}. Pick another with --port <n>.`)
   }
-  if (launcher && open) ui.openBrowser(url + 'launcher')
   // spawnloft-core's proxy holds a pipe to stdin: when it ends, however it ends, so does this panel
-  if (flags.exitWithStdin === true) {
+  if (behindProxy) {
     process.stdin.on('end', () => process.exit(0))
     process.stdin.on('error', () => process.exit(0))
     process.stdin.resume()
   }
   out(`SpawnLoft panel: ${url}`)
-  if (launcher) out(`Game launcher: ${url}launcher`)
+  if (!behindProxy) {
+    out(`Open this link in your browser to sign in (it works once, for 5 minutes):`)
+    out(`  ${auth.loginUrl(launcher ? '/launcher' : null)}`)
+  }
   out('Bound to 127.0.0.1 only — it can start servers and type console commands, so it is')
   out('for this machine, not the network. Ctrl+C to stop the panel (servers keep running).')
 }
 
 // Something on the port answers the launcher's summary route the way a SpawnLoft panel does.
+// Asked with a token signed by this install's key, so only this user's panel answers 200: there
+// is no route that tells a stranger a panel is here.
 async function isPanelAt(base) {
   try {
-    const res = await fetch(base + 'api/client/launcher', { redirect: 'error', signal: AbortSignal.timeout(2000) })
+    const res = await fetch(base + 'api/client/launcher', {
+      redirect: 'error',
+      signal: AbortSignal.timeout(2000),
+      headers: { authorization: apiAuthorization(Number(new URL(base).port)) },
+    })
     if (!res.ok) return false
     const body = await res.json()
     return Array.isArray(body?.profiles)

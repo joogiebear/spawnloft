@@ -11,8 +11,13 @@ import http from 'node:http'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-login-'))
 process.env.MCCTL_DATA_ROOT = scratch
+// the panel key is made in the config folder: not the developer's real one
+process.env.APPDATA = path.join(scratch, 'config-home')
+process.env.XDG_CONFIG_HOME = path.join(scratch, 'config-home')
 
 const ui = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch, authorization } = await import('./helpers/panel.mjs')
 const login = await import('../src/client-login.mjs')
 const auth = await import('../src/client-auth.mjs')
 const client = await import('../src/client.mjs')
@@ -112,13 +117,14 @@ async function openStream(loginId) {
 }
 
 function callback(query, extra = {}) {
-  // a top-level navigation: Host only, no Origin, never followed
-  return fetch(url + 'api/client/accounts/login/callback?' + new URLSearchParams(query), { redirect: 'manual', ...extra })
+  // a top-level navigation: Host only, no Origin, no credential (the browser comes back from
+  // Microsoft with none), never followed
+  return fetch(url + 'api/client/accounts/login/callback?' + new URLSearchParams(query), { redirect: 'manual', anonymous: true, ...extra })
 }
 
 function rawRequest(method, p, headers) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, method, path: p, headers }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, method, path: p, headers: { authorization: authorization(port), ...headers } }, (res) => {
       res.resume()
       res.on('end', () => resolve({ status: res.statusCode }))
     })

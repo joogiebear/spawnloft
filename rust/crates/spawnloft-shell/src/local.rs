@@ -87,14 +87,26 @@ pub fn carry_over_electron_files() {
 }
 
 /// GET `path` from the panel at `addr` and parse the JSON body. Addressed by Host as the window
-/// is (`127.0.0.1:<port>`), so the panel's own localhost rule lets it through.
+/// is (`127.0.0.1:<port>`), and signed in with a fresh token made from the install's key
+/// (`panel_auth`): the shell is not a page and has no session cookie.
 pub fn panel_get(addr: SocketAddr, path: &str) -> Result<Value, String> {
+    let key = spawnloft_lib::panel_auth::load_key()?;
+    panel_get_as(
+        addr,
+        path,
+        &spawnloft_lib::panel_auth::authorization(&key, addr.port()),
+    )
+}
+
+/// [`panel_get`] with the `Authorization` value given.
+pub fn panel_get_as(addr: SocketAddr, path: &str, authorization: &str) -> Result<Value, String> {
     let mut conn =
         TcpStream::connect_timeout(&addr, Duration::from_secs(5)).map_err(|e| format!("connect: {e}"))?;
     conn.set_read_timeout(Some(Duration::from_secs(20)))
         .map_err(|e| e.to_string())?;
     let req = format!(
-        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nAccept: application/json\r\n\
+         Authorization: {authorization}\r\nConnection: close\r\n\r\n",
         addr.port()
     );
     conn.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
@@ -164,10 +176,11 @@ mod tests {
             let req = String::from_utf8_lossy(&buf[..n]).to_string();
             assert!(req.starts_with("GET /api/setup HTTP/1.1\r\n"));
             assert!(req.contains(&format!("Host: 127.0.0.1:{}\r\n", addr.port())));
+            assert!(req.contains("Authorization: SpawnLoft token\r\n"));
             c.write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nb\r\n{\"needed\":1\r\n1\r\n}\r\n0\r\n\r\n")
                 .unwrap();
         });
-        let v = panel_get(addr, "/api/setup").unwrap();
+        let v = panel_get_as(addr, "/api/setup", "SpawnLoft token").unwrap();
         assert_eq!(v["needed"], 1);
     }
 }

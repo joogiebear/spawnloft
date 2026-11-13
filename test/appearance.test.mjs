@@ -12,6 +12,8 @@ process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 const settings = await import('../src/settings.mjs')
 const { normalizeTheme } = await import('../src/appearance.mjs')
 const { serve } = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 const servers = []
 after(async () => {
   for (const server of servers) {

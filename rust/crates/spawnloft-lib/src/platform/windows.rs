@@ -10,8 +10,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_PIPE_CONNECTED, FILETIME, GetLastError, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
-    STILL_ACTIVE,
+    CloseHandle, ERROR_PIPE_CONNECTED, FILETIME, GENERIC_WRITE, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
+    LocalFree, STILL_ACTIVE,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
@@ -19,7 +19,9 @@ use windows_sys::Win32::Security::Authorization::{
 use windows_sys::Win32::Security::{
     GetTokenInformation, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
-use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX};
+use windows_sys::Win32::Storage::FileSystem::{
+    CREATE_NEW, CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX,
+};
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
 };
@@ -515,6 +517,55 @@ pub fn user_sid() -> Result<String, String> {
 /// alone. Not SYSTEM, not Administrators, not other sessions of other users.
 pub fn pipe_sddl(sid: &str) -> String {
     format!("D:P(A;;GA;;;{sid})")
+}
+
+/// The SDDL of a private file: protected (nothing inherited from the folder), full access for
+/// this user alone. What `src/private-files.mjs` makes with icacls, here from the first moment.
+pub fn private_file_sddl(sid: &str) -> String {
+    format!("D:P(A;;FA;;;{sid})")
+}
+
+/// A new file only this user can open, failing when the name exists. The ACL is on the file
+/// when it is created, so it is never there under its folder's permissions.
+pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    use std::os::windows::ffi::OsStrExt;
+    let sddl = wide(&private_file_sddl(&user_sid().map_err(std::io::Error::other)?));
+    let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
+    // SAFETY: valid NUL-terminated string and out-pointer; the descriptor is freed below.
+    if unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            SDDL_REVISION_1,
+            &mut sd,
+            std::ptr::null_mut(),
+        )
+    } == 0
+    {
+        return Err(last_error());
+    }
+    let attrs = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: sd,
+        bInheritHandle: 0,
+    };
+    let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    // SAFETY: a NUL-terminated path and attributes that live through the call; the result is
+    // checked, and CREATE_NEW never opens a file that exists.
+    let handle = unsafe {
+        CreateFileW(
+            name.as_ptr(),
+            GENERIC_WRITE,
+            0,
+            &attrs,
+            CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL,
+            std::ptr::null_mut(),
+        )
+    };
+    let made = owned(handle).ok_or_else(last_error);
+    // SAFETY: allocated by the conversion above and not used after this.
+    unsafe { LocalFree(sd as _) };
+    made.map(std::fs::File::from)
 }
 
 /// A server end of a named pipe, waiting for its client.
