@@ -395,7 +395,17 @@ needs a route table or a sweep of `ui.mjs` and goes with thread 2.
   request waits for ever instead of failing (no retries, no error toasts behind the notice). A
   stream that errors asks `GET /api/appearance` once whether the sign-in holds; a panel that is
   only down answers nothing, and the stream keeps reconnecting. `setup.html` makes no HTTP request
-  (it talks to the window's bridge) and needs nothing.
+  (it talks to the window's bridge) and needs nothing. Its scope is requests the page makes: a
+  download link or a navigation after the end shows the server's 401 page, and once ended every
+  `fetch` waits for ever, a cross-origin one or one with its own timeout included.
+- **After the independent review**: no test reaches a real browser (`tools/run-tests.mjs` sets
+  `BROWSER` to Node); a `BROWSER` that cannot be run falls back to the system opener; on Linux
+  with no `DISPLAY` or `WAYLAND_DISPLAY` (and no `BROWSER`) `spawnloft ui` only prints the link.
+  The GET test redirects and compares the home folders too. Accepted: GETs that refresh download
+  caches (Minecraft's version list, the harness index) write those caches; a running server's
+  GETs are not walked (they read RCON and the daemon); a page that `spawnloft ui` wrote for the
+  desktop window's proxy port is swept rather than deleted on use (the Rust proxy does not
+  delete open pages).
 - **No GET writes** is a test on both listeners: `test/panel-get-writes.test.mjs` builds its
   requests from every literal the Node router compares a path segment with, in every position, on
   a seeded server, database and client profile, and compares the data and config folders after

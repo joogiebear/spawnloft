@@ -157,7 +157,8 @@ fn tree(root: &std::path::Path) -> std::collections::BTreeMap<std::path::PathBuf
 /// another loopback page makes, and without `Sec-Fetch-Site` the panel cannot tell. The routes the
 /// proxy answers itself are checked here; the Node panel's in test/panel-get-writes.test.mjs.
 /// `GET /api/update/rollbacks` reads the release list from the internet and is left out; it
-/// only reads.
+/// only reads. The list below must name every route in the route tables at the top of
+/// `update/api.rs` and `handover/api.rs`, which this test reads, so a new route is not missed.
 #[test]
 fn the_proxys_own_get_routes_write_nothing() {
     use std::io::{BufRead, Read, Write};
@@ -166,6 +167,14 @@ fn the_proxys_own_get_routes_write_nothing() {
     let data = home.path().join("data");
     std::fs::create_dir_all(&config).unwrap();
     std::fs::create_dir_all(&data).unwrap();
+    /// stops the panel however the test ends
+    struct Kill(std::process::Child);
+    impl Drop for Kill {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
     let mut child = std::process::Command::new(BIN)
         // nothing listens upstream: these routes never reach it
         .args(["ui", "--port", "0", "--upstream", "http://127.0.0.1:1/"])
@@ -181,10 +190,10 @@ fn the_proxys_own_get_routes_write_nothing() {
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let _panel = Kill(child);
     let mut line = String::new();
-    std::io::BufReader::new(child.stdout.take().unwrap())
-        .read_line(&mut line)
-        .unwrap();
+    std::io::BufReader::new(stdout).read_line(&mut line).unwrap();
     let port: u16 = line
         .trim()
         .strip_prefix(spawnloft_lib::panel::READY_PREFIX)
@@ -206,9 +215,7 @@ fn the_proxys_own_get_routes_write_nothing() {
         let _ = s.read_to_string(&mut answer);
         answer
     };
-    let mut before = tree(home.path());
-    let mut wrote = Vec::new();
-    for route in [
+    let asked = [
         "/api/update",
         "/api/update/log?n=5",
         "/api/update/nothing",
@@ -219,7 +226,31 @@ fn the_proxys_own_get_routes_write_nothing() {
         "/api/update/channel",
         "/api/handover",
         "/api/handover/dismiss",
-    ] {
+    ];
+    let lib = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../spawnloft-lib/src");
+    for table in ["update/api.rs", "handover/api.rs"] {
+        let text = std::fs::read_to_string(lib.join(table)).unwrap();
+        for row in text.lines().filter(|l| l.starts_with("//! | `")) {
+            let route = row
+                .split('`')
+                .nth(1)
+                .and_then(|r| r.split_whitespace().nth(1))
+                .unwrap_or_default()
+                .split('?')
+                .next()
+                .unwrap_or_default();
+            if route == "/api/update/rollbacks" {
+                continue;
+            }
+            assert!(
+                asked.iter().any(|a| a.split('?').next() == Some(route)),
+                "{table} lists {route}; add it to this test"
+            );
+        }
+    }
+    let mut before = tree(home.path());
+    let mut wrote = Vec::new();
+    for route in asked {
         let answer = get(route);
         assert!(answer.starts_with("HTTP/1.1 "), "{route}: no answer: {answer:?}");
         assert!(!answer.starts_with("HTTP/1.1 401"), "{route}: {answer}");
@@ -235,7 +266,5 @@ fn the_proxys_own_get_routes_write_nothing() {
         }
         before = after;
     }
-    let _ = child.kill();
-    let _ = child.wait();
     assert!(wrote.is_empty(), "GET requests that wrote: {wrote:#?}");
 }

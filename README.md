@@ -434,8 +434,9 @@ This is built for **localhost and LAN only**.
   an `Origin`, when there is one, must match that `Host` exactly, port included, and a browser's
   `Sec-Fetch-Site`, when it sends one, must say the request came from the panel itself. Pages of
   plugin web maps (dynmap, BlueMap, Plan) run on other loopback ports and render names and chat
-  players chose; they get none of this. No `GET` changes anything (a test walks every route), so a
-  request another page fires blind cannot either.
+  players chose; they get none of this. No `GET` changes your servers, settings or accounts (a
+  test walks every route; a few refresh download caches), so a request another page fires blind
+  cannot either.
 - **One limit of the browser path.** Browsers scope cookies to the host, not the port, so the
   session cookie of a browser signed in with `spawnloft ui` is also sent to any other web server
   on `127.0.0.1` that browser visits while the panel runs. A plugin web map runs as you and learns
@@ -605,7 +606,8 @@ without the app: in a browser, on a machine with no screen, and for scripts.
 **In a browser.** `spawnloft ui` starts the panel and opens your browser on it, already signed in.
 It does that through a small page it writes in the SpawnLoft settings folder (`open/`, readable by
 you alone), never by putting the link on a command line, where other accounts on the machine can
-read it. The link is printed as well, and works once, within five minutes. A browser installed as
+read it. `BROWSER`, when set, names the one program to open it with. On Linux with no display
+(over SSH) nothing is opened. The link is printed as well, and works once, within five minutes. A browser installed as
 a Snap or a Flatpak (Ubuntu's Firefox, for one) cannot read the settings folder and shows an
 error: use the printed link instead.
 

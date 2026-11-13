@@ -94,6 +94,15 @@ test('the opener gets the page\'s path and nothing else', () => {
   assert.deepEqual(open.opener(file, { BROWSER: ' firefox ' }, 'linux'), ['firefox', [file]])
 })
 
+test('with no display there is no browser to open, unless BROWSER names one', () => {
+  assert.equal(open.canOpen({}, 'linux'), false)
+  assert.equal(open.canOpen({ DISPLAY: ':0' }, 'linux'), true)
+  assert.equal(open.canOpen({ WAYLAND_DISPLAY: 'wayland-0' }, 'linux'), true)
+  assert.equal(open.canOpen({ BROWSER: 'w3m' }, 'linux'), true)
+  assert.equal(open.canOpen({}, 'darwin'), true)
+  assert.equal(open.canOpen({}, 'win32'), true)
+})
+
 test('a panel deletes the page whose link it took', async () => {
   const p = await serve({ port: 0 })
   servers.push(p.server)

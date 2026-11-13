@@ -13,5 +13,8 @@ const files = fs.readdirSync(testDir).filter((f) => f.endsWith('.test.mjs')).sor
 const env = { ...process.env, SPAWNLOFT_HARNESS_INDEX_FETCH: 'off' }
 // the tests isolate themselves with MCCTL_DATA_ROOT, which a SPAWNLOFT_DATA_ROOT would override
 delete env.SPAWNLOFT_DATA_ROOT
+// spawnloft ui hands its sign-in page to $BROWSER: Node, given an HTML file, stops at the first line,
+// so no test opens a real browser (which could spend a one-use link the test then uses)
+env.BROWSER = process.execPath
 const res = spawnSync(process.execPath, ['--test', ...process.argv.slice(2), ...files], { stdio: 'inherit', cwd: path.join(testDir, '..'), env })
 process.exit(res.status ?? 1)

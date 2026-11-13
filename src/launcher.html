@@ -566,7 +566,7 @@
   // The panel signs a page in with a cookie that lives as long as the panel process
   // (rust/PANEL-AUTH-DESIGN.md 3.3). When the panel answers {code: "auth"}, this page's sign-in is
   // gone: the panel restarted, or the tab sat closed past the idle time. Say so once, close the
-  // event streams (they would reconnect for ever against a 401) and stop asking: every later
+  // event streams (a stream cut off reconnects on its own; one that then meets the 401 stops) and stop asking: every later
   // request waits for ever instead of failing, so nothing behind the notice retries or toasts.
   const panelSession = (() => {
     const state = { ended: false, checking: false, streams: new Set() };

@@ -26,7 +26,7 @@ import * as create from './src/create.mjs'
 import * as paper from './src/paper.mjs'
 import * as ui from './src/ui.mjs'
 import { PROBE_HEADER, PROOF_HEADER, apiAuthorization, loadKey, loginLink, probeNonce, proofMatches } from './src/panel-auth.mjs'
-import { openInBrowser, writeOpenFile } from './src/panel-open.mjs'
+import { canOpen, openInBrowser, writeOpenFile } from './src/panel-open.mjs'
 import * as manage from './src/manage.mjs'
 import * as settings from './src/settings.mjs'
 import * as java from './src/java.mjs'
@@ -1251,7 +1251,8 @@ async function cmdUi(positional, flags) {
   // prints the link (a machine reached over SSH, section "Panel access" in the README). --link
   // starts nothing: it prints a fresh link for the panel already running on the port.
   const launcher = flags.launcher === true
-  const open = flags.open !== false && flags.link !== true
+  // a machine with no display (reached over SSH, usually) has no browser to open: only print
+  const open = flags.open !== false && flags.link !== true && canOpen()
   const to = launcher ? '/launcher' : null
   // started by spawnloft-core's proxy, which signs its own requests: no link is made or printed
   const behindProxy = flags.exitWithStdin === true

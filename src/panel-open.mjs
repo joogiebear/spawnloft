@@ -109,26 +109,47 @@ export function writeOpenFile(url, nonce) {
   return file
 }
 
-// The program that opens a file in the browser. BROWSER, when set, names one to run with the file
-// as its only argument (the convention Python's webbrowser and Jupyter follow); otherwise the
-// system's own opener. Only the file's path is passed, never the link.
-export function opener(file, env = process.env, platform = process.platform) {
-  const chosen = String(env.BROWSER ?? '').trim()
-  if (chosen) return [chosen, [file]]
+// The program that opens a file in the browser: the system's own opener, or BROWSER when it is
+// set. BROWSER is taken as one program, run with the file as its only argument; a value holding
+// a list or arguments (Python's webbrowser reads more into it) is not ours to parse, and when it
+// cannot be run the system's opener is used instead. Only the file's path is passed, never the
+// link.
+export function systemOpener(file, env = process.env, platform = process.platform) {
   // explorer, not `cmd /c start`: a path goes to it as one argument, with no shell to parse it
   if (platform === 'win32') return [path.win32.join(env.SystemRoot || 'C:\\Windows', 'explorer.exe'), [file]]
   if (platform === 'darwin') return ['open', [file]]
   return ['xdg-open', [file]]
 }
 
-// Opens the page in the browser. Never throws: with no browser the link is printed anyway.
-export function openInBrowser(file) {
-  const [cmd, args] = opener(file)
+export function opener(file, env = process.env, platform = process.platform) {
+  const chosen = String(env.BROWSER ?? '').trim()
+  if (chosen) return [chosen, [file]]
+  return systemOpener(file, env, platform)
+}
+
+// Whether there is a browser here to open at all: a Linux or BSD machine reached over SSH has no
+// display, and opening there would only claim to. BROWSER set says there is one.
+export function canOpen(env = process.env, platform = process.platform) {
+  if (String(env.BROWSER ?? '').trim()) return true
+  if (platform === 'win32' || platform === 'darwin') return true
+  return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY)
+}
+
+function run([cmd, args], onError) {
   try {
     const child = spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: false })
-    child.on('error', () => {})
+    child.on('error', onError)
     child.unref()
   } catch {
-    // no opener on this machine
+    onError()
   }
+}
+
+// Opens the page in the browser. Never throws: with no browser the link is printed anyway.
+export function openInBrowser(file) {
+  const first = opener(file)
+  const fallback = systemOpener(file)
+  run(first, () => {
+    if (first[0] !== fallback[0]) run(fallback, () => {})
+  })
 }

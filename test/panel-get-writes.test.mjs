@@ -19,14 +19,24 @@ import { fileURLToPath } from 'node:url'
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-get-writes-'))
 const config = path.join(scratch, 'config')
 const data = path.join(scratch, 'data')
+const home = path.join(scratch, 'home')
+fs.mkdirSync(home, { recursive: true })
 process.env.APPDATA = config
 process.env.XDG_CONFIG_HOME = config
 process.env.MCCTL_DATA_ROOT = data
+// everywhere else a write could land is in the scratch folder too, and compared
+process.env.HOME = home
+process.env.USERPROFILE = home
+process.env.LOCALAPPDATA = path.join(home, 'local')
+process.env.XDG_DATA_HOME = path.join(home, 'share')
+process.env.XDG_CACHE_HOME = path.join(home, 'cache')
 process.env.SPAWNLOFT_HARNESS_INDEX_FETCH = 'off'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 
-// Nothing here goes past this machine: a GET that would fetch from the internet gets a refusal,
-// which is enough to see whether it writes. Loopback requests (this test's own) go through.
+// Nothing here goes past this machine: a GET that would fetch from the internet gets a refusal.
+// So the download caches some GETs refresh (Minecraft's version list, the harness index) are not
+// written here; those are caches, not state. The server is stopped: what a running server's GETs
+// do is read RCON and the daemon. Loopback requests (this test's own) go through.
 const realFetch = globalThis.fetch
 globalThis.fetch = (input, init) => {
   const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url)
@@ -100,6 +110,7 @@ function snapshot() {
   }
   walk(config)
   walk(data)
+  walk(home)
   return out
 }
 
@@ -207,6 +218,10 @@ test('no GET request writes to the data or config folder', { timeout: 600000 }, 
     if (diff.length) found.push(`GET ${url} (${status}): ${diff.join(', ')}`)
     before = now
   }
+  // a write that lands late is still found, if not always on the request that made it
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  const late = changes(before, snapshot()).filter((line) => !ownClock(line))
+  if (late.length) found.push(`after the last GET: ${late.join(', ')}`)
   // most of the list must have reached a route, or the seed is wrong and this proves nothing
   const ok = answered.get(200) ?? 0
   assert.ok(ok >= 40, `only ${ok} of ${list.length} GETs answered 200: ${JSON.stringify([...answered])}`)
