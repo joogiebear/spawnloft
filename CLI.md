@@ -22,8 +22,11 @@ The app does not edit it automatically. If you move the app, update that PATH en
 Avoid symlinking the launcher alone: it resolves the runtime relative to its own directory.
 An installer/settings option for PATH setup is a separate follow-up.
 
-On Windows, run `resources\bin\spawnloft.cmd` inside the installed SpawnLoft directory,
-or add that `resources\bin` directory to your user PATH. `mcctl.cmd` remains available there.
+On Windows, SpawnLoft 2.0 puts `resources\bin` inside the installed SpawnLoft directory
+(`%LOCALAPPDATA%\Programs\SpawnLoft\resources\bin`) on your user PATH when it installs, and
+takes it off again when it is uninstalled; an update leaves it alone. Open a new terminal after
+installing and run `spawnloft` (or `mcctl`). With 1.x, run `resources\bin\spawnloft.cmd` there
+or add the folder to your user PATH yourself. On Linux the packages install `/usr/bin/spawnloft`.
 From a source checkout, use `node spawnloft.mjs ...` or the root Windows `.cmd` launchers;
 source usage requires Node 20 or later.
 

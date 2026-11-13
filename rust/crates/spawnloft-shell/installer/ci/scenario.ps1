@@ -478,6 +478,15 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Start-Scenario 's8-uninstall-and-rollback-to-1x'
     $run = Run-Installer $setupA @('/S') 300
     Check '2.x installs (exit 0)' ($run.code -eq 0) "exit $($run.code)"
+    # the install puts resources\bin on the user PATH (user_path.rs), once
+    Check '  resources\bin on the user PATH once' ((User-Path-Count "$inst\resources\bin") -eq 1) (Reg 'HKCU:\Environment' 'Path')
+    # from a folder of its own: cmd.exe looks in the current folder before PATH, and the checkout's
+    # root holds the source tree's spawnloft.cmd (which runs a node from PATH)
+    Push-Location $env:RUNNER_TEMP
+    try {
+      $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', 'spawnloft', '--version') 60 @{ PATH = "$([Environment]::ExpandEnvironmentVariables((Reg 'HKCU:\Environment' 'Path')));$env:WINDIR\System32" }
+    } finally { Pop-Location }
+    Check '  a new terminal finds spawnloft' ($r.code -eq 0 -and $r.out -match 'spawnloft-core') "$($r.code) $($r.out)$($r.err)"
     Kill-Everything
     $dataRoot = Use-Layout 'new'
     $spec = @{ servers = @(@{ name = 'keep' }); databases = @(); fixtures = $fixtures } | ConvertTo-Json -Depth 4
@@ -494,12 +503,14 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     $p = Run "$inst\uninstall.exe" @('/S', '/UPDATE', "_?=$inst") 300
     Check '/UPDATE uninstall exit 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
     Check '  task kept' (@(Tasks-Under-Mcctl).Count -eq 1)
+    Check '  user PATH entry kept' ((User-Path-Count "$inst\resources\bin") -eq 1)
     Check '  data kept' (Test-Path (Join-Path $dataRoot 'instances.json'))
     # the program files are gone until the reinstall, so ask the process table, not a CLI
     $st = State $dataRoot 'keep'
     Check '  server still running (daemon and JVM alive)' ((Pid-Alive $st.daemonPid) -and (Pid-Alive $st.javaPid))
     $run = Run-Installer $setupA @('/S') 300
     Check 'reinstall exit 0' ($run.code -eq 0) "exit $($run.code)"
+    Check '  still one user PATH entry' ((User-Path-Count "$inst\resources\bin") -eq 1)
     # only the shell: keep's daemon is a spawnloft-core.exe and must live to be stopped below
     Get-Process SpawnLoft -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
@@ -541,6 +552,7 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check '  SpawnLoft.exe removed' (-not (Test-Path "$inst\SpawnLoft.exe"))
     Check '  keys removed' (-not (Test-Path $uninstKey) -and -not (Test-Path $installKey))
     Check '  tasks removed' (@(Tasks-Under-Mcctl).Count -eq 0)
+    Check '  user PATH entry removed' ((User-Path-Count "$inst\resources\bin") -eq 0) (Reg 'HKCU:\Environment' 'Path')
     Check '  the server was stopped gracefully' (Test-Path (Join-Path $seed.servers.keep 'fake-exit.json'))
     Check '  data kept' (Test-Path (Join-Path $dataRoot 'instances.json'))
     Check '  settings kept' (Test-Path (Join-Path $env:APPDATA 'spawnloft\settings.json'))

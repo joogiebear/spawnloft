@@ -597,6 +597,166 @@ fn close(h: HANDLE) {
     unsafe { CloseHandle(h) };
 }
 
+/// The user's `Path` as stored under `HKCU\Environment`: its text and whether it is
+/// `REG_EXPAND_SZ`. `Ok(None)` when the user has no `Path` value of their own.
+pub fn read_user_path() -> std::io::Result<Option<(String, bool)>> {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, RegCloseKey, RegOpenKeyExW,
+    };
+    let sub = wide("Environment");
+    let name = wide("Path");
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: NUL-terminated strings and an out-pointer.
+    let r = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, sub.as_ptr(), 0, KEY_QUERY_VALUE, &mut key) };
+    if r == ERROR_FILE_NOT_FOUND {
+        return Ok(None);
+    }
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    let result = query_path(key, &name);
+    // SAFETY: the key opened above.
+    unsafe { RegCloseKey(key) };
+    result
+}
+
+fn query_path(
+    key: windows_sys::Win32::System::Registry::HKEY,
+    name: &[u16],
+) -> std::io::Result<Option<(String, bool)>> {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{REG_EXPAND_SZ, REG_SZ, RegQueryValueExW};
+    let mut kind = 0u32;
+    let mut bytes = 0u32;
+    // SAFETY: an open key, a NUL-terminated name, and out-pointers; a null data pointer asks
+    // for the size only.
+    let r = unsafe {
+        RegQueryValueExW(
+            key,
+            name.as_ptr(),
+            std::ptr::null(),
+            &mut kind,
+            std::ptr::null_mut(),
+            &mut bytes,
+        )
+    };
+    if r == ERROR_FILE_NOT_FOUND {
+        return Ok(None);
+    }
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    if kind != REG_SZ && kind != REG_EXPAND_SZ {
+        return Err(std::io::Error::other(format!(
+            "HKCU\\Environment\\Path has type {kind}"
+        )));
+    }
+    let mut buf = vec![0u16; (bytes as usize).div_ceil(2) + 1];
+    let mut size = (buf.len() * 2) as u32;
+    // SAFETY: `buf` holds `size` bytes.
+    let r = unsafe {
+        RegQueryValueExW(
+            key,
+            name.as_ptr(),
+            std::ptr::null(),
+            &mut kind,
+            buf.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    buf.truncate((size as usize) / 2);
+    // the value ends at its first NUL; anything after one is not part of the PATH
+    if let Some(end) = buf.iter().position(|&c| c == 0) {
+        buf.truncate(end);
+    }
+    // never lossy: a PATH that is written back must be the user's, character for character
+    let text = String::from_utf16(&buf)
+        .map_err(|_| std::io::Error::other("HKCU\\Environment\\Path is not valid UTF-16; left as it is"))?;
+    Ok(Some((text, kind == REG_EXPAND_SZ)))
+}
+
+/// Writes the user's `Path` (`REG_EXPAND_SZ` when `expand`), then tells running programs, the
+/// shell among them, that the environment changed, so a terminal opened next sees it.
+pub fn write_user_path(value: &str, expand: bool) -> std::io::Result<()> {
+    use windows_sys::Win32::Foundation::ERROR_SUCCESS;
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_EXPAND_SZ, REG_SZ, RegCloseKey, RegOpenKeyExW,
+        RegSetValueExW,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
+    };
+    let sub = wide("Environment");
+    let name = wide("Path");
+    let data = wide(value);
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: NUL-terminated strings and an out-pointer.
+    let r = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, sub.as_ptr(), 0, KEY_SET_VALUE, &mut key) };
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    let kind = if expand { REG_EXPAND_SZ } else { REG_SZ };
+    // SAFETY: an open key; `data` is NUL-terminated and its byte length includes the terminator.
+    let r = unsafe {
+        RegSetValueExW(
+            key,
+            name.as_ptr(),
+            0,
+            kind,
+            data.as_ptr().cast(),
+            (data.len() * 2) as u32,
+        )
+    };
+    // SAFETY: the key opened above.
+    unsafe { RegCloseKey(key) };
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    let what = wide("Environment");
+    let mut ignored = 0usize;
+    // SAFETY: a broadcast with a NUL-terminated string that outlives the call (the call returns
+    // after every window answered or the timeout passed); a window that hangs is skipped.
+    unsafe {
+        SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            what.as_ptr() as isize,
+            SMTO_ABORTIFHUNG,
+            5000,
+            &mut ignored,
+        )
+    };
+    Ok(())
+}
+
+/// `%NAME%` references in `s` expanded from this process's environment.
+pub fn expand_env(s: &str) -> String {
+    use windows_sys::Win32::System::Environment::ExpandEnvironmentStringsW;
+    if !s.contains('%') {
+        return s.to_string();
+    }
+    let src = wide(s);
+    let mut buf = vec![0u16; 1024];
+    loop {
+        // SAFETY: a NUL-terminated source and a destination of `buf.len()` characters.
+        let n =
+            unsafe { ExpandEnvironmentStringsW(src.as_ptr(), buf.as_mut_ptr(), buf.len() as u32) } as usize;
+        if n == 0 {
+            return s.to_string();
+        }
+        if n <= buf.len() {
+            buf.truncate(n.saturating_sub(1));
+            return String::from_utf16_lossy(&buf);
+        }
+        buf.resize(n, 0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

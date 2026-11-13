@@ -116,6 +116,14 @@ function Reg($key, $name) {
   try { (Get-ItemProperty -Path $key -Name $name -ErrorAction Stop).$name } catch { $null }
 }
 
+# How many entries of the user's PATH (HKCU\Environment, as stored, then expanded) name $dir
+function User-Path-Count([string] $dir) {
+  $want = $dir.TrimEnd('\').ToLowerInvariant()
+  @("$(Reg 'HKCU:\Environment' 'Path')" -split ';' | Where-Object {
+    $_.Trim() -and [Environment]::ExpandEnvironmentVariables($_).Trim().TrimEnd('\').ToLowerInvariant() -eq $want
+  }).Count
+}
+
 function Run($file, $argList, $seconds, [hashtable] $extra = @{}) {
   # Start-Process -Wait also waits for every descendant (a daemon, the app --force-run starts):
   # wait for the process itself only

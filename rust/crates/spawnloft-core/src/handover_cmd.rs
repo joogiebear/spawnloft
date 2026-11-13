@@ -498,3 +498,32 @@ fn exit_of(r: Result<i32, String>) -> Outcome {
         },
     }
 }
+
+/// `user-path add|remove`: the install's `resources\\bin` on the user's PATH (Windows,
+/// spawnloft-lib user_path.rs). The installer runs `add` on a new install and on the 1.x handover,
+/// never on a 2.x update (the PATH stays as the user has it); the uninstaller runs `remove` on a
+/// real uninstall only. Logged to the handover log; the exit code is 0 unless the registry refused.
+pub fn user_path(rest: &[String]) -> Outcome {
+    use spawnloft_lib::user_path;
+    let result = match rest {
+        [a] if a == "add" => user_path::add(),
+        [a] if a == "remove" => user_path::remove(),
+        _ => return usage_error("user-path takes add or remove"),
+    };
+    let data_root = paths::resolve_data_root();
+    let log = Log::open(Some(&Files::new(&data_root).log()), false);
+    match result {
+        Ok(c) => {
+            log.line(&format!("user-path {}: {c:?}", rest[0]));
+            Outcome::default()
+        }
+        Err(e) => {
+            log.line(&format!("user-path {}: not changed: {e}", rest[0]));
+            Outcome {
+                stdout: String::new(),
+                stderr: format!("{}: user-path {}: {e}\n", build::NAME, rest[0]),
+                code: 1,
+            }
+        }
+    }
+}

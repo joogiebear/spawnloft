@@ -59,7 +59,7 @@ pub fn forwards(args: &[std::ffi::OsString]) -> bool {
     match command.to_str() {
         Some(
             "--version" | "-V" | "version" | "--core-help" | "daemon" | "probe-process" | "handover"
-            | "update",
+            | "update" | "user-path",
         ) => false,
         Some("ui") => !["--exit-with-stdin", "--core-dir", "--upstream", "--node"]
             .iter()
@@ -85,6 +85,7 @@ pub fn help() -> String {
            {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
            {name} repair --quiet        rewrite task shims and server launchers (run by the installer)\n  \
            {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
+           {name} user-path add|remove  resources\\bin on the user PATH (run by the installer)\n  \
            {name} update <command>     the updater (check, status, apply, list, rollback, hold, channel, log)\n  \
            {name} --core-help          this text\n\
          \n\
@@ -262,6 +263,7 @@ pub fn run(args: &[String]) -> Outcome {
         "repair" => crate::handover_cmd::repair(rest),
         "uninstall" => crate::handover_cmd::uninstall(rest),
         "update" => crate::update_cmd::run(rest),
+        "user-path" => crate::handover_cmd::user_path(rest),
         other => usage_error(&format!("unknown command `{other}`")),
     }
 }
@@ -406,6 +408,7 @@ mod tests {
             &["ui", "--port", "0", "--exit-with-stdin", "--core-dir", "/c"],
             &["ui", "--upstream", "http://127.0.0.1:1/"],
             &["repair", "--quiet"],
+            &["user-path", "add"],
         ] {
             assert!(!forwards(&os(line)), "{line:?} is this binary's own");
         }
