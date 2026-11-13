@@ -266,7 +266,7 @@ Proposed threads, in order, all into `v2`:
    ports, the SSH-tunnel flow on the Linux VM, and whether each webview sends `Sec-Fetch-Site`.
 
 Acceptance, all scripted except thread 3: a request with no credential gets 401 on both
-listeners, on every route of the contract fixture except the three open ones; a login link works
+listeners, on every route of the contract fixture except the two open ones; a login link works
 once, not on another port and not after the panel restarted; an expired or altered token fails; the
 open-file flow logs a real browser in (scripted, since it is the one place a cross-site navigation
 is expected); no GET route writes; the Node port refuses a direct
