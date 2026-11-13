@@ -46,7 +46,7 @@ test('the store folders, the registry, the task shims and the settings go; the d
   }
   assert.ok(!remove.includes(layout.dataRoot), 'the data root was marked for recursive deletion')
   assert.ok(!remove.includes(layout.instancesDir), 'the instances folder was marked for recursive deletion')
-  assert.deepEqual(removeIfEmpty, [layout.instancesDir, layout.dataRoot, win.dirname(settings)])
+  assert.deepEqual(removeIfEmpty, [win.dirname(settings), layout.instancesDir, layout.dataRoot])
 })
 
 test("the desktop app's own folders go only when named, and nothing is listed twice", () => {
@@ -56,60 +56,47 @@ test("the desktop app's own folders go only when named, and nothing is listed tw
   assert.equal(remove.filter((p) => p === layout.jarsDir).length, 1)
 })
 
-test('a backups folder the person chose is never deleted whole, only what SpawnLoft wrote there', () => {
-  const chosen = { ...layout, backupsDir: 'D:\\Backups' }
-  const { remove, removeIfEmpty } = purgeTargets({
-    instances: [
-      { name: 'smp', dir: 'D:\\Games\\instances\\smp' },
-      { name: 'old', dir: 'D:\\Servers\\Old', origin: { adopted: 'D:\\Servers\\Old' } },
-      { name: 'smp-db', dir: 'D:\\Games\\services\\smp-db', kind: 'database' },
-    ],
-    layout: chosen,
-    settings,
-    pathApi: win,
-  })
-  assert.ok(!remove.includes('D:\\Backups'), 'the chosen backups folder was marked for recursive deletion')
-  for (const p of ['D:\\Backups\\smp', 'D:\\Backups\\old', 'D:\\Backups\\smp-db', 'D:\\Backups\\client\\exports']) {
-    assert.ok(remove.includes(p), `${p} was not marked for deletion`)
-  }
-  assert.ok(removeIfEmpty.includes('D:\\Backups'))
-  assert.ok(removeIfEmpty.indexOf('D:\\Backups\\client') < removeIfEmpty.indexOf('D:\\Backups'))
-  assert.ok(removeIfEmpty.indexOf('D:\\Backups') < removeIfEmpty.indexOf(layout.dataRoot))
-})
-
-test('a chosen backups folder at a drive root or the data root itself is handled the same way', () => {
-  for (const backupsDir of ['D:\\', layout.dataRoot]) {
-    const { remove } = purgeTargets({ instances: [{ name: 'smp' }], layout: { ...layout, backupsDir }, settings, pathApi: win })
-    assert.ok(!remove.includes(backupsDir), `${backupsDir} was marked for recursive deletion`)
-    assert.ok(remove.includes(win.join(backupsDir, 'smp')))
+test('a backups folder the person chose is never deleted by folder, only swept file by file', () => {
+  for (const backupsDir of ['D:\\Backups', 'D:\\', layout.dataRoot, 'C:\\Users\\me']) {
+    const { remove, sweep } = purgeTargets({
+      instances: [{ name: 'smp', dir: 'D:\\Games\\instances\\smp' }, { name: 'Documents' }],
+      layout: { ...layout, backupsDir },
+      settings,
+      pathApi: win,
+    })
+    assert.ok(!remove.includes(backupsDir))
+    for (const n of ['smp', 'Documents', 'client']) assert.ok(!remove.includes(win.join(backupsDir, n)), `${win.join(backupsDir, n)} was marked for recursive deletion`)
+    assert.deepEqual(sweep, { root: backupsDir, names: ['smp', 'Documents'] })
   }
 })
 
-test('the default backups folder is recognised however it is spelled', () => {
-  const { remove } = purgeTargets({ instances: [], layout: { ...layout, backupsDir: 'd:\\games\\Backups\\' }, settings, pathApi: win })
+test('the default backups folder is recognised however it is spelled, and goes whole', () => {
+  const { remove, sweep } = purgeTargets({ instances: [], layout: { ...layout, backupsDir: 'd:\\games\\Backups\\' }, settings, pathApi: win })
   assert.ok(remove.includes('d:\\games\\Backups\\'))
+  assert.equal(sweep, null)
 })
 
-test('a server name that could reach outside the backups folder is ignored', () => {
-  const { remove } = purgeTargets({
-    instances: [{ name: '..' }, { name: 'a\\..\\..' }, { name: 'x/../..' }, { name: '' }, {}],
-    layout: { ...layout, backupsDir: 'D:\\Backups' },
-    settings,
-    pathApi: win,
-  })
-  const inBackups = remove.filter((p) => p.toLowerCase().startsWith('d:\\backups'))
-  assert.deepEqual(inBackups, ['D:\\Backups\\client\\exports'])
+test('empty folders are tried deepest first, so a data root used as the backups folder still goes', () => {
+  const { removeIfEmpty } = purgeTargets({ instances: [], layout: { ...layout, servicesDir: 'D:\\Games\\services', backupsDir: layout.dataRoot }, settings, pathApi: win })
+  assert.ok(removeIfEmpty.indexOf(layout.dataRoot) > removeIfEmpty.indexOf(layout.instancesDir))
+  assert.ok(removeIfEmpty.indexOf(layout.dataRoot) > removeIfEmpty.indexOf('D:\\Games\\services'))
 })
 
-test('on disk: uninstalling with data keeps the other files in a chosen backups folder', (t) => {
+function tempDir(t) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-uninstall-'))
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  return tmp
+}
+
+function write(p, body = 'x') {
+  fs.mkdirSync(path.dirname(p), { recursive: true })
+  fs.writeFileSync(p, body)
+}
+
+test('on disk: uninstalling with data takes only SpawnLoft files out of a chosen backups folder', (t) => {
+  const tmp = tempDir(t)
   const dataRoot = path.join(tmp, 'data')
   const backupsDir = path.join(tmp, 'MyBackups')
-  const write = (p, body = 'x') => {
-    fs.mkdirSync(path.dirname(p), { recursive: true })
-    fs.writeFileSync(p, body)
-  }
   const disk = {
     dataRoot,
     instancesDir: path.join(dataRoot, 'instances'),
@@ -123,35 +110,73 @@ test('on disk: uninstalling with data keeps the other files in a chosen backups 
   write(path.join(disk.instancesDir, 'smp', 'server.properties'))
   write(disk.registryFile, '{}')
   write(settingsFile, '{}')
-  write(path.join(backupsDir, 'smp', '2026-11-13_120000.tar.gz'))
-  write(path.join(backupsDir, 'smp', '2026-11-13_120000.json'), '{}')
-  write(path.join(backupsDir, 'smp', 'exports', 'console.log'))
-  write(path.join(backupsDir, 'client', 'exports', 'bundle.zip'))
-  write(path.join(backupsDir, 'family photos', 'beach.jpg'))
-  write(path.join(backupsDir, 'tax-2025.pdf'))
-  write(path.join(backupsDir, 'client', 'notes.txt'))
+  const b = (...parts) => path.join(backupsDir, ...parts)
+  // SpawnLoft's
+  write(b('smp', '2026-11-13_120000_manual.tar.gz'))
+  write(b('smp', '2026-11-13_120000_manual.json'), JSON.stringify({ instance: 'smp' }))
+  write(b('smp', '2026-11-13_130000_daily.tar.gz.pending'))
+  write(b('smp', '.snapshot.lock'))
+  write(b('smp', 'exports', 'smp_console_2026-11-13_120000.log'))
+  write(b('smp', 'exports', 'world_2026-11-13_120000.zip'))
+  write(b('smp-db', 'manual_2026-11-13_120000.sql'))
+  write(b('smp-db', 'manual_2026-11-13_120000.json'), JSON.stringify({ database: 'smp-db' }))
+  write(b('gone', '2026-01-01_120000_manual.tar.gz'))
+  write(b('gone', '2026-01-01_120000_manual.json'), JSON.stringify({ instance: 'gone' }))
+  write(b('client', 'exports', 'client_diag_2026-11-13_120000.zip'))
+  // the person's
+  write(b('tax-2025.pdf'))
+  write(b('family photos', 'beach.jpg'))
+  write(b('Documents', 'letter.docx'))
+  write(b('Documents', 'old-project.tar.gz'))
+  write(b('smp', 'my notes.txt'))
+  write(b('smp', 'exports', 'keep-this.zip'))
+  write(b('client', 'notes.txt'))
+  write(b('archive', 'site.tar.gz'))
+  write(b('archive', 'site.json'), JSON.stringify({ instance: 'someone-else' }))
 
-  const targets = purgeTargets({ instances: [{ name: 'smp', dir: path.join(disk.instancesDir, 'smp') }], layout: disk, settings: settingsFile })
+  const targets = purgeTargets({
+    instances: [{ name: 'smp', dir: path.join(disk.instancesDir, 'smp') }, { name: 'smp-db' }, { name: 'Documents', origin: { adopted: 'x' } }],
+    layout: disk,
+    settings: settingsFile,
+  })
   const result = applyTargets(targets)
   assert.deepEqual(result.failed, [])
 
-  assert.ok(!fs.existsSync(path.join(backupsDir, 'smp')), "the server's backups were left behind")
-  assert.ok(!fs.existsSync(path.join(backupsDir, 'client', 'exports')))
-  assert.ok(fs.existsSync(path.join(backupsDir, 'family photos', 'beach.jpg')), 'an unrelated folder in the backups folder was deleted')
-  assert.ok(fs.existsSync(path.join(backupsDir, 'tax-2025.pdf')), 'an unrelated file in the backups folder was deleted')
-  assert.ok(fs.existsSync(path.join(backupsDir, 'client', 'notes.txt')))
-  assert.ok(!fs.existsSync(disk.instancesDir), 'the emptied instances folder was left behind')
+  for (const gone of [
+    b('smp', '2026-11-13_120000_manual.tar.gz'), b('smp', '2026-11-13_120000_manual.json'), b('smp', '2026-11-13_130000_daily.tar.gz.pending'),
+    b('smp', '.snapshot.lock'), b('smp', 'exports', 'smp_console_2026-11-13_120000.log'), b('smp', 'exports', 'world_2026-11-13_120000.zip'),
+    b('smp-db'), b('gone'), b('client', 'exports'),
+  ]) assert.ok(!fs.existsSync(gone), `${gone} was left behind`)
+  for (const kept of [
+    b('tax-2025.pdf'), b('family photos', 'beach.jpg'), b('Documents', 'letter.docx'), b('Documents', 'old-project.tar.gz'),
+    b('smp', 'my notes.txt'), b('smp', 'exports', 'keep-this.zip'), b('client', 'notes.txt'), b('archive', 'site.tar.gz'), b('archive', 'site.json'),
+  ]) assert.ok(fs.existsSync(kept), `${kept} was deleted`)
   assert.ok(!fs.existsSync(dataRoot), 'the emptied data root was left behind')
 })
 
 test('on disk: a chosen backups folder that held only SpawnLoft backups is removed once empty', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-uninstall-'))
-  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }))
+  const tmp = tempDir(t)
   const backupsDir = path.join(tmp, 'Backups')
-  fs.mkdirSync(path.join(backupsDir, 'smp'), { recursive: true })
-  fs.writeFileSync(path.join(backupsDir, 'smp', 'a.tar.gz'), 'x')
+  write(path.join(backupsDir, 'smp', '2026-11-13_120000_manual.tar.gz'))
+  write(path.join(backupsDir, 'smp', '2026-11-13_120000_manual.json'), JSON.stringify({ instance: 'smp' }))
   fs.mkdirSync(path.join(backupsDir, 'client', 'exports'), { recursive: true })
   const disk = { dataRoot: path.join(tmp, 'data'), backupsDir }
   applyTargets(purgeTargets({ instances: [{ name: 'smp' }], layout: disk, settings: path.join(tmp, 'cfg', 'settings.json') }))
   assert.ok(!fs.existsSync(backupsDir))
+})
+
+test('on disk: a symlinked folder inside a chosen backups folder is not followed', (t) => {
+  const tmp = tempDir(t)
+  const backupsDir = path.join(tmp, 'Backups')
+  const elsewhere = path.join(tmp, 'elsewhere')
+  write(path.join(elsewhere, '2026-11-13_120000_manual.tar.gz'))
+  fs.mkdirSync(backupsDir, { recursive: true })
+  try {
+    fs.symlinkSync(elsewhere, path.join(backupsDir, 'smp'), 'junction')
+  } catch {
+    t.skip('no symlinks here')
+    return
+  }
+  applyTargets(purgeTargets({ instances: [{ name: 'smp' }], layout: { dataRoot: path.join(tmp, 'data'), backupsDir }, settings: path.join(tmp, 'cfg', 'settings.json') }))
+  assert.ok(fs.existsSync(path.join(elsewhere, '2026-11-13_120000_manual.tar.gz')))
 })
