@@ -430,11 +430,6 @@ pub fn repair(rest: &[String]) -> Outcome {
     };
     if has(&f, "--quiet") {
         let log = Log::open(Some(&Files::new(&data_root).log()), false);
-        // `spawnloft` in a new terminal, as soon as the install is done (Windows; user_path.rs)
-        match spawnloft_lib::user_path::add() {
-            Ok(c) => log.line(&format!("repair: user PATH {c:?}")),
-            Err(e) => log.line(&format!("repair: user PATH not changed: {e}")),
-        }
         let code = match core.run_logged(&["repair", "--json"], Duration::from_secs(120), &log) {
             Ok((c, _)) => c,
             Err(e) => {
@@ -457,12 +452,6 @@ pub fn uninstall(rest: &[String]) -> Outcome {
         .chain(rest.iter().map(String::as_str))
         .collect();
     let data_root = paths::resolve_data_root();
-    // the uninstaller runs this only when the install is going away, never for an update
-    if rest.iter().any(|a| a == "--yes")
-        && let Err(e) = spawnloft_lib::user_path::remove()
-    {
-        eprintln!("{}: uninstall: user PATH not changed: {e}", build::NAME);
-    }
     match NodeCore::find(&data_root) {
         Ok(core) => exit_of(core.run_inherit(&args)),
         Err(e) => {
@@ -507,5 +496,34 @@ fn exit_of(r: Result<i32, String>) -> Outcome {
             stderr: format!("{}: {e}\n", build::NAME),
             code: 1,
         },
+    }
+}
+
+/// `user-path add|remove`: the install's `resources\\bin` on the user's PATH (Windows,
+/// spawnloft-lib user_path.rs). The installer runs `add` on a new install and on the 1.x handover,
+/// never on a 2.x update (the PATH stays as the user has it); the uninstaller runs `remove` on a
+/// real uninstall only. Logged to the handover log; the exit code is 0 unless the registry refused.
+pub fn user_path(rest: &[String]) -> Outcome {
+    use spawnloft_lib::user_path;
+    let result = match rest {
+        [a] if a == "add" => user_path::add(),
+        [a] if a == "remove" => user_path::remove(),
+        _ => return usage_error("user-path takes add or remove"),
+    };
+    let data_root = paths::resolve_data_root();
+    let log = Log::open(Some(&Files::new(&data_root).log()), false);
+    match result {
+        Ok(c) => {
+            log.line(&format!("user-path {}: {c:?}", rest[0]));
+            Outcome::default()
+        }
+        Err(e) => {
+            log.line(&format!("user-path {}: not changed: {e}", rest[0]));
+            Outcome {
+                stdout: String::new(),
+                stderr: format!("{}: user-path {}: {e}\n", build::NAME, rest[0]),
+                code: 1,
+            }
+        }
     }
 }

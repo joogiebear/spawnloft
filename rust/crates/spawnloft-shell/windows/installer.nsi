@@ -1174,6 +1174,15 @@ Section Install
   ; and the Node runtimes of other versions, now that this one is in place
   !insertmacro SPAWNLOFT_CLEAN_OTHER_RUNTIMES
 
+  ; SPAWNLOFT: `spawnloft` in a new terminal (spawnloft-lib user_path.rs). A new install and the
+  ; 1.x handover put resources\bin on the user PATH; a 2.x update leaves the PATH as the user has
+  ; it, so an entry they removed stays removed. A failure is logged and never fails the install.
+  ${If} $UpdateMode <> 1
+  ${OrIf} $LegacyMode = 2
+    nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" user-path add'
+    Pop $0
+  ${EndIf}
+
   ; SPAWNLOFT: task shims and server launchers rewritten for this install before any server
   ; starts again (2.3 step 8)
   ${If} $LegacyMode = 2
@@ -1296,6 +1305,9 @@ Section Uninstall
     ${If} $DeleteAppDataCheckboxState = 1
       StrCpy $R9 "--data"
     ${EndIf}
+    ; resources\bin off the user PATH: the folder is going away (user_path.rs)
+    nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" user-path remove'
+    Pop $R8
     DetailPrint "Stopping servers and removing scheduled tasks"
     ; SPAWNLOFT: through the core binary, never the Node core directly (D10, P0-F H3)
     nsExec::ExecToLog '"$INSTDIR\resources\bin\spawnloft-core.exe" uninstall --yes $R9'

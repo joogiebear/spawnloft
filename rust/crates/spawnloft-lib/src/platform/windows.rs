@@ -669,10 +669,14 @@ fn query_path(
         return Err(std::io::Error::from_raw_os_error(r as i32));
     }
     buf.truncate((size as usize) / 2);
-    while buf.last() == Some(&0) {
-        buf.pop();
+    // the value ends at its first NUL; anything after one is not part of the PATH
+    if let Some(end) = buf.iter().position(|&c| c == 0) {
+        buf.truncate(end);
     }
-    Ok(Some((String::from_utf16_lossy(&buf), kind == REG_EXPAND_SZ)))
+    // never lossy: a PATH that is written back must be the user's, character for character
+    let text = String::from_utf16(&buf)
+        .map_err(|_| std::io::Error::other("HKCU\\Environment\\Path is not valid UTF-16; left as it is"))?;
+    Ok(Some((text, kind == REG_EXPAND_SZ)))
 }
 
 /// Writes the user's `Path` (`REG_EXPAND_SZ` when `expand`), then tells running programs, the

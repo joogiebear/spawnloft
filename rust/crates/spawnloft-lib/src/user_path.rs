@@ -1,15 +1,22 @@
-//! The command line on the user's PATH (Windows). The installer's `repair --quiet` puts the
-//! install's `resources\bin` (where `spawnloft.cmd` and `mcctl.cmd` sit, 1.x's paths) on the
-//! user's PATH, and `uninstall --yes` takes it off again, so `spawnloft` works in a new terminal
-//! after installing 2.0 without anyone editing environment variables by hand. An update or a
-//! rollback to 1.x leaves the entry alone: the folder is the same.
+//! The command line on the user's PATH (Windows). The installer runs `spawnloft-core user-path add`
+//! on a new install and on the 1.x handover, which puts the install's `resources\bin` (where
+//! `spawnloft.cmd` and `mcctl.cmd` sit, 1.x's paths) on the user's PATH; the uninstaller runs
+//! `user-path remove` on a real uninstall. So `spawnloft` works in a new terminal after installing
+//! 2.0 without anyone editing environment variables by hand. A 2.x update and a rollback to 1.x
+//! leave the PATH as it is: the folder is the same, and an entry the user removed stays removed.
 //!
 //! This module is the string logic, testable everywhere; the registry read and write and the
 //! "environment changed" broadcast live in `platform::windows`.
 
 /// Windows paths compare without case and without a trailing separator.
 fn same(a: &str, b: &str) -> bool {
-    let trim = |s: &str| s.trim().trim_end_matches(['\\', '/']).to_lowercase();
+    // an entry may be quoted ("C:\\Program Files\\x"); Windows ignores the quotes
+    let trim = |s: &str| {
+        s.trim()
+            .trim_matches('"')
+            .trim_end_matches(['\\', '/'])
+            .to_lowercase()
+    };
     !a.trim().is_empty() && trim(a) == trim(b)
 }
 
@@ -61,7 +68,7 @@ pub enum Change {
     Skipped,
 }
 
-/// Puts this install's forwarder folder on the user's PATH (the installer's `repair --quiet`).
+/// Puts this install's forwarder folder on the user's PATH (the installer's `user-path add`).
 #[cfg(windows)]
 pub fn add() -> std::io::Result<Change> {
     use crate::platform::{expand_env, read_user_path, write_user_path};
@@ -81,7 +88,7 @@ pub fn add() -> std::io::Result<Change> {
     }
 }
 
-/// Takes this install's forwarder folder off the user's PATH (the uninstaller's `uninstall --yes`).
+/// Takes this install's forwarder folder off the user's PATH (the uninstaller's `user-path remove`).
 #[cfg(windows)]
 pub fn remove() -> std::io::Result<Change> {
     use crate::platform::{expand_env, read_user_path, write_user_path};
@@ -140,6 +147,7 @@ mod tests {
     fn an_entry_written_differently_is_the_same_entry() {
         let upper = DIR.to_uppercase();
         assert_eq!(with_entry(&format!(r"C:\a;{upper}\"), DIR, none), None);
+        assert_eq!(with_entry(&format!(r#"C:\a;"{DIR}""#), DIR, none), None);
         assert_eq!(
             with_entry(
                 r"%LOCALAPPDATA%\Programs\SpawnLoft\resources\bin;C:\a",
