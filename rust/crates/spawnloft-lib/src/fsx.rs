@@ -49,6 +49,26 @@ pub fn write_json(file: &Path, data: &serde_json::Value) -> std::io::Result<()> 
     rename_over(&tmp, file)
 }
 
+/// [`write_json`] for a file that must survive a power cut right after the call: the temp file
+/// is flushed to the disk before it replaces `file`, so the name holds either the old content or
+/// the new, never an empty or half-written file.
+pub fn write_json_durable(file: &Path, data: &serde_json::Value) -> std::io::Result<()> {
+    use std::io::Write;
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut text = serde_json::to_string_pretty(data).map_err(std::io::Error::other)?;
+    text.push('\n');
+    let mut tmp = file.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    let mut f = std::fs::File::create(&tmp)?;
+    f.write_all(text.as_bytes())?;
+    f.sync_all()?;
+    drop(f);
+    rename_over(&tmp, file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

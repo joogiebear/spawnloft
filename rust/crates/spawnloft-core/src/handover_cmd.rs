@@ -7,10 +7,10 @@ use std::time::Duration;
 use spawnloft_lib::handover::legacy::{self, CliLegacy, OwnRead};
 use spawnloft_lib::handover::resume::{self, ResumeOptions, Starter};
 use spawnloft_lib::handover::tasks::WindowsTasks;
-use spawnloft_lib::handover::{self as h, Files, Kind, Log, Marker, Record};
+use spawnloft_lib::handover::{self as h, Ctx, Files, Journal, Kind, Log, Marker, Record, Watch};
 use spawnloft_lib::nodecore::NodeCore;
 use spawnloft_lib::serde_json::json;
-use spawnloft_lib::{build, paths, procid, time};
+use spawnloft_lib::{build, paths, platform, procid, time};
 
 use crate::cli::{Outcome, usage_error};
 
@@ -19,6 +19,100 @@ const STALE_LOCK: Duration = Duration::from_secs(30 * 60);
 
 /// How long the installer's resume waits for another resume to finish.
 const RESUME_WAIT: Duration = Duration::from_secs(20 * 60);
+
+/// How long a stop or a restore waits for another handover step (a restore at sign-in, say).
+const STEP_WAIT: Duration = Duration::from_secs(60);
+
+/// The value under `HKCU\...\RunOnce` that puts an unfinished handover back at the next sign-in.
+const SIGN_IN_NAME: &str = "SpawnLoftHandover";
+
+/// The record on disk while a handover step runs. The first save of a stop also arms the
+/// sign-in command (`sign_in_for`): from then on something outside is about to change, and if
+/// this process and the installer both end without warning (a shutdown on the install-on-quit
+/// path, power loss), the next sign-in puts it back.
+struct FileJournal<'a> {
+    file: PathBuf,
+    log: &'a Log,
+    sign_in_for: Option<&'a Path>,
+    armed: std::cell::Cell<bool>,
+}
+
+impl<'a> FileJournal<'a> {
+    fn new(file: PathBuf, log: &'a Log) -> FileJournal<'a> {
+        FileJournal {
+            file,
+            log,
+            sign_in_for: None,
+            armed: std::cell::Cell::new(false),
+        }
+    }
+}
+
+impl Journal for FileJournal<'_> {
+    fn save(&self, record: &Record) {
+        if let Err(e) = record.write(&self.file) {
+            self.log
+                .line(&format!("could not write {}: {e}", self.file.display()));
+        }
+        if let Some(dir) = self.sign_in_for
+            && !self.armed.replace(true)
+        {
+            arm_sign_in(dir, self.log);
+        }
+    }
+}
+
+/// `"<this exe>" handover restore --legacy-dir "<dir>" --logon`, to run once at the next sign-in.
+fn sign_in_command(exe: &Path, legacy_dir: &Path) -> String {
+    let dir = legacy_dir.to_string_lossy();
+    // no trailing backslash before the closing quote: `\"` would escape it
+    let dir = dir.trim_end_matches(['\\', '/']);
+    format!(
+        "\"{}\" handover restore --legacy-dir \"{dir}\" --logon",
+        exe.display()
+    )
+}
+
+fn arm_sign_in(legacy_dir: &Path, log: &Log) {
+    if !cfg!(windows) {
+        return;
+    }
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    match platform::run_once_set(SIGN_IN_NAME, &sign_in_command(&exe, legacy_dir)) {
+        Ok(()) => log.line("if this update is cut short, the next sign-in puts back what it stopped"),
+        Err(e) => log.line(&format!("could not register the sign-in restore: {e}")),
+    }
+}
+
+fn disarm_sign_in(log: &Log) {
+    if !cfg!(windows) {
+        return;
+    }
+    if let Err(e) = platform::run_once_remove(SIGN_IN_NAME) {
+        log.line(&format!("could not remove the sign-in restore: {e}"));
+    }
+}
+
+/// Yes once the installer `pid` (by pid and creation time) no longer runs.
+fn installer_gone(pid: u32) -> Watch {
+    let start_time = procid::start_time(pid);
+    Watch::new(move || {
+        !procid::same_process(&procid::Recorded {
+            pid,
+            exe: None,
+            start_time,
+        })
+    })
+}
+
+/// SpawnLoft 1.x is still installed in `dir`, whole enough to start servers through.
+fn legacy_intact(legacy: &CliLegacy) -> bool {
+    legacy.exe().is_file()
+        && legacy.script().is_file()
+        && legacy.dir.join("resources").join("app.asar").is_file()
+}
 
 fn flags(
     rest: &[String],
@@ -65,15 +159,16 @@ pub fn handover(rest: &[String]) -> Outcome {
         Some((sub, rest)) if sub == "restore" => restore_cmd(rest),
         Some((sub, rest)) if sub == "cleanup" => cleanup_cmd(rest),
         _ => usage_error(
-            "usage: handover stop --legacy-dir <dir> [...] | handover resume [--pending] [--skip-start] | handover restore --legacy-dir <dir> | handover cleanup",
+            "usage: handover stop --legacy-dir <dir> [...] | handover resume [--pending] [--skip-start] | handover restore --legacy-dir <dir> [--logon] | handover cleanup",
         ),
     }
 }
 
 /// `handover stop --legacy-dir <dir> [--legacy-version <v>] [--deadline <s>] [--log <file>]
-/// [--silent] [--status-dir <dir>]`. With `--status-dir` (the installer's stopping page) the
-/// last lines go to `handover-progress.txt`, a `handover-cancel` file there cancels, and the exit
-/// code and the blocking servers are written to `handover-exit.txt` at the end.
+/// [--silent] [--status-dir <dir>] [--installer-pid <pid>]`. With `--status-dir` (the installer's
+/// stopping page) the last lines go to `handover-progress.txt`, a `handover-cancel` file there
+/// cancels, and the exit code and the blocking servers are written to `handover-exit.txt` at the
+/// end. With `--installer-pid` the stop ends like a Cancel once that process is gone.
 fn stop(rest: &[String]) -> Outcome {
     let f = match flags(
         rest,
@@ -83,6 +178,7 @@ fn stop(rest: &[String]) -> Outcome {
             "--deadline",
             "--log",
             "--status-dir",
+            "--installer-pid",
         ],
         &["--silent"],
     ) {
@@ -119,6 +215,11 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         Some(_) => return usage_error("--deadline takes a whole number of seconds"),
     };
     let silent = has(f, "--silent");
+    let installer = match get(f, "--installer-pid").map(str::parse::<u32>) {
+        None => None,
+        Some(Ok(pid)) if pid > 0 => Some(pid),
+        Some(_) => return usage_error("--installer-pid takes a process id"),
+    };
     let data_root = paths::resolve_data_root();
     let files = Files::new(&data_root);
     let log_path = get(f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
@@ -143,6 +244,8 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         silent,
         cancel_file: status_dir.map(|d| d.join("handover-cancel")),
         restore_wait: h::RESTORE_WAIT,
+        installer_gone: installer.map(installer_gone),
+        session_ending: Some(Watch::new(platform::session_ending)),
     };
     log.line(&format!(
         "handover stop: 1.x {} in {dir}, data root {}, deadline {} s, {}",
@@ -151,6 +254,12 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
         deadline.as_secs(),
         if silent { "silent" } else { "interactive" }
     ));
+
+    // One handover step at a time: a restore from the last sign-in may still be starting servers.
+    let Some(_lock) = wait_lock(&files.lock(), STEP_WAIT) else {
+        log.line("another handover step is still running: not updating now");
+        return done(h::EXIT_INTERNAL, json!({ "exit": 2, "busy": true }));
+    };
 
     // 1.x's own view, from the files its `readState` reads (no shipped 1.x lists as JSON)
     let listed = match legacy::read_state_files(&data_root) {
@@ -161,29 +270,52 @@ fn stop_with(f: &[(String, Option<String>)], status_dir: Option<&Path>) -> Outco
     // No Node check here (PLAN-2.0-REMAINING.md A8): this runs from staging\ before the payload
     // is extracted, and the payload carries the Node that starts the servers again.
 
-    let previous = Marker::read(&files.marker());
+    // what an attempt that never finished left: this one takes it over (design 2.4)
+    let unfinished = Record::read(&files.record()).filter(|r| !r.settled());
+    let took_over = unfinished.is_some();
+    let journal = FileJournal {
+        sign_in_for: Some(&legacy.dir),
+        ..FileJournal::new(files.record(), &log)
+    };
     let out = h::run_stop(
         &opts,
         listed,
-        &legacy,
-        &WindowsTasks,
-        previous,
+        Ctx {
+            legacy: &legacy,
+            tasks: &WindowsTasks,
+            journal: &journal,
+            log: &log,
+        },
+        h::Found {
+            marker: Marker::read(&files.marker()),
+            unfinished,
+        },
         &data_root.to_string_lossy(),
-        &log,
     );
-    let early = out.code == h::EXIT_BLOCKED && out.record.servers.is_empty();
-    if !early && let Err(e) = out.record.write(&files.record()) {
+    // a silent retry that stopped nothing and had nothing to take over keeps the last record
+    let untouched = out.code == h::EXIT_BLOCKED
+        && out.record.servers.is_empty()
+        && out.record.tasks_disabled.is_empty()
+        && !took_over;
+    if !untouched && let Err(e) = out.record.write(&files.record()) {
         log.line(&format!("could not write {}: {e}", files.record().display()));
     }
-    match &out.marker {
-        Some(m) => {
-            if let Err(e) = m.write(&files.marker()) {
-                log.line(&format!("could not write {}: {e}", files.marker().display()));
+    if !out.interrupted {
+        match &out.marker {
+            Some(m) => {
+                if let Err(e) = m.write(&files.marker()) {
+                    log.line(&format!("could not write {}: {e}", files.marker().display()));
+                }
+            }
+            None => {
+                let _ = std::fs::remove_file(files.marker());
             }
         }
-        None => {
-            let _ = std::fs::remove_file(files.marker());
-        }
+    }
+    // put back already (an abort, a cancel) or nothing was changed: the sign-in has nothing to do.
+    // After a stop that went through it stays until `handover resume` or `restore` has run.
+    if out.record.settled() {
+        disarm_sign_in(&log);
     }
     log.line(&format!("handover stop exits {}", out.code));
     done(
@@ -231,6 +363,20 @@ struct Lock(PathBuf);
 impl Drop for Lock {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// [`take_lock`], waiting up to `wait` for another step to let go of it.
+fn wait_lock(file: &Path, wait: Duration) -> Option<Lock> {
+    let until = std::time::Instant::now() + wait;
+    loop {
+        if let Some(lock) = take_lock(file) {
+            return Some(lock);
+        }
+        if std::time::Instant::now() >= until {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(500));
     }
 }
 
@@ -337,9 +483,13 @@ fn resume_cmd(rest: &[String]) -> Outcome {
             &unavailable
         }
     };
-    resume::run_resume(&mut record, opts, starter, &WindowsTasks, &log);
+    let journal = FileJournal::new(files.record(), &log);
+    resume::run_resume(&mut record, opts, starter, &WindowsTasks, &journal, &log);
     if let Err(e) = record.write(&files.record()) {
         log.line(&format!("could not write {}: {e}", files.record().display()));
+    }
+    if record.settled() {
+        disarm_sign_in(&log);
     }
     let failed: Vec<&str> = record
         .servers
@@ -358,22 +508,40 @@ fn resume_cmd(rest: &[String]) -> Outcome {
     done(0, json!({ "exit": 0, "failed": failed }))
 }
 
-/// `handover restore --legacy-dir <dir>`: the installer failed after a successful stop (the 1.x
-/// uninstaller failed, the person cancelled on a later page): what the stop stopped is started
-/// again under the 1.x that is still installed, and the tasks are enabled again.
+/// `handover restore --legacy-dir <dir> [--logon]`: the update did not complete after servers were
+/// stopped (the 1.x uninstaller failed, a later step of the install failed, the person cancelled,
+/// or the installer and the stop ended without warning and this is the next sign-in, `--logon`).
+/// What the stop stopped is started again under the 1.x that is still installed, and the tasks
+/// are enabled again. Does nothing when nothing is owed, and leaves the record alone when 1.x is
+/// no longer there (2.0's first start resumes it then).
 fn restore_cmd(rest: &[String]) -> Outcome {
-    let f = match flags(rest, &["--legacy-dir", "--log"], &[]) {
+    let f = match flags(rest, &["--legacy-dir", "--log"], &["--logon"]) {
         Ok(f) => f,
         Err(o) => return o,
     };
     let Some(dir) = get(&f, "--legacy-dir") else {
         return usage_error("handover restore needs --legacy-dir <the 1.x install folder>");
     };
+    let logon = has(&f, "--logon");
+    if logon {
+        // Windows gives a console program it starts at sign-in a window of its own
+        platform::detach_console();
+    }
     let data_root = paths::resolve_data_root();
     let files = Files::new(&data_root);
     let log_path = get(&f, "--log").map(PathBuf::from).unwrap_or_else(|| files.log());
-    let log = Log::open(Some(&log_path), true);
-    let Some(mut record) = Record::read(&files.record()) else {
+    let log = Log::open(Some(&log_path), !logon);
+    if Record::read(&files.record()).is_none_or(|r| r.settled()) {
+        disarm_sign_in(&log);
+        return done(0, json!({ "exit": 0, "record": null }));
+    }
+    let Some(_lock) = wait_lock(&files.lock(), STEP_WAIT) else {
+        log.line("handover restore: another handover step is running; leaving it to that one");
+        return done(0, json!({ "exit": 0, "busy": true }));
+    };
+    // read again under the lock: the other step may have settled it meanwhile
+    let Some(mut record) = Record::read(&files.record()).filter(|r| !r.settled()) else {
+        disarm_sign_in(&log);
         return done(0, json!({ "exit": 0, "record": null }));
     };
     let legacy = CliLegacy {
@@ -381,11 +549,34 @@ fn restore_cmd(rest: &[String]) -> Outcome {
         scratch: std::env::temp_dir(),
         data_root: data_root.clone(),
     };
-    log.line("handover restore: the update did not complete; starting the stopped servers again under 1.x");
-    h::restore(&mut record, &legacy, &WindowsTasks, &log);
+    if !legacy_intact(&legacy) {
+        log.line(&format!(
+            "handover restore: SpawnLoft 1 is no longer installed in {dir}; the record is left for SpawnLoft 2's first start"
+        ));
+        return done(0, json!({ "exit": 0, "legacy": "gone" }));
+    }
+    log.line(if logon {
+        "handover restore (sign-in): an update did not finish; starting the stopped servers again under 1.x"
+    } else {
+        "handover restore: the update did not complete; starting the stopped servers again under 1.x"
+    });
+    let journal = FileJournal::new(files.record(), &log);
+    h::restore(
+        &mut record,
+        Ctx {
+            legacy: &legacy,
+            tasks: &WindowsTasks,
+            journal: &journal,
+            log: &log,
+        },
+    );
     if let Err(e) = record.write(&files.record()) {
         log.line(&format!("could not write {}: {e}", files.record().display()));
     }
+    if record.settled() {
+        disarm_sign_in(&log);
+    }
+    log.line("handover restore done");
     done(0, json!({ "exit": 0 }))
 }
 
@@ -525,5 +716,91 @@ pub fn user_path(rest: &[String]) -> Outcome {
                 code: 1,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("sl-hocmd-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn the_sign_in_command_is_quoted_and_short_enough() {
+        let exe = Path::new(
+            r"C:\Users\A Person\AppData\Local\Programs\SpawnLoft\resources\bin\staging\spawnloft-core.exe",
+        );
+        let dir = Path::new(r"C:\Users\A Person\AppData\Local\Programs\SpawnLoft");
+        let cmd = sign_in_command(exe, dir);
+        assert_eq!(
+            cmd,
+            format!(
+                "\"{}\" handover restore --legacy-dir \"{}\" --logon",
+                exe.display(),
+                dir.display()
+            )
+        );
+        // what Windows runs from RunOnce
+        assert!(cmd.len() <= 260, "{}", cmd.len());
+        // a trailing backslash would escape the closing quote
+        let slashed = sign_in_command(exe, Path::new(r"C:\Programs\SpawnLoft\"));
+        assert!(
+            slashed.contains(r#"--legacy-dir "C:\Programs\SpawnLoft" --logon"#),
+            "{slashed}"
+        );
+        // and the command reads back as the flags `handover restore` takes
+        let args: Vec<String> = ["--legacy-dir", "x", "--logon"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert!(flags(&args, &["--legacy-dir", "--log"], &["--logon"]).is_ok());
+    }
+
+    #[test]
+    fn the_journal_keeps_the_record_on_disk() {
+        let d = tmp("journal");
+        let files = Files::new(&d);
+        let log = Log::none();
+        let journal = FileJournal::new(files.record(), &log);
+        let mut rec = Record::new("1.5.0", "2.0.0", "silent", "/d");
+        rec.tasks_disabled = vec!["backup".into()];
+        journal.save(&rec);
+        let back = Record::read(&files.record()).unwrap();
+        assert_eq!(back, rec);
+        assert!(!back.settled(), "unfinished on disk");
+        rec.tasks_reenabled = true;
+        journal.save(&rec);
+        assert!(Record::read(&files.record()).unwrap().settled());
+        assert!(!files.run_dir.join("handover.json.tmp").exists());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn one_handover_step_at_a_time() {
+        let d = tmp("lock");
+        let file = Files::new(&d).lock();
+        let first = take_lock(&file).expect("free");
+        assert!(
+            wait_lock(&file, Duration::from_millis(50)).is_none(),
+            "held by a live process"
+        );
+        drop(first);
+        assert!(wait_lock(&file, Duration::from_millis(50)).is_some());
+        // a lock whose owner is gone (the stop was cut short) is taken over
+        std::fs::write(&file, "4294967294 1 2026-01-01T00:00:00Z").unwrap();
+        assert!(take_lock(&file).is_some());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_watched_installer_that_never_ran_counts_as_gone() {
+        // no process has this id
+        assert!(installer_gone(4_294_967_294).yes());
+        assert!(!installer_gone(std::process::id()).yes());
     }
 }

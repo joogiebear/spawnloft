@@ -66,7 +66,7 @@ pub fn parse_states(text: &str) -> Vec<(String, bool)> {
 }
 
 impl Tasks for WindowsTasks {
-    fn enabled(&self) -> Result<Vec<String>, String> {
+    fn states(&self) -> Result<Vec<(String, bool)>, String> {
         if !cfg!(windows) {
             return Ok(Vec::new());
         }
@@ -74,11 +74,7 @@ impl Tasks for WindowsTasks {
             "Get-ScheduledTask -TaskPath '\\{FOLDER}\\' -ErrorAction SilentlyContinue | \
              ForEach-Object {{ \"$($_.TaskName)|$([int]$_.State)\" }}"
         ))?;
-        Ok(parse_states(&out)
-            .into_iter()
-            .filter(|(_, on)| *on)
-            .map(|(n, _)| n)
-            .collect())
+        Ok(parse_states(&out))
     }
 
     fn set_enabled(&self, name: &str, enabled: bool) -> Result<(), String> {

@@ -254,6 +254,24 @@ impl ProcessProbe {
     }
 }
 
+/// Windows only: a command for the next sign-in (`HKCU\...\RunOnce`). Nothing elsewhere.
+pub fn run_once_set(_name: &str, _command: &str) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Windows only.
+pub fn run_once_remove(_name: &str) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Windows only: whether the session is ending (shutdown, restart, sign-out).
+pub fn session_ending() -> bool {
+    false
+}
+
+/// Windows only: lets go of the console window a program started at sign-in is given.
+pub fn detach_console() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

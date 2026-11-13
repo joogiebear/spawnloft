@@ -757,6 +757,105 @@ pub fn expand_env(s: &str) -> String {
     }
 }
 
+const RUN_ONCE: &str = r"Software\Microsoft\Windows\CurrentVersion\RunOnce";
+
+/// The longest command line Windows runs from a `Run` or `RunOnce` value.
+pub const RUN_ONCE_MAX: usize = 260;
+
+/// A command Windows runs once at this user's next sign-in (`HKCU\...\RunOnce`, removed by
+/// Windows as it runs it). Setting the same name again replaces the command.
+pub fn run_once_set(name: &str, command: &str) -> std::io::Result<()> {
+    use windows_sys::Win32::Foundation::ERROR_SUCCESS;
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ, RegCloseKey,
+        RegCreateKeyExW, RegSetValueExW,
+    };
+    if command.encode_utf16().count() > RUN_ONCE_MAX {
+        return Err(std::io::Error::other("the command is too long for RunOnce"));
+    }
+    let sub = wide(RUN_ONCE);
+    let name = wide(name);
+    let data = wide(command);
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: NUL-terminated strings and out-pointers; no class, no security attributes.
+    let r = unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            sub.as_ptr(),
+            0,
+            std::ptr::null(),
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            std::ptr::null(),
+            &mut key,
+            std::ptr::null_mut(),
+        )
+    };
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    // SAFETY: an open key; `data` is NUL-terminated and its byte length includes the terminator.
+    let r = unsafe {
+        RegSetValueExW(
+            key,
+            name.as_ptr(),
+            0,
+            REG_SZ,
+            data.as_ptr().cast(),
+            (data.len() * 2) as u32,
+        )
+    };
+    // SAFETY: the key opened above.
+    unsafe { RegCloseKey(key) };
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    Ok(())
+}
+
+/// Removes a [`run_once_set`] command; fine when it is not there (Windows ran it, or none was set).
+pub fn run_once_remove(name: &str) -> std::io::Result<()> {
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows_sys::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE, RegCloseKey, RegDeleteValueW, RegOpenKeyExW,
+    };
+    let sub = wide(RUN_ONCE);
+    let name = wide(name);
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: NUL-terminated strings and an out-pointer.
+    let r = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, sub.as_ptr(), 0, KEY_SET_VALUE, &mut key) };
+    if r == ERROR_FILE_NOT_FOUND {
+        return Ok(());
+    }
+    if r != ERROR_SUCCESS {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    // SAFETY: an open key and a NUL-terminated name.
+    let r = unsafe { RegDeleteValueW(key, name.as_ptr()) };
+    // SAFETY: the key opened above.
+    unsafe { RegCloseKey(key) };
+    if r != ERROR_SUCCESS && r != ERROR_FILE_NOT_FOUND {
+        return Err(std::io::Error::from_raw_os_error(r as i32));
+    }
+    Ok(())
+}
+
+/// Whether this session is ending (shutdown, restart or sign-out under way): a program started
+/// now is ended a moment later.
+pub fn session_ending() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_SHUTTINGDOWN};
+    // SAFETY: no arguments beyond the metric's index.
+    unsafe { GetSystemMetrics(SM_SHUTTINGDOWN) != 0 }
+}
+
+/// Lets go of this process's console. A console program Windows starts at sign-in is given a
+/// window of its own; this closes it (the programs it starts are started without one).
+pub fn detach_console() {
+    use windows_sys::Win32::System::Console::FreeConsole;
+    // SAFETY: no arguments; failing (no console) changes nothing.
+    unsafe { FreeConsole() };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use super::{Entry, Kind, Log, PARALLEL, Record, Tasks, reenable_tasks};
+use super::{Entry, Journal, Kind, Log, PARALLEL, Record, Tasks, reenable_tasks};
 use crate::time;
 
 /// Entries younger than this may still be started by the shell's first run or `doctor --fix`.
@@ -47,12 +47,14 @@ pub fn candidates(record: &Record, opts: ResumeOptions, now_ms: i64) -> Vec<usiz
         .collect()
 }
 
-/// Runs the resume on `record` in place.
+/// Runs the resume on `record` in place. The record goes to `journal` after each batch of starts,
+/// so a resume that is cut short does not start the same servers a second time.
 pub fn run_resume(
     record: &mut Record,
     opts: ResumeOptions,
     starter: &dyn Starter,
     tasks: &dyn Tasks,
+    journal: &dyn Journal,
     log: &Log,
 ) {
     let picked = candidates(record, opts, time::now_ms());
@@ -120,15 +122,18 @@ pub fn run_resume(
                         }
                     }
                 }
+                journal.save(record);
             }
         }
     }
     reenable_tasks(tasks, record, log);
     record.resume_exit = Some(0);
+    journal.save(record);
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::NoJournal;
     use super::*;
     use std::sync::Mutex;
 
@@ -152,7 +157,7 @@ mod tests {
     }
     struct NoTasks(Mutex<Vec<String>>);
     impl Tasks for NoTasks {
-        fn enabled(&self) -> Result<Vec<String>, String> {
+        fn states(&self) -> Result<Vec<(String, bool)>, String> {
             Ok(Vec::new())
         }
         fn set_enabled(&self, name: &str, enabled: bool) -> Result<(), String> {
@@ -194,7 +199,7 @@ mod tests {
         let mut r = record();
         let s = starter("creative");
         let t = NoTasks(Mutex::new(Vec::new()));
-        run_resume(&mut r, ResumeOptions::default(), &s, &t, &Log::none());
+        run_resume(&mut r, ResumeOptions::default(), &s, &t, &NoJournal, &Log::none());
         let ev = s.events.lock().unwrap().clone();
         assert_eq!(ev[0], "db");
         assert!(!ev.contains(&"lost".to_string()));
@@ -211,7 +216,14 @@ mod tests {
 
         // a second run starts nothing and does not touch the tasks again
         let s2 = starter("");
-        run_resume(&mut r, ResumeOptions::default(), &s2, &t, &Log::none());
+        run_resume(
+            &mut r,
+            ResumeOptions::default(),
+            &s2,
+            &t,
+            &NoJournal,
+            &Log::none(),
+        );
         assert!(s2.events.lock().unwrap().is_empty());
         assert_eq!(t.0.lock().unwrap().len(), 1);
     }
@@ -229,6 +241,7 @@ mod tests {
             },
             &s,
             &t,
+            &NoJournal,
             &Log::none(),
         );
         assert!(s.events.lock().unwrap().is_empty());
