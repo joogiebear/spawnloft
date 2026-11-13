@@ -79,7 +79,7 @@ test('ui on a port something else holds says so instead of crashing', async () =
     for (const args of [['ui', '--port', String(port), '--launcher', '--no-open'], ['ui', '--port', String(port), '--no-open']]) {
       const r = await cli(args)
       assert.notEqual(r.code, 0)
-      assert.match(r.stderr, new RegExp(`port ${port} is already in use\\. Pick another`))
+      assert.match(r.stderr, new RegExp(`port ${port} is already in use by another program\\. Pick another`))
       assert.doesNotMatch(r.stderr, /EADDRINUSE|at Server/)
     }
   } finally {
@@ -87,7 +87,7 @@ test('ui on a port something else holds says so instead of crashing', async () =
   }
 })
 
-test('ui without --launcher on a port a panel holds names the running panel', async () => {
+test('ui without --launcher on a port a panel holds signs the browser in to that panel', async () => {
   const { server, port } = await listener((req, res) => {
     prove(req, res)
     res.writeHead(200, { 'content-type': 'application/json' })
@@ -95,8 +95,9 @@ test('ui without --launcher on a port a panel holds names the running panel', as
   })
   try {
     const r = await cli(['ui', '--port', String(port), '--no-open'])
-    assert.notEqual(r.code, 0)
-    assert.match(r.stderr, new RegExp(`by a SpawnLoft panel: open http://127\\.0\\.0\\.1:${port}/`))
+    assert.equal(r.code, 0, r.stderr)
+    assert.match(r.stdout, new RegExp(`A SpawnLoft panel is already running on port ${port}`))
+    assert.match(r.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}/auth\\?t=v1\\.login\\.${port}\\.\\S+$`, 'm'))
   } finally {
     server.close()
   }
@@ -113,7 +114,7 @@ test('something that only answers like a panel is not called one, and gets no si
     for (const args of [['ui', '--port', String(port), '--launcher', '--no-open'], ['ui', '--port', String(port), '--no-open']]) {
       const r = await cli(args)
       assert.notEqual(r.code, 0)
-      assert.match(r.stderr, new RegExp(`port ${port} is already in use\\. Pick another`))
+      assert.match(r.stderr, new RegExp(`port ${port} is already in use by another program\\. Pick another`))
       assert.doesNotMatch(r.stdout + r.stderr, /auth\?t=|v1\.login|SpawnLoft panel/)
     }
   } finally {
