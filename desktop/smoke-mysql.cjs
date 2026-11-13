@@ -3,6 +3,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
+const { authorization } = require('./smoke-panel-auth.cjs')
 
 // native Oracle binaries, created through the packaged GUI from an empty engine store
 module.exports = async function smokeMySQL({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings }) {
@@ -23,7 +24,11 @@ module.exports = async function smokeMySQL({ page, api, cli, core, executable, e
     // fails the test is the panel going quiet, so it is judged over a window, not a single poll.
     let rows
     try {
-      const response = await fetch(new URL('/api/databases', page.url()), { signal: AbortSignal.timeout(4000) })
+      const target = new URL('/api/databases', page.url())
+      const response = await fetch(target, {
+        signal: AbortSignal.timeout(4000),
+        headers: { Authorization: authorization(path.join(env.APPDATA, 'spawnloft'), target.port) },
+      })
       rows = await response.json()
     } catch (err) {
       if (err.name !== 'TimeoutError') throw err

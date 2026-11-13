@@ -334,6 +334,11 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
 
 /// The panel answers at `url`: grant it the bridge, then show the first-run wizard if the panel
 /// says this machine has no locations yet, the panel otherwise.
+///
+/// The window gets there through `/auth` with a one-use login token (`panel_auth`), which leaves
+/// it a session cookie for this panel's port. The console and launcher windows the shell builds
+/// later share the app's cookie store, so they are signed in with it. A restarted core is a new
+/// port and a new listener: this runs again and signs the window in there.
 fn open_panel(app: &tauri::AppHandle, url: &str) {
     let parsed: tauri::Url = match url.parse() {
         Ok(u) => u,
@@ -342,14 +347,23 @@ fn open_panel(app: &tauri::AppHandle, url: &str) {
     if let Err(e) = bridge::set_panel(app, &parsed) {
         return cannot_start(app, &e);
     }
-    let mut target = parsed.clone();
-    if let Some(addr) = app.state::<bridge::Shell>().panel_addr() {
-        match local::panel_get(addr, "/api/setup") {
-            Ok(v) if v["needed"] == serde_json::Value::Bool(true) => target.set_path("/setup"),
-            Ok(_) => {}
-            Err(e) => local::log(&format!("could not ask the panel about first-run setup: {e}")),
-        }
+    let Some(addr) = app.state::<bridge::Shell>().panel_addr() else {
+        return cannot_start(app, &format!("the core printed an address with no port `{url}`"));
+    };
+    let mut to = None;
+    match local::panel_get(addr, "/api/setup") {
+        Ok(v) if v["needed"] == serde_json::Value::Bool(true) => to = Some("/setup"),
+        Ok(_) => {}
+        Err(e) => local::log(&format!("could not ask the panel about first-run setup: {e}")),
     }
+    // the key is only ever used to sign; what goes in the address is a token that works once
+    let login = spawnloft_lib::panel_auth::load_key()
+        .and_then(|key| spawnloft_lib::panel_auth::login_path(&key, addr.port(), to));
+    let target = match login.map(|path| parsed.join(&path)) {
+        Ok(Ok(target)) => target,
+        Ok(Err(e)) => return cannot_start(app, &format!("could not build the panel's address: {e}")),
+        Err(e) => return cannot_start(app, &format!("could not sign the window in to the panel: {e}")),
+    };
     match app.get_webview_window(bridge::MAIN) {
         Some(w) => {
             if let Err(e) = w.navigate(target) {

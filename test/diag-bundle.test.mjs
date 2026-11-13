@@ -79,6 +79,9 @@ fs.utimesSync(path.join(clientRoot, 'run', 'fixclient', 'client.log'), t, t)
 fs.utimesSync(path.join(runDir, 'console.log'), t, t)
 
 process.env.MCCTL_DATA_ROOT = data
+// the panel key is made in the config folder: not the developer's real one
+process.env.APPDATA = path.join(scratch, 'config')
+process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 
 const { collectServer, buildBundle, writeBundle, summarise, collectClient, summarySection } = await import('../src/diag-bundle.mjs')
 const { extractZip, zipEntries } = await import('../src/zip.mjs')
@@ -340,4 +343,25 @@ test('the harness token in a crash report never reaches the bundle', async () =>
   assert.ok(report, 'the crash report is in the bundle')
   assert.ok(!report.text.includes('deadbeef'), 'token scrubbed')
   assert.match(report.text, /spawnloft\.harness\.token=\[redacted\]/)
+})
+
+test('the panel key and tokens signed with it never reach the bundle', async () => {
+  const auth = await import('../src/panel-auth.mjs')
+  const key = auth.loadKey()
+  const text = fs.readFileSync(auth.keyFile(), 'utf8').trim()
+  // a login link and an api token that ended up in a log some other way
+  const link = `http://127.0.0.1:8770/auth?t=${auth.makeToken(key, 'login', 8770)}`
+  const header = auth.apiAuthorization(8770)
+  const log = path.join(runDir, 'console.log')
+  const before = fs.readFileSync(log, 'utf8')
+  fs.appendFileSync(log, `[12:00:00] [Server thread/INFO]: opened ${link}\n[12:00:01] [Server thread/INFO]: Authorization: ${header}\n`)
+  try {
+    const bundle = await buildBundle({ server: 'diagtest', client: 'fixclient', lines: 400 })
+    const everything = [summarise(bundle), JSON.stringify(summarySection(bundle)), ...bundle.files.map(f => `${f.name}\n${f.text}`), ...bundle.timeline.map(e => `${e.text} ${e.raw}`)].join('\n')
+    assert.ok(!everything.includes(text), 'the key is not in the bundle')
+    assert.ok(!bundle.files.some(f => /panel\.key/.test(f.name)), 'nor is its file')
+    assert.ok(!/v1\.(login|api)\.\d+\.\d+\.[\w-]*\.[\w-]{43}/.test(everything), 'a token in a log line is scrubbed')
+  } finally {
+    fs.writeFileSync(log, before)
+  }
 })

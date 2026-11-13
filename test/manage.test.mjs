@@ -22,6 +22,8 @@ const backup = await import('../src/backup.mjs')
 const { sameProcess, UserError, findFreePort } = await import('../src/util.mjs')
 const { INSTANCES_DIR } = await import('../src/paths.mjs')
 const ui = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 
 function world(dir, name) {
   fs.mkdirSync(path.join(dir, name, 'region'), { recursive: true })

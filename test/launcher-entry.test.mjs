@@ -3,6 +3,7 @@
 // run here too so CI covers them without Electron).
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -41,18 +42,32 @@ test('--launcher is a boolean flag', () => {
   assert.deepEqual(parseArgs(['--launcher', '--no-open'], { booleanFlags: BOOLEAN_FLAGS }).flags, { launcher: true, open: false })
 })
 
+// what this user's panel adds to a signed answer: proof that it holds the install's key
+function prove(req, res) {
+  const key = Buffer.from(fs.readFileSync(path.join(scratch, 'config', 'spawnloft', 'panel.key'), 'utf8').trim(), 'base64url')
+  const proof = crypto.createHmac('sha256', key).update(`probe.v1.${req.headers['x-spawnloft-probe']}`).digest('base64url')
+  res.setHeader('x-spawnloft-proof', proof)
+}
+
 test('ui --launcher with a panel already on the port points at that panel\'s launcher', async () => {
   const seen = []
   const { server, port } = await listener((req, res) => {
-    seen.push(req.url)
+    seen.push([req.url, req.headers.authorization])
+    prove(req, res)
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ profiles: [], accounts: [], servers: [] }))
   })
   try {
     const r = await cli(['ui', '--port', String(port), '--launcher', '--no-open'])
     assert.equal(r.code, 0, r.stderr)
-    assert.match(r.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}/launcher`))
-    assert.deepEqual(seen, ['/api/client/launcher'])
+    // a link that signs a browser in to that panel and lands on its launcher
+    assert.match(r.stdout, new RegExp(`http://127\\.0\\.0\\.1:${port}/auth\\?t=v1\\.login\\.${port}\\.\\d+\\.[\\w-]{22}\\.[\\w-]{43}&to=/launcher`))
+    // the question "is that a panel" is asked with a token for that port, never with the key
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0][0], '/api/client/launcher')
+    assert.match(seen[0][1], new RegExp(`^SpawnLoft v1\\.api\\.${port}\\.\\d+\\.\\.[\\w-]{43}$`))
+    const key = fs.readFileSync(path.join(scratch, 'config', 'spawnloft', 'panel.key'), 'utf8').trim()
+    assert.ok(!seen[0][1].includes(key) && !r.stdout.includes(key))
   } finally {
     server.close()
   }
@@ -74,6 +89,7 @@ test('ui on a port something else holds says so instead of crashing', async () =
 
 test('ui without --launcher on a port a panel holds names the running panel', async () => {
   const { server, port } = await listener((req, res) => {
+    prove(req, res)
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ profiles: [] }))
   })
@@ -81,6 +97,25 @@ test('ui without --launcher on a port a panel holds names the running panel', as
     const r = await cli(['ui', '--port', String(port), '--no-open'])
     assert.notEqual(r.code, 0)
     assert.match(r.stderr, new RegExp(`by a SpawnLoft panel: open http://127\\.0\\.0\\.1:${port}/`))
+  } finally {
+    server.close()
+  }
+})
+
+test('something that only answers like a panel is not called one, and gets no sign-in link', async () => {
+  // any program can hold the port and answer 200; without the key it cannot prove anything
+  const { server, port } = await listener((req, res) => {
+    res.setHeader('x-spawnloft-proof', 'A'.repeat(43))
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ profiles: [] }))
+  })
+  try {
+    for (const args of [['ui', '--port', String(port), '--launcher', '--no-open'], ['ui', '--port', String(port), '--no-open']]) {
+      const r = await cli(args)
+      assert.notEqual(r.code, 0)
+      assert.match(r.stderr, new RegExp(`port ${port} is already in use\\. Pick another`))
+      assert.doesNotMatch(r.stdout + r.stderr, /auth\?t=|v1\.login|SpawnLoft panel/)
+    }
   } finally {
     server.close()
   }

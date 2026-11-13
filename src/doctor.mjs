@@ -14,6 +14,7 @@ import { checkPrivateFiles } from './private-files.mjs'
 import { ACCOUNTS_FILE, clientStateFile } from './client-paths.mjs'
 import { listProfiles as listClientProfiles } from './client.mjs'
 import { humanBytes, dirSize, isPortFree } from './util.mjs'
+import { keyFile as panelKeyFile } from './panel-auth.mjs'
 
 // Every file that holds a secret: a refresh token, an RCON or database password, a harness or
 // mclo.gs token. Files that do not exist are skipped by the check.
@@ -22,6 +23,7 @@ export function privateFiles() {
     { file: ACCOUNTS_FILE, what: 'accounts file (Microsoft sign-in tokens)' },
     { file: REGISTRY_FILE, what: 'registry (RCON and database passwords)' },
     { file: path.join(RUN_DIR, 'mclogs.json'), what: 'mclo.gs tokens' },
+    { file: panelKeyFile(), what: 'panel key (signs the panel\'s sign-in tokens)' },
   ]
   for (const inst of listInstances()) {
     files.push({ file: path.join(inst.dir, 'server.properties'), what: `${inst.name}: server.properties (RCON password)` })

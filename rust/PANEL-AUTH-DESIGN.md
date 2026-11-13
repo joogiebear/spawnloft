@@ -1,6 +1,6 @@
 # Panel access: design for authenticating the local panel API
 
-Status: **design accepted, no code yet** (2026-11-13, revised after a second-look review). Target: `v2` only, internal until Victor
+Status: **design accepted; the mechanism (thread 1 of section 4) is built, see section 7**. First written as: design accepted, no code yet (2026-11-13, revised after a second-look review). Target: `v2` only, internal until Victor
 says "push to beta". Answers the decision owed in `rust/beta-review/REVIEW.md` section 3.
 
 ## 1. The problem, as the code stands
@@ -298,3 +298,74 @@ windows open; the diagnostics bundle does not contain the key.
   a sign-in when `[::1]:<port>` is taken. Worth its own small task.
 - `README.md:425-432` describes the current rule ("an unauthenticated local HTTP server");
   it is rewritten in thread 2.
+
+## 7. As built (thread 1, the mechanism)
+
+Code: `rust/crates/spawnloft-lib/src/panel_auth.rs` and `panel.rs`, `src/panel-auth.mjs` and
+`ui.mjs`, the shell's `open_panel` and `panel_get`. The shared fixture is
+`test/fixtures/contracts/panel-auth.json`, made by `tools/make-panel-auth-fixture.mjs`.
+
+Proved before building on it (3.6): on Linux (webkit2gtk 2.52) the app's windows share one cookie
+store, take an `HttpOnly; SameSite=Strict` cookie from plain-http loopback, and send
+`Sec-Fetch-Site: none` for a window the shell opens and `same-origin` after the refresh.
+`smoke-tauri.cjs` now checks the console and launcher windows are signed in. Windows and the Mac
+mini are still owed (thread 3).
+
+Where the code is more exact than, or differs from, the text above:
+
+- **Clocks.** A token up to 2 seconds "in the future" is accepted: two processes can read the same
+  clock a few milliseconds apart (V8 keeps its own on Windows). A listener whose clock is set back
+  after it started moves its start time back with it, or every fresh token would be "issued
+  before the start" until the clock caught up.
+- **Session idle time** is counted in ticks the listener lived through, not wall time, and not at
+  all while a request on the session is still open. A computer that slept overnight, or a page
+  that only holds its event streams, does not lose the window's session. Fifteen minutes after
+  the last connection closes it is gone, as designed.
+- **Origin** must be exactly `http://<Host>` (it was "same host and port, any scheme").
+  **Host** is one of the three loopback names exactly; the Node panel used to take all of
+  `127.0.0.0/8`. Two `Host`, `Origin`, `Sec-Fetch-Site` or `Authorization` headers are refused.
+- **`to`** on a login link is `/launcher` or `/setup` written plainly; nothing is decoded, and
+  anything else lands on `/`.
+- **Open routes** are matched on the request target exactly as sent, before any normalising, so
+  the proxy and the Node panel behind it cannot read it two ways.
+- **The proxy's request parsing is strict** (CRLF only, no control characters, no folded lines,
+  token header names): it adds a token for the upstream to the head it forwards, so the upstream
+  must not be able to find a different end to that head.
+- **Sessions are stored under a hash of their id.** The diagnostics bundle also scrubs anything
+  shaped like a sign-in token from log text, and `doctor` checks the key file's permissions.
+- **`spawnloft ui`** (until thread 2): prints the one-use sign-in link and does not open a
+  browser; `--launcher` onto a running panel prints a link to that panel's launcher. The
+  open-file flow, `--link` and the pages' "session ended" notice are thread 2.
+- **Electron on `v2`**: `desktop/main.js` got the three lines that load the sign-in link, and its
+  smoke scripts sign their own requests, so the retired package job keeps passing until thread 2
+  removes it. That leg runs only on pushes to `v2`, so it could not be run before the merge.
+
+Changed after the independent review of this build:
+
+- **The CLI's "is that my panel" question is answered with proof.** A token proves the caller to
+  the panel, not the panel to the caller: anything holding the port could answer 200 and be
+  called "a SpawnLoft panel" and handed a sign-in link (3.4 says "only this user's panel answers 200"; anything can). The CLI now sends a
+  fresh nonce in `X-SpawnLoft-Probe` with its signed request, and a panel answers an allowed
+  request with `X-SpawnLoft-Proof`, the HMAC of `probe.v1.<nonce>` under the key. The text signed
+  can never be a token (those start `v1.`), and it is no open route: 3.9's objection does not
+  apply. The proxy passes both headers through.
+- **Spent login nonces** are forgotten only when the wall clock and the listener's own tick clock
+  both say the token is dead, so a clock stepped forward and back does not make a used link good
+  again.
+- **The Node panel releases a session's request when its connection closes** as well as when the
+  response does: a response queued behind another on a dropped connection never closes itself,
+  and the session would never have idled out.
+- **A key file that exists** must be a plain file of this user (not a link, not another
+  account's); one that others can read is made private again before use (Unix). The Node panel
+  refuses to write a key into a file it could not make private.
+
+Known limits, accepted:
+
+- Whoever can set the machine's clock back to before a token was issued, while the listener that
+  the token names is gone and another has taken its port, can make that token good again for its
+  lifetime. The start-time rule cannot tell such a token from a fresh one.
+- The idle timer does not bound a stolen session: its holder can keep one request open. It ends
+  with the listener.
+
+Not done here and still owed: the test that no GET route writes (3.4 step 3 depends on it), which
+needs a route table or a sweep of `ui.mjs` and goes with thread 2.

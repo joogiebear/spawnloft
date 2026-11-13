@@ -43,7 +43,20 @@
       })
       if (!res.ok || !body) return { ok: false, error: (body && body.error) || 'SpawnLoft could not save these locations.' }
       // the core reads its locations once, at start: the window restarts it and opens the panel again
-      if (body.ok) await call('restart_core')
+      if (!body.ok) return body
+      // This is often the page's first call into the shell, and right after the window came here
+      // (start page, sign-in, wizard) webkit2gtk can still report an earlier address for it, which
+      // the shell refuses. The locations are saved by now, so ask again rather than leave the
+      // window on a core that does not know them.
+      for (let tries = 0; ; tries++) {
+        try {
+          await call('restart_core')
+          break
+        } catch (err) {
+          if (tries >= 10 || !/not the panel/.test(String((err && err.message) || err))) throw err
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
       return body
     },
   }

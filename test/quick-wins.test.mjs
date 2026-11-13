@@ -11,6 +11,8 @@ process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 process.env.MCCTL_FAKE_CLIENT = path.resolve(process.cwd(), 'test', 'fixtures', 'fake-client.mjs')
 process.env.NODE_ENV = 'test'
 const { serve } = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 const registry = await import('../src/registry.mjs')
 const { UserError } = await import('../src/util.mjs')
 const client = await import('../src/client.mjs')

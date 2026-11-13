@@ -7,7 +7,12 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-db-options-'))
 process.env.MCCTL_DATA_ROOT = scratch
+// the panel key is made in the config folder: not the developer's real one
+process.env.APPDATA = path.join(scratch, 'config-home')
+process.env.XDG_CONFIG_HOME = path.join(scratch, 'config-home')
 const ui = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 const registry = await import('../src/registry.mjs')
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 

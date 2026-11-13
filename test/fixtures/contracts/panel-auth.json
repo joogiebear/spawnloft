@@ -1,0 +1,2428 @@
+{
+  "about": "The panel sign-in rule (rust/PANEL-AUTH-DESIGN.md) as data. Made by tools/make-panel-auth-fixture.mjs; run by test/panel-auth.test.mjs and by cargo test (panel_auth). The keys are test keys.",
+  "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "port": 8770,
+  "started": 1800000000000,
+  "loginTtlMs": 300000,
+  "apiTtlMs": 60000,
+  "futureLeewayMs": 2000,
+  "sessionIdleMs": 900000,
+  "openRoutes": [
+    "/auth",
+    "/api/client/accounts/login/callback"
+  ],
+  "cookie": "spawnloft_8770",
+  "expectations": [
+    "forbidden",
+    "open",
+    "login",
+    "login-refused",
+    "allow",
+    "unauthorized-api",
+    "unauthorized-page"
+  ],
+  "mint": [
+    {
+      "name": "login-a",
+      "purpose": "login",
+      "port": 8770,
+      "issued": 1800000001000,
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g"
+    },
+    {
+      "name": "login-b",
+      "purpose": "login",
+      "port": 8770,
+      "issued": 1800000002000,
+      "nonce": "BBBBBBBBBBBBBBBBBBBBBB",
+      "token": "v1.login.8770.1800000002000.BBBBBBBBBBBBBBBBBBBBBB.hWK8AsBJFW3AifcEgnTEk2DCckYYJzrIFjnoSQCjCL4"
+    },
+    {
+      "name": "login-c",
+      "purpose": "login",
+      "port": 8770,
+      "issued": 1800000003000,
+      "nonce": "CCCCCCCCCCCCCCCCCCCCCC",
+      "token": "v1.login.8770.1800000003000.CCCCCCCCCCCCCCCCCCCCCC.PkPIDxI9z7o7FMTn_U5_wu-kHSo7hL62LcHXyhpuu3g"
+    },
+    {
+      "name": "login-other-port",
+      "purpose": "login",
+      "port": 8771,
+      "issued": 1800000001000,
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "token": "v1.login.8771.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.1aGjctg9Eo-kKtyKcMCMFcSE-ETT_XPqgDdzVO_nSTc"
+    },
+    {
+      "name": "login-early",
+      "purpose": "login",
+      "port": 8770,
+      "issued": 1799999999999,
+      "nonce": "AAAAAAAAAAAAAAAAAAAAAA",
+      "token": "v1.login.8770.1799999999999.AAAAAAAAAAAAAAAAAAAAAA.5YBChSpvHE3-PMSTWQFDsqME2lj9MwBvjKY7qZyysC4"
+    },
+    {
+      "name": "login-at-start",
+      "purpose": "login",
+      "port": 8770,
+      "issued": 1800000000000,
+      "nonce": "DDDDDDDDDDDDDDDDDDDDDD",
+      "token": "v1.login.8770.1800000000000.DDDDDDDDDDDDDDDDDDDDDD.ByS__wHO2hIX4MLUS5pKAxRK7RaulahVyrLa1OlLIZY"
+    },
+    {
+      "name": "api-a",
+      "purpose": "api",
+      "port": 8770,
+      "issued": 1800000001000,
+      "nonce": "",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A"
+    },
+    {
+      "name": "api-other-port",
+      "purpose": "api",
+      "port": 8771,
+      "issued": 1800000001000,
+      "nonce": "",
+      "token": "v1.api.8771.1800000001000..7KjKgnLM1qigG5VmaW07by_0dsBaHrDtCxB-bkpZEWw"
+    },
+    {
+      "name": "api-early",
+      "purpose": "api",
+      "port": 8770,
+      "issued": 1799999999999,
+      "nonce": "",
+      "token": "v1.api.8770.1799999999999..2z6E1CcNJ_Et4DrXf_z6y8c_4Fs-r4Cp6IwT-mm3K6A"
+    },
+    {
+      "name": "api-back",
+      "purpose": "api",
+      "port": 8770,
+      "issued": 1799999995000,
+      "nonce": "",
+      "token": "v1.api.8770.1799999995000..4B0edTJMXAXnye5oo0iBoX5anWJtopvWQVcJtGAWPVM"
+    },
+    {
+      "name": "api-late",
+      "purpose": "api",
+      "port": 8770,
+      "issued": 1800003600000,
+      "nonce": "",
+      "token": "v1.api.8770.1800003600000..vFRcewNbkxp9j3sdiby2kg5zLffSHQcbepc8lemSLsI"
+    }
+  ],
+  "tokens": {
+    "login-a": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g",
+    "login-b": "v1.login.8770.1800000002000.BBBBBBBBBBBBBBBBBBBBBB.hWK8AsBJFW3AifcEgnTEk2DCckYYJzrIFjnoSQCjCL4",
+    "login-c": "v1.login.8770.1800000003000.CCCCCCCCCCCCCCCCCCCCCC.PkPIDxI9z7o7FMTn_U5_wu-kHSo7hL62LcHXyhpuu3g",
+    "login-other-port": "v1.login.8771.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.1aGjctg9Eo-kKtyKcMCMFcSE-ETT_XPqgDdzVO_nSTc",
+    "login-early": "v1.login.8770.1799999999999.AAAAAAAAAAAAAAAAAAAAAA.5YBChSpvHE3-PMSTWQFDsqME2lj9MwBvjKY7qZyysC4",
+    "login-at-start": "v1.login.8770.1800000000000.DDDDDDDDDDDDDDDDDDDDDD.ByS__wHO2hIX4MLUS5pKAxRK7RaulahVyrLa1OlLIZY",
+    "api-a": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+    "api-other-port": "v1.api.8771.1800000001000..7KjKgnLM1qigG5VmaW07by_0dsBaHrDtCxB-bkpZEWw",
+    "api-early": "v1.api.8770.1799999999999..2z6E1CcNJ_Et4DrXf_z6y8c_4Fs-r4Cp6IwT-mm3K6A",
+    "api-back": "v1.api.8770.1799999995000..4B0edTJMXAXnye5oo0iBoX5anWJtopvWQVcJtGAWPVM",
+    "api-late": "v1.api.8770.1800003600000..vFRcewNbkxp9j3sdiby2kg5zLffSHQcbepc8lemSLsI",
+    "login-wrong-key": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.dCqvSLH7gs_z046dp3xgwP-HZI91R58YVGyNC7kWtVE",
+    "api-wrong-key": "v1.api.8770.1800000001000..4Ydzw0R1CRmFa7jwY3kieb2p2bF3uh8csGKZv3VAB9U"
+  },
+  "checks": [
+    {
+      "name": "a login token, the moment it was made",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": true
+    },
+    {
+      "name": "a login token at five minutes",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000301000,
+      "ok": true
+    },
+    {
+      "name": "a login token past five minutes",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000301001,
+      "ok": false
+    },
+    {
+      "name": "an api token at sixty seconds",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000061000,
+      "ok": true
+    },
+    {
+      "name": "an api token past sixty seconds",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000061001,
+      "ok": false
+    },
+    {
+      "name": "two seconds ahead of this clock is still the same machine",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1799999999000,
+      "ok": true
+    },
+    {
+      "name": "further ahead than that is refused",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1799999998999,
+      "ok": false
+    },
+    {
+      "name": "issued the millisecond the listener started",
+      "token": "v1.login.8770.1800000000000.DDDDDDDDDDDDDDDDDDDDDD.ByS__wHO2hIX4MLUS5pKAxRK7RaulahVyrLa1OlLIZY",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000000000,
+      "ok": true
+    },
+    {
+      "name": "issued before the listener started",
+      "token": "v1.api.8770.1799999999999..2z6E1CcNJ_Et4DrXf_z6y8c_4Fs-r4Cp6IwT-mm3K6A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000000000,
+      "ok": false
+    },
+    {
+      "name": "a login token before the listener started",
+      "token": "v1.login.8770.1799999999999.AAAAAAAAAAAAAAAAAAAAAA.5YBChSpvHE3-PMSTWQFDsqME2lj9MwBvjKY7qZyysC4",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000000000,
+      "ok": false
+    },
+    {
+      "name": "a login token is not an api token",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.icRPt_PxiceckDhUdTK-cbc9mYnmVmrqy68QDXqS6-g",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "an api token is not a login token",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "made for another port",
+      "token": "v1.api.8771.1800000001000..7KjKgnLM1qigG5VmaW07by_0dsBaHrDtCxB-bkpZEWw",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "the same token at the port it names",
+      "token": "v1.api.8771.1800000001000..7KjKgnLM1qigG5VmaW07by_0dsBaHrDtCxB-bkpZEWw",
+      "purpose": "api",
+      "port": 8771,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": true
+    },
+    {
+      "name": "signed with another key",
+      "token": "v1.api.8770.1800000001000..4Ydzw0R1CRmFa7jwY3kieb2p2bF3uh8csGKZv3VAB9U",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a login token signed with another key",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.dCqvSLH7gs_z046dp3xgwP-HZI91R58YVGyNC7kWtVE",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "one character of the MAC changed",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRrAA",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "another spelling of the same MAC bytes",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2B",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "the MAC cut short",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "no MAC",
+      "token": "v1.api.8770.1800000001000.",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "an empty MAC",
+      "token": "v1.api.8770.1800000001000..",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "nothing",
+      "token": "",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "an unknown version",
+      "token": "v2.api.8770.1800000001000..n78G-8v-jpqxCZZ0ZATrA9LHn08UpPtp-oiPkeYUz9M",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "the version in capitals",
+      "token": "V1.api.8770.1800000001000..ULxMiNLOrM9G7EMcYbmp4hfXQT621M2JgB4hHiLmeyk",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "an unknown purpose",
+      "token": "v1.admin.8770.1800000001000..9bpjeNI2qghFs3NMnS6Xs9hT-0b75Oq7JpoLsxlc91w",
+      "purpose": "admin",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a port with a leading zero",
+      "token": "v1.api.08770.1800000001000..kKhdCrFh4LhFGacOVkZHXQ5J_jTatPmJnRkdAFNBnIM",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a port with a sign",
+      "token": "v1.api.+8770.1800000001000..gr9HGIuxrfnF-XHr8vtfZZ6DAObl78aA25BVTeNHDQE",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "port zero",
+      "token": "v1.api.0.1800000001000..feooeFLTInCkx5EuUSKu4OyLpZLpFe6RAtAmEj2auh4",
+      "purpose": "api",
+      "port": 0,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a time with a leading zero",
+      "token": "v1.api.8770.01800000001000..9NfITuNFTVOsTH_ZTZsPgUzVpHYTYfrkh4Q1KDBaqak",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a time with a fraction",
+      "token": "v1.api.8770.1800000001000.5..d0RYQGANVBkTkQ27IV8dgN1JGqwiZYJmfY-qfQ3k26U",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a time in exponent form",
+      "token": "v1.api.8770.18e11..JWFzWP_nyo6AB4Th1EjDIhBrL2zDkOCv_qRCtUPrG98",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a time of sixteen digits",
+      "token": "v1.api.8770.1800000000001000..sMLnb4Gdz_QmWiBk9hE8O4WxfJyy61SFTBi3644dtoI",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "an api token with a nonce",
+      "token": "v1.api.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAA.h5iZRJ5Z23taDek4_VQeFJQQK1GqO0pUNEvdECbuJBo",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a login token without a nonce",
+      "token": "v1.login.8770.1800000001000..eQ-DcBVMUU7UQuB6C2qBO0E6UnBJA-iQGlGdlAsDaqU",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a login token with a short nonce",
+      "token": "v1.login.8770.1800000001000.AAAA.Zb8og5IsnEW_DwCUhg0LJ8WE7_RTDS6BUH2-9dD2lTc",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a login nonce outside the alphabet",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAA+/.8X3zYreHqZE8U9rjPp6h6m2E87Cejg-kNwtHTZhIdnw",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "one part too many",
+      "token": "v1.api.8770.1800000001000..x.ONJf0sfoQmQ5wYd00jQtvwX9D2c1mvyqiDVSw2TxlXI",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a space in front",
+      "token": " v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "a line break behind",
+      "token": "v1.api.8770.1800000001000..GBlDjcI-BGbvan-glj17LqWuMnMogxfZ5MC4XZDRr2A\n",
+      "purpose": "api",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    },
+    {
+      "name": "longer than any real token",
+      "token": "v1.login.8770.1800000001000.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.5FsmrguvUG14x_cvAmFlIw44EQMn-5vh0nOf-bndt7A",
+      "purpose": "login",
+      "port": 8770,
+      "started": 1800000000000,
+      "now": 1800000001000,
+      "ok": false
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "no credential",
+      "steps": [
+        {
+          "name": "the API",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "the API with a query",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances?x=1",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "a write, from the panel's own origin",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "the panel page",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "the launcher page",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/launcher",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "the setup page",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/setup",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "a path that is not under /api/",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "any other method",
+          "now": 1800000001000,
+          "method": "DELETE",
+          "target": "/api/instances/x",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        }
+      ]
+    },
+    {
+      "name": "Host names this machine",
+      "steps": [
+        {
+          "name": "no Host",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "another name for a loopback address (DNS rebinding)",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "evil.example:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "another loopback address",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.2:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a LAN address",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "192.168.1.20:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "localhost",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "localhost:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "the IPv6 loopback",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "[::1]:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "no port",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "localhost"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "another local port (an ssh tunnel): the token names the real one",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "LOCALHOST:9000"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "spaces around the value",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              " 127.0.0.1:8770 "
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "a colon and no port",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a port that is not a number",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:80a"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a user in front",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "evil@127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "two Host headers",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "host",
+              "evil.example"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        }
+      ]
+    },
+    {
+      "name": "Origin, when there is one, is this panel",
+      "steps": [
+        {
+          "name": "the panel's own origin",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "capitals",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "localhost:8770"
+            ],
+            [
+              "Origin",
+              "HTTP://LOCALHOST:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "another loopback port (a plugin web map)",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8771"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "localhost is not 127.0.0.1",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://localhost:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a site",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "https://evil.example"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "null (a sandboxed frame, a local file)",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "null"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "https on the same host and port",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "https://127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a trailing slash",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8770/"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "two Origin headers",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "https://evil.example"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "a foreign origin on an open route",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback?code=x&state=y",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "https://evil.example"
+            ]
+          ],
+          "expect": "forbidden"
+        }
+      ]
+    },
+    {
+      "name": "Sec-Fetch-Site, when there is one, says same-origin or none",
+      "steps": [
+        {
+          "name": "same-origin",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "same-origin"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "none (typed, a bookmark, the window itself)",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "none"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "capitals",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "sec-fetch-site",
+              "Same-Origin"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "same-site: every loopback port is one site",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "same-site"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "cross-site",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "cross-site"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "anything else",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "same-origin, none"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "two of them",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "same-origin"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "none"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "refused before the credential is looked at",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "cross-site"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "Microsoft's redirect arrives cross-site",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback?code=x&state=y",
+          "headers": [
+            [
+              "Host",
+              "localhost:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "cross-site"
+            ]
+          ],
+          "expect": "open"
+        },
+        {
+          "name": "a login link opened from a local file",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "cross-site"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "s"
+        }
+      ]
+    },
+    {
+      "name": "the two open routes, and nothing near them",
+      "steps": [
+        {
+          "name": "the sign-in callback",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "open"
+        },
+        {
+          "name": "with its query",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback?code=x&state=y",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "open"
+        },
+        {
+          "name": "as a POST",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "as a HEAD",
+          "now": 1800000001000,
+          "method": "HEAD",
+          "target": "/api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "with a trailing slash",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "with dot segments after it",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callback/../../../instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "with dot segments before it",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/x/../api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "percent-encoded",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/callbac%6b",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "in capitals",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/API/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "with a second slash",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "//api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "with a backslash",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api\\client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "as a whole address",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "http://127.0.0.1:8770/api/client/accounts/login/callback",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "the other login routes",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/client/accounts/login/abc/stream",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "/auth with no token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "/auth as a POST",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "/auth with a trailing slash",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth/?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "/auth in capitals",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/AUTH?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "the token was not spent by any of those",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "s"
+        }
+      ]
+    },
+    {
+      "name": "a login link works once and gives a session",
+      "steps": [
+        {
+          "name": "the link",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "one"
+        },
+        {
+          "name": "the page, with the cookie",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "the API, with the cookie",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Origin",
+              "http://127.0.0.1:8770"
+            ],
+            [
+              "Sec-Fetch-Site",
+              "same-origin"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "the link a second time",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "a second time, from the browser that has the session",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "another link, to the launcher",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-b}&to=/launcher",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/launcher",
+          "save": "two"
+        },
+        {
+          "name": "the first session still works",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "and the second",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:two}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "among other cookies",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "theme=dark; spawnloft_8770={session:one}; x=y"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "no space after the semicolon",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "a=b;spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "a stale cookie of the same name in front",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx; spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "in a second Cookie header",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "a=b"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "under another port's name",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8771={session:one}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "under a longer name",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "xspawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "a session nobody was given",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "an empty cookie",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770="
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "the session id as an api token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {session:one}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        }
+      ]
+    },
+    {
+      "name": "what a login link may carry",
+      "steps": [
+        {
+          "name": "to the setup wizard",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}&to=/setup",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/setup",
+          "save": "s"
+        },
+        {
+          "name": "to anywhere else: the panel",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-b}&to=//evil.example/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "s"
+        },
+        {
+          "name": "an encoded target is not decoded",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?to=%2Flauncher&t={token:login-c}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "s"
+        },
+        {
+          "name": "the first t is the token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t=x&t={token:login-at-start}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "which the line above did not spend",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?x&t={token:login-at-start}&to=/launcher&to=/setup",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/launcher",
+          "save": "s"
+        }
+      ]
+    },
+    {
+      "name": "login tokens that are refused",
+      "steps": [
+        {
+          "name": "for another port",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-other-port}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "issued before this listener started",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-early}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "signed with another key",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-wrong-key}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "an api token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:api-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "an empty one",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t=",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "past five minutes",
+          "now": 1800000301001,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login-refused"
+        },
+        {
+          "name": "a later one still works then",
+          "now": 1800000302000,
+          "method": "GET",
+          "target": "/auth?t={token:login-b}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "s"
+        }
+      ]
+    },
+    {
+      "name": "api tokens",
+      "steps": [
+        {
+          "name": "the header",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "again: an api token is not single use",
+          "now": 1800000001000,
+          "method": "POST",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "the scheme in lower case",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "authorization",
+              "spawnloft {token:api-a}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "as a Bearer token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "Bearer {token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "with no scheme",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "{token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "two spaces",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft  {token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "something after it",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a} x"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "in the query instead",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances?t={token:api-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "in the cookie instead",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "for another port",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-other-port}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "issued before this listener started",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-early}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "signed with another key",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-wrong-key}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "a login token",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:login-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "which that did not spend",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "one"
+        },
+        {
+          "name": "a bad token beside a good session",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-wrong-key}"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "two Authorization headers",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "forbidden"
+        },
+        {
+          "name": "past sixty seconds",
+          "now": 1800000061001,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "a page asked for with a stale token",
+          "now": 1800000061001,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-a}"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        }
+      ]
+    },
+    {
+      "name": "a session nobody uses for fifteen minutes ends",
+      "steps": [
+        {
+          "name": "sign in",
+          "now": 1800000001000,
+          "method": "GET",
+          "target": "/auth?t={token:login-a}",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ]
+          ],
+          "expect": "login",
+          "to": "/",
+          "save": "one"
+        },
+        {
+          "name": "fifteen minutes later, to the millisecond",
+          "now": 1800000901000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "which counted as use",
+          "now": 1800001801000,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "a millisecond past fifteen idle minutes",
+          "now": 1800002701001,
+          "method": "GET",
+          "target": "/",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "unauthorized-page"
+        },
+        {
+          "name": "and it does not come back",
+          "now": 1800002701002,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Cookie",
+              "spawnloft_8770={session:one}"
+            ]
+          ],
+          "expect": "unauthorized-api"
+        },
+        {
+          "name": "a fresh api token works at any age of the listener",
+          "now": 1800003600000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-late}"
+            ]
+          ],
+          "expect": "allow"
+        }
+      ]
+    },
+    {
+      "name": "a clock set back after the start locks nobody out",
+      "steps": [
+        {
+          "name": "a token from the new, earlier time",
+          "now": 1799999995000,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-back}"
+            ]
+          ],
+          "expect": "allow"
+        },
+        {
+          "name": "the start has moved back with the clock",
+          "now": 1799999999999,
+          "method": "GET",
+          "target": "/api/instances",
+          "headers": [
+            [
+              "Host",
+              "127.0.0.1:8770"
+            ],
+            [
+              "Authorization",
+              "SpawnLoft {token:api-early}"
+            ]
+          ],
+          "expect": "allow"
+        }
+      ]
+    }
+  ]
+}

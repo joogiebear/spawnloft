@@ -252,7 +252,7 @@ export async function buildBundle({ server = null, client = null, lines = TAIL_L
   try { identities = microsoftIdentities() } catch { /* no accounts file: nothing to hide */ }
   if (facts.client?.account?.type === 'microsoft' && facts.client.account.name) identities.push(facts.client.account.name)
   const hideIdentities = redactIdentities(identities)
-  const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]').replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]').replace(/\btoken:[^:\s]+:/g, 'token:[redacted]:') : s)
+  const clean = (s) => (typeof s === 'string' ? hideIdentities(scrub(redactAccountName(s))).replace(/spawnloft\.harness\.token=\S+/g, 'spawnloft.harness.token=[redacted]').replace(/(--accessToken[\s=]+)\S+/g, '$1[redacted]').replace(/\btoken:[^:\s]+:/g, 'token:[redacted]:').replace(PANEL_TOKEN, 'v1.$1.[redacted]') : s)
   if (facts.client?.account?.type === 'microsoft') facts.client.account = { type: 'microsoft', name: MICROSOFT_PLACEHOLDER }
   for (const f of files) f.text = clean(f.text)
   for (const finding of findings.server) {
@@ -274,6 +274,11 @@ export const MICROSOFT_PLACEHOLDER = '[microsoft account]'
 
 // Replaces each identity wherever it stands on its own (not inside a longer word), longest
 // first so a bare uuid is not left half-replaced by its dashed form.
+// A panel sign-in token (panel-auth.mjs) that ended up in a log: short-lived, but it has no
+// business in a file that gets shared. The panel key itself lives in the config folder, which no
+// bundle reads.
+const PANEL_TOKEN = /\bv1\.(login|api)\.\d+\.\d+\.[\w-]*\.[\w-]{43}(?![\w-])/g
+
 export function redactIdentities(identities) {
   const list = [...new Set(identities.filter((s) => typeof s === 'string' && s.length >= 3))].sort((a, b) => b.length - a.length)
   if (!list.length) return (s) => s

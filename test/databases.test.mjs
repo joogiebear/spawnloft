@@ -14,6 +14,9 @@ import { execFileSync } from 'node:child_process'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-databases-'))
 process.env.MCCTL_DATA_ROOT = scratch
+// the panel key is made in the config folder: not the developer's real one
+process.env.APPDATA = path.join(scratch, 'config-home')
+process.env.XDG_CONFIG_HOME = path.join(scratch, 'config-home')
 
 const { putInstance, updateInstance, listInstances, listServices, listAll, isDatabase, usedPorts } = await import('../src/registry.mjs')
 const services = await import('../src/services.mjs')
@@ -23,6 +26,8 @@ const { readState } = await import('../src/control.mjs')
 const { ENGINES_DIR, INSTANCES_DIR } = await import('../src/paths.mjs')
 const { UserError, findFreePort, isPortFree } = await import('../src/util.mjs')
 const ui = await import('../src/ui.mjs')
+// the panel takes no request without a credential: sign every one in (test/helpers/panel.mjs)
+const { panelFetch: fetch } = await import('./helpers/panel.mjs')
 const backup = await import('../src/backup.mjs')
 
 const VERSION = '0.0.0-fake'

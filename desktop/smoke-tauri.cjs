@@ -6,7 +6,9 @@
 // first-run wizard and the core restart after it, the bridge and its refusals, the interface size
 // and its file, the navigation guard, the console and launcher windows, downloads, Microsoft
 // sign-in in the system browser, the window's saved place, and that a killed core leaves no Node
-// panel behind. Optional screenshots at a given screen size (Linux: run under Xvfb at that size).
+// panel behind. And the panel's lock (rust/PANEL-AUTH-DESIGN.md): the window is signed in through
+// its login link, its console and launcher windows share that session, and nothing without a
+// credential gets an answer from either listener. Optional screenshots at a given screen size (Linux: run under Xvfb at that size).
 //
 // Usage: node desktop/smoke-tauri.cjs <SpawnLoft executable> <spawnloft-core executable> <core dir> <artifacts dir>
 //   env TAURI_DRIVER (default tauri-driver on PATH), SMOKE_SCREENSHOT=<name> to save screenshots
@@ -15,6 +17,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn, execFileSync } = require('node:child_process')
+const { authorization, provesItself } = require('./smoke-panel-auth.cjs')
 
 const [shellExe, coreExe, coreDir, outDir] = process.argv.slice(2).map((p) => p && path.resolve(p))
 assert.ok(shellExe && coreExe && coreDir && outDir, 'usage: smoke-tauri.cjs <shell> <core> <core dir> <artifacts>')
@@ -81,6 +84,15 @@ async function wd(method, url, body) {
 const js = (script, ...args) => wd('POST', '/execute/sync', { script, args })
 const jsAsync = (script, ...args) => wd('POST', '/execute/async', { script, args })
 const url = () => wd('GET', '/url')
+// the status of a GET made by the page itself, with whatever credential the window holds
+const pageGet = (route) => jsAsync(`const done = arguments[arguments.length - 1]; fetch(${JSON.stringify(route)}).then((r) => done(r.status), (e) => done(String(e)))`)
+// the port a process listens on (Linux), to reach the Node panel behind the core directly
+function listeningPort(pid) {
+  try {
+    const line = execFileSync('ss', ['-Hltnp']).toString().split('\n').find((l) => l.includes(`pid=${pid},`))
+    return line ? Number(/:(\d+)\s/.exec(line)?.[1]) : null
+  } catch { return null }
+}
 // a bridge call from the page, awaited
 const bridge = (expr) => jsAsync(`const done = arguments[arguments.length - 1]; Promise.resolve().then(() => ${expr}).then((v) => done({ v }), (e) => done({ e: String(e && e.message || e) }))`)
 
@@ -131,6 +143,33 @@ async function main() {
     assert.equal(JSON.parse(fs.readFileSync(path.join(configDir, 'settings.json'), 'utf8')).dataRoot, dataRoot)
     record(`setup: saved, core restarted on port ${panel.port}`)
     await until(() => js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel page')
+
+    // 1b. the lock. The window came in through /auth and holds a session the page cannot read;
+    // nobody without a credential gets an answer, from the core or from the Node panel behind it
+    assert.equal(await pageGet('/api/setup'), 200, 'the window is signed in')
+    assert.equal(await js('return document.cookie'), '', 'the session cookie is HttpOnly')
+    for (const route of ['/api/instances', '/api/setup', '/api/update', '/api/client/launcher']) {
+      const res = await fetch(`http://127.0.0.1:${panel.port}${route}`)
+      assert.equal(res.status, 401, `${route} without a credential`)
+      assert.equal((await res.json()).code, 'auth')
+    }
+    assert.equal((await fetch(`http://127.0.0.1:${panel.port}/`)).status, 401, 'the page without a credential')
+    assert.equal((await fetch(`http://127.0.0.1:${panel.port}/api/setup`, { headers: { authorization: authorization(configDir, panel.port) } })).status, 200, 'a token signed with the install\'s key')
+    // a page on another loopback port could make the browser send the cookie; such a request is refused
+    assert.equal((await fetch(`http://127.0.0.1:${panel.port}/api/setup`, { headers: { authorization: authorization(configDir, panel.port), 'sec-fetch-site': 'same-site' } })).status, 403)
+    // through the proxy too, the panel proves it holds the key to a caller that asks
+    assert.ok(await provesItself(configDir, `http://127.0.0.1:${panel.port}/api/client/launcher`), 'the panel proves itself')
+    const nodePort = isWin ? null : listeningPort(pids(NODE_PANEL)[0])
+    if (nodePort) {
+      assert.notEqual(nodePort, Number(panel.port))
+      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`)).status, 401, 'the Node panel, called directly')
+      // the window's token is for the core's port, not this one
+      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`, { headers: { authorization: authorization(configDir, panel.port) } })).status, 401)
+      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`, { headers: { authorization: authorization(configDir, nodePort) } })).status, 200)
+      record(`lock: no credential, no answer, on the core (${panel.port}) and on the Node panel behind it (${nodePort})`)
+    } else {
+      record(`lock: no credential, no answer, on the core (${panel.port}); the Node panel's port was not found, so it was not called directly`)
+    }
 
     if (process.env.SMOKE_SCREENSHOT) {
       await fill()
@@ -199,6 +238,9 @@ async function main() {
       seen.push(u.pathname + u.search)
       const has = await until(() => js('return document.readyState === "complete" && typeof window.spawnloftDesktop'), 'child page')
       assert.equal(has, 'object', 'child windows get the bridge')
+      // built by the shell, not by the page: signed in only because the app's windows share cookies
+      assert.equal(await pageGet('/api/setup'), 200, `${u.pathname + u.search} shares the main window's session`)
+      assert.ok(await js('return !!document.querySelector("#uiSize, #app, main, body > *")') && !/Sign in to this panel/.test(await wd('GET', '/title')), 'the child shows its page, not the sign-in page')
     }
     assert.deepEqual(seen.sort(), ['/?console=smoke%20server', '/launcher'])
     await wd('POST', '/window', { handle: main })
@@ -206,7 +248,7 @@ async function main() {
     await clickOpen('/?console=smoke%20server', 'spawnloft-console-smoke')
     await sleep(1000)
     assert.equal((await wd('GET', '/window/handles')).length, handles.length, 'a second open of the same console opens nothing new')
-    record('windows: console and launcher open with the bridge; other addresses do not')
+    record('windows: console and launcher open with the bridge and the session; other addresses do not')
 
     // 6. a download from the panel goes to Downloads
     await js('const a = document.createElement("a"); a.href = "/api/setup"; a.download = "../setup check.json"; document.body.append(a); a.click(); a.remove()')
@@ -226,7 +268,7 @@ async function main() {
       // the callback reaches the panel through the proxy (a forged code is refused, but answered)
       const cb = await fetch(`http://localhost:${panel.port}/api/client/accounts/login/callback?code=x&state=nope`).catch(() => fetch(`http://127.0.0.1:${panel.port}/api/client/accounts/login/callback?code=x&state=nope`))
       assert.equal(cb.status, 400)
-      await fetch(`http://127.0.0.1:${panel.port}/api/client/accounts/login/${made.loginId}`, { method: 'DELETE', headers: { origin: panel.origin } }).catch(() => {})
+      await fetch(`http://127.0.0.1:${panel.port}/api/client/accounts/login/${made.loginId}`, { method: 'DELETE', headers: { origin: panel.origin, authorization: authorization(configDir, panel.port) } }).catch(() => {})
       record('sign-in: system browser, redirect through the window\'s own port')
     }
 
@@ -245,6 +287,9 @@ async function main() {
     // and the window starts the core again and shows the panel on its new port
     await until(async () => { const u = new URL(await url()); return u.port !== panel.port && u.pathname === '/' }, 'the panel again after the core was killed', 60000)
     record(`restart: the window started the core again (port ${new URL(await url()).port})`)
+    // a new port is a new listener: the window was signed in there again, the old session is gone
+    await until(() => js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel page after the restart')
+    assert.equal(await pageGet('/api/setup'), 200, 'the window is signed in to the restarted core')
     // a Node panel that dies takes its core along, and the window brings both back
     const second = new URL(await url())
     const node2 = await until(() => { const n = pids(NODE_PANEL); return n.length && n }, 'the new Node panel')
