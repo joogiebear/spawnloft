@@ -126,6 +126,9 @@ function changes(before, afterwards) {
 // Files the panel writes on its own clock, whatever is asked: its log. Anything else that changes
 // while a GET runs is that GET's doing.
 const ownClock = (line) => /(^|[\\/])panel\.log$/.test(line.replace(/^\w+ /, ''))
+  // Windows PowerShell, which the panel runs to read scheduled tasks, keeps a startup cache in
+  // the profile it is given (AppData\Local\Microsoft\Windows\PowerShell): its own file, not ours
+  || /^\w+ home[\\/]AppData[\\/]Local[\\/]Microsoft([\\/]Windows([\\/]PowerShell([\\/].*)?)?)?$/.test(line)
 
 // every literal the router compares a segment with, by position
 const source = fs.readFileSync(path.join(HERE, '..', 'src', 'ui.mjs'), 'utf8')
