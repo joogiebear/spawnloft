@@ -221,9 +221,9 @@ check because it runs before the route split (`panel.rs:403`).
   "open SpawnLoft" page instead of the panel, and `curl` against the API returns 401. Both go in
   the release notes; the draft's known issue "The panel trusts programs on this computer"
   (`beta-review/RELEASE-NOTES-DRAFT.md:69`) is removed.
-- `rust-internal.yml` still builds and smoke-tests the Electron window on `v2`.
-  `desktop/main.js` calls `ui.serve` in-process, so `serve()` returns a `loginUrl()` function and
-  `main.js` loads that (about 5 lines) for as long as that job exists.
+- `rust-internal.yml` still builds and smoke-tests the Electron window on `v2`, and
+  `desktop/main.js` calls `ui.serve` in-process. That job is removed rather than taught to sign in
+  (decision 5).
 
 ### 3.9 What is rejected, and why
 
