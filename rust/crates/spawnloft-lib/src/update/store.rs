@@ -257,7 +257,7 @@ impl Store {
         let tmp = dest.with_extension("part");
         std::fs::write(&tmp, bytes)?;
         crate::fsx::rename_over(&tmp, &dest)?;
-        self.prune_cache(keep);
+        self.prune_cache(keep, Some(version));
         Ok(dest)
     }
 
@@ -265,8 +265,10 @@ impl Store {
         let _ = std::fs::remove_dir_all(self.cache_dir().join(version));
     }
 
-    /// Keeps the `keep` highest versions; folders that are not versions go too.
-    pub fn prune_cache(&self, keep: usize) {
+    /// Keeps the `keep` highest versions and `always` (the version just stored: a rollback target
+    /// is lower than what the cache already holds and is about to be installed); folders that are
+    /// not versions go too.
+    pub fn prune_cache(&self, keep: usize, always: Option<&str>) {
         let Ok(entries) = std::fs::read_dir(self.cache_dir()) else {
             return;
         };
@@ -280,8 +282,12 @@ impl Store {
                 }
             }
         }
+        let always = always.and_then(|v| Version::parse(v).ok());
         versions.sort_by(|a, b| b.0.cmp(&a.0));
-        for (_, path) in versions.into_iter().skip(keep) {
+        for (version, path) in versions.into_iter().skip(keep) {
+            if always.as_ref() == Some(&version) {
+                continue;
+            }
             let _ = std::fs::remove_dir_all(path);
         }
     }
@@ -396,7 +402,7 @@ mod tests {
             s.store_artifact(v, "SpawnLoft-Setup.exe", b"x", 2).unwrap();
         }
         std::fs::create_dir_all(s.cache_dir().join("junk")).unwrap();
-        s.prune_cache(2);
+        s.prune_cache(2, None);
         let mut left: Vec<String> = std::fs::read_dir(s.cache_dir())
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
@@ -404,6 +410,25 @@ mod tests {
         left.sort();
         assert_eq!(left, ["2.0.1", "2.0.2"]);
         assert!(s.cache_file("2.0.2", "SpawnLoft-Setup.exe").is_file());
+        let _ = std::fs::remove_dir_all(&s.dir);
+    }
+
+    #[test]
+    fn a_rollback_target_below_the_cached_versions_is_kept() {
+        let s = Store::new(temp("cache-rollback"));
+        for v in ["2.0.0-beta.2", "2.0.0-beta.3"] {
+            s.store_artifact(v, "SpawnLoft-Setup.exe", b"x", 2).unwrap();
+        }
+        // rolling back to beta.1: lower than both, and it is the one about to be installed
+        let kept = s
+            .store_artifact("2.0.0-beta.1", "SpawnLoft-Setup.exe", b"x", 2)
+            .unwrap();
+        assert!(kept.is_file());
+        assert!(s.cache_file("2.0.0-beta.3", "SpawnLoft-Setup.exe").is_file());
+        // the next ordinary download prunes it again
+        s.store_artifact("2.0.0-beta.4", "SpawnLoft-Setup.exe", b"x", 2)
+            .unwrap();
+        assert!(!kept.exists());
         let _ = std::fs::remove_dir_all(&s.dir);
     }
 

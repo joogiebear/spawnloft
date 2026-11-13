@@ -13,12 +13,23 @@
 //      make_latest flags. make_latest follows the rule in release-gate.releaseFlags: a beta is a
 //      prerelease and is never latest; a stable release is latest unless deliberately held back.
 //
+// The gate runs in release mode (release-gate.mjs --release; rust/beta-review/REVIEW.md B5): at
+// least everything the build checked, so a publish never takes bytes the build gate would refuse.
+// That is the setup's Authenticode publisher, the Linux packages, the binary versions, what every
+// build trusts (B6), a complete platform set (B4) and a feed signed by a release key. A check
+// this machine cannot make (Authenticode off Windows; the Linux packages without dpkg-deb and
+// rpm) must be covered by an --evidence record a passing gate wrote on a machine that could, for
+// the same bytes; otherwise nothing is published. --partial, --throwaway-key and --unsigned exist
+// for the dry runs; --confirm refuses the last two.
+//
 // Nothing publishes without --confirm, and the publish step is never run by the dry-run workflow.
 // The real run needs the TAURI signing secrets (already spent at build time) and gh auth.
 //
 //   node release-publish.mjs --dir <assembled dir> --version <v> --commit <sha>
 //        [--channel stable|beta] [--make-latest true|false] [--repo joogiebear/spawnloft]
-//        [--notes <file>] [--check-binary-versions] [--installed <dir>]... [--confirm]
+//        [--notes <file>] [--installed <dir>]... [--binary <file>]... [--evidence <record>]...
+//        [--authenticode-cn <name>] [--partial] [--throwaway-key] [--unsigned] [--confirm]
+//        [--allow-prebeta-number]   (beta.1000 and up are pre-beta build numbers; refused otherwise)
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -46,9 +57,19 @@ function parseArgs(argv) {
       case '--repo': out.repo = value(); break
       case '--notes': out.notes = value(); break
       case '--pubkey': out.pubkey = value(); break
-      case '--check-binary-versions': out.checkBinaryVersions = true; break
+      // always on now (release mode); accepted so older command lines keep working
+      case '--check-binary-versions': break
       case '--installed': (out.installed ??= []).push(value()); break
+      case '--binary': (out.binaries ??= []).push(value()); break
+      case '--evidence': (out.evidence ??= []).push(value()); break
+      case '--authenticode-cn': out.authenticodeCn = value(); break
+      case '--partial': out.partial = true; break
+      // a real publish of fewer than all platforms: 1.x installs on the missing ones get no update
+      case '--allow-partial-publish': out.allowPartialPublish = true; break
+      case '--throwaway-key': out.throwawayKey = true; break
+      case '--unsigned': out.unsigned = true; break
       case '--confirm': out.confirm = true; break
+      case '--allow-prebeta-number': out.allowPrebetaNumber = true; break
       default: throw new Error(`unknown argument ${a}`)
     }
   }
@@ -64,12 +85,26 @@ function assetPaths(dir) {
   return fs.readdirSync(dir).filter(n => fs.statSync(path.join(dir, n)).isFile()).map(n => path.join(dir, n))
 }
 
-export function main(argv) {
-  const opts = parseArgs(argv)
+// `inject` is for the tests: { tools } stands in for what this host can check.
+export function main(argv, inject = {}) {
+  const opts = { ...parseArgs(argv), ...inject }
   const { prerelease, makeLatest } = releaseFlags(opts.channel, opts.makeLatest)
 
-  // 1. the gate, on the exact bytes about to be published
-  const result = gate({ dir: opts.dir, version: opts.version, pubkey: opts.pubkey, channel: opts.channel, makeLatest: opts.makeLatest, checkBinaryVersions: opts.checkBinaryVersions, installed: opts.installed })
+  // Pre-beta builds made on the signing machine are numbered beta.1001 and up so they never take
+  // a public number (rust/SIGNING-WINDOWS.md). One of them published would sit above every real
+  // beta: the ordering rule below would then refuse 2.0.0-beta.1 for good.
+  if (opts.confirm && isPrebetaNumber(opts.version) && !opts.allowPrebetaNumber) {
+    throw new Error(`${opts.version} is a pre-beta build number (beta.1000 and up are never published); nothing was published`)
+  }
+  // the two dry-run waivers never reach a real publish
+  if (opts.confirm && opts.throwawayKey) throw new Error('--throwaway-key is for dry runs: a release is signed by a release key; nothing was published')
+  if (opts.confirm && opts.partial && !opts.allowPartialPublish) throw new Error('--partial is for dry runs: a published release carries every platform (pass --allow-partial-publish only on purpose); nothing was published')
+  if (opts.confirm && opts.unsigned) throw new Error('--unsigned is for dry runs: every 1.x Windows install checks the publisher; nothing was published')
+
+  // 1. the gate in release mode, on the exact bytes about to be published (B5)
+  const result = gate({ dir: opts.dir, version: opts.version, pubkey: opts.pubkey, channel: opts.channel, makeLatest: opts.makeLatest,
+    release: true, authenticodeCn: opts.authenticodeCn, partial: opts.partial, throwawayKey: opts.throwawayKey, unsigned: opts.unsigned,
+    installed: opts.installed, binaries: opts.binaries, evidence: opts.evidence, tools: opts.tools })
   if (!result.ok) {
     for (const p of result.problems) console.error(`  FAIL ${p}`)
     throw new Error('the release gate did not pass; nothing was published')
@@ -80,7 +115,8 @@ export function main(argv) {
   const local = assets.map(p => { const bytes = fs.readFileSync(p); return { name: path.basename(p), size: bytes.length, sha256: sha256(bytes), path: p } })
 
   if (!opts.confirm) {
-    console.log(`DRY: would publish ${tag} to ${opts.repo} from ${opts.commit.slice(0, 12)}: ${assets.length} assets, prerelease=${prerelease}, make_latest=${makeLatest}.`)
+    for (const n of result.notes) console.log(`  ok   ${n}`)
+    console.log(`DRY: would publish ${tag} to ${opts.repo} from ${opts.commit.slice(0, 12)}: ${assets.length} assets${opts.partial ? ` (PARTIAL: ${result.platforms.join(', ')})` : ''}, prerelease=${prerelease}, make_latest=${makeLatest}.`)
     console.log('Pass --confirm (with gh authenticated and the signing already done) to publish.')
     return { tag, prerelease, makeLatest, assets: local.map(a => a.name) }
   }
@@ -120,6 +156,12 @@ export function main(argv) {
   gh(['release', 'edit', tag, '--repo', opts.repo, `--draft=false`, `--prerelease=${prerelease}`, `--latest=${makeLatest}`])
   console.log(`Published ${tag}: ${local.length} assets, prerelease=${prerelease}, make_latest=${makeLatest}.`)
   return { tag, prerelease, makeLatest, assets: local.map(a => a.name) }
+}
+
+// `X.Y.Z-beta.N` with N of 1000 or more: the numbers the pre-beta builds use.
+export function isPrebetaNumber(version) {
+  const m = /-beta\.(\d+)$/.exec(version)
+  return !!m && Number(m[1]) >= 1000
 }
 
 // Ordering (P0-E 4b / design 11): a 2.x release must be a higher version than every published

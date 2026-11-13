@@ -10,6 +10,10 @@ on:
     # ready_for_review is not a default type; without it, marking the draft ready runs nothing
     types: [opened, synchronize, reopened, ready_for_review]
 
+# tests only: nothing here writes to the repository
+permissions:
+  contents: read
+
 jobs:
   # dev is next month's release and main is this month's, and the version says which is which.
   # A prerelease version on dev is what switches the beta pipeline ON: after a stable release dev

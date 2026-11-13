@@ -891,6 +891,7 @@ impl<'a> Context<'a> {
             "target": self.target,
             "keys": self.keys.iter().map(|k| json!({ "id": k.id, "from": k.from })).collect::<Vec<_>>(),
             "keysOverridden": keys::is_overridden(),
+            "feed": fetch::FEED_KIND,
             "feedBaseline": policy::FEED_BASELINE,
             "dataFormat": Store::data_format(&self.data_root).ok(),
             "lastCheckAt": state.last_check_at,
@@ -957,9 +958,13 @@ pub fn sha512_hex(bytes: &[u8]) -> String {
 /// sha512. `Ok` means the bytes are exactly the release's artifact.
 pub fn verify_artifact(bytes: &[u8], pinned: &Pinned, keys: &[TrustedKey]) -> Result<(), String> {
     let Some(sig) = pinned.signature.as_deref() else {
-        return Err(
-            "this platform's package carries no signature; install it with the package manager".to_string(),
-        );
+        // Linux packages carry no minisign signature (the package manager installs them, design
+        // 5.7): the signed envelope's size and sha512 are what bind the bytes. Every other
+        // platform's artifact is run by this program and must be signed.
+        if !pinned.target.starts_with("linux-") {
+            return Err(format!("the {} artifact carries no signature", pinned.target));
+        }
+        return check_size_and_digest(bytes, pinned);
     };
     let key = keys
         .iter()
@@ -974,6 +979,11 @@ pub fn verify_artifact(bytes: &[u8], pinned: &Pinned, keys: &[TrustedKey]) -> Re
     let want = Version::parse(&pinned.version).map_err(|e| e.to_string())?;
     envelope::check_trusted_comment(signature.trusted_comment(), &pinned.file, &want)
         .map_err(|r| format!("artifact signature: {r}"))?;
+    check_size_and_digest(bytes, pinned)
+}
+
+/// The envelope's size and sha512 for `bytes`.
+fn check_size_and_digest(bytes: &[u8], pinned: &Pinned) -> Result<(), String> {
     if bytes.len() as u64 != pinned.size {
         return Err(format!(
             "the artifact is {} bytes, the feed said {}",
@@ -1012,7 +1022,7 @@ pub fn apply(ctx: &Context<'_>, pinned: &Pinned, run_installer: bool) -> Result<
             let cap = usize::try_from(pinned.size.min(ARTIFACT_CAP as u64)).unwrap_or(usize::MAX);
             let b = ctx
                 .fetch
-                .get(&pinned.url, cap)
+                .download(&pinned.url, cap)
                 .map_err(|e| format!("download failed: {e}"))?;
             if let Err(why) = verify_artifact(&b, pinned, &ctx.keys) {
                 ctx.store
@@ -1614,6 +1624,44 @@ mod tests {
             "{notice}"
         );
         assert!(linux_cli_notice(&p, "rpm").contains("sudo dnf install ./spawnloft-cli-"));
+    }
+
+    #[test]
+    fn a_linux_package_is_bound_by_the_envelope_and_nothing_else_goes_unsigned() {
+        let key = TestKey::generate();
+        let package = b"deb bytes".to_vec();
+        let sha = sha512_hex(&package);
+        let env = envelope::parse(
+            &envelope_json(&key.trusted.id, "2.0.0-beta.3", |m| {
+                m["platforms"]["linux-x86_64-deb"]["sha512"] = sha.clone().into();
+                m["platforms"]["linux-x86_64-deb"]["size"] = (package.len() as u64).into();
+            }),
+            beta(),
+        )
+        .unwrap();
+        let (target, entry) = platform_entry(&env, "linux-x86_64-deb").unwrap();
+        let p = Pinned::from(&env, &key.trusted, target, entry, false);
+        assert!(p.signature.is_none());
+        let keys = vec![key.trusted.clone()];
+        assert_eq!(verify_artifact(&package, &p, &keys), Ok(()));
+        assert!(
+            verify_artifact(b"deb bytez", &p, &keys)
+                .unwrap_err()
+                .contains("sha512")
+        );
+        assert!(
+            verify_artifact(b"longer deb bytes", &p, &keys)
+                .unwrap_err()
+                .contains("bytes")
+        );
+        // a record for a platform whose artifact this program runs is never taken unsigned
+        let mut windows = p.clone();
+        windows.target = "windows-x86_64".into();
+        assert!(
+            verify_artifact(&package, &windows, &keys)
+                .unwrap_err()
+                .contains("no signature")
+        );
     }
 
     #[test]

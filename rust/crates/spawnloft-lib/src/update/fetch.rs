@@ -6,10 +6,20 @@
 //! loopback `http://127.0.0.1:<port>/` base that a test serves; a release build has no override.
 //!
 //! [`Fetch`] is the HTTP side behind a trait so the check logic is tested against fixtures. The
-//! real one is `ureq` with rustls, hard caps on body size, and a global timeout per request.
+//! real one is `ureq` with rustls, hard caps on body size, a global timeout per feed request and a stall timeout per artifact
+//! download.
 
 use std::fmt;
 use std::time::Duration;
+
+/// Which feed code this build carries, as `update status` reports it (`feed`). The release gate
+/// (desktop/release-gate.mjs) also reads it straight out of the binary, so a test build with the
+/// `internal-feed` feature (loopback HTTP feeds, `SPAWNLOFT_UPDATE_SOURCE`) can never pass for a
+/// release. Exactly one of the two strings is compiled into a binary.
+#[cfg(not(feature = "internal-feed"))]
+pub const FEED_KIND: &str = "spawnloft-feed:release";
+#[cfg(feature = "internal-feed")]
+pub const FEED_KIND: &str = "spawnloft-feed:internal";
 
 /// Where releases are.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,6 +96,12 @@ impl fmt::Display for FetchError {
 /// One GET, the whole body, at most `cap` bytes.
 pub trait Fetch {
     fn get(&self, url: &str, cap: usize) -> Result<Vec<u8>, FetchError>;
+
+    /// The same for a release artifact (tens of megabytes): the real client times the stall, not
+    /// the whole transfer, so a slow line still finishes.
+    fn download(&self, url: &str, cap: usize) -> Result<Vec<u8>, FetchError> {
+        self.get(url, cap)
+    }
 }
 
 /// Whether this build fetches from `url` at all: HTTPS always; plain HTTP only to loopback and
@@ -104,8 +120,17 @@ pub fn allowed_url(url: &str) -> bool {
 /// The real client.
 #[derive(Debug)]
 pub struct Https {
+    /// Feed reads: small bodies under one end-to-end budget.
     agent: ureq::Agent,
+    /// Artifact downloads: an installer does not fit in the feed budget on a slow line, so the
+    /// stall is what is timed (per read), under a generous total.
+    artifacts: ureq::Agent,
 }
+
+/// The end-to-end budget for one artifact download.
+const ARTIFACT_BUDGET: Duration = Duration::from_secs(60 * 60);
+/// A download that sends nothing for this long is given up.
+const ARTIFACT_STALL: Duration = Duration::from_secs(60);
 
 impl Default for Https {
     fn default() -> Self {
@@ -115,30 +140,34 @@ impl Default for Https {
 
 impl Https {
     pub fn new(timeout: Duration) -> Https {
-        let config = ureq::Agent::config_builder()
-            .timeout_global(Some(timeout))
-            .http_status_as_error(false)
-            .max_redirects(5)
-            // a redirect must not step down to plain HTTP; the loopback test feed is the one exception
-            .https_only(!cfg!(feature = "internal-feed"))
-            .user_agent(format!(
-                "SpawnLoft/{} (update check)",
-                crate::build::current().version
-            ))
+        let builder = || {
+            ureq::Agent::config_builder()
+                .http_status_as_error(false)
+                .max_redirects(5)
+                // a redirect must not step down to plain HTTP; the loopback test feed is the one exception
+                .https_only(!cfg!(feature = "internal-feed"))
+                .user_agent(format!(
+                    "SpawnLoft/{} (update check)",
+                    crate::build::current().version
+                ))
+        };
+        let feed = builder().timeout_global(Some(timeout)).build();
+        let artifacts = builder()
+            .timeout_global(Some(ARTIFACT_BUDGET))
+            .timeout_connect(Some(timeout))
+            .timeout_per_read(Some(ARTIFACT_STALL))
             .build();
         Https {
-            agent: ureq::Agent::new_with_config(config),
+            agent: ureq::Agent::new_with_config(feed),
+            artifacts: ureq::Agent::new_with_config(artifacts),
         }
     }
-}
 
-impl Fetch for Https {
-    fn get(&self, url: &str, cap: usize) -> Result<Vec<u8>, FetchError> {
+    fn read(agent: &ureq::Agent, url: &str, cap: usize) -> Result<Vec<u8>, FetchError> {
         if !allowed_url(url) {
             return Err(FetchError::Scheme(url.to_string()));
         }
-        let mut resp = self
-            .agent
+        let mut resp = agent
             .get(url)
             .header(
                 "Accept",
@@ -171,6 +200,16 @@ impl Fetch for Https {
             return Err(FetchError::TooLarge);
         }
         Ok(bytes)
+    }
+}
+
+impl Fetch for Https {
+    fn get(&self, url: &str, cap: usize) -> Result<Vec<u8>, FetchError> {
+        Https::read(&self.agent, url, cap)
+    }
+
+    fn download(&self, url: &str, cap: usize) -> Result<Vec<u8>, FetchError> {
+        Https::read(&self.artifacts, url, cap)
     }
 }
 
@@ -228,6 +267,16 @@ mod tests {
         let t = Source::from_base("http://127.0.0.1:8123/");
         assert_eq!(t.atom, "http://127.0.0.1:8123/releases.atom");
         assert_eq!(t.download, "http://127.0.0.1:8123/download/");
+    }
+
+    #[test]
+    fn the_feed_kind_names_the_feature() {
+        let want = if cfg!(feature = "internal-feed") {
+            "spawnloft-feed:internal"
+        } else {
+            "spawnloft-feed:release"
+        };
+        assert_eq!(FEED_KIND, want);
     }
 
     #[test]

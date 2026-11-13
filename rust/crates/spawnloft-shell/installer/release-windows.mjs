@@ -20,8 +20,11 @@
 //   4. `tauri build` with bundle.windows.signCommand = sign-windows.ps1, which signs the shell,
 //      the uninstaller (inside makensis) and the setup;
 //   5. assembles the update asset set (desktop/release-feed.mjs), the same step as release.yml;
-//   6. runs the release gate with --authenticode-cn "victor zemeckis" and --signed for the
-//      shell, the core and node.exe, --check-binary-versions, --runtime and --payload;
+//   6. runs the release gate in release mode on this Windows half (--release --partial) with
+//      --authenticode-cn "victor zemeckis" and --signed for the shell, the core and node.exe,
+//      --binary for the shell and core (what they trust), --runtime and --payload, and has it
+//      write <out>.gate-record.json: the Authenticode and trust checks bound to the setup's
+//      sha256, which the assembly and the publish step take as --evidence;
 //   7. writes <out>.signing-report.json beside the folder (commit, version, key, each file's
 //      sha256 and signer), so the folder itself holds only the release assets.
 //
@@ -31,8 +34,10 @@
 // installed-copy checks (--installed, the uninstaller's signature) belong to the W8 runs on a
 // clean VM, with this folder's setup.
 //
-// The release key: without --key a throwaway minisign key is made for the run, and the build's
-// updater trusts only that key, so these builds can never take or offer a real update. With the
+// The release key: without --key a throwaway minisign key is made for the run and signs this
+// run's feed and artifacts, so nothing here can be offered to a real install. The build itself
+// still trusts the release keys compiled into the core (update/keys.rs), like every build: what
+// keeps a pre-beta install from taking a public beta is only its higher beta number. With the
 // real key (UPDATER-KEYS.md), pass --key/--pubkey and put the password in
 // TAURI_SIGNING_PRIVATE_KEY_PASSWORD; it is read from the environment and never written down.
 import crypto from 'node:crypto'
@@ -79,13 +84,22 @@ export function signingSettings(desktopPackage) {
   return { SPAWNLOFT_SIGN_ENDPOINT: o.endpoint, SPAWNLOFT_SIGN_ACCOUNT: o.codeSigningAccountName, SPAWNLOFT_SIGN_PROFILE: o.certificateProfileName, SPAWNLOFT_SIGN_PUBLISHER: o.publisherName }
 }
 
-// The gate's command line for the assembled folder.
-export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, nodeExe, runtime, payload }) {
-  return ['--dir', out, '--version', version, '--pubkey', pubkey, '--authenticode-cn', publisher, '--check-binary-versions',
-    '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--runtime', runtime, '--payload', payload]
+// The gate's command line for the assembled folder: release mode on the Windows half of a release
+// (--partial), the built shell and core read for what they trust (the setup is compressed, so this
+// is the machine that can prove it), and the record of the checks only Windows can make written
+// for the assembly and the publish step (--evidence there). A throwaway-key run says so.
+export function gateArgs({ out, version, pubkey, publisher, shellExe, coreExe, nodeExe, runtime, payload, record, throwaway }) {
+  return ['--dir', out, '--version', version, '--pubkey', pubkey, '--release', '--partial', ...(throwaway ? ['--throwaway-key'] : []),
+    '--authenticode-cn', publisher, '--check-binary-versions',
+    '--signed', shellExe, '--signed', coreExe, '--signed', `${nodeExe}=${OPENJS_CN}`, '--binary', shellExe, '--binary', coreExe,
+    '--runtime', runtime, '--payload', payload, ...(record ? ['--write-record', record] : [])]
 }
 
-const withoutKey = e => Object.fromEntries(Object.entries(e).filter(([k]) => !/^TAURI_SIGNING_PRIVATE_KEY/i.test(k)))
+// Left out of every build step: the release key (only the two signing steps get it), and the
+// build-time switches of the test builds. SPAWNLOFT_UPDATE_PUBKEYS is compiled into the core
+// (spawnloft-lib build.rs) and would make a signed build trust a test key list; the other two
+// belong to the CI feed scenarios. A terminal that still has one set must not shape a signed build.
+const withoutKey = e => Object.fromEntries(Object.entries(e).filter(([k]) => !/^(TAURI_SIGNING_PRIVATE_KEY|SPAWNLOFT_UPDATE_PUBKEYS$|SPAWNLOFT_UPDATE_SOURCE$|SPAWNLOFT_FEED_BASELINE$)/i.test(k)))
 const step = title => console.log(`\n== ${title}`)
 const stop = message => { console.error(`\nStopped: ${message}`); process.exit(1) }
 function run(cmd, args, { cwd = ROOT, env = process.env, shell = false } = {}) {
@@ -212,7 +226,7 @@ async function main(argv) {
     keyFile = path.join(work, 'throwaway.key')
     run(process.execPath, [tauri, 'signer', 'generate', '--ci', '-p', '', '-w', keyFile, '-f'], { env })
     pubB64File = `${keyFile}.pub`
-    console.log('a THROWAWAY key: this build trusts only it, so it can never take or offer a real update')
+    console.log('a THROWAWAY key signs this run: nothing built here can be offered to a real install')
   }
   // the CLI writes the .pub as one base64 line of the two-line minisign file; the gate takes the decoded form
   const pubText = fs.readFileSync(pubB64File, 'utf8')
@@ -251,7 +265,8 @@ async function main(argv) {
     '--tauri', tauri, '--win', setup, '--min-version', '2.0.0-beta.1', '--date', new Date().toISOString().replace(/\.\d+Z$/, 'Z')], { env: keyEnv })
 
   step('The release gate')
-  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg })])
+  const record = `${out}.gate-record.json`
+  run(process.execPath, [path.join(ROOT, 'desktop', 'release-gate.mjs'), ...gateArgs({ out, version, pubkey: pubFile, publisher, shellExe, coreExe, nodeExe, runtime: path.join(cfg, 'runtime'), payload: cfg, record, throwaway: !opts.key })])
 
   // beside the folder, not in it: the folder holds exactly the release assets, so the gate (and a
   // later publish step) find nothing unaccounted for

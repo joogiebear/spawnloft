@@ -25,6 +25,10 @@ on:
       - 'desktop/release-gate.mjs'
       - 'desktop/release-publish.mjs'
       - 'desktop/release-feed.test.mjs'
+      - 'desktop/build-trust.mjs'
+      - 'desktop/release-assemble.mjs'
+      - 'desktop/package.json'
+      - 'rust/crates/spawnloft-lib/src/update/**'
       - 'desktop/update-envelope.mjs'
       - 'desktop/update-envelope.test.mjs'
       - 'desktop/preview-artifacts.mjs'
@@ -139,14 +143,17 @@ jobs:
           "DRY_INSTALLED=$env:LOCALAPPDATA\Programs\SpawnLoft" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: The release gate
         run: |
+          # release mode, as a publish runs it, with the three dry-run waivers said out loud: one
+          # platform (--partial), a throwaway feed key, an unsigned setup. What the build trusts is
+          # read from the installed copy (its shell and core, and the core's update status).
           node desktop/release-gate.mjs --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
-            --check-binary-versions --installed "$DRY_INSTALLED" \
+            --release --partial --throwaway-key --unsigned --installed "$DRY_INSTALLED" \
             --runtime "$DRY_INSTALLED/resources/runtime" --payload "$DRY_INSTALLED"
       - name: The publish ordering, in dry mode (nothing is published)
         run: |
           node desktop/release-publish.mjs \
             --dir "$RUNNER_TEMP/release" --version "$DRY_VERSION" --pubkey "$RUNNER_TEMP/release.pub" \
-            --commit "$GITHUB_SHA" --check-binary-versions --installed "$DRY_INSTALLED"
+            --commit "$GITHUB_SHA" --partial --throwaway-key --unsigned --installed "$DRY_INSTALLED"
       - name: Show the assembled feed
         run: |
           echo "===== spawnloft-updates.json"; cat "$RUNNER_TEMP/release/spawnloft-updates.json"
