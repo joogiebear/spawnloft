@@ -16,4 +16,15 @@ function authorization(configDir, port) {
   return `SpawnLoft ${body}.${crypto.createHmac('sha256', key).update(body).digest('base64url')}`
 }
 
-module.exports = { authorization }
+// The panel proving itself to a caller that holds the key (what `spawnloft ui` asks before it
+// calls something on a port "a SpawnLoft panel"): true when a signed request carrying a fresh
+// nonce is answered with that nonce's signature.
+async function provesItself(configDir, url) {
+  const key = Buffer.from(fs.readFileSync(path.join(configDir, 'panel.key'), 'utf8').trim(), 'base64url')
+  const nonce = crypto.randomBytes(16).toString('base64url')
+  const res = await fetch(url, { headers: { authorization: authorization(configDir, new URL(url).port), 'x-spawnloft-probe': nonce } })
+  const want = crypto.createHmac('sha256', key).update(`probe.v1.${nonce}`).digest('base64url')
+  return res.status === 200 && res.headers.get('x-spawnloft-proof') === want
+}
+
+module.exports = { authorization, provesItself }

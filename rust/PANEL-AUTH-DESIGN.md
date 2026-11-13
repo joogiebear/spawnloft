@@ -340,5 +340,32 @@ Where the code is more exact than, or differs from, the text above:
   smoke scripts sign their own requests, so the retired package job keeps passing until thread 2
   removes it. That leg runs only on pushes to `v2`, so it could not be run before the merge.
 
+Changed after the independent review of this build:
+
+- **The CLI's "is that my panel" question is answered with proof.** A token proves the caller to
+  the panel, not the panel to the caller: anything holding the port could answer 200 and be
+  called "a SpawnLoft panel" and handed a sign-in link (3.4 says "only this user's panel answers 200"; anything can). The CLI now sends a
+  fresh nonce in `X-SpawnLoft-Probe` with its signed request, and a panel answers an allowed
+  request with `X-SpawnLoft-Proof`, the HMAC of `probe.v1.<nonce>` under the key. The text signed
+  can never be a token (those start `v1.`), and it is no open route: 3.9's objection does not
+  apply. The proxy passes both headers through.
+- **Spent login nonces** are forgotten only when the wall clock and the listener's own tick clock
+  both say the token is dead, so a clock stepped forward and back does not make a used link good
+  again.
+- **The Node panel releases a session's request when its connection closes** as well as when the
+  response does: a response queued behind another on a dropped connection never closes itself,
+  and the session would never have idled out.
+- **A key file that exists** must be a plain file of this user (not a link, not another
+  account's); one that others can read is made private again before use (Unix). The Node panel
+  refuses to write a key into a file it could not make private.
+
+Known limits, accepted:
+
+- Whoever can set the machine's clock back to before a token was issued, while the listener that
+  the token names is gone and another has taken its port, can make that token good again for its
+  lifetime. The start-time rule cannot tell such a token from a fresh one.
+- The idle timer does not bound a stolen session: its holder can keep one request open. It ends
+  with the listener.
+
 Not done here and still owed: the test that no GET route writes (3.4 step 3 depends on it), which
 needs a route table or a sweep of `ui.mjs` and goes with thread 2.

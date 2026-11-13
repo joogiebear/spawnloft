@@ -25,7 +25,7 @@ import * as backup from './src/backup.mjs'
 import * as create from './src/create.mjs'
 import * as paper from './src/paper.mjs'
 import * as ui from './src/ui.mjs'
-import { apiAuthorization, loadKey, makeToken } from './src/panel-auth.mjs'
+import { PROBE_HEADER, PROOF_HEADER, apiAuthorization, loadKey, makeToken, probeNonce, proofMatches } from './src/panel-auth.mjs'
 import * as manage from './src/manage.mjs'
 import * as settings from './src/settings.mjs'
 import * as java from './src/java.mjs'
@@ -1285,17 +1285,21 @@ async function cmdUi(positional, flags) {
   out('for this machine, not the network. Ctrl+C to stop the panel (servers keep running).')
 }
 
-// Something on the port answers the launcher's summary route the way a SpawnLoft panel does.
-// Asked with a token signed by this install's key, so only this user's panel answers 200: there
-// is no route that tells a stranger a panel is here.
+// This user's SpawnLoft panel is what holds the port. Anything can answer 200 there, so the
+// panel has to prove it holds this install's key: the request carries a fresh nonce and the
+// answer must carry its signature. The request is signed as well, so there is no route that
+// tells a stranger a panel is here.
 async function isPanelAt(base) {
   try {
+    const key = loadKey()
+    const nonce = probeNonce()
     const res = await fetch(base + 'api/client/launcher', {
       redirect: 'error',
       signal: AbortSignal.timeout(2000),
-      headers: { authorization: apiAuthorization(Number(new URL(base).port)) },
+      headers: { authorization: apiAuthorization(Number(new URL(base).port)), [PROBE_HEADER]: nonce },
     })
     if (!res.ok) return false
+    if (!proofMatches(key, nonce, res.headers.get(PROOF_HEADER))) return false
     const body = await res.json()
     return Array.isArray(body?.profiles)
   } catch {

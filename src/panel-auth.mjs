@@ -49,9 +49,27 @@ function parseKey(text) {
   return key.length === 32 && key.toString('base64url') === line ? key : null
 }
 
+// A key file that exists must be a plain file of this user. One that others can read (a restore
+// or a copy can leave it so) is made private again before it is used. On Windows the ACL is set
+// when the file is made, and `doctor` checks it.
+function checkKeyFile(file) {
+  if (process.platform === 'win32') return
+  let stat
+  try {
+    stat = fs.lstatSync(file)
+  } catch (err) {
+    if (err.code === 'ENOENT') return
+    throw err
+  }
+  if (!stat.isFile()) throw new Error('it is not a plain file; delete it and start the panel again')
+  if (stat.uid !== process.getuid()) throw new Error('it belongs to another account; delete it and start the panel again')
+  if ((stat.mode & 0o077) !== 0) fs.chmodSync(file, 0o600)
+}
+
 function readKey(file) {
   let text
   try {
+    checkKeyFile(file)
     text = fs.readFileSync(file, 'utf8')
   } catch (err) {
     if (err.code === 'ENOENT') return { missing: true }
@@ -83,7 +101,10 @@ function createKey(file) {
       try {
         writeNew(file, text)
       } catch (second) {
-        if (second.code !== 'EEXIST') throw second
+        if (second.code === 'EEXIST') return
+        // made here and not usable: do not leave an empty key file behind
+        fs.rmSync(file, { force: true })
+        throw second
       }
     }
   } finally {
@@ -95,7 +116,9 @@ function createKey(file) {
 function writeNew(file, text) {
   const fd = fs.openSync(file, 'wx', 0o600)
   try {
-    protectPrivateFile(file)
+    // no key in a file that could not be made private
+    const made = protectPrivateFile(file)
+    if (!made.ok) throw new Error(`could not make ${file} private: ${made.reason}`)
     fs.writeSync(fd, text)
     fs.fsyncSync(fd)
   } finally {
@@ -176,7 +199,7 @@ export class PanelAuth {
     this.port = port
     this.started = started
     this.sessions = new Map() // sessionKey -> { seen (idle clock ms), active (open requests) }
-    this.used = new Map() // login nonce -> issued
+    this.used = new Map() // login nonce -> { issued, spent (idle clock ms) }
   }
 
   // `headers` is a list of [name, value] pairs as they came. `now` is the wall clock (tokens);
@@ -241,11 +264,14 @@ export class PanelAuth {
     }
     const checked = checkToken(this.key, token, { purpose: 'login', port: this.port, now, started: this.started })
     if (!checked.ok) return { kind: 'login-refused' }
-    for (const [nonce, issued] of this.used) {
-      if (now - issued > LOGIN_TTL_MS + FUTURE_LEEWAY_MS) this.used.delete(nonce)
+    // forgotten only when both clocks say the token is long dead: the wall clock alone can be
+    // stepped forward and back again, which would make a spent link good a second time
+    const keep = LOGIN_TTL_MS + FUTURE_LEEWAY_MS
+    for (const [nonce, { issued, spent }] of this.used) {
+      if (now - issued > keep && idleNow - spent > keep) this.used.delete(nonce)
     }
     if (this.used.has(checked.nonce)) return { kind: 'login-refused' }
-    this.used.set(checked.nonce, checked.issued)
+    this.used.set(checked.nonce, { issued: checked.issued, spent: idleNow })
     return { kind: 'login', session: this.newSession(idleNow), to: LOGIN_TARGETS.includes(to) ? to : '/' }
   }
 
@@ -286,6 +312,29 @@ export class PanelAuth {
     const token = makeToken(this.key, 'login', this.port, { now })
     return `http://127.0.0.1:${this.port}/auth?t=${token}${LOGIN_TARGETS.includes(to) ? `&to=${to}` : ''}`
   }
+}
+
+// How a caller that holds the key tells this user's panel from anything else that answers on
+// the port: it sends a fresh nonce in PROBE_HEADER with a signed request, and only a panel with
+// the same key can answer with this in PROOF_HEADER. A token alone proves the caller to the
+// panel, not the panel to the caller.
+export const PROBE_HEADER = 'x-spawnloft-probe'
+export const PROOF_HEADER = 'x-spawnloft-proof'
+
+export function probeNonce() {
+  return crypto.randomBytes(16).toString('base64url')
+}
+
+// null unless `nonce` is one well-formed nonce; the text signed cannot be a token's
+export function probeProof(key, nonce) {
+  if (typeof nonce !== 'string' || nonce.length !== 22 || !B64URL.test(nonce)) return null
+  return mac(key, `probe.v1.${nonce}`).toString('base64url')
+}
+
+export function proofMatches(key, nonce, proof) {
+  const want = probeProof(key, nonce)
+  if (!want || typeof proof !== 'string' || proof.length !== want.length) return false
+  return crypto.timingSafeEqual(Buffer.from(proof), Buffer.from(want))
 }
 
 // `Authorization` for a caller that can read the key, for the panel on `port` of this machine

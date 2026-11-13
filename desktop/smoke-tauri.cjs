@@ -17,7 +17,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn, execFileSync } = require('node:child_process')
-const { authorization } = require('./smoke-panel-auth.cjs')
+const { authorization, provesItself } = require('./smoke-panel-auth.cjs')
 
 const [shellExe, coreExe, coreDir, outDir] = process.argv.slice(2).map((p) => p && path.resolve(p))
 assert.ok(shellExe && coreExe && coreDir && outDir, 'usage: smoke-tauri.cjs <shell> <core> <core dir> <artifacts>')
@@ -157,6 +157,8 @@ async function main() {
     assert.equal((await fetch(`http://127.0.0.1:${panel.port}/api/setup`, { headers: { authorization: authorization(configDir, panel.port) } })).status, 200, 'a token signed with the install\'s key')
     // a page on another loopback port could make the browser send the cookie; such a request is refused
     assert.equal((await fetch(`http://127.0.0.1:${panel.port}/api/setup`, { headers: { authorization: authorization(configDir, panel.port), 'sec-fetch-site': 'same-site' } })).status, 403)
+    // through the proxy too, the panel proves it holds the key to a caller that asks
+    assert.ok(await provesItself(configDir, `http://127.0.0.1:${panel.port}/api/client/launcher`), 'the panel proves itself')
     const nodePort = isWin ? null : listeningPort(pids(NODE_PANEL)[0])
     if (nodePort) {
       assert.notEqual(nodePort, Number(panel.port))

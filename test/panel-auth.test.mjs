@@ -110,11 +110,18 @@ test('a session with an open request does not idle out, and does once it closed'
 
 test('used login nonces are forgotten once their token has expired anyway', () => {
   const rule = new auth.PanelAuth({ key, port: 9, started: 0 })
-  const go = (now, nonce) => rule.decide({ method: 'GET', target: `/auth?t=${auth.makeToken(key, 'login', 9, { now, nonce })}`, headers: [['host', 'localhost:9']] }, { now })
-  assert.equal(go(1000, 'A'.repeat(22)).kind, 'login')
+  const link = (now, nonce) => ({ method: 'GET', target: `/auth?t=${auth.makeToken(key, 'login', 9, { now, nonce })}`, headers: [['host', 'localhost:9']] })
+  const go = (now, idleNow, nonce) => rule.decide(link(now, nonce), { now, idleNow })
+  assert.equal(go(1000, 0, 'A'.repeat(22)).kind, 'login')
   assert.equal(rule.used.size, 1)
-  assert.equal(go(1000 + auth.LOGIN_TTL_MS + auth.FUTURE_LEEWAY_MS + 1, 'B'.repeat(22)).kind, 'login')
-  assert.deepEqual([...rule.used.keys()], ['B'.repeat(22)])
+  const later = 1000 + auth.LOGIN_TTL_MS + auth.FUTURE_LEEWAY_MS + 1
+  // the wall clock alone jumping ahead forgets nothing: it can jump back
+  assert.equal(go(later, 0, 'B'.repeat(22)).kind, 'login')
+  assert.equal(rule.used.size, 2)
+  assert.equal(rule.decide(link(1000, 'A'.repeat(22)), { now: 1001, idleNow: 0 }).kind, 'login-refused')
+  // once this process has also lived that long, it does
+  assert.equal(go(later, auth.LOGIN_TTL_MS + auth.FUTURE_LEEWAY_MS + 1, 'C'.repeat(22)).kind, 'login')
+  assert.deepEqual([...rule.used.keys()].sort(), ['B'.repeat(22), 'C'.repeat(22)])
 })
 
 test('sessions are kept under a hash, never under their id', () => {
@@ -167,6 +174,17 @@ test('a key file that already exists is never replaced', () => {
   const script = `const a = await import(${JSON.stringify(new URL('../src/panel-auth.mjs', import.meta.url).href)}); process.stdout.write(a.loadKey().toString('base64url'))`
   const run = (dir) => spawnSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, APPDATA: dir, XDG_CONFIG_HOME: dir }, encoding: 'utf8' })
   assert.equal(run(config).stdout, mine)
+  if (process.platform !== 'win32') {
+    // it was written readable by others here, as a restore or a copy can leave it
+    assert.equal(fs.statSync(path.join(config, 'spawnloft', 'panel.key')).mode & 0o777, 0o600, 'made private again before use')
+    // a link in its place is not followed
+    const linked = path.join(scratch, 'linked')
+    fs.mkdirSync(path.join(linked, 'spawnloft'), { recursive: true })
+    fs.symlinkSync(path.join(config, 'spawnloft', 'panel.key'), path.join(linked, 'spawnloft', 'panel.key'))
+    const res = run(linked)
+    assert.notEqual(res.status, 0)
+    assert.match(res.stderr, /panel\.key \(it is not a plain file/)
+  }
 
   // a damaged one is reported, with its path, and left as it is
   const bad = path.join(scratch, 'damaged')
@@ -291,6 +309,48 @@ test('the Microsoft sign-in callback needs no credential, and gives nothing away
   assert.equal((await fetch(p.url + 'api/client/accounts/login/callback?code=x&state=nope', { method: 'POST' })).status, 401)
 })
 
+test('a panel proves itself to a caller that holds the key, and to nobody else', async () => {
+  const p = await panel()
+  const nonce = auth.probeNonce()
+  const signed = await fetch(p.url + 'api/client/launcher', { headers: { authorization: auth.apiAuthorization(p.port), [auth.PROBE_HEADER]: nonce } })
+  assert.equal(signed.status, 200)
+  const proof = signed.headers.get(auth.PROOF_HEADER)
+  assert.ok(auth.proofMatches(auth.loadKey(), nonce, proof))
+  assert.ok(!auth.proofMatches(auth.loadKey(), auth.probeNonce(), proof), 'for that nonce only')
+  assert.ok(!auth.proofMatches(Buffer.alloc(32, 1), nonce, proof), 'with that key only')
+  // what is signed can never be a token: not the text, and nothing but a nonce is signed
+  assert.equal(auth.probeProof(key, `v1.api.${p.port}.1.`), null)
+  assert.equal(auth.probeProof(key, ''), null)
+  assert.ok(!auth.proofMatches(key, nonce, null))
+  // no proof for a caller without a credential, or for a malformed or repeated nonce
+  assert.equal((await fetch(p.url + 'api/client/launcher', { headers: { [auth.PROBE_HEADER]: nonce } })).headers.get(auth.PROOF_HEADER), null)
+  const bad = await fetch(p.url + 'api/client/launcher', { headers: { authorization: auth.apiAuthorization(p.port), [auth.PROBE_HEADER]: 'x' } })
+  assert.equal(bad.status, 200)
+  assert.equal(bad.headers.get(auth.PROOF_HEADER), null)
+})
+
+test('a session is released when its connection drops with requests still queued', async () => {
+  const p = await panel()
+  const signedIn = await fetch(p.auth.loginUrl())
+  const cookie = signedIn.headers.get('set-cookie').split(';')[0]
+  const state = [...p.auth.sessions.values()][0]
+  assert.equal(state.active, 0)
+  // one request that stays open (an event stream), and more queued behind it on the connection
+  const net = await import('node:net')
+  const socket = net.connect(p.port, '127.0.0.1')
+  await new Promise((resolve) => socket.once('connect', resolve))
+  const one = (route) => `GET ${route} HTTP/1.1\r\nHost: 127.0.0.1:${p.port}\r\nCookie: ${cookie}\r\n\r\n`
+  socket.write(one('/api/jobs/any/stream') + one('/api/instances').repeat(4))
+  const until = async (cond, what) => {
+    for (let i = 0; i < 200 && !cond(); i++) await new Promise((r) => setTimeout(r, 10))
+    assert.ok(cond(), what)
+  }
+  await until(() => state.active >= 1, 'the open request holds the session')
+  await new Promise((r) => setTimeout(r, 100))
+  socket.destroy()
+  await until(() => state.active === 0, `every request let go of the session (${state.active} still held)`)
+})
+
 // ---- the command line ---------------------------------------------------------------------------
 
 // `spawnloft ui` as a process, until `stop()`; resolves once it printed its address
@@ -342,4 +402,19 @@ test('the panel behind the desktop window prints no link', async () => {
   } finally {
     await p.stop()
   }
+})
+
+test('spawnloft ui --launcher finds this user\'s panel already on the port', async () => {
+  const p = await panel()
+  const res = await new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(HERE, '..', 'mcctl.mjs'), 'ui', '--port', String(p.port), '--launcher'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    child.stdout.on('data', (c) => { out += c })
+    child.stderr.on('data', (c) => { out += c })
+    child.once('close', (status) => resolve({ status, out }))
+  })
+  assert.equal(res.status, 0, res.out)
+  const link = /^\s+(http:\/\/127\.0\.0\.1:\d+\/auth\?t=v1\.login\.\S+&to=\/launcher)$/m.exec(res.out)?.[1]
+  assert.ok(link, res.out)
+  assert.match(await (await fetch(link)).text(), /content="0; url=\/launcher"/)
 })

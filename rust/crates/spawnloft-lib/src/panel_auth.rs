@@ -138,6 +138,7 @@ pub fn load_key() -> Result<Key, String> {
 pub fn load_key_at(file: &Path) -> Result<Key, String> {
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
     loop {
+        check_key_file(file)?;
         let found = match std::fs::read_to_string(file) {
             Ok(text) => Key::parse(&text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -161,6 +162,41 @@ pub fn load_key_at(file: &Path) -> Result<Key, String> {
         }
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// A key file that exists must be a plain file of this user. One that others can read (a restore
+/// or a copy can leave it so) is made private again before it is used.
+#[cfg(unix)]
+fn check_key_file(file: &Path) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let meta = match std::fs::symlink_metadata(file) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("could not read the panel key {}: {e}", file.display())),
+    };
+    if !meta.file_type().is_file() {
+        return Err(format!(
+            "the panel key {} is not a plain file; delete it and start the panel again",
+            file.display()
+        ));
+    }
+    if meta.uid() != crate::platform::uid() {
+        return Err(format!(
+            "the panel key {} belongs to another account; delete it and start the panel again",
+            file.display()
+        ));
+    }
+    if meta.mode() & 0o077 != 0 {
+        std::fs::set_permissions(file, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| format!("could not make the panel key {} private: {e}", file.display()))?;
+    }
+    Ok(())
+}
+
+/// On Windows the file's ACL is set when it is made (`create_private_new`); `doctor` checks it.
+#[cfg(not(unix))]
+fn check_key_file(_file: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 /// Makes the key file if nobody has yet. The key is written to a private temporary file and
@@ -381,8 +417,9 @@ struct Session {
 struct State {
     started: u64,
     sessions: HashMap<String, Session>,
-    /// Login nonces already spent, with when their token was issued.
-    used: HashMap<String, u64>,
+    /// Login nonces already spent, with when their token was issued and when it was spent on the
+    /// idle clock.
+    used: HashMap<String, (u64, u64)>,
 }
 
 /// The request rule of one listener: its key, its port, when it started, its sessions and the
@@ -518,16 +555,19 @@ impl PanelAuth {
         else {
             return Verdict::LoginRefused;
         };
-        state
-            .used
-            .retain(|_, issued| now.saturating_sub(*issued) <= LOGIN_TTL_MS + FUTURE_LEEWAY_MS);
+        // forgotten only when both clocks say the token is long dead: the wall clock alone can be
+        // stepped forward and back again, which would make a spent link good a second time
+        let keep = LOGIN_TTL_MS + FUTURE_LEEWAY_MS;
+        state.used.retain(|_, (issued, spent)| {
+            now.saturating_sub(*issued) <= keep || idle_now.saturating_sub(*spent) <= keep
+        });
         if state.used.contains_key(&checked.nonce) {
             return Verdict::LoginRefused;
         }
         let Ok(id) = random::<32>() else {
             return Verdict::LoginRefused;
         };
-        state.used.insert(checked.nonce, checked.issued);
+        state.used.insert(checked.nonce, (checked.issued, idle_now));
         let session = b64url_encode(&id);
         state.sessions.insert(
             session_key(&session),
@@ -906,15 +946,30 @@ mod tests {
     fn used_nonces_are_forgotten_once_their_token_has_expired_anyway() {
         let key = Key::from_bytes([4; 32]);
         let rule = PanelAuth::new(key.clone(), 9, 0);
-        let go = |now: u64, nonce: &str| {
+        let go = |now: u64, idle: u64, nonce: &str| {
             let link = format!("/auth?t={}", make_token(&key, Purpose::Login, 9, now, nonce));
-            request(&rule, &link, None, now, 0)
+            request(&rule, &link, None, now, idle)
         };
-        assert!(matches!(go(1000, &"A".repeat(22)), Verdict::Login { .. }));
+        assert!(matches!(go(1000, 0, &"A".repeat(22)), Verdict::Login { .. }));
         let later = 1000 + LOGIN_TTL_MS + FUTURE_LEEWAY_MS + 1;
-        assert!(matches!(go(later, &"B".repeat(22)), Verdict::Login { .. }));
+        // the wall clock alone jumping ahead forgets nothing: it can jump back
+        assert!(matches!(go(later, 0, &"B".repeat(22)), Verdict::Login { .. }));
+        assert_eq!(rule.state.lock().unwrap().used.len(), 2);
+        let link = format!(
+            "/auth?t={}",
+            make_token(&key, Purpose::Login, 9, 1000, &"A".repeat(22))
+        );
+        assert!(matches!(
+            request(&rule, &link, None, 1001, 0),
+            Verdict::LoginRefused
+        ));
+        // once this process has also lived that long, it does
+        let idle = LOGIN_TTL_MS + FUTURE_LEEWAY_MS + 1;
+        assert!(matches!(go(later, idle, &"C".repeat(22)), Verdict::Login { .. }));
         let state = rule.state.lock().unwrap();
-        assert_eq!(state.used.keys().collect::<Vec<_>>(), [&"B".repeat(22)]);
+        let mut left: Vec<_> = state.used.keys().cloned().collect();
+        left.sort();
+        assert_eq!(left, ["B".repeat(22), "C".repeat(22)]);
     }
 
     #[test]
@@ -984,6 +1039,17 @@ mod tests {
         let theirs = b64url_encode(&[7u8; 32]);
         std::fs::write(&file, format!("{theirs}\n")).unwrap();
         assert_eq!(load_key_at(&file).unwrap(), Key::from_bytes([7; 32]));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            // it was written readable by others here, as a restore or a copy can leave it
+            let mode = std::fs::metadata(&file).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600, "made private again before use");
+            let link = dir.join("link.key");
+            std::os::unix::fs::symlink(&file, &link).unwrap();
+            let err = load_key_at(&link).unwrap_err();
+            assert!(err.contains("is not a plain file"), "{err}");
+        }
         std::fs::write(&file, "not a key\n").unwrap();
         let err = load_key_at(&file).unwrap_err();
         assert!(err.contains("is damaged; delete the file"), "{err}");

@@ -90,7 +90,22 @@ export function serve({ port = 8770, host = '127.0.0.1', open = true } = {}) {
       for (let i = 0; i + 1 < req.rawHeaders.length; i += 2) headers.push([req.rawHeaders[i], req.rawHeaders[i + 1]])
       const verdict = auth.decide({ method: req.method, target: req.url, headers }, { now: Date.now(), idleNow: idleNow() })
       if (panelAuth.answer(res, verdict, auth.port)) return
-      if (verdict.session) res.once('close', () => auth.release(verdict.session, idleNow()))
+      if (verdict.session) {
+        // released once, when the response or its connection ends, whichever is first: a
+        // response queued behind another on a connection that then drops never closes itself
+        const socket = req.socket
+        const release = () => {
+          res.off('close', release)
+          socket.off('close', release)
+          auth.release(verdict.session, idleNow())
+        }
+        res.once('close', release)
+        socket.once('close', release)
+      }
+      // a caller with the key asks whether this is its own panel (see panel-auth.mjs)
+      const probes = headers.filter(([k]) => k.toLowerCase() === panelAuth.PROBE_HEADER)
+      const proof = verdict.kind === 'allow' && probes.length === 1 ? panelAuth.probeProof(key, String(probes[0][1]).trim()) : null
+      if (proof) res.setHeader(panelAuth.PROOF_HEADER, proof)
       await activity.asActor({ kind: 'panel' }, () => route(req, res))
     } catch (err) {
       // SSE routes write their headers first; writeHead here would throw ERR_HTTP_HEADERS_SENT
