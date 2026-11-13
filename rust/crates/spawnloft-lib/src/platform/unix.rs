@@ -131,6 +131,7 @@ pub fn process_image(pid: u32) -> Option<String> {
 /// Linux names a replaced binary `<path> (deleted)`: a 1.x daemon that outlived a package upgrade
 /// still runs from that image, and its name is the path without the suffix (as `src/util.mjs`
 /// reads it).
+#[cfg(any(target_os = "linux", test))]
 fn without_deleted(image: &str) -> &str {
     image.strip_suffix(" (deleted)").unwrap_or(image)
 }
