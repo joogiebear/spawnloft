@@ -480,7 +480,12 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
     Check '2.x installs (exit 0)' ($run.code -eq 0) "exit $($run.code)"
     # the install puts resources\bin on the user PATH (user_path.rs), once
     Check '  resources\bin on the user PATH once' ((User-Path-Count "$inst\resources\bin") -eq 1) (Reg 'HKCU:\Environment' 'Path')
-    $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', 'spawnloft', '--version') 60 @{ PATH = "$([Environment]::ExpandEnvironmentVariables((Reg 'HKCU:\Environment' 'Path')));$env:WINDIR\System32" }
+    # from a folder of its own: cmd.exe looks in the current folder before PATH, and the checkout's
+    # root holds the source tree's spawnloft.cmd (which runs a node from PATH)
+    Push-Location $env:RUNNER_TEMP
+    try {
+      $r = Run-Captured "$env:WINDIR\System32\cmd.exe" @('/d', '/c', 'spawnloft', '--version') 60 @{ PATH = "$([Environment]::ExpandEnvironmentVariables((Reg 'HKCU:\Environment' 'Path')));$env:WINDIR\System32" }
+    } finally { Pop-Location }
     Check '  a new terminal finds spawnloft' ($r.code -eq 0 -and $r.out -match 'spawnloft-core') "$($r.code) $($r.out)$($r.err)"
     Kill-Everything
     $dataRoot = Use-Layout 'new'
