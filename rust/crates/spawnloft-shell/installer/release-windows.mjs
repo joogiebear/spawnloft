@@ -236,8 +236,12 @@ async function main(argv) {
   const nodeExe = path.join(cfg, 'runtime', runtimeRecord.exe)
 
   step('Building and signing the shell, uninstaller and setup')
-  run(process.execPath, [tauri, 'build', '--ci', '--bundles', 'nsis', '--config', path.join(cfg, 'overlay.json')], { cwd: SHELL, env: keyEnv })
-  const shellExe = path.join(RUST, 'target', 'release', 'SpawnLoft.exe')
+  // the sign command keeps a copy of each file as it signed it: the bundler rewrites the loose
+  // target\release\SpawnLoft.exe after packing the signed one, so the gate checks the copy
+  const signedCopies = path.join(work, 'signed')
+  run(process.execPath, [tauri, 'build', '--ci', '--bundles', 'nsis', '--config', path.join(cfg, 'overlay.json')], { cwd: SHELL, env: { ...keyEnv, SPAWNLOFT_SIGNED_COPIES: signedCopies } })
+  const shellExe = path.join(signedCopies, 'SpawnLoft.exe')
+  if (!fs.existsSync(shellExe)) stop(`the sign command did not sign SpawnLoft.exe (no copy at ${shellExe})`)
   const setup = path.join(RUST, 'target', 'release', 'bundle', 'nsis', `SpawnLoft_${version}_x64-setup.exe`)
   if (!fs.existsSync(setup)) stop(`the setup was not produced at ${setup}`)
 

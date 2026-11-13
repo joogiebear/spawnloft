@@ -78,3 +78,12 @@ test('KitsRoot10 is read from reg query output', async () => {
   assert.equal(parseKitsRoot(''), null)
   assert.equal(parseKitsRoot(null), null)
 })
+
+test('the gate checks the shell as it was signed, not the loose target file', () => {
+  // the bundler rewrites target\release\SpawnLoft.exe after packing the signed copy
+  const text = fs.readFileSync(path.join(root, 'rust/crates/spawnloft-shell/installer/release-windows.mjs'), 'utf8')
+  assert.match(text, /const shellExe = path\.join\(signedCopies, 'SpawnLoft\.exe'\)/)
+  assert.match(text, /SPAWNLOFT_SIGNED_COPIES: signedCopies/)
+  const ps = fs.readFileSync(path.join(root, 'rust/crates/spawnloft-shell/installer/sign-windows.ps1'), 'utf8')
+  assert.match(ps, /SPAWNLOFT_SIGNED_COPIES/)
+})

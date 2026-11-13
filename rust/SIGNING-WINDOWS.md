@@ -125,3 +125,7 @@ The thread then reports the gate's output and the signing report.
 - **A resource path "doesn't exist" in `tauri-build`**: the work folder must be on the checkout's
   drive (it is, under `rust\target\signed-work`); tauri-build drops the drive letter of absolute
   resource paths.
+- **`rust\target\release\SpawnLoft.exe` shows NotSigned after a good build**: expected. The bundler
+  rewrites that loose file after it packs the signed copy into the setup. The sign command keeps a
+  copy of every file as it signed it (`SPAWNLOFT_SIGNED_COPIES`), and the gate and the report check
+  that copy.

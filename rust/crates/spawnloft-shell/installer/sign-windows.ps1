@@ -77,4 +77,11 @@ foreach ($p in $paths) {
   }
 }
 if ($bad) { exit 1 }
+# A copy of each file as signed, for the gate: the bundler rewrites target\release\SpawnLoft.exe after
+# it packs the signed copy, so the loose file is no evidence of what shipped.
+$copies = [Environment]::GetEnvironmentVariable('SPAWNLOFT_SIGNED_COPIES')
+if ($copies) {
+  New-Item -ItemType Directory -Force -Path $copies | Out-Null
+  foreach ($p in $paths) { Copy-Item -LiteralPath $p -Destination (Join-Path $copies (Split-Path -Leaf $p)) -Force }
+}
 exit 0
