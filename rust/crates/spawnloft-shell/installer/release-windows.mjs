@@ -153,7 +153,12 @@ async function main(argv) {
   if (fs.existsSync(out) && fs.readdirSync(out).length) stop(`${out} already holds a build. Move it away or pick another --out.`)
   console.log(`${version} from ${branch} at ${commit.slice(0, 12)}, signed as "${publisher}" (through ${host})`)
 
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-signed-'))
+  // under rust/target (ignored by git), not os.tmpdir(): tauri-build drops the drive letter of an
+  // absolute resource path, so with the checkout on S: a C:\...\Temp resource resolves to S:\...
+  // and the build stops. On the checkout's own drive every resource path resolves.
+  const workParent = path.join(RUST, 'target', 'signed-work')
+  fs.mkdirSync(workParent, { recursive: true })
+  const work = fs.mkdtempSync(path.join(workParent, 'spawnloft-signed-'))
   // the throwaway key and the staged files go with the folder, on success or not
   process.on('exit', () => { try { fs.rmSync(work, { recursive: true, force: true }) } catch {} })
   // no PSModulePath: each PowerShell builds its own (desktop/windows-powershell.mjs). No release

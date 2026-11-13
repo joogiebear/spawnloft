@@ -62,3 +62,11 @@ test('nothing in the signed build path publishes', () => {
   const text = fs.readFileSync(path.join(root, 'rust/crates/spawnloft-shell/installer/release-windows.mjs'), 'utf8')
   assert.doesNotMatch(text, /release-publish\.mjs|\bgh release\b|'release', 'create'|--confirm/)
 })
+
+test('the signed build stages its files on the checkout\'s drive', () => {
+  // tauri-build drops the drive letter of an absolute resource path: with the checkout on S:, a
+  // resource under C:\...\Temp resolves to S:\... and the shell build stops
+  const text = fs.readFileSync(path.join(root, 'rust/crates/spawnloft-shell/installer/release-windows.mjs'), 'utf8')
+  assert.doesNotMatch(text, /mkdtempSync\(path\.join\(os\.tmpdir\(\)/)
+  assert.match(text, /path\.join\(RUST, 'target', 'signed-work'\)/)
+})
