@@ -1,7 +1,7 @@
 # One installer scenario of rust/INSTALLER-UPDATER-DESIGN.md section 11, on a fresh windows-latest
 # machine (installer.yml runs each in a job of its own).
 #
-#   scenario.ps1 -Name s1|s2a|s2b|s3|s4|s5|s8|s9 -Feed <dir with the 2.0 installers> -Beta <1.6 setup>
+#   scenario.ps1 -Name s1|s2a|s2b|s3|s4|s5|s8|s9|s10|s11 -Feed <dir with the 2.0 installers> -Beta <1.6 setup>
 #                -Stable <1.5.0 setup> -VersionA <2.x a> -VersionB <2.x b> [-NodeMode none|decoy]
 #
 # Every scenario runs with no Node.js on PATH (2.0 carries its own); -NodeMode decoy puts a
@@ -111,6 +111,49 @@ function Seed-Profile {
   New-Item -ItemType Directory -Force $upd | Out-Null
   Set-Content (Join-Path $upd 'SpawnLoft-Setup-1.6.0-beta.999.exe') 'x'
   $cfg
+}
+
+# The setup's windows, for the scenarios that drive the full UI
+function Load-Win32 {
+  # plain Win32 for NSIS's dialogs: the main window is the visible #32770 of the setup's pid
+  # with a Back button (id 3); its buttons are 1 Next/Install, 2 Cancel, 3 Back, pressed with
+  # BM_CLICK; texts are read with WM_GETTEXT, which Windows marshals across processes
+  Add-Type -Namespace Ci -Name Win -UsingNamespace System.Text, System.Collections.Generic -MemberDefinition @'
+public delegate bool EnumProc(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
+[DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
+[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
+[DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint m, IntPtr w, StringBuilder l, uint f, uint t, out IntPtr r);
+[DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+public static string Cls(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
+public static string Text(IntPtr h) { var s = new StringBuilder(4096); IntPtr r; SendMessageTimeout(h, 0x000D, (IntPtr)4096, s, 2, 2000, out r); return s.ToString(); }
+public static List<IntPtr> Tops(int pid) {
+  var l = new List<IntPtr>();
+  EnumWindows((h, x) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) l.Add(h); return true; }, IntPtr.Zero);
+  return l;
+}
+public static IntPtr Main(int pid) {
+  foreach (var h in Tops(pid)) if (Cls(h) == "#32770" && GetDlgItem(h, 3) != IntPtr.Zero) return h;
+  return IntPtr.Zero;
+}
+public static string Dump(int pid) {
+  var sb = new StringBuilder();
+  foreach (var t in Tops(pid)) {
+    sb.Append("[" + Cls(t) + " '" + Text(t) + "']");
+    EnumChildWindows(t, (h, x) => { if (IsWindowVisible(h)) { var tx = Text(h); if (tx.Length > 0) sb.Append(" | " + tx.Replace("\r", " ").Replace("\n", " ")); } return true; }, IntPtr.Zero);
+    sb.Append(" ;; ");
+  }
+  return sb.ToString();
+}
+public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
+// what the dialog gets from a click on its button `id` (WM_COMMAND, BN_CLICKED): unlike BM_CLICK it
+// does not need the dialog to be the active window
+public static void Command(IntPtr dialog, int id, IntPtr button) { PostMessage(dialog, 0x0111, (IntPtr)id, button); }
+'@
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -271,42 +314,7 @@ switch ($Name) {
     $goodJava = Java-Pid $dataRoot 'good'
     $p = Start-Process $setupA -PassThru
     $null = $p.Handle
-    # plain Win32 for NSIS's dialogs: the main window is the visible #32770 of the setup's pid
-    # with a Back button (id 3); its buttons are 1 Next/Install, 2 Cancel, 3 Back, pressed with
-    # BM_CLICK; texts are read with WM_GETTEXT, which Windows marshals across processes
-    Add-Type -Namespace Ci -Name Win -UsingNamespace System.Text, System.Collections.Generic -MemberDefinition @'
-public delegate bool EnumProc(IntPtr h, IntPtr l);
-[DllImport("user32.dll")] static extern bool EnumWindows(EnumProc f, IntPtr l);
-[DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p, EnumProc f, IntPtr l);
-[DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
-[DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
-[DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr h);
-[DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
-[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
-[DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr h, uint m, IntPtr w, StringBuilder l, uint f, uint t, out IntPtr r);
-[DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
-public static string Cls(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
-public static string Text(IntPtr h) { var s = new StringBuilder(4096); IntPtr r; SendMessageTimeout(h, 0x000D, (IntPtr)4096, s, 2, 2000, out r); return s.ToString(); }
-public static List<IntPtr> Tops(int pid) {
-  var l = new List<IntPtr>();
-  EnumWindows((h, x) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) l.Add(h); return true; }, IntPtr.Zero);
-  return l;
-}
-public static IntPtr Main(int pid) {
-  foreach (var h in Tops(pid)) if (Cls(h) == "#32770" && GetDlgItem(h, 3) != IntPtr.Zero) return h;
-  return IntPtr.Zero;
-}
-public static string Dump(int pid) {
-  var sb = new StringBuilder();
-  foreach (var t in Tops(pid)) {
-    sb.Append("[" + Cls(t) + " '" + Text(t) + "']");
-    EnumChildWindows(t, (h, x) => { if (IsWindowVisible(h)) { var tx = Text(h); if (tx.Length > 0) sb.Append(" | " + tx.Replace("\r", " ").Replace("\n", " ")); } return true; }, IntPtr.Zero);
-    sb.Append(" ;; ");
-  }
-  return sb.ToString();
-}
-public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
-'@
+    Load-Win32
     function Window { $h = [Ci.Win]::Main($p.Id); if ($h -eq [IntPtr]::Zero) { $null } else { $h } }
     function Button($w, $id) { if (-not $w) { return $null }; $b = [Ci.Win]::GetDlgItem($w, $id); if ($b -eq [IntPtr]::Zero) { $null } else { $b } }
     function Enabled($b) { $b -and [Ci.Win]::IsWindowEnabled($b) }
@@ -600,6 +608,192 @@ public static void Click(IntPtr h) { PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.
       Check "  $k kept" (Test-Path -LiteralPath (Join-Path $cfg $k))
     }
     $script:result.left = @(Get-ChildItem -Force $cfg | ForEach-Object { $_.Name })
+  }
+
+  's10' {
+    # blocker B1 of the 2.0 beta review: a handover that ends without warning (the PC shuts down on
+    # the install-on-quit path, power is lost, the setup is ended) must leave nothing switched off
+    # and forget no server
+    Start-Scenario 's10-handover-cut-short'
+    $v1 = Install-Legacy $Beta
+    $dataRoot = Use-Layout 'new'
+    $seed = Seed-Legacy @(@{ name = 'slow'; ignoreStop = $true }, @{ name = 'good' }) @()
+    Start-Running1 @('slow', 'good')
+    Cli1 @('task', 'add', 'good', '--do', 'backup', '--daily', '03:00') | Out-Null
+    $task = @(Tasks-Under-Mcctl)[0]
+    Check '1.x registered a task under \mcctl\' ($null -ne $task)
+    $runOnce = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
+    function Task-Enabled { "$((Get-ScheduledTask -TaskPath '\mcctl\' -TaskName $task.TaskName).State)" -ne 'Disabled' }
+    function Staged-Core { @(Get-Process spawnloft-core -ErrorAction SilentlyContinue) }
+    # the silent setup, up to the point where good is stopped and the stop waits on slow
+    function Begin-Stop {
+      $java = Java-Pid $dataRoot 'good'
+      $script:slowJava = Java-Pid $dataRoot 'slow'
+      $setup = Start-Process $setupA -ArgumentList '--updated', '/S' -PassThru
+      $null = $setup.Handle
+      Check 'the handover stops good' (Wait-Until { -not (Pid-Alive $java) } 180) "java $java"
+      $rec = Record $dataRoot
+      Check '  and the record on disk already names both servers and the task, unfinished' ($rec -and $null -eq $rec.stopExit -and (Entry $rec 'good') -and (Entry $rec 'slow') -and @($rec.tasksDisabled) -contains $task.TaskName -and -not $rec.tasksReenabled) "$($rec | ConvertTo-Json -Compress -Depth 5)"
+      Check '  the task is off for the stop' (-not (Task-Enabled))
+      Check '  the sign-in restore is registered' ("$(Reg $runOnce 'SpawnLoftHandover')" -match 'handover restore .*--logon')
+      Check '  slow was sent its stop and holds it' (Wait-Until { Console-Has $dataRoot 'slow' 'holding the stop' } 90)
+      Check '  the stop still runs (it waits on slow)' ((Staged-Core).Count -ge 1 -and -not $setup.HasExited)
+      $setup
+    }
+    function Good-Back-Under-1x($what) {
+      Check "$what`: good runs again under 1.x" (Wait-Until { (List1)['good'].status -eq 'running' } 120) "$((List1)['good'].status)"
+      Check '  and is run by 1.x' ((State $dataRoot 'good').daemonExe -like '*SpawnLoft*') "daemonExe $((State $dataRoot 'good').daemonExe)"
+      Check '  the task is on again' (Wait-Until { Task-Enabled } 60)
+      $rec = Record $dataRoot
+      Check '  the record is settled' ((Entry $rec 'good').start -eq 'restored-1x' -and [bool] $rec.tasksReenabled) "$($rec | ConvertTo-Json -Compress -Depth 5)"
+      Check '  slow was never ended' ((List1)['slow'].status -eq 'running' -and (Pid-Alive $script:slowJava)) "java $script:slowJava"
+      Check '  1.x intact' ((Test-Path "$inst\resources\app.asar") -and (Reg $uninstKey 'DisplayVersion') -eq $v1)
+      Check '  no sign-in restore left behind' (Wait-Until { -not (Reg $runOnce 'SpawnLoftHandover') } 30) "$(Reg $runOnce 'SpawnLoftHandover')"
+      $rec
+    }
+    # slow holds the stop it was sent: let it finish, and start it again as it was, under 1.x
+    function Reset-Slow {
+      Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
+      Check 'slow finishes the stop it held' (Wait-Until { (List1)['slow'].status -ne 'running' } 90) "$((List1)['slow'].status)"
+      Set-Content (Join-Path $seed.servers.slow 'ignore-stop') ''
+      Cli1 @('start', 'slow', '--detach') | Out-Null
+      Check 'slow runs again under 1.x' (Wait-Until { (List1)['slow'].status -eq 'running' } 90)
+    }
+
+    # 1. the setup is ended (Task Manager) while servers are being stopped: the stop notices that
+    #    nobody is left to finish the update and puts everything back itself
+    $setup = Begin-Stop
+    Stop-Process -Id $setup.Id -Force -ErrorAction SilentlyContinue
+    Check 'the stop ends by itself once the setup is gone' (Wait-Until { (Staged-Core).Count -eq 0 } 120)
+    $script:result.afterSetupEnded = Good-Back-Under-1x 'setup ended'
+    Check '  no blocked marker (nothing refused; nobody was there)' (-not (Test-Path (Join-Path $dataRoot 'run\handover-blocked.json')))
+
+    # 2. everything ends at once (a shutdown, a power cut): nothing is put back then; the next
+    #    sign-in does it
+    Reset-Slow
+    $setup = Begin-Stop
+    # the core may end by itself between the listing and the kill
+    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    Check 'cut: good is down and the task is off (what blocker B1 left for good)' ((List1)['good'].status -ne 'running' -and -not (Task-Enabled))
+    $rec = Record $dataRoot
+    $script:result.recordAtCut = $rec
+    Check '  the record is unfinished and names good' ($null -eq $rec.stopExit -and -not $rec.tasksReenabled -and -not (Entry $rec 'good').start) "$($rec | ConvertTo-Json -Compress -Depth 5)"
+    $cmd = "$(Reg $runOnce 'SpawnLoftHandover')"
+    $script:result.signInCommand = $cmd
+    Check '  the sign-in restore is registered' ($cmd -match '^"([^"]+spawnloft-core\.exe)"\s+(handover restore --legacy-dir ".+" --logon)$') $cmd
+    $coreExe = $Matches[1]; $restoreArgs = $Matches[2]
+    Check '  within what RunOnce runs (260 characters)' ($cmd.Length -le 260) "$($cmd.Length)"
+    # what Windows does at the next sign-in
+    $p = Run $coreExe $restoreArgs 180
+    Check 'the sign-in restore exits 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
+    $script:result.afterSignIn = Good-Back-Under-1x 'sign-in'
+    $goodStarts = (Starts $seed.servers.good).Count
+    $p = Run $coreExe $restoreArgs 60
+    Check '  a second sign-in restore starts nothing' ($p.ExitCode -eq 0 -and (Starts $seed.servers.good).Count -eq $goodStarts)
+
+    # 3. cut again, and this time the update itself is run again before any sign-in: it takes
+    #    over what the cut attempt left, and both servers come back under 2.0
+    Reset-Slow
+    $setup = Begin-Stop
+    # the core may end by itself between the listing and the kill
+    Stop-Process -Id (@($setup.Id) + @(Staged-Core | ForEach-Object { $_.Id })) -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    # slow finishes the stop it was holding: now both are down and only the record knows why
+    Remove-Item (Join-Path $seed.servers.slow 'ignore-stop')
+    Check 'slow finishes the stop it held' (Wait-Until { (List1)['slow'].status -ne 'running' } 90) "$((List1)['slow'].status)"
+    Check 'both are down and the task is off' ((List1)['good'].status -ne 'running' -and -not (Task-Enabled))
+    $run = Run-Installer $setupA @('--updated', '/S') 600
+    $script:result.takeOver = $run
+    Check 'the next attempt goes through (exit 0)' ($run.code -eq 0) "exit $($run.code)"
+    Check-Layout2
+    $rec = Record $dataRoot
+    $script:result.record = $rec
+    foreach ($n in 'good', 'slow') {
+      $e = Entry $rec $n
+      Check "  $n was taken over and started again" ($e -and $e.stop -eq 'was-stopped' -and $e.start -eq 'running') "$($e | ConvertTo-Json -Compress)"
+      Check-Rust-Daemon $dataRoot $n | Out-Null
+    }
+    $l2 = Status2
+    Check '  both run under 2.0' ($l2['good'].status -eq 'running' -and $l2['slow'].status -eq 'running') "$($l2['good'].status) / $($l2['slow'].status)"
+    Check '  the task is on again' (Task-Enabled)
+    Check '  the record says so' ([bool] $rec.tasksReenabled -and @($rec.tasksDisabled) -contains $task.TaskName)
+    Check '  no sign-in restore left behind' (-not (Reg $runOnce 'SpawnLoftHandover')) "$(Reg $runOnce 'SpawnLoftHandover')"
+    $script:result.handoverLog = Get-Content (Join-Path $dataRoot 'run\handover.log') -Raw
+  }
+
+  's11' {
+    # blocker B2: in the full UI the servers are stopped before the WebView2 step; a PC without
+    # WebView2 that cannot download it must still end with the servers running
+    Start-Scenario 's11-ui-handover-without-webview2'
+    $v1 = Install-Legacy $Beta
+    $dataRoot = Use-Layout 'new'
+    $seed = Seed-Legacy @(@{ name = 'good' }) @()
+    Start-Running1 @('good')
+    $goodJava = Java-Pid $dataRoot 'good'
+    Cli1 @('task', 'add', 'good', '--do', 'backup', '--daily', '03:00') | Out-Null
+    $task = @(Tasks-Under-Mcctl)[0]
+    # as on such a PC: no WebView2 registered (the values the setup reads), no way to fetch it
+    $wv = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+    $wvKeys = @("HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$wv", "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv", "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$wv")
+    foreach ($k in $wvKeys) { if (Reg $k 'pv') { Rename-ItemProperty -Path $k -Name 'pv' -NewName 'pv-hidden-by-ci' } }
+    function WebView2-Registered { @($wvKeys | Where-Object { Reg $_ 'pv' }).Count -gt 0 }
+    Check 'no WebView2 is registered' (-not (WebView2-Registered))
+    # The firewall, not the hosts file (a hosted runner resolves past it): nothing leaves the setup
+    # (the download runs inside it), and the link's addresses are closed to everything.
+    Set-NetFirewallProfile -All -Enabled True
+    New-NetFirewallRule -DisplayName 'ci-no-webview2-setup' -Direction Outbound -Program (Resolve-Path $setupA).Path -Action Block | Out-Null
+    $addrs = @([System.Net.Dns]::GetHostAddresses('go.microsoft.com') | ForEach-Object { "$_" })
+    New-NetFirewallRule -DisplayName 'ci-no-webview2-link' -Direction Outbound -RemoteAddress $addrs -Action Block | Out-Null
+    $reach = $false
+    foreach ($a in $addrs) {
+      $c = [System.Net.Sockets.TcpClient]::new(([System.Net.IPAddress] $a).AddressFamily)
+      try { if ($c.ConnectAsync($a, 443).Wait(5000) -and $c.Connected) { $reach = $true } } catch { } finally { $c.Dispose() }
+    }
+    Check 'the WebView2 download link cannot be reached' (-not $reach) "addresses $($addrs -join ', ')"
+
+    Load-Win32
+    $p = Start-Process $setupA -PassThru
+    $null = $p.Handle
+    function Window { $h = [Ci.Win]::Main($p.Id); if ($h -eq [IntPtr]::Zero) { $null } else { $h } }
+    function Button($w, $id) { if (-not $w) { return $null }; $b = [Ci.Win]::GetDlgItem($w, $id); if ($b -eq [IntPtr]::Zero) { $null } else { $b } }
+    Check 'the setup window appears' (Wait-Until { $null -ne (Window) } 60)
+    # Next / Install / Finish whenever it is enabled: welcome, the stopping page (which moves on
+    # by itself), the install, the finish page
+    $script:result.pageTrail = @()
+    $ended = Wait-Until {
+      if ($p.HasExited) { return $true }
+      $w = Window
+      if ($w) {
+        $t = [Ci.Win]::Dump($p.Id)
+        if ($script:result.pageTrail -notcontains $t) { $script:result.pageTrail += , $t }
+        $n = Button $w 1
+        # by now other windows have come and gone (the 1.x uninstaller, the core): the setup is
+        # not the active window, where BM_CLICK may do nothing
+        if ($n -and [Ci.Win]::IsWindowEnabled($n)) { [Ci.Win]::Command($w, 1, $n); Start-Sleep -Milliseconds 700 }
+      }
+      $false
+    } 600
+    if (-not $ended) {
+      $script:result.stuck = @{ window = [bool] (Window); texts = [Ci.Win]::Dump($p.Id); processes = @(Get-Process | Where-Object { $_.Name -match 'SpawnLoft|spawnloft|setup|nsis|msedge|Edge' } | ForEach-Object { "$($_.Name) $($_.Id)" }) }
+      Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+    }
+    Check 'the setup runs to its end in the full UI' $ended "$($script:result.pageTrail[-1])"
+    Check '  exit code 0' ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
+    Check '  it stopped good on the way' (-not (Pid-Alive $goodJava))
+    Check-Graceful $dataRoot 'good' $goodJava
+    Check '  WebView2 is still not registered (its installer never ran)' (-not (WebView2-Registered))
+    # the finish page starts the app, which cannot open a window here; only the shell is ended
+    Get-Process SpawnLoft -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Check-Layout2
+    $rec = Record $dataRoot
+    $script:result.record = $rec
+    $e = Entry $rec 'good'
+    Check '  good: stopped, then running' ($e.stop -eq 'stopped' -and $e.start -eq 'running') "$($e | ConvertTo-Json -Compress)"
+    Check-Rust-Daemon $dataRoot 'good' | Out-Null
+    Check '  2.0 lists good running' ((Status2)['good'].status -eq 'running')
+    Check '  the task is on again' ("$((Get-ScheduledTask -TaskPath '\mcctl\' -TaskName $task.TaskName).State)" -ne 'Disabled' -and [bool] $rec.tasksReenabled)
+    Check '  no sign-in restore left behind' (-not (Reg 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' 'SpawnLoftHandover'))
   }
 
   default { throw "unknown scenario $Name" }

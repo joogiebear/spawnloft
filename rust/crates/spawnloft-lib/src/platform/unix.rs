@@ -262,6 +262,38 @@ impl ProcessProbe {
     }
 }
 
+/// The longest command Windows runs from RunOnce.
+pub const RUN_ONCE_MAX: usize = 260;
+
+/// Renames over `to` and flushes the folder, so the new name survives a power cut.
+pub fn rename_durable(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    std::fs::rename(from, to)?;
+    if let Some(dir) = to.parent()
+        && let Ok(d) = std::fs::File::open(dir)
+    {
+        let _ = d.sync_all();
+    }
+    Ok(())
+}
+
+/// Windows only: a command for the next sign-in (`HKCU\...\RunOnce`). Nothing elsewhere.
+pub fn run_once_set(_name: &str, _command: &str) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Windows only.
+pub fn run_once_remove(_name: &str) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// Windows only: whether the session is ending (shutdown, restart, sign-out).
+pub fn session_ending() -> bool {
+    false
+}
+
+/// Windows only: lets go of the console window a program started at sign-in is given.
+pub fn detach_console() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

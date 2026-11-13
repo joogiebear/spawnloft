@@ -25,7 +25,13 @@
 ;   2.0 afterwards (`handover resume`); a server that will not stop aborts the update and leaves
 ;   1.x as it was (rust/INSTALLER-UPDATER-DESIGN.md sections 2 to 4 and 9);
 ; - one setup and one uninstaller at a time (named mutexes), /ROLLBACK allows the one downgrade a
-;   rollback asks for, /NORESUME leaves the stopped servers stopped (tests).
+;   rollback asks for, /NORESUME leaves the stopped servers stopped (tests);
+; - once servers are stopped for the handover, nothing ends the install without putting them
+;   back: over 1.x a failed WebView2 download or install does not stop the install (design 2.6),
+;   .onInstFailed starts them again under 1.x when a section gives up while 1.x is still there,
+;   and `handover stop` is told this setup's process id, so it puts everything back itself when
+;   the setup is ended under it. (A stop cut short with the whole session, by a shutdown or a
+;   power cut, is put back at the next sign-in or by the next attempt: spawnloft-lib handover.)
 
 Unicode true
 ManifestDPIAware true
@@ -134,6 +140,8 @@ Var StopRunning
 Var StopLabel
 Var Rollback
 Var NoResume
+; SPAWNLOFT: this setup's process id, for `handover stop --installer-pid`
+Var SetupPid
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -611,7 +619,7 @@ Function PageStopping
   Delete "$PLUGINSDIR\handover-progress.txt"
   StrCpy $StopRunning 1
   ; not waited for: the page's timer follows it through the status files
-  ExecShell "" '"$CoreStaged"' 'handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" --status-dir "$PLUGINSDIR"' SW_HIDE
+  ExecShell "" '"$CoreStaged"' 'handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" --status-dir "$PLUGINSDIR" --installer-pid $SetupPid' SW_HIDE
   ${NSD_CreateTimer} StopTick 400
   nsDialogs::Show
 FunctionEnd
@@ -680,6 +688,19 @@ Function SpawnLoftUserAbort
       ${IfThen} $0 > 2400 ${|} ${ExitDo} ${|}
     ${Loop}
     StrCpy $StopRunning 0
+    ; A stop that had already ended with everything stopped (its answer not read yet by the
+    ; page's timer) never saw the Cancel: its servers are started again here.
+    ClearErrors
+    FileOpen $1 "$PLUGINSDIR\handover-exit.txt" r
+    ${IfNot} ${Errors}
+      FileRead $1 $2
+      FileClose $1
+      IntOp $2 $2 + 0
+      ${If} $2 = 0
+        StrCpy $StopDone 1
+        Call RestoreLegacyServers
+      ${EndIf}
+    ${EndIf}
   ${Else}
     Call RestoreLegacyServers
   ${EndIf}
@@ -789,6 +810,8 @@ LangString deleteAppData ${LANG_ENGLISH} "Also delete servers, worlds, backups, 
 
 Function .onInit
   !insertmacro SPAWNLOFT_SINGLE_INSTANCE "Local\SpawnLoftSetup-${APPGUID}"
+  System::Call 'kernel32::GetCurrentProcessId() i .s'
+  Pop $SetupPid
 
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -932,6 +955,13 @@ Section WebView2
           DetailPrint "$(webview2DownloadSuccess)"
         ${Else}
           DetailPrint "$(webview2DownloadError)"
+          ; SPAWNLOFT: over 1.x the install goes on (design 2.6). In the full UI the servers are
+          ; stopped by now, and stopping here would leave them down; the CLI, daemons and MCP
+          ; need no WebView2, and the app's first start says where to get it.
+          ${If} $LegacyMode = 1
+            DetailPrint "SpawnLoft 2 is being installed without Microsoft Edge WebView2. Its window will say how to get it."
+            Goto webview2_done
+          ${EndIf}
           Abort "$(webview2AbortError)"
         ${EndIf}
         StrCpy $6 "$TEMP\MicrosoftEdgeWebview2Setup.exe"
@@ -964,6 +994,11 @@ Section WebView2
           DetailPrint "$(webview2InstallSuccess)"
         ${Else}
           DetailPrint "$(webview2InstallError)"
+          ; SPAWNLOFT: as above
+          ${If} $LegacyMode = 1
+            DetailPrint "SpawnLoft 2 is being installed without Microsoft Edge WebView2. Its window will say how to get it."
+            Goto webview2_done
+          ${EndIf}
           Abort "$(webview2AbortError)"
         ${EndIf}
       webview2_done:
@@ -990,6 +1025,8 @@ Section WebView2
               DetailPrint "$(webview2InstallSuccess)"
             ${Else}
               MessageBox MB_ICONEXCLAMATION|MB_ABORTRETRYIGNORE "$(webview2InstallError)" IDIGNORE ignore IDRETRY update_webview
+              ; SPAWNLOFT: Quit runs no callback; servers the stopping page stopped start again
+              Call RestoreLegacyServers
               Quit
               ignore:
             ${EndIf}
@@ -1020,7 +1057,7 @@ Section Install
       ${OrIf} $PassiveMode = 1
         StrCpy $0 "--silent"
       ${EndIf}
-      nsExec::ExecToLog '"$CoreStaged" handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" $0'
+      nsExec::ExecToLog '"$CoreStaged" handover stop --legacy-dir "$LegacyDir" --legacy-version "$LegacyVersion" --installer-pid $SetupPid $0'
       Pop $1
       ; string compares: nsExec pushes "error" or "timeout" when the core did not run, which an
       ; integer compare would read as 0 (stopped) and let the 1.x uninstaller kill the servers
@@ -1212,6 +1249,19 @@ Section Install
     SetAutoClose true
   ${EndIf}
 SectionEnd
+
+; SPAWNLOFT: a section gave up (Abort, a file that could not be written). While 1.x is still
+; installed, what the stop stopped is started again under it and its tasks are enabled again; in
+; the full UI this runs when the person closes the failed setup. Once 1.x is removed there is
+; nothing to start them with until SpawnLoft 2 is in place: the record stays, and the next run of
+; this setup followed by SpawnLoft 2's first start puts them back.
+Function .onInstFailed
+  ${If} $LegacyMode = 1
+    Call RestoreLegacyServers
+  ${ElseIf} $LegacyMode = 2
+    MessageBox MB_ICONSTOP "SpawnLoft 1 was removed, but SpawnLoft 2 could not be installed completely. Run this setup again, then open SpawnLoft: the servers that were running start again and the scheduled tasks are switched back on." /SD IDOK
+  ${EndIf}
+FunctionEnd
 
 Function .onInstSuccess
   ; Check for `/R` flag only in silent and passive installers because

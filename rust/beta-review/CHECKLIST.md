@@ -6,11 +6,11 @@ undone. Findings are numbered as in [REVIEW.md](REVIEW.md).
 ## A. Code that must land on `v2` first
 
 - [ ] This review branch merged (fixes F1 to F8).
-- [ ] B1: the handover record is written before and during the stop; an unfinished record is
+- [x] B1: the handover record is written before and during the stop; an unfinished record is
       taken over by the next attempt. Test: kill `handover stop` mid-way, run again, tasks are
-      enabled and the stopped servers start.
-- [ ] B2: `.onInstFailed` restores or resumes; a failed WebView2 bootstrapper no longer aborts
-      over 1.x.
+      enabled and the stopped servers start. (#198, scenario s10)
+- [x] B2: `.onInstFailed` restores or resumes; a failed WebView2 bootstrapper no longer aborts
+      over 1.x. (#198, scenario s11)
 - [x] B7: bundled Node 24.22.3 (#194, merged as 35124db).
 - [ ] All three installer workflows green on the Node 24.22.3 commit.
 - [ ] Decision recorded on the panel's local authentication (REVIEW section 3): fix now, or ship

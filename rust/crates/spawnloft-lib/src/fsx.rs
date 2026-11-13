@@ -9,9 +9,17 @@ pub const RENAME_RETRIES: u32 = 5;
 
 /// Renames over `to`, retrying while another program holds it.
 pub fn rename_over(from: &Path, to: &Path) -> std::io::Result<()> {
+    rename_retrying(from, to, |a, b| std::fs::rename(a, b))
+}
+
+fn rename_retrying(
+    from: &Path,
+    to: &Path,
+    rename: impl Fn(&Path, &Path) -> std::io::Result<()>,
+) -> std::io::Result<()> {
     let mut attempt = 0;
     loop {
-        match std::fs::rename(from, to) {
+        match rename(from, to) {
             Ok(()) => return Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied || is_busy(&e) => {
                 if attempt >= RENAME_RETRIES {
@@ -47,6 +55,26 @@ pub fn write_json(file: &Path, data: &serde_json::Value) -> std::io::Result<()> 
     let tmp = std::path::PathBuf::from(tmp);
     std::fs::write(&tmp, text)?;
     rename_over(&tmp, file)
+}
+
+/// [`write_json`] for a file that must survive a power cut right after the call: the temp file
+/// is flushed to the disk before it replaces `file`, so the name holds either the old content or
+/// the new, never an empty or half-written file, and the replacement itself is written through.
+pub fn write_json_durable(file: &Path, data: &serde_json::Value) -> std::io::Result<()> {
+    use std::io::Write;
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut text = serde_json::to_string_pretty(data).map_err(std::io::Error::other)?;
+    text.push('\n');
+    let mut tmp = file.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    let mut f = std::fs::File::create(&tmp)?;
+    f.write_all(text.as_bytes())?;
+    f.sync_all()?;
+    drop(f);
+    rename_retrying(&tmp, file, crate::platform::rename_durable)
 }
 
 #[cfg(test)]

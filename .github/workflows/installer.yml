@@ -1,7 +1,7 @@
 name: installer
 
 # The 2.0 Windows installer's scenarios (rust/INSTALLER-UPDATER-DESIGN.md section 11, items 1 to 5,
-# 8 and 9), internal only, v2 only; successor of tauri-spike.yml. Builds 2.x a and b with a
+# 8 to 11), internal only, v2 only; successor of tauri-spike.yml. Builds 2.x a and b with a
 # throwaway updater key, then runs each scenario on a fresh windows-latest machine against the
 # published 1.5.0 and 1.6.0-beta.413 setups. Nothing leaves the runners except workflow artifacts
 # kept 14 days; no secrets, no feed, no tag, no release. Every scenario prints its result JSON into
@@ -98,7 +98,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: [s1, s2a, s2b, s3, s4, s5, s8, s9]
+        name: [s1, s2a, s2b, s3, s4, s5, s8, s9, s10, s11]
         node: [none]
         include:
           - { name: s1, node: decoy }

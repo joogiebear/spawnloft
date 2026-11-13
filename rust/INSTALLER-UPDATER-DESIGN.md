@@ -260,6 +260,38 @@ read by the first launch (section 8) and by `doctor`, deleted once the person ha
 the tasks it disabled (`tasksDisabled`) so resume and abort re-enable exactly those. The log
 beside it, `run/handover.log`, keeps the 1.x CLI output.
 
+**The record is a journal** (added after the 2.0 beta review, blockers B1 and B2). `handover stop`
+can end without warning at any point: the person quits the app and shuts the PC down (the
+install-on-quit path), power is lost, the setup is ended from Task Manager. So the record is
+written, flushed to the disk, **before** each step it describes: the task names before the first
+task is disabled, each server as `stop: "stopping"` before it is asked to stop, and again after
+each batch, each restart and the re-enabling. `stopExit` stays `null` until the stop phase has an
+answer. A record is *unsettled* while a task it disabled is not enabled again or a server it
+stopped (`stopped`, `was-stopped`, `stopping`, `stop-sent`) has no `start`. Whoever comes next
+settles it, and each of them can be repeated or cut short itself:
+
+- **The next `handover stop`** (electron-updater reruns the pending setup at every quit) takes an
+  unsettled record over: the tasks are carried into the new record, and so is every server that
+  attempt stopped and that is still down, as `was-stopped`, so resume (or this attempt's own
+  abort) starts it again. A blocked silent retry that stops nothing still puts back what it took
+  over.
+- **`handover restore --legacy-dir <dir> [--logon]`** starts them again under the 1.x that is
+  still installed and enables the tasks. The setup runs it on Cancel, on a failed 1.x uninstall
+  and from `.onInstFailed`; and `handover stop` registers it under `HKCU\...\RunOnce`
+  (`SpawnLoftHandover`, the staged core) with its first write, so that after a shutdown or a power
+  cut **the next sign-in** puts things back even if the app is not opened for weeks. The value is
+  removed as soon as the record is settled (abort, restore, resume). It does nothing when 1.x is
+  no longer installed: then 2.0's first start resumes.
+- **`handover stop --installer-pid <pid>`**: the setup passes its own process id. When that
+  process is gone (by pid and creation time), the stop ends like a Cancel and puts everything back
+  itself, also when the last server has just stopped. If Windows is shutting down at that moment
+  nothing is started (it would be ended at once) and the record is left for the sign-in.
+
+A server is started again only within 24 hours of its stop (the time of the real stop is carried
+through takeovers); the tasks are enabled again however old the record is. A task that cannot be
+enabled and still exists keeps the record unsettled, so the next step tries again. A server that
+runs already is never started twice. The steps exclude each other through `run/handover.lock`.
+
 ### 2.5 `handover resume`
 
 Starts, through the new core's own supervisor, every entry whose `stop` is `stopped` or
@@ -789,6 +821,8 @@ state (**verified** for the rollback direction).
 | The 1.x panel is open when the handover runs | its install-on-quit could start the pending setup a second time | the 1.x uninstaller force-closes it (no graceful quit); the installer mutex makes a second setup exit at once |
 | 1.x uninstaller fails or leaves `app.asar` | mixed folder | retried five times, then abort with 2 (spike); recorded servers are **restarted through the 1.x CLI** so the abort leaves them running |
 | Installer closed or power lost between stop and resume | servers down | the record says `start: skipped`; the shell's first run or `doctor --fix` runs resume (under the lock) for entries younger than 24 h, then shows the banner; no ordinary command does |
+| PC shut down, power lost or the setup ended **during** `handover stop`, or after it and before 1.x is removed | 1.x still installed, its tasks disabled, the stopped servers down, nothing in memory any more | the record is a journal written before each step (2.4): the setup's process id lets the stop put everything back itself when only the setup is gone; otherwise the next sign-in (`RunOnce`, `handover restore --logon`) or the next attempt's `handover stop` takes the record over; tasks always come back, servers within 24 h |
+| A section fails after the stopping page stopped the servers (WebView2 cannot be downloaded on a double-click install over 1.x) | servers down, 1.x still there, nothing restoring them | over 1.x a WebView2 failure no longer stops the install (2.6); any other failed section runs `.onInstFailed`, which restores under 1.x while it is installed |
 | Running the core from the temp folder is refused by policy (AppLocker, SRP, ASR) | handover cannot start | the core is extracted to `resources\bin\staging\` first; `$PLUGINSDIR` is the fallback |
 | `handover resume` fails to start a server | that server down | recorded `failed` with the reason; banner with Start; `doctor` lists it |
 | Restart Manager closes an argv forwarder mid-task | a task run cut short | task re-runs at its trigger; the forwarder's job object takes its child down with it |

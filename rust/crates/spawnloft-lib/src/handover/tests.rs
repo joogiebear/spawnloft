@@ -1,4 +1,5 @@
 use super::*;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -17,9 +18,11 @@ struct Fake {
 #[derive(Default)]
 struct FakeLegacy {
     servers: Mutex<BTreeMap<String, Fake>>,
-    events: Mutex<Vec<String>>,
+    events: Arc<Mutex<Vec<String>>>,
     /// a server that appears (running) after the first stop, as a task would start one
     appears: Mutex<Option<(String, Kind)>>,
+    /// 1.x cannot say what runs (its state file unreadable)
+    blind: Mutex<bool>,
 }
 
 impl FakeLegacy {
@@ -49,10 +52,26 @@ impl FakeLegacy {
     fn status(&self, name: &str) -> String {
         self.servers.lock().unwrap()[name].status.clone()
     }
+    /// The same servers in the same states, with no history: the world as a later process finds it.
+    fn again(servers: &BTreeMap<String, Fake>) -> FakeLegacy {
+        let f = FakeLegacy::default();
+        *f.servers.lock().unwrap() = servers.clone();
+        f
+    }
+    fn running(&self) -> Vec<String> {
+        let s = self.servers.lock().unwrap();
+        s.iter()
+            .filter(|(_, f)| f.status == "running")
+            .map(|(n, _)| n.clone())
+            .collect()
+    }
 }
 
 impl Legacy for FakeLegacy {
     fn list(&self) -> Result<Vec<Listed>, String> {
+        if *self.blind.lock().unwrap() {
+            return Err("unreadable".into());
+        }
         let mut servers = self.servers.lock().unwrap();
         for f in servers.values_mut() {
             if f.finish_at.is_some_and(|t| Instant::now() >= t) {
@@ -135,6 +154,8 @@ impl Legacy for FakeLegacy {
 #[derive(Default)]
 struct FakeTasks {
     state: Mutex<BTreeMap<String, bool>>,
+    /// tasks Task Scheduler refuses to change for now
+    refuses: Mutex<BTreeSet<String>>,
 }
 
 impl FakeTasks {
@@ -148,22 +169,85 @@ impl FakeTasks {
     fn get(&self, n: &str) -> bool {
         self.state.lock().unwrap()[n]
     }
+    fn again(state: &BTreeMap<String, bool>) -> FakeTasks {
+        let t = FakeTasks::default();
+        *t.state.lock().unwrap() = state.clone();
+        t
+    }
+    fn on(&self) -> Vec<String> {
+        self.enabled().unwrap()
+    }
 }
 
 impl Tasks for FakeTasks {
-    fn enabled(&self) -> Result<Vec<String>, String> {
+    fn states(&self) -> Result<Vec<(String, bool)>, String> {
         Ok(self
             .state
             .lock()
             .unwrap()
             .iter()
-            .filter(|(_, e)| **e)
-            .map(|(n, _)| n.clone())
+            .map(|(n, e)| (n.clone(), *e))
             .collect())
     }
     fn set_enabled(&self, name: &str, enabled: bool) -> Result<(), String> {
-        self.state.lock().unwrap().insert(name.into(), enabled);
-        Ok(())
+        if self.refuses.lock().unwrap().contains(name) {
+            return Err("access denied".into());
+        }
+        match self.state.lock().unwrap().get_mut(name) {
+            Some(e) => {
+                *e = enabled;
+                Ok(())
+            }
+            None => Err("the task does not exist".into()),
+        }
+    }
+}
+
+/// One save of the journal: the record as it went to disk, and the world at that moment.
+#[derive(Clone)]
+struct Shot {
+    record: Record,
+    servers: BTreeMap<String, Fake>,
+    tasks: BTreeMap<String, bool>,
+}
+
+/// A journal that keeps every save with the world as it was then, so a test can end the
+/// handover at any save ("the PC lost power here") and hand what is left to the next step.
+struct Shots<'a> {
+    legacy: &'a FakeLegacy,
+    tasks: &'a FakeTasks,
+    shots: RefCell<Vec<Shot>>,
+}
+
+impl<'a> Shots<'a> {
+    fn new(legacy: &'a FakeLegacy, tasks: &'a FakeTasks) -> Shots<'a> {
+        Shots {
+            legacy,
+            tasks,
+            shots: RefCell::new(Vec::new()),
+        }
+    }
+    fn now(&self, record: &Record) -> Shot {
+        Shot {
+            record: record.clone(),
+            servers: self.legacy.servers.lock().unwrap().clone(),
+            tasks: self.tasks.state.lock().unwrap().clone(),
+        }
+    }
+}
+
+impl Journal for Shots<'_> {
+    fn save(&self, record: &Record) {
+        self.shots.borrow_mut().push(self.now(record));
+    }
+}
+
+fn ctx<'a>(l: &'a FakeLegacy, t: &'a FakeTasks, j: &'a dyn Journal, log: &'a Log) -> Ctx<'a> {
+    Ctx {
+        legacy: l,
+        tasks: t,
+        journal: j,
+        log,
     }
 }
 
@@ -171,15 +255,39 @@ fn opts(silent: bool, deadline_ms: u64) -> StopOptions {
     StopOptions {
         legacy_version: "1.6.0-beta.413".into(),
         to_version: "2.0.0".into(),
+        legacy_dir: None,
         deadline: Duration::from_millis(deadline_ms),
         silent,
         cancel_file: None,
         restore_wait: Duration::from_millis(300),
+        installer_gone: None,
+        session_ending: None,
     }
 }
 
 fn go(o: &StopOptions, l: &FakeLegacy, t: &FakeTasks, m: Option<Marker>) -> StopOutcome {
-    run_stop(o, l.list().unwrap(), l, t, m, "/d", &Log::none())
+    go_on(o, l, t, m, None)
+}
+
+/// A stop that finds the record `unfinished` on disk.
+fn go_on(
+    o: &StopOptions,
+    l: &FakeLegacy,
+    t: &FakeTasks,
+    marker: Option<Marker>,
+    unfinished: Option<Record>,
+) -> StopOutcome {
+    run_stop(
+        o,
+        l.list().unwrap(),
+        ctx(l, t, &NoJournal, &Log::none()),
+        Found { marker, unfinished },
+        "/d",
+    )
+}
+
+fn put_back(r: &mut Record, l: &FakeLegacy, t: &FakeTasks) {
+    restore_waiting(r, ctx(l, t, &NoJournal, &Log::none()), Duration::from_millis(40));
 }
 
 fn entry<'a>(r: &'a Record, n: &str) -> &'a Entry {
@@ -332,11 +440,9 @@ fn cancel_puts_everything_back_and_leaves_no_marker() {
             ..opts(false, 60_000)
         },
         l.list().unwrap(),
-        &l,
-        &FakeTasks::default(),
-        None,
+        ctx(&l, &FakeTasks::default(), &NoJournal, &Log::none()),
+        Found::default(),
         "/d",
-        &Log::none(),
     );
     t.join().unwrap();
     assert!(started.elapsed() < Duration::from_secs(10));
@@ -404,4 +510,466 @@ fn a_retry_starts_again_what_blocked_before_and_is_stopped_now() {
     assert_eq!(entry(&out.record, "stuck").stop, "was-stopped");
     assert!(entry(&out.record, "stuck").to_restart());
     assert_eq!(entry(&out.record, "other").stop, "stopped");
+}
+
+// ---------------------------------------------------------------------------------------------
+// A handover that ends without warning (blocker B1 of the 2.0 beta review)
+
+const RAN: [&str; 3] = ["creative", "db", "survival"];
+const TASKS_ON: [&str; 2] = ["backup", "restart"];
+
+/// Three things running (two servers and their database), one stopped, one orphaned; two tasks
+/// on and one the person had switched off.
+fn world() -> (FakeLegacy, FakeTasks) {
+    (
+        FakeLegacy::with(&[
+            ("db", Kind::Database, "running"),
+            ("survival", Kind::Server, "running"),
+            ("creative", Kind::Server, "running"),
+            ("idle", Kind::Server, "stopped"),
+            ("lost", Kind::Server, "orphaned"),
+        ]),
+        FakeTasks::with(&[("backup", true), ("restart", true), ("off", false)]),
+    )
+}
+
+/// Every state a power cut can leave: each record that reached the disk, with the world as it
+/// was at that save and as it was at the next one (the record is written before the step it
+/// announces, so the world can be one step ahead of it, never more).
+fn cuts(l: &FakeLegacy, t: &FakeTasks) -> Vec<Shot> {
+    let j = Shots::new(l, t);
+    let out = run_stop(
+        &opts(true, 5000),
+        l.list().unwrap(),
+        ctx(l, t, &j, &Log::none()),
+        Found::default(),
+        "/d",
+    );
+    assert_eq!(out.code, EXIT_OK);
+    let mut shots = j.shots.borrow().clone();
+    // the record the caller writes at the end
+    shots.push(j.now(&out.record));
+    let mut all = Vec::new();
+    for k in 0..shots.len() {
+        all.push(shots[k].clone());
+        if let Some(next) = shots.get(k + 1) {
+            all.push(Shot {
+                record: shots[k].record.clone(),
+                ..next.clone()
+            });
+        }
+    }
+    all
+}
+
+#[test]
+fn the_record_says_what_is_about_to_change_before_it_changes() {
+    let (l, t) = world();
+    let j = Shots::new(&l, &t);
+    run_stop(
+        &opts(true, 5000),
+        l.list().unwrap(),
+        ctx(&l, &t, &j, &Log::none()),
+        Found::default(),
+        "/d",
+    );
+    let shots = j.shots.borrow();
+    // the tasks are named on disk while every one of them is still on
+    let first = &shots[0];
+    assert_eq!(first.record.tasks_disabled, TASKS_ON);
+    assert!(!first.record.tasks_reenabled);
+    assert!(first.tasks["backup"] && first.tasks["restart"]);
+    assert_eq!(first.record.stop_exit, None);
+    // and each server is named, as `stopping`, while it still runs
+    for name in RAN {
+        assert!(
+            shots.iter().any(|s| s.servers[name].status == "running"
+                && s.record
+                    .servers
+                    .iter()
+                    .any(|e| e.name == name && e.stop == "stopping")),
+            "{name} was not on disk before its stop"
+        );
+    }
+    // an unfinished record never reads as settled
+    assert!(shots.iter().all(|s| !s.record.settled()));
+}
+
+#[test]
+fn a_stop_cut_short_anywhere_is_put_back_by_restore() {
+    let (l, t) = world();
+    let cuts = cuts(&l, &t);
+    assert!(cuts.len() >= 8, "{} cuts", cuts.len());
+    for (i, cut) in cuts.iter().enumerate() {
+        let l2 = FakeLegacy::again(&cut.servers);
+        let t2 = FakeTasks::again(&cut.tasks);
+        let mut rec = cut.record.clone();
+        put_back(&mut rec, &l2, &t2);
+        assert_eq!(l2.running(), RAN, "cut {i}: everything that ran runs again");
+        assert_eq!(l2.status("idle"), "stopped", "cut {i}");
+        assert_eq!(l2.status("lost"), "orphaned", "cut {i}");
+        assert_eq!(
+            t2.on(),
+            TASKS_ON,
+            "cut {i}: the tasks are on again, and only those"
+        );
+        assert!(rec.settled(), "cut {i}");
+        // nothing that ran through the cut is started a second time
+        let started: Vec<String> = l2
+            .events()
+            .into_iter()
+            .filter(|e| e.starts_with("start "))
+            .collect();
+        for s in &started {
+            let name = s.trim_start_matches("start ");
+            assert_ne!(cut.servers[name].status, "running", "cut {i}: {name} ran already");
+        }
+        // databases before the servers that use them
+        if let (Some(d), Some(s)) = (
+            started.iter().position(|e| e == "start db"),
+            started.iter().position(|e| e == "start survival"),
+        ) {
+            assert!(d < s, "cut {i}");
+        }
+        // a second restore (the sign-in after an abort that already ran) changes nothing
+        let before = l2.events().len();
+        put_back(&mut rec, &l2, &t2);
+        assert_eq!(l2.events().len(), before, "cut {i}: restore twice");
+        assert_eq!(t2.on(), TASKS_ON, "cut {i}");
+    }
+}
+
+#[test]
+fn a_restore_cut_short_is_finished_by_the_next_one() {
+    let (l, t) = world();
+    let cuts = cuts(&l, &t);
+    let last = cuts.last().unwrap();
+    // the restore itself loses power after each of its saves
+    let l2 = FakeLegacy::again(&last.servers);
+    let t2 = FakeTasks::again(&last.tasks);
+    let j = Shots::new(&l2, &t2);
+    let mut rec = last.record.clone();
+    restore_waiting(
+        &mut rec,
+        ctx(&l2, &t2, &j, &Log::none()),
+        Duration::from_millis(40),
+    );
+    let shots = j.shots.borrow().clone();
+    assert!(shots.len() >= 3);
+    for (i, shot) in shots.iter().enumerate() {
+        let l3 = FakeLegacy::again(&shot.servers);
+        let t3 = FakeTasks::again(&shot.tasks);
+        let mut rec = shot.record.clone();
+        put_back(&mut rec, &l3, &t3);
+        assert_eq!(l3.running(), RAN, "restore cut {i}");
+        assert_eq!(t3.on(), TASKS_ON, "restore cut {i}");
+        assert!(rec.settled());
+        for s in l3.events().iter().filter(|e| e.starts_with("start ")) {
+            let name = s.trim_start_matches("start ");
+            assert_ne!(
+                shot.servers[name].status, "running",
+                "restore cut {i}: {name} twice"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_next_attempt_takes_over_what_a_cut_one_left() {
+    let (l, t) = world();
+    for (i, cut) in cuts(&l, &t).iter().enumerate() {
+        // the update runs again and goes through: resume must get everything that ever ran
+        let l2 = FakeLegacy::again(&cut.servers);
+        let t2 = FakeTasks::again(&cut.tasks);
+        let out = go_on(&opts(true, 5000), &l2, &t2, None, Some(cut.record.clone()));
+        assert_eq!(out.code, EXIT_OK, "cut {i}");
+        let mut again: Vec<&str> = out
+            .record
+            .servers
+            .iter()
+            .filter(|e| e.to_restart())
+            .map(|e| e.name.as_str())
+            .collect();
+        again.sort_unstable();
+        assert_eq!(again, RAN, "cut {i}: all three start again after the update");
+        let mut off = out.record.tasks_disabled.clone();
+        off.sort_unstable();
+        assert_eq!(off, TASKS_ON, "cut {i}: resume enables both tasks again");
+        assert!(!out.record.tasks_reenabled);
+        assert!(
+            l2.running().is_empty(),
+            "cut {i}: nothing left for the 1.x uninstaller to end"
+        );
+        assert_eq!(entry(&out.record, "lost").stop, "orphaned");
+        assert!(out.record.servers.iter().all(|e| e.name != "idle"));
+        // no name twice
+        let mut names: Vec<&str> = out.record.servers.iter().map(|e| e.name.as_str()).collect();
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(names.len(), out.record.servers.len(), "cut {i}");
+    }
+}
+
+#[test]
+fn a_taken_over_attempt_that_is_blocked_puts_everything_back() {
+    // the first attempt stopped creative, was about to stop survival, and ended there
+    let (l, t) = world();
+    l.tweak("creative", |f| f.status = "stopped".into());
+    l.tweak("survival", |f| f.refuses = true);
+    t.set_enabled("backup", false).unwrap();
+    t.set_enabled("restart", false).unwrap();
+    let mut old = Record::new("1.6.0-beta.413", "2.0.0", "silent", "/d");
+    old.servers.push(Entry::new("creative", Kind::Server, "stopped"));
+    old.servers.push(Entry::new("survival", Kind::Server, "stopping"));
+    old.tasks_disabled = vec!["backup".into(), "restart".into()];
+    let out = go_on(&opts(true, 200), &l, &t, None, Some(old));
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert_eq!(l.running(), RAN);
+    assert_eq!(
+        entry(&out.record, "creative").start.as_deref(),
+        Some("restored-1x")
+    );
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(out.record.settled());
+    assert_eq!(out.marker.unwrap().blocked_by, vec!["survival".to_string()]);
+}
+
+#[test]
+fn a_blocked_silent_retry_still_puts_back_what_a_cut_attempt_left() {
+    // attempt 1 was blocked by stuck (marker); attempt 2, by hand, stopped fine and lost power;
+    // attempt 3 is silent and held back by the marker: it stops nothing, but 1.x stays, so fine
+    // and the task come back now
+    let l = FakeLegacy::with(&[
+        ("stuck", Kind::Server, "running"),
+        ("fine", Kind::Server, "stopped"),
+    ]);
+    let t = FakeTasks::with(&[("backup", false)]);
+    let mut old = Record::new("1.6.0-beta.413", "2.0.0", "ui", "/d");
+    old.servers.push(Entry::new("fine", Kind::Server, "stopped"));
+    old.servers.push(Entry::new("stuck", Kind::Server, "stopping"));
+    old.tasks_disabled = vec!["backup".into()];
+    let m = Marker {
+        blocked_by: vec!["stuck".into()],
+        at_ms: time::now_ms() - 60_000,
+        attempts: 1,
+    };
+    let out = go_on(&opts(true, 1000), &l, &t, Some(m), Some(old));
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert_eq!(
+        l.events(),
+        vec!["start fine".to_string()],
+        "nothing stopped, fine started"
+    );
+    assert!(t.get("backup"));
+    assert!(out.record.settled());
+    assert_eq!(out.marker.unwrap().attempts, 2);
+}
+
+#[test]
+fn what_was_stopped_more_than_a_day_ago_is_left_alone_but_its_tasks_come_back() {
+    let l = FakeLegacy::with(&[("old", Kind::Server, "stopped"), ("new", Kind::Server, "stopped")]);
+    let t = FakeTasks::with(&[("backup", false)]);
+    let mut rec = Record::new("1.5.0", "2.0.0", "silent", "/d");
+    let mut e = Entry::new("old", Kind::Server, "stopped");
+    e.stopped_at = Some(time::now_ms() - TAKEOVER_WINDOW.as_millis() as i64 - 1);
+    rec.servers.push(e);
+    let mut e = Entry::new("new", Kind::Server, "stopped");
+    e.stopped_at = Some(time::now_ms() - 3_600_000);
+    rec.servers.push(e);
+    rec.tasks_disabled = vec!["backup".into()];
+
+    // the next attempt carries the young one and the task, not the old one
+    let out = go_on(&opts(true, 1000), &l, &t, None, Some(rec.clone()));
+    assert_eq!(out.code, EXIT_OK);
+    assert!(out.record.servers.iter().all(|e| e.name != "old"));
+    assert!(entry(&out.record, "new").to_restart());
+    assert_eq!(out.record.tasks_disabled, vec!["backup".to_string()]);
+    // carried with the time of the real stop, so the day does not start over
+    assert_eq!(
+        entry(&out.record, "new").stopped_at,
+        entry(&rec, "new").stopped_at
+    );
+
+    // and so does a restore
+    put_back(&mut rec, &l, &t);
+    assert_eq!(l.events(), vec!["start new".to_string()]);
+    assert_eq!(entry(&rec, "old").start.as_deref(), Some("skipped"));
+    assert!(t.get("backup"));
+    assert!(rec.settled());
+}
+
+#[test]
+fn a_task_that_cannot_be_enabled_is_tried_again_and_a_deleted_one_is_let_go() {
+    let (l, t) = world();
+    let mut rec = go(&opts(true, 5000), &l, &t, None).record;
+    t.refuses.lock().unwrap().insert("backup".into());
+    t.state.lock().unwrap().remove("restart");
+    put_back(&mut rec, &l, &t);
+    assert_eq!(l.running(), RAN);
+    assert!(!rec.tasks_reenabled, "backup is still off");
+    assert!(!rec.settled());
+    assert!(!t.get("backup"));
+    // the next step (a sign-in, the next attempt, resume) gets it; restart is gone for good
+    t.refuses.lock().unwrap().clear();
+    let before = l.events().len();
+    put_back(&mut rec, &l, &t);
+    assert!(t.get("backup"));
+    assert!(rec.tasks_reenabled && rec.settled());
+    assert_eq!(l.events().len(), before, "no server started twice");
+}
+
+#[test]
+fn an_installer_that_is_gone_ends_the_stop_like_a_cancel() {
+    // gone from the start: nothing is asked to stop
+    let (l, t) = world();
+    let o = StopOptions {
+        installer_gone: Some(Watch::new(|| true)),
+        ..opts(true, 5000)
+    };
+    let out = go(&o, &l, &t, None);
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert!(out.marker.is_none());
+    assert!(l.events().is_empty());
+    assert_eq!(l.running(), RAN);
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(out.record.settled());
+
+    // gone as the last stop goes through: "stopped" would be an answer to nobody
+    let (l, t) = world();
+    let ev = l.events.clone();
+    let o = StopOptions {
+        installer_gone: Some(Watch::new(move || {
+            ev.lock().unwrap().iter().any(|e| e == "stop db")
+        })),
+        ..opts(false, 5000)
+    };
+    let out = go(&o, &l, &t, None);
+    assert_eq!(out.code, EXIT_BLOCKED);
+    assert!(out.marker.is_none());
+    assert!(!out.interrupted);
+    assert_eq!(l.running(), RAN, "everything was started again");
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(out.record.settled());
+}
+
+#[test]
+fn during_a_shutdown_nothing_is_started_and_the_sign_in_puts_it_back() {
+    let (l, t) = world();
+    let ev = l.events.clone();
+    let j = Shots::new(&l, &t);
+    let marker = Marker {
+        blocked_by: vec!["elsewhere".into()],
+        at_ms: 5,
+        attempts: 2,
+    };
+    let out = run_stop(
+        &StopOptions {
+            installer_gone: Some(Watch::new(move || {
+                ev.lock().unwrap().iter().any(|e| e == "stop db")
+            })),
+            session_ending: Some(Watch::new(|| true)),
+            ..opts(false, 5000)
+        },
+        l.list().unwrap(),
+        ctx(&l, &t, &j, &Log::none()),
+        Found {
+            marker: Some(marker.clone()),
+            unfinished: None,
+        },
+        "/d",
+    );
+    assert!(out.interrupted);
+    assert_eq!(out.code, EXIT_INTERNAL);
+    assert_eq!(out.marker, Some(marker), "the marker file stays as it is");
+    assert!(l.events().iter().all(|e| !e.starts_with("start ")));
+    assert!(!out.record.settled());
+    assert!(t.on().is_empty());
+    // what is on disk is what the outcome holds
+    let on_disk = j.shots.borrow().last().unwrap().record.clone();
+    assert_eq!(on_disk, out.record);
+    // the next sign-in
+    let l2 = FakeLegacy::again(&l.servers.lock().unwrap());
+    let mut rec = on_disk;
+    put_back(&mut rec, &l2, &t);
+    assert_eq!(l2.running(), RAN);
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(rec.settled());
+}
+
+#[test]
+fn a_shutdown_with_the_installer_still_there_starts_nothing_either() {
+    let (l, t) = world();
+    l.servers.lock().unwrap().get_mut("creative").unwrap().refuses = true;
+    let j = Shots::new(&l, &t);
+    let out = run_stop(
+        &StopOptions {
+            session_ending: Some(Watch::new(|| true)),
+            ..opts(true, 600)
+        },
+        l.list().unwrap(),
+        ctx(&l, &t, &j, &Log::none()),
+        Found::default(),
+        "/d",
+    );
+    // creative did not stop: an abort, but not one that starts servers into the shutdown
+    assert!(out.interrupted);
+    assert_eq!(out.code, EXIT_INTERNAL);
+    assert!(l.events().iter().all(|e| !e.starts_with("start ")));
+    assert!(!out.record.settled(), "what was stopped is still owed");
+    assert!(out.record.servers.iter().all(|e| e.start.is_none()));
+    // the next sign-in
+    let l2 = FakeLegacy::again(&l.servers.lock().unwrap());
+    let mut rec = j.shots.borrow().last().unwrap().record.clone();
+    put_back(&mut rec, &l2, &t);
+    assert_eq!(l2.running(), RAN);
+    assert_eq!(t.on(), TASKS_ON);
+    assert!(rec.settled());
+}
+
+#[test]
+fn a_restore_that_cannot_list_keeps_what_it_cannot_judge() {
+    let (l, t) = world();
+    let mut rec = Record::new("1.5.0", "2.0.0", "silent", "/d");
+    // cut right after survival was asked to stop: it went down, nobody wrote that
+    rec.servers.push(Entry::new("survival", Kind::Server, "stopping"));
+    l.servers.lock().unwrap().get_mut("survival").unwrap().status = "stopped".into();
+    *l.blind.lock().unwrap() = true;
+    put_back(&mut rec, &l, &t);
+    assert!(!rec.settled(), "running or not, nobody could say: still owed");
+    assert!(l.events().iter().all(|e| !e.starts_with("start ")));
+    *l.blind.lock().unwrap() = false;
+    put_back(&mut rec, &l, &t);
+    assert!(rec.settled());
+    assert_eq!(entry(&rec, "survival").start.as_deref(), Some("restored-1x"));
+    assert!(l.running().iter().any(|n| n == "survival"));
+}
+
+#[test]
+fn settled_means_nothing_is_owed() {
+    let mut r = Record::new("1.5.0", "2.0.0", "silent", "/d");
+    assert!(r.settled(), "nothing stopped, nothing disabled");
+    r.tasks_disabled = vec!["t".into()];
+    assert!(!r.settled());
+    r.tasks_reenabled = true;
+    assert!(r.settled());
+    for (stop, owed) in [
+        ("stopped", true),
+        ("was-stopped", true),
+        ("stopping", true),
+        ("stop-sent", true),
+        ("still-running", false),
+        ("orphaned", false),
+        ("failed", false),
+    ] {
+        r.servers = vec![Entry::new("s", Kind::Server, stop)];
+        assert_eq!(!r.settled(), owed, "{stop}");
+        r.servers[0].start = Some("failed".into());
+        assert!(r.settled(), "{stop}, start tried");
+    }
+    // an unfinished record survives the round trip as unfinished
+    r.servers = vec![Entry::new("s", Kind::Server, "stopping")];
+    r.tasks_reenabled = false;
+    let back = Record::from_json(&r.to_json()).unwrap();
+    assert_eq!(back, r);
+    assert!(!back.settled() && back.stop_exit.is_none());
 }
