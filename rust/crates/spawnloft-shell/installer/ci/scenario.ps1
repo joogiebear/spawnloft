@@ -723,12 +723,18 @@ switch ($Name) {
     foreach ($k in $wvKeys) { if (Reg $k 'pv') { Rename-ItemProperty -Path $k -Name 'pv' -NewName 'pv-hidden-by-ci' } }
     function WebView2-Registered { @($wvKeys | Where-Object { Reg $_ 'pv' }).Count -gt 0 }
     Check 'no WebView2 is registered' (-not (WebView2-Registered))
-    # both families: with only an IPv4 line Windows still asks DNS for the IPv6 address
-    Add-Content -Path "$env:WINDIR\System32\drivers\etc\hosts" -Value "`r`n127.0.0.1 go.microsoft.com`r`n::1 go.microsoft.com"
-    ipconfig /flushdns | Out-Null
-    $addrs = @(try { [System.Net.Dns]::GetHostAddresses('go.microsoft.com') } catch { @() })
-    $away = @($addrs | Where-Object { -not [System.Net.IPAddress]::IsLoopback($_) })
-    Check 'the WebView2 download link leads nowhere' ($away.Count -eq 0) "resolves to $($addrs -join ', ')"
+    # The firewall, not the hosts file (a hosted runner resolves past it): nothing leaves the setup
+    # (the download runs inside it), and the link's addresses are closed to everything.
+    Set-NetFirewallProfile -All -Enabled True
+    New-NetFirewallRule -DisplayName 'ci-no-webview2-setup' -Direction Outbound -Program (Resolve-Path $setupA).Path -Action Block | Out-Null
+    $addrs = @([System.Net.Dns]::GetHostAddresses('go.microsoft.com') | ForEach-Object { "$_" })
+    New-NetFirewallRule -DisplayName 'ci-no-webview2-link' -Direction Outbound -RemoteAddress $addrs -Action Block | Out-Null
+    $reach = $false
+    foreach ($a in $addrs) {
+      $c = [System.Net.Sockets.TcpClient]::new(([System.Net.IPAddress] $a).AddressFamily)
+      try { if ($c.ConnectAsync($a, 443).Wait(5000) -and $c.Connected) { $reach = $true } } catch { } finally { $c.Dispose() }
+    }
+    Check 'the WebView2 download link cannot be reached' (-not $reach) "addresses $($addrs -join ', ')"
 
     Load-Win32
     $p = Start-Process $setupA -PassThru
