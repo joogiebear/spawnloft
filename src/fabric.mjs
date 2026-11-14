@@ -9,6 +9,8 @@ import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, humanBytes, assertSafeVersion, isInside } from './util.mjs'
+import { partPath, dropPart } from './download.mjs'
+import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 const API = 'https://meta.fabricmc.net/v2'
 const HEADERS = { 'User-Agent': 'SpawnLoft (github.com/joogiebear/spawnloft)', Accept: 'application/json' }
@@ -66,10 +68,13 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
   }
 
   const url = `${API}/versions/loader/${encodeURIComponent(game)}/${encodeURIComponent(loader)}/${encodeURIComponent(installer)}/server/jar`
+  const signal = cancelSignal()
+  checkCancelled()
   let res
   try {
-    res = await fetch(url, { headers: { 'User-Agent': HEADERS['User-Agent'] } })
+    res = await fetch(url, { headers: { 'User-Agent': HEADERS['User-Agent'] }, ...(signal ? { signal } : {}) })
   } catch (err) {
+    if (signal?.aborted) throw new Cancelled()
     fail(`could not reach the Fabric meta API: ${err.cause?.message || err.message}`)
   }
   if (!res.ok || !res.body) {
@@ -78,7 +83,7 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
       : `download failed (${res.status}) for ${url}`)
   }
 
-  const tmp = `${dest}.part`
+  const tmp = partPath(dest)
   const source = Readable.fromWeb(res.body)
   let received = 0
   const total = Number(res.headers.get('content-length')) || 0
@@ -86,7 +91,13 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
     received += chunk.length
     onProgress?.({ received, total })
   })
-  await pipeline(source, fs.createWriteStream(tmp))
+  try {
+    await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
+  } catch (err) {
+    dropPart(tmp)
+    if (!signal?.aborted) throw err
+    throw new Cancelled()
+  }
 
   // no published checksum, so a structural floor: an HTML error page saved as a jar would be tiny
   const size = fs.statSync(tmp).size

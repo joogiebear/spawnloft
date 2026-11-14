@@ -1223,3 +1223,52 @@ test('Settings: a link is checked as it is typed, and a game rule is a row that 
   assert.match(html, /unit\.textContent = f\.unit;/)
   assert.match(html, /input\.setAttribute\('aria-describedby', unit\.id \+ ' ' \+ bad\.id\);/)
 })
+
+test('Add: a create that is running can be cancelled from its own button', () => {
+  const { cancelledWords } = lifted(['cancelledWords'])
+  assert.equal(cancelledWords({ code: 'cancelled', message: 'x' }), 'Cancelled. No server was created.')
+  assert.equal(cancelledWords({ code: 'java-too-old', message: 'x' }), '')
+  assert.equal(cancelledWords(null), '')
+
+  // the button, driven as the page drives it
+  const calls = []
+  const classes = new Set(['primary'])
+  const button = {
+    textContent: 'Create server', type: 'submit', disabled: true, dataset: {}, onclick: null,
+    classList: { contains: (c) => classes.has(c), remove: (c) => classes.delete(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) },
+  }
+  let answer = { cancelling: true }
+  let now = 1000
+  const cancelButtonFor = new Function('post', 'toast', 'Date', `${fnSource('cancelButtonFor')}; return cancelButtonFor`)(
+    async (route, body) => { calls.push([route, body]); if (answer instanceof Error) throw answer; return answer },
+    (message, kind) => calls.push(['toast', message, kind]),
+    { now: () => now })
+  const restore = cancelButtonFor(button, 'job 1')
+  assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, classes.has('primary')], ['Cancel', 'button', false, 'job 1', false])
+  // the second half of a double click on Create lands here, and is not a Cancel
+  now += 200
+  button.onclick()
+  assert.deepEqual([button.textContent, button.disabled, calls.length], ['Cancel', false, 0])
+  now += 600
+  const pressed = button.onclick()
+  assert.deepEqual([button.textContent, button.disabled], ['Cancelling…', true])
+  return pressed.then(async () => {
+    assert.deepEqual(calls, [['/jobs/job%201/cancel', {}]])
+    // the panel could not be asked: the button is a Cancel again, and the reason is said
+    answer = new Error('the panel is not answering')
+    await button.onclick()
+    assert.deepEqual([button.textContent, button.disabled], ['Cancel', false])
+    assert.deepEqual(calls.at(-1), ['toast', 'the panel is not answering', 'bad'])
+    // nothing by that id is running yet, or any more: the button can be pressed again
+    answer = { cancelling: false }
+    await button.onclick()
+    assert.deepEqual([button.textContent, button.disabled], ['Cancel', false])
+    restore()
+    assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, button.onclick, classes.has('primary')], ['Create server', 'submit', false, undefined, null, true])
+    // both creates use it, and neither starts a second one from Enter while the first runs
+    assert.match(html, /const restoreCreate = cancelButtonFor\(\$\('#bCreate'\), jobId\);/)
+    assert.match(html, /const restorePack = cancelButtonFor\(\$\('#bPackCreate'\), jobId\);/)
+    assert.match(html, /if \(\$\('#bCreate'\)\.dataset\.job\) return;/)
+    assert.match(html, /if \(\$\('#bPackCreate'\)\.dataset\.job\) return;/)
+  })
+})

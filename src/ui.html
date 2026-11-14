@@ -15476,10 +15476,59 @@ $('#formDb').onsubmit = async (e) => {
   }
 };
 
+/*
+  While a create runs, its button is the way to stop it. The button is the form's submit button,
+  so for that time it is made a plain one: pressed, it asks the panel to stop the job, and the
+  create's own request then comes back saying it was cancelled. The function returned puts the
+  button back as it was.
+*/
+function cancelButtonFor(button, jobId) {
+  const was = { text: button.textContent, primary: button.classList.contains('primary') };
+  button.type = 'button';
+  button.dataset.job = jobId;
+  button.classList.remove('primary');
+  button.textContent = 'Cancel';
+  button.disabled = false;
+  // The press that started the create can have a second one right behind it (a double click, a
+  // key held down), and that one would land on Cancel. For a moment the button takes none.
+  const armed = Date.now() + 700;
+  button.onclick = async () => {
+    if (Date.now() < armed) return;
+    button.disabled = true;
+    button.textContent = 'Cancelling\u2026';
+    try {
+      const out = await post('/jobs/' + encodeURIComponent(jobId) + '/cancel', {});
+      // nothing by that id is running: not started yet, or over in the moment before the press.
+      // The button is a Cancel again; if the create is over, its own answer is about to put it back.
+      if (!out.cancelling && button.dataset.job === jobId) { button.disabled = false; button.textContent = 'Cancel'; }
+    } catch (err) {
+      if (button.dataset.job !== jobId) return;
+      button.disabled = false;
+      button.textContent = 'Cancel';
+      toast(err.message, 'bad');
+    }
+  };
+  return () => {
+    button.onclick = null;
+    delete button.dataset.job;
+    button.type = 'submit';
+    button.classList.toggle('primary', was.primary);
+    button.textContent = was.text;
+    button.disabled = false;
+  };
+}
+
+/** What the Add sheet says under the bar once a create was cancelled. */
+function cancelledWords(err) {
+  return err && err.code === 'cancelled' ? 'Cancelled. No server was created.' : '';
+}
+
 // Set for one submit after "Create anyway" on a Java refusal, then cleared.
 let forceJava = false;
 $('#formNew').onsubmit = async (e) => {
   e.preventDefault();
+  // Enter in a field while a create is running is not a second create
+  if ($('#bCreate').dataset.job) return;
   if (!checkName($('#nName'), $('#nNameBad'))) { $('#nName').focus(); return; }
   if (!checkMemory($('#nMem'), $('#nMemBad'))) { $('#nMem').focus(); return; }
   if (!checkPort($('#nPort'), $('#nPortBad'))) { $('#nPort').focus(); return; }
@@ -15491,7 +15540,7 @@ $('#formNew').onsubmit = async (e) => {
   bar.style.width = '0';
   bar.classList.add('indet');
   msg.textContent = 'Starting…';
-  $('#bCreate').disabled = true;
+  const restoreCreate = cancelButtonFor($('#bCreate'), jobId);
   lockAddTabs(true);
   $('#newHint').textContent = 'This can take a minute on a slow connection.';
 
@@ -15530,7 +15579,7 @@ $('#formNew').onsubmit = async (e) => {
     jobs.close();
     lockAddTabs(false);
     $('#newProg').hidden = true;
-    $('#bCreate').disabled = false;
+    restoreCreate();
     e.target.reset();
     $('#nMem').value = '4G';
     // reset() put the loader back to Paper but left the version list and hints from whichever
@@ -15547,9 +15596,11 @@ $('#formNew').onsubmit = async (e) => {
     lockAddTabs(false);
     bar.classList.remove('indet');
     bar.style.width = '0';
-    msg.textContent = err.message;
-    $('#bCreate').disabled = false;
+    msg.textContent = cancelledWords(err) || err.message;
+    restoreCreate();
     $('#newHint').textContent = '';
+    // stopped because it was asked to: said under the bar, where the progress was, and not as a fault
+    if (cancelledWords(err)) { $('#bCreate').focus(); return; }
     if (err.code === 'java-too-old') {
       // The refusal is about a certainty - the class files will not load on that Java - but
       // the person may be about to install one, or know something this table does not.
@@ -15674,6 +15725,7 @@ $('#pMem').oninput = () => checkMemory($('#pMem'), $('#pMemBad'));
 $('#formPack').onsubmit = async (e) => {
   e.preventDefault();
   if (!packView.chosen) return;
+  if ($('#bPackCreate').dataset.job) return;
   if (!checkName($('#pName'), $('#pNameBad'))) { $('#pName').focus(); return; }
   if (!checkMemory($('#pMem'), $('#pMemBad'))) { $('#pMem').focus(); return; }
 
@@ -15684,7 +15736,7 @@ $('#formPack').onsubmit = async (e) => {
   bar.style.width = '0';
   bar.classList.add('indet');
   msg.textContent = 'Starting…';
-  $('#bPackCreate').disabled = true;
+  const restorePack = cancelButtonFor($('#bPackCreate'), jobId);
   lockAddTabs(true);
 
   const jobs = new EventSource('/api/jobs/' + jobId + '/stream');
@@ -15711,7 +15763,7 @@ $('#formPack').onsubmit = async (e) => {
     jobs.close();
     lockAddTabs(false);
     $('#packProg').hidden = true;
-    $('#bPackCreate').disabled = false;
+    restorePack();
     await refresh();
     select(inst.name);
     toast('Created ' + (inst.label || inst.name) + ' from ' + packView.chosen.title + '.', 'good');
@@ -15720,8 +15772,9 @@ $('#formPack').onsubmit = async (e) => {
     lockAddTabs(false);
     bar.classList.remove('indet');
     bar.style.width = '0';
-    msg.textContent = err.message;
-    $('#bPackCreate').disabled = false;
+    msg.textContent = cancelledWords(err) || err.message;
+    restorePack();
+    if (cancelledWords(err)) { $('#bPackCreate').focus(); return; }
     toast(err.message, 'bad');
   }
 };

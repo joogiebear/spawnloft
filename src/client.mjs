@@ -7,6 +7,7 @@ import dns from 'node:dns'
 import net from 'node:net'
 import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
+import { checkCancelled } from './cancel.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
 import { mojangJava } from './client-java.mjs'
@@ -467,6 +468,9 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // arm64 natives, so its natives, its rules and its Java all follow it
   const runOs = resolved.os
 
+  // A launch that was cancelled stops between its steps, and inside a download; nothing it has
+  // fetched is thrown away, so the next launch starts from there.
+  checkCancelled()
   onStage({ stage: 'java', message: 'Finding Java' })
   // Mojang's runtime for the version's component, for the arch the game runs as (plan step V2)
   const runtime = () => {
@@ -480,6 +484,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onWarning(picked.warning)
   }
 
+  checkCancelled()
   const installed = fakeInstalled ? null : await ensureVersion(versionId, { os: runOs, onProgress, keepNatives: versionsInUse(name), ...(fetchImpl ? { fetchImpl } : {}) })
   // the older asset layouts: a tree under real names, shared (virtual) or in the profile (resources)
   const assetsDir = installed ? assetTreeDir(installed.assetsLayout, installed.assetIndex.id, profileDir(name)) : null
@@ -505,7 +510,9 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     }
   }
 
+  checkCancelled()
   const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
+  checkCancelled()
   // last before the game, so a failed download or sign-in does not leave a server started for nothing
   if (stopped && ensureServer) {
     onStage({ stage: 'server', message: `Starting ${target}` })
@@ -516,6 +523,8 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   if (harnessToken) removeHarnessFile(name)
   const command = buildCommand({ version, profile: { ...profile, server: target }, profileName: name, account, java, os: runOs, harnessToken, address, assetsDir })
   onStage({ stage: 'spawn', message: 'Starting the game' })
+  // the last moment: once the game is started, stopping it is Stop's job, not Cancel's
+  checkCancelled()
   // server: the one the game joins by itself (quickPlay), so a join to it can wait instead of racing
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed, assetsDir) } })
 

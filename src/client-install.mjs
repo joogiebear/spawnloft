@@ -8,6 +8,7 @@ import { nativesStamp } from './client-version.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
 import { fail, safeRelativePath, isInside } from './util.mjs'
+import { isCancelled } from './cancel.mjs'
 
 export const PARALLEL = 8
 
@@ -209,6 +210,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
     try {
       await fetchImpl(ai.url, indexDest, { hash: 'sha1', expected: ai.sha1, label: `asset index ${ai.id}` })
     } catch (err) {
+      if (isCancelled(err)) throw err
       fail(`could not download asset index ${ai.id} from ${ai.url}: ${err.message}`)
     }
     indexBytes = ai.size ?? 0
@@ -249,6 +251,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
         try {
           await fetchImpl(dl.url, jarPath, { hash: 'sha1', expected: dl.sha1, label: `the client jar for ${id}` })
         } catch (err) {
+          if (isCancelled(err)) throw err
           fail(`could not download the client jar for ${id} from ${dl.url}: ${err.message}`)
         }
         downloaded++
@@ -275,6 +278,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
       try {
         await fetchImpl(logCfg.url, dest, { hash: 'sha1', expected: logCfg.sha1, label: `the log config ${logCfg.id}` })
       } catch (err) {
+        if (isCancelled(err)) throw err
         fail(`could not download the log config ${logCfg.id} from ${logCfg.url}: ${err.message}; without it ${id} would run open to Log4Shell, so it is not launched`)
       }
       downloaded++
@@ -306,6 +310,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
       try {
         await fetchImpl(row.url, dest, opts)
       } catch (err) {
+        if (isCancelled(err)) throw err
         fail(`could not download library ${row.name} from ${row.url}: ${err.message}`)
       }
       libBytes += row.size ?? 0
@@ -338,6 +343,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
       try {
         await fetchImpl(row.url, dest, { hash: 'sha1', expected: row.hash, label: `asset ${row.hash}` })
       } catch (err) {
+        if (isCancelled(err)) throw err
         fail(`could not download asset ${row.hash} from ${row.url}: ${err.message}`)
       }
       assetBytes += row.size ?? 0

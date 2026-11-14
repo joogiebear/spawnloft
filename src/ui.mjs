@@ -47,6 +47,7 @@ import { scrubber } from './mcp-tools.mjs'
 import { rconExposure, joinInfo } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
+import { withCancel, checkCancelled, orCancelled, isCancelled } from './cancel.mjs'
 import { activeBlock } from './control.mjs'
 import * as panelAuth from './panel-auth.mjs'
 import * as panelOpen from './panel-open.mjs'
@@ -311,6 +312,34 @@ async function feedback(instanceName, { title = '' } = {}) {
 // id; losing them on restart is fine.
 const jobs = new Map()
 const JOB_LIMIT = 32
+
+// Jobs that can be stopped part way: a create, a game launch. The id is the job's; the page that
+// started it is the one that knows it.
+const cancels = new Map()
+
+/** Run fn as the job `id`, which POST /api/jobs/<id>/cancel can then stop. Without an id it is
+ *  just run. */
+async function cancellable(id, fn) {
+  if (!id) return fn()
+  if (cancels.has(id)) fail('that job is already running')
+  const controller = new AbortController()
+  cancels.set(id, controller)
+  try {
+    return await withCancel(controller.signal, fn)
+  } finally {
+    cancels.delete(id)
+  }
+}
+
+/** Ask a running job to stop. False when there is none by that id: finished, or never started. */
+export function cancelJob(id) {
+  const controller = cancels.get(id)
+  if (!controller) return false
+  // said at once, so the page shows it is being stopped while the step in hand winds up
+  if (!controller.signal.aborted) jobUpdate(id, { message: 'Cancelling', cancelling: true })
+  controller.abort()
+  return true
+}
 
 function jobUpdate(id, patch) {
   if (!id) return
@@ -1061,6 +1090,7 @@ async function handleClient(req, res, seg, url) {
     }
     const jobId = String(body.jobId)
     if (!JOB_ID.test(jobId)) fail('jobId must be 1 to 64 letters, digits, dashes or underscores')
+    if (cancels.has(jobId)) fail('that job is already running')
     client.getProfile(profileName)
     // Answered now: the page has opened the job stream, and every refusal from here on (the
     // launch lock among them) arrives there as the job's error.
@@ -1128,7 +1158,8 @@ function launcherSummary() {
 }
 
 async function startServerForLaunch(name) {
-  const out = await supervisor.start(name, { timeout: LAUNCH_SERVER_WAIT_MS })
+  // a cancelled launch stops waiting; the server, once asked to start, is left to
+  const out = await orCancelled(supervisor.start(name, { timeout: LAUNCH_SERVER_WAIT_MS }))
   if (out.failed) fail(`server "${name}" started but stopped again: ${out.reason}; the game was not launched`)
   if (out.timedOut) fail(`server "${name}" had not finished starting after about 2 minutes, so the game was not launched; watch its console, then launch again`)
 }
@@ -1136,8 +1167,8 @@ async function startServerForLaunch(name) {
 // `startServer` is the page's "Start server and launch": without it a stopped server is a warning.
 function launchJob(jobId, profileName, { startServer, ...opts }) {
   // a reused id must not carry the last run's outcome into this one
-  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined, code: undefined })
-  client.launch(profileName, {
+  jobUpdate(jobId, { stage: 'start', percent: null, message: 'Preparing', done: false, pid: undefined, version: undefined, account: undefined, warnings: undefined, code: undefined, cancelling: undefined })
+  cancellable(jobId, () => client.launch(profileName, {
     ...opts,
     launchedBy: 'launcher',
     ensureServer: startServer ? startServerForLaunch : null,
@@ -1147,13 +1178,15 @@ function launchJob(jobId, profileName, { startServer, ...opts }) {
       message: `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files · ${humanBytes(bytes)}`,
       percent: total ? Math.min(100, Math.round((done / total) * 100)) : null,
     }),
-  }).then(
+  })).then(
     (out) => jobUpdate(jobId, {
-      stage: 'running', percent: 100, message: `Running · pid ${out.pid}`, done: true,
+      stage: 'running', percent: 100, message: `Running · pid ${out.pid}`, done: true, cancelling: undefined,
       pid: out.pid, version: out.version, account: out.account, warnings: out.warnings,
     }),
     // the code (unknown-variable, java-too-old, ...) lets a page or an assistant tell refusals apart
-    (err) => jobUpdate(jobId, { stage: 'error', percent: null, message: err?.message ?? String(err), done: true, code: err?.code }),
+    (err) => jobUpdate(jobId, isCancelled(err)
+      ? { stage: 'cancelled', percent: null, message: 'Cancelled', done: true, code: 'cancelled', cancelling: undefined }
+      : { stage: 'error', percent: null, message: err?.message ?? String(err), done: true, code: err?.code, cancelling: undefined }),
   )
 }
 
@@ -1855,6 +1888,10 @@ async function route(req, res) {
     return json(res, 200, schedule.keepRunningLoggedOut())
   }
 
+  if (seg[1] === 'jobs' && seg[3] === 'cancel' && seg.length === 4 && req.method === 'POST') {
+    return json(res, 200, { cancelling: cancelJob(String(seg[2])) })
+  }
+
   if (seg[1] === 'jobs' && seg[3] === 'stream' && req.method === 'GET') {
     res.writeHead(200, {
       'content-type': 'text/event-stream',
@@ -2074,6 +2111,11 @@ async function route(req, res) {
     if (!body.name && body.label) body.name = registry.freeName(slugFor(String(body.label)))
     if (!body.name) return json(res, 400, { error: 'name is required' })
     const jobId = body.jobId ? String(body.jobId) : null
+    if (jobId && !JOB_ID.test(jobId)) fail('jobId must be 1 to 64 letters, digits, dashes or underscores')
+    // before its record is touched: the job by this id that is still running keeps its own
+    if (jobId && cancels.has(jobId)) fail('that job is already running')
+    jobUpdate(jobId, { stage: 'start', percent: null, message: 'Starting', done: false, cancelling: undefined })
+    return cancellable(jobId, async () => {
     try {
       let jar = body.jar || null
       // a modpack decides the loader, Minecraft version, mods and config itself
@@ -2084,7 +2126,7 @@ async function route(req, res) {
           onlineMode: body.onlineMode !== false,
           onProgress: ({ message, percent }) => jobUpdate(jobId, { stage: 'pack', message, percent: percent ?? null }),
         })
-        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
+        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true, cancelling: undefined })
         return json(res, 200, { ...safeInstance(labelled(String(body.name), body.label)), pack: result })
       }
       // NeoForge is installer-laid and launched from a starter jar; see neoforge.createServer
@@ -2102,7 +2144,7 @@ async function route(req, res) {
           onlineMode: body.onlineMode !== false,
           onProgress: ({ message, percent }) => jobUpdate(jobId, { stage: 'neoforge', message, percent: percent ?? null }),
         })
-        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
+        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true, cancelling: undefined })
         return json(res, 200, safeInstance(labelled(String(body.name), body.label)))
       }
       // every jar-based loader: resolve the version, fetch or build the jar, place it.
@@ -2136,6 +2178,8 @@ async function route(req, res) {
       } else if (loader !== 'paper') {
         return json(res, 400, { error: `a Minecraft version is required for a ${sources.labelFor(loader)} server` })
       }
+      // the jar is in the shared store by now and stays there; nothing of the server exists yet
+      checkCancelled()
       jobUpdate(jobId, { stage: 'create', percent: null, message: 'Setting up the server folder' })
       const inst = await create.newInstance(String(body.name), {
         jar,
@@ -2149,13 +2193,19 @@ async function route(req, res) {
         // the person clicking Create is the local operator; no second EULA prompt
         acceptEula: true,
       })
-      jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${inst.name}`, done: true })
+      jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${inst.name}`, done: true, cancelling: undefined })
       return json(res, 200, safeInstance(labelled(inst.name, body.label)))
     } catch (err) {
+      // stopped on purpose: said as that, on the stream and in the answer, and not as a failure
+      if (isCancelled(err)) {
+        jobUpdate(jobId, { stage: 'cancelled', percent: null, message: 'Cancelled', done: true, cancelling: undefined })
+        return json(res, 409, { error: 'Cancelled. No server was created.', code: 'cancelled' })
+      }
       // also put the error on the job stream so a watching page shows where it failed
-      jobUpdate(jobId, { stage: 'error', message: err?.message ?? String(err), done: true })
+      jobUpdate(jobId, { stage: 'error', message: err?.message ?? String(err), done: true, cancelling: undefined })
       throw err
     }
+    })
   }
 
   const name = seg[2]

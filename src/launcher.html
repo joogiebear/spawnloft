@@ -1641,8 +1641,35 @@
           if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
           return h('span', { class: 'step' }, s.name)
         })),
-        h('p', { class: 'hint', text: `${CLOSING} does not stop the download. It keeps going and the files are used next time.` })),
+        // the one thing to do while it runs; once the game itself is starting there is nothing left to cancel
+        h('div', { class: 'runrow' },
+          h('button', { id: 'cancelLaunch', disabled: Boolean(job.cancelling) || stepOf(job.stage) >= 4, onclick: () => cancelLaunch(job) }, job.cancelling ? 'Cancelling…' : 'Cancel')),
+        h('p', { class: 'hint', text: `${CLOSING} does not stop the download. It keeps going and the files are used next time. Cancel stops it; what is already downloaded is kept.` })),
     ]
+  }
+
+  // Asks the panel to stop the launch. The job's own stream then says it was cancelled, and that
+  // is what puts Play back; a launch that had already finished just carries on to its result.
+  async function cancelLaunch(job) {
+    if (job.done || job.cancelling) return
+    job.cancelling = true
+    render()
+    try {
+      const out = await api(`jobs/${enc(job.id)}/cancel`, { method: 'POST', body: {} })
+      if (!out?.cancelling && !job.done) { job.cancelling = false; render() }
+    } catch (err) {
+      if (job.done) return
+      job.cancelling = false
+      S.flash = null
+      S.notice = { profile: job.profile, tone: 'fault', title: 'Could not cancel', text: sentence(plain(err.message)) }
+      render()
+    }
+  }
+
+  /** What the page says after a launch was cancelled. */
+  function cancelledNotice(job) {
+    const started = job.startsServer && job.reached >= 3
+    return { tone: '', title: 'Launch cancelled', text: 'The game was not started. What was downloaded is kept for next time.' + (started ? ' Its server had already been asked to start, and is left to.' : '') }
   }
 
   function runningCard(p) {
@@ -1754,6 +1781,7 @@
       }
       job.stage = ev.stage
       job.message = ev.message
+      if (ev.cancelling) job.cancelling = true
       job.percent = ev.percent ?? null
       job.reached = Math.max(job.reached, stepOf(ev.stage))
       if (ev.done) finishJob(job, ev)
@@ -1773,6 +1801,8 @@
     if (ev?.stage === 'running') {
       S.watch[job.profile] = { since: Date.now(), stopping: false }
       if (ev.warnings?.length) S.notice = { profile: job.profile, tone: 'warn', title: 'Playing, with a warning', text: ev.warnings.map(sentence).join(' ') }
+    } else if (ev?.stage === 'cancelled' || ev?.code === 'cancelled') {
+      S.notice = { profile: job.profile, ...cancelledNotice(job), at: Date.now() }
     } else if (ev && versionRefusal(ev)) {
       const p = profileNamed(job.profile)
       if (p) S.refusals[job.profile] = { mc: p.mc, message: ev.message }

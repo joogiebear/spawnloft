@@ -11,6 +11,7 @@ import { JARS_DIR } from './paths.mjs'
 import * as create from './create.mjs'
 import { removeInstance, updateInstance } from './registry.mjs'
 import { fail, UserError, humanBytes, assertSafeVersion, isInside } from './util.mjs'
+import { Cancelled, cancelSignal, checkCancelled, stopOnCancel, OWN_GROUP, inOwnGroup } from './cancel.mjs'
 
 const MAVEN = 'https://maven.neoforged.net'
 const API = `${MAVEN}/api/maven/versions/releases/net/neoforged/neoforge`
@@ -82,14 +83,19 @@ export async function fetchInstaller(neoVersion, { onProgress = () => {} } = {})
 
   const url = `${MAVEN}/releases/net/neoforged/neoforge/${encodeURIComponent(neoVersion)}/${encodeURIComponent(name)}`
   onProgress({ message: `Downloading the NeoForge ${neoVersion} installer`, percent: null })
+  const job = cancelSignal()
+  checkCancelled()
   let res
+  let bytes
   try {
-    res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(120000) })
+    res = await fetch(url, { headers: HEADERS, signal: job ? AbortSignal.any([job, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000) })
+    if (res.ok) bytes = Buffer.from(await res.arrayBuffer())
   } catch (err) {
+    if (job?.aborted) throw new Cancelled()
     fail(`could not reach the NeoForge maven: ${err.cause?.message || err.message}`)
   }
   if (!res.ok) fail(`installer download failed (${res.status}) for ${url}`)
-  const bytes = Buffer.from(await res.arrayBuffer())
+  checkCancelled()
 
   const shaRes = await fetch(`${url}.sha256`, { headers: HEADERS, signal: AbortSignal.timeout(30000) }).catch(() => null)
   if (shaRes?.ok) {
@@ -106,10 +112,12 @@ export async function fetchInstaller(neoVersion, { onProgress = () => {} } = {})
 export function installServer(dir, installerPath, { java = 'java', onProgress = () => {} } = {}) {
   return new Promise((resolve, reject) => {
     onProgress({ message: 'Installing NeoForge (this downloads its libraries and takes a few minutes)', percent: null })
-    const child = spawn(java, ['-jar', installerPath, '--install-server', dir, '--server-jar'], {
+    const child = inOwnGroup(spawn(java, ['-jar', installerPath, '--install-server', dir, '--server-jar'], {
       cwd: dir,
       windowsHide: true,
-    })
+      ...OWN_GROUP,
+    }))
+    const cancelled = stopOnCancel(child)
     let tail = ''
     const keepTail = (c) => {
       tail = (tail + c.toString()).slice(-2000)
@@ -120,6 +128,7 @@ export function installServer(dir, installerPath, { java = 'java', onProgress = 
       err.code === 'ENOENT' ? `could not run ${java} to install NeoForge` : `NeoForge install failed: ${err.message}`)))
     child.on('close', (code) => {
       const starter = path.join(dir, 'server.jar')
+      if (cancelled()) return reject(new Cancelled())
       if (code === 0 && fs.existsSync(starter)) {
         fs.rmSync(path.join(dir, `${path.basename(installerPath)}.log`), { force: true })
         resolve({ starter: 'server.jar' })
@@ -136,6 +145,8 @@ export async function createServer(name, mc, {
 } = {}) {
   const neoVersion = await resolveBuild(mc, build)
   const installer = await fetchInstaller(neoVersion, { onProgress })
+  // nothing of the server exists yet; from here a cancel is a failed install, which removes it
+  checkCancelled()
   const inst = await create.newInstance(name, {
     java,
     loader: 'neoforge',
@@ -152,7 +163,8 @@ export async function createServer(name, mc, {
   } catch (err) {
     try {
       removeInstance(name)
-      fs.rmSync(inst.dir, { recursive: true, force: true })
+      // the installer was writing here a moment ago, and Windows lets go of a folder slowly
+      fs.rmSync(inst.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     } catch {
       /* the original error is the one worth reporting */
     }
