@@ -677,7 +677,6 @@
   const PICK_KEY = 'spawnloft.launcher.profile'
   // per profile, where Join pointed last: { server } or { address }; nothing is the title screen
   const JOIN_KEY = 'spawnloft.launcher.join'
-  const CALLBACK_URI = 'http://localhost/api/client/accounts/login/callback'
   const STEPS = ['Version', 'Java', 'Files', 'Server', 'Start']
   // the all-versions plan's strict-mode codes: the version itself is refused, not this launch
   const STRICT_CODES = ['unknown-variable', 'unknown-rule-key', 'newer-launcher-format', 'unknown-asset-layout', 'no-natives-for-this-machine']
@@ -949,6 +948,36 @@
     return ['Opens ', what, ' on the title screen as ', as, '.']
   }
 
+  // What the core says is written for a terminal as often as not: it names commands to run and a
+  // log file to read. Here it is said for someone looking at a Play button. Anything not listed is
+  // passed on as it is.
+  const PLAIN = [
+    [/^profile "(.+?)" is running; stop it (?:first|before changing .+?): spawnloft client stop .+$/, (m) => `\u201c${m[1]}\u201d is running. Close the game first, then try again.`],
+    [/^profile "(.+?)" is being launched \(pid [^)]*\); wait for it(?: before changing .+)?$/, (m) => `\u201c${m[1]}\u201d is already starting. Give it a moment, then try again.`],
+    [/^invalid profile name ".*" - use letters, digits, dash, underscore \(max 32 chars\)$/s, () => 'That name will not work. Use letters, digits, dashes and underscores, 32 at most.'],
+    [/^the saved sign-in for (.+?) no longer works; run spawnloft client login again$/, (m) => `The saved sign-in for ${m[1]} no longer works. Sign in again from the account menu.`],
+    [/^the code expired before it was entered; run spawnloft client login again$/, () => 'The sign-in ran out of time. Try again.'],
+    [/^Microsoft's sign-in server stopped answering \(.*\); run spawnloft client login again in a few minutes$/s, () => 'Microsoft\u2019s sign-in server stopped answering. Try again in a few minutes.'],
+    [/^Minecraft refused the sign-in \(HTTP 403\)/, () => 'Minecraft refused the sign-in for this copy of SpawnLoft. Nothing is wrong with your account. You can still play offline on local servers.'],
+    [/^the account could not be saved; see panel\.log$/, () => 'The account could not be saved. Try signing in again.'],
+    [/^the sign-in failed inside SpawnLoft; see panel\.log$/, () => 'The sign-in failed inside SpawnLoft. Try again.'],
+  ]
+  function plain(message) {
+    const text = String(message ?? '')
+    for (const [test, say] of PLAIN) {
+      const m = test.exec(text)
+      if (m) return say(m)
+    }
+    return text
+  }
+
+  /** One sentence for an answer that carried a status and no words. */
+  function plainStatus(status) {
+    if (status === 401 || status === 403) return 'This page is no longer signed in to SpawnLoft. Open the launcher again from the SpawnLoft app.'
+    if (status >= 500) return `SpawnLoft hit a problem (error ${status}). Try again in a moment.`
+    return `SpawnLoft refused that without saying why (error ${status}).`
+  }
+
   function sentence(text) {
     const s = String(text ?? '').trim()
     return s ? s[0].toUpperCase() + s.slice(1) : s
@@ -1096,7 +1125,7 @@
     let data = null
     try { data = await res.json() } catch { /* an empty or non-JSON answer */ }
     if (!res.ok) {
-      const err = new Error(data?.error || `the panel answered ${res.status}`)
+      const err = new Error(data?.error ? plain(data.error) : plainStatus(res.status))
       err.status = res.status
       throw err
     }
@@ -1126,6 +1155,7 @@
   const S = {
     summary: null,
     down: false,
+    downWhy: null,
     pick: stored('local', PICK_KEY),
     // per profile: { server: a name or null, address: what was typed }; neither is the title screen
     targets: loadTargets(),
@@ -1358,8 +1388,8 @@
 
   function unreachableView() {
     return h('div', { class: 'nothing', role: 'alert' }, h('div', { class: 'glyph' }, ico('alert')),
-      h('h2', { text: 'Can\'t reach SpawnLoft' }),
-      h('p', { text: 'The panel that runs the launcher is not answering. If you closed the SpawnLoft app, open it again; this page reconnects by itself.' }),
+      h('h2', { text: S.downWhy ? 'SpawnLoft could not open the launcher' : 'Can\'t reach SpawnLoft' }),
+      h('p', { text: S.downWhy || 'The panel that runs the launcher is not answering. If you closed the SpawnLoft app, open it again; this page reconnects by itself.' }),
       h('button', { class: 'primary', onclick: () => poll() }, 'Try again'))
   }
 
@@ -1735,7 +1765,7 @@
       const p = profileNamed(job.profile)
       if (p) S.refusals[job.profile] = { mc: p.mc, message: ev.message }
     } else if (ev) {
-      S.notice = { profile: job.profile, ...launchNotice(ev.message), at: Date.now() }
+      S.notice = { profile: job.profile, ...launchNotice(plain(ev.message)), at: Date.now() }
     }
     refresh()
   }
@@ -2232,11 +2262,11 @@
     if (ev.status === 'done') {
       S.acctNotice = { tone: 'live', title: `Signed in as ${ev.account?.name ?? 'your account'}`, signedIn: ev.account?.uuid ?? null }
     } else if (ev.status === 'cancelled' && login.closedEarly) {
-      S.acctNotice = { tone: 'warn', title: 'The sign-in window closed before the sign-in finished', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Try again' }
+      S.acctNotice = { tone: 'warn', title: 'The sign-in window closed before the sign-in finished', text: 'Nothing was saved.', retry: 'Try again' }
     } else if (ev.status === 'cancelled') {
-      S.acctNotice = { tone: '', title: 'Sign-in cancelled', text: `Nothing was saved. If Microsoft showed an error about the redirect address, its app registration needs ${CALLBACK_URI}; see CLIENT.md.`, retry: 'Add Microsoft account' }
+      S.acctNotice = { tone: '', title: 'Sign-in cancelled', text: 'Nothing was saved.', retry: 'Add Microsoft account' }
     } else {
-      S.acctNotice = { tone: 'fault', title: sentence(ev.message ?? 'the sign-in failed'), text: 'Try again, or play offline on local servers.', retry: 'Try again' }
+      S.acctNotice = { tone: 'fault', title: sentence(plain(ev.message ?? 'the sign-in failed')), text: 'Try again, or play offline on local servers.', retry: 'Try again' }
     }
     if (S.menu !== 'ask') S.menu = 'account'
     refresh()
@@ -2345,12 +2375,16 @@
       noticeExits(next)
       S.summary = next
       S.down = false
+      S.downWhy = null
     } catch (err) {
       if (err instanceof PanelDown) S.down = true
+      // An answer that is an error is not "still loading": with nothing to show yet, the page
+      // says so and why, where it used to sit on the loading shapes for as long as it lasted.
+      else if (!S.summary) { S.down = true; S.downWhy = sentence(err.message) }
     }
     await readLog()
     if (S.notice?.busy && Date.now() - (S.notice.at ?? 0) > 30000) S.notice = null
-    const key = JSON.stringify([S.summary, S.down, S.log, S.notice, S.crash && { ...S.crash }])
+    const key = JSON.stringify([S.summary, S.down, S.downWhy, S.log, S.notice, S.crash && { ...S.crash }])
     if (key !== lastKey) {
       lastKey = key
       render()

@@ -139,3 +139,28 @@ test("Paper's wording for a missing dependency names the plugin, not the word Un
   assert.ok(!/"Unknown"/.test(odd.advice))
   assert.match(odd.advice, /the lines above name it/)
 })
+
+test('the page is told where to click, and the terminal what to run', async () => {
+  const { diagnose } = await import('../src/diagnose.mjs')
+  const lines = [
+    '**** FAILED TO BIND TO PORT!',
+    'You need to agree to the EULA in order to run the server.',
+    'java.lang.UnsupportedClassVersionError: x has been compiled by a more recent version (class file version 65.0)',
+  ]
+  const page = diagnose(lines, { port: 25565, dir: '/srv/smp', panel: true })
+  for (const f of page) assert.ok(!/"spawnloft |under Manage/.test(f.advice), f.advice)
+  assert.match(page.find((f) => f.id === 'eula').advice, /^Open eula\.txt in Files/)
+  assert.match(page.find((f) => f.id === 'wrong-java').advice, /under Settings, Java and memory\.$/)
+  const all = [
+    'java.lang.OutOfMemoryError: Java heap space', 'No space left on device',
+    'Exception reading /srv/world/level.dat', 'Error: Unable to access jarfile paper.jar',
+  ]
+  for (const line of all) {
+    const [f] = diagnose([line], { panel: true })
+    assert.ok(f && !/"spawnloft |under Manage/.test(f.advice), line)
+  }
+  // the terminal keeps its commands, and the eula path is this system's own
+  const cli = diagnose(lines, { port: 25565, dir: '/srv/smp' })
+  assert.match(cli.find((f) => f.id === 'wrong-java').advice, /"spawnloft set <name> java=/)
+  assert.ok(cli.find((f) => f.id === 'eula').advice.includes((await import('node:path')).join('/srv/smp', 'eula.txt')))
+})

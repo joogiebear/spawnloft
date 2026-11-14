@@ -2002,6 +2002,8 @@ async function route(req, res) {
       memory: inst.memory,
       dir: inst.dir,
       crashDir: path.join(inst.dir, 'crash-reports'),
+      // the page gets the advice that names a place to click, not a command to run
+      panel: true,
     })
     const crashes = crashReports(inst, { limit: 5 })
     // only while running (a stopped server has no port open); first because the panel shows two findings
