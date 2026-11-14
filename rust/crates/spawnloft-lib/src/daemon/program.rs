@@ -90,7 +90,13 @@ pub fn minecraft(inst: &Instance, node: Option<&Path>) -> Result<Program, String
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .ok_or_else(|| format!("instance \"{}\" has no usable jar name", inst.name))?;
-    let mut args = vec![format!("-Xms{memory}"), format!("-Xmx{memory}")];
+    // -Dterminal.jline=false before the person's flags, as in registry.mjs serverJvmArgs: no TTY, so
+    // without it TerminalConsoleAppender prints "Advanced terminal features are not available".
+    let mut args = vec![
+        format!("-Xms{memory}"),
+        format!("-Xmx{memory}"),
+        "-Dterminal.jline=false".to_string(),
+    ];
     args.extend(flags);
     args.extend(["-jar".to_string(), jar_name, "--nogui".to_string()]);
     let java = inst.java();
@@ -211,6 +217,7 @@ mod tests {
             ["-jar".to_string(), "paper.jar".to_string(), "--nogui".to_string()]
         );
         assert!(p.args.contains(&"-XX:+UseG1GC".to_string()));
+        assert_eq!(p.args[2], "-Dterminal.jline=false");
         assert_eq!(p.stop, Stop::Stdin("stop\n".into()));
 
         let own = minecraft(
@@ -220,7 +227,15 @@ mod tests {
         .unwrap();
         assert_eq!(
             own.args,
-            ["-Xms2G", "-Xmx2G", "-Dx=1", "-jar", "paper.jar", "--nogui"]
+            [
+                "-Xms2G",
+                "-Xmx2G",
+                "-Dterminal.jline=false",
+                "-Dx=1",
+                "-jar",
+                "paper.jar",
+                "--nogui"
+            ]
         );
     }
 

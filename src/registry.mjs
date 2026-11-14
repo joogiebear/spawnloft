@@ -139,6 +139,18 @@ export function assertInstanceDir(inst) {
   if (!fs.existsSync(jar)) fail(`server jar not found for "${inst.name}": ${jar}`)
 }
 
+// Java arguments for a Minecraft server. -Dterminal.jline=false comes first so a person's own flags
+// can still override it: the server runs without a TTY, so TerminalConsoleAppender (Paper, Velocity,
+// Forge) would try JLine, fail, and print "Advanced terminal features are not available in this
+// environment" on every start. With the property set it skips that attempt; the console reads stdin
+// and prints plain text exactly as it already did after the failed attempt. Servers without the
+// appender (vanilla, Fabric) ignore an unknown system property.
+export const SERVER_SYSTEM_PROPERTIES = ['-Dterminal.jline=false']
+
+export function serverJvmArgs(memory, flags, jarName) {
+  return [`-Xms${memory}`, `-Xmx${memory}`, ...SERVER_SYSTEM_PROPERTIES, ...flags, '-jar', jarName, '--nogui']
+}
+
 // Aikar's G1 flags; the large-heap variant starts at 12G because the young-gen sizing for 4G starves a big heap
 export function jvmFlagsFor(memory) {
   const gb = parseMemoryGb(memory)
