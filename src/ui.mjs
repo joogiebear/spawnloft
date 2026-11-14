@@ -1102,6 +1102,21 @@ async function handleClient(req, res, seg, url) {
   if (verb === 'stop' && req.method === 'POST') {
     return json(res, 200, await client.stop(profileName))
   }
+  // The profile's folder in the file manager, or one of the two folders the game writes its own
+  // logs and crash reports to. `what` is matched against that list, never used as a path; a
+  // folder the game has not made yet falls back to the profile's own.
+  if (verb === 'reveal' && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    // fellBack: the game has not made that folder yet, so the page can say what was opened instead
+    const { target, fellBack } = client.revealTarget(profileName, body.what)
+    return json(res, 200, { dir: await manage.openFolder(target), fellBack })
+  }
+  // the Play page showed this exit's crash notice and it was dismissed
+  if (verb === 'exit-seen' && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    if (typeof body.endedAt !== 'string' || body.endedAt.length > 40) fail('send the exit\'s "endedAt"')
+    return json(res, 200, client.markExitSeen(profileName, body.endedAt))
+  }
   // a new name for the setup, or a second setup with this one's settings, mods and options
   if ((verb === 'rename' || verb === 'duplicate') && req.method === 'POST') {
     const body = (await readBody(req)) ?? {}

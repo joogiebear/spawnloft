@@ -227,12 +227,28 @@ Microsoft account. Changing the version, loader, Java, memory or harness is refu
 is running. Changing the version of a setup that has mods in its folder warns that they may not
 load. **Remove setup** keeps its folder unless you tick the box.
 
-While a game runs the button turns into **Stop**, with **Open folder** (desktop app only; a
-browser tab shows the folder's path instead). If the game goes away without a Stop from the page
-and did not simply quit, a notice says so, shows the last lines of the game log, and offers
-**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. "Did
-not simply quit" is read from the log: within the first minute, anything but a clean exit (the
-game's own "Stopping!" with no error before it); after that, a log that does not end in that
+While a game runs the card shows how long it has run and offers **Stop**, **Show log** and
+**Open folder**. Stop asks first (the game closes where it stands; for a single-player world,
+quitting from the game's own menu saves it first). Show log shows the game's last 200 lines and
+follows them while it is open, with **Copy** and **Open log folder**. Folders open through the
+panel, in a browser tab as in the desktop app; on a machine with no desktop the page says where
+the folder is instead.
+
+If the game goes away without a Stop from the page and did not simply quit, a notice says so,
+with when and how it ended (the exit code, or the signal), the last lines of the game log
+(**Show N lines** for all of them, up to 200, **Copy log**), **Show crash reports**, **Open log folder** and
+**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The
+panel records every game's exit itself, so a crash is told even if the page was closed when it
+happened (within twelve hours, until it is dismissed or the setup is played again; the
+dismissal is kept with the record, so it holds across restarts of the app). A crash on a setup
+other than the one in view is named on the card in view, with **Show** to go to it. "Did not
+simply quit" comes from that record: any exit code but 0, or a signal, is a crash, unless the
+log ends in the game's own "Stopping!" with no error in it (a game that was quit and fell over
+on its way out); an exit with 0 is one only within the first minute and only if the log does not
+show the game closing (a mod loader's error window). **Show crash reports** and **Open log
+folder** open the setup's own folder, and say so, when the game has not made those folders yet. A game that outlived the panel that started it has no record, and the log decides as
+before: within the first minute, anything but a clean exit (the game's own "Stopping!" with no
+error before it); after that, a log that does not end in that
 "Stopping!", which is a hard crash or a mod loader's error dialog closed after a while, and never
 a routine error line from earlier in a long session. When
 Play cannot work it is greyed with the reason where the line under it was, and a link that fixes
