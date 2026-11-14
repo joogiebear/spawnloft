@@ -1,0 +1,46 @@
+# Sets mod loaders up for real (tools/real-loader-install.mjs): each installer downloaded and
+# checked, its build steps run on Mojang's Java, every output checked, and the launch command
+# built with every file it names on disk. It stops before the game would start; no job can show a
+# game window. Runs on pull requests that change the loaders' code, weekly, and by hand.
+name: loader-install
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
+  pull_request:
+    paths:
+      - src/client-forge-install.mjs
+      - src/client-neoforge.mjs
+      - src/client-loaders.mjs
+      - src/client-install.mjs
+      - src/client-meta.mjs
+      - src/client.mjs
+      - tools/real-loader-install.mjs
+      - .github/workflows/loader-install.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loader-install-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { loader: neoforge, mc: '26.3', build: '26.3.0.103' }
+          - { loader: neoforge, mc: '1.21.1', build: '21.1.266', and: '21.1.265' }
+    name: ${{ matrix.loader }} ${{ matrix.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Set ${{ matrix.loader }} ${{ matrix.build }} up for Minecraft ${{ matrix.mc }}
+        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }}

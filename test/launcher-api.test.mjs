@@ -35,6 +35,8 @@ fs.copyFileSync(path.join(fixtures, 'fabric-game-versions.json'), path.join(clie
 fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'fabric-game-versions.json.fetched-at'), String(Date.now()))
 fs.copyFileSync(path.join(fixtures, 'loaders', 'quilt', 'game-versions.json'), path.join(clientPaths.CLIENT_CACHE_DIR, 'quilt-game-versions.json'))
 fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'quilt-game-versions.json.fetched-at'), String(Date.now()))
+fs.copyFileSync(path.join(fixtures, 'loaders', 'neoforge', 'versions.json'), path.join(clientPaths.CLIENT_CACHE_DIR, 'neoforge-versions.json'))
+fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'neoforge-versions.json.fetched-at'), String(Date.now()))
 
 function addServer(name, port, props) {
   const dir = path.join(scratch, 'data', 'instances', name)
@@ -156,7 +158,7 @@ test('the version picker reads the shared cache and lists every id Mojang does, 
   fs.truncateSync(clientPaths.versionJar(mc), json.downloads.client.size)
   out = await (await call('client/versions')).json()
   const [snapshot, newer, row] = out.versions
-  assert.deepEqual(row, { id: '1.21.11', type: 'release', kind: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, javaNeedsExact: true, harness: true, fabric: null, loaders: { fabric: null, quilt: null }, refusal: platformRefusal(json), note: null })
+  assert.deepEqual(row, { id: '1.21.11', type: 'release', kind: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, javaNeedsExact: true, harness: true, fabric: null, loaders: { fabric: null, quilt: null, neoforge: null }, refusal: platformRefusal(json), note: null })
   assert.equal(newer.downloaded, false)
   assert.equal(newer.javaNeeds, 25)
   assert.equal(newer.javaNeedsExact, false, 'a guess from the id until the JSON is read')
@@ -558,7 +560,7 @@ test('a version this SpawnLoft cannot launch fails its job with the refusal\'s c
 })
 
 test('one version in full, and the lists read again on request', async () => {
-  for (const file of ['version_manifest_v2.json', 'fabric-game-versions.json', 'quilt-game-versions.json']) {
+  for (const file of ['version_manifest_v2.json', 'fabric-game-versions.json', 'quilt-game-versions.json', 'neoforge-versions.json']) {
     fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, `${file}.fetched-at`), String(Date.now()))
   }
   const res = await call(`client/versions/${encodeURIComponent(mc)}`)

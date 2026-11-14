@@ -20,7 +20,7 @@ const client = await import('../src/client.mjs')
 const linux = { name: 'linux', arch: 'x64', version: '6.1.0' }
 
 test('the loader list: vanilla first, Fabric and Quilt behind the shared shape, and the same list client.mjs checks a setup against', () => {
-  assert.deepEqual(LOADERS, ['vanilla', 'fabric', 'quilt'])
+  assert.deepEqual(LOADERS, ['vanilla', 'fabric', 'quilt', 'neoforge'])
   assert.equal(client.LOADERS, LOADERS)
   assert.equal(loaderFor('vanilla'), null)
   const fabric = loaderFor('fabric')

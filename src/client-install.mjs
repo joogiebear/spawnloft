@@ -73,7 +73,7 @@ export function saveLedger(ledger) {
 // checksum, and a file fetched without one is never written down as checked.
 const isSha1 = (v) => typeof v === 'string' && /^[0-9a-f]{40}$/i.test(v)
 
-async function noteChecked(ledger, file, sha1) {
+export async function noteChecked(ledger, file, sha1) {
   if (!ledger || !isSha1(sha1)) return
   try {
     const stat = await fs.promises.stat(file)

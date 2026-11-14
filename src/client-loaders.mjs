@@ -12,6 +12,8 @@
 //   versionId(mc, build)          the id of its version file (versions/<id>/<id>.json)
 //   isInstalled(mc, build)        whether that version file is on disk
 //   ensureInstalled(mc, build)    leaves a complete versions/<id>/ and returns the id
+//   finishInstall(mc, build, o)   optional: what is left once the game's Java is picked and the
+//                                 vanilla game is downloaded (an installer's build steps)
 //   afterInstall(name, profile)   anything for the setup's mods folder
 import fs from 'node:fs'
 
@@ -24,6 +26,10 @@ import {
   quiltGameVersions, quiltAvailable, assertQuiltAvailable, quiltBuilds, pickQuilt, quiltVersionId,
   ensureQuiltProfile,
 } from './client-quilt.mjs'
+import {
+  neoforgeGameVersions, neoforgeAvailable, assertNeoforgeAvailable, neoforgeBuilds, pickNeoforge,
+  neoforgeVersionId, neoforgeInstalled, ensureNeoforgeVersion, finishNeoforge,
+} from './client-neoforge.mjs'
 
 const fabric = {
   id: 'fabric',
@@ -61,7 +67,24 @@ const quilt = {
   },
 }
 
-const MODULES = { fabric, quilt }
+// NeoForge is set up by the installer engine: its version file first, its build steps on the
+// game's own Java. It needs nothing in the mods folder.
+const neoforge = {
+  id: 'neoforge',
+  name: 'NeoForge',
+  gameVersions: (opts) => neoforgeGameVersions(opts),
+  available: (mc, list) => neoforgeAvailable(mc, list),
+  assertAvailable: (mc, opts) => assertNeoforgeAvailable(mc, opts),
+  builds: (mc, opts) => neoforgeBuilds(mc, opts),
+  pick: (builds, wanted = null) => pickNeoforge(builds, wanted),
+  versionId: (mc, build) => neoforgeVersionId(mc, build),
+  isInstalled: (mc, build) => neoforgeInstalled(mc, build),
+  ensureInstalled: async (mc, build, opts = {}) => ensureNeoforgeVersion(mc, build, opts),
+  finishInstall: async (mc, build, opts = {}) => finishNeoforge(mc, build, opts),
+  afterInstall: null,
+}
+
+const MODULES = { fabric, quilt, neoforge }
 
 // Every loader id a setup may name, vanilla first.
 export const LOADERS = ['vanilla', ...Object.keys(MODULES)]

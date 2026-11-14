@@ -35,7 +35,7 @@ spawnloft client launch play
 The first launch downloads the client jar, its libraries and assets (a few hundred megabytes,
 with progress on stderr, plus Mojang's Java when it is needed) and starts the game as an offline
 player named after the profile. The download is shared between profiles of the same version, so a second profile on 1.21.11 starts
-at once. `spawnloft client install <name>` does the download without starting the game.
+at once. `spawnloft client install <name>` does the downloads, and sets a mod loader up, without starting the game.
 
 `launch` takes `--as <playerName>` to play offline under another name, `--account <name>` to
 play as a signed-in Microsoft account, `--server <name>` to point at a different server for this run, and `--wait`, which keeps the command alive for five seconds and
@@ -81,8 +81,23 @@ refused with "use Vanilla for it". Quilt works the same way: its meta hands out 
 since its rows carry no checksum, each library's is read from the `.sha1` file Quilt's maven
 publishes beside it before anything is downloaded. A Quilt profile gets Fabric API in its `mods/`
 as a Fabric one does (Quilt loads it, and retired its own libraries from 26.1 on). Mod loader
-files are only taken over https from the loaders' own hosts and Mojang's. Forge and NeoForge are
-listed in the launcher and greyed out until a later SpawnLoft. The harness has its own, shorter list (see [The harness](#the-harness)).
+files are only taken over https from the loaders' own hosts and Mojang's.
+
+NeoForge builds for 1.20.2 and newer (its builds name the version: 21.1.266 is 1.21.1, 26.3.0.103
+is 26.3). Its first Play runs NeoForge's installer the way the installer would, but inside
+SpawnLoft: the installer jar is downloaded to `client/cache/installers/` and checked against the
+`.sha1` the maven publishes, its version file goes under `versions/neoforge-<build>/`, its
+libraries are downloaded and checked like Mojang's, and then its build steps (which patch the
+game jar) run one by one on the Java picked for the version, each as a plain child process with
+no shell, in a temporary folder. The launch card shows them as "Setting up NeoForge 21.1.266
+(step 3 of 6)". Their output goes to `client/run/<profile>/loader-install.log`. A stamp written
+last marks the build as set up; a later Play checks that every file the stamp lists is still as
+it was, and sets the build up again if one was changed or removed. A step that fails, a cancel,
+or a crash leaves the finished steps in place, and the next Play carries on from there. Two
+profiles on the same build share its files, and the second one waits for the first rather than
+building them again. A NeoForge profile gets nothing in its `mods/` folder.
+
+Forge is listed in the launcher and greyed out until a later SpawnLoft. The harness has its own, shorter list (see [The harness](#the-harness)).
 
 When Mojang changes the format of a version file in a way this SpawnLoft does not understand (a
 new launcher format, a platform rule or a launcher setting it has not seen), the launch is
@@ -140,7 +155,7 @@ builds for it: Mojang's Java there stops at 17, so 1.20.4 and older.
 
 ```
 spawnloft client list
-spawnloft client new <name> --mc <version> [--loader vanilla|fabric|quilt] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
+spawnloft client new <name> --mc <version> [--loader vanilla|fabric|quilt|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
 spawnloft client set <name> key=value ...
 spawnloft client remove <name> [--purge]
 ```
@@ -149,9 +164,9 @@ A profile is a few keys, all changeable with `set`:
 
 | Key | Meaning |
 | --- | --- |
-| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer); a mistyped id is refused with the nearest ones. |
-| `loader` | `vanilla`, `fabric` or `quilt`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
-| `loaderVersion` | The loader's own build (Fabric's or Quilt's). Left empty, the newest stable one is picked at the first launch and recorded; a beta only where there is nothing else. |
+| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
+| `loader` | `vanilla`, `fabric`, `quilt` or `neoforge`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
+| `loaderVersion` | The loader's own build (Fabric's, Quilt's or NeoForge's). Left empty, the newest stable one is picked at the first launch and recorded; a beta only where there is nothing else. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
 | `java` | A specific Java to use, `mojang` for Mojang's own runtime for the version, or empty to let SpawnLoft pick (an installed Java that fits, else Mojang's runtime, downloaded once into `client/runtime/`). |
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
@@ -230,7 +245,7 @@ snapshots, or everything, marks for the latest release, snapshots and what is al
 downloaded, and a version this computer cannot run listed with the reason and not pickable. The
 list is Mojang's, cached for an hour so it works offline once fetched; **Refresh** reads it
 again, for a version out within the hour. Then **Mods** (None, which is plain "Vanilla"
-Minecraft, Fabric or Quilt; Forge and NeoForge are shown and greyed out until a later SpawnLoft;
+Minecraft, Fabric, Quilt or NeoForge; Forge is shown and greyed out until a later SpawnLoft;
 a loader with no build for the picked version is greyed out with the reason; a list on a narrow
 window), memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory; a
 choice above the machine's memory cannot be picked, one above three quarters of it is warned
@@ -580,6 +595,8 @@ downloads. The panel, the launcher and the assistant's tools get the same words 
 | `fabric-not-available`, `loader-not-available` | The mod loader (Fabric, or another for `loader-not-available`) has no build for this version, or none yet for a new one. | Use Vanilla, or wait a day for a new release. |
 | `loader-host-refused` | A loader's profile named a download somewhere other than the loaders' own hosts and Mojang's. | Update SpawnLoft, or pick another build. |
 | `loader-install-needed` | A file the loader's installer makes is missing or damaged. | Set the loader up again. |
+| `loader-installer-unknown` | The loader's installer is in a format this SpawnLoft does not know, or names another Minecraft version, version id or a file it cannot place. | Update SpawnLoft, or pick an older build in Advanced. |
+| `loader-install-failed` | One of the loader's build steps failed; the message names the step and its last lines, and `client/run/<profile>/loader-install.log` has the rest. | Play again (the finished steps are kept), or pick another build in Advanced. |
 | `newer-launcher-format`, `unknown-rule-key`, `unknown-variable` | The version file uses something this SpawnLoft does not understand yet. | Update SpawnLoft. |
 | `no-natives-for-this-machine` | Mojang built no game for this machine (Linux arm64), or this version needs x64 emulation the machine does not have. | Install Rosetta on a Mac (the message has the command); use Windows 11 on arm64; use bots on Linux arm64. |
 | `java-too-old`, `java-missing` | The profile's own Java is too old, or no Java fits and Mojang's could not be had. | Let SpawnLoft download Mojang's (clear the profile's `java`, be online once), or install the Java the message names. |
