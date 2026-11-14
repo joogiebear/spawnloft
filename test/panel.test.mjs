@@ -987,12 +987,14 @@ test('how friends join: an address for each place someone can be, and none that 
 })
 
 test('installing a plugin asks about a wrong version and about what it needs, and says what happened', () => {
-  const { mismatchQuestion, dependencyQuestion, installedWords } = lifted(['mismatchQuestion', 'dependencyQuestion', 'installedWords'])
+  const { mismatchQuestion, dependencyQuestion, installedWords, builtForWords } = lifted(['listWords', 'mismatchQuestion', 'dependencyQuestion', 'installedWords', 'builtForWords'])
   // a build that lists this version is not asked about
   assert.equal(mismatchQuestion('Chunky', { exactMatch: true, builtFor: null }, '1.21.4'), null)
   const wrong = mismatchQuestion('Chunky', { exactMatch: false, builtFor: '1.20.4' }, '1.21.4')
   assert.match(wrong.text, /lists Minecraft 1\.20\.4, and this server runs 1\.21\.4/)
   assert.equal(wrong.confirmLabel, 'Install anyway')
+  // a build that lists nothing is not said to list "other versions"
+  assert.match(mismatchQuestion('Chunky', { exactMatch: false, builtFor: null }, '1.21.4').text, /does not list Minecraft 1\.21\.4\./)
 
   // nothing missing: nothing asked
   assert.equal(dependencyQuestion('Shop', { requires: [{ title: 'Vault', installed: true }] }, 'plugin'), null)
@@ -1000,30 +1002,45 @@ test('installing a plugin asks about a wrong version and about what it needs, an
   // one missing: offered by name, with a way to decline
   const one = dependencyQuestion('Shop', { requires: [{ title: 'Vault', installed: false, id: 'v', source: 'modrinth' }, { title: 'Here', installed: true }] }, 'plugin')
   assert.equal(one.title, 'Shop needs another plugin')
-  assert.match(one.text, /will not load without Vault\./)
+  assert.equal(one.text, 'It will not load without Vault.')
   assert.deepEqual(one.choices.map((c) => [c.value, c.label]), [['with', 'Install Vault too'], ['alone', 'Only Shop']])
   assert.deepEqual(one.fetch.map((d) => d.id), ['v'])
   // several, one of which lives elsewhere: it is named with where, and not offered
   const some = dependencyQuestion('Shop', { requires: [
-    { title: 'Vault', installed: false, id: 'v' }, { title: 'ProtocolLib', installed: false, id: 'p' },
+    { title: 'Vault', installed: false, id: 'v' }, { title: 'ProtocolLib', installed: false, id: 'p', mismatch: true, builtFor: '1.20.4' },
     { title: 'Citizens', installed: false, id: 'c', external: 'https://ci.citizensnpcs.co' },
   ] }, 'mod')
   assert.equal(some.title, 'Shop needs 2 other mods')
-  assert.match(some.text, /Citizens is not on Hangar or Modrinth: get it from https:\/\/ci\.citizensnpcs\.co/)
-  assert.deepEqual(some.fetch.map((d) => d.id), ['v', 'p'])
   assert.match(some.text, /without Vault, ProtocolLib and Citizens\./)
+  assert.match(some.text, /SpawnLoft cannot fetch Citizens: get it from https:\/\/ci\.citizensnpcs\.co and add it under Files\./)
+  // nothing is claimed about where else it might be
+  assert.ok(!some.text.includes('Modrinth'))
+  // what comes along is held to the same question as the thing asked for
+  assert.match(some.text, /newest build of ProtocolLib lists Minecraft 1\.20\.4, not this server’s version\./)
   assert.equal(some.choices[0].hint, 'Vault and ProtocolLib.')
-  // only things it cannot fetch: no choice to make but whether to go on
-  const none = dependencyQuestion('Shop', { requires: [{ title: 'Citizens', installed: false, external: 'https://x' }] }, 'plugin')
-  assert.equal(none.choices, undefined)
-  assert.deepEqual(none.fetch, [])
-  assert.equal(none.confirmLabel, 'Install Shop anyway')
+  assert.deepEqual(some.fetch.map((d) => d.id), ['v', 'p'])
+  // here but turned off: said, and never fetched a second time
+  const off = dependencyQuestion('Shop', { requires: [{ title: 'Vault', installed: false, off: true, id: 'v' }] }, 'plugin')
+  assert.match(off.text, /Vault is here but turned off: turn it on in the list below\./)
+  assert.deepEqual([off.choices, off.fetch, off.confirmLabel], [undefined, [], 'Install Shop anyway'])
+  // one the source would not name is still a thing it needs
+  const blind = dependencyQuestion('Shop', { requires: [{ title: 'something Modrinth does not name', installed: false, id: null, unnamed: true }] }, 'plugin')
+  assert.match(blind.text, /has to be found and added by hand/)
+  assert.deepEqual(blind.fetch, [])
 
   assert.deepEqual(installedWords({ installed: 'Shop.jar', version: '3.1' }, [], []), { text: 'Installed Shop.jar (3.1).', tone: 'good' })
   assert.equal(installedWords({ installed: 'Shop.jar', version: '3.1' }, [{ title: 'Vault' }, { title: 'ProtocolLib' }], []).text, 'Installed Shop.jar (3.1), with Vault and ProtocolLib.')
   const partly = installedWords({ installed: 'Shop.jar', version: '3.1' }, [], [{ title: 'Vault', why: 'download failed: 503' }])
   assert.equal(partly.tone, '')
   assert.match(partly.text, /Could not install Vault \(download failed: 503\)\./)
-  // the search is kept: an install no longer redraws the whole pane
+
+  // the row's note follows the server: there while the build does not list its version, gone when it does
+  assert.deepEqual(builtForWords(['1.20.1', '1.20.4'], '1.21.4'), { text: 'Built for 1.20.4', title: 'This build lists Minecraft 1.20.4 and older. This server runs 1.21.4.' })
+  assert.equal(builtForWords(['1.20.1', '1.20.4'], '1.20.1'), null)
+  assert.equal(builtForWords(null, '1.21.4'), null)
+  assert.equal(builtForWords([], '1.21.4'), null)
+  assert.equal(builtForWords(['1.20.4'], null), null)
+  // the search is kept: an install no longer redraws the whole pane, and the hint no longer promises a note
   assert.match(html, /await refreshInstalled\(\);/)
+  assert.ok(!html.includes('anything else installs with a note'))
 })

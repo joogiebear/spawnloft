@@ -8403,46 +8403,59 @@ function renderDockBadge() {
  * file rename or a download - the server picks them up at its next start, and the pane says
  * so once at the top instead of on every row.
  */
+/** "A", "A and B", "A, B and C". */
+function listWords(items) {
+  return items.length > 1 ? items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1] : items.join('');
+}
+
 /**
  * What to ask before a build made for another Minecraft version goes in, or null when the build
  * lists this server's version. It used to install unasked, with a note that left after five seconds.
  */
 function mismatchQuestion(title, plan, gameVersion) {
-  if (!plan || plan.exactMatch || !plan.builtFor) return null;
+  if (!plan || plan.exactMatch) return null;
+  const runs = gameVersion ? 'Minecraft ' + gameVersion : 'this server\u2019s Minecraft version';
   return {
     title: 'Made for a different Minecraft version',
-    text: 'The newest build of ' + title + ' lists Minecraft ' + plan.builtFor + ', and this server runs ' + (gameVersion || 'another version')
-      + '. It may work anyway, but its author has not said so.',
+    text: 'The newest build of ' + title + (plan.builtFor ? ' lists Minecraft ' + plan.builtFor + ', and this server runs ' + (gameVersion || 'another version') + '.' : ' does not list ' + runs + '.')
+      + ' It may work anyway, but its author has not said so.',
     confirmLabel: 'Install anyway',
   };
 }
 
 /**
- * What to ask when something cannot load without other things that are not here yet, or null
+ * What to ask when something cannot load without other things that are not ready here, or null
  * when it needs nothing more. `word` is "plugin" or "mod".
+ *
+ * Three kinds of "not ready": ones SpawnLoft can fetch (offered), ones it cannot (named, with
+ * where they live when that is known), and ones that are here but turned off (said, since
+ * fetching a second copy would be worse than the gap).
  */
 function dependencyQuestion(title, plan, word) {
-  const missing = ((plan && plan.requires) || []).filter((d) => !d.installed);
-  if (!missing.length) return null;
-  const list = (items) => { const t = items.map((d) => d.title); return t.length > 1 ? t.slice(0, -1).join(', ') + ' and ' + t[t.length - 1] : t.join(''); };
-  const can = missing.filter((d) => !d.external);
-  const cannot = missing.filter((d) => d.external);
-  const elsewhere = cannot.length
-    ? ' ' + list(cannot) + (cannot.length === 1 ? ' is' : ' are') + ' not on Hangar or Modrinth: get ' + (cannot.length === 1 ? 'it' : 'them') + ' from ' + cannot.map((d) => d.external).join(', ') + ' and add ' + (cannot.length === 1 ? 'it' : 'them') + ' under Files.'
-    : '';
+  const needs = ((plan && plan.requires) || []).filter((d) => !d.installed);
+  if (!needs.length) return null;
+  const names = (items) => listWords(items.map((d) => d.title));
+  const isAre = (items) => (items.length === 1 ? ' is' : ' are');
+  const off = needs.filter((d) => d.off);
+  const cannot = needs.filter((d) => !d.off && (d.external || d.unnamed || !d.id));
+  const can = needs.filter((d) => !d.off && !cannot.includes(d));
+  const more = [];
+  if (off.length) more.push(names(off) + isAre(off) + ' here but turned off: turn ' + (off.length === 1 ? 'it' : 'them') + ' on in the list below.');
+  for (const d of cannot) {
+    more.push(d.external ? 'SpawnLoft cannot fetch ' + d.title + ': get it from ' + d.external + ' and add it under Files.'
+      : 'It also needs ' + d.title + ', which has to be found and added by hand.');
+  }
+  const wrong = can.filter((d) => d.mismatch);
+  for (const d of wrong) more.push('The newest build of ' + d.title + (d.builtFor ? ' lists Minecraft ' + d.builtFor + ', not this server\u2019s version.' : ' does not list this server\u2019s Minecraft version.'));
+  const text = 'It will not load without ' + names(needs) + '.' + (more.length ? ' ' + more.join(' ') : '');
   if (!can.length) {
-    return {
-      title: title + ' needs something SpawnLoft cannot fetch',
-      text: 'It will not load without ' + list(cannot) + '.' + elsewhere,
-      confirmLabel: 'Install ' + title + ' anyway',
-      fetch: [],
-    };
+    return { title: title + ' needs something that is not ready', text, confirmLabel: 'Install ' + title + ' anyway', fetch: [] };
   }
   return {
     title: title + ' needs ' + (can.length === 1 ? 'another ' + word : can.length + ' other ' + word + 's'),
-    text: 'It will not load without ' + list(missing) + '.' + elsewhere,
+    text,
     choices: [
-      { value: 'with', label: 'Install ' + (can.length === 1 ? can[0].title : 'them') + ' too', hint: can.length === 1 ? 'Both are downloaded.' : list(can) + '.' },
+      { value: 'with', label: 'Install ' + (can.length === 1 ? can[0].title : 'them') + ' too', hint: can.length === 1 ? 'Both are downloaded.' : names(can) + '.' },
       { value: 'alone', label: 'Only ' + title, hint: 'It stays unloaded until what it needs is added.' },
     ],
     confirmLabel: 'Install',
@@ -8452,9 +8465,16 @@ function dependencyQuestion(title, plan, word) {
 
 /** One line for what an install did: the thing asked for, what came with it, and what did not. */
 function installedWords(main, extras, failed) {
-  const and = extras.length ? ', with ' + extras.map((e) => e.title).join(' and ') : '';
+  const and = extras.length ? ', with ' + listWords(extras.map((e) => e.title)) : '';
   const not = failed.length ? ' Could not install ' + failed.map((f) => f.title + ' (' + f.why + ')').join(', ') + '.' : '';
   return { text: 'Installed ' + main.installed + (main.version ? ' (' + main.version + ')' : '') + and + '.' + not, tone: failed.length ? '' : 'good' };
+}
+
+/** The note on an installed row whose build does not list the Minecraft version the server runs now. */
+function builtForWords(listed, gameVersion) {
+  if (!Array.isArray(listed) || !listed.length || !gameVersion || listed.includes(gameVersion)) return null;
+  const newest = listed[listed.length - 1];
+  return { text: 'Built for ' + newest, title: 'This build lists Minecraft ' + newest + (listed.length > 1 ? ' and older' : '') + '. This server runs ' + gameVersion + '.' };
 }
 
 async function renderPlugins(opts) {
@@ -8511,7 +8531,7 @@ async function renderPlugins(opts) {
     ? 'The server is running, so everything here takes effect the next time it starts.'
     : 'Applies the next time the server starts.')
     + (data.gameVersion
-      ? ' Builds for ' + data.gameVersion + ' are preferred; anything else installs with a note.'
+      ? ' Builds for ' + data.gameVersion + ' are preferred; anything else asks first.'
       : '');
   body.append(how);
 
@@ -8727,12 +8747,11 @@ async function renderPlugins(opts) {
       el.append(mark, nm, meta, acts);
       list.append(el);
 
-      const reset = () => { install.disabled = false; install.textContent = 'Install'; };
+      // back to how it was, with focus where it had been: a disabled button drops it
+      const reset = () => { install.disabled = false; install.textContent = 'Install'; install.focus(); };
       install.onclick = async () => {
         install.disabled = true;
-        install.textContent = 'Checking…';
-        const extras = [];
-        const failed = [];
+        install.textContent = 'Checking\u2026';
         try {
           // asked first: what would be fetched, whether it is for this version, what it needs
           const plan = await api(base + '/plan?projectId=' + encodeURIComponent(hit.id) + '&source=' + encodeURIComponent(hit.source || 'modrinth'));
@@ -8743,30 +8762,25 @@ async function renderPlugins(opts) {
           if (needs) {
             const got = await ask(needs);
             if (!got) return reset();
-            if (!needs.choices || got.choice === 'with') also = needs.fetch;
+            if (needs.choices && got.choice === 'with') also = needs.fetch;
           }
-          install.textContent = 'Downloading…';
-          const out = await post(base + '/install', { projectId: hit.id, source: hit.source });
-          // what it needs comes after it: a failure there leaves the thing asked for in place
-          for (const dep of also) {
-            try {
-              await post(base + '/install', { projectId: dep.id, source: dep.source });
-              extras.push(dep);
-            } catch (e) {
-              failed.push({ title: dep.title, why: e.message });
-            }
-          }
+          install.textContent = 'Downloading\u2026';
+          // one request, so one backup of the folder covers the lot
+          const out = await post(base + '/install', { projectId: hit.id, source: hit.source, also: also.map((d) => ({ projectId: d.id, source: d.source })) });
+          const titleOf = (id) => (also.find((d) => d.id === id) || { title: id }).title;
+          const extras = (out.extras || []).map((e) => ({ title: titleOf(e.projectId) }));
+          const failed = (out.failed || []).map((f) => ({ title: titleOf(f.projectId), why: plainMessage(f.error) }));
           const said = installedWords(out, extras, failed);
           toast(said.text, said.tone);
           // The search stays as it was: three plugins from one search is one search. Only the
           // list of what is installed is fetched again.
-          install.textContent = 'Installed';
-          install.className = '';
-          for (const dep of extras) installedNames.add(dep.title.toLowerCase());
+          for (const got of [hit, ...extras]) installedNames.add(got.title.toLowerCase());
           for (const other of list.querySelectorAll('.w-acts button')) {
-            if (other !== install && !other.disabled && installedNames.has((other.dataset.title || '').toLowerCase())) {
-              other.textContent = 'Installed'; other.disabled = true; other.className = '';
-            }
+            if (!installedNames.has((other.dataset.title || '').toLowerCase())) continue;
+            other.textContent = 'Installed';
+            other.disabled = true;
+            other.className = '';
+            other.setAttribute('aria-label', 'Installed: ' + other.dataset.title);
           }
           q.focus();
           await refreshInstalled();
@@ -8975,11 +8989,12 @@ async function renderPlugins(opts) {
       src.append(document.createTextNode(' · '), file);
     }
     // Said on the row for as long as it is true, where it used to be a toast that left.
-    if (p.builtFor && data.gameVersion && p.builtFor !== data.gameVersion) {
+    const builtFor = builtForWords(p.gameVersions, data.gameVersion);
+    if (builtFor) {
       const built = document.createElement('span');
       built.className = 'plug-built';
-      built.textContent = 'Built for ' + p.builtFor;
-      built.title = 'This build lists Minecraft ' + p.builtFor + '. This server runs ' + data.gameVersion + '.';
+      built.textContent = builtFor.text;
+      built.title = builtFor.title;
       src.append(document.createTextNode(' · '), built);
     }
     main.append(nm, src);

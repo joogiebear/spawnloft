@@ -281,80 +281,146 @@ const mrVersion = (extra = {}) => ({
   project_id: 'main1', version_number: '2.0', version_type: 'release', loaders: ['paper'], game_versions: ['1.21.4'],
   files: [{ primary: true, filename: 'Main.jar', url: 'https://cdn.modrinth.com/Main.jar', hashes: {} }], dependencies: [], ...extra,
 })
+const needs = (...ids) => ids.map((id) => ({ project_id: id, dependency_type: 'required' }))
+const paper = () => ({ ...fakeInstance(), jar: 'paper-1.21.4-100.jar' })
+const brief = (plan) => plan.requires.map((d) => [d.title, d.installed, d.off])
 
 test('a plan lists what a build needs, and which of it is already here', async (t) => {
-  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  const inst = paper()
   // Vault dropped in by hand is still Vault; ProtocolLib was installed by SpawnLoft under another file name
   writeJar(path.join(inst.dir, 'plugins'), 'Vault-1.7.jar', 'name: Vault\n')
   writeJar(path.join(inst.dir, 'plugins'), 'plib.jar', 'name: Something Else\n')
   recordManaged(inst, 'plib.jar', { source: 'modrinth', project: 'plib1', version: '5.0' })
   const asked = []
   t.mock.method(globalThis, 'fetch', async (url) => {
-    asked.push(String(url))
+    asked.push(decodeURIComponent(String(url)))
     return answers({
-      '/project/main1/version': [mrVersion({ dependencies: [
-        { project_id: 'vault1', dependency_type: 'required' },
-        { project_id: 'plib1', dependency_type: 'required' },
-        { project_id: 'lp1', dependency_type: 'required' },
-        { project_id: 'opt1', dependency_type: 'optional' },
-        { project_id: null, version_id: 'v9', dependency_type: 'required' },
-      ] })],
+      '/project/main1/version': [mrVersion({ dependencies: [...needs('vault1', 'plib1', 'lp1'), { project_id: 'opt1', dependency_type: 'optional' }, { project_id: 'bad1', dependency_type: 'incompatible' }] })],
+      '/project/lp1/version': [mrVersion({ project_id: 'lp1' })],
       '/projects?ids=': [{ id: 'vault1', slug: 'vault', title: 'Vault' }, { id: 'plib1', slug: 'protocollib', title: 'ProtocolLib' }, { id: 'lp1', slug: 'luckperms', title: 'LuckPerms' }],
     })(url)
   })
   const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
-  assert.equal(plan.version, '2.0')
-  assert.equal(plan.exactMatch, true)
-  assert.equal(plan.builtFor, null)
-  assert.deepEqual(plan.requires.map((d) => [d.title, d.installed]), [['Vault', true], ['ProtocolLib', true], ['LuckPerms', false]])
-  // nothing was downloaded to find this out
+  assert.deepEqual([plan.version, plan.exactMatch, plan.builtFor], ['2.0', true, null])
+  assert.deepEqual(brief(plan), [['Vault', true, false], ['ProtocolLib', true, false], ['LuckPerms', false, false]])
+  // nothing was downloaded to find this out, and what is already here was not asked about again
   assert.ok(asked.every((u) => u.startsWith('https://api.modrinth.com/')), asked.join(' '))
+  assert.ok(!asked.some((u) => u.includes('/project/vault1/') || u.includes('/project/plib1/')))
   assert.deepEqual(fs.readdirSync(path.join(inst.dir, 'plugins')).filter((f) => f.endsWith('.jar')).sort(), ['Vault-1.7.jar', 'plib.jar'])
 })
 
-test('a plan says when the only build is for another Minecraft version, and the install remembers it', async (t) => {
-  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+test('a plan goes down through what the requirements need, once each, and says which have no build for this version', async (t) => {
+  const inst = paper()
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ dependencies: needs('a1', 'b1') })],
+    // a needs b (already listed) and c; c needs main (a loop); b has only an old build
+    '/project/a1/version': [mrVersion({ project_id: 'a1', dependencies: needs('b1', 'c1') })],
+    '/project/b1/version': [mrVersion({ project_id: 'b1', game_versions: ['1.20.4'] })],
+    '/project/c1/version': [mrVersion({ project_id: 'c1', dependencies: needs('main1') })],
+    '/projects?ids=': [{ id: 'a1', slug: 'a', title: 'A' }, { id: 'b1', slug: 'b', title: 'B' }, { id: 'c1', slug: 'c', title: 'C' }],
+  }))
+  const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.deepEqual(plan.requires.map((d) => [d.title, d.mismatch, d.builtFor]), [['A', false, null], ['C', false, null], ['B', true, '1.20.4']])
+})
+
+test('a turned-off jar is not "installed", and a jar with a name in another alphabet does not stand in for everything', async (t) => {
+  const inst = paper()
+  writeJar(path.join(inst.dir, 'plugins'), 'Vault.jar.disabled', 'name: Vault\n')
+  writeJar(path.join(inst.dir, 'plugins'), 'jingji.jar', 'name: 经济\n')
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ dependencies: needs('vault1', 'lp1') })],
+    '/project/lp1/version': [mrVersion({ project_id: 'lp1' })],
+    // the name lookup fails: both are listed by id, and neither counts as here
+    '/projects?ids=': null,
+  }))
+  const lost = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.deepEqual(brief(lost), [['vault1', false, false], ['lp1', false, false]])
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ dependencies: needs('vault1') })],
+    '/projects?ids=': [{ id: 'vault1', slug: 'vault', title: 'Vault' }],
+  }))
+  assert.deepEqual(brief(await planInstall(inst, 'main1', { gameVersion: '1.21.4' })), [['Vault', false, true]])
+})
+
+test('a requirement named only by build is looked up, and listed even when it cannot be', async (t) => {
+  const inst = paper()
+  const byBuild = [{ project_id: null, version_id: 'v9', dependency_type: 'required' }]
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ dependencies: byBuild })],
+    '/versions?ids=': [{ id: 'v9', project_id: 'lp1' }],
+    '/project/lp1/version': [mrVersion({ project_id: 'lp1' })],
+    '/projects?ids=': [{ id: 'lp1', slug: 'luckperms', title: 'LuckPerms' }],
+  }))
+  assert.deepEqual(brief(await planInstall(inst, 'main1', { gameVersion: '1.21.4' })), [['LuckPerms', false, false]])
+  t.mock.method(globalThis, 'fetch', answers({ '/project/main1/version': [mrVersion({ dependencies: byBuild })] }))
+  const blind = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.equal(blind.requires.length, 1)
+  assert.deepEqual([blind.requires[0].unnamed, blind.requires[0].id, blind.requires[0].installed], [true, null, false])
+})
+
+test('a mod is known by its id as well as its name, and a modpack\'s record is not a project match', async (t) => {
+  const inst = { ...fakeInstance(), jar: 'fabric-server-mc.1.21.4-loader.0.16.0-launcher.1.0.0.jar', loader: 'fabric' }
+  fs.mkdirSync(path.join(inst.dir, 'mods'), { recursive: true })
+  fs.writeFileSync(path.join(inst.dir, 'mods', 'cloth.jar'), buildZip([['fabric.mod.json', JSON.stringify({ id: 'cloth-config', name: 'Cloth Config v15', version: '15.0' })]]))
+  fs.writeFileSync(path.join(inst.dir, 'mods', 'other.jar'), buildZip([['fabric.mod.json', JSON.stringify({ id: 'other', name: 'Other', version: '1' })]]))
+  // the pack's own id is on every jar it brought; it says nothing about which project a jar is
+  recordManaged(inst, 'other.jar', { source: 'modpack', project: 'arch1', version: '1' })
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ loaders: ['fabric'], dependencies: needs('cloth1', 'arch1') })],
+    '/project/arch1/version': [mrVersion({ project_id: 'arch1', loaders: ['fabric'] })],
+    '/projects?ids=': [{ id: 'cloth1', slug: 'cloth-config', title: 'Cloth Config API' }, { id: 'arch1', slug: 'architectury-api', title: 'Architectury API' }],
+  }))
+  assert.equal(listPlugins(inst).find((p) => p.file === 'cloth.jar').modId, 'cloth-config')
+  assert.deepEqual(brief(await planInstall(inst, 'main1', { gameVersion: '1.21.4' })), [['Cloth Config API', true, false], ['Architectury API', false, false]])
+})
+
+test('a plan says when the only build is for another Minecraft version, and the record keeps what the build lists', async (t) => {
+  const inst = paper()
   t.mock.method(globalThis, 'fetch', answers({
     '/project/main1/version': [mrVersion({ game_versions: ['1.20.1', '1.20.4'] })],
     'cdn.modrinth.com/Main.jar': new TextEncoder().encode('jar'),
   }))
   const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
   assert.deepEqual([plan.exactMatch, plan.builtFor], [false, '1.20.4'])
+  // a server whose version is not known is not told its plugins are for the wrong one
+  assert.equal((await planInstall(inst, 'main1', {})).exactMatch, true)
   const out = await installPlugin(inst, 'main1', { gameVersion: '1.21.4' })
   assert.match(out.versionNote, /lists 1\.20\.4, not 1\.21\.4/)
-  assert.equal(readManaged(inst).managed['Main.jar'].builtFor, '1.20.4')
-  assert.equal(listPlugins(inst).find((p) => p.file === 'Main.jar').builtFor, '1.20.4')
+  assert.deepEqual(readManaged(inst).managed['Main.jar'].gameVersions, ['1.20.1', '1.20.4'])
+  assert.deepEqual(listPlugins(inst).find((p) => p.file === 'Main.jar').gameVersions, ['1.20.1', '1.20.4'])
+  // a jar added by hand says nothing about versions
+  writeJar(path.join(inst.dir, 'plugins'), 'Hand.jar', 'name: Hand\n')
+  assert.equal(listPlugins(inst).find((p) => p.file === 'Hand.jar').gameVersions, null)
 })
 
-test('a matching build leaves no "built for" behind, and a failed name lookup still lists what is needed', async (t) => {
-  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
-  t.mock.method(globalThis, 'fetch', answers({
-    '/project/main1/version': [mrVersion({ dependencies: [{ project_id: 'lp1', dependency_type: 'required' }] })],
-    'cdn.modrinth.com/Main.jar': new TextEncoder().encode('jar'),
-  }))
-  const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
-  assert.deepEqual(plan.requires, [{ source: 'modrinth', id: 'lp1', title: 'lp1', installed: false, external: null }])
-  await installPlugin(inst, 'main1', { gameVersion: '1.21.4' })
-  assert.equal(readManaged(inst).managed['Main.jar'].builtFor, undefined)
+test('a project id that is not one never reaches a request', async (t) => {
+  const inst = paper()
+  const fetched = t.mock.method(globalThis, 'fetch', answers({}))
+  for (const bad of ['..', '.', '', 'a/b', 'a?b', 'x'.repeat(65), 'a b']) {
+    await assert.rejects(planInstall(inst, bad, {}), /not a project id/, bad)
+    await assert.rejects(installPlugin(inst, bad, {}), /not a project id/, bad)
+  }
+  assert.equal(fetched.mock.callCount(), 0)
 })
 
 test('a Hangar plan lists required plugins, and where one that is hosted elsewhere lives', async (t) => {
-  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  const inst = paper()
   writeJar(path.join(inst.dir, 'plugins'), 'Vault.jar', 'name: Vault\n')
+  const build = (extra) => ({ name: '3.1', channel: { name: 'Release' }, platformDependencies: { PAPER: ['1.21.4'] }, downloads: { PAPER: { downloadUrl: 'https://hangar/x.jar', fileInfo: { name: 'x.jar' } } }, ...extra })
   t.mock.method(globalThis, 'fetch', answers({
-    '/projects/Shop/versions': { result: [{
-      name: '3.1', channel: { name: 'Release' }, platformDependencies: { PAPER: ['1.20.4'] },
-      downloads: { PAPER: { downloadUrl: 'https://hangar/x.jar', fileInfo: { name: 'Shop.jar' } } },
+    '/projects/Shop/versions': { result: [build({
+      platformDependencies: { PAPER: ['1.20.4'] },
       pluginDependencies: { PAPER: [
         { name: 'Vault', required: true, externalUrl: null },
         { name: 'Citizens', required: true, externalUrl: 'https://ci.citizensnpcs.co' },
         { name: 'PlaceholderAPI', required: false, externalUrl: null },
         { name: 'ProtocolLib', required: true, externalUrl: null },
       ] },
-    }] },
+    })] },
+    '/projects/ProtocolLib/versions': { result: [build({})] },
   }))
   const plan = await planInstall(inst, 'Shop', { source: 'hangar', gameVersion: '1.21.4' })
   assert.deepEqual([plan.version, plan.exactMatch, plan.builtFor], ['3.1', false, '1.20.4'])
-  assert.deepEqual(plan.requires.map((d) => [d.title, d.installed, d.external]),
-    [['Vault', true, null], ['Citizens', false, 'https://ci.citizensnpcs.co'], ['ProtocolLib', false, null]])
+  assert.deepEqual(plan.requires.map((d) => [d.title, d.installed, d.external, d.mismatch]),
+    [['Vault', true, null, false], ['Citizens', false, 'https://ci.citizensnpcs.co', false], ['ProtocolLib', false, null, false]])
 })

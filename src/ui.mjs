@@ -1136,7 +1136,9 @@ async function handlePlugins(req, res, name, seg, url) {
   if (req.method === 'GET' && verb === 'plan') {
     const projectId = String(url.searchParams.get('projectId') || '')
     if (!projectId) return json(res, 400, { error: 'projectId is required' })
-    return json(res, 200, await pluginActions.planInstall(inst, projectId, { source: url.searchParams.get('source') || 'modrinth' }))
+    const source = url.searchParams.get('source') || 'modrinth'
+    if (source !== 'modrinth' && source !== 'hangar') return json(res, 400, { error: 'unknown source' })
+    return json(res, 200, await pluginActions.planInstall(inst, projectId, { source }))
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
   const body = await readBody(req)
@@ -1149,7 +1151,11 @@ async function handlePlugins(req, res, name, seg, url) {
   }
   if (verb === 'install') {
     if (!body.projectId) return json(res, 400, { error: 'projectId is required' })
-    return json(res, 200, await pluginActions.installWithSnapshot(inst, body.projectId, { source: body.source }))
+    // what it needs, to be fetched with it: at most a handful, each a project id and where from
+    const also = (Array.isArray(body.also) ? body.also : []).slice(0, 20)
+      .filter((d) => d && d.projectId)
+      .map((d) => ({ projectId: String(d.projectId), source: d.source === 'hangar' ? 'hangar' : 'modrinth' }))
+    return json(res, 200, await pluginActions.installWithSnapshot(inst, body.projectId, { source: body.source, also }))
   }
   if (verb === 'updates') {
     return json(res, 200, await plugins.checkUpdatesReport(inst, { gameVersion }))
