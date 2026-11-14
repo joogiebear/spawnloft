@@ -2086,6 +2086,8 @@
   .set-control { display: grid; gap: 6px; min-width: 0; justify-items: stretch; }
   .set-control > .switch { justify-self: start; }
   .set-stack { display: grid; gap: 6px; min-width: 0; }
+  .set-unit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-2); align-items: center; }
+  .set-unit .hint { margin: 0; }
   .set-row[data-changed] .set-control input:not(.switch), .set-row[data-changed] .set-control select { border-color: var(--lapis-edge); }
   .set-row[data-changed] .set-control .switch { border-color: var(--lapis-edge); }
 
@@ -13380,6 +13382,24 @@ async function buildServerSettings(row, body) {
   const players = data.players;
 
   for (const f of data.fields) {
+    // A setting this version of Minecraft keeps in the world as a game rule. The row stays, so
+    // nobody goes looking for where PvP went, and it has nothing to change: a line in the file
+    // would be written and ignored.
+    if (f.gameRule) {
+      // an output is something a label can name, so the row reads as one thing
+      const where = el('output', 'hint');
+      where.id = 'p_' + f.key;
+      where.textContent = 'Set with /gamerule';
+      addRow(sectionFor(f.group || 'other'), {
+        id: where.id,
+        label: f.label,
+        // where it went first; what it does is still a click away
+        help: gameRuleWords() + (f.note ? ' ' + f.note : ''),
+        control: where,
+        entry: { kind: 'prop', key: f.key, changed: () => false, tag: 'Game rule', reset: () => {} },
+      });
+      continue;
+    }
     let input;
     if (f.type === 'bool' || f.type === 'enum') {
       input = el('select');
@@ -13393,8 +13413,9 @@ async function buildServerSettings(row, body) {
       }
     } else {
       input = el('input');
-      input.type = f.type === 'int' ? 'number' : 'text';
+      input.type = f.type === 'int' ? 'number' : f.type === 'url' ? 'url' : 'text';
       if (f.type === 'int') { input.min = String(f.min); input.max = String(f.max); }
+      if (f.type === 'url') { input.placeholder = 'https://'; input.spellcheck = false; }
       input.value = f.value == null ? '' : String(f.value);
       input.autocomplete = 'off';
     }
@@ -13408,8 +13429,29 @@ async function buildServerSettings(row, body) {
     if (f.type === 'int') {
       const bad = fieldNote(input);
       control = el('div', 'set-stack');
-      control.append(input, bad);
+      // what the number counts, beside it: "10" alone does not say chunks or blocks
+      let field = input;
+      if (f.unit) {
+        field = el('div', 'set-unit');
+        const unit = el('span', 'hint');
+        unit.id = input.id + '_unit';
+        unit.textContent = f.unit;
+        input.setAttribute('aria-describedby', unit.id + ' ' + bad.id);
+        field.append(input, unit);
+      }
+      control.append(field, bad);
       invalid = () => !checkRange(input, bad, f.min, f.max);
+      input.addEventListener('input', invalid);
+    } else if (f.type === 'url') {
+      const bad = fieldNote(input);
+      control = el('div', 'set-stack');
+      control.append(input, bad);
+      invalid = () => {
+        const problem = linkProblem(input.value);
+        bad.textContent = problem;
+        input.setAttribute('aria-invalid', String(Boolean(problem)));
+        return Boolean(problem);
+      };
       input.addEventListener('input', invalid);
     }
     const { left } = addRow(sectionFor(f.group || 'other'), {
@@ -13880,12 +13922,12 @@ async function buildServerSettings(row, body) {
       if (changed) changedSections.add(e.section);
       e.line.toggleAttribute('data-changed', changed);
       e.tags.textContent = '';
-      const tag = changed ? 'Changed' : (e.isDefault && e.isDefault() ? 'Default' : '');
+      const tag = changed ? 'Changed' : e.tag || (e.isDefault && e.isDefault() ? 'Default' : '');
       if (tag) {
         const t = el('span', 'set-tag');
         t.textContent = tag;
         if (changed) t.dataset.tone = 'changed';
-        t.title = changed ? 'Different from what is saved' : 'Not in server.properties yet: this is Minecraft\u2019s own default';
+        t.title = changed ? 'Different from what is saved' : e.tag ? 'Kept in the world, not in server.properties' : 'Not in server.properties yet: this is Minecraft\u2019s own default';
         e.tags.append(t);
       }
     }
@@ -13932,6 +13974,12 @@ async function buildServerSettings(row, body) {
           const c = controls.get(f.key);
           if (c) { c.original = f.value == null ? '' : String(f.value); c.set = Boolean(f.set); }
         }
+        // left out by the server: this form was drawn before the server's version changed
+        for (const g of out.ignored || []) {
+          const c = controls.get(g.key);
+          if (c) c.input.value = c.original;
+        }
+        if (out.ignored && out.ignored.length) toast(ignoredWords(out.ignored.map((g) => g.label)), 'bad');
       }
       if (Object.keys(own).length) {
         await post(base + '/settings', own);
@@ -15097,6 +15145,26 @@ function fieldNote(input) {
   note.setAttribute('aria-live', 'polite');
   input.setAttribute('aria-describedby', note.id);
   return note;
+}
+
+/** What is wrong with a link typed into a setting, or '' when it will do. Empty means none. */
+function linkProblem(value) {
+  const v = String(value == null ? '' : value).trim();
+  if (!v) return '';
+  return /^https?:\/\/[^\s/]+(\/\S*)?$/i.test(v) ? '' : 'Use a link that starts with http:// or https://, or leave it empty.';
+}
+
+/** Under a setting that this version of Minecraft keeps as a game rule. One sentence, so all of
+ *  it shows. */
+/** After a save that left settings out because the server's version keeps them as game rules. */
+function ignoredWords(labels) {
+  const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : labels[0];
+  return list + (labels.length > 1 ? ' were' : ' was') + ' not saved: in this server\u2019s version of Minecraft '
+    + (labels.length > 1 ? 'they are game rules' : 'it is a game rule') + ', changed with /gamerule in the Console.';
+}
+
+function gameRuleWords() {
+  return 'A game rule in this version of Minecraft, kept in the world: change it with /gamerule in the Console.';
 }
 
 function checkRange(input, out, min, max) {
