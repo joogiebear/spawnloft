@@ -464,6 +464,25 @@ async function handleFiles(req, res, name, seg, url) {
   if (req.method === 'GET') {
     if (!verb) return json(res, 200, { ...files.listDir(inst, q('path'), { running }), running })
     if (verb === 'read') return json(res, 200, await files.readFile(inst, q('path')))
+    // the end of a text file too big to edit, to read and not to save
+    if (verb === 'tail') return json(res, 200, await files.readTail(inst, q('path')))
+    if (verb === 'image') {
+      const out = await files.imageFile(inst, q('path'))
+      res.writeHead(200, {
+        // from the file's first bytes, never from its name, and not to be guessed at again
+        'content-type': out.type,
+        'content-length': out.size,
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "default-src 'none'; sandbox",
+        'cache-control': 'no-store',
+      })
+      // no more than was promised, if the file grows meanwhile; and a file that went away between
+      // the look and the read ends this answer, not the panel
+      const stream = fs.createReadStream(out.file, { end: out.size - 1 })
+      stream.on('error', () => res.destroy())
+      stream.pipe(res)
+      return
+    }
     if (verb === 'search') return json(res, 200, { ...await files.searchNames(inst, q('path'), q('q'), { running }), running })
     if (verb === 'download') {
       const out = await files.downloadable(inst, q('path'))
@@ -476,6 +495,7 @@ async function handleFiles(req, res, name, seg, url) {
       })
       const stream = fs.createReadStream(out.file)
       stream.on('close', out.done)
+      stream.on('error', () => res.destroy())
       stream.pipe(res)
       return
     }

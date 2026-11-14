@@ -1540,7 +1540,7 @@
   .fm-sel button { padding: 4px 10px; font-size: var(--t-2); }
   .fm-list { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .fm-row {
-    display: grid; grid-template-columns: 20px minmax(0, 1fr) 84px 132px; column-gap: var(--s-3);
+    display: grid; grid-template-columns: 20px minmax(0, 1fr) 84px 132px 28px; column-gap: var(--s-3);
     align-items: center; min-height: 38px; padding: 0 var(--s-4);
     border-bottom: 1px solid var(--line); transition: background var(--ease);
   }
@@ -1550,6 +1550,11 @@
   .fm-head { min-height: 34px; background: rgba(var(--ink-rgb), .02); font: 650 var(--t-1)/1 var(--ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
   .fm-head .fm-size { text-align: right; }
   .fm-row input[type="checkbox"] { margin: 0; }
+  /* What can be done with one row, last in it. Faint until the row is pointed at or holds focus. */
+  .fm-row .fm-more { grid-column: -2; width: 28px; height: 28px; color: var(--ink-3); opacity: .5; transition: opacity var(--ease); }
+  .fm-row:hover .fm-more, .fm-row:focus-within .fm-more, .fm-row .fm-more[aria-expanded="true"] { opacity: 1; }
+  /* One menu for every row, placed by the button that opened it: the list clips what overflows it. */
+  .menu.row-menu { position: fixed; min-width: 200px; z-index: 60; }
   .fm-open {
     display: flex; align-items: center; gap: var(--s-2); min-width: 0; justify-self: start; max-width: 100%;
     padding: 4px 0; background: none; border: 0; box-shadow: none; color: var(--ink);
@@ -1566,17 +1571,17 @@
   .fm-row .fm-when .long { display: none; }
   /* Wide: what kind of thing each entry is. Ultra: the exact time, not the short stamp. */
   @container pane (min-width: 1280px) {
-    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 132px; }
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 132px 28px; }
     .fm-row .fm-kind { display: block; }
   }
   @container pane (min-width: 2000px) {
-    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 210px; }
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 96px 84px 210px 28px; }
     .fm-row .fm-when .short { display: none; }
     .fm-row .fm-when .long { display: inline; }
   }
   .pane[data-drop] .fm-list { outline: 2px dashed var(--lapis-edge); outline-offset: 4px; }
   @container pane (max-width: 560px) {
-    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 72px; }
+    .fm-row { grid-template-columns: 20px minmax(0, 1fr) 72px 28px; }
     .fm-row .fm-when { display: none; }
   }
 
@@ -1609,6 +1614,24 @@
   .fm-code textarea:focus { outline: none; box-shadow: none; background: transparent; }
   .fm-code textarea::selection { background: rgba(var(--accent-rgb), .3); color: transparent; }
   .fm-code.plain pre { display: none; }
+  /* Where Find matched, painted under the text by a third layer laid out like the other two. */
+  .fm-code pre.fm-marks, .fm-code.plain pre.fm-marks { display: block; color: transparent; }
+  .fm-marks mark { color: transparent; background: rgba(var(--accent-rgb), .28); border-radius: 2px; }
+  .fm-marks mark.now { background: rgba(var(--accent-rgb), .6); outline: 1px solid var(--lapis); }
+  /* Wrapped: long lines fold at the edge. All three layers must fold at the same place, so the
+     textarea always keeps its scrollbar and the layers under it stop short of it. Line numbers
+     would no longer line up, so the gutter goes. */
+  .fm-code.wrap pre, .fm-code.wrap textarea { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .fm-code.wrap textarea { overflow-y: scroll; overflow-x: hidden; }
+  .fm-editor.nogutter { grid-template-columns: minmax(0, 1fr); }
+  .fm-editor.nogutter .fm-gutter { display: none; }
+  .fm-find { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-bottom: var(--s-2); }
+  .fm-find input[type="search"] { flex: 0 1 240px; min-width: 140px; }
+  .fm-find button { padding: 4px 10px; font-size: var(--t-2); }
+  .fm-find .said { font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); min-width: 6em; }
+  .fm-find button[aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
+  .fm-image { display: grid; place-items: center; min-height: 240px; padding: var(--s-5); background: var(--sunken); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: auto; }
+  .fm-image img { max-width: 100%; height: auto; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--line); }
   .fm-code.plain textarea { color: var(--ink); }
   .fm-code.plain textarea::selection { color: var(--ink); }
   .hl-key { color: var(--lapis-ink); }
@@ -4089,6 +4112,7 @@ $('#tabConsole').onclick = () => setTool(null);
 
 function closeTool() {
   const was = toolView.tool;
+  rowMenu.close(false);
   setTool(null);
   // Focus goes back to the button that opened it, not to the top of the page with the panel gone.
   if (was) $('#' + dockId(was))?.focus();
@@ -10354,6 +10378,121 @@ function fileKind(e) {
   return known[ext] || ext.toUpperCase();
 }
 
+/** The path a rename gives: the same folder, the new name. */
+function renamedPath(path, name) {
+  const at = path.lastIndexOf('/');
+  return (at < 0 ? '' : path.slice(0, at + 1)) + name;
+}
+
+/** The path a move gives: the same name, in the folder typed ('' is the server folder). */
+function movedPath(path, folder) {
+  const dir = String(folder ?? '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const name = path.split('/').pop();
+  return dir ? dir + '/' + name : name;
+}
+
+/** Every path from one row to another, both included, in the order listed. Null when either is gone. */
+function pathsBetween(entries, a, b) {
+  const i = entries.findIndex((e) => e.path === a);
+  const j = entries.findIndex((e) => e.path === b);
+  if (i < 0 || j < 0) return null;
+  return entries.slice(Math.min(i, j), Math.max(i, j) + 1).map((e) => e.path);
+}
+
+/**
+ * What a row's menu offers, in order. Something the running server holds can be opened and
+ * downloaded but not renamed, moved or deleted, and the menu says why.
+ */
+function fileRowActions(e) {
+  const held = e.inUse ? 'In use by the running server' : '';
+  const folder = e.type === 'dir';
+  const acts = [];
+  if (folder) acts.push({ id: 'open', label: 'Open' });
+  else if (e.type === 'file') acts.push({ id: 'open', label: 'Open' });
+  if (e.type !== 'file' && !folder) return acts;
+  acts.push({ id: 'rename', label: 'Rename', hint: held, disabled: Boolean(e.inUse) });
+  acts.push({ id: 'move', label: 'Move to\u2026', hint: held, disabled: Boolean(e.inUse) });
+  acts.push({ id: 'download', label: folder ? 'Download as a zip' : 'Download' });
+  if (!folder && ARCHIVE_RE.test(e.path)) acts.push({ id: 'unzip', label: 'Unzip here' });
+  acts.push({ id: 'delete', label: 'Delete', hint: held, disabled: Boolean(e.inUse), danger: true });
+  return acts;
+}
+
+/**
+ * The one menu every row shares. It hangs from the page, not the list (which clips), beside the
+ * button that opened it, and goes when something else is pressed, the page scrolls or resizes.
+ */
+const rowMenu = (() => {
+  let menu = null;
+  let owner = null;
+  const close = (refocus) => {
+    if (!menu) return;
+    menu.remove();
+    menu = null;
+    if (owner) {
+      owner.setAttribute('aria-expanded', 'false');
+      if (refocus && owner.isConnected) owner.focus();
+    }
+    owner = null;
+  };
+  document.addEventListener('pointerdown', (e) => {
+    if (menu && !menu.contains(e.target) && !(owner && owner.contains(e.target))) close(false);
+  });
+  document.addEventListener('scroll', (e) => { if (menu && !menu.contains(e.target)) close(false); }, true);
+  window.addEventListener('resize', () => close(false));
+  const open = (button, items, run) => {
+    if (owner === button) { close(true); return; }
+    close(false);
+    owner = button;
+    menu = document.createElement('div');
+    menu.className = 'menu row-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', button.getAttribute('aria-label') || 'Actions');
+    for (const item of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      b.tabIndex = -1;
+      b.disabled = Boolean(item.disabled);
+      if (item.danger) b.dataset.tone = 'danger';
+      const title = document.createElement('b');
+      title.textContent = item.label;
+      b.append(title);
+      if (item.hint) {
+        const hint = document.createElement('span');
+        hint.textContent = item.hint;
+        b.append(hint);
+      }
+      b.onclick = () => { close(true); run(item.id); };
+      menu.append(b);
+    }
+    menu.addEventListener('keydown', (e) => {
+      const list = Array.from(menu.querySelectorAll('[role="menuitem"]:not(:disabled)'));
+      const at = list.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); }
+      else if (e.key === 'Tab') close(true);
+      else if (!list.length) return;
+      else if (e.key === 'ArrowDown') { e.preventDefault(); list[(at + 1) % list.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); list[(at - 1 + list.length) % list.length].focus(); }
+      else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
+      else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
+    });
+    document.body.append(menu);
+    // under the button, its right edge on the button's; above it when there is no room below
+    const at = button.getBoundingClientRect();
+    const tall = menu.offsetHeight;
+    // measured without the page's scrollbar, which innerWidth counts
+    const page = document.documentElement;
+    const below = at.bottom + 4 + tall <= page.clientHeight - 8;
+    menu.style.top = Math.max(8, below ? at.bottom + 4 : at.top - 4 - tall) + 'px';
+    menu.style.right = Math.max(8, page.clientWidth - at.right) + 'px';
+    button.setAttribute('aria-expanded', 'true');
+    const first = menu.querySelector('[role="menuitem"]:not(:disabled)');
+    if (first) first.focus();
+  };
+  return { open, close };
+})();
+
 async function renderFiles(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -10361,6 +10500,8 @@ async function renderFiles(opts) {
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
   if (body.dataset.for !== row.name) paneLoading(body);
+  // a menu left open belongs to the rows of the server it was opened on
+  if (body.dataset.for !== row.name) rowMenu.close(false);
   body.dataset.for = row.name;
   const view = filesStateFor(row.name);
   if (view.editing) return renderFileEditor(row, view);
@@ -10384,6 +10525,7 @@ async function renderFiles(opts) {
   const entries = view.query ? data.results : data.entries;
   for (const p of [...view.selected]) if (!entries.some((e) => e.path === p)) view.selected.delete(p);
 
+  rowMenu.close(false);
   body.textContent = '';
   paneHead(body, 'folder', 'Files',
     'Everything in this server’s folder. An edit, a replaced file or a delete keeps a copy first, which Backups can put back.');
@@ -10493,6 +10635,51 @@ async function renderFiles(opts) {
     catch (e) { toast(e.message, 'bad'); }
   };
 
+  // ---- one thing at a time -----------------------------------------------------
+  const renameOne = async (path) => {
+    const was = path.split('/').pop();
+    const got = await ask({
+      title: 'Rename ' + was,
+      input: { label: 'New name', value: was, required: true },
+      confirmLabel: 'Rename',
+      submit: ({ text }) => {
+        const name = text.trim();
+        if (/[\\/]/.test(name)) throw new Error('A name has no slashes in it. Use Move to put it in another folder.');
+        return name === was ? null : post(base + '/move', { from: path, to: renamedPath(path, name) });
+      },
+    });
+    if (!got || !got.out) return;
+    view.selected.clear();
+    again();
+  };
+  const moveOne = async (path) => {
+    const name = path.split('/').pop();
+    const from = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    const got = await ask({
+      title: 'Move ' + name,
+      text: 'The folder to put it in, as a path from the server folder: plugins/Old, for one. Leave it empty for the server folder itself.',
+      input: { label: 'Folder', value: from, placeholder: 'the server folder' },
+      confirmLabel: 'Move',
+      submit: ({ text }) => {
+        const to = movedPath(path, text);
+        return to === path ? null : post(base + '/move', { from: path, to });
+      },
+    });
+    if (!got || !got.out) return;
+    toast('Moved ' + name + ' to ' + (got.out.path || movedPath(path, '')) + '.', 'good');
+    view.selected.clear();
+    again();
+  };
+  const unzipOne = async (path, button) => {
+    if (button) button.disabled = true;
+    try {
+      const out = await post(base + '/extract', { path });
+      toast('Unpacked into ' + out.path + '.', 'good');
+      go(out.path);
+    } catch (e) { toast(e.message, 'bad'); if (button) button.disabled = false; }
+  };
+  const heldWords = (e) => e.name + ' is in use by the running server, so it cannot be renamed, moved or deleted until the server stops.';
+
   // ---- what is selected -------------------------------------------------------
   const sel = [...view.selected];
   const selEntries = entries.filter((e) => view.selected.has(e.path));
@@ -10503,8 +10690,10 @@ async function renderFiles(opts) {
     count.textContent = sel.length + ' selected';
     const dl = iconButton('download', 'Download');
     dl.hidden = sel.length !== 1;
-    const rename = iconButton('pencil', 'Rename or move');
+    const rename = iconButton('pencil', 'Rename');
     rename.hidden = sel.length !== 1;
+    const move = iconButton('folder', 'Move');
+    move.hidden = sel.length !== 1;
     const zip = iconButton('archive', 'Zip');
     const unzip = iconButton('archive', 'Unzip');
     unzip.hidden = !(sel.length === 1 && selEntries[0] && selEntries[0].type === 'file' && ARCHIVE_RE.test(sel[0]));
@@ -10517,29 +10706,20 @@ async function renderFiles(opts) {
     if (busy.length) {
       del.disabled = true;
       rename.disabled = true;
-      whyOff.textContent = busy[0].name + ' is in use by the running server, so it cannot be renamed or deleted until the server stops.';
+      move.disabled = true;
+      whyOff.textContent = heldWords(busy[0]);
     }
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'ghost';
     clear.textContent = 'Clear';
-    acts.append(count, dl, rename, zip, unzip, del, clear, whyOff);
+    acts.append(count, dl, rename, move, zip, unzip, del, clear, whyOff);
     body.append(acts);
 
     clear.onclick = () => { view.selected.clear(); again(); };
     dl.onclick = () => downloadPath(row, sel[0]);
-    rename.onclick = async () => {
-      const got = await ask({
-        title: 'Rename or move ' + sel[0].split('/').pop(),
-        text: 'A new name, or a path from the server folder to move it somewhere else.',
-        input: { label: 'New path', value: sel[0], required: true },
-        confirmLabel: 'Rename',
-        submit: ({ text }) => (text === sel[0] ? null : post(base + '/move', { from: sel[0], to: text })),
-      });
-      if (!got || !got.out) return;
-      view.selected.clear();
-      again();
-    };
+    rename.onclick = () => renameOne(sel[0]);
+    move.onclick = () => moveOne(sel[0]);
     zip.onclick = async () => {
       const first = sel[0].split('/').pop();
       const got = await ask({
@@ -10553,14 +10733,7 @@ async function renderFiles(opts) {
       view.selected.clear();
       again();
     };
-    unzip.onclick = async () => {
-      unzip.disabled = true;
-      try {
-        const out = await post(base + '/extract', { path: sel[0] });
-        toast('Unpacked into ' + out.path + '.', 'good');
-        go(out.path);
-      } catch (e) { toast(e.message, 'bad'); unzip.disabled = false; }
-    };
+    unzip.onclick = () => unzipOne(sel[0], unzip);
     del.onclick = () => deleteFiles(row, view, sel, entries).then(again);
   }
 
@@ -10617,7 +10790,17 @@ async function renderFiles(opts) {
     box.type = 'checkbox';
     box.checked = view.selected.has(e.path);
     box.setAttribute('aria-label', 'Select ' + e.name);
-    box.onchange = () => { if (box.checked) view.selected.add(e.path); else view.selected.delete(e.path); again(); };
+    // Shift and a click ticks, or unticks, everything from the last box used to this one.
+    // Shift and a click would also pick the page's text between the two rows
+    line.addEventListener('mousedown', (ev) => { if (ev.shiftKey) ev.preventDefault(); });
+    box.onclick = (ev) => {
+      const range = ev.shiftKey && view.anchor ? pathsBetween(entries, view.anchor, e.path) : null;
+      for (const p of range || [e.path]) {
+        if (box.checked) view.selected.add(p); else view.selected.delete(p);
+      }
+      view.anchor = e.path;
+      again();
+    };
     const open = document.createElement('button');
     open.type = 'button';
     open.className = 'fm-name fm-open';
@@ -10657,10 +10840,48 @@ async function renderFiles(opts) {
     line.append(box, open, kind, size, when);
     list.append(line);
 
-    open.onclick = () => {
+    const openIt = () => {
       if (e.type === 'dir') go(e.path);
       else if (e.type === 'file') openFile(row, view, e.path);
     };
+    open.onclick = openIt;
+    const actions = fileRowActions(e);
+    const act = (id) => {
+      if (id === 'open') openIt();
+      else if (id === 'rename') renameOne(e.path);
+      else if (id === 'move') moveOne(e.path);
+      else if (id === 'download') downloadPath(row, e.path);
+      else if (id === 'unzip') unzipOne(e.path, null);
+      else if (id === 'delete') deleteFiles(row, view, [e.path], entries).then(again);
+    };
+    if (actions.length > 1) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'icon-btn fm-more';
+      more.append(icon('dots'));
+      more.setAttribute('aria-label', 'Actions for ' + e.name);
+      more.setAttribute('aria-haspopup', 'menu');
+      more.setAttribute('aria-expanded', 'false');
+      more.title = e.inUse ? 'Actions' : 'Rename, move, download, delete';
+      more.onclick = () => rowMenu.open(more, actions, act);
+      line.append(more);
+      // F2 renames and Delete deletes the row that holds the focus, as a file manager does
+      line.addEventListener('keydown', (ev) => {
+        const key = rowKey(ev);
+        if (!key) return;
+        ev.preventDefault();
+        // with this row among the ticked ones, Delete means all of them, as the bar's Delete does
+        const ticked = [...view.selected];
+        if (key === 'delete' && ticked.length > 1 && view.selected.has(e.path)) {
+          const held = entries.find((x) => x.inUse && view.selected.has(x.path));
+          if (held) { toast(heldWords(held), 'bad'); return; }
+          deleteFiles(row, view, ticked, entries).then(again);
+          return;
+        }
+        if (e.inUse) { toast(heldWords(e), 'bad'); return; }
+        act(key);
+      });
+    }
   }
   if (!entries.length) {
     body.append(list);
@@ -10673,7 +10894,7 @@ async function renderFiles(opts) {
 
   const note = document.createElement('div');
   note.className = 'hint';
-  note.textContent = 'Drop files or whole folders onto this list to upload them here.';
+  note.textContent = 'Drop files or whole folders onto this list to upload them here. On a row, F2 renames and Delete deletes; Shift and a click ticks a run of rows.';
   body.append(note);
 
   // Files dragged in from the desktop land in the folder on screen.
@@ -10925,25 +11146,67 @@ async function deleteFiles(row, view, paths, entries) {
   }
 }
 
+const IMAGE_RE = /\.(png|jpe?g|gif|webp)$/i;
+/** A packed text file, most often an old log: logs/2026-11-13-1.log.gz. Not a .tar.gz, which is an archive. */
+const PACKED_RE = /\.gz$/i;
+const isPackedText = (p) => PACKED_RE.test(p) && !/\.tar\.gz$/i.test(p);
+
+/** The line above a file that is shown to read and not to edit: how much of it this is. */
+function tailWords(tail) {
+  if (tail.whole) return tail.packed ? 'Unpacked to read it here. Read only.' : 'Read only.';
+  return 'The last ' + fileSize(tail.shown) + ' of ' + fileSize(tail.of) + (tail.packed ? ' once unpacked' : '')
+    + '. Read only: download it for the whole file.';
+}
+
+/** Why a file is not opened here, when it is not: what it is, and that a download is the way. */
+/** What a key pressed on a file's row asks for: F2 renames; Delete deletes, and on a Mac, where
+ *  that key is rare, Cmd+Backspace does, as in Finder. */
+function rowKey(ev) {
+  if (ev.altKey || ev.ctrlKey || ev.shiftKey) return null;
+  if (ev.key === 'F2' && !ev.metaKey) return 'rename';
+  if (ev.key === 'Delete' && !ev.metaKey) return 'delete';
+  if (ev.key === 'Backspace' && ev.metaKey) return 'delete';
+  return null;
+}
+
+function notShownWords(reason, size, packed) {
+  if (reason === 'large' && packed) return 'It unpacks to more than can be read here. Download it and unpack it to read it.';
+  if (packed) return 'It could not be unpacked: it is cut short, or is not the packed text its name says. Download it to open it elsewhere.';
+  if (reason === 'large') return 'It is ' + fileSize(size) + ', too big to open here. Download it to open it elsewhere.';
+  return 'It is not text - a jar, a world file or an archive. Download it to open it elsewhere.';
+}
+
 async function openFile(row, view, p) {
   const base = '/instances/' + encodeURIComponent(row.name) + '/files';
+  const show = (editing) => { view.editing = editing; renderFiles({ force: true }); };
+  // a picture is looked at, not read: nothing is fetched here but the picture itself
+  if (IMAGE_RE.test(p)) { show({ path: p, text: '', original: '', image: true }); return; }
+  const packed = isPackedText(p);
   let out;
   try {
-    out = await api(base + '/read?path=' + encodeURIComponent(p));
+    // a packed log is never offered to the editor: what is on disk is not its text
+    out = packed ? { text: null, reason: 'large' } : await api(base + '/read?path=' + encodeURIComponent(p));
+    if (out.text == null && out.reason === 'large') {
+      // too big to edit, but a log's last lines are the ones wanted: read its end
+      const tail = await api(base + '/tail?path=' + encodeURIComponent(p));
+      if (tail.text != null) {
+        const text = tail.text.replace(/\r\n/g, '\n');
+        show({ path: tail.path, text, original: text, tail: { whole: tail.whole, shown: tail.shown, of: tail.of, packed: tail.packed } });
+        return;
+      }
+      out = tail;
+    }
   } catch (e) { toast(e.message, 'bad'); return; }
   if (out.text == null) {
     const ok = await ask({
-      title: p.split('/').pop() + ' is not something to edit here',
-      text: out.reason === 'large'
-        ? 'It is ' + fileSize(out.size) + ', too big for the editor. Download it to open it in something made for files that size.'
-        : 'It is not text - a jar, a world file or an image. Download it to open it elsewhere.',
+      title: p.split('/').pop() + ' cannot be opened here',
+      text: notShownWords(out.reason, out.size, packed),
       confirmLabel: 'Download',
     });
     if (ok) downloadPath(row, p);
     return;
   }
-  view.editing = { path: out.path, text: out.text.replace(/\r\n/g, '\n'), original: out.text.replace(/\r\n/g, '\n'), version: out.version };
-  renderFiles({ force: true });
+  show({ path: out.path, text: out.text.replace(/\r\n/g, '\n'), original: out.text.replace(/\r\n/g, '\n'), version: out.version });
 }
 
 // ------------------------------------------------------------ the editor ---
@@ -11029,11 +11292,89 @@ function highlightLine(line, lang) {
   return escHtml(line);
 }
 
+/** Find stops counting here; a file with more matches than this says "2000+". */
+const FIND_CAP = 2000;
+
+/** Where `needle` occurs in `text`, ignoring case, as start offsets, up to `cap` of them. */
+function findAll(text, needle, cap) {
+  const starts = [];
+  if (!needle) return { starts, len: 0, capped: false };
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  let m;
+  let capped = false;
+  while ((m = re.exec(text))) {
+    if (starts.length >= cap) { capped = true; break; }
+    starts.push(m.index);
+  }
+  return { starts, len: needle.length, capped };
+}
+
+/** The text as HTML with every match in a <mark>, and the one Find stands on marked "now". */
+function markMatches(text, starts, len, current) {
+  let out = '';
+  let from = 0;
+  starts.forEach((s, i) => {
+    out += escHtml(text.slice(from, s)) + '<mark' + (i === current ? ' class="now"' : '') + '>' + escHtml(text.slice(s, s + len)) + '</mark>';
+    from = s + len;
+  });
+  return out + escHtml(text.slice(from));
+}
+
+/** Beside the Find box: which match this is, of how many. */
+function findWords(needle, at, total, capped) {
+  if (!needle) return '';
+  if (!total) return 'No matches';
+  return (at + 1) + ' of ' + total + (capped ? '+' : '');
+}
+
+const FILES_WRAP_KEY = 'spawnloft.files.wrap';
+/** Whether the editor folds long lines. Remembered, where the browser allows. */
+let filesWrap = false;
+try { filesWrap = localStorage.getItem(FILES_WRAP_KEY) === '1'; } catch { /* stays off */ }
+
+/** A picture, shown as it is: server-icon.png is the usual one. */
+function renderFileImage(row, view) {
+  const body = $('#filesBody');
+  const ed = view.editing;
+  const name = ed.path.split('/').pop();
+  body.textContent = '';
+  paneHead(body, 'file', name, ed.path);
+  const bar = document.createElement('div');
+  bar.className = 'fm-bar';
+  const back = iconButton('folder', 'All files', 'ghost');
+  const grow = document.createElement('span');
+  grow.className = 'grow';
+  const dl = iconButton('download', 'Download');
+  bar.append(back, grow, dl);
+  const frame = document.createElement('div');
+  frame.className = 'fm-image';
+  const img = document.createElement('img');
+  img.alt = name;
+  const said = document.createElement('div');
+  said.className = 'fm-foot hint';
+  said.setAttribute('role', 'status');
+  img.onload = () => { said.textContent = img.naturalWidth + ' \u00d7 ' + img.naturalHeight + ' pixels'; };
+  img.onerror = () => {
+    frame.textContent = '';
+    frame.append(emptyState('file', name + ' could not be shown: it is not a picture a browser can draw, or it is too big. Download it to look at it.'));
+  };
+  img.src = '/api/instances/' + encodeURIComponent(row.name) + '/files/image?path=' + encodeURIComponent(ed.path);
+  frame.append(img);
+  body.append(bar, frame, said);
+  back.onclick = () => { view.editing = null; renderFiles({ force: true }); };
+  dl.onclick = () => downloadPath(row, ed.path);
+  requestAnimationFrame(() => back.focus({ preventScroll: true }));
+}
+
 function renderFileEditor(row, view) {
   const body = $('#filesBody');
   const ed = view.editing;
+  rowMenu.close(false);
+  if (ed.image) return renderFileImage(row, view);
   const base = '/instances/' + encodeURIComponent(row.name) + '/files';
-  const lang = langOf(ed.path);
+  // the end of a file too big to edit: read, searched and wrapped like any other, never saved
+  const readOnly = Boolean(ed.tail);
+  const lang = readOnly ? 'plain' : langOf(ed.path);
   const painted = lang !== 'plain' && ed.text.length <= HIGHLIGHT_MAX;
   body.textContent = '';
   paneHead(body, 'file', ed.path.split('/').pop(), ed.path);
@@ -11056,7 +11397,45 @@ function renderFileEditor(row, view) {
   save.className = 'primary';
   save.textContent = 'Save';
   bar.append(back, dot, grow, reload, dl, save);
+  save.hidden = readOnly;
   body.append(bar);
+  if (readOnly) {
+    const partial = document.createElement('div');
+    partial.className = 'hint';
+    partial.style.marginBottom = 'var(--s-2)';
+    partial.textContent = tailWords(ed.tail);
+    body.append(partial);
+  }
+
+  // ---- find, and wrap -----------------------------------------------------------
+  const findRow = document.createElement('div');
+  findRow.className = 'fm-find';
+  findRow.setAttribute('role', 'search');
+  const q = document.createElement('input');
+  q.type = 'search';
+  q.placeholder = 'Find in this file';
+  q.setAttribute('aria-label', 'Find in this file');
+  q.dataset.kept = '1';
+  const found = document.createElement('span');
+  found.className = 'said';
+  found.setAttribute('role', 'status');
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'ghost';
+  prev.textContent = 'Previous';
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'ghost';
+  next.textContent = 'Next';
+  const findGrow = document.createElement('span');
+  findGrow.className = 'grow';
+  const wrapBtn = document.createElement('button');
+  wrapBtn.type = 'button';
+  wrapBtn.className = 'ghost';
+  wrapBtn.textContent = 'Wrap lines';
+  wrapBtn.title = 'Fold long lines at the edge, so nothing runs off to the right';
+  findRow.append(q, prev, next, found, findGrow, wrapBtn);
+  body.append(findRow);
 
   const box = document.createElement('div');
   box.className = 'fm-editor';
@@ -11067,13 +11446,18 @@ function renderFileEditor(row, view) {
   code.className = 'fm-code' + (painted ? '' : ' plain');
   const pre = document.createElement('pre');
   pre.setAttribute('aria-hidden', 'true');
+  const marks = document.createElement('pre');
+  marks.className = 'fm-marks';
+  marks.setAttribute('aria-hidden', 'true');
   const ta = document.createElement('textarea');
   ta.spellcheck = false;
   ta.wrap = 'off';
+  ta.readOnly = readOnly;
   ta.setAttribute('autocapitalize', 'off');
-  ta.setAttribute('aria-label', ed.path);
+  ta.setAttribute('aria-label', ed.path + (readOnly ? ', read only' : ''));
   ta.value = ed.text;
-  code.append(pre, ta);
+  // matches first, so they are painted under the text
+  code.append(marks, pre, ta);
   box.append(gutter, code);
   body.append(box);
 
@@ -11081,7 +11465,9 @@ function renderFileEditor(row, view) {
   foot.className = 'fm-foot hint';
   const where = document.createElement('span');
   const how = document.createElement('span');
-  how.textContent = LANG_NAMES[lang] + '  ·  Ctrl+S saves  ·  Tab indents with spaces; Esc, then Tab, moves on';
+  how.textContent = readOnly
+    ? 'Read only  ·  Ctrl+F finds'
+    : LANG_NAMES[lang] + '  ·  Ctrl+S saves  ·  Ctrl+F finds  ·  Tab indents with spaces; Esc, then Tab, moves on';
   foot.append(where, how);
   body.append(foot);
 
@@ -11101,21 +11487,143 @@ function renderFileEditor(row, view) {
     save.disabled = !dirty;
   };
   const sync = () => {
-    pre.scrollTop = ta.scrollTop;
-    pre.scrollLeft = ta.scrollLeft;
+    pre.scrollTop = marks.scrollTop = ta.scrollTop;
+    pre.scrollLeft = marks.scrollLeft = ta.scrollLeft;
     gutter.scrollTop = ta.scrollTop;
   };
   const caret = () => {
+    // the end of a file has no line numbers of its own: line 1 here is not line 1 of the file
+    if (readOnly && !ed.tail.whole) { where.textContent = ''; return; }
     const before = ta.value.slice(0, ta.selectionStart);
     const ln = before.split('\n').length;
     where.textContent = 'Line ' + ln + ', column ' + (before.length - before.lastIndexOf('\n'));
   };
-  ta.addEventListener('input', () => { ed.text = ta.value; paint(); caret(); });
+
+  // The layers under the textarea stop where its scrollbar starts, or wrapped lines would fold
+  // at different places in each.
+  const layout = () => {
+    const bar = (ta.offsetWidth - ta.clientWidth) + 'px';
+    pre.style.right = marks.style.right = bar;
+  };
+  const setWrap = (on) => {
+    code.classList.toggle('wrap', on);
+    box.classList.toggle('nogutter', on || (readOnly && !ed.tail.whole));
+    ta.wrap = on ? 'soft' : 'off';
+    wrapBtn.setAttribute('aria-pressed', String(on));
+    layout();
+    sync();
+  };
+  wrapBtn.onclick = () => {
+    filesWrap = !filesWrap;
+    try { localStorage.setItem(FILES_WRAP_KEY, filesWrap ? '1' : '0'); } catch { /* not remembered */ }
+    setWrap(filesWrap);
+    reveal();
+  };
+
+  // Find: every match is marked in the layer under the text, and the one it stands on is scrolled
+  // to. The marks are laid out exactly as the text is, so where a mark sits is where its match is,
+  // wrapped or not.
+  let hits = { starts: [], len: 0, capped: false };
+  let at = -1;
+  const say = () => {
+    found.textContent = findWords(q.value, at, hits.starts.length, hits.capped);
+    prev.disabled = next.disabled = hits.starts.length < 1;
+  };
+  function reveal() {
+    const cur = marks.querySelector('mark.now');
+    if (!cur) return;
+    const top = cur.offsetTop;
+    const left = cur.offsetLeft;
+    if (top < ta.scrollTop + 8 || top > ta.scrollTop + ta.clientHeight - 48) ta.scrollTop = Math.max(0, top - ta.clientHeight / 2);
+    if (left < ta.scrollLeft + 8 || left > ta.scrollLeft + ta.clientWidth - 80) ta.scrollLeft = Math.max(0, left - ta.clientWidth / 2);
+    sync();
+  }
+  // `move` is off when the text changed under a search already made: the marks are counted again
+  // and the view stays where the typing is, not carried off to the next match.
+  const runFind = (from, move = true) => {
+    hits = findAll(ta.value, q.value, FIND_CAP);
+    if (!hits.starts.length) {
+      at = -1;
+      marks.textContent = '';
+    } else {
+      // the first match at or after where the reading is, so Find goes on from there
+      at = hits.starts.findIndex((s) => s >= from);
+      if (at < 0) at = move ? 0 : hits.starts.length - 1;
+      marks.innerHTML = markMatches(ta.value, hits.starts, hits.len, at) + '\n ';
+    }
+    say();
+    if (move) reveal(); else sync();
+  };
+  const step = (by) => {
+    const n = hits.starts.length;
+    if (!n) return;
+    const all = marks.querySelectorAll('mark');
+    if (all[at]) all[at].classList.remove('now');
+    at = (at + by + n) % n;
+    if (all[at]) all[at].classList.add('now');
+    say();
+    reveal();
+  };
+  let findTimer = 0;
+  let findWaiting = null;
+  const findNow = () => {
+    clearTimeout(findTimer);
+    const waiting = findWaiting;
+    findWaiting = null;
+    if (waiting && ta.isConnected) runFind(waiting.from(), waiting.move);
+  };
+  const findSoon = (from, move = true) => {
+    clearTimeout(findTimer);
+    findWaiting = { from, move };
+    findTimer = setTimeout(findNow, 140);
+  };
+  q.addEventListener('input', () => findSoon(() => (at >= 0 ? hits.starts[at] : ta.selectionStart)));
+  q.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // a search still waiting to run is run, and that lands on a match: no step past it
+      if (findWaiting) findNow();
+      else step(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      // back to the text, on the match Find stands on; the next Escape is the tool's
+      e.preventDefault();
+      e.stopPropagation();
+      if (at >= 0) ta.setSelectionRange(hits.starts[at], hits.starts[at] + hits.len);
+      ta.focus({ preventScroll: true });
+      caret();
+    }
+  });
+  prev.onclick = () => step(-1);
+  next.onclick = () => step(1);
+  // Ctrl+F, from anywhere in the file's own controls, is this Find and not the browser's
+  const findKey = (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f') return;
+    e.preventDefault();
+    // what is picked in the text is what to look for; pressed in the Find box itself, the words
+    // already typed there stay
+    const picked = document.activeElement === ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '';
+    if (picked && picked.length <= 200 && !picked.includes('\n')) q.value = picked;
+    q.focus();
+    q.select();
+    if (q.value) runFind(ta.selectionStart);
+  };
+  for (const part of [bar, findRow, box]) part.addEventListener('keydown', findKey);
+  say();
+
+  ta.addEventListener('input', () => {
+    ed.text = ta.value;
+    paint();
+    caret();
+    if (q.value) {
+      const stood = at >= 0 ? hits.starts[at] : 0;
+      findSoon(() => stood, false);
+    }
+  });
   ta.addEventListener('scroll', sync);
   ta.addEventListener('keyup', caret);
   ta.addEventListener('click', caret);
   ta.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    if (e.key === 'Tab' && !readOnly && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
       ta.setRangeText('  ', ta.selectionStart, ta.selectionEnd, 'end');
       ta.dispatchEvent(new Event('input'));
@@ -11124,11 +11632,11 @@ function renderFileEditor(row, view) {
       // the text stays as it is for when it opens again.
       e.preventDefault();
       e.stopPropagation();
-      save.disabled ? back.focus() : save.focus();
+      save.disabled || readOnly ? back.focus() : save.focus();
     }
   });
   box.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (!save.disabled) save.click(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (!save.disabled && !readOnly) save.click(); }
   });
   paint();
   caret();
@@ -11143,11 +11651,17 @@ function renderFileEditor(row, view) {
     // Whatever margin that arithmetic missed shows up as the pane scrolling; take it back off.
     const over = pane.scrollHeight - pane.clientHeight;
     if (over > 0 && h - over >= 320) box.style.height = (h - over) + 'px';
+    layout();
   };
   const ro = new ResizeObserver(fit);
   ro.observe(pane);
+  setWrap(filesWrap);
   fit();
-  requestAnimationFrame(() => ta.focus({ preventScroll: true }));
+  requestAnimationFrame(() => {
+    ta.focus({ preventScroll: true });
+    // the end of a log is what was asked for: start there
+    if (readOnly && !ed.tail.whole) { ta.scrollTop = ta.scrollHeight; sync(); }
+  });
 
   const leave = async () => {
     if (ta.value !== ed.original) {
@@ -11168,6 +11682,8 @@ function renderFileEditor(row, view) {
   dl.onclick = () => downloadPath(row, ed.path);
 
   const write = async (force) => {
+    // the end of a file, or a picture, is not the file: there is nothing here to save over it
+    if (readOnly) return;
     save.disabled = true;
     save.textContent = 'Saving…';
     try {
