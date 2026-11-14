@@ -905,13 +905,16 @@
   // given and everything else needs room too. `line` says what the computer has.
   function memoryAdvice(memory, machine) {
     const totalBytes = Number(machine?.totalMemory)
-    const total = totalBytes > 0 ? Math.max(2, Math.floor(totalBytes / 1024 ** 3 * 2) / 2) : null
+    // a computer sold with 8 GB says 7.7: it is counted as the 8 it was sold as
+    const real = totalBytes / 1024 ** 3
+    const total = totalBytes > 0 ? Math.ceil(real) : null
     const gb = memoryGb(memory)
     const tooMuch = (choice) => total !== null && (memoryGb(choice) ?? 0) > total
     let warn = null
     if (total !== null && gb !== null) {
+      const safer = Math.max(1, Math.floor(total / 2))
       if (gb > total) warn = `This computer has ${gbText(totalBytes)} of memory, less than the ${memoryText(memory)} this setup is given. The game may not start.`
-      else if (gb > total * 0.75) warn = `That is most of this computer's ${gbText(totalBytes)}. The game and everything else open may slow down; ${memoryText(memoryFromGb(Math.max(2, Math.floor(total / 2))))} is a safer choice.`
+      else if (gb > real * 0.75) warn = `That is most of this computer's ${gbText(totalBytes)}. The game and everything else open may slow down${safer < gb ? `; ${memoryText(memoryFromGb(safer))} is a safer choice` : ''}.`
     }
     const line = total === null ? 'Most setups need 2 to 4 GB.' : machine.freeMemory ? `This computer has ${gbText(machine.freeMemory)} free of ${gbText(totalBytes)}.` : `This computer has ${gbText(totalBytes)}.`
     return { total, tooMuch, warn, line }
@@ -954,9 +957,12 @@
 
   // Whose game the setup in view starts when that is not the account the chip names: the
   // setup's own "Play as". null when they are the same, or the setup has none.
-  function setupPlaysAs(profile, defaultUuid) {
-    if (!profile?.account || !profile.accountName) return null
-    if (profile.accountUuid && profile.accountUuid === defaultUuid) return null
+  function setupPlaysAs(profile, def) {
+    // an account that was signed out since has no type: there is no player to name
+    if (!profile?.account || !profile.accountName || !profile.accountType) return null
+    if (profile.accountUuid && profile.accountUuid === def?.uuid) return null
+    // a setup set to an offline name, which is also who is signed in
+    if (!profile.accountUuid && profile.accountType === 'offline' && def?.type === 'offline' && def.name === profile.accountName) return null
     return profile.accountName
   }
 
@@ -1568,6 +1574,7 @@
 
   function openMenu(which, { focus = true } = {}) {
     S.menu = which
+    S.acctAsk = null
     render()
     if (focus) {
       const first = document.querySelector('.menu button:not(:disabled), .menu input')
@@ -1632,7 +1639,9 @@
     const inMenu = !keep && active?.closest?.('.menu[id]')
     const row = inMenu ? { menu: inMenu.id, at: menuItems(inMenu).indexOf(active) } : null
     // the running game's log stays at its end while it grows, and where it was scrolled to otherwise
-    const listWas = $('fMcList')?.scrollTop ?? null
+    // what was typed changed: the best matches are at the top, so the list starts there again
+    const listWas = S.sheet?.vTop ? 0 : $('fMcList')?.scrollTop ?? null
+    if (S.sheet?.vTop) S.sheet.vTop = false
     const logWas = $('liveLogPre')
     const logAt = logWas ? { top: logWas.scrollTop, left: logWas.scrollLeft, end: logWas.scrollTop + logWas.clientHeight >= logWas.scrollHeight - 12 } : null
     $('chipwrap').replaceChildren(...(S.down ? [] : accountChip()))
@@ -1665,7 +1674,7 @@
     const open = S.menu === 'account'
     const attrs = { id: 'chip', 'aria-expanded': String(open), 'aria-controls': 'menuAccount', onclick: toggleMenu('account') }
     // the setup in view can be set to another player than the one named here: say so
-    const own = S.summary ? setupPlaysAs(currentProfile(), S.summary.defaultAccount) : null
+    const own = S.summary ? setupPlaysAs(currentProfile(), def) : null
     const chip = def
       ? h('button', { ...attrs, class: 'chip' }, tile(def), h('span', { class: 'who' }, h('b', { text: def.name }),
         h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' }),
@@ -1678,7 +1687,7 @@
   function accountMenu(def) {
     const accounts = accountsNow()
     const p = currentProfile()
-    const own = S.summary ? setupPlaysAs(p, S.summary.defaultAccount) : null
+    const own = S.summary ? setupPlaysAs(p, def) : null
     const verb = (a) => (a.type === 'offline' ? 'Remove' : 'Sign out')
     const ask = (a) => { S.acctAsk = a.uuid; render(); $('acctKeep')?.focus({ preventScroll: true }) }
     const asking = S.acctAsk ? accounts.find((a) => a.uuid === S.acctAsk) ?? null : null
@@ -1730,7 +1739,7 @@
       h('label', { class: 'flabel', for: id, text: 'Offline name' }),
       h('div', { class: 'inline' },
         h('input', { id, value: o.name, maxlength: '16', placeholder: 'Like Steve_01', class: o.error || problem ? 'bad' : null, 'aria-describedby': `${id}Hint`, autocomplete: 'off', spellcheck: 'false',
-          oninput: (e) => { o.name = e.target.value; o.error = null; render() }, onkeydown: (e) => { if (e.key === 'Enter' && offlineNameOk(o.name)) go() } }),
+          oninput: (e) => { o.name = e.target.value; o.error = null; if (!e.isComposing) render() }, oncompositionend: (e) => { o.name = e.target.value; render() }, onkeydown: (e) => { if (e.key === 'Enter' && offlineNameOk(o.name)) go() } }),
         h('button', { class: 'sm', id: `${id}Go`, disabled: !ok, onclick: go }, action)),
       h('small', { class: o.error || problem ? 'hint bad' : 'hint', id: `${id}Hint`, role: o.error ? 'alert' : null, text: o.error ? sentence(o.error) : problem ?? '3 to 16 letters, digits or underscores.' }),
     ]
@@ -2472,6 +2481,7 @@
   function openSheet(p = null, prefill = null, focus = null) {
     const servers = serversNow()
     S.menu = null
+    S.acctAsk = null
     S.sheetFrom = document.activeElement?.id || null
     S.sheet = p
       ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, serverList: p.serverList !== false, error: null, saving: false, removing: false }
@@ -2607,8 +2617,9 @@
       $(`fMcRow${f.vAt}`)?.scrollIntoView({ block: 'nearest' })
     }
     const keys = (e) => {
+      if (e.isComposing) return
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : -1) }
-      else if (e.key === 'Enter') { e.preventDefault(); const r = rows[f.vAt] ?? (rows.length === 1 ? rows[0] : null); if (r) pick(r) }
+      else if (e.key === 'Enter') { e.preventDefault(); const r = rows[f.vAt] ?? rows.find((x) => x.id.toLowerCase() === typed.toLowerCase()) ?? (rows.length === 1 ? rows[0] : null); if (r) pick(r) }
     }
     const tab = (mode, text) => h('button', { type: 'button', id: `fMcShow-${mode}`, 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; f.vAt = -1; render() } }, text)
     const typed = String(f.vFind ?? '').trim()
@@ -2617,20 +2628,20 @@
     const changed = p && f.mc !== p.mc
     const box = f.vOpen && h('div', { class: 'vbox', id: 'fMcBox' },
       h('input', { id: 'fMcFind', type: 'text', role: 'combobox', 'aria-label': 'Find a version', 'aria-expanded': 'true', 'aria-controls': 'fMcOptions', 'aria-autocomplete': 'list', 'aria-activedescendant': f.vAt >= 0 ? `fMcRow${f.vAt}` : null,
-        placeholder: 'Type to find one, like 1.20', value: f.vFind ?? '', autocomplete: 'off', spellcheck: 'false', oninput: (e) => { f.vFind = e.target.value; f.vAt = -1; render() }, onkeydown: keys }),
+        placeholder: 'Type to find one, like 1.20', value: f.vFind ?? '', autocomplete: 'off', spellcheck: 'false', oninput: (e) => { f.vFind = e.target.value; f.vAt = -1; f.vTop = true; if (!e.isComposing) render() }, oncompositionend: (e) => { f.vFind = e.target.value; render() }, onkeydown: keys }),
       h('div', { class: 'vtabs' },
         h('div', { class: 'seg', role: 'group', 'aria-label': 'Which versions the list shows' }, tab('release', 'Releases'), tab('snapshot', 'And snapshots'), tab('all', 'Everything')),
         h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), title: 'Ask Mojang for the list again, for a version out within the hour', onclick: () => loadVersions({ refresh: true }) }, v?.loading ? 'Reading\u2026' : 'Refresh')),
       typed && h('small', { class: 'hint', text: 'Searching every version, snapshots and old ones included.' }),
       // the options alone are the listbox; the notes under them are not options
       h('div', { class: 'vlist', id: 'fMcList' }, h('div', { class: 'vopts', id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' },
-        rows.map((r, i) => h('div', { class: i === f.vAt ? 'vrow at' : 'vrow', id: `fMcRow${i}`, role: 'option', 'aria-selected': String(r.id === f.mc), 'aria-disabled': blocked(r) ? 'true' : null, onclick: () => pick(r) },
+        rows.map((r, i) => h('div', { class: i === f.vAt ? 'vrow at' : 'vrow', id: `fMcRow${i}`, role: 'option', 'aria-selected': String(r.id === f.mc), 'aria-disabled': blocked(r) ? 'true' : null, onpointerdown: (e) => e.preventDefault(), onclick: () => pick(r) },
           h('span', { class: 'vid', text: r.id }), badges(r),
           (r.refusal || r.note) && h('small', { class: r.refusal ? 'why warn' : 'why', text: sentence(r.refusal ?? r.note) })))),
-        !rows.length && h('p', { class: 'hint', text: v?.loading ? 'Reading the version list\u2026' : typed ? `No version has \u201c${typed}\u201d in its name.` : 'No versions to pick.' }),
+        !rows.length && h('p', { class: 'hint', role: 'status', text: v?.loading ? 'Reading the version list\u2026' : typed ? `No version has \u201c${typed}\u201d in its name.` : 'No versions to pick.' }),
         more > 0 && h('p', { class: 'hint', text: `${more} more. Type part of a version to find it.` })))
     return h('div', { class: f.vOpen ? 'field full' : 'field' }, h('span', { class: 'label', id: 'fMcLabel', text: 'Version' }),
-      h('button', { type: 'button', class: 'vpick', id: 'fMc', 'aria-haspopup': 'listbox', 'aria-expanded': String(Boolean(f.vOpen)), 'aria-controls': f.vOpen ? 'fMcBox' : null, 'aria-labelledby': 'fMcLabel fMcNow',
+      h('button', { type: 'button', class: 'vpick', id: 'fMc', 'aria-haspopup': 'dialog', 'aria-expanded': String(Boolean(f.vOpen)), 'aria-controls': f.vOpen ? 'fMcBox' : null, 'aria-labelledby': 'fMcLabel fMcNow',
         onclick: () => { if (f.vOpen) return close(); f.vOpen = true; f.vAt = -1; render(); $('fMcFind')?.focus({ preventScroll: true }); $('fMcList')?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }) } },
         h('span', { class: 'now', id: 'fMcNow' }, h('b', { text: f.mc || (v?.loading ? 'Reading the version list\u2026' : 'Pick a version') }), cur && badges(cur)), ico('chev')),
       box,
@@ -2665,7 +2676,10 @@
     try {
       out = await api('client/javas/check', { method: 'POST', body: { path } })
     } catch (err) {
-      if (err instanceof PanelDown) throw err
+      if (err instanceof PanelDown) {
+        if (f.javaCheck?.checking) f.javaCheck = null
+        throw err
+      }
       out = { path, found: false, message: sentence(err.message) }
     }
     if (S.sheet === f && fieldText(f.java) === path) { f.javaCheck = out; renderSoon() }
@@ -2678,12 +2692,13 @@
   let pressed = false
   let renderWaits = false
   document.addEventListener('pointerdown', () => { pressed = true }, true)
-  for (const ev of ['pointerup', 'pointercancel']) {
-    document.addEventListener(ev, () => {
-      pressed = false
-      if (renderWaits) { renderWaits = false; setTimeout(render, 0) }
-    }, true)
+  const released = () => {
+    pressed = false
+    if (renderWaits) { renderWaits = false; setTimeout(render, 0) }
   }
+  // the release can go elsewhere: to a context menu, or to another window
+  for (const ev of ['pointerup', 'pointercancel', 'contextmenu']) document.addEventListener(ev, released, true)
+  window.addEventListener('blur', released)
   function renderSoon() {
     if (pressed) renderWaits = true
     else render()
@@ -2718,8 +2733,10 @@
     const fit = javaFit(major, javaNeeds(f.mc), f.mc)
     const onpick = (e) => {
       const val = e.target.value
+      // "Another Java" starts from the path the setup had, so that it is not lost by looking
+      const had = fieldText(f.java)
       f.javaOther = val === JAVA_OTHER
-      f.java = f.javaOther ? '' : val
+      f.java = f.javaOther ? (had && had !== 'mojang' && had !== 'java' ? had : '') : val
       f.javaCheck = null
       render()
       if (f.javaOther) $('fJavaPath')?.focus()
@@ -2955,6 +2972,8 @@
       const typedJava = fieldText(f.java)
       if (f.javaOther && !typedJava) f.javaOther = false
       if (typedJava && typedJava !== 'mojang' && typedJava !== javaWas && !(S.javas?.javas ?? []).some((j) => j.path === typedJava)) {
+        // asked again: the file may have appeared, or the last answer was the panel's trouble
+        f.javaCheck = null
         const check = await checkJava(f)
         if (check && check.found === false) {
           f.adv = true
@@ -3209,6 +3228,7 @@
     try {
       await api('client/accounts/default', { method: 'POST', body: { uuid } })
       S.menu = null
+      S.acctAsk = null
     } catch (err) {
       S.acctNotice = { tone: 'fault', title: 'Couldn\'t change who is playing', text: sentence(err.message) }
     }
@@ -3223,7 +3243,9 @@
     } catch (err) {
       S.acctNotice = { tone: 'fault', title: `Couldn't remove ${a.name}`, text: sentence(err.message) }
     }
-    refresh()
+    await refresh()
+    // the button that was pressed is gone with the question
+    if (!document.activeElement || document.activeElement === document.body) $('chip')?.focus({ preventScroll: true })
   }
 
   // ---- the poll ------------------------------------------------------------------------------
@@ -3288,7 +3310,8 @@
     // and selecting is the way to copy when Copy cannot. The read after it is let go shows the rest.
     if (key !== lastKey && !selectingLog()) {
       lastKey = key
-      render()
+      // not between the press and the release of a click, which the rebuild would swallow
+      renderSoon()
       if (asked && document.activeElement === document.body) $('play')?.focus({ preventScroll: true })
     }
   }

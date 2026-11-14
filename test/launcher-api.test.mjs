@@ -607,6 +607,14 @@ test('the Javas on this machine are listed, and a path is checked before a setup
   const no = await check(notJava)
   assert.equal(no.found, false)
   assert.equal(no.message, 'That file is not a Java: it did not answer the way Java does.')
+  // a program that ends well and says no version is no Java either
+  if (process.platform !== 'win32') {
+    const quiet = path.join(scratch, 'quiet-java')
+    fs.writeFileSync(quiet, '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+    const q = await check(quiet)
+    assert.equal(q.found, false)
+    assert.equal(q.message, 'That file is not a Java: it did not answer the way Java does.')
+  }
   assert.equal((await check(`  ${missing}  `)).path, missing, 'trimmed')
   for (const bad of [undefined, '', '   ', 7, 'x'.repeat(1025)]) assert.equal((await check(bad)).status, 400)
   // a Java that was found is one by the check too

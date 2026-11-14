@@ -367,14 +367,17 @@ ipcMain.handle('spawnloft:pickFolder', async (_e, { title } = {}) => {
 
 // for world archives. Windows can't offer files and folders in one native dialog, so this
 // picks files; the page has a text field for pasting a folder path.
-ipcMain.handle('spawnloft:pickFile', async (_e, { title } = {}) => {
+ipcMain.handle('spawnloft:pickFile', async (_e, { title, kind } = {}) => {
   const res = await dialog.showOpenDialog(win, {
     title: title || 'Choose a file',
     properties: ['openFile'],
-    filters: [
-      { name: 'World archives', extensions: ['zip', 'gz', 'tgz'] },
-      { name: 'All files', extensions: ['*'] },
-    ],
+    // "program": a Java, which is no archive
+    filters: kind === 'program'
+      ? [{ name: 'All files', extensions: ['*'] }]
+      : [
+          { name: 'World archives', extensions: ['zip', 'gz', 'tgz'] },
+          { name: 'All files', extensions: ['*'] },
+        ],
   })
   return res.canceled ? null : res.filePaths[0]
 })

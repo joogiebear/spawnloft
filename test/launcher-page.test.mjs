@@ -989,7 +989,14 @@ test('memory is checked against the computer', () => {
   assert.equal(a.tooMuch('4G'), false)
   assert.match(a.warn, /^This computer has 4 GB of memory, less than the 8 GB this setup is given\./)
   assert.equal(a.line, 'This computer has 4 GB.')
-  // a panel that does not say: nothing is refused
+  // a computer sold with 8 GB says a little less: 8 GB can still be picked, with the warning
+  const sold8 = { totalMemory: 7.7 * GB, freeMemory: 0 }
+  assert.equal(memoryAdvice('8G', sold8).tooMuch('8G'), false)
+  assert.match(memoryAdvice('8G', sold8).warn, /^That is most of this computer's 7\.7 GB\..*4 GB is a safer choice\.$/)
+  // small computers: the right sentence, and never the choice already made as the safer one
+  assert.match(memoryAdvice('2G', { totalMemory: GB }).warn, /^This computer has 1 GB of memory, less than the 2 GB/)
+  assert.match(memoryAdvice('2G', { totalMemory: 2 * GB }).warn, /1 GB is a safer choice\.$/)
+  assert.match(memoryAdvice('1G', { totalMemory: GB }).warn, /may slow down\.$/)
   a = memoryAdvice('8G', undefined)
   assert.deepEqual([a.total, a.warn, a.tooMuch('8G'), a.line], [null, null, false, 'Most setups need 2 to 4 GB.'])
   assert.match(fnSource('sheetView'), /MEMORY_CHOICES\.map\(\(c\) => \[c, memoryText\(c\), advice\.tooMuch\(c\)\]\)/)
@@ -1023,6 +1030,17 @@ test('Java is a list, and a path is checked before it is saved', () => {
   assert.match(fnSource('renderSoon'), /if \(pressed\) renderWaits = true\s+else render\(\)/)
 })
 
+test('the sheet after review: Save asks about the Java again, typing with an IME is left whole, Enter takes an exact version', () => {
+  assert.match(fnSource('saveSheet'), /f\.javaCheck = null\n\s+const check = await checkJava\(f\)/)
+  const picker = fnSource('versionPicker')
+  assert.match(picker, /if \(!e\.isComposing\) render\(\) \}, oncompositionend:/)
+  assert.match(picker, /rows\.find\(\(x\) => x\.id\.toLowerCase\(\) === typed\.toLowerCase\(\)\)/)
+  assert.match(picker, /onpointerdown: \(e\) => e\.preventDefault\(\)/)
+  assert.match(fnSource('offlineField'), /if \(!e\.isComposing\) render\(\) \}, oncompositionend:/)
+  assert.match(html, /for \(const ev of \['pointerup', 'pointercancel', 'contextmenu'\]\)/)
+  assert.match(fnSource('pollOnce'), /renderSoon\(\)/)
+})
+
 test('the sheet says things in plain words', () => {
   const sheet = fnSource('sheetView')
   assert.doesNotMatch(html, /through MCP/)
@@ -1044,10 +1062,21 @@ test('accounts: signing out asks first, the offline name has a label and is chec
   assert.equal(offlineNameOk('ab'), false)
 
   // the chip names the default account; a setup with its own player says so
-  assert.equal(setupPlaysAs({ account: 'u2', accountUuid: 'u2', accountName: 'Alex' }, 'u1'), 'Alex')
-  assert.equal(setupPlaysAs({ account: 'u1', accountUuid: 'u1', accountName: 'Sam' }, 'u1'), null)
-  assert.equal(setupPlaysAs({ account: null }, 'u1'), null)
-  assert.equal(setupPlaysAs(null, 'u1'), null)
+  const sam = { uuid: 'u1', name: 'Sam', type: 'microsoft' }
+  assert.equal(setupPlaysAs({ account: 'u2', accountUuid: 'u2', accountName: 'Alex', accountType: 'microsoft' }, sam), 'Alex')
+  assert.equal(setupPlaysAs({ account: 'u1', accountUuid: 'u1', accountName: 'Sam', accountType: 'microsoft' }, sam), null)
+  assert.equal(setupPlaysAs({ account: null }, sam), null)
+  assert.equal(setupPlaysAs(null, sam), null)
+  // an offline name that is also who is signed in is not "another player"
+  const tester = { uuid: 'o1', name: 'Tester', type: 'offline' }
+  assert.equal(setupPlaysAs({ account: 'offline:Tester', accountUuid: null, accountName: 'Tester', accountType: 'offline' }, tester), null)
+  assert.equal(setupPlaysAs({ account: 'offline:Tester', accountUuid: null, accountName: 'Tester', accountType: 'offline' }, sam), 'Tester')
+  // an account signed out since: its key is not a name to show
+  assert.equal(setupPlaysAs({ account: 'f3d28cb0', accountUuid: null, accountName: 'f3d28cb0', accountType: null }, sam), null)
+  // the question does not outlive the menu it was asked in
+  for (const fn of ['setDefault', 'openSheet']) assert.match(fnSource(fn), /S\.acctAsk = null/, fn)
+  assert.match(html, /S\.menu = which\n\s+S\.acctAsk = null/)
+  assert.match(fnSource('removeAccount'), /await refresh\(\)[\s\S]*\$\('chip'\)\?\.focus/)
   assert.match(fnSource('accountChip'), /own && h\('small', \{ class: 'own', id: 'chipOwn', text: `This setup plays as \$\{own\}` \}\)/)
 
   const menu = fnSource('accountMenu')

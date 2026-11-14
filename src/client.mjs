@@ -1269,7 +1269,9 @@ export async function checkJava(given) {
     if (stat.isDirectory()) return no(`That is a folder. Pick the ${process.platform === 'win32' ? 'javaw.exe or java.exe' : 'java'} file inside its bin folder.`)
   }
   const state = await probe(p)
-  if (!state.found) return no(p === 'java' ? 'No program called java was found on this computer.' : 'That file is not a Java: it did not answer the way Java does.')
+  // a program that ends well without saying a version is not a Java either
+  const said = state.major != null || /version "/.test(state.version ?? '')
+  if (!state.found || !said) return no(p === 'java' && !state.found ? 'No program called java was found on this computer.' : 'That file is not a Java: it did not answer the way Java does.')
   return { path: p, found: true, major: state.major ?? null, version: state.version ?? null, arch: state.arch ?? null, message: null }
 }
 
