@@ -359,14 +359,14 @@ export const EDITABLE_PROPS = [
   { key: 'max-players', group: 'access', label: 'Max players', type: 'int', fallback: '20', min: 1, max: 1000,
     note: 'How many can be on at once. More players need more memory and a faster processor.' },
   { key: 'white-list', group: 'access', label: 'Whitelist', type: 'bool', fallback: 'false', note: 'Only listed players can join. The list is on the Players page, where people are added by name.' },
-  { key: 'enforce-whitelist', group: 'access', label: 'Remove players who are not listed', type: 'bool', fallback: 'false',
+  { key: 'enforce-whitelist', group: 'access', label: 'Remove players who are not listed', type: 'bool', fallback: 'false', since: '1.13',
     note: 'With the whitelist on, someone online who is not on the list is removed, not just kept from joining next time. Without this, turning the whitelist on leaves whoever is already playing where they are.' },
   { key: 'player-idle-timeout', group: 'access', label: 'Remove idle players after', type: 'int', fallback: '0', min: 0, max: 10080, unit: 'minutes',
     note: 'Minutes a player can do nothing before being removed. 0 never removes anyone.' },
   { key: 'hide-online-players', group: 'access', label: 'Hide who is online', type: 'bool', fallback: 'false', since: '1.18',
     note: 'The server list does not show the names of who is playing.' },
-  { key: 'op-permission-level', group: 'access', label: 'What operators may do', type: 'int', fallback: '4', min: 0, max: 4, unit: 'level',
-    note: 'The level a player gets when made an operator, from 1 to 4. 1 can build inside spawn protection. 2 adds cheat commands and command blocks. 3 adds kicking, banning and making operators. 4 adds stopping the server.' },
+  { key: 'op-permission-level', group: 'access', label: 'What operators may do', type: 'int', fallback: '4', min: 0, max: 4,
+    note: 'The level a player gets when made an operator, from 0 to 4. 0 adds nothing to what any player can do. 1 can build inside spawn protection. 2 adds cheat commands and command blocks. 3 adds kicking, banning and making operators. 4 adds stopping the server.' },
 
   { key: 'difficulty', group: 'gameplay', label: 'Difficulty', type: 'enum', fallback: 'easy', options: ['peaceful', 'easy', 'normal', 'hard'],
     note: 'How hard monsters hit, and whether hunger can kill. Peaceful has no monsters, and health comes back by itself.' },
@@ -399,7 +399,7 @@ export const EDITABLE_PROPS = [
   { key: 'max-world-size', group: 'world', label: 'World size limit', type: 'int', fallback: '29999984', min: 1, max: 29999984, unit: 'blocks',
     note: 'How far from the centre the world may reach, in blocks.' },
   { key: 'resource-pack', group: 'world', label: 'Resource pack', type: 'url', fallback: '',
-    note: 'A link to a resource pack that players are offered when they join. Empty for none. It has to be a direct download link to the .zip.' },
+    note: 'A direct download link to a resource pack .zip, offered to players when they join. Empty for none.' },
   { key: 'require-resource-pack', group: 'world', label: 'Require the resource pack', type: 'bool', fallback: 'false', since: '1.17',
     note: 'A player who turns the pack down is disconnected.' },
 ]
@@ -407,14 +407,29 @@ export const EDITABLE_PROPS = [
 // What a server of this version is shown: rows it does not have yet are left out, and rows that
 // became game rules are marked. With no version known, every row is offered as the file's.
 export function propsFor(mcVersion) {
-  const known = typeof mcVersion === 'string' && /^\d+(\.\d+)*$/.test(mcVersion)
+  // 1.21.9-rc1 and 26.1-snapshot-2 are read as the release they lead to; an old weekly name
+  // (24w14a) says nothing about where it sits, and is not known
+  const version = typeof mcVersion === 'string' ? /^(\d+(?:\.\d+)+)(?:[-_ +].*)?$/.exec(mcVersion.trim())?.[1] ?? null : null
   const out = []
   for (const spec of EDITABLE_PROPS) {
-    if (known && spec.since && upgrade.compareMcVersions(mcVersion, spec.since) < 0) continue
-    out.push(known && spec.until && upgrade.compareMcVersions(mcVersion, spec.until) >= 0 ? { ...spec, gameRule: true } : spec)
+    if (version && spec.since && upgrade.compareMcVersions(version, spec.since) < 0) continue
+    out.push(version && spec.until && upgrade.compareMcVersions(version, spec.until) >= 0 ? { ...spec, gameRule: true } : spec)
   }
   return out
 }
+
+// Minecraft reads the file with Java's Properties, where a backslash starts an escape: one at the
+// end of a value joins the next line onto it, and \u wants four hex digits or the file fails to
+// load. Minecraft also writes ":" and "=" back with a backslash in front.
+function assertNoBrokenEscape(key, value) {
+  if (/(^|[^\\])(\\\\)*\\$/.test(value)) fail(`${key} cannot end with a backslash: Minecraft would read the next line of the file as part of it`)
+  if (/\\u(?![0-9a-fA-F]{4})/.test(value)) fail(`${key} has \\u without four hex digits after it, which Minecraft cannot read`)
+}
+/** A value as the person wrote it, from the way Minecraft saved it: https\://x/p.zip?v\=2. */
+export function unescapedProp(value) {
+  return String(value).replace(/\\([:=#! ])/g, '$1')
+}
+const PLAIN_SHOWN = (spec) => spec.type === 'url' || spec.key === 'level-seed'
 
 // A field with no group here still renders, in a section at the end.
 const PROP_GROUPS = [
@@ -426,14 +441,13 @@ const PROP_GROUPS = [
     blurb: 'What players see before they join, and how much the server draws for them.' },
 ]
 
-const PROP_BY_KEY = new Map(EDITABLE_PROPS.map((p) => [p.key, p]))
 
 function coerceProp(spec, raw) {
   const value = String(raw).trim()
   if (spec.type === 'url') {
     // one line of the file, and a link the game will fetch: http or https, or empty for none
     if (value === '') return value
-    if (/[\r\n\s]/.test(value) || !/^https?:\/\/[^\s/]+(\/\S*)?$/i.test(value)) fail(`${spec.key} must be a link starting with http:// or https://, or empty`)
+    if (/[\r\n\s\\]/.test(value) || !/^https?:\/\/[^\s/]+(\/\S*)?$/i.test(value)) fail(`${spec.key} must be a link starting with http:// or https://, or empty`)
     return value
   }
   if (spec.type === 'bool') {
@@ -453,6 +467,7 @@ function coerceProp(spec, raw) {
   }
   // a newline would split the line and create a second key
   if (/[\r\n]/.test(value)) fail(`${spec.key} cannot contain a line break`)
+  assertNoBrokenEscape(spec.key, value)
   return value
 }
 
@@ -649,7 +664,7 @@ async function handleProps(req, res, name) {
   const offered = propsFor(plugins.mcVersionOf(inst))
   const shape = (current) => offered.map((spec) => ({
     ...spec,
-    value: current.get(spec.key) ?? spec.fallback,
+    value: PLAIN_SHOWN(spec) && current.has(spec.key) ? unescapedProp(current.get(spec.key)) : current.get(spec.key) ?? spec.fallback,
     set: current.has(spec.key),
   }))
 
@@ -661,14 +676,20 @@ async function handleProps(req, res, name) {
 
   const body = await readBody(req)
   const updates = {}
+  // A game rule, sent by a form drawn before the server was moved to a version that made it one:
+  // written, it would sit in the file and change nothing. It is left out and said to be, and the
+  // settings sent with it are still saved.
+  const ignored = []
   for (const [key, raw] of Object.entries(body)) {
     const spec = offered.find((p) => p.key === key)
     if (!spec) return json(res, 400, { error: `${key} is not editable from here` })
-    // written, it would sit in the file and change nothing
-    if (spec.gameRule) return json(res, 400, { error: `${spec.label} is a game rule in this version of Minecraft, kept in the world and not in server.properties. Change it with /gamerule in the Console.` })
+    if (spec.gameRule) { ignored.push({ key, label: spec.label }); continue }
     updates[key] = coerceProp(spec, raw)
   }
-  if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
+  if (!Object.keys(updates).length) {
+    if (ignored.length) return json(res, 200, { changed: [], ignored, appliesOnRestart: false, fields: shape(readProps(file)) })
+    return json(res, 400, { error: 'nothing to change' })
+  }
 
   // The whitelist is the one setting here a running server can be told about, and the Players
   // page shows this file as the state: written alone, the page said On while anyone could join.
@@ -679,6 +700,7 @@ async function handleProps(req, res, name) {
   activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => settingWords(k, v)).join(', ') })
   return json(res, 200, {
     changed: Object.keys(updates),
+    ignored,
     appliesOnRestart: supervisor.isRunning(name),
     fields: shape(readProps(file)),
   })

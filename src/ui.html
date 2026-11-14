@@ -13386,13 +13386,15 @@ async function buildServerSettings(row, body) {
     // nobody goes looking for where PvP went, and it has nothing to change: a line in the file
     // would be written and ignored.
     if (f.gameRule) {
-      const where = el('span', 'hint');
+      // an output is something a label can name, so the row reads as one thing
+      const where = el('output', 'hint');
       where.id = 'p_' + f.key;
       where.textContent = 'Set with /gamerule';
       addRow(sectionFor(f.group || 'other'), {
         id: where.id,
         label: f.label,
-        help: gameRuleWords(),
+        // where it went first; what it does is still a click away
+        help: gameRuleWords() + (f.note ? ' ' + f.note : ''),
         control: where,
         entry: { kind: 'prop', key: f.key, changed: () => false, tag: 'Game rule', reset: () => {} },
       });
@@ -13972,6 +13974,12 @@ async function buildServerSettings(row, body) {
           const c = controls.get(f.key);
           if (c) { c.original = f.value == null ? '' : String(f.value); c.set = Boolean(f.set); }
         }
+        // left out by the server: this form was drawn before the server's version changed
+        for (const g of out.ignored || []) {
+          const c = controls.get(g.key);
+          if (c) c.input.value = c.original;
+        }
+        if (out.ignored && out.ignored.length) toast(ignoredWords(out.ignored.map((g) => g.label)), 'bad');
       }
       if (Object.keys(own).length) {
         await post(base + '/settings', own);
@@ -15148,6 +15156,13 @@ function linkProblem(value) {
 
 /** Under a setting that this version of Minecraft keeps as a game rule. One sentence, so all of
  *  it shows. */
+/** After a save that left settings out because the server's version keeps them as game rules. */
+function ignoredWords(labels) {
+  const list = labels.length > 1 ? labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1] : labels[0];
+  return list + (labels.length > 1 ? ' were' : ' was') + ' not saved: in this server\u2019s version of Minecraft '
+    + (labels.length > 1 ? 'they are game rules' : 'it is a game rule') + ', changed with /gamerule in the Console.';
+}
+
 function gameRuleWords() {
   return 'A game rule in this version of Minecraft, kept in the world: change it with /gamerule in the Console.';
 }
