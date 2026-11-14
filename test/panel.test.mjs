@@ -1206,7 +1206,7 @@ test('Files: Find marks every match whatever its case, and a big file says how m
 })
 
 test('Settings: a link is checked as it is typed, and a game rule is a row that saves nothing', () => {
-  const { linkProblem, gameRuleWords } = lifted(['linkProblem', 'gameRuleWords'])
+  const { linkProblem, gameRuleWords, ignoredWords } = lifted(['linkProblem', 'gameRuleWords', 'ignoredWords'])
   for (const ok of ['', '   ', 'https://example.com/pack.zip', 'http://10.0.0.5:8080/p.zip?v=2', ' https://example.com/p.zip ']) assert.equal(linkProblem(ok), '', ok)
   for (const bad of ['pack.zip', 'ftp://example.com/p.zip', 'https://', 'https://example.com/a b.zip', 'javascript:alert(1)']) assert.match(linkProblem(bad), /http:\/\/ or https:\/\//, bad)
   // one sentence, so none of it is behind "More", and it says where the setting went
@@ -1214,8 +1214,11 @@ test('Settings: a link is checked as it is typed, and a game rule is a row that 
   assert.ok(!/[.!?]\s+\S/.test(words))
   assert.match(words, /game rule/)
   assert.match(words, /\/gamerule in the Console/)
-  // the row has no field, is never a change, and wears its tag
-  assert.match(html, /if \(f\.gameRule\) \{[\s\S]{0,700}changed: \(\) => false, tag: 'Game rule'[\s\S]{0,80}continue;/)
+  // the row has no field, is never a change, wears its tag, and is something a label can name
+  assert.match(html, /if \(f\.gameRule\) \{[\s\S]{0,900}changed: \(\) => false, tag: 'Game rule'[\s\S]{0,80}continue;/)
+  assert.match(html, /const where = el\('output', 'hint'\);/)
+  assert.match(ignoredWords(['PvP']), /^PvP was not saved: .* it is a game rule, changed with \/gamerule in the Console\.$/)
+  assert.match(ignoredWords(['PvP', 'Monsters', 'The Nether']), /^PvP, Monsters and The Nether were not saved: .* they are game rules/)
   // a number says what it counts, and the field is described by it
   assert.match(html, /unit\.textContent = f\.unit;/)
   assert.match(html, /input\.setAttribute\('aria-describedby', unit\.id \+ ' ' \+ bad\.id\);/)

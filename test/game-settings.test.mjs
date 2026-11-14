@@ -9,7 +9,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-game-settings-'))
 process.env.APPDATA = path.join(scratch, 'config')
 process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
-const { EDITABLE_PROPS, propsFor, serve } = await import('../src/ui.mjs')
+const { EDITABLE_PROPS, propsFor, unescapedProp, serve } = await import('../src/ui.mjs')
 const registry = await import('../src/registry.mjs')
 const { readProps } = await import('../src/props.mjs')
 const { panelFetch } = await import('./helpers/panel.mjs')
@@ -31,7 +31,7 @@ test('every setting says what it does, and a number says what it counts', () => 
     if (p.type === 'bool') assert.ok(['true', 'false'].includes(p.fallback))
   }
   assert.equal(new Set(keys(EDITABLE_PROPS)).size, EDITABLE_PROPS.length, 'a key is listed twice')
-  for (const key of ['view-distance', 'simulation-distance', 'spawn-protection', 'player-idle-timeout']) {
+  for (const key of ['view-distance', 'simulation-distance', 'spawn-protection', 'player-idle-timeout', 'max-world-size']) {
     assert.ok(EDITABLE_PROPS.find((p) => p.key === key).unit, `${key} does not say its unit`)
   }
 })
@@ -51,7 +51,17 @@ test('what became a game rule is marked from the version that moved it', () => {
   assert.deepEqual(marked('1.21.8'), [])
   assert.deepEqual(marked('1.21.9'), [...RULES].sort())
   assert.deepEqual(marked('1.21.10'), [...RULES].sort(), '1.21.10 is after 1.21.9, not before')
-  assert.deepEqual(marked('1.22'), [...RULES].sort())
+  // the year-style versions come after every 1.x
+  for (const v of ['26.1', '26.2.1']) {
+    assert.deepEqual(marked(v), [...RULES].sort(), v)
+    assert.ok(keys(propsFor(v)).includes('simulation-distance'), v)
+  }
+  // a release candidate or a snapshot of a version is read as that version
+  assert.deepEqual(marked('1.21.9-rc1'), [...RULES].sort())
+  assert.deepEqual(marked('26.1-snapshot-2'), [...RULES].sort())
+  assert.deepEqual(marked('1.21.8-pre2'), [])
+  assert.ok(!keys(propsFor('1.12.2')).includes('enforce-whitelist'))
+  assert.ok(keys(propsFor('1.13')).includes('enforce-whitelist'))
   // the list itself is not written on
   assert.ok(EDITABLE_PROPS.every((p) => !('gameRule' in p)))
 })
@@ -89,7 +99,7 @@ test('the panel offers and saves by the server’s version', async () => {
     assert.deepEqual([idle.value, idle.set, idle.unit], ['0', false, 'minutes'])
 
     // a link, or nothing
-    for (const bad of ['pack.zip', 'ftp://example.com/p.zip', 'https://example.com/a b.zip', 'https://example.com/p.zip\nop-permission-level=4', 'javascript:alert(1)']) {
+    for (const bad of ['https://example.com/p.zip\\', 'https://example.com/a\\u00e9.zip', 'pack.zip', 'ftp://example.com/p.zip', 'https://example.com/a b.zip', 'https://example.com/p.zip\nop-permission-level=4', 'javascript:alert(1)']) {
       const res = await save('older', { 'resource-pack': bad })
       assert.equal(res.status, 400, bad)
       assert.match((await res.json()).error, /http/)
@@ -98,6 +108,21 @@ test('the panel offers and saves by the server’s version', async () => {
     assert.equal(readProps(path.join(oldDir, 'server.properties')).get('resource-pack'), 'https://example.com/packs/p.zip?v=2')
     assert.equal((await save('older', { 'resource-pack': '' })).status, 200)
     assert.equal(readProps(path.join(oldDir, 'server.properties')).get('resource-pack'), '')
+
+    // what Java would read as an escape is refused in text: a backslash at the end takes the next
+    // line of the file with it, and a bad \u stops the file loading
+    for (const bad of ['abc\\', 'abc\\\\\\', 'seed\\uZZ12']) assert.equal((await save('older', { 'level-seed': bad })).status, 400, bad)
+    for (const fine of ['abc\\\\', '\\u00a7aGreen', 'plain seed 123']) assert.equal((await save('older', { 'level-seed': fine })).status, 200, fine)
+    // Minecraft writes the link back with its colon and equals escaped; it is shown as it was typed
+    fs.appendFileSync(path.join(oldDir, 'server.properties'), '')
+    fs.writeFileSync(path.join(oldDir, 'server.properties'), 'pvp=true\nmotd=hello\nresource-pack=https\\://example.com/p.zip?v\\=2\n')
+    const read = await (await panelFetch(at('older'))).json()
+    assert.equal(read.fields.find((f) => f.key === 'resource-pack').value, 'https://example.com/p.zip?v=2')
+    assert.equal(unescapedProp('a\\:b\\=c\\\\d'), 'a:b=c\\\\d')
+    // a row this version does not have is not saved to it
+    registry.updateInstance('older', { mcVersion: '1.16.5' })
+    assert.equal((await save('older', { 'simulation-distance': '6' })).status, 400)
+    registry.updateInstance('older', { mcVersion: '1.20.4' })
 
     // ranges hold for the new numbers
     assert.equal((await save('older', { 'op-permission-level': '5' })).status, 400)
@@ -110,13 +135,20 @@ test('the panel offers and saves by the server’s version', async () => {
     const newer = await (await panelFetch(at('newer'))).json()
     assert.equal(newer.fields.find((f) => f.key === 'pvp').gameRule, true)
     assert.equal(newer.fields.find((f) => f.key === 'hardcore').gameRule, undefined)
+    // a form drawn before the upgrade sends both: the game rule is left out and named, the rest saved
     const res = await save('newer', { pvp: 'false', hardcore: 'true' })
-    assert.equal(res.status, 400)
-    assert.match((await res.json()).error, /game rule.*\/gamerule/)
-    // refused whole: the setting sent with it was not written either
-    const untouched = readProps(path.join(newDir, 'server.properties'))
-    assert.equal(untouched.get('pvp'), 'true')
-    assert.equal(untouched.has('hardcore'), false)
+    assert.equal(res.status, 200)
+    const out = await res.json()
+    assert.deepEqual(out.ignored, [{ key: 'pvp', label: 'PvP' }])
+    assert.deepEqual(out.changed, ['hardcore'])
+    const after = readProps(path.join(newDir, 'server.properties'))
+    assert.equal(after.get('pvp'), 'true')
+    assert.equal(after.get('hardcore'), 'true')
+    // only a game rule: nothing is written, and that is said, not called an error
+    const only = await save('newer', { pvp: 'false' })
+    assert.equal(only.status, 200)
+    assert.deepEqual((await only.json()).changed, [])
+    assert.equal(readProps(path.join(newDir, 'server.properties')).get('pvp'), 'true')
   } finally {
     panel.server.closeAllConnections()
     await new Promise((resolve) => panel.server.close(resolve))
