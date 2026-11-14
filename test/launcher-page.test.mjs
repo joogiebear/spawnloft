@@ -1209,8 +1209,8 @@ test('two things said in the same moment are said together, and nothing is said 
   assert.match(fnSource('announce'), /if \(S\.down\) return/)
 })
 
-test('the Mods choice: None and four loaders, each with its reason; Forge on 1.12.2 and older is coming', () => {
-  const L = ['LOADER_NAMES', 'MOD_LOADERS', 'COMING', 'INSTALLER_LOADERS', 'loaderName', 'modded', 'legacyForgeMc']
+test('the Mods choice: None and four loaders, each with its reason; Forge from 1.6.4, the untested ones said', () => {
+  const L = ['LOADER_NAMES', 'MOD_LOADERS', 'COMING', 'INSTALLER_LOADERS', 'loaderName', 'modded', 'forgeTooOld', 'forgeUntested']
   const { loaderBlock, loaderHint, loaderChangeWarning, loaderText, nameBase, setupTitle, defaultMemory, versionFacts, playSentence, MOD_LOADERS } = lifted([...L, 'loaderBlock', 'loaderHint', 'loaderChangeWarning', 'loaderText', 'nameBase', 'setupTitle', 'defaultMemory', 'versionFacts', 'playSentence'], '', ['MOD_LOADERS'])
   assert.deepEqual(MOD_LOADERS, ['fabric', 'quilt', 'forge', 'neoforge'])
   // the version facts decide: per loader, then Fabric's old flag from a panel without the list
@@ -1222,8 +1222,15 @@ test('the Mods choice: None and four loaders, each with its reason; Forge on 1.1
   assert.equal(loaderBlock('fabric', '1.8.9', { fabric: false }), 'Fabric has no build for 1.8.9.')
   assert.equal(loaderBlock('forge', '1.20.1', info), null)
   assert.equal(loaderBlock('forge', '1.20.1', { loaders: { forge: false } }), 'Forge has no build for 1.20.1.')
-  assert.equal(loaderBlock('forge', '1.12.2', { loaders: { forge: false } }), 'Forge for 1.12.2 and older is coming in a later SpawnLoft.')
-  assert.equal(loaderBlock('forge', '1.7.10', {}), 'Forge for 1.12.2 and older is coming in a later SpawnLoft.')
+  assert.equal(loaderBlock('forge', '1.12.2', { loaders: { forge: true } }), null)
+  assert.equal(loaderBlock('forge', '1.7.10', {}), null)
+  assert.equal(loaderBlock('forge', '1.6.4', {}), null)
+  assert.equal(loaderBlock('forge', '1.6.2', {}), 'SpawnLoft offers Forge from Minecraft 1.6.4 on.')
+  assert.equal(loaderBlock('forge', '1.5.2', { loaders: { forge: false } }), 'SpawnLoft offers Forge from Minecraft 1.6.4 on.')
+  const { forgeUntested } = lifted(['forgeTooOld', 'forgeUntested'], '', ['forgeUntested'])
+  for (const mc of ['1.6.4', '1.8.9', '1.10.2', '1.12.1']) assert.equal(forgeUntested('forge', mc), true, mc)
+  for (const mc of ['1.7.10', '1.12.2', '1.13', '1.20.1', '26.3', '1.5.2']) assert.equal(forgeUntested('forge', mc), false, mc)
+  assert.equal(forgeUntested('fabric', '1.8.9'), false)
   assert.equal(loaderBlock('forge', '1.13', {}), null)
   assert.equal(loaderBlock('forge', '26.3', {}), null)
   assert.match(loaderHint('forge'), /The first Play sets Forge up, which takes a minute or two\.$/)

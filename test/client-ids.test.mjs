@@ -126,7 +126,7 @@ test('the picker lists every id Mojang does, with its kind, newest first, and Fa
   assert.equal(row('1.12.2').fabric, false)
   // every loader's answer, Quilt's from its real list
   assert.deepEqual(row('1.20.4').loaders, { fabric: true, quilt: true, forge: true, neoforge: true })
-  assert.deepEqual(row('1.12.2').loaders, { fabric: false, quilt: false, forge: false, neoforge: false })
+  assert.deepEqual(row('1.12.2').loaders, { fabric: false, quilt: false, forge: true, neoforge: false })
   assert.equal(row('b1.7.3').kind, 'beta')
   assert.equal(row('b1.7.3').javaNeeds, 8)
   assert.equal(row('b1.7.3').javaNeedsExact, false)

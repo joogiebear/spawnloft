@@ -13,6 +13,7 @@ on:
       - src/client-forge-install.mjs
       - src/client-neoforge.mjs
       - src/client-forge.mjs
+      - src/client-forge-legacy.mjs
       - src/client-loaders.mjs
       - src/client-install.mjs
       - src/client-meta.mjs
@@ -40,6 +41,9 @@ jobs:
           - { loader: forge, mc: '26.3', build: '66.1.8' }
           - { loader: forge, mc: '1.20.1', build: '47.4.28', and: '47.4.29' }
           - { loader: forge, mc: '1.16.5', build: '36.2.34' }
+          - { loader: forge, mc: '1.12.2', build: '14.23.5.2859', and: '14.23.0.2486' }
+          - { loader: forge, mc: '1.7.10', build: '10.13.4.1614-1.7.10' }
+          - { loader: forge, mc: '1.6.4', build: '9.11.1.1345' }
     name: ${{ matrix.loader }} ${{ matrix.build }}
     steps:
       - uses: actions/checkout@v4

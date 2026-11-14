@@ -1370,15 +1370,21 @@
   function loaderBlock(loader, mc, info) {
     if (!modded(loader)) return null
     if (COMING.includes(loader)) return `${loaderName(loader)} is coming in a later SpawnLoft.`
-    if (loader === 'forge' && legacyForgeMc(mc)) return 'Forge for 1.12.2 and older is coming in a later SpawnLoft.'
+    if (loader === 'forge' && forgeTooOld(mc)) return 'SpawnLoft offers Forge from Minecraft 1.6.4 on.'
     const has = info?.loaders && typeof info.loaders === 'object' ? info.loaders[loader] : loader === 'fabric' ? info?.fabric : undefined
     return has === false ? `${loaderName(loader)} has no build for ${mc}.` : null
   }
 
-  // Minecraft 1.12.2 and older, where Forge's installer is the older kind
-  function legacyForgeMc(mc) {
+  // Minecraft 1.6.3 and older, where Forge patched the game jar itself
+  function forgeTooOld(mc) {
+    const m = /^1\.(\d+)(?:\.(\d+))?$/.exec(String(mc ?? ''))
+    return Boolean(m) && (Number(m[1]) < 6 || (Number(m[1]) === 6 && Number(m[2] ?? 0) < 4))
+  }
+
+  // Forge on 1.6.4 to 1.12.2 other than 1.7.10 and 1.12.2: offered, not started by hand (design Q1)
+  function forgeUntested(loader, mc) {
     const m = /^1\.(\d+)(?:\.\d+)?$/.exec(String(mc ?? ''))
-    return Boolean(m) && Number(m[1]) < 13
+    return loader === 'forge' && Boolean(m) && Number(m[1]) < 13 && !forgeTooOld(mc) && mc !== '1.7.10' && mc !== '1.12.2'
   }
 
   // The line under the Mods choice: why the pick cannot be used, else what it does.
@@ -3011,6 +3017,7 @@
       h('select', { class: 'modspick', id: 'fLoader', 'aria-labelledby': 'fLoaderLabel', value: f.loader, onchange: (e) => pickLoader(e.target.value) },
         loaderChoices.map(([l, text, why]) => h('option', { value: l, disabled: Boolean(why) && l !== f.loader, text: why && l !== f.loader ? `${text} (${COMING.includes(l) ? 'coming' : 'not for this version'})` : text }))),
       h('small', { class: loaderNo ? 'hint warn' : 'hint', text: loaderNo ?? loaderHint(f.loader) }),
+      !loaderNo && forgeUntested(f.loader, f.mc) && h('small', { class: 'hint', text: `Forge on ${f.mc} is not tested by SpawnLoft. Its 1.7.10 and 1.12.2 are, and ${f.mc} uses the same kind of installer.` }),
       changed && h('small', { class: 'hint warn', text: changed }),
       others.length > 0 && !loaderNo && h('small', { class: 'hint', text: others.join(' ') }))
 
