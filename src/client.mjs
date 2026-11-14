@@ -233,6 +233,10 @@ export function updateProfile(name, patch, { launching = false } = {}) {
   return { name, ...withDefaults(reg.profiles[name]) }
 }
 
+// Windows lets go of a folder a moment after the game that had it open has exited, so a purge
+// straight after a stop is tried again for about a second before it is an error (EPERM, EBUSY).
+const PURGE = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }
+
 export function removeProfile(name, { purge = false } = {}) {
   if (status(name).running) fail(`profile "${name}" is running; stop it first: spawnloft client stop ${name}`)
   getProfile(name)
@@ -244,11 +248,11 @@ export function removeProfile(name, { purge = false } = {}) {
     const reg = loadProfiles()
     delete reg.profiles[name]
     saveProfiles(reg)
-    if (purge) fs.rmSync(profileDir(name), { recursive: true, force: true })
+    if (purge) fs.rmSync(profileDir(name), PURGE)
   } finally {
     release()
   }
-  if (purge) fs.rmSync(clientRunDir(name), { recursive: true, force: true })
+  if (purge) fs.rmSync(clientRunDir(name), PURGE)
 }
 
 function holderText(name) {
