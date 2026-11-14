@@ -212,6 +212,12 @@ export function reveal(name, sub = null, folder = null, { run = spawn, platform 
     if (!r.stat.isDirectory()) throw new UserError(`${r.rel} is not a folder`)
     target = r.full
   }
+  return openFolder(target, { run, platform, env })
+}
+
+// The opener itself, for any folder the caller has already decided on (a server's, above, or a
+// launcher profile's).
+export function openFolder(target, { run = spawn, platform = process.platform, env = process.env } = {}) {
   const [cmd, args] =
     platform === 'win32' ? ['explorer.exe', [target]]
     : platform === 'darwin' ? ['open', [target]]

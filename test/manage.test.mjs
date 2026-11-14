@@ -167,6 +167,9 @@ test('opening a folder with no file manager on the machine is a refusal, not an 
   const started = (cmd, args, opts) => spawn(process.execPath, ['-e', ''], opts)
   assert.equal(await manage.reveal('reveal-none', 'logs', null, { run: started, env: desktop }), path.join(inst.dir, 'logs'))
   assert.equal(await manage.reveal('reveal-none', '../..', null, { run: started, env: desktop }), inst.dir)
+  // the opener by itself, for a folder that is not a server's (a launcher profile's)
+  assert.equal(await manage.openFolder(scratch, { run: started, env: desktop }), scratch)
+  await assert.rejects(manage.openFolder(scratch, { run: started, platform: 'linux', env: {} }), (err) => err instanceof UserError && /no desktop/.test(err.message) && err.message.includes(scratch))
   // Linux with no display: refused before anything is started, since the opener would only exit
   let ran = false
   await assert.rejects(

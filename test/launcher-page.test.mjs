@@ -232,7 +232,7 @@ test('small display helpers', () => {
 })
 
 test('every watched game that goes without a Stop from this page is noticed, and an early one is marked', () => {
-  const { watchedExits } = lifted(['CRASH_WINDOW_MS', 'watchedExits'])
+  const { watchedExits } = lifted(['CRASH_WINDOW_MS', 'recordedExit', 'watchedExits'])
   const t0 = Date.parse('2026-10-28T10:00:00Z')
   const watch = {}
   const running = (name, startedAt) => ({ name, running: true, startedAt })
@@ -242,13 +242,13 @@ test('every watched game that goes without a Stop from this page is noticed, and
   assert.deepEqual(Object.keys(watch).sort(), ['a', 'b', 'c'])
   watch.b.stopping = true
   // a gone 18 s in: early; b stopped from here: nothing; c ran an hour: noticed, the log decides
-  assert.deepEqual(watchedExits(watch, [gone('a'), gone('b'), gone('c')], t0 + 18000), [{ name: 'a', seconds: 18, early: true }, { name: 'c', seconds: 3618, early: false }])
+  assert.deepEqual(watchedExits(watch, [gone('a'), gone('b'), gone('c')], t0 + 18000), [{ name: 'a', seconds: 18, early: true, exit: null }, { name: 'c', seconds: 3618, early: false, exit: null }])
   assert.deepEqual(watch, {})
   // a removed profile is nothing either
   watch.d = { since: t0, stopping: false }
   assert.deepEqual(watchedExits(watch, [], t0 + 1000), [])
   // the log decides (readLog -> exitVerdict); exits wait their turn while one is shown
-  assert.match(fnSource('readLog'), /if \(exitVerdict\(lines, c\.early\) === 'closed'\)/)
+  assert.match(fnSource('readLog'), /if \(crashVerdict\(c\.exit, lines, c\.early\) === 'closed'\)/)
   assert.match(fnSource('noticeExits'), /S\.exits\.push\(\.\.\.watchedExits\(S\.watch, next\.profiles, Date\.now\(\)\)\)/)
   assert.match(fnSource('nextExit'), /if \(S\.crash \|\| !S\.exits\.length\) return/)
 })
@@ -285,7 +285,109 @@ test('the crash notice says how long the game ran in the unit that fits', () => 
   assert.equal(ranFor(1380), '23 minutes')
   assert.equal(ranFor(7200), '2 hours')
   assert.equal(ranFor(9000), '2 hours 30 minutes')
-  assert.match(fnSource('crashNotice'), /Minecraft closed \$\{ranFor\(crash\.seconds\)\} after it started/)
+  assert.match(fnSource('crashNotice'), /`Minecraft \$\{rec && exitKind\(rec\) === 'abnormal' \? 'crashed' : 'closed'\} \$\{ranFor\(crash\.seconds\)\} after it started`/)
+})
+
+test('the panel\'s record of the exit decides crash or not, and the log only where the record cannot', () => {
+  const { watchedExits, recordedExit, exitKind, crashVerdict, exitWords } = lifted(['CRASH_WINDOW_MS', 'crashSigns', 'saidStopping', 'cleanExit', 'exitVerdict', 'recordedExit', 'exitKind', 'crashVerdict', 'exitWords', 'watchedExits'])
+  const t0 = Date.parse('2026-11-14T10:00:00Z')
+  const rec = (over = {}) => ({ pid: 5, code: 1, signal: null, startedAt: '2026-11-14T10:00:00.000Z', endedAt: '2026-11-14T10:00:20.000Z', stopped: false, ...over })
+  // the record is this run's: same start time
+  assert.deepEqual(recordedExit(rec(), { since: t0, startedAt: '2026-11-14T10:00:00.000Z' }), rec())
+  assert.equal(recordedExit(rec({ startedAt: '2026-11-13T09:00:00.000Z' }), { since: t0, startedAt: '2026-11-14T10:00:00.000Z' }), null)
+  // a run gone before any poll saw it: the record written since the launch
+  assert.deepEqual(recordedExit(rec(), { since: t0 }), rec())
+  assert.equal(recordedExit(rec({ endedAt: '2026-11-13T09:00:20.000Z' }), { since: t0 }), null)
+  assert.equal(recordedExit(null, { since: t0 }), null)
+  assert.equal(recordedExit({ code: 1 }, { since: t0 }), null)
+
+  assert.equal(exitKind(rec()), 'abnormal')
+  assert.equal(exitKind(rec({ code: null, signal: 'SIGKILL' })), 'abnormal')
+  assert.equal(exitKind(rec({ code: 0 })), 'clean')
+  assert.equal(exitKind(rec({ code: 143, stopped: true })), 'stopped')
+
+  const quit = ['[21:03:00] [Render thread/INFO]: Stopping!']
+  const dialog = ['[21:03:00] [main/ERROR]: Incompatible mods found!']
+  // an abnormal end is a crash whatever the log says, early or late
+  assert.equal(crashVerdict(rec(), quit, false), 'crash')
+  assert.equal(crashVerdict(rec({ code: null, signal: 'SIGSEGV' }), [], true), 'crash')
+  // asked for: never a crash
+  assert.equal(crashVerdict(rec({ stopped: true }), dialog, true), 'closed')
+  // exit code 0: closed, unless it went in the first minute without the log showing it close
+  assert.equal(crashVerdict(rec({ code: 0 }), dialog, false), 'closed')
+  assert.equal(crashVerdict(rec({ code: 0 }), quit, true), 'closed')
+  assert.equal(crashVerdict(rec({ code: 0 }), dialog, true), 'crash')
+  // no record (the game outlived the panel that started it): the log decides, as before
+  assert.equal(crashVerdict(null, quit, false), 'closed')
+  assert.equal(crashVerdict(null, [], false), 'crash')
+
+  assert.equal(exitWords(rec(), '21:03'), 'It ended at 21:03 with exit code 1.')
+  assert.equal(exitWords(rec({ code: null, signal: 'SIGKILL' }), '21:03'), 'It was ended by SIGKILL at 21:03.')
+  assert.equal(exitWords(rec({ code: null }), '21:03'), 'It ended at 21:03.')
+  assert.equal(exitWords(null, null), '')
+
+  // a watched run carries its record with it
+  const watch = {}
+  watchedExits(watch, [{ name: 'a', running: true, startedAt: '2026-11-14T10:00:00.000Z' }], t0 + 3000)
+  assert.equal(watch.a.startedAt, '2026-11-14T10:00:00.000Z')
+  assert.deepEqual(watchedExits(watch, [{ name: 'a', running: false, lastExit: rec() }], t0 + 21000), [{ name: 'a', seconds: 21, early: true, exit: rec() }])
+  // a watch a launch started learns the run's start time at the first poll that sees it running
+  const fromJob = { b: { since: t0, stopping: false } }
+  watchedExits(fromJob, [{ name: 'b', running: true, startedAt: '2026-11-14T10:00:01.000Z' }], t0 + 3000)
+  assert.equal(fromJob.b.startedAt, '2026-11-14T10:00:01.000Z')
+})
+
+test('a crash recorded while the page was closed is told once, if it is recent', () => {
+  const { unseenCrashes, cleanSeen } = lifted(['CRASH_WINDOW_MS', 'CRASH_REPLAY_MS', 'exitKind', 'unseenCrashes', 'cleanSeen'])
+  const now = Date.parse('2026-11-14T12:00:00Z')
+  const rec = (over = {}) => ({ code: 1, signal: null, startedAt: '2026-11-14T11:00:00.000Z', endedAt: '2026-11-14T11:30:00.000Z', stopped: false, ...over })
+  const row = (name, lastExit, running = false) => ({ name, running, lastExit })
+  const rows = [
+    row('crashed', rec()),
+    row('early', rec({ startedAt: '2026-11-14T11:29:50.000Z' })),
+    row('quit', rec({ code: 0 })),
+    row('stopped', rec({ stopped: true })),
+    row('old', rec({ startedAt: '2026-11-12T10:00:00.000Z', endedAt: '2026-11-12T11:00:00.000Z' })),
+    row('again', rec(), true),
+    row('seen', rec()),
+    row('never', null),
+  ]
+  assert.deepEqual(unseenCrashes(rows, { seen: '2026-11-14T11:30:00.000Z' }, now), [
+    { name: 'crashed', seconds: 1800, early: false, exit: rec() },
+    { name: 'early', seconds: 10, early: true, exit: rec({ startedAt: '2026-11-14T11:29:50.000Z' }) },
+  ])
+  // a later crash of the same setup is a new one
+  assert.equal(unseenCrashes([row('seen', rec())], { seen: '2026-11-13T08:00:00.000Z' }, now).length, 1)
+  // only the page's first answer from the panel replays them, and a dismissed one is remembered
+  assert.match(fnSource('noticeExits'), /if \(first\) S\.exits\.push\(\.\.\.unseenCrashes\(next\.profiles, S\.seenExits, Date\.now\(\)\)\)/)
+  assert.match(fnSource('pollOnce'), /noticeExits\(next, !S\.summary\)/)
+  assert.match(fnSource('dropCrash'), /S\.seenExits\[c\.profile\] = c\.exit\.endedAt\s+stored\('local', EXITS_KEY, JSON\.stringify\(S\.seenExits\)\)/)
+  assert.deepEqual(cleanSeen({ a: '2026-11-14T11:30:00.000Z', b: 7, c: null, d: 'x'.repeat(50) }), { a: '2026-11-14T11:30:00.000Z' })
+  assert.deepEqual(cleanSeen('junk'), {})
+  assert.deepEqual(Object.keys(cleanSeen(JSON.parse('{"__proto__": "x", "a": "y"}'))), ['a'])
+})
+
+test('a running game: how long, its log on request, and a Stop that asks first', () => {
+  const { playingFor } = lifted(['ranFor', 'playingFor'])
+  assert.equal(playingFor(5000), 'under a minute')
+  assert.equal(playingFor(61000), '1 minute')
+  assert.equal(playingFor(12.9 * 60000), '12 minutes')
+  assert.equal(playingFor(65 * 60000), '65 minutes')
+  assert.equal(playingFor(125 * 60000), '2 hours 5 minutes')
+  const card = fnSource('runningCard')
+  // Stop opens the question; only "Stop now" stops, and the safe choice gets the focus
+  assert.match(card, /id: 'stop', disabled: S\.stopping === p\.name, onclick: \(\) => askStop\(p\)/)
+  assert.match(card, /id: 'stopNow', 'aria-describedby': 'stopWhy', onclick: \(\) => stopProfile\(p\)/)
+  assert.match(fnSource('askStop'), /\$\('keepPlaying'\)\?\.focus/)
+  assert.match(card, /If a single-player world is open, quit from the game\\'s own menu instead/)
+  // the log is read only while it is shown, and stays at its end while it grows
+  assert.match(card, /id: 'liveLog', 'aria-expanded': String\(Boolean\(live\)\), 'aria-controls': 'liveLogBox'/)
+  assert.match(fnSource('readLive'), /if \(!live\) return/)
+  assert.match(fnSource('render'), /logNow\.scrollTop = logAt && !logAt\.end \? logAt\.top : logNow\.scrollHeight/)
+  // folders open through the panel, so a browser tab can do it too and no path is printed
+  assert.match(fnSource('reveal'), /client\/profiles\/\$\{enc\(p\.name\)\}\/reveal`, \{ method: 'POST', body: \{ what \} \}/)
+  assert.doesNotMatch(html, /desktop\?\.openProfileFolder/)
+  assert.doesNotMatch(card, /class: 'path'/)
 })
 
 test('the Edit form sends only what changed, and nothing a running game cannot change', () => {
