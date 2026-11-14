@@ -512,3 +512,40 @@ test('removing a setup puts focus on the safe answer, and the button says when w
   assert.ok(!/\$\('confirmRemove'\)\?\.focus\(\)/.test(html), 'the destructive button must not take focus when the strip opens')
   assert.match(html, /keep\?\.focus\(\)/)
 })
+
+test('what the core says for a terminal is said for the launcher', () => {
+  const from = html.indexOf('const PLAIN = [')
+  const to = html.indexOf('\n  ]', from)
+  assert.ok(from > 0 && to > from)
+  const { plain, plainStatus } = new Function(
+    `${html.slice(from, to + 4)}\n${fnSource('plain')}\n${fnSource('plainStatus')}\nreturn { plain, plainStatus }`)()
+
+  assert.equal(plain('profile "main" is running; stop it first: spawnloft client stop main'),
+    '“main” is running. Close the game first, then try again.')
+  assert.equal(plain('profile "main" is being launched (pid 4242); wait for it'),
+    '“main” is already starting. Give it a moment, then try again.')
+  assert.match(plain('invalid profile name "a b" - use letters, digits, dash, underscore (max 32 chars)'), /^That name will not work\./)
+  assert.match(plain('the saved sign-in for Alex no longer works; run spawnloft client login again'), /Sign in again from the account menu\.$/)
+  assert.equal(plain('the code expired before it was entered; run spawnloft client login again'), 'The sign-in ran out of time. Try again.')
+  assert.equal(plain('the account could not be saved; see panel.log'), 'The account could not be saved. Try signing in again.')
+  // nothing a person is told names a command or a log file
+  for (const said of [
+    'profile "x" is running; stop it before changing its version: spawnloft client stop x',
+    'the sign-in failed inside SpawnLoft; see panel.log',
+    'Minecraft refused the sign-in (HTTP 403): app not allowed',
+  ]) assert.ok(!/spawnloft client|panel\.log|HTTP 403/.test(plain(said)), said)
+  // and anything not listed is passed on as it is
+  assert.equal(plain('Java 21 is needed for 1.21.'), 'Java 21 is needed for 1.21.')
+  assert.equal(plain(null), '')
+
+  // the busy notice still knows a launch in progress once it is said in plain words
+  const { launchNotice } = lifted(['sentence', 'launchNotice'])
+  assert.equal(launchNotice(plain('profile "main" is being launched (pid 4242); wait for it')).busy, true)
+
+  assert.match(plainStatus(401), /no longer signed in/)
+  assert.match(plainStatus(503), /error 503/)
+  assert.match(plainStatus(418), /error 418/)
+
+  assert.ok(!/CALLBACK_URI/.test(html))
+  assert.match(html, /SpawnLoft could not open the launcher/)
+})

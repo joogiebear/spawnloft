@@ -2561,7 +2561,7 @@
 
   /* ---- toasts ------------------------------------------------------------ */
 
-  #toasts { position: fixed; right: 18px; bottom: 18px; display: grid; gap: 8px; z-index: 40; justify-items: end; }
+  #toasts { position: fixed; right: 18px; bottom: 64px; display: grid; gap: 8px; z-index: 40; justify-items: end; }
   .toast {
     display: flex;
     gap: 10px;
@@ -3426,6 +3426,7 @@
       <label for="dlgType" id="dlgTypeLabel"></label>
       <input id="dlgType" class="mono" autocomplete="off" spellcheck="false">
     </div>
+    <p class="hint bad" id="dlgError" role="alert" hidden></p>
   </div>
   <footer>
     <button id="dlgCancel">Cancel</button>
@@ -3618,11 +3619,51 @@ const isDb = (row) => Boolean(row && row.kind === 'database');
 
 // ------------------------------------------------------------------ api ----
 
+/**
+ * One plain sentence for a request that failed without the panel saying why: the browser's own
+ * "Failed to fetch" for no answer at all (status 0), or a bare status code.
+ */
+function plainFailure(status) {
+  if (!status) return 'SpawnLoft did not answer. Check that it is still running, then try again.';
+  if (status === 401 || status === 403) return 'This page is no longer signed in to SpawnLoft. Reload it to sign in again.';
+  if (status === 404) return 'SpawnLoft has no such thing any more. It may have been renamed or removed; reload the page.';
+  if (status === 413) return 'That is too large to send in one go.';
+  if (status >= 500) return 'SpawnLoft hit a problem doing that (error ' + status + '). Try again; if it keeps happening, send a report from Feedback.';
+  return 'SpawnLoft refused that without saying why (error ' + status + ').';
+}
+
+/**
+ * The core's "could not reach X: getaddrinfo ENOTFOUND api.x.com", said for someone who has never
+ * seen a resolver error. Everything else the core says is passed on as it is.
+ */
+function plainMessage(message) {
+  const text = String(message);
+  // Two refusals about databases that point at the terminal, said for the page they arrive on.
+  if (/^a version is required - see: spawnloft db versions$/.test(text)) return 'Choose a version first.';
+  const dropped = /^"(.+)" is not running, so its data cannot be dropped - start it first, or detach without --drop$/.exec(text);
+  if (dropped) return dropped[1] + ' is not running, so its data cannot be dropped. Start it first, or detach and keep the data.';
+  const m = /^could not reach (.+?): (.+)$/is.exec(text);
+  // Only a host: "could not reach schtasks to delete ..." is about a program on this computer.
+  if (!m || !/^[\w.-]+(\.[a-z]{2,}|:\d+)$/i.test(m[1])) return text;
+  const what = m[1];
+  if (/:\d+$/.test(what)) return 'Could not reach ' + what + '. Nothing answered at that address.';
+  return 'Could not reach ' + what + '. Check this computer\u2019s internet connection, then try again.';
+}
+
 async function api(path, opt) {
-  const res = await fetch('/api' + path, opt);
+  let res;
+  try {
+    res = await fetch('/api' + path, opt);
+  } catch (e) {
+    // A request that was called off is not a failure to report.
+    if (e && e.name === 'AbortError') throw e;
+    const err = new Error(plainFailure(0));
+    err.network = true;
+    throw err;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const err = new Error(body.error || (res.status + ' ' + res.statusText));
+    const err = new Error(body.error ? plainMessage(body.error) : plainFailure(res.status));
     // A refusal the page can do something about carries a code: "java-too-old" gets a
     // "create anyway" rather than a dead end.
     if (body.code) err.code = body.code;
@@ -3639,7 +3680,32 @@ const post = (path, body) => api(path, {
 
 // --------------------------------------------------------------- chrome ----
 
-function toast(message, kind) {
+/** How many toasts may stand at once. Past that the oldest that is not waiting on work goes. */
+const TOAST_MAX = 4;
+
+/**
+ * Whether a toast stays until it is dismissed or its job removes it.
+ *
+ * An error always did. So does one that says work is under way - it ends in an ellipsis, and the
+ * caller takes it down when the work ends; five seconds of "Restoring…" followed by nothing read
+ * as a restore that had stopped. And so does one asked to stay because it carries something to
+ * read or copy: a link, the path of a file just written.
+ */
+function toastStays(message, kind, opts) {
+  if (kind === 'bad' || (opts && opts.stay)) return true;
+  return /(\u2026|\.\.\.)$/.test(String(message).trim());
+}
+
+/** Which toasts to drop so a new one fits: the oldest first, sparing the ones still working. */
+function toastsToDrop(list, max) {
+  const over = list.length - max;
+  if (over <= 0) return [];
+  // Never the newest: it was shown this instant, and may be the error that matters.
+  const idle = list.slice(0, -1).filter((t) => !t.working);
+  return idle.slice(0, over);
+}
+
+function toast(message, kind, opts) {
   const el = document.createElement('div');
   el.className = 'toast' + (kind ? ' ' + kind : '');
   const text = document.createElement('div');
@@ -3653,11 +3719,16 @@ function toast(message, kind) {
   close.onclick = () => el.remove();
   // The tone is said by a glyph as well as the edge colour, so it does not rest on colour alone.
   el.append(icon(kind === 'bad' ? 'alert' : kind === 'good' ? 'check' : 'bolt'), text, close);
+  const stays = toastStays(message, kind, opts);
+  // Work under way, or something to read or copy: neither is dropped to make room.
+  if (stays && kind !== 'bad') el.dataset.working = '1';
   $('#toasts').append(el);
   $('#live').textContent = message;
-  // Errors stay until dismissed. Everything else is an acknowledgement, and an acknowledgement
-  // that has to be dismissed is just more work.
-  if (kind !== 'bad') setTimeout(() => el.remove(), 5200);
+  // A plain acknowledgement goes by itself: one that has to be dismissed is just more work.
+  if (!stays) setTimeout(() => el.remove(), 5200);
+  // Errors do not expire, so they are not left to pile up over the page either.
+  const standing = [...$('#toasts').children].map((node) => ({ node, working: node.dataset.working === '1' }));
+  for (const t of toastsToDrop(standing, TOAST_MAX)) t.node.remove();
   return el;
 }
 
@@ -3674,6 +3745,17 @@ function toast(message, kind) {
 // One <dialog> serves every prompt, so a dialog that opens another one has to be careful about
 // whose events it is hearing. See the note on `cancel` below.
 let askSeq = 0;
+// A refusal shown in the dialog belongs to that asking: the next thing to open it starts clean.
+document.getElementById('dlg').addEventListener('close', () => {
+  document.getElementById('dlgError').hidden = true;
+  document.getElementById('dlgCancel').disabled = false;
+});
+
+/** Whether Confirm is held back: the name not typed yet, or a box left empty that needs a value. */
+function askBlocked(opts, typed) {
+  if (opts.typeToConfirm) return typed !== opts.typeToConfirm;
+  return Boolean(opts.input && opts.input.required) && !String(typed).trim();
+}
 
 function ask(opts) {
   const dlg = $('#dlg');
@@ -3733,11 +3815,18 @@ function ask(opts) {
   // Nothing to cancel when the dialog is telling you something rather than asking.
   $('#dlgCancel').hidden = Boolean(opts.tellOnly);
 
-  const check = () => { ok.disabled = Boolean(opts.typeToConfirm) && typeBox.value !== opts.typeToConfirm; };
+  const errBox = $('#dlgError');
+  errBox.textContent = '';
+  errBox.hidden = true;
+  $('#dlgCancel').disabled = false;
+  // Confirm waits for the name to be typed, or for a value the question cannot do without: a
+  // dialog that closes on an empty box and then does nothing reads as a button that is broken.
+  const check = () => { ok.disabled = askBlocked(opts, typeBox.value); };
   check();
-  typeBox.oninput = check;
+  typeBox.oninput = () => { errBox.hidden = true; check(); };
 
   const mine = ++askSeq;
+  let submitting = false;
 
   return new Promise((resolve) => {
     let settled = false;
@@ -3767,15 +3856,55 @@ function ask(opts) {
       stale close from a dialog this one replaced fails the guard, and a close of THIS dialog with
       no answer resolves as the cancel it was.
     */
-    const onCancel = () => { if (mine === askSeq) done(null); };
+    const onCancel = (e) => {
+      if (mine !== askSeq) return;
+      // Escape while the answer is being acted on would leave the request running with nobody
+      // to hear how it went.
+      if (submitting) return e.preventDefault();
+      done(null);
+    };
     // A stale 'close' - queued by the dialog this one replaced, arriving after showModal() - finds
     // the dialog open again; a real close finds it shut. Only the real one is an answer.
-    const onClose = () => { if (mine === askSeq && !dlg.open) done(null); };
+    const onClose = () => {
+      if (mine !== askSeq || dlg.open) return;
+      // Closed under a save that is still running (a second Escape is not always offered to
+      // 'cancel'): put it back, so there is somewhere for the answer to be said.
+      if (submitting) return dlg.showModal();
+      done(null);
+    };
     dlg.addEventListener('cancel', onCancel);
     dlg.addEventListener('close', onClose);
-    ok.onclick = () => {
+    ok.onclick = async () => {
       const picked = choiceBox.querySelector('input:checked');
-      done({ choice: picked ? picked.value : null, text: typeBox.value.trim() });
+      const result = { choice: picked ? picked.value : null, text: typeBox.value.trim() };
+      if (!opts.submit) return done(result);
+      /*
+        `submit` does the thing the dialog asked about while the dialog is still open. A refusal -
+        a name that is taken, a folder that is not there - is shown under the field with the
+        typing still in it, where a toast after the dialog had closed threw the typing away.
+      */
+      submitting = true;
+      errBox.hidden = true;
+      ok.disabled = true;
+      $('#dlgCancel').disabled = true;
+      const label = ok.textContent;
+      ok.textContent = 'Working\u2026';
+      try {
+        result.out = await opts.submit(result);
+      } catch (err) {
+        if (mine !== askSeq || settled) return;
+        submitting = false;
+        ok.textContent = label;
+        $('#dlgCancel').disabled = false;
+        errBox.textContent = err.message;
+        errBox.hidden = false;
+        check();
+        if (!typeWrap.hidden) { typeBox.focus(); typeBox.select(); }
+        return;
+      }
+      submitting = false;
+      $('#dlgCancel').disabled = false;
+      done(result);
     };
     $('#dlgCancel').onclick = () => done(null);
     typeBox.onkeydown = (e) => {
@@ -6731,14 +6860,14 @@ $('#bDiagZip').onclick = async () => {
     const out = await post('/instances/' + encodeURIComponent(state.current) + '/diag');
     note.remove();
     const basename = out.file.split(/[\\/]/).pop();
-    const el = toast('Diagnostics zip written (' + out.sizeHuman + '). ', 'good');
+    const el = toast('Diagnostics zip written (' + out.sizeHuman + '). ', 'good', { stay: true });
     const a = document.createElement('a');
     a.href = '/api/instances/' + encodeURIComponent(state.current) + '/diag/download?file=' + encodeURIComponent(basename);
     a.textContent = 'Download';
     a.download = '';
     el.querySelector('div').append(a);
-    // The toast goes away on its own after a few seconds, so the download starts without
-    // waiting for the link to be clicked; the link is there for a second copy.
+    // The download starts without waiting for the link to be clicked; the link stays for a
+    // second copy.
     a.click();
   } catch (err) {
     note.remove();
@@ -6771,7 +6900,7 @@ $('#miExportShare').onclick = async () => {
     openOutside(out.url);
     toast(out.trimmed
       ? 'Uploaded the last ' + out.lines.toLocaleString() + ' lines — ' + out.url
-      : 'Uploaded — ' + out.url, 'good');
+      : 'Uploaded — ' + out.url, 'good', { stay: true });
   } catch (err) {
     note.remove();
     toast(err.message, 'bad');
@@ -8100,6 +8229,27 @@ async function renderPlugins(opts) {
   // A search and its results are not redrawn from under whoever is reading them.
   q.addEventListener('input', () => add.toggleAttribute('data-holding', Boolean(q.value.trim())));
 
+  /** A search that could not be made: why, and the way to make it again. */
+  const searchFailed = (reasons, again = true) => {
+    const box = document.createElement('div');
+    box.style.display = 'grid';
+    box.style.gap = '8px';
+    box.style.justifyItems = 'start';
+    for (const reason of reasons) {
+      const bad = document.createElement('div');
+      bad.className = 'bad';
+      bad.textContent = reason;
+      box.append(bad);
+    }
+    if (!again) return box;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'Try again';
+    retry.onclick = () => doSearch();
+    box.append(retry);
+    return box;
+  };
+
   const doSearch = async () => {
     const term = q.value.trim();
     if (!term) return;
@@ -8114,16 +8264,21 @@ async function renderPlugins(opts) {
       found = await api(base + '/search?q=' + encodeURIComponent(term));
     } catch (e) {
       looking.remove();
-      const bad = document.createElement('div');
-      bad.className = 'bad';
-      bad.textContent = e.message;
-      results.append(bad);
       go.disabled = false;
+      results.append(searchFailed([e.message]));
       return;
     }
     go.disabled = false;
     results.textContent = '';
-    for (const err of found.errors || []) {
+    const failed = (found.errors || []).map(plainMessage);
+    // A source that was not reached found nothing because it was not asked, which is not the
+    // same as there being nothing: no "nothing matches" under a failure.
+    if (failed.length && !found.results.length) {
+      // "Fabric runs no plugins or mods" is an answer, not a failure: no button that cannot help.
+      results.append(searchFailed(failed, !failed.every((why) => /runs no plugins or mods/.test(why))));
+      return;
+    }
+    for (const err of failed) {
       const bad = document.createElement('div');
       bad.className = 'bad';
       bad.textContent = err;
@@ -9796,22 +9951,24 @@ async function renderFiles(opts) {
   body.append(bar);
 
   newFile.onclick = async () => {
-    const got = await ask({ title: 'New file in ' + (view.dir || 'the server folder'), input: { label: 'Name', placeholder: 'config.yml' }, confirmLabel: 'Create' });
-    if (!got || !got.text) return;
-    const p = view.dir ? view.dir + '/' + got.text : got.text;
-    try {
-      const out = await post(base + '/write', { path: p, text: '', create: true });
-      view.editing = { path: out.path, text: '', original: '', version: out.version };
-      again();
-    } catch (e) { toast(e.message, 'bad'); }
+    const got = await ask({
+      title: 'New file in ' + (view.dir || 'the server folder'),
+      input: { label: 'Name', placeholder: 'config.yml', required: true },
+      confirmLabel: 'Create',
+      submit: ({ text }) => post(base + '/write', { path: view.dir ? view.dir + '/' + text : text, text: '', create: true }),
+    });
+    if (!got) return;
+    view.editing = { path: got.out.path, text: '', original: '', version: got.out.version };
+    again();
   };
   newFolder.onclick = async () => {
-    const got = await ask({ title: 'New folder in ' + (view.dir || 'the server folder'), input: { label: 'Name' }, confirmLabel: 'Create' });
-    if (!got || !got.text) return;
-    try {
-      const out = await post(base + '/mkdir', { dir: view.dir, name: got.text });
-      go(out.path);
-    } catch (e) { toast(e.message, 'bad'); }
+    const got = await ask({
+      title: 'New folder in ' + (view.dir || 'the server folder'),
+      input: { label: 'Name', required: true },
+      confirmLabel: 'Create',
+      submit: ({ text }) => post(base + '/mkdir', { dir: view.dir, name: text }),
+    });
+    if (got) go(got.out.path);
   };
   upload.onclick = () => picker.click();
   picker.onchange = () => { uploadFiles(row, view, [...picker.files].map((f) => ({ file: f, name: f.name }))).then(again); picker.value = ''; };
@@ -9864,27 +10021,26 @@ async function renderFiles(opts) {
       const got = await ask({
         title: 'Rename or move ' + sel[0].split('/').pop(),
         text: 'A new name, or a path from the server folder to move it somewhere else.',
-        input: { label: 'New path', value: sel[0] },
+        input: { label: 'New path', value: sel[0], required: true },
         confirmLabel: 'Rename',
+        submit: ({ text }) => (text === sel[0] ? null : post(base + '/move', { from: sel[0], to: text })),
       });
-      if (!got || !got.text || got.text === sel[0]) return;
-      try {
-        await post(base + '/move', { from: sel[0], to: got.text });
-        view.selected.clear();
-        again();
-      } catch (e) { toast(e.message, 'bad'); }
+      if (!got || !got.out) return;
+      view.selected.clear();
+      again();
     };
     zip.onclick = async () => {
       const first = sel[0].split('/').pop();
-      const got = await ask({ title: 'Zip ' + (sel.length === 1 ? first : sel.length + ' items'), input: { label: 'Archive name', value: (sel.length === 1 ? first.replace(/\.[^.]+$/, '') : 'archive') + '.zip' }, confirmLabel: 'Zip' });
-      if (!got || !got.text) return;
-      zip.disabled = true;
-      try {
-        const out = await post(base + '/archive', { paths: sel, name: got.text });
-        toast('Made ' + out.path + ' (' + fileSize(out.size) + ').', 'good');
-        view.selected.clear();
-        again();
-      } catch (e) { toast(e.message, 'bad'); zip.disabled = false; }
+      const got = await ask({
+        title: 'Zip ' + (sel.length === 1 ? first : sel.length + ' items'),
+        input: { label: 'Archive name', value: (sel.length === 1 ? first.replace(/\.[^.]+$/, '') : 'archive') + '.zip', required: true },
+        confirmLabel: 'Zip',
+        submit: ({ text }) => post(base + '/archive', { paths: sel, name: text }),
+      });
+      if (!got) return;
+      toast('Made ' + got.out.path + ' (' + fileSize(got.out.size) + ').', 'good', { stay: true });
+      view.selected.clear();
+      again();
     };
     unzip.onclick = async () => {
       unzip.disabled = true;
@@ -10074,6 +10230,35 @@ function uploadUrl(base, dir, name, overwrite) {
   return base + '?dir=' + encodeURIComponent(dir) + '&name=' + encodeURIComponent(name) + (overwrite ? '&overwrite=1' : '');
 }
 
+/** The line in the upload notice: which file of how many, and how much of the whole has gone. */
+function uploadWords(at, count, sentBytes, totalBytes, where) {
+  const share = totalBytes > 0 ? Math.min(100, Math.floor((sentBytes / totalBytes) * 100)) : null;
+  return 'Uploading ' + (count === 1 ? '' : at + ' of ' + count + ' ') + 'to ' + where
+    + (share === null ? '\u2026' : ' \u00b7 ' + share + '%');
+}
+
+/**
+ * One file sent with its progress reported, which fetch cannot do for a request body. Resolves
+ * like the answer it replaces, { ok, status, out }; rejects when the panel did not answer or the
+ * upload was called off. `hold` is handed the request so the caller can abort it.
+ */
+function sendFile(url, file, onProgress, hold) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded); };
+    xhr.onload = () => {
+      let out = {};
+      try { out = JSON.parse(xhr.responseText) || {}; } catch { /* an answer with no body */ }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, out });
+    };
+    xhr.onerror = () => reject(new Error(plainFailure(0)));
+    xhr.onabort = () => reject(new Error('Upload stopped.'));
+    hold(xhr);
+    xhr.send(file);
+  });
+}
+
 /** `list` is [{ file, name }]: name is the path inside the upload folder, slashes for subfolders. */
 async function uploadFiles(row, view, list) {
   list = list.map((it) => (it instanceof File ? { file: it, name: it.webkitRelativePath || it.name } : it));
@@ -10085,23 +10270,47 @@ async function uploadFiles(row, view, list) {
   const where = dir || 'the server folder';
   const top = new Set(list.map((it) => it.name.split('/')[0]));
   const label = list.length === 1 ? list[0].name : list.length + ' files';
+  // One notice for the whole upload, there until it ends: how far along it is, and a way to stop
+  // it. A world of two gigabytes used to show "Uploading…" for five seconds and then nothing.
   const note = toast('Uploading ' + label + ' to ' + where + '…');
-  const send = (it, overwrite) => fetch(uploadUrl(base, dir, it.name, overwrite), { method: 'POST', body: it.file });
+  const noteText = note.querySelector('div');
+  const stop = document.createElement('button');
+  stop.type = 'button';
+  stop.className = 'sm';
+  stop.textContent = 'Cancel';
+  note.insertBefore(stop, note.querySelector('.x'));
+  note.querySelector('.x').hidden = true;
+  const total = list.reduce((n, it) => n + (it.file.size || 0), 0);
+  let sent = 0;
+  let at = 0;
+  let cancelled = false;
+  let current = null;
+  stop.onclick = () => { cancelled = true; stop.disabled = true; if (current) current.abort(); };
+  const paint = (loaded) => { noteText.textContent = uploadWords(at, list.length, sent + loaded, total, where); };
+  const send = async (it, overwrite) => {
+    paint(0);
+    const res = await sendFile(uploadUrl(base, dir, it.name, overwrite), it.file, paint, (xhr) => { current = xhr; });
+    current = null;
+    return res;
+  };
   let done = 0;
   const exists = [];
   for (const it of list) {
+    if (cancelled) break;
+    at++;
     try {
       const res = await send(it, false);
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok && out.code === 'exists') { exists.push(it); continue; }
-      if (!res.ok) throw new Error(out.error || res.statusText);
+      if (!res.ok && res.out.code === 'exists') { exists.push(it); continue; }
+      if (!res.ok) throw new Error(res.out.error ? plainMessage(res.out.error) : plainFailure(res.status));
       done++;
+      sent += it.file.size || 0;
     } catch (e) {
+      if (cancelled) break;
       toast(it.name + ': ' + e.message, 'bad');
     }
   }
   // One question for the lot, so a folder dropped over an older copy of itself is not a hundred prompts.
-  if (exists.length) {
+  if (exists.length && !cancelled) {
     const ok = await ask({
       title: exists.length === 1 ? 'Replace ' + exists[0].name + '?' : 'Replace ' + exists.length + ' files?',
       text: (exists.length === 1 ? exists[0].name + ' is' : exists.length + ' of the files are') + ' already in ' + where
@@ -10110,19 +10319,27 @@ async function uploadFiles(row, view, list) {
       danger: true,
     });
     if (ok) {
+      at -= exists.length;
       for (const it of exists) {
+        if (cancelled) break;
+        at++;
         try {
           const res = await send(it, true);
-          const out = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(out.error || res.statusText);
+          if (!res.ok) throw new Error(res.out.error ? plainMessage(res.out.error) : plainFailure(res.status));
           done++;
+          sent += it.file.size || 0;
         } catch (e) {
+          if (cancelled) break;
           toast(it.name + ': ' + e.message, 'bad');
         }
       }
     }
   }
   note.remove();
+  if (cancelled) {
+    toast('Upload stopped. ' + (done ? (done === 1 ? '1 file is' : done + ' files are') + ' already in ' + where + '.' : 'Nothing was uploaded.'), done ? '' : 'good');
+    return;
+  }
   if (done) {
     const what = top.size === 1 && list.some((it) => it.name.includes('/')) ? [...top][0] + ' (' + (done === 1 ? '1 file' : done + ' files') + ')'
       : (done === 1 ? '1 file' : done + ' files');
@@ -10789,6 +11006,7 @@ function backupsMoveWords(from, to) {
 
 async function changeBackupsLocation(current) {
   let chosen = null;
+  let saved = null; // the answer, when the dialog itself did the saving
   if (desktop) {
     // said before the folder picker opens, not after the choice has been saved
     const go = await ask({
@@ -10803,15 +11021,16 @@ async function changeBackupsLocation(current) {
     const answer = await ask({
       title: 'Where should backups be kept?',
       text: backupsMoveWords(current, 'the new folder').before,
-      input: { label: 'Full path to a folder', value: '', placeholder: current },
+      input: { label: 'Full path to a folder', value: '', placeholder: current, required: true },
       confirmLabel: 'Use this folder',
+      submit: ({ text }) => post('/settings', { backupsDir: text }),
     });
-    if (!answer || !answer.text) return;
-    chosen = answer.text;
+    if (!answer) return;
+    saved = answer.out;
   }
 
   try {
-    const out = await post('/settings', { backupsDir: chosen });
+    const out = saved || await post('/settings', { backupsDir: chosen });
     await renderBackups({ force: true });
     if (!out.restartRequired) {
       toast('Backups are kept there already.', 'good');
@@ -11369,6 +11588,7 @@ function renderBackupHistory(row, data, signature) {
   }
   mset.onclick = async () => {
     let chosen = null;
+    let saved = null; // the answer, when the dialog itself did the saving
     if (desktop) {
       chosen = await desktop.pickFolder('Where should snapshot copies go? Ideally another drive.');
       if (!chosen) return;
@@ -11378,14 +11598,15 @@ function renderBackupHistory(row, data, signature) {
         text: 'Every new snapshot, for every server, is copied there as it is taken - ideally on '
           + 'a different drive, so one disk failure cannot take the servers and their backups '
           + 'together. Retention deletions follow the mirror too.',
-        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\spawnloft-backups' },
+        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\spawnloft-backups', required: true },
         confirmLabel: 'Use this folder',
+        submit: ({ text }) => post('/settings', { backupsMirrorDir: text }),
       });
-      if (!answer || !answer.text) return;
-      chosen = answer.text;
+      if (!answer) return;
+      saved = answer.out;
     }
     try {
-      const out = await post('/settings', { backupsMirrorDir: chosen });
+      const out = saved || await post('/settings', { backupsMirrorDir: chosen });
       toast('New snapshots now mirror to ' + out.backupsMirrorDir + '. No restart needed.', 'good');
       await renderBackups({ force: true });
     } catch (e) { toast(e.message, 'bad'); }
@@ -11530,12 +11751,9 @@ function renderBackupHistory(row, data, signature) {
           text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
           input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
           confirmLabel: 'Save',
+          submit: ({ text }) => post(base + '/note', { snapshot: snap.name, note: text }),
         });
-        if (!got) return;
-        try {
-          await post(base + '/note', { snapshot: snap.name, note: got.text });
-          await renderBackups({ force: true });
-        } catch (e) { toast(e.message, 'bad'); }
+        if (got) await renderBackups({ force: true });
       };
       download.onclick = () => {
         const a = document.createElement('a');
@@ -11572,7 +11790,7 @@ function renderBackupHistory(row, data, signature) {
           typeToConfirm: row.name,
         });
         if (!ok) return;
-        const note = toast('Restoring ' + snap.name + '.');
+        const note = toast('Restoring ' + snap.name + '\u2026');
         restoring.set(row.name, snap.name);
         lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
         const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
@@ -12551,6 +12769,18 @@ async function openFolder(name) {
   }
 }
 
+/** What an Edit asks the core to do: a rename, a patch of the settings that changed, both or neither. */
+function editPlan(row, typed) {
+  const patch = {};
+  if (typed.label !== (row.label || '')) patch.label = typed.label;
+  if (typed.memory && typed.memory !== row.memory) patch.memory = typed.memory;
+  if (typed.port && Number(typed.port) !== row.port) patch.port = typed.port;
+  return {
+    rename: typed.name && typed.name !== row.name ? typed.name : null,
+    patch: Object.keys(patch).length ? patch : null,
+  };
+}
+
 async function editServer(row) {
   const dlg = $('#dlg');
   $('#dlgTitle').textContent = 'Edit ' + row.name;
@@ -12607,45 +12837,79 @@ async function editServer(row) {
       resolve(v);
     };
     // 'cancel' first and 'close' as the net, for the reasons spelled out in ask().
-    const onCancel = () => { if (mine === askSeq) done(null); };
+    // Escape while a save runs would leave the rename going with nobody to hear how it went.
+    let saving = false;
+    const onCancel = (e) => {
+      if (mine !== askSeq) return;
+      if (saving) return e.preventDefault();
+      done(null);
+    };
     // A stale 'close' - queued by the dialog this one replaced, arriving after showModal() - finds
     // the dialog open again; a real close finds it shut. Only the real one is an answer.
-    const onClose = () => { if (mine === askSeq && !dlg.open) done(null); };
+    const onClose = () => {
+      if (mine !== askSeq || dlg.open) return;
+      if (saving) return dlg.showModal();
+      done(null);
+    };
     dlg.addEventListener('cancel', onCancel);
     dlg.addEventListener('close', onClose);
-    ok.onclick = () => done({
-      label: $('#edLabel').value.trim(),
-      name: $('#edName').value.trim(),
-      memory: $('#edMem').value.trim(),
-      port: $('#edPort').value.trim(),
-    });
-    $('#dlgCancel').onclick = () => done(null);
+    const errBox = $('#dlgError');
+    errBox.hidden = true;
+    // Saved while the dialog is open: a name that is taken or a port in use is said here, under
+    // the fields, with what was typed still in them.
+    let name = row.name;
+    ok.onclick = async () => {
+      const typed = {
+        label: $('#edLabel').value.trim(),
+        name: $('#edName').value.trim(),
+        memory: $('#edMem').value.trim(),
+        port: $('#edPort').value.trim(),
+      };
+      // After a rename that took and a save that did not, the list may not have caught up: the
+      // server is planned from under its new name either way, so the rename is not asked twice.
+      const now = rowOf(name) || { ...row, name };
+      const plan = editPlan(now, typed);
+      if (!plan.rename && !plan.patch) return done(name === row.name ? { changed: false } : { changed: true, name, renamed: true, patched: false });
+      saving = true;
+      ok.disabled = true;
+      $('#dlgCancel').disabled = true;
+      errBox.hidden = true;
+      let renamed = false;
+      try {
+        // The name first: it is the change most often refused, and refused it leaves nothing
+        // half saved.
+        if (plan.rename) {
+          await post('/instances/' + encodeURIComponent(name) + '/rename', { to: plan.rename });
+          name = plan.rename;
+          renamed = true;
+        }
+        if (plan.patch) await post('/instances/' + encodeURIComponent(name) + '/settings', plan.patch);
+        saving = false;
+        done({ changed: true, name, renamed: name !== row.name, patched: Boolean(plan.patch) });
+      } catch (e) {
+        saving = false;
+        if (mine !== askSeq || settled) return;
+        if (renamed) { state.current = null; await refresh(); select(name); }
+        errBox.textContent = (renamed ? 'Renamed to ' + name + ', but the rest was not saved. ' : '') + e.message;
+        errBox.hidden = false;
+        ok.disabled = false;
+        $('#dlgCancel').disabled = false;
+      }
+    };
+    $('#dlgCancel').onclick = () => done(name !== row.name ? { changed: true, name, renamed: true, patched: false } : null);
     dlg.showModal();
     $('#edLabel').focus();
   });
-  if (!result) return;
+  $('#dlgCancel').disabled = false;
+  if (!result || !result.changed) return;
 
-  try {
-    const patch = {};
-    if (result.label !== (row.label || '')) patch.label = result.label;
-    if (result.memory && result.memory !== row.memory) patch.memory = result.memory;
-    if (result.port && Number(result.port) !== row.port) patch.port = result.port;
-    if (Object.keys(patch).length) {
-      await post('/instances/' + encodeURIComponent(row.name) + '/settings', patch);
-    }
-    if (result.name && result.name !== row.name) {
-      await post('/instances/' + encodeURIComponent(row.name) + '/rename', { to: result.name });
-      state.current = null;
-      await refresh();
-      select(result.name);
-      toast('Renamed to ' + result.name + '.', 'good');
-      return;
-    }
-    await refresh();
-    if (Object.keys(patch).length) toast('Saved. Takes effect on the next start.', 'good');
-  } catch (e) {
-    toast(e.message, 'bad');
+  if (result.renamed) {
+    if (state.current !== result.name) { state.current = null; await refresh(); select(result.name); }
+    toast('Renamed to ' + result.name + '.', 'good');
+    return;
   }
+  await refresh();
+  if (result.patched) toast('Saved. Takes effect on the next start.', 'good');
 }
 
 async function rebuildServer(row) {
@@ -12661,7 +12925,7 @@ async function rebuildServer(row) {
     ],
   });
   if (!res) return;
-  const note = toast('Resetting ' + row.name + '… taking a snapshot first.');
+  const note = toast('Taking a snapshot, then resetting ' + row.name + '…');
   try {
     const out = await post('/instances/' + encodeURIComponent(row.name) + '/rebuild', {
       keepPlugins: res.choice === 'keep',
@@ -13508,8 +13772,18 @@ function selectTab(tab) {
   if (tab === 'db') loadDbEngines().then(syncDbForm);
 }
 
+/**
+ * The Add sheet's tabs, held still while a create runs: another tab hid the progress bar of a
+ * download that cannot yet be stopped, and left nothing to say it was still going.
+ */
+function lockAddTabs(on) {
+  for (const tab of document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')) tab.disabled = on;
+}
+
 function openAdd(tab) {
   openSheet('add');
+  // A create is running: its tab, with its progress, is the one to come back to.
+  if ([...document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')].some((t) => t.disabled)) return;
   selectTab(tab);
   setTimeout(() => $(tab === 'adopt' ? '#aDir' : tab === 'pack' ? '#pSearch' : tab === 'db' ? '#dName' : '#nName').focus(), 0);
 }
@@ -13796,6 +14070,7 @@ $('#formNew').onsubmit = async (e) => {
   bar.classList.add('indet');
   msg.textContent = 'Starting…';
   $('#bCreate').disabled = true;
+  lockAddTabs(true);
   $('#newHint').textContent = 'This can take a minute on a slow connection.';
 
   // Watching the job rather than guessing at it: the jar is tens of megabytes, and a spinner that
@@ -13831,6 +14106,7 @@ $('#formNew').onsubmit = async (e) => {
     });
     forceJava = false;
     jobs.close();
+    lockAddTabs(false);
     $('#newProg').hidden = true;
     $('#bCreate').disabled = false;
     e.target.reset();
@@ -13846,6 +14122,7 @@ $('#formNew').onsubmit = async (e) => {
   } catch (err) {
     forceJava = false;
     jobs.close();
+    lockAddTabs(false);
     bar.classList.remove('indet');
     bar.style.width = '0';
     msg.textContent = err.message;
@@ -13986,6 +14263,7 @@ $('#formPack').onsubmit = async (e) => {
   bar.classList.add('indet');
   msg.textContent = 'Starting…';
   $('#bPackCreate').disabled = true;
+  lockAddTabs(true);
 
   const jobs = new EventSource('/api/jobs/' + jobId + '/stream');
   jobs.onmessage = (ev) => {
@@ -14009,6 +14287,7 @@ $('#formPack').onsubmit = async (e) => {
       jobId: jobId,
     });
     jobs.close();
+    lockAddTabs(false);
     $('#packProg').hidden = true;
     $('#bPackCreate').disabled = false;
     await refresh();
@@ -14016,6 +14295,7 @@ $('#formPack').onsubmit = async (e) => {
     toast('Created ' + inst.name + ' from ' + packView.chosen.title + '.', 'good');
   } catch (err) {
     jobs.close();
+    lockAddTabs(false);
     bar.classList.remove('indet');
     bar.style.width = '0';
     msg.textContent = err.message;

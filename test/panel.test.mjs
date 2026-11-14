@@ -548,3 +548,100 @@ test('a stop or a restart asks first when it takes something from somebody, and 
   assert.match(op.text, /every command/)
   assert.ok(!/'Make op'/.test(html))
 })
+
+test('a failed request is said in words someone can act on', () => {
+  const { plainFailure, plainMessage } = lifted(['plainFailure', 'plainMessage'])
+  // no answer at all: never the browser's own "Failed to fetch"
+  assert.match(plainFailure(0), /did not answer/)
+  assert.match(plainFailure(401), /no longer signed in/)
+  assert.match(plainFailure(403), /no longer signed in/)
+  assert.match(plainFailure(413), /too large/)
+  assert.match(plainFailure(502), /error 502/)
+  assert.match(plainFailure(418), /error 418/)
+  assert.ok(!/Failed to fetch/.test(plainFailure(0)))
+
+  assert.equal(plainMessage('could not reach api.modrinth.com: getaddrinfo ENOTFOUND api.modrinth.com'),
+    'Could not reach api.modrinth.com. Check this computer’s internet connection, then try again.')
+  assert.equal(plainMessage('could not reach 127.0.0.1:3306: connect ECONNREFUSED'),
+    'Could not reach 127.0.0.1:3306. Nothing answered at that address.')
+  assert.equal(plainMessage('a version is required - see: spawnloft db versions'), 'Choose a version first.')
+  assert.equal(plainMessage('"main" is not running, so its data cannot be dropped - start it first, or detach without --drop'),
+    'main is not running, so its data cannot be dropped. Start it first, or detach and keep the data.')
+  // a program on this computer that could not be run is not an internet problem
+  assert.equal(plainMessage('could not reach schtasks to delete "nightly": spawn ENOENT'), 'could not reach schtasks to delete "nightly": spawn ENOENT')
+  // everything else is passed on untouched
+  assert.equal(plainMessage('That port is taken by "lobby".'), 'That port is taken by "lobby".')
+
+  // the one place every request goes through uses both
+  assert.match(html, /err\.network = true/)
+  assert.match(html, /plainMessage\(/)
+})
+
+test('toasts stay while work runs, and the stack is capped', () => {
+  const { toastStays, toastsToDrop } = lifted(['toastStays', 'toastsToDrop'])
+  assert.equal(toastStays('Saved.', 'ok'), false)
+  assert.equal(toastStays('Nope', 'bad'), true)
+  assert.equal(toastStays('Restoring…', 'ok'), true)
+  assert.equal(toastStays('Restoring... ', 'ok'), true)
+  assert.equal(toastStays('Copied to /tmp/x.zip', 'ok', { stay: true }), true)
+
+  const t = (id, working) => ({ id, working })
+  assert.deepEqual(toastsToDrop([t(1), t(2)], 4), [])
+  // the oldest idle ones go first; one that says work is under way is never dropped
+  assert.deepEqual(toastsToDrop([t(1, true), t(2), t(3), t(4), t(5), t(6)], 4).map((x) => x.id), [2, 3])
+  assert.deepEqual(toastsToDrop([t(1, true), t(2, true), t(3, true), t(4, true), t(5, true)], 4), [])
+  // the one just shown is never the one dropped
+  assert.deepEqual(toastsToDrop([t(1, true), t(2, true), t(3, true), t(4, true), t(5)], 4), [])
+  assert.match(html, /const TOAST_MAX = 4;/)
+})
+
+test('a dialog that saves keeps what was typed when the save is refused', () => {
+  const { askBlocked } = lifted(['askBlocked'])
+  assert.equal(askBlocked({ typeToConfirm: 'lobby' }, 'lobb'), true)
+  assert.equal(askBlocked({ typeToConfirm: 'lobby' }, 'lobby'), false)
+  assert.equal(askBlocked({ input: { required: true } }, '   '), true)
+  assert.equal(askBlocked({ input: { required: true } }, 'notes.txt'), false)
+  assert.equal(askBlocked({ input: {} }, ''), false)
+  assert.equal(askBlocked({}, ''), false)
+
+  // the refusal is shown in the dialog, and the next asking starts clean
+  assert.match(html, /<p class="hint bad" id="dlgError"/)
+  assert.match(html, /getElementById\('dlg'\)\.addEventListener\('close'/)
+  // the dialogs that used to close and then toast the refusal now save inside
+  for (const title of ['New file', 'New folder']) {
+    const at = html.indexOf(`title: '${title} in '`)
+    assert.ok(at > 0, title)
+    assert.match(html.slice(at, at + 900), /submit:/, title)
+  }
+
+  const { editPlan } = lifted(['editPlan'])
+  const row = { name: 'lobby', label: 'Lobby', memory: '2G', port: 25565 }
+  assert.deepEqual(editPlan(row, { name: 'lobby', label: 'Lobby', memory: '2G', port: '25565' }), { rename: null, patch: null })
+  assert.deepEqual(editPlan(row, { name: 'hub', label: 'Lobby', memory: '2G', port: '25565' }), { rename: 'hub', patch: null })
+  assert.deepEqual(editPlan(row, { name: 'hub', label: '', memory: '4G', port: '25566' }),
+    { rename: 'hub', patch: { label: '', memory: '4G', port: '25566' } })
+  assert.deepEqual(editPlan({ name: 'a', port: 1 }, { name: 'a', label: '', memory: '', port: '' }), { rename: null, patch: null })
+})
+
+test('an upload says how far it has got', () => {
+  const { uploadWords } = lifted(['uploadWords'])
+  assert.equal(uploadWords(1, 1, 50, 200, 'plugins'), 'Uploading to plugins · 25%')
+  assert.equal(uploadWords(2, 3, 200, 200, 'plugins'), 'Uploading 2 of 3 to plugins · 100%')
+  assert.equal(uploadWords(1, 2, 0, 0, 'world'), 'Uploading 1 of 2 to world…')
+  assert.equal(uploadWords(1, 1, 999, 200, 'x'), 'Uploading to x · 100%')
+  // sent with progress and a way to stop, not one silent fetch
+  assert.match(html, /function sendFile\(url, file, onProgress, hold\)/)
+  assert.match(html, /xhr\.upload\.onprogress/)
+})
+
+test('a search that failed never says nothing matches', () => {
+  const at = html.indexOf('const searchFailed = (reasons, again = true) => {')
+  assert.ok(at > 0)
+  assert.match(html.slice(at, at + 1400), /Try again/)
+})
+
+test('the Add sheet holds its tabs while a create runs', () => {
+  assert.match(html, /function lockAddTabs\(on\)/)
+  assert.equal((html.match(/lockAddTabs\(true\);/g) || []).length, 2)
+  assert.equal((html.match(/lockAddTabs\(false\);/g) || []).length, 4)
+})

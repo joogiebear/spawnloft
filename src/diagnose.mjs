@@ -9,6 +9,11 @@ import { humanBytes } from './util.mjs'
 // class-file major version to Java release
 export const CLASS_VERSION_TO_JAVA = (major) => major - 44
 
+// Advice is said twice where the two readers would do different things: `ctx.panel` is the page,
+// where the fix is a place to click, and everything else (the terminal, the console line the
+// daemon writes, a webhook) gets the command. A page that says to run "spawnloft set" sends
+// someone who has never opened a terminal looking for one.
+
 // ordered from more specific/actionable to less
 export const SHAPES = [
   {
@@ -16,25 +21,31 @@ export const SHAPES = [
     test: /FAILED TO BIND TO PORT|Address already in use|Failed to bind to address/i,
     title: 'The port is already taken',
     advice: (m, ctx) => `Something else is listening on port ${ctx.port ?? 'this server’s port'} - `
-      + 'usually another server, or another copy of this one. "spawnloft list" shows who; '
-      + 'change the port under Manage if both should run at once.',
+      + 'usually another server, or another copy of this one. '
+      + (ctx.panel
+        ? 'Stop the other one, or give this server a port of its own: the menu beside Stop, then "Rename, memory and port".'
+        : '"spawnloft list" shows who; change the port under Manage if both should run at once.'),
   },
   {
     id: 'eula',
     test: /You need to agree to the EULA/i,
     title: 'The EULA is not accepted',
-    advice: (m, ctx) => `Set eula=true in ${ctx.dir ? `${ctx.dir}\\eula.txt` : 'eula.txt'} `
+    advice: (m, ctx) => (ctx.panel
+      ? 'Open eula.txt in Files, change eula=false to eula=true '
+      : `Set eula=true in ${ctx.dir ? path.join(ctx.dir, 'eula.txt') : 'eula.txt'} `)
       + '(see https://aka.ms/MinecraftEULA) and start again.',
   },
   {
     id: 'wrong-java',
     test: /UnsupportedClassVersionError.*class file version (\d+)/i,
     title: 'Java is too old for this server',
-    advice: (m) => {
+    advice: (m, ctx) => {
       const needs = CLASS_VERSION_TO_JAVA(Number(m[1]))
       return `This server is built for Java ${needs} or newer, and the Java that launched it is older. `
-        + `Install Java ${needs}+ and, if several are installed, point this server at it with `
-        + `"spawnloft set <name> java=<path-to-java.exe>".`
+        + `Install Java ${needs}+ and, if several are installed, `
+        + (ctx.panel
+          ? 'choose it for this server under Settings, Java and memory.'
+          : 'point this server at it with "spawnloft set <name> java=<path-to-java.exe>".')
     },
   },
   {
@@ -42,15 +53,17 @@ export const SHAPES = [
     test: /java\.lang\.OutOfMemoryError/,
     title: 'The server ran out of memory',
     advice: (m, ctx) => `It has ${ctx.memory ?? 'its configured memory'} and wants more. Raise it under `
-      + 'Manage (modded servers usually want 4G or more), and make sure the machine has that to give.',
+      + `${ctx.panel ? 'Settings, Java and memory' : 'Manage'} (modded servers usually want 4G or more), and make sure the machine has that to give.`,
   },
   {
     id: 'out-of-disk',
     test: /No space left on device|There is not enough space on the disk/i,
     title: 'The disk is full',
-    advice: () => 'The drive this server lives on has no room left - saves and logs are failing. '
-      + 'Free space, or move the server with "spawnloft config set-instances" onto a drive that has some. '
-      + '"spawnloft prune" can thin old snapshots.',
+    advice: (m, ctx) => 'The drive this server lives on has no room left - saves and logs are failing. '
+      + (ctx.panel
+        ? 'Free space on that drive. Old backups are the usual place to find some: delete the ones you no longer need in Backups.'
+        : 'Free space, or move the server with "spawnloft config set-instances" onto a drive that has some. '
+          + '"spawnloft prune" can thin old snapshots.'),
   },
   {
     id: 'missing-plugin-dependency',
@@ -91,8 +104,10 @@ export const SHAPES = [
     id: 'corrupt-world',
     test: /Exception reading .*level\.dat|Failed to load level|ChunkIoErrorReport|Corrupted chunk/i,
     title: 'The world failed to load',
-    advice: () => 'Part of the world data would not read back - usually a hard power-off mid-save. '
-      + 'Restore the latest snapshot from the Backups tab; "spawnloft verify" proves which ones are whole.',
+    advice: (m, ctx) => 'Part of the world data would not read back - usually a hard power-off mid-save. '
+      + (ctx.panel
+        ? 'Restore the latest backup from Backups.'
+        : 'Restore the latest snapshot from the Backups tab; "spawnloft verify" proves which ones are whole.'),
   },
   {
     id: 'ticking-crash',
@@ -114,9 +129,11 @@ export const SHAPES = [
     id: 'missing-jar',
     test: /Unable to access jarfile (.+)/i,
     title: 'The server jar is missing',
-    advice: (m) => `Java could not find ${m[1] ? `"${m[1].trim()}"` : 'the server jar'}. `
-      + 'Re-download it ("spawnloft upgrade" for Paper, or re-choose a jar with "spawnloft set <name> jar=..."), '
-      + 'or restore the folder from a snapshot.',
+    advice: (m, ctx) => `Java could not find ${m[1] ? `"${m[1].trim()}"` : 'the server jar'}. `
+      + (ctx.panel
+        ? 'Download it again under Settings, Server software, or restore the folder from a backup.'
+        : 'Re-download it ("spawnloft upgrade" for Paper, or re-choose a jar with "spawnloft set <name> jar=..."), '
+          + 'or restore the folder from a snapshot.'),
   },
 ]
 
