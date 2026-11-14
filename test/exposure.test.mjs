@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isPublicIPv4, publicAddresses, firewallActive, boundAddress, rconExposure } from '../src/exposure.mjs'
+import { isPublicIPv4, publicAddresses, firewallActive, boundAddress, rconExposure, isPrivateIPv4, lanAddresses, joinInfo } from '../src/exposure.mjs'
 
 test('an address the internet can route to is told apart from one only a LAN can', () => {
   for (const address of ['203.0.114.9', '8.8.8.8', '172.15.0.1', '172.32.0.1', '100.63.0.1', '100.128.0.1', '192.167.1.1'])
@@ -64,4 +64,36 @@ test('the warning speaks only on the machine it is about', () => {
   assert.equal(rconExposure(inst, { ...vps, platform: 'win32' }), null, 'Windows has its own inbound firewall')
   assert.equal(rconExposure(inst, { ...vps, platform: 'darwin' }), null)
   assert.equal(rconExposure({ ...inst, rcon: null }, vps), null, 'no RCON configured')
+})
+
+// --- where a server can be joined from ---
+
+const HOME = {
+  lo: [{ address: '127.0.0.1', family: 'IPv4', internal: true }],
+  wifi: [{ address: '192.168.1.24', family: 'IPv4', internal: false }, { address: 'fe80::1', family: 'IPv6', internal: false }],
+  vpn: [{ address: '10.8.0.3', family: 'IPv4', internal: false }],
+  cgnat: [{ address: '100.72.1.9', family: 'IPv4', internal: false }],
+}
+
+test('a home network address is a private one, and nothing else', () => {
+  for (const yes of ['10.0.0.5', '172.16.0.1', '172.31.255.254', '192.168.1.24']) assert.equal(isPrivateIPv4(yes), true, yes)
+  for (const no of ['127.0.0.1', '172.32.0.1', '169.254.3.3', '100.72.1.9', '8.8.8.8', '192.168.1', 'fe80::1', '']) assert.equal(isPrivateIPv4(no), false, no)
+  assert.deepEqual(lanAddresses(HOME), ['192.168.1.24', '10.8.0.3'])
+})
+
+test('join info is read off this computer: its addresses, and where the server listens', () => {
+  const inst = { port: 25565, dir: '/nowhere' }
+  assert.deepEqual(joinInfo(inst, { interfaces: HOME, bound: '' }), { port: 25565, here: 'localhost', loopbackOnly: false, lan: ['192.168.1.24', '10.8.0.3'], public: [] })
+  // a machine with a public address of its own has it listed; a home computer never does
+  const vps = { eth0: [{ address: '203.0.114.7', family: 'IPv4', internal: false }] }
+  assert.deepEqual(joinInfo(inst, { interfaces: vps, bound: '' }).public, ['203.0.114.7'])
+  // listening on this computer only: nobody else gets an address
+  const closed = joinInfo(inst, { interfaces: HOME, bound: '127.0.0.1' })
+  assert.equal(closed.loopbackOnly, true)
+  assert.deepEqual([closed.lan, closed.public, closed.here], [[], [], 'localhost'])
+  // bound to one address: that one alone, and not localhost
+  const one = joinInfo(inst, { interfaces: HOME, bound: '192.168.1.24' })
+  assert.deepEqual([one.here, one.lan], ['192.168.1.24', ['192.168.1.24']])
+  // a port that is not known is null, never a guess
+  assert.equal(joinInfo({ dir: '/nowhere' }, { interfaces: HOME, bound: '' }).port, null)
 })

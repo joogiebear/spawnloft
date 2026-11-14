@@ -937,3 +937,36 @@ test('the whitelist says what its state means, and a player can be added by name
   // Settings no longer sends anyone to the console for this
   assert.ok(!html.includes('whitelist add <name>'))
 })
+
+test('how friends join: an address for each place someone can be, and none that is made up', () => {
+  const { joinWays, joinLead } = lifted(['joinWays', 'joinLead'])
+  const home = joinWays({ port: 25565, here: 'localhost', loopbackOnly: false, lan: ['192.168.1.24'], public: [] })
+  assert.deepEqual(home.map((w) => w.who), ['On this computer', 'On your home network', 'Over the internet'])
+  assert.deepEqual(home.map((w) => w.addresses), [['localhost:25565'], ['192.168.1.24:25565'], []])
+  // the internet row gives no address, says what is needed, and says nothing was looked up
+  assert.match(home[2].note, /port forwarding/)
+  assert.match(home[2].note, /port 25565 \(TCP\)/)
+  assert.match(home[2].note, /does not look up your public address/)
+
+  // no network: said, with no address
+  const alone = joinWays({ port: 25565, here: 'localhost', loopbackOnly: false, lan: [], public: [] })
+  assert.deepEqual(alone[1].addresses, [])
+  assert.match(alone[1].note, /no home network address right now/)
+  // two networks: both, and which to try
+  assert.match(joinWays({ port: 1, here: 'localhost', lan: ['10.0.0.2', '192.168.1.24'], public: [] })[1].note, /first is usually the one/)
+  // a machine with its own public address
+  const vps = joinWays({ port: 25565, here: 'localhost', lan: [], public: ['203.0.114.7'] })
+  assert.deepEqual(vps[2].addresses, ['203.0.114.7:25565'])
+  assert.match(vps[2].note, /firewall/)
+  // listening on this computer only
+  const closed = joinWays({ port: 25565, here: 'localhost', loopbackOnly: true, lan: [], public: [] })
+  assert.deepEqual(closed.map((w) => w.who), ['On this computer', 'Anyone else'])
+  assert.match(closed[1].note, /nobody else can reach it/)
+  // a port that is not known gives no address anywhere: "localhost:?" could be copied before
+  const unknown = joinWays({ port: null, here: 'localhost', lan: ['192.168.1.24'], public: [] })
+  assert.deepEqual(unknown.flatMap((w) => w.addresses), [])
+  assert.match(joinLead({ port: null }, 'stopped'), /port is not known yet/)
+  assert.match(joinLead({ port: 25565 }, 'stopped'), /not running/)
+  assert.match(joinLead({ port: 25565 }, 'running'), /Add Server/)
+  assert.ok(!html.includes("'localhost:' + (row.port || '?')"))
+})

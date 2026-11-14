@@ -41,6 +41,15 @@ after(async () => {
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
+test('where the server can be joined from is answered from this computer alone', async () => {
+  const at = `${panel.url}api/instances/${name}/join`
+  const info = await (await panelFetch(at)).json()
+  assert.equal(info.port, 41620)
+  assert.equal(info.here, 'localhost')
+  assert.ok(Array.isArray(info.lan) && Array.isArray(info.public))
+  assert.equal((await panelFetch(at, { method: 'POST' })).status, 405)
+})
+
 test('the whitelist switch has to be told on or off', async () => {
   for (const body of [{}, { on: 'false' }, { on: 1 }]) {
     const res = await send('whitelist-mode', body)

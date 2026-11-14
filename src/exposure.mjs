@@ -30,6 +30,38 @@ export function publicAddresses(interfaces = os.networkInterfaces()) {
     .map(entry => entry.address)
 }
 
+// an address a home router hands out: reachable from the same network, and from nowhere else
+export function isPrivateIPv4(address) {
+  const parts = String(address).split('.')
+  if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false
+  const [a, b] = parts.map(Number)
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+}
+
+export function lanAddresses(interfaces = os.networkInterfaces()) {
+  return Object.values(interfaces).flat()
+    .filter(entry => entry && !entry.internal && entry.family === 'IPv4' && isPrivateIPv4(entry.address))
+    .map(entry => entry.address)
+}
+
+// Where a server can be joined from, as far as this computer can tell by looking at itself: its
+// own network interfaces and the server's server-ip. Nothing is asked of anything outside, so
+// there is no public address for a computer behind a router - the router has it, not this machine.
+export function joinInfo(inst, { interfaces = os.networkInterfaces(), bound = undefined } = {}) {
+  const ip = bound ?? boundAddress(inst.dir)
+  const loopbackOnly = ip === '127.0.0.1' || ip === 'localhost' || ip === '::1'
+  // a server bound to one address answers on that one alone, and not on localhost
+  const only = ip && !loopbackOnly ? ip : null
+  const pick = list => (loopbackOnly ? [] : only ? list.filter(address => address === only) : list)
+  return {
+    port: Number.isInteger(inst.port) ? inst.port : null,
+    here: only ?? 'localhost',
+    loopbackOnly,
+    lan: pick(lanAddresses(interfaces)),
+    public: pick(publicAddresses(interfaces)),
+  }
+}
+
 // True, false, or null for "could not tell". ufw and firewalld state can be read without root; hand-written
 // nftables/iptables rules cannot be listed, so a saved ruleset file gives null and false means none was found.
 export function firewallActive({ read = file => fs.readFileSync(file, 'utf8'), run = spawnSync } = {}) {
