@@ -201,7 +201,7 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
 // rejects when it cannot be started. The 'error' listener is the point: a missing program (a
 // Linux machine with no xdg-open, which is any server reached over SSH) is reported by an
 // 'error' event, not by spawn() throwing, and with nothing listening that event ends the panel.
-export function reveal(name, sub = null, folder = null, { run = spawn, platform = process.platform } = {}) {
+export function reveal(name, sub = null, folder = null, { run = spawn, platform = process.platform, env = process.env } = {}) {
   const inst = getInstance(name)
   // `sub` arrives over HTTP, so it is matched against an allowlist, never used as a path.
   // `folder` is confined to the server folder by files.resolvePath.
@@ -216,6 +216,11 @@ export function reveal(name, sub = null, folder = null, { run = spawn, platform 
     platform === 'win32' ? ['explorer.exe', [target]]
     : platform === 'darwin' ? ['open', [target]]
     : ['xdg-open', [target]]
+  // A Linux machine reached over SSH often has xdg-open and no desktop: it would start, find no
+  // display and exit, and the page would say the folder opened.
+  if (platform !== 'win32' && platform !== 'darwin' && !env.DISPLAY && !env.WAYLAND_DISPLAY) {
+    return Promise.reject(new UserError(`This computer has no desktop to open folders on. The folder is ${target}`))
+  }
   const refused = (err) => new UserError(
     err && err.code === 'ENOENT'
       ? `This computer has no file manager to open folders with. The folder is ${target}`

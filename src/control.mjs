@@ -1,5 +1,6 @@
 import net from 'node:net'
 import fs from 'node:fs'
+import path from 'node:path'
 import { controlPath, stateFile } from './paths.mjs'
 import { readJson, pidAlive, sameProcess, UserError } from './util.mjs'
 
@@ -88,10 +89,47 @@ export function isActiveStatus(status) {
   return ACTIVE_STATUSES.includes(status)
 }
 
+// A restore in progress, for a server or a database, as a marker file beside its state file. A
+// restore extracts over the folder for minutes with the server stopped, so "is it running" says
+// the files are free when they are anything but: a start, a delete, a rename or another restore on
+// top of one leaves a world that is neither the backup nor what it replaced. A file, not a
+// variable, because the panel, the CLI, an assistant's MCP process and scheduled tasks are
+// separate processes. The marker names its process; one left by a process that has died is ignored.
+function restoreMarker(name) {
+  return path.join(path.dirname(stateFile(name)), 'restoring.json')
+}
+
+export function isRestoring(name) {
+  const mark = readJson(restoreMarker(name), null)
+  return Boolean(mark && Number.isInteger(mark.pid) && pidAlive(mark.pid))
+}
+
+export function restoreBlock(name, verb) {
+  return isRestoring(name) ? `A backup is being put back into "${name}" right now. Wait for it to finish before ${verb}.` : null
+}
+
+// Marks the restore and returns the function that clears the mark. Throws if one is already running.
+export function beginRestore(name, verb = 'restoring another') {
+  const why = restoreBlock(name, verb)
+  if (why) throw new UserError(why)
+  const file = restoreMarker(name)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }))
+  return () => {
+    try {
+      fs.unlinkSync(file)
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
 // Why an operation on this instance's files has to wait, or null. The way out differs by status (an
 // orphaned server can only be killed, so "stop it first" would send people to a command that refuses),
 // hence one message builder. verb is what the caller was about to do, e.g. "deleting it".
 export function activeBlock(name, verb) {
+  const restoring = restoreBlock(name, verb)
+  if (restoring) return restoring
   const { status, state } = readState(name)
   if (status === 'running') return `"${name}" is running - stop it before ${verb}.`
   if (status === 'stopping') return `"${name}" is still shutting down - wait for it to finish before ${verb}.`

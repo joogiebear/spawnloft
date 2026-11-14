@@ -238,28 +238,44 @@ test('Play picks the profile for the server\'s version, preferring the one point
   assert.equal(playProfileFor({ name: 'x', mcVersion: '1.21.11' }, []), null)
 })
 
-test('deleting several things in Files names them, and asks for the server name when the server itself would go', () => {
+test('deleting in Files names what goes, and asks for the server name when the server itself would go', () => {
   const { deleteConfirm } = lifted(['deleteConfirm'])
   const entries = [
     { path: 'world', type: 'dir' }, { path: 'plugins', type: 'dir' }, { path: 'server.jar', type: 'file' },
     { path: 'server.properties', type: 'file' }, { path: 'eula.txt', type: 'file' }, { path: 'notes.txt', type: 'file' },
-    { path: 'a.log', type: 'file' }, { path: 'b.log', type: 'file' },
+    { path: 'logs', type: 'dir' }, { path: 'crash-reports', type: 'dir' }, { path: 'rpg', type: 'dir' },
   ]
   const one = deleteConfirm('survival', ['plugins/Old.jar'], entries)
   assert.deepEqual(one, { what: 'Old.jar', text: 'A copy is kept first, so Backups can put it back.', typeToConfirm: null })
 
-  const logs = deleteConfirm('survival', ['a.log', 'b.log'], entries)
-  assert.equal(logs.typeToConfirm, null, 'two loose files are not the server')
-  assert.match(logs.text, /^This deletes a\.log, b\.log\. A copy is kept first/)
+  // routine cleanup is not the server going, and is not described as if it were
+  const tidy = deleteConfirm('survival', ['logs', 'crash-reports'], entries)
+  assert.equal(tidy.typeToConfirm, null)
+  assert.equal(tidy.text, 'This deletes logs, crash-reports. A copy is kept first, so Backups can put them back.')
 
   const all = deleteConfirm('survival', entries.map((e) => e.path), entries)
-  assert.equal(all.what, '8 items')
+  assert.equal(all.what, '9 items')
   assert.equal(all.typeToConfirm, 'survival')
-  assert.match(all.text, /^This deletes world, plugins, server\.jar, server\.properties, eula\.txt, notes\.txt and 2 more\. The server cannot run without some of these\./)
+  assert.match(all.text, /^This deletes world, plugins, server\.jar, server\.properties, eula\.txt, notes\.txt and 3 more\. The server cannot run as it is without world, plugins, server\.jar, server\.properties\. /)
 
+  // one thing can be the server too: the world on its own is asked about the same way
+  const world = deleteConfirm('survival', ['world'], entries)
+  assert.equal(world.typeToConfirm, 'survival')
+  assert.match(world.text, /^The server cannot run as it is without world\. A copy is kept first/)
+  // the world is whatever level-name says, not the word "world"
+  assert.equal(deleteConfirm('survival', ['rpg'], entries, 'rpg').typeToConfirm, 'survival')
+  assert.equal(deleteConfirm('survival', ['rpg'], entries).typeToConfirm, null)
   // inside a subfolder nothing is "the server": the copy in Backups is enough
   assert.equal(deleteConfirm('survival', ['plugins/A', 'plugins/B.jar'], [{ path: 'plugins/A', type: 'dir' }]).typeToConfirm, null)
-  assert.equal(deleteConfirm('survival', ['server.properties', 'notes.txt'], entries).typeToConfirm, 'survival')
+})
+
+test('the Restore dialog promises a copy only when one can be kept, and says the databases are not in it', () => {
+  const { restoreWords } = lifted(['restoreWords'])
+  assert.deepEqual(restoreWords({ members: ['world', 'plugins'], databases: [] }),
+    { copy: 'A copy of the files as they are now is kept in this list first.', note: '' })
+  assert.match(restoreWords({ members: [], databases: [] }).copy, /no copy of how things are now can be kept/)
+  assert.match(restoreWords({ members: ['databases'] }).copy, /no copy/)
+  assert.match(restoreWords({ members: ['world', 'databases'], databases: [{ database: 'x' }] }).note, /databases are not part of the copy/)
 })
 
 test('copying a secret never spells it out in a label, a tooltip or a toast', () => {
@@ -301,11 +317,36 @@ test('an upload stays in the folder it started in, and unsaved editor text is no
 })
 
 test('a restore locks its list: every button off, and the row says it is restoring', () => {
-  const { lockRestoring } = lifted(['lockRestoring'])
-  assert.ok(lockRestoring)
-  const src = fnSource('lockRestoring')
-  assert.match(src, /b\.disabled = true/)
-  assert.match(src, /data-restoring/)
-  // both lists call it after drawing, so a redraw during a restore comes up locked
-  assert.equal(html.split('lockRestoring(').length - 1 >= 5, true)
+  // a few elements, enough for the function to run for real
+  const button = () => ({ disabled: false, title: '' })
+  const line = (name) => {
+    const attrs = new Map()
+    const when = { textContent: 'Nov 14', setAttribute: (k, v) => attrs.set('when.' + k, v) }
+    return { dataset: { backupName: name }, attrs, when,
+      hasAttribute: (k) => attrs.has(k), setAttribute: (k, v) => attrs.set(k, v), querySelector: () => when }
+  }
+  const scopeOf = (buttons, lines) => ({ querySelectorAll: (sel) => (sel === 'button' ? buttons : lines) })
+  const { lockRestoring, restoring } = new Function(`${constSource('restoring')}\n${fnSource('lockRestoring')}\nreturn { lockRestoring, restoring }`)()
+
+  const buttons = [button(), button(), button()]
+  const lines = [line('a.tar.gz'), line('b.tar.gz')]
+  lockRestoring(scopeOf(buttons, lines), 'survival')
+  assert.ok(buttons.every((b) => !b.disabled), 'nothing is locked when nothing is restoring')
+
+  restoring.set('survival', 'b.tar.gz')
+  lockRestoring(scopeOf(buttons, lines), 'creative')
+  assert.ok(buttons.every((b) => !b.disabled), 'another server restoring locks nothing here')
+  lockRestoring(scopeOf(buttons, lines), 'survival')
+  assert.ok(buttons.every((b) => b.disabled && b.title === 'Wait for the restore to finish'))
+  assert.equal(lines[0].attrs.has('data-restoring'), false)
+  assert.equal(lines[1].attrs.get('aria-busy'), 'true')
+  assert.match(lines[1].when.textContent, /^Restoring this one/)
+  // drawn again during the restore: still locked, the row not written twice
+  lines[1].when.textContent = 'x'
+  lockRestoring(scopeOf(buttons, lines), 'survival')
+  assert.equal(lines[1].when.textContent, 'x')
+
+  // both pages mark the restore before sending it and clear the mark whatever happens
+  assert.equal(html.split('restoring.set(row.name,').length - 1, 2)
+  assert.equal(html.split('restoring.delete(row.name);').length - 1, 2)
 })

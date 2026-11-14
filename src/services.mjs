@@ -9,7 +9,7 @@ import {
 import * as mariadb from './mariadb.mjs'
 import * as garnet from './garnet.mjs'
 import * as mysql from './mysql.mjs'
-import { readState, clearState, activeBlock } from './control.mjs'
+import { readState, clearState, activeBlock, beginRestore, restoreBlock, isRestoring } from './control.mjs'
 import { fail, findFreePort, isPortFree, randomPassword, validateName, cleanLabel, stamp, humanBytes, safeRelativePath, isInside } from './util.mjs'
 import * as supervisor from './supervisor.mjs'
 import * as activity from './activity.mjs'
@@ -357,6 +357,10 @@ export async function dumpAttachments(serverName, dir) {
       skipped.push({ service: db.name, database: a.database, reason: 'the database is not running' })
       continue
     }
+    if (isRestoring(db.name)) {
+      skipped.push({ service: db.name, database: a.database, reason: 'a backup was being put back into it at the time' })
+      continue
+    }
     const rel = dumpFileFor(db.name, a.database)
     try {
       const { bytes } = await engineOf(db).dump(db, a.database, path.join(dir, rel))
@@ -468,29 +472,28 @@ export async function backupDatabase(name, { label = 'manual', quiet = false, du
 }
 
 // Takes a "pre-restore" backup first, so restoring the wrong backup can itself be undone.
-// Restores in progress in this process, by database name: a second restore, a delete or a new
-// dump on top of one refuses until it has finished.
-const dbRestoresRunning = new Set()
+// A restore marks the database for as long as it runs (control.mjs): a second restore, a delete
+// or a new dump on top of one refuses until it has finished.
 export function isRestoringDatabase(name) {
-  return dbRestoresRunning.has(name)
+  return isRestoring(name)
 }
 function refuseWhileRestoringDatabase(name, verb) {
-  if (dbRestoresRunning.has(name)) fail(`A backup is being put back into "${name}" right now. Wait for it to finish before ${verb}.`)
+  const why = restoreBlock(name, verb)
+  if (why) fail(why)
 }
 
 export async function restoreDatabaseBackup(name, file) {
   const db = getDatabase(name)
   const full = dumpPath(name, file)
   if (!isUp(db)) fail(`"${name}" is not running. A backup is put back into the running database - start it first.`)
-  refuseWhileRestoringDatabase(name, 'restoring another')
-  dbRestoresRunning.add(name)
+  const done = beginRestore(name)
   try {
     const safety = attachedDatabases(db).length ? await backupDatabase(name, { label: 'pre-restore', quiet: true, duringRestore: true }) : null
     await engineOf(db).importSql(db, full)
     activity.record(name, 'restore', { detail: path.basename(full) + (safety ? `; how it was is kept as ${safety.name}` : '') })
     return { restored: path.basename(full), safety: safety?.name ?? null }
   } finally {
-    dbRestoresRunning.delete(name)
+    done()
   }
 }
 
@@ -538,6 +541,10 @@ export async function importDumps(serverName, dumps, baseDir) {
     const db = getDatabase(d.service)
     if (!isUp(db)) {
       skipped.push({ ...d, reason: `"${d.service}" is not running; the dump is left at ${file}` })
+      continue
+    }
+    if (isRestoring(db.name)) {
+      skipped.push({ ...d, reason: `a backup is being put back into "${d.service}" right now; the dump is left at ${file}` })
       continue
     }
     try {

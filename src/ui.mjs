@@ -624,7 +624,6 @@ async function handleBackups(req, res, name, seg) {
   const body = await readBody(req)
 
   if (!action) {
-    backup.refuseWhileRestoring(name, 'taking a new one')
     // snapshotting a running server is allowed; createSnapshot skips files the server holds locked
     const running = supervisor.isRunning(name)
     const out = await backup.createSnapshot(inst, {
@@ -655,7 +654,8 @@ async function handleBackups(req, res, name, seg) {
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))
-    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true })
+    // withoutCopy is the answer to "the copy could not be kept; restore anyway?", never the default
+    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true, safety: body.withoutCopy !== true })
     return json(res, 200, out)
   }
 
@@ -1990,7 +1990,6 @@ async function route(req, res) {
 
   // supervisor.start waits for ready and reports whether it got there
   const started = async () => {
-    backup.refuseWhileRestoring(name, 'starting it')
     const out = await supervisor.start(name)
     const status = safeInstance(supervisor.statusOf(name))
     if (out.failed) return json(res, 500, { error: `"${name}" started but stopped again: ${out.reason}`, status })

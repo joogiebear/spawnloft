@@ -9704,8 +9704,10 @@ async function renderFiles(opts) {
   const pane = body.closest('.pane');
   pane.ondragover = (ev) => {
     if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
-    // with a file open in the editor there is no list to drop onto; the page-wide guard refuses it
-    if (filesStateFor(row.name).editing) return;
+    // With a file open in the editor there is no list to drop onto, and these handlers belong to
+    // the server whose list was drawn last, which may not be the one on screen now. Either way the
+    // page-wide guard refuses the drop.
+    if (state.current !== row.name || filesStateFor(row.name).editing) return;
     ev.preventDefault();
     pane.setAttribute('data-drop', '');
   };
@@ -9715,7 +9717,7 @@ async function renderFiles(opts) {
     if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
     // before anything else: the browser's own answer to a dropped file is to open it over the panel
     ev.preventDefault();
-    if (filesStateFor(row.name).editing) return;
+    if (state.current !== row.name || filesStateFor(row.name).editing) return;
     // The entries must be taken before the first await: the browser empties the drop's item list
     // once the event handler has returned.
     const roots = [...ev.dataTransfer.items]
@@ -9823,33 +9825,37 @@ async function uploadFiles(row, view, list) {
  * What the Delete dialog in Files says for a selection.
  *
  * One file is named in the title. Several are named in the text, since "14 items" does not say
- * that the world and the server jar are among them. And a selection that takes several things from
- * the top of the server's folder, a folder or the jar or server.properties among them, is the
- * server itself going: that one asks for the server's name, the way removing a server does.
+ * that the world and the server jar are among them. A selection that takes a world, the plugins,
+ * the jar or server.properties from the top of the server's folder is the server itself going:
+ * that one says which, and asks for the server's name, the way removing a server does.
  */
-function deleteConfirm(serverName, paths, entries) {
+function deleteConfirm(serverName, paths, entries, levelName) {
   const nameOf = (p) => p.split('/').pop();
+  const level = levelName || 'world';
+  const byPath = new Map((entries || []).map((e) => [e.path, e]));
+  // What the server is made of, at the top of its folder: its worlds, what it loads, its jar and
+  // its settings. A folder of logs or crash reports is not, and is not asked about as if it were.
+  const VITAL_FOLDERS = [level, level + '_nether', level + '_the_end', 'plugins', 'mods', 'config', 'libraries', 'versions'];
+  const isVital = (p) => !p.includes('/') && ((byPath.get(p) || {}).type === 'dir'
+    ? VITAL_FOLDERS.includes(p)
+    : /\.jar$/i.test(p) || p === 'server.properties');
+  const vital = paths.filter(isVital);
+  const warn = vital.length ? 'The server cannot run as it is without ' + vital.map(nameOf).join(', ') + '. ' : '';
   if (paths.length === 1) {
-    return { what: nameOf(paths[0]), text: 'A copy is kept first, so Backups can put it back.', typeToConfirm: null };
+    return { what: nameOf(paths[0]), text: warn + 'A copy is kept first, so Backups can put it back.', typeToConfirm: vital.length ? serverName : null };
   }
   const shown = paths.slice(0, 6).map(nameOf).join(', ');
   const rest = paths.length - 6;
-  const names = shown + (rest > 0 ? ' and ' + rest + ' more' : '');
-  const byPath = new Map((entries || []).map((e) => [e.path, e]));
-  const vital = paths.some((p) => !p.includes('/')
-    && ((byPath.get(p) || {}).type === 'dir' || /\.jar$/i.test(p) || p === 'server.properties'));
   return {
     what: paths.length + ' items',
-    text: 'This deletes ' + names + '. '
-      + (vital ? 'The server cannot run without some of these. ' : '')
-      + 'A copy is kept first, so Backups can put them back.',
-    typeToConfirm: vital ? serverName : null,
+    text: 'This deletes ' + shown + (rest > 0 ? ' and ' + rest + ' more' : '') + '. ' + warn + 'A copy is kept first, so Backups can put them back.',
+    typeToConfirm: vital.length ? serverName : null,
   };
 }
 
 async function deleteFiles(row, view, paths, entries) {
   const base = '/instances/' + encodeURIComponent(row.name) + '/files';
-  const confirm = deleteConfirm(row.name, paths, entries);
+  const confirm = deleteConfirm(row.name, paths, entries, row.levelName);
   const what = confirm.what;
   const ok = await ask({
     title: 'Delete ' + what + '?',
@@ -10671,6 +10677,7 @@ async function renderBackups(opts) {
   body.append(auto);
   body.append(renderBackupHistory(row, data, signature));
   paintBackupStanding(standing, row, data, null, go);
+  lockRestoring(body, row.name);
   let automatic;
   try {
     automatic = await api(base + '/auto');
@@ -10682,6 +10689,7 @@ async function renderBackups(opts) {
   if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
   auto.replaceWith(autoBackupSection(base, automatic));
   paintBackupStanding(standing, row, data, automatic, go);
+  lockRestoring(body, row.name);
 }
 
 const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only', config: 'Config only', plugins: 'Plugins only' };
@@ -10873,6 +10881,22 @@ function lockRestoring(scope, owner) {
       when.textContent = 'Restoring this one\u2026 it can take a few minutes.';
     }
   }
+}
+
+/**
+ * What the Restore dialog may promise about the copy kept first. The copy holds the files the
+ * backup lists, as they are now. A backup that lists nothing (made by hand, or by an old version)
+ * gets no copy, and the databases a backup carries are never in it: both are said, not implied.
+ */
+function restoreWords(snap) {
+  const files = (snap.members || []).some((m) => m !== 'databases');
+  const dbs = (snap.databases || []).length > 0;
+  return {
+    copy: files
+      ? 'A copy of the files as they are now is kept in this list first.'
+      : 'This backup does not record what it holds, so no copy of how things are now can be kept.',
+    note: dbs ? ' The databases are not part of the copy kept first: back them up from their own page if you may want them back.' : '',
+  };
 }
 
 function renderBackupHistory(row, data, signature) {
@@ -11118,13 +11142,15 @@ function renderBackupHistory(row, data, signature) {
           ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
           : '';
         const flawed = snap.problems && snap.problems.length ? ' Note: ' + snap.problems.join(' ') : '';
+        const words = restoreWords(snap);
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
           text: 'This puts back ' + covers + ' from ' + (snap.note ? '“' + snap.note + '” (' + snap.name + ')' : snap.name)
-            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs + flawed,
+            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs + flawed
+            + words.note,
           choices: [
-            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. A copy of how things are now is kept in this list first, so this can be undone.' },
-            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of how things are now is kept in this list first, so this can be undone.' },
+            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
+            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. ' + words.copy },
           ],
           confirmLabel: 'Restore',
           danger: true,
@@ -11134,9 +11160,26 @@ function renderBackupHistory(row, data, signature) {
         const note = toast('Restoring ' + snap.name + '.');
         restoring.set(row.name, snap.name);
         lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
+        const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
         try {
-          const out = await post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean' });
-          if (out.safety) toast('What was there before is kept as ' + out.safety + '.', 'good');
+          let out;
+          try {
+            out = await send(false);
+          } catch (e) {
+            // The copy could not be kept, usually a full disk. Nothing has changed; going ahead
+            // without it is a second, separate yes.
+            if (e.code !== 'no-copy') throw e;
+            const sure = await ask({
+              title: 'Restore without keeping a copy?',
+              text: e.message + ' Restoring now overwrites what is there with no way back.',
+              confirmLabel: 'Restore without a copy',
+              danger: true,
+              typeToConfirm: row.name,
+            });
+            if (!sure) { note.remove(); return; }
+            out = await send(true);
+          }
+          if (out.safety) toast('How it was before is kept as ' + out.safety + '.', 'good');
           note.remove();
           const imported = (out.databases && out.databases.imported) || [];
           const skipped = (out.databases && out.databases.skipped) || [];

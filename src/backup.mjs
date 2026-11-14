@@ -11,6 +11,7 @@ import * as settings from './settings.mjs'
 import { rconExec } from './rcon.mjs'
 import { fail, stamp, humanBytes, writeJson, readJson, UserError, acquireLockAsync, safeRelativePath } from './util.mjs'
 import * as activity from './activity.mjs'
+import { beginRestore, restoreBlock, isRestoring as restoreInProgress } from './control.mjs'
 
 // The mirror is a second location every snapshot is copied to. Read from settings on each call
 // so enabling it needs no restart. A failed mirror copy is reported but never fails the backup.
@@ -210,7 +211,10 @@ function appendToError(err, line) {
 // A running server is flushed first (save-off, save-all flush, then save-on afterwards) so the
 // copy isn't torn mid-write. A flush that can't be done (RCON down) is reported in the result and
 // manifest rather than failing the snapshot.
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false } = {}) {
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false, duringRestore = false } = {}) {
+  // a copy of a folder that is halfway through being put back is a backup of nothing; the one
+  // exception is the copy the restore itself takes before it starts
+  if (!duringRestore) refuseWhileRestoring(inst.name, 'taking a new one')
   // `members` narrows a snapshot to named paths, e.g. one config file before it is changed. The
   // owner's leave-out list applies to every normal backup but not to a copy of named files.
   const leaveOut = only ? [] : excludePatterns(inst)
@@ -441,7 +445,9 @@ export async function newestSnapshotAt(name) {
 export function resolveSnapshot(name, ref) {
   const all = listSnapshots(name)
   if (!all.length) fail(`no snapshots exist for "${name}"`)
-  if (!ref || ref === 'latest') return all[0]
+  // "latest" is the newest backup someone would mean: not the copy a restore kept of what it
+  // replaced, or restoring "latest" twice would undo the first restore
+  if (!ref || ref === 'latest') return all.find((s) => s.label !== 'pre-restore') ?? all[0]
   const exact = all.find((s) => s.name === ref || s.name === `${ref}.tar.gz`)
   if (exact) return exact
   const partial = all.filter((s) => s.name.includes(ref))
@@ -457,24 +463,22 @@ export function checkRestorable(snapshot) {
   return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
 }
 
-// Restores in progress in this process, by server name. A second restore, a delete or a start on
-// top of one is how a world ends up as neither the backup nor what it replaced, so those refuse
-// until it has finished.
-const restoresRunning = new Set()
+// A restore marks the server for as long as it runs (control.mjs): a second restore, a delete, a
+// new backup or a start on top of one refuses until it has finished, from any process.
 export function isRestoring(name) {
-  return restoresRunning.has(name)
+  return restoreInProgress(name)
 }
 export function refuseWhileRestoring(name, verb) {
-  if (restoresRunning.has(name)) fail(`A backup is being put back into "${name}" right now. Wait for it to finish before ${verb}.`)
+  const why = restoreBlock(name, verb)
+  if (why) fail(why)
 }
 
 export async function restoreSnapshot(inst, snapshot, options = {}) {
-  refuseWhileRestoring(inst.name, 'restoring another')
-  restoresRunning.add(inst.name)
+  const done = beginRestore(inst.name)
   try {
     return await restoreSnapshotLocked(inst, snapshot, options)
   } finally {
-    restoresRunning.delete(inst.name)
+    done()
   }
 }
 
@@ -509,7 +513,15 @@ async function restoreSnapshotLocked(inst, snapshot, { quiet = false, clean = fa
       .filter((m) => m !== 'databases' && safeRelativePath(m) !== null)
       .filter((m) => fs.existsSync(path.join(inst.dir, ...m.split(/[\\/]/))))
     if (present.length) {
-      const res = await createSnapshot(inst, { scope: 'files', label: 'pre-restore', members: present, flush: false })
+      let res
+      try {
+        res = await createSnapshot(inst, { scope: 'files', label: 'pre-restore', members: present, flush: false, duringRestore: true })
+      } catch (err) {
+        // A full disk is one of the times people restore. A clean restore deletes, so it stops
+        // here; an ordinary one can go ahead without the copy, but only when asked to.
+        fail(`Could not keep a copy of how things are now, so nothing was changed (${err.message}).` +
+          (clean ? '' : ' It can be restored without that copy, which cannot be undone.'), clean ? undefined : 'no-copy')
+      }
       safety = path.basename(res.file)
       if (clean) for (const m of present) await fs.promises.rm(path.join(inst.dir, ...m.split(/[\\/]/)), { recursive: true, force: true })
     }
