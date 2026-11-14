@@ -187,12 +187,27 @@ export async function onlineNow(inst) {
   }
 }
 
-export async function setOp(inst, uuid, on) {
+/**
+ * Whether one of the server's own lists names this player now.
+ *
+ * Asked after a console command, because the console's answer is a sentence and not a result:
+ * "That player does not exist" comes back the same way "Made Steve a server operator" does. The
+ * server writes the list before it answers, so the file is the result. Matched by name as well as
+ * id, since an offline-mode server files the same person under an id of its own making.
+ */
+function listed(dir, file, who) {
+  const name = String(who.name || '').toLowerCase()
+  return readList(dir, file).some((r) =>
+    String(r.uuid).toLowerCase() === who.uuid || (name && String(r.name || '').toLowerCase() === name))
+}
+
+// `running` and `exec` are the server's state and its console, named so a test can stand in for both.
+export async function setOp(inst, uuid, on, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
   const who = findPlayer(inst, uuid)
-  if (supervisor.isRunning(inst.name)) {
+  if (running) {
     const name = requireName(who, on ? 'opping' : 'deopping')
-    const [reply] = await rconExec(inst, [`${on ? 'op' : 'deop'} ${name}`])
-    return { uuid: who.uuid, op: on, via: 'console', reply: stripColors(reply || '').trim() }
+    const [reply] = await exec(inst, [`${on ? 'op' : 'deop'} ${name}`])
+    return { uuid: who.uuid, op: on, via: 'console', reply: stripColors(reply || '').trim(), took: listed(inst.dir, OPS, who) === on }
   }
   updateList(inst.dir, OPS, (rows) => {
     const filtered = rows.filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
@@ -210,15 +225,15 @@ export async function setOp(inst, uuid, on) {
   return { uuid: who.uuid, op: on, via: 'file' }
 }
 
-export async function setBan(inst, uuid, on, reason) {
+export async function setBan(inst, uuid, on, reason, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
   const who = findPlayer(inst, uuid)
   const why = String(reason || '').trim().slice(0, 200)
-  if (supervisor.isRunning(inst.name)) {
+  if (running) {
     const name = requireName(who, on ? 'banning' : 'pardoning')
     // banning a connected player also kicks them
     const cmd = on ? `ban ${name}${why ? ' ' + why : ''}` : `pardon ${name}`
-    const [reply] = await rconExec(inst, [cmd])
-    return { uuid: who.uuid, banned: on, via: 'console', reply: stripColors(reply || '').trim() }
+    const [reply] = await exec(inst, [cmd])
+    return { uuid: who.uuid, banned: on, via: 'console', reply: stripColors(reply || '').trim(), took: listed(inst.dir, BANNED, who) === on }
   }
   updateList(inst.dir, BANNED, (rows) => {
     const filtered = rows.filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
