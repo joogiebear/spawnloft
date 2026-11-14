@@ -548,8 +548,9 @@ downloads. The panel, the launcher and the assistant's tools get the same words 
 - **Files are hashed once.** A library, asset or jar that passes its SHA-1 is noted in
   `client/cache/verified.json` with its size and modification time, and later launches take a file
   whose size and time still match as checked. A file that was replaced, cut short or touched is
-  hashed again and fetched again if it is wrong. Deleting `verified.json` makes the next launch
-  hash everything once more; nothing else depends on it.
+  hashed again and fetched again if it is wrong. `spawnloft client install <profile> --verify`
+  hashes every file of that profile's version again, whatever the list says, and repairs what is
+  wrong; deleting `verified.json` does the same for every version on the next launch.
 - **Downloads give up on a dead connection.** A file that gets no bytes for 30 seconds, or whose
   connection is cut part way, is asked for again, three times in all, before the launch fails
   with the code `download-failed`.

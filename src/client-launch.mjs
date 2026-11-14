@@ -180,6 +180,11 @@ export async function spawnClient(command, { name, state }) {
   // record means "not known", and the log is still the fallback for those.
   // set when the state is written; Stop removes the state file before this handler runs
   let startedAt = null
+  // a Stop mark left by a game this process never heard exit must not be read as this one's
+  if (child.pid) {
+    stopAsked.delete(child.pid)
+    try { fs.rmSync(stopMark(name), { force: true }) } catch { /* only a mark */ }
+  }
   child.on('exit', (code, signal) => {
     const mine = readJson(clientStateFile(name), null)?.pid === child.pid
     try {
@@ -263,12 +268,15 @@ export function fromBeforeBoot(startedAt, { now = Date.now(), uptime = os.uptime
 }
 
 function stateAlive(state) {
-  if (fromBeforeBoot(state.startedAt)) return false
   if (!pidAlive(state.pid)) return false
-  // the same pid with another start time is another process, whatever it is called
-  if (state.procStart) {
-    const now = procStartTicks(state.pid)
-    if (now && now !== state.procStart) return false
+  // Where the process's own start time can be read it decides, both ways: the same pid with
+  // another start time is another process, and the same start time is this game whatever the
+  // wall clock has done since (a VM resumed, a clock corrected by hours).
+  const ticks = state.procStart ? procStartTicks(state.pid) : null
+  if (ticks) {
+    if (ticks !== state.procStart) return false
+  } else if (fromBeforeBoot(state.startedAt)) {
+    return false
   }
   return sameProcess(state.pid, state.javaExe, Date.parse(state.startedAt) || 0)
 }

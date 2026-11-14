@@ -360,10 +360,13 @@ export async function pickClientJava({ explicit = null, requirement, arch = null
     const warning = over ? `${what} wants ${need}; using Java ${state.major} at ${explicit}, which is newer, so the game may not start.` : null
     return { path: explicit, warning, source: 'explicit' }
   }
+  // whether the list is a remembered one, asked before recentJavas() refreshes it
+  const remembered = !found && javasKept !== null
   let all = found ?? await recentJavas()
   let choice = chooseClientJava(all, requirement, arch)
   // a remembered Java that has since been removed: look again before settling for less
-  if (choice && !found && choice.path !== 'java' && !fsSync.existsSync(choice.path)) {
+  // (and none that fits may only mean one was installed since the last look)
+  if (!found && (choice ? choice.path !== 'java' && !fsSync.existsSync(choice.path) : remembered)) {
     all = await recentJavas({ fresh: true })
     choice = chooseClientJava(all, requirement, arch)
   }

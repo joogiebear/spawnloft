@@ -623,6 +623,19 @@ test('a refresh that cannot reach Microsoft does not mark the account, and says 
   }
   await assert.rejects(accountFor('away', { fetchImpl: half, now }), (err) => err.code === 'sign-in-unreachable')
   assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  // an answer that is not Microsoft's at all (a hotel's log-in page, a proxy's block page)
+  const portal = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token <') } })
+  await assert.rejects(accountFor('away', { fetchImpl: portal, now }), (err) => err.code === 'sign-in-unreachable')
+  const blocked = scripted([{ match() {}, reply: { status: 403, json: {} } }])
+  await assert.rejects(accountFor('away', { fetchImpl: blocked, now }), (err) => err.code === 'sign-in-unreachable')
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  // Xbox answering that it is busy, after Microsoft renewed the token
+  const xboxBusy = scripted([
+    { match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 200, json: tokenReply } },
+    { match(url) { assert.equal(url, XBL_URL) }, reply: { status: 503, json: {} } },
+  ])
+  await assert.rejects(accountFor('away', { fetchImpl: xboxBusy, now }), (err) => err.code === 'sign-in-unreachable')
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
   // Microsoft refusing the refresh token is the one that marks it
   const refused = scripted([{ match() {}, reply: { status: 400, json: { error: 'invalid_grant' } } }])
   await assert.rejects(accountFor('away', { fetchImpl: refused, now }), (err) => err.code === 'sign-in-expired')

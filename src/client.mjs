@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import dns from 'node:dns'
 import net from 'node:net'
-import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { checkCancelled } from './cancel.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
@@ -254,6 +254,8 @@ export function removeProfile(name, { purge = false } = {}) {
     release()
   }
   if (purge) fs.rmSync(clientRunDir(name), PURGE)
+  // how the last game ended belongs to this profile, not to a later one of the same name
+  else fs.rmSync(clientLastExit(name), { force: true })
 }
 
 function holderText(name) {

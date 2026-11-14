@@ -76,8 +76,12 @@ function sha1OfFile(file) {
 }
 
 // Notes a file as checked: it was just hashed here, or just downloaded against that hash.
+// A checksum is 40 hex characters; anything else in a version file (an empty string) is no
+// checksum, and a file fetched without one is never written down as checked.
+const isSha1 = (v) => typeof v === 'string' && /^[0-9a-f]{40}$/i.test(v)
+
 async function noteChecked(ledger, file, sha1) {
-  if (!ledger || sha1 == null) return
+  if (!ledger || !isSha1(sha1)) return
   try {
     const stat = await fs.promises.stat(file)
     const key = ledgerKey(file)
@@ -98,7 +102,7 @@ export async function needsFetch(file, { sha1 = null, size = null } = {}, ledger
     return true
   }
   if (size != null && stat.size !== size) return true
-  if (sha1 == null) return false
+  if (!isSha1(sha1)) return false
   const want = String(sha1).toLowerCase()
   const key = ledgerKey(file)
   const line = ledger?.files[key]
@@ -286,6 +290,7 @@ export async function ensureVersion(id, opts = {}) {
 }
 
 async function ensureVersionWith(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = new Set(), ledger }) {
+  const began = Date.now()
   let rawJson
   try {
     rawJson = JSON.parse(fs.readFileSync(versionJson(id), 'utf8'))
@@ -472,12 +477,16 @@ async function ensureVersionWith(id, { os = currentOs(), onProgress = () => {}, 
   // keepNatives: the ids whose natives a running game has loaded; an extracted folder is left as it is
   const keep = keepNatives.has(id) && fs.existsSync(completeFile)
   if (nativeRows.length > 0 && !keep && (nativeWasDownloaded || !stamped)) {
-    // Two setups on one version started together would each clear the folder under the other;
-    // the second waits, then finds the first one's stamp and leaves the folder as it is.
+    // Two setups on one version started together would each clear the folder under the other,
+    // perhaps under the other's game by then. The second waits, and a stamp written since this
+    // call began is the first one's work from the same checked jars: the folder is left as it is.
     fs.mkdirSync(path.dirname(nativesDir(id)), { recursive: true })
     const release = await acquireLockAsync(`${nativesDir(id)}.lock`, { timeoutMs: 60000 })
     try {
-      const done = !nativeWasDownloaded && fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === plan.nativesStamp
+      let done = false
+      try {
+        done = fs.readFileSync(completeFile, 'utf8') === plan.nativesStamp && (!nativeWasDownloaded || fs.statSync(completeFile).mtimeMs >= began)
+      } catch { /* no stamp: extract */ }
       if (!done) await extractNatives(id, nativeRows, { stamp: plan.nativesStamp, subdir: plan.nativesSubdir, extraDirs: plan.nativesExtraDirs })
     } finally {
       release()

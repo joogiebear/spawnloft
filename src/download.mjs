@@ -170,7 +170,8 @@ async function downloadOnce(url, dest, { hash, expected, onProgress, minBytes, l
   try {
     let res
     try {
-      res = await fetchRetry(url, { headers: { 'User-Agent': UA }, signal })
+      // each new request gets the full time: an answer, even a refusal, is not a stall
+      res = await fetchRetry(url, { headers: { 'User-Agent': UA }, signal }, { onRetry: wind })
     } catch (err) {
       if (cancel?.aborted) throw new Cancelled()
       if (stall.signal.aborted) throw stalled()

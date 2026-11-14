@@ -2151,7 +2151,7 @@ async function cmdBot(positional, flags) {
  */
 async function cmdClient(positional, flags) {
   const [sub, ...rest] = positional
-  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
+  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
   const quiet = flags.json === true
   // Only a phase that fetches something is worth a line: a cached launch re-checks every file and
   // would otherwise print the whole list, reading as if it downloaded the game again.
@@ -2222,10 +2222,11 @@ async function cmdClient(positional, flags) {
   }
 
   if (sub === 'install') {
-    checkFlags(flags, ['json'])
+    checkFlags(flags, ['json', 'verify'])
     if (rest.length !== 1) throw new UsageError(usage)
     const id = await client.prepareVersion(rest[0], { onProgress })
-    const result = await ensureVersion(id, { onProgress })
+    // --verify: hash every file again, whatever earlier launches noted as checked (a repair)
+    const result = await ensureVersion(id, { onProgress, verify: flags.verify === true })
     if (quiet) process.stdout.write(jsonLine('client', { name: rest[0], ...result }))
     else out(`Installed ${result.id}: ${result.downloaded} files (${result.bytes} bytes)`)
     return

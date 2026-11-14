@@ -1177,10 +1177,11 @@ function launchJob(jobId, profileName, { startServer, ...opts }) {
     launchedBy: 'launcher',
     ensureServer: startServer ? startServerForLaunch : null,
     onStage: ({ stage, message }) => jobUpdate(jobId, { stage, message, percent: null }),
-    onProgress: ({ phase, done, total, bytes }) => jobUpdate(jobId, {
+    onProgress: ({ phase, done, total, bytes, fetching }) => jobUpdate(jobId, {
       stage: phase === 'harness mod' ? 'harness' : phase,
       // nothing fetched so far in this step: the files on disk are being checked, not downloaded
-      message: bytes ? `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files · ${humanBytes(bytes)}` : `Checking ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files`,
+      // (a step that only ever counts files it fetches says so itself)
+      message: bytes || fetching ? `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files${bytes ? ` · ${humanBytes(bytes)}` : ''}` : `Checking ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files`,
       percent: total ? Math.min(100, Math.round((done / total) * 100)) : null,
     }),
   })).then(
