@@ -236,13 +236,17 @@ the folder is instead.
 
 If the game goes away without a Stop from the page and did not simply quit, a notice says so,
 with when and how it ended (the exit code, or the signal), the last lines of the game log
-(**Show more** for all 200, **Copy log**), **Show crash reports**, **Open log folder** and
+(**Show N lines** for all of them, up to 200, **Copy log**), **Show crash reports**, **Open log folder** and
 **Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The
 panel records every game's exit itself, so a crash is told even if the page was closed when it
-happened (within twelve hours, and until it is dismissed). "Did not simply quit" comes from
-that record: any exit code but 0, or a signal, is a crash; an exit with 0 is one only within
-the first minute and only if the log does not show the game closing (a mod loader's error
-window). A game that outlived the panel that started it has no record, and the log decides as
+happened (within twelve hours, until it is dismissed or the setup is played again; the
+dismissal is kept with the record, so it holds across restarts of the app). A crash on a setup
+other than the one in view is named on the card in view, with **Show** to go to it. "Did not
+simply quit" comes from that record: any exit code but 0, or a signal, is a crash, unless the
+log ends in the game's own "Stopping!" with no error in it (a game that was quit and fell over
+on its way out); an exit with 0 is one only within the first minute and only if the log does not
+show the game closing (a mod loader's error window). **Show crash reports** and **Open log
+folder** open the setup's own folder, and say so, when the game has not made those folders yet. A game that outlived the panel that started it has no record, and the log decides as
 before: within the first minute, anything but a clean exit (the game's own "Stopping!" with no
 error before it); after that, a log that does not end in that
 "Stopping!", which is a hard crash or a mod loader's error dialog closed after a while, and never

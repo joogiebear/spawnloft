@@ -10,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
-const { launch, status, stop, lastExit, played, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
+const { launch, status, stop, lastExit, markExitSeen, revealTarget, played, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
 const { readClientState, fromBeforeBoot, procStartTicks } = await import('../src/client-launch.mjs')
 const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson, ASSETS_DIR, profileDir } = await import('../src/client-paths.mjs')
 
@@ -385,6 +385,34 @@ test('the exit of a game is recorded: stopped from here, or gone by itself with 
   assert.equal(rec.launches, 2)
   assert.equal(rec.lastPlayedAt, crashed.startedAt)
   assert.ok(rec.totalMs > 0)
+
+  // The page's "shown and dismissed" is kept with the record, by the exit's own end time: a
+  // mark for another exit (an older one, arriving late) changes nothing.
+  assert.equal(crashed.seen, false)
+  assert.deepEqual(markExitSeen('ends', asked.endedAt === crashed.endedAt ? 'another' : asked.endedAt), { seen: false })
+  assert.equal(lastExit('ends').seen, false)
+  assert.deepEqual(markExitSeen('ends', crashed.endedAt), { seen: true })
+  assert.deepEqual(lastExit('ends'), { ...crashed, seen: true })
+  assert.throws(() => markExitSeen('no-such-setup', crashed.endedAt))
+  // the next run's record starts unmarked
+  since = Date.now()
+  process.env.FAKE_CLIENT_FAIL = 'window'
+  try { await launch('ends', { fakeJava }) } finally { delete process.env.FAKE_CLIENT_FAIL }
+  assert.equal((await untilExit('ends', { since })).seen, false)
+})
+
+test('"open folder" is the setup\'s own, its logs or its crash reports, and nothing else', () => {
+  createProfile('folders', { mc })
+  const folder = profileDir('folders')
+  assert.deepEqual(revealTarget('folders', 'folder'), { target: folder, fellBack: false })
+  // the game has made neither yet: the setup's folder, and the answer says so
+  assert.deepEqual(revealTarget('folders', 'logs'), { target: folder, fellBack: true })
+  assert.deepEqual(revealTarget('folders', 'crash-reports'), { target: folder, fellBack: true })
+  fs.mkdirSync(path.join(folder, 'logs'))
+  assert.deepEqual(revealTarget('folders', 'logs'), { target: path.join(folder, 'logs'), fellBack: false })
+  // `what` is a word from a list, never a path
+  for (const what of ['../..', 'saves', '/etc', ['logs'], null, undefined]) assert.deepEqual(revealTarget('folders', what), { target: folder, fellBack: false })
+  assert.throws(() => revealTarget('no-such-setup', 'logs'))
 })
 
 test('a state file from before this machine started is nobody\'s game', () => {

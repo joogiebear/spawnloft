@@ -286,7 +286,7 @@
   }
   button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); cursor: pointer; transition: all var(--ease); white-space: nowrap; }
   button:where(:hover:not(:disabled)) { border-color: rgba(var(--ink-rgb), .2); background: var(--raised-hi); }
-  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:disabled, button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--primary-top); border-color: var(--primary-edge); color: var(--primary-ink); font-weight: 650; box-shadow: none; }
   button.primary:where(:hover:not(:disabled)) { background: var(--primary-hover-top); }
   button.danger { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
@@ -729,8 +729,6 @@
   const LOG_SCAN = 200
   // a crash the panel recorded while this page was closed is still told, this long after
   const CRASH_REPLAY_MS = 12 * 60 * 60 * 1000
-  // per profile, the end time of the last recorded exit this page has shown and had dismissed
-  const EXITS_KEY = 'spawnloft.launcher.exits'
   // the memory segments; anything else is Custom, a slider in half-gigabyte steps
   const MEMORY_CHOICES = ['2G', '4G', '8G']
   const STOPPED = new Set(['stopped', 'stale'])
@@ -934,7 +932,10 @@
     const out = []
     for (const row of profiles) {
       if (!row.running) continue
-      if (!watch[row.name]) watch[row.name] = { since: Date.parse(row.startedAt) || now, stopping: false }
+      // a run that ended and another that began between two reads: the watch moves to the new
+      // run, or its end would be measured from, and matched against, the old one's start
+      const other = watch[row.name]?.startedAt && row.startedAt && watch[row.name].startedAt !== row.startedAt
+      if (!watch[row.name] || other) watch[row.name] = { since: Date.parse(row.startedAt) || now, stopping: false }
       // which run it is, so the panel's record of its end can be told from an older one
       if (!watch[row.name].startedAt && row.startedAt) watch[row.name].startedAt = row.startedAt
     }
@@ -943,7 +944,8 @@
       if (row?.running) continue
       delete watch[name]
       const lived = now - w.since
-      if (row && !w.stopping) out.push({ name, seconds: Math.max(1, Math.round(lived / 1000)), early: lived < CRASH_WINDOW_MS, exit: recordedExit(row.lastExit, w) })
+      // `watch` goes along: a record written a moment after this read is looked for once more
+      if (row && !w.stopping) out.push({ name, seconds: Math.max(1, Math.round(lived / 1000)), early: lived < CRASH_WINDOW_MS, exit: recordedExit(row.lastExit, w), watch: { since: w.since, startedAt: w.startedAt } })
     }
     return out
   }
@@ -965,15 +967,17 @@
     return rec.code === 0 && !rec.signal ? 'clean' : 'abnormal'
   }
 
-  // Crash or not, from the record when there is one. An abnormal end is a crash whatever the log
-  // says; a clean one is a crash only in the first minute and only if the log does not show the
-  // game closing (a mod loader's error window, closed, can exit with 0). With no record the log
-  // decides alone, as before the panel kept one.
+  // Crash or not, from the record when there is one. An abnormal end is a crash unless the log
+  // shows the game closing with nothing wrong in it: a game that said "Stopping!" and then went
+  // down in a driver on its way out, or was ended from outside as it closed, was quit, and whoever
+  // quit it is not helped by a crash notice. A clean end is a crash only in the first minute and
+  // only if the log does not show the game closing (a mod loader's error window, closed, can exit
+  // with 0). With no record the log decides alone, as before the panel kept one.
   function crashVerdict(rec, lines, early) {
     if (!rec) return exitVerdict(lines, early)
     const kind = exitKind(rec)
     if (kind === 'stopped') return 'closed'
-    if (kind === 'abnormal') return 'crash'
+    if (kind === 'abnormal') return cleanExit(lines) ? 'closed' : 'crash'
     return early && !cleanExit(lines) ? 'crash' : 'closed'
   }
 
@@ -982,31 +986,27 @@
   function exitWords(rec, at) {
     if (!rec) return ''
     if (rec.signal) return `It was ended by ${rec.signal} at ${at}.`
-    return `It ended at ${at}${Number.isInteger(rec.code) ? ` with exit code ${rec.code}` : ''}.`
+    // Windows' own fault codes are known by their hex (0xC0000005), not as ten digits
+    const code = Number.isInteger(rec.code) ? (rec.code > 0x7fffffff ? `0x${rec.code.toString(16).toUpperCase()}` : String(rec.code)) : null
+    return `It ended at ${at}${code ? ` with exit code ${code}` : ''}.`
   }
 
   // Crashes the panel recorded that this page has not shown: a game that went down while the page
   // was closed, or whose notice was still up when the page was reloaded. Only what the record
-  // itself calls abnormal, and only recent ones: an old one says nothing about today.
+  // itself calls abnormal, and only recent ones: an old one says nothing about today. Not one
+  // the panel has marked as shown (rec.seen) or this page has (`seen`, { profile: endedAt }), and
+  // not one from before the setup's last run: a game started since (outside the panel, or one
+  // that outlived it) left no record of its own, and its log is not that crash's.
   function unseenCrashes(profiles, seen, now) {
     const out = []
     for (const row of profiles) {
       const rec = row.lastExit
-      if (row.running || !rec || typeof rec.endedAt !== 'string' || exitKind(rec) !== 'abnormal') continue
+      if (row.running || !rec || typeof rec.endedAt !== 'string' || rec.seen || exitKind(rec) !== 'abnormal') continue
+      if (row.played?.lastPlayedAt && rec.startedAt && row.played.lastPlayedAt !== rec.startedAt) continue
       const ended = Date.parse(rec.endedAt)
       if (!Number.isFinite(ended) || now - ended > CRASH_REPLAY_MS || ended > now + 60000 || seen[row.name] === rec.endedAt) continue
       const lived = Math.max(0, ended - (Date.parse(rec.startedAt) || ended))
       out.push({ name: row.name, seconds: Math.max(1, Math.round(lived / 1000)), early: lived < CRASH_WINDOW_MS, exit: rec })
-    }
-    return out
-  }
-
-  // What localStorage held about shown exits, made into { profile: endedAt }.
-  function cleanSeen(saved) {
-    const out = {}
-    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out
-    for (const [name, at] of Object.entries(saved).slice(0, 500)) {
-      if (typeof at === 'string' && at.length <= 40 && name !== '__proto__') out[name] = at
     }
     return out
   }
@@ -1347,7 +1347,7 @@
     // the crash notice shows all the lines read, not the last few
     logMore: false,
     // profile -> endedAt of the recorded exit whose notice was dismissed here
-    seenExits: loadSeen(),
+    seenExits: {},
     // the running game's log, while "Show log" is open: { profile, lines }
     live: null,
     // the profile whose Stop was pressed and is waiting for "Stop now"
@@ -1378,12 +1378,6 @@
     let saved = null
     try { saved = JSON.parse(stored('local', JOIN_KEY) ?? 'null') } catch { /* ignored */ }
     return cleanTargets(saved)
-  }
-
-  function loadSeen() {
-    let saved = null
-    try { saved = JSON.parse(stored('local', EXITS_KEY) ?? 'null') } catch { /* ignored */ }
-    return cleanSeen(saved)
   }
 
   // What localStorage held, or anything else, made into the shape the page trusts.
@@ -1434,6 +1428,11 @@
   }
 
   function pickProfile(name) {
+    // the log drawer and the Stop question belong to the card that is leaving
+    if (S.pick !== name) {
+      if (S.live && S.live.profile !== name) S.live = null
+      if (S.stopAsk && S.stopAsk !== name) S.stopAsk = null
+    }
     S.pick = name
     stored('local', PICK_KEY, name)
   }
@@ -1506,7 +1505,7 @@
     const row = inMenu ? { menu: inMenu.id, at: menuItems(inMenu).indexOf(active) } : null
     // the running game's log stays at its end while it grows, and where it was scrolled to otherwise
     const logWas = $('liveLogPre')
-    const logAt = logWas ? { top: logWas.scrollTop, end: logWas.scrollTop + logWas.clientHeight >= logWas.scrollHeight - 12 } : null
+    const logAt = logWas ? { top: logWas.scrollTop, left: logWas.scrollLeft, end: logWas.scrollTop + logWas.clientHeight >= logWas.scrollHeight - 12 } : null
     $('chipwrap').replaceChildren(...(S.down ? [] : accountChip()))
     $('stage').replaceChildren(S.down ? unreachableView() : playView())
     $('sheet').replaceChildren(...(S.sheet && !S.down ? [sheetView()] : []))
@@ -1523,7 +1522,10 @@
       items[Math.min(row.at, items.length - 1)]?.focus({ preventScroll: true })
     }
     const logNow = $('liveLogPre')
-    if (logNow) logNow.scrollTop = logAt && !logAt.end ? logAt.top : logNow.scrollHeight
+    if (logNow) {
+      logNow.scrollTop = logAt && !logAt.end ? logAt.top : logNow.scrollHeight
+      if (logAt) logNow.scrollLeft = logAt.left
+    }
   }
 
   // ---- the account chip and its menu -----------------------------------------------------------
@@ -1618,6 +1620,7 @@
     const { state } = plan
     const kids = [flashNotice(), setupHead(p)]
     if (S.crash?.profile === p.name && !S.crash.pending && state.kind !== 'running' && state.kind !== 'launching') kids.push(crashNotice(S.crash))
+    else if (S.crash && !S.crash.pending && S.crash.profile !== p.name && profileNamed(S.crash.profile)) kids.push(crashElsewhere(S.crash))
     if (S.notice?.profile === p.name && state.kind !== 'launching' && !(S.notice.busy && state.kind === 'blocked')) {
       const n = S.notice
       kids.push(notice({ ...n, acts: n.fix === 'sign-in' ? [h('button', { class: 'sm', onclick: () => openMenu('account') }, 'Sign in')] : [], onclose: () => { S.notice = null; render() } }))
@@ -2025,8 +2028,9 @@
             h('button', { id: 'keepPlaying', onclick: () => { S.stopAsk = null; render(); $('stop')?.focus({ preventScroll: true }) } }, 'Keep playing'),
             h('button', { class: 'danger', id: 'stopNow', 'aria-describedby': 'stopWhy', onclick: () => stopProfile(p) }, ico('stop'), 'Stop now'))
           : h('div', { class: 'runrow' },
-            h('button', { class: 'danger stop', id: 'stop', disabled: S.stopping === p.name, onclick: () => askStop(p) }, ico('stop'), S.stopping === p.name ? 'Stopping\u2026' : 'Stop'),
-            h('button', { id: 'liveLog', 'aria-expanded': String(Boolean(live)), 'aria-controls': 'liveLogBox', onclick: () => toggleLive(p) }, live ? 'Hide log' : 'Show log'),
+            // not `disabled` while stopping: the button holds the focus "Stop now" had
+            h('button', { class: 'danger stop', id: 'stop', 'aria-disabled': S.stopping === p.name ? 'true' : null, onclick: () => { if (S.stopping !== p.name) askStop(p) } }, ico('stop'), S.stopping === p.name ? 'Stopping\u2026' : 'Stop'),
+            h('button', { id: 'liveLog', 'aria-expanded': String(Boolean(live)), 'aria-controls': live ? 'liveLogBox' : null, onclick: () => toggleLive(p) }, live ? 'Hide log' : 'Show log'),
             h('button', { id: 'openFolder', onclick: () => reveal(p, 'folder') }, ico('folder'), 'Open folder')),
         h('div', { class: 'facts' }, facts),
         live && h('div', { class: 'livelog', id: 'liveLogBox' },
@@ -2062,16 +2066,30 @@
     return notice({ tone: 'fault', title, text, acts, extra: [pre, logActs], onclose: () => { dropCrash(); nextExit(); render() } })
   }
 
+  // Another setup's game crashed: said on the card in view, since the notice itself sits on its
+  // own setup's card and would otherwise wait there unseen.
+  function crashElsewhere(crash) {
+    const q = profileNamed(crash.profile)
+    return notice({ tone: 'fault', title: `Minecraft crashed in ${setupName(q)}`, text: 'Its log is on that setup\'s card.',
+      acts: [h('button', { class: 'sm', id: 'crashShow', onclick: () => { pickProfile(crash.profile); render(); $('crashLogPre')?.focus({ preventScroll: true }) } }, 'Show')],
+      onclose: () => { dropCrash(); nextExit(); render() } })
+  }
+
   // The crash notice is done with: dismissed, or its game is being played again. What the panel
-  // recorded is remembered as shown, so a reload does not bring it back.
+  // recorded is marked as shown there, so neither a reload nor the app's next start brings it back.
   function dropCrash() {
-    const c = S.crash
-    if (c?.exit?.endedAt) {
-      S.seenExits[c.profile] = c.exit.endedAt
-      stored('local', EXITS_KEY, JSON.stringify(S.seenExits))
-    }
+    seenExit(S.crash)
     S.crash = null
     S.logMore = false
+  }
+
+  // The mark is kept by the panel, with the record: the desktop app's page gets a new address at
+  // every start, so nothing it stores itself is still there the next time. S.seenExits covers the
+  // moment until the panel's answer carries the mark.
+  function seenExit(c) {
+    if (!c?.exit?.endedAt) return
+    S.seenExits[c.profile] = c.exit.endedAt
+    api(`client/profiles/${enc(c.profile)}/exit-seen`, { method: 'POST', body: { endedAt: c.exit.endedAt } }).catch(() => { /* it is told again after a reload, no worse */ })
   }
 
   // Lines to the clipboard, and the button says so for a moment.
@@ -2087,13 +2105,15 @@
       try { ok = document.execCommand('copy') } catch { /* nothing more to try */ }
       box.remove()
     }
+    const back = () => $(what === 'live' ? 'copyLive' : 'copyCrash')?.focus({ preventScroll: true })
     if (!ok) {
       S.flash = { tone: 'warn', title: 'Could not copy', text: 'Select the lines and copy them by hand.' }
-      return render()
+      render()
+      return back()
     }
     S.copied = what
     render()
-    $(what === 'live' ? 'copyLive' : 'copyCrash')?.focus({ preventScroll: true })
+    back()
     setTimeout(() => { if (S.copied === what) { S.copied = null; render() } }, 2000)
   }
 
@@ -2137,7 +2157,8 @@
     } else {
       body.server = false
     }
-    dropCrash()
+    // only this setup's crash is done with by playing it again
+    if (S.crash?.profile === p.name) dropCrash()
     S.notice = null
     S.flash = null
     S.menu = null
@@ -2220,6 +2241,7 @@
     S.stopping = p.name
     if (S.watch[p.name]) S.watch[p.name].stopping = true
     render()
+    $('stop')?.focus({ preventScroll: true })
     try {
       await api(`client/profiles/${enc(p.name)}/stop`, { method: 'POST' })
     } catch (err) {
@@ -2227,8 +2249,10 @@
       if (S.watch[p.name]) S.watch[p.name].stopping = false
     }
     S.stopping = null
+    // focus follows only if it is still where Stop left it
+    const held = document.activeElement === $('stop') || document.activeElement === document.body
     await refresh()
-    ;($('play') ?? $('stop'))?.focus({ preventScroll: true })
+    if (held && (document.activeElement === document.body || document.activeElement === $('stop'))) ($('play') ?? $('stop'))?.focus({ preventScroll: true })
   }
 
   // The setup's folder, or the folder the game keeps its logs or crash reports in, in the file
@@ -2236,7 +2260,11 @@
   // where the folder is.
   async function reveal(p, what) {
     try {
-      await api(`client/profiles/${enc(p.name)}/reveal`, { method: 'POST', body: { what } })
+      const out = await api(`client/profiles/${enc(p.name)}/reveal`, { method: 'POST', body: { what } })
+      if (out?.fellBack && !S.sheet) {
+        S.flash = { tone: '', title: what === 'crash-reports' ? 'The game has written no crash report' : 'The game has no log folder yet', text: 'The setup\'s own folder was opened instead.' }
+        render()
+      }
     } catch (err) {
       if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       const why = sentence(plain(err.message)) || (p.folder ? `It is ${p.folder}` : '')
@@ -2588,7 +2616,10 @@
     // the row itself, so the sheet and the card read as the same setup until the next poll
     const row = S.summary?.profiles?.find((q) => q.name === from)
     if (row) row.name = to
-    if (S.crash?.profile === from) S.crash = null
+    if (S.seenExits[from]) { S.seenExits[to] = S.seenExits[from]; delete S.seenExits[from] }
+    if (S.crash?.profile === from) S.crash.profile = to
+    if (S.log.profile === from) S.log.profile = to
+    for (const e of S.exits) if (e.name === from) e.name = to
   }
 
   async function duplicateProfile(p) {
@@ -2933,15 +2964,26 @@
     }
     await readLog()
     await readLive()
-    if (S.stopAsk && !profileNamed(S.stopAsk)?.running) S.stopAsk = null
+    // the game went while "Stop the game?" was up: the question goes, and focus to what replaces it
+    const asked = S.stopAsk && !profileNamed(S.stopAsk)?.running
+    if (asked) S.stopAsk = null
     if (S.notice?.busy && Date.now() - (S.notice.at ?? 0) > 30000) S.notice = null
     // the minute, while a game runs: "for 12 minutes" moves on though nothing else changed
     const minute = profilesNow().some((p) => p.running) ? Math.floor(Date.now() / 60000) : 0
     const key = JSON.stringify([S.summary, S.down, S.downWhy, S.log, S.live, minute, S.notice, S.crash && { ...S.crash }])
-    if (key !== lastKey) {
+    // lines being selected in a log are left alone: rebuilding the page would drop the selection,
+    // and selecting is the way to copy when Copy cannot. The read after it is let go shows the rest.
+    if (key !== lastKey && !selectingLog()) {
       lastKey = key
       render()
+      if (asked && document.activeElement === document.body) $('play')?.focus({ preventScroll: true })
     }
+  }
+
+  function selectingLog() {
+    const sel = window.getSelection?.()
+    if (!sel || sel.isCollapsed || !sel.anchorNode) return false
+    return ['liveLogPre', 'crashLogPre'].some((id) => $(id)?.contains(sel.anchorNode))
   }
 
   // A game this page saw running that is gone, not stopped from here, may have crashed: the log
@@ -2959,8 +3001,8 @@
   // The next exit waiting, if no crash is being shown or read.
   function nextExit() {
     if (S.crash || !S.exits.length) return
-    const { name, seconds, early, exit = null } = S.exits.shift()
-    S.crash = { profile: name, seconds, early, exit, report: null, pending: true }
+    const { name, seconds, early, exit = null, watch = null } = S.exits.shift()
+    S.crash = { profile: name, seconds, early, exit, watch, report: null, pending: true }
     S.logMore = false
     S.log = { profile: name, lines: [] }
   }
@@ -2970,10 +3012,18 @@
   async function readLog() {
     const c = S.crash
     if (!c || !c.pending || profileNamed(c.profile)?.running) return
+    // The process can be seen gone a moment before the panel has written how it ended (Windows
+    // above all): with no record yet, the next read is waited for once before the log decides alone.
+    if (!c.exit && c.watch) {
+      c.exit = recordedExit(profileNamed(c.profile)?.lastExit, c.watch)
+      if (!c.exit && !c.waited) { c.waited = true; return }
+    }
     try {
       const out = await api(`client/profiles/${enc(c.profile)}/log?lines=${LOG_SCAN}`)
       const lines = out.lines ?? []
       if (crashVerdict(c.exit, lines, c.early) === 'closed') {
+        // an exit the record calls abnormal but the log shows as a quit is not asked about again
+        seenExit(c)
         if (S.crash === c) S.crash = null
         S.log = { profile: null, lines: [] }
         nextExit()

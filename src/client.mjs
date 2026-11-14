@@ -912,7 +912,18 @@ export function status(name) {
 // outlived the process that started it, or has never run).
 export function lastExit(name) {
   const rec = readLastExit(name)
-  return rec ? { code: rec.code, signal: rec.signal, startedAt: rec.startedAt, endedAt: rec.endedAt, stopped: Boolean(rec.stopped) } : null
+  return rec ? { code: rec.code, signal: rec.signal, startedAt: rec.startedAt, endedAt: rec.endedAt, stopped: Boolean(rec.stopped), seen: Boolean(rec.seen) } : null
+}
+
+// The Play page showed this exit and it was dismissed: kept with the record, not in the page,
+// because the desktop app's page has a new address (and so empty storage) at every start.
+// `endedAt` names the exit, so a mark that arrives late cannot land on a newer one.
+export function markExitSeen(name, endedAt) {
+  getProfile(name)
+  const rec = readLastExit(name)
+  if (!rec || rec.endedAt !== endedAt) return { seen: false }
+  if (!rec.seen) writeJson(clientLastExit(name), { ...rec, seen: true })
+  return { seen: true }
 }
 
 const sessions = new Map()
@@ -1241,4 +1252,15 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
 export function profileFolder(name) {
   getProfile(name)
   return profileDir(name)
+}
+
+// Which folder "open folder" means: the profile's own, or the one the game keeps its logs or
+// crash reports in. `what` is matched against that list and never used as a path. A folder the
+// game has not made yet falls back to the profile's own, and says so.
+export function revealTarget(name, what) {
+  const folder = profileFolder(name)
+  fs.mkdirSync(folder, { recursive: true })
+  const sub = ['logs', 'crash-reports'].includes(what) ? path.join(folder, what) : null
+  const target = sub && fs.existsSync(sub) ? sub : folder
+  return { target, fellBack: Boolean(sub) && target === folder }
 }
