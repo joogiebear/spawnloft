@@ -138,9 +138,20 @@ test('a rename that only changes capitals is not stopped by the file itself', ()
   // here, where case counts, both ways still behave: the new capitals are a new name
   put('Notes.txt', 'n')
   files.movePath(inst, 'Notes.txt', 'notes.txt')
-  assert.deepEqual([fs.existsSync(path.join(dir, 'notes.txt')), fs.existsSync(path.join(dir, 'Notes.txt'))], [true, false])
-  put('Notes.txt', 'other')
-  assert.throws(() => files.movePath(inst, 'notes.txt', 'Notes.txt'), /already exists/)
+  // by what the folder lists: asking for either spelling finds the file where case is ignored
+  assert.deepEqual([fs.readdirSync(dir).includes('notes.txt'), fs.readdirSync(dir).includes('Notes.txt')], [true, false])
+  // does this disk tell capitals apart? (Linux does; Windows and macOS as installed do not)
+  const caseCounts = !fs.existsSync(path.join(dir, 'NOTES.TXT'))
+  if (caseCounts) {
+    put('Notes.txt', 'other')
+    assert.throws(() => files.movePath(inst, 'notes.txt', 'Notes.txt'), /already exists/)
+  } else {
+    // the real thing: the name found under the new capitals is the file itself, and it is renamed
+    files.movePath(inst, 'notes.txt', 'Notes.txt')
+    assert.ok(fs.readdirSync(dir).includes('Notes.txt') && !fs.readdirSync(dir).includes('notes.txt'))
+    files.movePath(inst, 'Notes.txt', 'notes.txt')
+    assert.ok(fs.readdirSync(dir).includes('notes.txt'))
+  }
   assert.throws(() => files.movePath(inst, 'notes.txt', 'nowhere/notes.txt'), /there is no folder nowhere/)
   assert.throws(() => files.movePath(inst, 'notes.txt', 'logs/short.log/notes.txt'), /logs\/short\.log is not a folder/)
 })
