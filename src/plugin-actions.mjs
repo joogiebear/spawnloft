@@ -26,7 +26,7 @@ export async function searchEverywhere(inst, q) {
 async function snapshotPlugins(inst, label) {
   // no plugins folder yet, nothing to snapshot
   if (!fs.existsSync(path.join(inst.dir, plugins.contentKindFor(inst).dir))) return null
-  return backup.createSnapshot(inst, { scope: 'plugins', label, running: supervisor.isRunning(inst.name), quiet: true })
+  return backup.createSnapshot(inst, { scope: 'plugins', label, running: supervisor.isRunning(inst.name), quiet: true, changeCopy: true })
 }
 
 // What an install would fetch and what it needs, for the page to ask about before anything is written.

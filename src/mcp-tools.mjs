@@ -520,7 +520,7 @@ const actionTools = [
       let snapshot = null
       if (plan.existed) {
         progress(`Snapshotting ${plan.shown}`)
-        const res = await backup.createSnapshot(inst, { scope: 'config', label: 'before-edit', members: [plan.shown], flush: false })
+        const res = await backup.createSnapshot(inst, { scope: 'config', label: 'before-edit', members: [plan.shown], flush: false, changeCopy: true })
         snapshot = path.basename(res.file)
         // The snapshot took a moment; a plugin saving its config meanwhile must not be written over.
         if (!configFiles.unchangedSince(plan)) fail(`${plan.shown} changed while it was being snapshotted; read it again`)

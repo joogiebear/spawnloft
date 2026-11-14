@@ -151,7 +151,7 @@ export async function readFile(inst, relative) {
 async function snapshotFirst(inst, rels, label) {
   const members = rels.filter((r) => fs.existsSync(path.join(inst.dir, ...r.split('/'))))
   if (!members.length) return null
-  const snap = await backup.createSnapshot(inst, { scope: 'files', label, members, flush: false })
+  const snap = await backup.createSnapshot(inst, { scope: 'files', label, members, flush: false, changeCopy: true })
   return path.basename(snap.file)
 }
 

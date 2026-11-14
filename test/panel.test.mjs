@@ -1060,7 +1060,7 @@ test('the backup history says what it holds, and asks plainly before several go 
   assert.deepEqual(totals, { whole: { count: 2, size: 3072 * MB }, copies: { count: 4, size: 7 * MB } })
   assert.equal(historyWords(totals), '2 backups, 3.0 GB. 4 small copies kept before changes, 7.0 MB.')
   assert.equal(historyWords(backupTotals([whole('w', MB)])), '1 backup, 1.0 MB.')
-  assert.equal(historyWords(backupTotals([copy('c', MB, 1)])), 'No backup of the server yet. 1 small copy kept before changes, 1.0 MB.')
+  assert.equal(historyWords(backupTotals([copy('c', MB, 1)])), 'No backups. 1 small copy kept before changes, 1.0 MB.')
   assert.deepEqual(backupTotals(undefined), { whole: { count: 0, size: 0 }, copies: { count: 0, size: 0 } })
 
   // what the clean-up takes at once: old, a small copy, not locked, no note
@@ -1068,8 +1068,12 @@ test('the backup history says what it holds, and asks plainly before several go 
   const q = cleanCopiesQuestion(list, 30, now)
   assert.equal(q.title, 'Remove small copies after 30 days?')
   assert.match(q.text, /1 copy is already that old \(3\.0 MB\) and goes now\.$/)
-  assert.match(q.text, /Backups of the server are never removed by this/)
-  assert.match(q.text, /Undo in Activity stops working/)
+  assert.match(q.text, /Never removed by this: a backup, a copy that is locked or has a note, and the copy of anything deleted in Files\./)
+  assert.match(q.text, /each time a backup or a copy is taken for this server, the small copies older than 30 days are removed/)
+  assert.match(q.text, /Undo in Activity is no longer offered/)
+  // the names go with the answer, so only what was counted is removed
+  assert.deepEqual(q.remove, ['c1'])
+  assert.deepEqual(copiesDue([copy('d', MB, 99, { label: 'file-delete' })], 30, now), [])
   assert.equal(q.confirmLabel, 'Turn on and remove 1')
   assert.equal(q.danger, true)
   const none = cleanCopiesQuestion([whole('w', MB), copy('c', MB, 3)], 30, now)
@@ -1084,7 +1088,7 @@ test('the backup history says what it holds, and asks plainly before several go 
 
   const mixed = deleteManyQuestion([list[0], list[2], list[5]], list)
   assert.equal(mixed.title, 'Delete 3 backups?')
-  assert.equal(mixed.text, '2.0 GB in all. 2 are small copies kept before a change; the rest are backups you or a schedule made. What they hold goes with them, and there is no way back.')
+  assert.equal(mixed.text, '2.0 GB in all. 2 are small copies kept before a change; the rest are not. What they hold goes with them, and there is no way back.')
   assert.equal(mixed.confirmLabel, 'Delete 3 backups')
   assert.equal(mixed.danger, true)
   // every backup of the server is among them: said, since the small copies left do not back it up
@@ -1106,6 +1110,12 @@ test('the backup history says what it holds, and asks plainly before several go 
   assert.equal(deletedManyWords({ removed: ['a'], size: MB, skipped: [{ name: 'x', reason: 'locked' }, { name: 'y', reason: 'missing' }, { name: 'z', reason: 'missing' }] }),
     'Deleted 1 backup, 1.0 MB freed. 1 is locked and stays. 2 were already gone.')
   assert.equal(deletedManyWords({ removed: [], size: 0, skipped: [{ name: 'x', reason: 'locked' }] }), 'Nothing was deleted. 1 is locked and stays.')
+  assert.equal(deletedManyWords({ removed: ['a'], size: MB, skipped: [{ name: 'x', reason: 'busy' }] }),
+    'Deleted 1 backup, 1.0 MB freed. 1 is open in another program, or still downloading, and stays.')
+  // a change whose copy has gone says so where Undo was
+  assert.match(html, /e\.snapshotGone && !undone\.has\(e\.snapshot\)/)
+  // the tick box is not a grid column: the database backups list shares these rows
+  assert.match(html, /\.snaps\.picks \.snaps-head, \.snaps\.picks \.snap \{ position: relative;/)
 
   // the list starts without the small copies, and the page asks the core which they are
   assert.match(html, /let showSmallCopies = false;/)

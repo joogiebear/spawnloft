@@ -231,7 +231,7 @@ function appendToError(err, line) {
 // A running server is flushed first (save-off, save-all flush, then save-on afterwards) so the
 // copy isn't torn mid-write. A flush that can't be done (RCON down) is reported in the result and
 // manifest rather than failing the snapshot.
-export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false, duringRestore = false } = {}) {
+export async function createSnapshot(inst, { scope = 'standard', label = null, running = false, taskId = null, flush = true, members: only = null, quiet = false, duringRestore = false, changeCopy = false } = {}) {
   // a copy of a folder that is halfway through being put back is a backup of nothing; the one
   // exception is the copy the restore itself takes before it starts
   if (!duringRestore) refuseWhileRestoring(inst.name, 'taking a new one')
@@ -258,7 +258,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   // blocking the thread the first snapshot needs to finish.
   const release = await acquireLockAsync(path.join(dir, '.snapshot.lock'), { timeoutMs: 30 * 60 * 1000 })
   try {
-    const made = await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut })
+    const made = await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet, changeCopy }, { members, base, dir, leaveOut })
     // The clean-up a server turned on runs here, where something is being written anyway: never on
     // a read, never in the middle of a restore, and it cannot fail the snapshot just taken.
     if (inst.backupCleanCopies === true && !duringRestore) {
@@ -274,7 +274,7 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   }
 }
 
-async function createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut }) {
+async function createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet, changeCopy }, { members, base, dir, leaveOut }) {
   // Attached databases go in as a `databases/` member with one SQL dump each, dumped into a
   // scratch folder and added with -C so the server folder never holds them. Only for the standard
   // and full scopes. A database that isn't running becomes a manifest warning, not a failure.
@@ -362,6 +362,8 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
       instance: inst.name,
       scope,
       label,
+      // taken by SpawnLoft before a change, as against asked for: see isChangeCopy
+      changeCopy: changeCopy === true,
       // scheduled task that produced this (its retention applies), null for manual snapshots
       taskId,
       members: archived,
@@ -431,15 +433,22 @@ export function snapshotProblems(warnings) {
 
 // A small copy: part of a server (its plugins, its config, or named files) that SpawnLoft took by
 // itself before a change, so the change can be undone. The page keeps these out of the way of the
-// backups of the server, and they are the only thing the clean-up below ever removes. Told from the
-// manifest, by the labels SpawnLoft itself writes: a "Config only" backup someone asked for is
-// theirs, and so is anything a schedule made. A deleted world's copy (world-delete) is not one
-// either: it can be the only copy of that world there is.
+// backups, and they are the only thing the clean-up below ever looks at. The call that takes one
+// says so (changeCopy), and the manifest records the answer either way, so a backup someone asked
+// for is theirs whatever they labelled it. A manifest from before that was recorded is told by the
+// labels SpawnLoft wrote then. A deleted world's copy (world-delete) is not one: it can be the only
+// copy of that world there is.
 const CHANGE_COPY_LABELS = new Set(['pre-install', 'pre-update', 'before-edit', 'file-edit', 'file-replace', 'file-delete'])
 const PARTIAL_SCOPES = new Set(['plugins', 'config', 'files'])
 export function isChangeCopy(manifest) {
-  return Boolean(manifest) && PARTIAL_SCOPES.has(manifest.scope) && CHANGE_COPY_LABELS.has(manifest.label) && !manifest.taskId
+  if (!manifest || !PARTIAL_SCOPES.has(manifest.scope) || manifest.taskId) return false
+  if (typeof manifest.changeCopy === 'boolean') return manifest.changeCopy
+  return CHANGE_COPY_LABELS.has(manifest.label)
 }
+
+// What was deleted in Files exists nowhere else, so its copy is kept out of the way like the
+// others but is never removed for being old.
+const neverCleaned = (snap) => snap.label === 'file-delete'
 
 export function listSnapshots(name) {
   // a listing makes nothing: the panel answers it on a GET (test/panel-get-writes.test.mjs)
@@ -777,15 +786,23 @@ export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) 
   return remove
 }
 
+// Removes one archive with its manifest and its second copy. Answers false when the archive would
+// not go (on Windows, a file someone is downloading stays), and then leaves its manifest too.
 function removeFiles(name, snap) {
-  fs.rmSync(snap.path, { force: true })
+  try {
+    fs.rmSync(snap.path, { force: true })
+  } catch {
+    return false
+  }
   fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
   mirrorRemove(name, snap.name)
+  return true
 }
 
 // Several at once, by their exact names as the history lists them: no "latest", no part of a name,
-// since a delete of many must not guess at any of them. A locked one, or one that is no longer
-// there, is left and said; the rest still go. One line in the activity for the lot.
+// since a delete of many must not guess at any of them. A locked one, one that is no longer there
+// or one that is open somewhere is left and said; the rest still go. One line in the activity for
+// what went.
 export const REMOVE_MANY_LIMIT = 500
 export function removeSnapshots(name, refs) {
   refuseWhileRestoring(name, 'deleting backups')
@@ -797,15 +814,11 @@ export function removeSnapshots(name, refs) {
   let size = 0
   for (const ref of [...new Set(refs.map(String))]) {
     const snap = byName.get(ref)
-    if (!snap) {
-      skipped.push({ name: ref, reason: 'missing' })
+    const reason = !snap ? 'missing' : snap.locked ? 'locked' : removeFiles(name, snap) ? null : 'busy'
+    if (reason) {
+      skipped.push({ name: ref, reason })
       continue
     }
-    if (snap.locked) {
-      skipped.push({ name: ref, reason: 'locked' })
-      continue
-    }
-    removeFiles(name, snap)
     removed.push(snap.name)
     size += snap.size
   }
@@ -815,24 +828,38 @@ export function removeSnapshots(name, refs) {
 }
 
 // The clean-up a server can turn on (registry: backupCleanCopies). It removes small copies, as
-// isChangeCopy defines them, once they are older than COPY_DAYS. Never a backup of the server, a
-// locked one, or one somebody put a note on. Off unless turned on.
+// isChangeCopy defines them, once they are older than COPY_DAYS. Never a backup, a locked one, one
+// somebody put a note on, or the copy of something deleted in Files. Off unless turned on.
+// `only` narrows it to named ones: what the page listed when it asked.
 export const COPY_DAYS = 30
 export function oldCopies(name, { now = Date.now(), days = COPY_DAYS } = {}) {
   const before = now - days * 24 * 3600 * 1000
-  return listSnapshots(name).filter((s) => s.copy && !s.locked && !s.note && new Date(s.mtime).getTime() < before)
+  return listSnapshots(name).filter((s) => s.copy && !neverCleaned(s) && !s.locked && !s.note && new Date(s.mtime).getTime() < before)
 }
 
-export function cleanCopies(name, { now = Date.now(), days = COPY_DAYS } = {}) {
+export function cleanCopies(name, { now = Date.now(), days = COPY_DAYS, only = null } = {}) {
   if (isRestoring(name)) return { removed: [], size: 0 }
-  const old = oldCopies(name, { now, days })
+  const names = only ? new Set(only.map(String)) : null
+  const gone = []
   let size = 0
-  for (const snap of old) {
-    removeFiles(name, snap)
+  for (const snap of oldCopies(name, { now, days })) {
+    if (names && !names.has(snap.name)) continue
+    // one that will not go now is tried again by the next clean-up
+    if (!removeFiles(name, snap)) continue
+    gone.push(snap.name)
     size += snap.size
   }
-  if (old.length) {
-    activity.record(name, 'backup-prune', { detail: `${old.length} small ${old.length === 1 ? 'copy' : 'copies'} older than ${days} days, ${humanBytes(size)}` })
+  if (gone.length) {
+    activity.record(name, 'backup-prune', { detail: `${gone.length} small ${gone.length === 1 ? 'copy' : 'copies'} older than ${days} days, ${humanBytes(size)}` })
   }
-  return { removed: old.map((s) => s.name), size }
+  return { removed: gone, size }
+}
+
+// The archives a server has, by name and nothing else: for asking whether a copy is still there.
+export function snapshotNames(name) {
+  try {
+    return new Set(fs.readdirSync(path.join(BACKUPS_DIR, name)).filter((f) => f.endsWith('.tar.gz')))
+  } catch {
+    return new Set()
+  }
 }
