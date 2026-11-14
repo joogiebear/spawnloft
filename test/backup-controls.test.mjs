@@ -227,7 +227,7 @@ test('deleting a world from the Worlds page keeps a copy in Backups first', asyn
   assert.ok(!fs.existsSync(path.join(inst.dir, 'old')))
   const copy = backup.listSnapshots(inst.name).find((s) => s.name === res.snapshot)
   assert.deepEqual(copy.members.sort(), ['old', 'old_nether'])
-  assert.equal(copy.label, 'file-delete')
+  assert.equal(copy.label, 'world-delete')
   // and the copy puts it back
   await backup.restoreSnapshot(inst, copy, { safety: false })
   assert.ok(fs.existsSync(path.join(inst.dir, 'old', 'level.dat')))
@@ -247,6 +247,8 @@ test('Standard and Worlds backups hold every world in the folder, not only the a
   world(inst.dir, 'world_nether')
   world(inst.dir, 'creative')
   world(inst.dir, 'minigames_the_end')
+  // a world being imported is unpacked into a hidden folder: not a member
+  world(inst.dir, '.mcctl-import-123')
   fs.mkdirSync(path.join(inst.dir, 'logs'))
   fs.mkdirSync(path.join(inst.dir, 'not-a-world'))
   assert.deepEqual(backup.worldFolders(inst.dir), ['creative', 'minigames_the_end', 'world', 'world_nether'])
@@ -269,7 +271,8 @@ test('"last backed up" is the newest backup that holds the worlds, not a copy of
   const inst = server()
   assert.deepEqual(await backup.snapshotSummary(inst.name), { newestAt: null, newestBackupAt: null, count: 0 })
   const whole = await backup.createSnapshot(inst, { scope: 'standard' })
-  const old = new Date(Date.now() - 3 * 24 * 3600 * 1000)
+  // on a whole second: some filesystems keep no finer time
+  const old = new Date(Math.floor(Date.now() / 1000) * 1000 - 3 * 24 * 3600 * 1000)
   fs.utimesSync(whole.file, old, old)
   await backup.createSnapshot(inst, { scope: 'plugins', label: 'pre-install' })
   const summary = await backup.snapshotSummary(inst.name)

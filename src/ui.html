@@ -8435,7 +8435,7 @@ async function renderWorlds(opts) {
           if (e.code !== 'large') throw e;
           const sure = await ask({
             title: 'Delete "' + w.name + '" without a copy?',
-            text: e.message + '. Deleted without one, there is no way back. Export it first if there is any doubt.',
+            text: e.message + '. Deleted without one, the only way back is a backup that already holds it. Export it first if there is any doubt.',
             confirmLabel: 'Delete for good',
             danger: true,
             typeToConfirm: w.name,
@@ -10199,7 +10199,7 @@ const ACTIVITY_TEXT = {
 };
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
 // decides where a button is drawn.
-const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit']);
+const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit', 'world-delete']);
 // SpawnLoft's own entries - the crash guard, its restarts - are under All: nobody goes looking for
 // them on their own, and a fifth button made the row of filters the loudest thing on the screen.
 const ACTIVITY_FILTERS = [['', 'All'], ['you', 'You'], ['schedule', 'Schedule'], ['assistant', 'Assistant']];
@@ -10432,6 +10432,7 @@ const FILES_SNAPSHOT = {
   'file-edit': { tag: 'before an edit', why: 'as it was before it was edited in Files' },
   'file-replace': { tag: 'before a replace', why: 'as it was before an upload replaced it' },
   'file-delete': { tag: 'deleted', why: 'as it was when it was deleted in Files' },
+  'world-delete': { tag: 'deleted world', why: 'as it was when it was deleted in Worlds' },
 };
 
 /** The Reason column: what prompted a snapshot, from its label or the schedule that took it. */
@@ -10440,7 +10441,7 @@ function snapshotReason(snap) {
   const named = {
     'pre-restore': 'Before a restore', 'before-edit': 'Before an AI edit', 'pre-delete': 'Before a delete',
     'pre-rebuild': 'Before a reset', 'pre-upgrade': 'Before an upgrade', 'pre-pack-update': 'Before a pack update',
-    'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete',
+    'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete', 'world-delete': 'On delete',
     manual: 'Manual', nightly: 'Nightly',
   };
   if (named[label]) return named[label];
@@ -10756,7 +10757,8 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
   const week = 7 * 24 * 3600 * 1000;
   const stale = !latest || Date.now() - latest > week;
   const known = automatic && !automatic.error;
-  const on = known && automatic.auto;
+  // paused in Schedule is not on, whatever made it
+  const on = known && automatic.auto && automatic.auto.enabled !== false;
   // a task made in Schedule that backs this server up counts: the server is being backed up
   const elsewhere = known && !on && automatic.scheduled && automatic.scheduled.length ? automatic.scheduled : null;
   box.dataset.tone = stale ? 'warn' : on || elsewhere ? 'live' : '';
@@ -10777,7 +10779,7 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
     const every = AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, automatic.auto.schedule));
     const next = whenNext(automatic.auto.nextRun);
     head.textContent = 'Automatic backups on';
-    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 7)
+    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 'all of them')
       + (next ? ' · next ' + next : '');
   } else if (elsewhere) {
     head.textContent = 'Backed up on a schedule';
@@ -10813,8 +10815,10 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
 const KEEP_SCHEDULE = '__as-it-is';
 
 /** Why the "keeping" number cannot be saved, or null. The schedule keeps between 1 and 365. */
-function keepProblem(value) {
+function keepProblem(value, emptyKeepsAll) {
   const text = String(value).trim();
+  // left empty on a task that already keeps everything: it goes on keeping everything
+  if (!text && emptyKeepsAll) return null;
   const n = Number(text);
   if (!text || !Number.isInteger(n) || n < 1 || n > 365) return 'Use a whole number from 1 to 365.';
   return null;
@@ -10877,7 +10881,11 @@ function autoBackupSection(base, data) {
   keep.type = 'number';
   keep.min = '1';
   keep.max = '365';
-  keep.value = String((known.auto && known.auto.keep) || 7);
+  // A task that keeps everything (made elsewhere) shows as that, not as 7: Apply would otherwise
+  // start deleting its older backups for someone who only changed the time.
+  const keepsAll = Boolean(known.auto) && known.auto.keep == null;
+  keep.value = keepsAll ? '' : String((known.auto && known.auto.keep) || 7);
+  if (keepsAll) keep.placeholder = 'all';
   keep.style.maxWidth = '68px';
   keep.setAttribute('aria-label', 'How many automatic backups to keep');
   const keepAfter = document.createElement('span');
@@ -10917,19 +10925,19 @@ function autoBackupSection(base, data) {
   };
   sayKeep(null);
   keepNote.hidden = known.automaticAvailable === false;
-  keep.addEventListener('input', () => sayKeep(keepProblem(keep.value)));
+  keep.addEventListener('input', () => sayKeep(keepProblem(keep.value, keepsAll)));
   auto.append(keepNote);
 
   apply.onclick = async () => {
     // an empty or impossible number used to be saved as "keep everything", with a toast that said scheduled
-    const problem = onOff.checked ? keepProblem(keep.value) : null;
+    const problem = onOff.checked ? keepProblem(keep.value, keepsAll) : null;
     sayKeep(problem);
     if (problem) { keep.focus(); return; }
     apply.disabled = true;
     try {
       const chosen = every.value === KEEP_SCHEDULE ? { schedule: known.auto.schedule } : AUTO_INTERVALS.find((o) => o.label === every.value);
       await post(base + '/auto', onOff.checked
-        ? { enabled: true, schedule: chosen.schedule, keep: Number(keep.value) }
+        ? { enabled: true, schedule: chosen.schedule, keep: keep.value.trim() ? Number(keep.value) : null }
         : { enabled: false });
       toast(onOff.checked ? 'Automatic backups scheduled.' : 'Automatic backups turned off.', 'good');
       await renderBackups({ force: true });

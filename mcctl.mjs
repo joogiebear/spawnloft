@@ -1189,11 +1189,11 @@ async function cmdWorlds(positional, flags) {
     const target = positional[2]
     if (!target) fail(`usage: spawnloft worlds ${name} delete <world> --yes`)
     if (!flags.yes) {
-      fail(`deleting "${target}" is permanent: only the ACTIVE world is ever in snapshots, so an
-  inactive world has no way back unless it was exported. Re-run with --yes.`)
+      fail(`this deletes the world "${target}". A copy is kept in its backups first (not past 1 GB:
+  add --no-copy for that). Re-run with --yes.`)
     }
-    const res = worlds.deleteWorld(inst, target)
-    out(`Deleted ${res.removed.join(', ')}.`)
+    const res = await worlds.deleteWorldKeepingCopy(inst, target, { withoutCopy: flags.copy === false })
+    out(`Deleted ${res.removed.join(', ')}.${res.snapshot ? ` A copy is kept as ${res.snapshot}.` : ''}`)
     return
   }
 

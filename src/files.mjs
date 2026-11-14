@@ -439,7 +439,7 @@ export async function searchNames(inst, relative, query, { running = false } = {
 }
 
 // Changes whose snapshot holds exactly them, so the Activity tool can offer Undo.
-export const UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit'])
+export const UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit', 'world-delete'])
 
 // The Activity tool's Undo. Only snapshots of named files/folders qualify; a whole-server snapshot
 // is a restore. Unlike a restore it works while the server runs, provided nothing it puts back

@@ -10,6 +10,7 @@ import { runTar, tarMember, EXCLUDE_ARGS, createSnapshot } from './backup.mjs'
 import { tarHandlesZip } from './tar.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { fail, dirSizeAsync, humanBytes, stamp, validateName } from './util.mjs'
+import { MAX_COPY_BYTES } from './files.mjs'
 
 // dimension folders a Bukkit-family server keeps beside a world
 const DIM_SUFFIXES = ['_nether', '_the_end']
@@ -190,9 +191,10 @@ export async function exportWorld(inst, name) {
   return { file, size, sizeHuman: humanBytes(size), members }
 }
 
-// A copy this size or smaller is taken before a world is deleted. Past it, gzip takes minutes and
-// as much disk again, so the caller is told (code "large") and can ask again with withoutCopy.
-export const MAX_WORLD_COPY_BYTES = 1024 * 1024 * 1024
+// A copy is taken before a world is deleted, up to the size Files copies before a delete. Past
+// it, gzip takes minutes and as much disk again, so the caller is told (code "large") and can ask
+// again with withoutCopy.
+export const MAX_WORLD_COPY_BYTES = MAX_COPY_BYTES
 
 // What the Worlds page calls: the world is copied into Backups first, the way Files copies what
 // it deletes, so the page made for worlds is not the less safe way to remove one.
@@ -205,7 +207,7 @@ export async function deleteWorldKeepingCopy(inst, name, { withoutCopy = false }
     if (bytes > MAX_WORLD_COPY_BYTES) {
       fail(`"${name}" is ${humanBytes(bytes)}; keeping a copy first would take a while and as much space again`, 'large')
     }
-    const res = await createSnapshot(inst, { scope: 'files', label: 'file-delete', members, flush: false, quiet: true })
+    const res = await createSnapshot(inst, { scope: 'files', label: 'world-delete', members, flush: false, quiet: true })
     snapshot = path.basename(res.file)
   }
   return { ...deleteWorld(inst, name), snapshot }

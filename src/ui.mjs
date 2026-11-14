@@ -603,7 +603,8 @@ async function handleBackups(req, res, name, seg) {
     // the tab draws this first and polls it; the scheduler lookup (PowerShell on Windows) can take
     // seconds on a cold machine and must not block it
     if (action === 'history') return json(res, 200, history)
-    const auto = await autoBackupTask(name)
+    // one question to the scheduler for both answers: on macOS each one is a process per task
+    const { auto, others } = backupTasksOf(await schedule.list(), name)
     const automatic = {
       auto: auto && {
         id: auto.id,
@@ -615,7 +616,7 @@ async function handleBackups(req, res, name, seg) {
         nextRun: auto.windows?.nextRun ?? null,
       },
       // other enabled tasks from Schedule that back this server up
-      scheduled: backupTasksOf(await schedule.list(), name).others.map((t) => ({ id: t.id, name: t.name, schedule: t.schedule })),
+      scheduled: others.map((t) => ({ id: t.id, name: t.name, schedule: t.schedule })),
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
       background: schedule.background(),
@@ -705,9 +706,6 @@ async function handleBackups(req, res, name, seg) {
   return json(res, 404, { error: 'not found' })
 }
 
-// The automatic backup the Backups tab owns. Match by owner mark, not by action type: the
-// Scheduler tab can make backup tasks too. The fallback adopts an unowned task with the exact
-// default name (made before the mark existed).
 // The backups folder is read once at startup. A different one saved since then is not in use
 // yet, and until the restart nothing else says that a change is waiting.
 function pendingBackupsDir() {
@@ -719,6 +717,9 @@ function pendingBackupsDir() {
   }
 }
 
+// The automatic backup the Backups tab owns. Match by owner mark, not by action type: the
+// Scheduler tab can make backup tasks too. The fallback adopts an unowned task with the exact
+// default name (made before the mark existed).
 async function autoBackupTask(name) {
   return backupTasksOf(await schedule.list(), name).auto
 }
@@ -1057,7 +1058,7 @@ async function handleWorlds(req, res, name, seg) {
   }
   if (verb === 'delete') {
     const out = await worlds.deleteWorldKeepingCopy(inst, String(body.name), { withoutCopy: body.withoutCopy === true })
-    activity.record(name, 'world-delete', { detail: String(body.name), snapshot: out.snapshot })
+    activity.record(name, 'world-delete', { detail: String(body.name) + (out.snapshot ? '' : ' (no copy kept)'), snapshot: out.snapshot })
     return json(res, 200, out)
   }
   return json(res, 404, { error: 'not found' })
@@ -1625,7 +1626,8 @@ async function route(req, res) {
     const dir = path.resolve(raw)
     const writable = settings.checkWritable(dir)
     if (!writable.ok) return json(res, 400, { error: `SpawnLoft cannot write to ${dir}: ${writable.error}` })
-    settings.save({ backupsDir: dir })
+    // the default folder is saved as "no choice", so backups keep following the data folder if it moves
+    settings.save({ backupsDir: dir === path.join(LAYOUT.dataRoot, 'backups') ? null : dir })
     return json(res, 200, { backupsDir: dir, restartRequired: dir !== LAYOUT.backupsDir })
   }
 
@@ -1836,7 +1838,9 @@ async function route(req, res) {
     }))
     // No archive on disk is either "never backed up" or "backed up, then deleted"; the log tells
     // which, so the page does not call a server that had eighteen backups this morning "never".
-    const bare = Object.keys(servers).filter((n) => !servers[n].backupCount)
+    // by the newest backup of the server, not by any archive: a copy of the plugins left on disk
+    // must not turn "had eighteen backups, all deleted" back into "never"
+    const bare = Object.keys(servers).filter((n) => !servers[n].lastBackupAt)
     if (bare.length) {
       const trails = activity.backupTrails(bare)
       for (const n of bare) servers[n].backupTrail = trails[n]

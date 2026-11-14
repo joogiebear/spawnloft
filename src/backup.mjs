@@ -159,7 +159,9 @@ export function worldFolders(dir) {
     return []
   }
   return entries
-    .filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'level.dat')))
+    // not hidden folders: a world being imported is unpacked into one, and it is gone again
+    // before a backup that listed it has finished
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.') && fs.existsSync(path.join(dir, e.name, 'level.dat')))
     .map((e) => e.name)
     .sort()
 }

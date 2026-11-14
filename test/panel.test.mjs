@@ -365,6 +365,9 @@ test('the Backups strip counts only backups of the server, and a custom schedule
 
   for (const bad of ['', ' ', '0', '-3', '2.5', 'abc', '366']) assert.equal(keepProblem(bad), 'Use a whole number from 1 to 365.', bad)
   for (const good of ['1', '7', '365', ' 14 ']) assert.equal(keepProblem(good), null, good)
+  // a task that keeps everything may go on doing so, with the box left empty
+  assert.equal(keepProblem('', true), null)
+  assert.equal(keepProblem('0', true), 'Use a whole number from 1 to 365.')
 
   assert.equal(scheduledBackupWords([{ name: 'Weekly world backup', schedule: { kind: 'weekly', day: 'SUN', at: '03:00' } }]),
     '“Weekly world backup” runs every Sunday at 03:00. Change it in Schedule.')
