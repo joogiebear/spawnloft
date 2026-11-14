@@ -14,6 +14,18 @@ export const MINIMUM_MAJOR = 17
 // a build, not a vendor download page behind a login
 export const DOWNLOAD_URL = 'https://adoptium.net/temurin/releases/?version=25'
 
+/**
+ * The download page already narrowed to this computer, so the person is not left to pick an
+ * operating system and a processor out of a table. A filter the page does not know is ignored
+ * by it, which leaves the page as DOWNLOAD_URL shows it.
+ */
+export function downloadUrlFor(platform = process.platform, arch = process.arch) {
+  const os = { win32: 'windows', darwin: 'mac', linux: 'linux' }[platform]
+  const cpu = { x64: 'x64', arm64: 'aarch64' }[arch]
+  if (!os || !cpu) return DOWNLOAD_URL
+  return `${DOWNLOAD_URL}&os=${os}&arch=${cpu}&package=jdk`
+}
+
 // handles `openjdk version "21.0.5"` and the pre-9 `java version "1.8.0_401"`, where the major is the second number
 export function parseMajor(text) {
   const m = /version "(\d+)(?:\.(\d+))?[^"]*"/.exec(text)

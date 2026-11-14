@@ -34,7 +34,7 @@ export function getSetup() {
 }
 
 export async function checkJava() {
-  return { ...(await java.health()), downloadUrl: java.DOWNLOAD_URL }
+  return { ...(await java.health()), downloadUrl: java.downloadUrlFor() }
 }
 
 // { ok } or { ok: false, error }; the caller (the shell) restarts the core on ok

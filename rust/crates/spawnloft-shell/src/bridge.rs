@@ -23,8 +23,8 @@ use serde_json::{Value, json};
 use tauri::ipc::CapabilityBuilder;
 use tauri::webview::{DownloadEvent, NewWindowResponse};
 use tauri::{
-    AppHandle, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -44,6 +44,7 @@ pub const COMMANDS: &[&str] = &[
     "open_profile_folder",
     "open_microsoft_login",
     "restart_core",
+    "focus_window",
 ];
 
 pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
@@ -56,7 +57,8 @@ pub fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static 
         open_external,
         open_profile_folder,
         open_microsoft_login,
-        restart_core
+        restart_core,
+        focus_window
     ]
 }
 
@@ -89,6 +91,8 @@ pub struct Shell {
     main_state: Tracker,
     launcher_state: Tracker,
     reported: Mutex<Vec<PathBuf>>,
+    /// When a window was last signed in again because its page asked.
+    signed_in_again: Mutex<Option<std::time::Instant>>,
 }
 
 impl Shell {
@@ -103,6 +107,7 @@ impl Shell {
             main_state: Tracker::new(config.join("window-state.json")),
             launcher_state: Tracker::new(config.join("launcher-window-state.json")),
             reported: Mutex::new(Vec::new()),
+            signed_in_again: Mutex::new(None),
         }
     }
 
@@ -162,6 +167,209 @@ fn is_start_page(url: &Url) -> bool {
     }
 }
 
+/// A page that lost its sign-in moves here to ask for a new one. The panel serves nothing
+/// there: the window answers.
+const AGAIN_PATH: &str = spawnloft_lib::panel_auth::AGAIN_PATH;
+
+/// Two requests to be signed in again closer together than this are a sign-in that does not
+/// hold (the page asks by itself when it finds it has none), and the second is not answered.
+const AGAIN_GAP: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Asked of the window by the start page's "could not start" state, and by a second start of
+/// the app that found the main window gone: start the core (again). `main.rs` listens.
+pub const RETRY_EVENT: &str = "spawnloft:retry";
+
+/// `Some(to)` when `url` is a panel page asking to be signed in again; `to` is where the page
+/// said it was (`/launcher`, `/setup`), when it said.
+pub fn sign_in_request(url: &Url, panel: Option<&Url>) -> Option<Option<String>> {
+    if !panel.is_some_and(|p| same_origin(url, p)) || url.path() != AGAIN_PATH {
+        return None;
+    }
+    Some(
+        url.query_pairs()
+            .find(|(k, _)| k == "to")
+            .map(|(_, v)| v.into_owned()),
+    )
+}
+
+/// What a link on the start page's "could not start" state asks of the window.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum StartAction {
+    Retry,
+    ShowLog,
+    Quit,
+}
+
+/// The start page has no bridge (it is not the panel), so its buttons are links to itself with
+/// `?do=`, and the window reads them as they are followed.
+pub fn start_action(url: &Url) -> Option<StartAction> {
+    if !is_start_page(url) {
+        return None;
+    }
+    match url.query_pairs().find(|(k, _)| k == "do")?.1.as_ref() {
+        "retry" => Some(StartAction::Retry),
+        "log" => Some(StartAction::ShowLog),
+        "quit" => Some(StartAction::Quit),
+        _ => None,
+    }
+}
+
+/// One sentence for the person, for a reason written for the log.
+pub fn failure_words(why: &str) -> &'static str {
+    if why.contains("has no core program") {
+        "A part of SpawnLoft is missing from this installation. Installing SpawnLoft again will put it back."
+    } else if why.contains("did not print its address") {
+        "SpawnLoft's background service took too long to start."
+    } else if why.contains("keeps stopping") {
+        "SpawnLoft's background service keeps stopping."
+    } else if why.contains("exited before") || why.contains("did not start") {
+        "SpawnLoft's background service did not start."
+    } else {
+        "SpawnLoft's background service started, but this window could not open its panel."
+    }
+}
+
+/// The main window says the core could not be started, with Try again, the log and Quit;
+/// `false` when there is no main window to say it in.
+pub fn show_failure<R: Runtime>(app: &AppHandle<R>, why: &str, log: &Path) -> bool {
+    let Some(w) = app.get_webview_window(MAIN) else {
+        return false;
+    };
+    let mut url = start_page();
+    url.query_pairs_mut()
+        .append_pair("failed", failure_words(why))
+        .append_pair("detail", why)
+        .append_pair("log", &log.display().to_string());
+    w.navigate(url).is_ok()
+}
+
+/// The address that signs a window in at the panel: `/auth` with a token that works once.
+pub fn login_url<R: Runtime>(app: &AppHandle<R>, to: Option<&str>) -> Result<Url, String> {
+    let shell = app.state::<Shell>();
+    let (Some(panel), Some(addr)) = (shell.panel(), shell.panel_addr()) else {
+        return Err("the panel is not up".into());
+    };
+    // the key is only ever used to sign; what goes in the address is a token that works once
+    let path = spawnloft_lib::panel_auth::load_key()
+        .and_then(|key| spawnloft_lib::panel_auth::login_path(&key, addr.port(), to))
+        .map_err(|e| format!("could not sign the window in to the panel: {e}"))?;
+    panel
+        .join(&path)
+        .map_err(|e| format!("could not build the panel's address: {e}"))
+}
+
+/// A window whose sign-in ran out (the panel's idle time) is signed in again where it was. A
+/// console window cannot be: a sign-in lands on the panel or the launcher. It closes, and the
+/// main window, which shares the sign-in, comes forward signed in.
+fn sign_in_again<R: Runtime>(app: &AppHandle<R>, label: &str, to: Option<&str>) {
+    let (target, to) = if label == LAUNCHER {
+        (LAUNCHER, Some("/launcher"))
+    } else if label == MAIN {
+        (MAIN, to)
+    } else {
+        if let Some(w) = app.get_webview_window(label) {
+            let _ = w.close();
+        }
+        (MAIN, None)
+    };
+    let Some(w) = app.get_webview_window(target) else {
+        return reopen_main(app);
+    };
+    // The page asks by itself, so a sign-in that does not hold would ask for ever: a second
+    // request right after the first is told so and not answered.
+    let too_soon = app.state::<Shell>().signed_in_again.lock().is_ok_and(|mut last| {
+        let soon = last.is_some_and(|at| at.elapsed() < AGAIN_GAP);
+        *last = Some(std::time::Instant::now());
+        soon
+    });
+    let made = if too_soon {
+        Err("could not sign the window in to the panel: the sign-in did not hold".to_string())
+    } else {
+        login_url(app, to)
+    };
+    match made {
+        Ok(url) => {
+            if let Err(e) = w.navigate(url) {
+                local::log(&format!("sign in again: {e}"));
+            }
+            focus(&w);
+        }
+        // said in the main window: a link that was followed and did nothing reads as broken
+        Err(e) => {
+            local::log(&format!("sign in again: {e}"));
+            show_failure(app, &e, &local::run_dir().join("panel.log"));
+        }
+    }
+}
+
+/// The main window was closed while a launcher or console window kept the app alive, and the
+/// app was started again: build it anew and sign it in.
+pub fn reopen_main<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    // off the caller's thread, which has to return before a window can exist
+    std::thread::spawn(move || match build_main(&app) {
+        Ok(w) => {
+            if !app.state::<crate::Core>().is_running() {
+                let _ = app.emit(RETRY_EVENT, ());
+                return;
+            }
+            match login_url(&app, None) {
+                Ok(url) => {
+                    if let Err(e) = w.navigate(url) {
+                        local::log(&format!("reopen the main window: {e}"));
+                    }
+                }
+                // No panel to open: a core that is still starting, or one that never came up
+                // and said so in the window that has since been closed. Either way it is
+                // started over, and opens the panel in this window when it is up.
+                Err(e) => {
+                    local::log(&format!("reopen the main window: {e}"));
+                    let _ = app.emit(RETRY_EVENT, ());
+                }
+            }
+        }
+        Err(e) => local::log(&format!("could not reopen the main window: {e}")),
+    });
+}
+
+/// Every navigation of every window comes through here: the two the window answers itself,
+/// then the guard.
+fn on_navigation<R: Runtime>(app: &AppHandle<R>, label: &str, url: &Url) -> bool {
+    if label == MAIN
+        && let Some(action) = start_action(url)
+    {
+        // Only from the start page itself. On Linux and macOS this is asked for the frames of a
+        // page as well, and a frame inside the panel has no business quitting the app.
+        let on_start_page = app
+            .get_webview_window(MAIN)
+            .and_then(|w| w.url().ok())
+            .is_some_and(|at| is_start_page(&at));
+        if !on_start_page {
+            local::log("a start page action asked from another page was refused");
+            return false;
+        }
+        // None of them is followed as a link: an address that restarts the core must not be
+        // left in the window's history for Back or Reload to find.
+        match action {
+            // the core is stopped and started; the window goes to its plain "Starting" state
+            StartAction::Retry => {
+                let _ = app.emit(RETRY_EVENT, ());
+            }
+            StartAction::ShowLog => {
+                let _ = tauri_plugin_opener::open_path(local::run_dir(), None::<&str>);
+            }
+            StartAction::Quit => app.exit(0),
+        }
+        return false;
+    }
+    if let Some(to) = sign_in_request(url, app.state::<Shell>().panel().as_ref()) {
+        let (app, label) = (app.clone(), label.to_string());
+        std::thread::spawn(move || sign_in_again(&app, &label, to.as_deref()));
+        return false;
+    }
+    may_navigate(app, url)
+}
+
 /// Where a window may go: the panel's origin, the start page, and `about:` frames.
 pub fn may_navigate<R: Runtime>(app: &AppHandle<R>, url: &Url) -> bool {
     if is_start_page(url) || (url.scheme() == "about" && matches!(url.path(), "blank" | "srcdoc")) {
@@ -198,9 +406,10 @@ pub fn set_panel<R: Runtime>(app: &AppHandle<R>, url: &Url) -> Result<(), String
     if fresh {
         // local as well: right after the window moves from its start page (tauri://localhost) to
         // the panel, webkit2gtk can still name the old origin on the first IPC request, and the
-        // ACL then refuses the panel itself. The start page is static and has no script, and
-        // every command checks the window's live URL against the panel (from_panel), so this
-        // grants nothing a non-panel page can use.
+        // ACL then refuses the panel itself. The start page's only script writes the text of a
+        // failure the window gave it and calls nothing, and every command checks the window's
+        // live URL against the panel (from_panel), so this grants nothing a non-panel page can
+        // use.
         let mut cap = CapabilityBuilder::new(format!("panel-{port}"))
             .remote(format!("http://127.0.0.1:{port}"))
             .local(true)
@@ -429,6 +638,18 @@ fn open_microsoft_login<R: Runtime>(webview: Webview<R>, url: String) -> Result<
     Ok(json!({ "ok": open_https(&url), "external": true }))
 }
 
+/// Brings the calling window forward. The Microsoft sign-in happens in the system browser,
+/// which is then on top of the launcher that has the answer.
+#[tauri::command]
+fn focus_window<R: Runtime>(webview: Webview<R>) -> Result<Value, String> {
+    from_panel(&webview)?;
+    let w = webview.window();
+    let _ = w.unminimize();
+    let _ = w.show();
+    let _ = w.set_focus();
+    Ok(json!({ "ok": true }))
+}
+
 /// After the first-run wizard saved new locations: the core reads them only at start.
 #[tauri::command]
 fn restart_core(webview: Webview) -> Result<Value, String> {
@@ -509,13 +730,14 @@ fn panel_window<'a, R: Runtime>(
     url: WebviewUrl,
 ) -> WebviewWindowBuilder<'a, R, AppHandle<R>> {
     let nav = app.clone();
+    let nav_label = label.to_string();
     let opener = app.clone();
     let theme_bg = tauri::window::Color(0x0c, 0x0e, 0x14, 0xff);
     WebviewWindowBuilder::new(app, label, url)
         .title("SpawnLoft")
         .background_color(theme_bg)
         .initialization_script(BRIDGE_JS)
-        .on_navigation(move |url| may_navigate(&nav, url))
+        .on_navigation(move |url| on_navigation(&nav, &nav_label, url))
         .on_new_window(move |url, _features| {
             open_requested(&opener, &url);
             NewWindowResponse::Deny
@@ -812,6 +1034,68 @@ mod tests {
 
     fn u(s: &str) -> Url {
         Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn the_window_answers_sign_in_and_start_page_links() {
+        let p = u("http://127.0.0.1:4100/");
+        assert_eq!(
+            sign_in_request(&u("http://127.0.0.1:4100/auth/again"), Some(&p)),
+            Some(None)
+        );
+        assert_eq!(
+            sign_in_request(&u("http://127.0.0.1:4100/auth/again?to=/launcher"), Some(&p)),
+            Some(Some("/launcher".into()))
+        );
+        // another port is not the panel, and neither is any other path
+        assert_eq!(
+            sign_in_request(&u("http://127.0.0.1:4101/auth/again"), Some(&p)),
+            None
+        );
+        assert_eq!(sign_in_request(&u("http://127.0.0.1:4100/auth"), Some(&p)), None);
+        assert_eq!(
+            sign_in_request(&u("http://127.0.0.1:4100/auth/again"), None),
+            None
+        );
+
+        let start = start_page();
+        let with = |q: &str| {
+            let mut s = start.clone();
+            s.set_query(Some(q));
+            s
+        };
+        assert_eq!(start_action(&start), None);
+        assert_eq!(start_action(&with("do=retry")), Some(StartAction::Retry));
+        assert_eq!(start_action(&with("do=log")), Some(StartAction::ShowLog));
+        assert_eq!(start_action(&with("do=quit")), Some(StartAction::Quit));
+        assert_eq!(start_action(&with("do=format")), None);
+        assert_eq!(start_action(&with("failed=x&detail=y")), None);
+        // only the start page's own links: a panel page with the same query is a panel page
+        assert_eq!(start_action(&u("http://127.0.0.1:4100/?do=quit")), None);
+    }
+
+    #[test]
+    fn a_failure_is_said_for_a_person() {
+        for why in [
+            "this installation has no core program (resources/bin)",
+            "/opt/x/spawnloft-core did not start: No such file or directory",
+            "the core did not print its address within 90 seconds",
+            "the core exited before the panel was ready; see panel.log",
+            "the core keeps stopping; see panel.log",
+            "the core printed a bad address `x`",
+            "capability: nope",
+        ] {
+            let said = failure_words(why);
+            assert!(
+                !said.contains("core") && !said.contains("panel.log") && !said.contains("capability"),
+                "{said}"
+            );
+            assert!(said.ends_with('.'), "{said}");
+        }
+        assert_ne!(
+            failure_words("the core keeps stopping; see panel.log"),
+            failure_words("the core printed a bad address `x`")
+        );
     }
 
     #[test]

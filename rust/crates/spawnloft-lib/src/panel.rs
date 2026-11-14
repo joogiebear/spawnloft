@@ -462,7 +462,10 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
                 panel_auth::login_page(to).as_bytes(),
             );
         }
-        Verdict::LoginRefused | Verdict::Unauthorized { api: false } => {
+        v @ (Verdict::LoginRefused | Verdict::Unauthorized { api: false }) => {
+            // under the desktop window, the page asks the window to sign it in again
+            let shell = std::env::var_os("SPAWNLOFT_SHELL").is_some_and(|s| s == "tauri");
+            let refused = matches!(v, Verdict::LoginRefused);
             return respond_with(
                 &mut conn,
                 401,
@@ -473,7 +476,7 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
                     PAGE_HEADERS[1],
                     PAGE_HEADERS[2],
                 ],
-                panel_auth::unauthorized_page().as_bytes(),
+                panel_auth::unauthorized_page(shell, head.path(), refused).as_bytes(),
             );
         }
         Verdict::Unauthorized { api: true } => {

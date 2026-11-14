@@ -360,3 +360,12 @@ test('Java: probe() asks again with -version when a Java refuses -XshowSettings 
   assert.equal(state.arch, null, 'its arch stays unknown')
   assert.equal((await probe(stubJava('java-props', { major: 21, arch: 'aarch64' }))).arch, 'arm64')
 })
+
+test('the Java download link is narrowed to this computer', async () => {
+  const { downloadUrlFor, DOWNLOAD_URL } = await import('../src/java.mjs')
+  assert.equal(downloadUrlFor('win32', 'x64'), DOWNLOAD_URL + '&os=windows&arch=x64&package=jdk')
+  assert.equal(downloadUrlFor('darwin', 'arm64'), DOWNLOAD_URL + '&os=mac&arch=aarch64&package=jdk')
+  assert.equal(downloadUrlFor('linux', 'x64'), DOWNLOAD_URL + '&os=linux&arch=x64&package=jdk')
+  assert.equal(downloadUrlFor('freebsd', 'x64'), DOWNLOAD_URL)
+  assert.equal(downloadUrlFor('linux', 'riscv64'), DOWNLOAD_URL)
+})

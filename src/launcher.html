@@ -591,12 +591,25 @@
       title.textContent = 'This panel session has ended';
       const text = document.createElement('p');
       text.style.cssText = 'margin:0;color:#9aa4ba';
-      text.append('Open SpawnLoft again from the app, or run ');
-      const cmd = document.createElement('code');
-      cmd.style.color = '#e9ecf4';
-      cmd.textContent = 'spawnloft ui';
-      text.append(cmd, ' for a new sign-in link.');
       card.append(title, text);
+      if (window.spawnloftDesktop && window.spawnloftDesktop.shell === 'tauri') {
+        // In the app the window can sign itself in again: loading the page anew is answered with
+        // the sign-in page, which the window sends through a new one-use link (bridge.rs).
+        text.append('SpawnLoft restarted, or this window sat unused for a while. Anything typed and not saved here is lost.');
+        const again = document.createElement('button');
+        again.type = 'button';
+        again.textContent = 'Sign in again';
+        again.style.cssText = 'margin-top:16px;padding:7px 14px;border:1px solid #4a67e8;border-radius:6px;background:#4a67e8;color:#fff;font:inherit;cursor:pointer';
+        again.onclick = () => location.reload();
+        card.append(again);
+        setTimeout(() => again.focus(), 0);
+      } else {
+        text.append('Open SpawnLoft again from the app, or run ');
+        const cmd = document.createElement('code');
+        cmd.style.color = '#e9ecf4';
+        cmd.textContent = 'spawnloft ui';
+        text.append(cmd, ' for a new sign-in link.');
+      }
       box.append(card);
       (document.body || document.documentElement).append(box);
     }
@@ -1370,7 +1383,7 @@
     if (login.external && login.status !== 'finishing') {
       return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
         h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
-          'Finish signing in in your browser, then come back here. This page updates by itself.'),
+          'Finish signing in in your browser within 10 minutes. SpawnLoft comes back to the front when Microsoft is done.'),
         h('span', { class: 'acts' },
           h('button', { class: 'linkbtn', onclick: () => openMicrosoft(login) }, 'Open Microsoft\'s page again'),
           h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
@@ -2181,6 +2194,11 @@
           openMicrosoft(login)
         }
         return
+      }
+      // Microsoft's page was in the browser, which is still in front of this window
+      if (login.external && !login.raised && ev.status !== 'cancelled') {
+        login.raised = true
+        desktop?.focusWindow?.().catch(() => {})
       }
       if (ev.status === 'finishing') return render()
       endLogin(login, ev)
