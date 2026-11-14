@@ -487,7 +487,12 @@
   .side-new .ico { width: 14px; height: 14px; flex: none; }
   .side-new[aria-current="page"] { background: var(--lapis-wash); border-color: var(--lapis-edge); color: var(--ink); }
   /* Play, under it: shows the Play page, the game launcher in the stage. */
-  .side-play { margin-top: calc(var(--s-1) - var(--s-3)); }
+  .side-play { margin-top: calc(var(--s-1) - var(--s-3)); position: relative; }
+  /* a launch under way or a game running, seen from any page */
+  .side-play[data-state]::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--live); }
+  .side-play[data-state="launching"]::after { background: var(--warn); animation: side-play-pulse 1.2s ease-in-out infinite; }
+  @keyframes side-play-pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .side-play[data-state="launching"]::after { animation: none; } }
 
   /*
     Java, when it is missing or too old: a chip rather than a banner across the page. It is a
@@ -3399,11 +3404,6 @@
           </label>
           <p id="setBetaStatus" class="hint" aria-live="polite" style="margin:10px 0 0"></p>
         </div>
-        <div id="setClient">
-          <h2>Game client</h2>
-          <p class="hint" style="margin:0 0 12px">Setups for the real Minecraft game, each started pointed at one of your servers. They are made and changed on the Play page.</p>
-          <dl class="kv" id="clientProfiles"></dl>
-        </div>
         <div id="setMcp">
           <h2>AI assistants</h2>
           <p class="hint" style="margin:0 0 12px">
@@ -4761,7 +4761,7 @@ function moreItems(row) {
   const play = playProfileFor(row);
   return [
     { label: 'Open folder', hint: 'Shows the server’s files in ' + FILE_MANAGER + '.', run: () => openFolder(row.name) },
-    { label: 'Play', hint: !play ? 'Opens the Play page to make a setup for this server.' : play.running ? 'The game client \u201c' + play.name + '\u201d is running.' : 'Starts the game client \u201c' + play.name + '\u201d pointed at this server.', run: () => playClient(row) },
+    { label: 'Play', hint: !play ? 'Opens the Play page to make a setup for this server.' : play.running ? 'The setup \u201c' + play.name + '\u201d is running: opens it on the Play page.' : 'Starts the setup \u201c' + play.name + '\u201d on the Play page, pointed at this server.', run: () => playClient(row) },
     { label: 'Upgrade…', hint: 'A newer build, or a newer Minecraft version, under Server software.', run: () => openUpgrade() },
     'sep',
     // A running server offers to stop first rather than a dead item; stopping, it waits like the rest.
@@ -6253,8 +6253,7 @@ function updateHomeCard(card, row) {
   const play = card.querySelector('.sc-play');
   const pp = playProfileFor(row);
   play.textContent = pp && pp.running ? 'Playing' : 'Play';
-  play.title = !pp ? 'Opens the Play page to make a setup for this server' : pp.running ? pp.name + ' is running' : 'Starts ' + pp.name + ' pointed at this server';
-  play.disabled = Boolean(pp && launching.has(pp.name));
+  play.title = !pp ? 'Opens the Play page to make a setup for this server' : pp.running ? pp.name + ' is running: opens it on the Play page' : 'Starts ' + pp.name + ' on the Play page, pointed at this server';
   card.querySelector('.sc-foot .sc-open').setAttribute('aria-label', 'Open ' + name);
 
   // Live figures while it runs; one line saying why there are none while it does not.
@@ -6408,21 +6407,13 @@ async function fetchClientProfiles() {
   try { next = await api('/client/profiles') } catch { next = [] }
   if (JSON.stringify(next) === JSON.stringify(state.clientProfiles)) return;
   state.clientProfiles = next;
+  showPlayState();
   renderHomeCards();
   if (state.current) buildMoreMenu();
 }
 function playProfileFor(row, profiles = state.clientProfiles) {
   const fits = profiles.filter((p) => !row.mcVersion || p.mc === row.mcVersion);
   return fits.find((p) => p.server === row.name) ?? fits[0] ?? null;
-}
-// One launch per profile at a time: the Play buttons stay disabled until the POST returns, and a
-// second click meanwhile only says so (the server refuses a second launch anyway).
-const launching = new Set();
-function setPlayDisabled(name, disabled) {
-  for (const btn of document.querySelectorAll('.scard .sc-play')) {
-    const pp = playProfileFor(rowOf(btn.closest('.scard').dataset.name) || {});
-    if (pp && pp.name === name) btn.disabled = disabled;
-  }
 }
 // The game launcher: the Play page, the /launcher document in a frame of the panel's own stage,
 // in the desktop app and a browser alike. Loaded the first time Play is pressed and kept loaded
@@ -6446,34 +6437,41 @@ function focusPlay() {
   } catch { /* not loaded, or not ours */ }
   frame.focus();
 }
-// No profile fits the server: the Play page opens with its New setup form filled in for it (a
-// loaded frame hears about it through the storage event, a fresh one reads the key as it loads).
-function openLauncherFor(row) {
-  try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify({ mc: row.mcVersion || null, server: row.name })) } catch {}
+// Every Play in the panel is the Play page's Play: a server card or the More menu leaves a note
+// for the page ({ mc, server, profile, play }) and opens it, and the page picks the setup, points
+// it at the server and starts the launch with its own progress, Cancel and errors. With no
+// setup that fits, the page opens its New setup form filled in for the server. A loaded frame
+// hears the note through the storage event; a fresh one reads the key as it loads.
+function openLauncherFor(row, profile = null) {
+  const note = { mc: row.mcVersion || null, server: row.name };
+  if (profile) { note.profile = profile.name; note.play = !profile.running; }
+  // the time makes two presses in a row two notes: a storage event needs a changed value
+  note.at = Date.now();
+  try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify(note)) } catch {}
   showPlay();
 }
-async function playClient(row) {
-  const p = playProfileFor(row);
-  if (!p) { openLauncherFor(row); return; }
-  if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
-  // An acknowledgement, not an error: the game is already open, which is what Play is for.
-  if (p.running) { toast(p.name + ' is already running. Stop it under Preferences \u203a Game client.'); return; }
-  launching.add(p.name);
-  setPlayDisabled(p.name, true);
-  const note = toast('Starting ' + p.name + '…');
-  try {
-    const out = await post('/client/profiles/' + encodeURIComponent(p.name) + '/launch', { server: row.name });
-    note.remove();
-    if (out.warnings && out.warnings.length) toast(p.name + ' is running. ' + out.warnings.map((w) => w.charAt(0).toUpperCase() + w.slice(1) + '.').join(' '), 'bad');
-    else toast(p.name + ' is running.', 'good')
-  } catch (e) {
-    note.remove();
-    toast(e.message, 'bad')
-  } finally {
-    launching.delete(p.name);
-    setPlayDisabled(p.name, false);
-    await loadClientProfiles()
-  }
+function playClient(row) {
+  openLauncherFor(row, playProfileFor(row));
+}
+// What the Play page says about itself (launcher.html, tellPanel): a launch under way or a game
+// running shows on the sidebar's Play button, whichever page is open.
+let playState = { launching: null, running: [] };
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || e.source !== $('#playFrame').contentWindow) return;
+  const d = e.data;
+  if (!d || d.type !== 'spawnloft-play-state') return;
+  playState = { launching: typeof d.launching === 'string' ? d.launching : null, running: Array.isArray(d.running) ? d.running.filter((n) => typeof n === 'string') : [] };
+  showPlayState();
+});
+function showPlayState() {
+  // before the frame has loaded, the profiles poll is what is known
+  const running = playState.running.length ? playState.running : state.clientProfiles.filter((p) => p.running).map((p) => p.name);
+  const b = $('#bLauncher');
+  const what = playState.launching ? 'launching' : running.length ? 'running' : '';
+  if (what) b.dataset.state = what; else delete b.dataset.state;
+  const words = playState.launching ? 'Play: starting ' + playState.launching : running.length ? 'Play: ' + running.join(', ') + (running.length === 1 ? ' is' : ' are') + ' running' : 'Play';
+  b.title = words;
+  b.setAttribute('aria-label', words);
 }
 async function refresh() {
   // One poll at a time. A stalled request otherwise piles up behind itself, and responses landing
@@ -15915,7 +15913,6 @@ function renderSettings() {
 
   renderCoreUpdates().then((on) => { if (on) $('#setUpdates').hidden = true; });
   renderUpdateChannel();
-  renderClientProfiles();
   renderMcp();
 
   const about = $('#setAbout');
@@ -16010,49 +16007,6 @@ function mcpSnippets(launch, { destructive, ips }) {
   return { json, cli };
 }
 
-function renderClientProfiles() {
-  const dl = document.querySelector('#clientProfiles');
-  dl.innerHTML = '';
-  if (!state.clientProfiles.length) {
-    const dt = el('dt');
-    dt.textContent = 'No setups yet';
-    const dd = el('dd');
-    const go = el('button', 'ghost');
-    go.type = 'button';
-    go.textContent = 'Make one on the Play page';
-    go.onclick = () => showPlay();
-    dd.append(go);
-    dl.append(dt, dd);
-    return;
-  }
-  for (const p of state.clientProfiles) {
-    const dt = el('dt');
-    dt.textContent = p.name;
-    const dd = el('dd');
-    dd.append(document.createTextNode(`Minecraft ${p.mc}, ${p.loader}${p.loaderVersion ? ' ' + p.loaderVersion : ''}${p.harness ? ', harness' : ''} · ${p.running ? 'running' : 'stopped'} `));
-    const btn = el('button', 'ghost');
-    btn.textContent = p.running ? 'Stop' : 'Launch';
-    btn.disabled = launching.has(p.name);
-    btn.onclick = async () => {
-      if (!p.running) {
-        if (launching.has(p.name)) { toast(p.name + ' is being launched.'); return; }
-        launching.add(p.name);
-      }
-      btn.disabled = true;
-      try {
-        await post(`/client/profiles/${encodeURIComponent(p.name)}/${p.running ? 'stop' : 'launch'}`, {});
-      } catch (e) {
-        toast(e.message, 'bad');
-      } finally {
-        launching.delete(p.name);
-      }
-      await loadClientProfiles();
-      renderClientProfiles();
-    };
-    dd.append(btn);
-    dl.append(dt, dd);
-  }
-}
 async function renderMcp() {
   let launch;
   try {

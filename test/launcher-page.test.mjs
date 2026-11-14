@@ -395,7 +395,12 @@ test('a server card\'s pre-fill picks the setup that fits, running or not', () =
   assert.equal(prefillPick({ mc: '1.21.11', server: 'survival' }, profiles).profile.name, 'b')
   assert.equal(prefillPick({ mc: '1.21.11', server: 'creative' }, profiles).profile.name, 'a')
   assert.equal(prefillPick({ mc: '1.19.4', server: 'x' }, profiles).profile, null)
-  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0] })
+  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0], play: false })
+  // the panel's Play names its setup, which wins over a fit; Play only goes with a setup that is there
+  assert.deepEqual(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'a', play: true }, profiles), { mc: '1.21.11', server: 'survival', profile: profiles[0], play: true })
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'gone', play: true }, profiles).play, false)
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'gone', play: true }, profiles).profile.name, 'b')
+  assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'a', play: 'yes' }, profiles).play, false)
   assert.doesNotMatch(fnSource('takePrefill'), /!p\.running/)
 })
 
@@ -561,4 +566,32 @@ test('a launch can be cancelled, and the page says what that left', () => {
   assert.match(fnSource('cancelLaunch'), /api\(`jobs\/\$\{enc\(job\.id\)\}\/cancel`, \{ method: 'POST', body: \{\} \}\)/)
   // a cancelled launch is not shown as a fault
   assert.match(fnSource('finishJob'), /ev\?\.stage === 'cancelled' \|\| ev\?\.code === 'cancelled'\) \{\s+S\.notice = \{ profile: job\.profile, \.\.\.cancelledNotice\(job\)/)
+})
+
+test('a copy of a setup gets a free name that fits', () => {
+  const { copyName } = lifted(['copyName'])
+  assert.equal(copyName('survival', ['survival']), 'survival-copy')
+  assert.equal(copyName('survival', ['survival', 'Survival-Copy']), 'survival-copy-2')
+  const long = 'a'.repeat(32)
+  assert.equal(copyName(long, [long]), 'a'.repeat(27) + '-copy')
+  assert.equal(copyName(long, [long]).length, 32)
+})
+
+test('when a setup was last played, and for how long, in words', () => {
+  const { dayWords, playedWords, playedLine } = lifted(['dayWords', 'playedWords', 'playedLine'])
+  const now = new Date(2026, 10, 14, 15, 0).getTime()
+  assert.equal(dayWords(new Date(2026, 10, 14, 0, 5).toISOString(), now), 'today')
+  assert.equal(dayWords(new Date(2026, 10, 13, 23, 55).toISOString(), now), 'yesterday')
+  assert.equal(dayWords(new Date(2026, 10, 9, 12, 0).toISOString(), now), '5 days ago')
+  assert.match(dayWords(new Date(2026, 5, 1, 12, 0).toISOString(), now), /2026/)
+  assert.equal(dayWords('nonsense', now), '')
+  assert.equal(playedWords(30000), '')
+  assert.equal(playedWords(12 * 60000), '12 min')
+  assert.equal(playedWords(200 * 60000), '3 h 20 min')
+  assert.equal(playedWords(180 * 60000), '3 h')
+  assert.equal(playedWords(41.5 * 3600000), '41 h')
+  assert.equal(playedLine({ running: true, played: null }), 'Running now')
+  assert.equal(playedLine({ running: false, played: { lastPlayedAt: null, totalMs: 0 } }), 'Never played')
+  assert.equal(playedLine({ running: false }), 'Never played')
+  assert.match(playedLine({ running: false, played: { lastPlayedAt: new Date().toISOString(), totalMs: 200 * 60000 } }), /^Played today · 3 h 20 min in all$/)
 })

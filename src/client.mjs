@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import dns from 'node:dns'
 import net from 'node:net'
-import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, clientPlayed, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { checkCancelled } from './cancel.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
@@ -15,7 +15,7 @@ import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install
 import { plainClientLog } from './client-log.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
-import { buildCommand, spawnClient, readClientState, readLastExit, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
+import { buildCommand, spawnClient, readClientState, readLastExit, readPlayed, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
 import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
@@ -184,12 +184,7 @@ export function getProfile(name) {
 export function createProfile(name, { mc: typedMc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
   validateProfileName(name)
   const reg = loadProfiles()
-  const lower = name.toLowerCase()
-  for (const existing of Object.keys(reg.profiles)) {
-    if (existing.toLowerCase() === lower) {
-      fail(`a profile named "${existing}" already exists (names must differ in more than case)`)
-    }
-  }
+  assertNameFree(reg, name)
   const assistantAccount = false
   const mc = trimMc(typedMc)
   validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount })
@@ -255,7 +250,89 @@ export function removeProfile(name, { purge = false } = {}) {
   }
   if (purge) fs.rmSync(clientRunDir(name), PURGE)
   // how the last game ended belongs to this profile, not to a later one of the same name
-  else fs.rmSync(clientLastExit(name), { force: true })
+  else for (const file of [clientLastExit(name), clientPlayed(name)]) fs.rmSync(file, { force: true })
+}
+
+function assertNameFree(reg, name, { except = null } = {}) {
+  const lower = name.toLowerCase()
+  for (const existing of Object.keys(reg.profiles)) {
+    if (existing !== except && existing.toLowerCase() === lower) {
+      fail(`a profile named "${existing}" already exists (names must differ in more than case)`, 'name-taken')
+    }
+  }
+}
+
+// A new name for a profile: its registry entry, its game folder and its run folder (log, how it
+// last ended, time played) move together. Not while it runs or is being launched, as the game
+// has the folder open. The folder moves first and moves back if the registry cannot be saved.
+export function renameProfile(name, newName) {
+  validateProfileName(newName)
+  getProfile(name)
+  if (newName === name) return getProfile(name)
+  if (status(name).running) fail(`profile "${name}" is running; stop it before renaming it`, 'already-running')
+  const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })
+  if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`, 'launching')
+  let released = false
+  try {
+    const reg = loadProfiles()
+    assertNameFree(reg, newName, { except: name })
+    // a folder left by a profile removed without its files is not this one's to take over
+    const caseOnly = newName.toLowerCase() === name.toLowerCase()
+    if (!caseOnly && fs.existsSync(profileDir(newName))) {
+      fail(`a folder named "${newName}" is already in the profiles folder (left by a removed profile); pick another name or delete ${profileDir(newName)}`, 'name-taken')
+    }
+    const hadDir = fs.existsSync(profileDir(name))
+    if (hadDir) {
+      try {
+        fs.renameSync(profileDir(name), profileDir(newName))
+      } catch (err) {
+        fail(`could not rename the folder of "${name}" (${err.code ?? err.message}); close anything that has it open and try again`)
+      }
+    }
+    try {
+      // key order is kept, so nothing that lists the file sees the profile jump
+      reg.profiles = Object.fromEntries(Object.entries(reg.profiles).map(([key, cfg]) => [key === name ? newName : key, cfg]))
+      saveProfiles(reg)
+    } catch (err) {
+      if (hadDir) try { fs.renameSync(profileDir(newName), profileDir(name)) } catch { /* reported below */ }
+      throw err
+    }
+    // the run folder holds the lock this call has: let go, then move what is left of it
+    release()
+    released = true
+    try {
+      if (!caseOnly) fs.rmSync(clientRunDir(newName), PURGE)
+      if (fs.existsSync(clientRunDir(name))) fs.renameSync(clientRunDir(name), clientRunDir(newName))
+    } catch { /* the log and the play record stay under the old name; the profile itself has moved */ }
+  } finally {
+    if (!released) release()
+  }
+  return getProfile(newName)
+}
+
+// What a copy of a profile takes with it from the game folder: how the game is set up, not what
+// was played in it (worlds, screenshots, logs stay with the original).
+const DUPLICATE_TAKES = ['options.txt', 'optionsof.txt', 'servers.dat', 'mods', 'config', 'resourcepacks', 'shaderpacks']
+
+// A second profile with the first one's settings, mods and options. assistantAccount starts off,
+// as for every new profile.
+export function duplicateProfile(name, newName) {
+  const from = getProfile(name)
+  const made = createProfile(newName, { mc: from.mc, loader: from.loader, loaderVersion: from.loaderVersion, java: from.java, memory: from.memory, harness: from.harness, server: from.server, account: from.account })
+  try {
+    for (const item of DUPLICATE_TAKES) {
+      const src = path.join(profileDir(name), item)
+      if (fs.existsSync(src)) fs.cpSync(src, path.join(profileDir(newName), item), { recursive: true, force: true })
+    }
+  } catch (err) {
+    removeProfile(newName, { purge: true })
+    fail(`could not copy the files of "${name}": ${err.message}`)
+  }
+  return getProfile(made.name)
+}
+
+export function played(name) {
+  return readPlayed(name)
 }
 
 function holderText(name) {

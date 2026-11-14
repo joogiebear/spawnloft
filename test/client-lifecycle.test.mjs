@@ -10,7 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
-const { launch, status, stop, lastExit, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
+const { launch, status, stop, lastExit, played, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
 const { readClientState, fromBeforeBoot, procStartTicks } = await import('../src/client-launch.mjs')
 const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson, ASSETS_DIR, profileDir } = await import('../src/client-paths.mjs')
 
@@ -380,6 +380,11 @@ test('the exit of a game is recorded: stopped from here, or gone by itself with 
   assert.equal(crashed.stopped, false)
   assert.equal(crashed.code, 1)
   assert.ok(Date.parse(crashed.endedAt) >= Date.parse(crashed.startedAt))
+  // and when it was last played, how often, and for how long in all
+  const rec = played('ends')
+  assert.equal(rec.launches, 2)
+  assert.equal(rec.lastPlayedAt, crashed.startedAt)
+  assert.ok(rec.totalMs > 0)
 })
 
 test('a state file from before this machine started is nobody\'s game', () => {

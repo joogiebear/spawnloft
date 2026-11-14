@@ -1102,6 +1102,13 @@ async function handleClient(req, res, seg, url) {
   if (verb === 'stop' && req.method === 'POST') {
     return json(res, 200, await client.stop(profileName))
   }
+  // a new name for the setup, or a second setup with this one's settings, mods and options
+  if ((verb === 'rename' || verb === 'duplicate') && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    if (typeof body.name !== 'string' || !body.name) fail('send the new name as "name"')
+    const made = verb === 'rename' ? client.renameProfile(profileName, body.name) : client.duplicateProfile(profileName, body.name)
+    return json(res, 200, clientProfileRow(made))
+  }
   return json(res, 405, { error: 'method not allowed' })
 }
 
@@ -1119,6 +1126,8 @@ function clientProfileRow(p) {
     running: st.running, pid: st.pid, startedAt: st.startedAt, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
     // how its last game ended, when the panel saw it end: { code, signal, startedAt, endedAt, stopped }
     lastExit: client.lastExit(p.name),
+    // { lastPlayedAt, totalMs, launches }: totalMs grows when a game the panel started ends
+    played: client.played(p.name),
     // shown on the launcher's facts card; a browser tab cannot open it, so it shows the path
     folder: client.profileFolder(p.name),
   }

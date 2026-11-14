@@ -134,7 +134,12 @@ test('the panel has a sidebar Play that shows the Play page, and the card falls 
   const code = html.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n')
   const opens = [...code.matchAll(/window\.open\(([^)]*)\)/g)].map((m) => m[1]).filter((a) => a.includes('launcher'))
   assert.deepEqual(opens, [])
-  assert.match(html, /function openLauncherFor\(row\) \{[\s\S]*?showPlay\(\)/)
+  assert.match(html, /function openLauncherFor\(row, profile = null\) \{[\s\S]*?showPlay\(\)/)
+  // every Play in the panel is the Play page's: no launch is posted from the panel itself, and
+  // Preferences no longer has a second list of setups with its own Launch and Stop
+  assert.match(html, /function playClient\(row\) \{\s*openLauncherFor\(row, playProfileFor\(row\)\);\s*\}/)
+  assert.doesNotMatch(code, /\/launch['`]/)
+  assert.doesNotMatch(html, /id="clientProfiles"|renderClientProfiles/)
 })
 
 test('inside the Play page the launcher is a page, not a window: a title for the brand, "leaving" for "closing"', () => {

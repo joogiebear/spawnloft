@@ -8,8 +8,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { createProfile, listProfiles, getProfile, updateProfile, removeProfile, loadProfiles, saveProfiles } = await import('../src/client.mjs')
-const { profileDir, PROFILES_FILE } = await import('../src/client-paths.mjs')
+const { createProfile, listProfiles, getProfile, updateProfile, removeProfile, renameProfile, duplicateProfile, played, loadProfiles, saveProfiles } = await import('../src/client.mjs')
+const { profileDir, clientRunDir, clientPlayed, clientLaunchLock, PROFILES_FILE } = await import('../src/client-paths.mjs')
 
 test('loadProfiles on a fresh root gives the empty registry', () => {
   const reg = loadProfiles()
@@ -131,4 +131,70 @@ test('a profile written before assistantAccount existed reads as false', () => {
   assert.equal(getProfile('legacy').assistantAccount, false)
   assert.equal(updateProfile('legacy', { memory: '3G' }).assistantAccount, false)
   removeProfile('legacy')
+})
+
+// ---- rename and duplicate ----
+
+test('renameProfile moves the entry, the game folder and the run folder together', () => {
+  createProfile('old-name', { mc: '1.21.4', memory: '3G' })
+  createProfile('other', { mc: '1.21.4' })
+  fs.mkdirSync(path.join(profileDir('old-name'), 'saves', 'World'), { recursive: true })
+  fs.mkdirSync(clientRunDir('old-name'), { recursive: true })
+  fs.writeFileSync(clientPlayed('old-name'), JSON.stringify({ lastPlayedAt: '2026-11-01T10:00:00.000Z', totalMs: 60000, launches: 2 }))
+  const order = Object.keys(loadProfiles().profiles)
+
+  const p = renameProfile('old-name', 'new-name')
+  assert.equal(p.name, 'new-name')
+  assert.equal(p.memory, '3G')
+  assert.throws(() => getProfile('old-name'), /no profile named/)
+  assert.ok(fs.existsSync(path.join(profileDir('new-name'), 'saves', 'World')), 'the worlds came along')
+  assert.equal(fs.existsSync(profileDir('old-name')), false)
+  assert.deepEqual(played('new-name'), { lastPlayedAt: '2026-11-01T10:00:00.000Z', totalMs: 60000, launches: 2 })
+  assert.equal(fs.existsSync(clientRunDir('old-name')), false)
+  assert.deepEqual(Object.keys(loadProfiles().profiles), order.map((k) => (k === 'old-name' ? 'new-name' : k)), 'the entry keeps its place')
+
+  // refusals: a name in use (whatever its case), a bad name, a folder someone left behind
+  assert.throws(() => renameProfile('new-name', 'OTHER'), (err) => err.code === 'name-taken')
+  assert.throws(() => renameProfile('new-name', 'has space'), /invalid profile name/)
+  fs.mkdirSync(profileDir('leftover'), { recursive: true })
+  assert.throws(() => renameProfile('new-name', 'leftover'), (err) => err.code === 'name-taken')
+  assert.ok(fs.existsSync(profileDir('new-name')), 'a refused rename moves nothing')
+  // its own name in another case is a rename like any other; the same name is nothing to do
+  assert.equal(renameProfile('new-name', 'New-Name').name, 'New-Name')
+  assert.equal(renameProfile('New-Name', 'New-Name').name, 'New-Name')
+  // not while it is being launched
+  const lock = clientLaunchLock('New-Name')
+  fs.mkdirSync(path.dirname(lock), { recursive: true })
+  fs.writeFileSync(lock, String(process.pid))
+  assert.throws(() => renameProfile('New-Name', 'later'), (err) => err.code === 'launching')
+  fs.rmSync(lock)
+  removeProfile('New-Name', { purge: true })
+  removeProfile('other', { purge: true })
+  fs.rmSync(profileDir('leftover'), { recursive: true })
+})
+
+test('duplicateProfile copies the settings, mods and options, and leaves the worlds', () => {
+  createProfile('src', { mc: '1.21.4', loader: 'fabric', memory: '4G', account: 'offline:Steve' })
+  updateProfile('src', { assistantAccount: true })
+  const dir = profileDir('src')
+  fs.writeFileSync(path.join(dir, 'options.txt'), 'lang:nl_nl\nfov:0.5\n')
+  fs.mkdirSync(path.join(dir, 'mods'))
+  fs.writeFileSync(path.join(dir, 'mods', 'sodium.jar'), 'jar')
+  fs.mkdirSync(path.join(dir, 'config', 'deep'), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'config', 'deep', 'a.toml'), 'x = 1')
+  fs.mkdirSync(path.join(dir, 'saves', 'World'), { recursive: true })
+
+  const copy = duplicateProfile('src', 'src-copy')
+  assert.equal(copy.name, 'src-copy')
+  for (const key of ['mc', 'loader', 'memory', 'account']) assert.equal(copy[key], getProfile('src')[key], key)
+  assert.equal(copy.assistantAccount, false, 'a copy starts with it off, as every new profile does')
+  const to = profileDir('src-copy')
+  assert.equal(fs.readFileSync(path.join(to, 'options.txt'), 'utf8'), 'lang:nl_nl\nfov:0.5\n')
+  assert.equal(fs.readFileSync(path.join(to, 'mods', 'sodium.jar'), 'utf8'), 'jar')
+  assert.equal(fs.readFileSync(path.join(to, 'config', 'deep', 'a.toml'), 'utf8'), 'x = 1')
+  assert.equal(fs.existsSync(path.join(to, 'saves')), false)
+  assert.deepEqual(played('src-copy'), { lastPlayedAt: null, totalMs: 0, launches: 0 })
+  assert.throws(() => duplicateProfile('src', 'SRC-copy'), (err) => err.code === 'name-taken')
+  removeProfile('src', { purge: true })
+  removeProfile('src-copy', { purge: true })
 })
