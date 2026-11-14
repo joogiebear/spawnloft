@@ -138,7 +138,8 @@ test('a rename that only changes capitals is not stopped by the file itself', ()
   // here, where case counts, both ways still behave: the new capitals are a new name
   put('Notes.txt', 'n')
   files.movePath(inst, 'Notes.txt', 'notes.txt')
-  assert.deepEqual([fs.existsSync(path.join(dir, 'notes.txt')), fs.existsSync(path.join(dir, 'Notes.txt'))], [true, false])
+  // by what the folder lists: asking for either spelling finds the file where case is ignored
+  assert.deepEqual([fs.readdirSync(dir).includes('notes.txt'), fs.readdirSync(dir).includes('Notes.txt')], [true, false])
   // does this disk tell capitals apart? (Linux does; Windows and macOS as installed do not)
   const caseCounts = !fs.existsSync(path.join(dir, 'NOTES.TXT'))
   if (caseCounts) {
