@@ -8,3 +8,5 @@
 /test/fixtures/client/java-runtime-*.json text eol=lf
 /test/fixtures/client/jre-legacy-*.json text eol=lf
 /test/fixtures/client/harness-index/* text eol=lf
+# The loaders' captured files: manifest.json names each by the sha1 of its bytes, as published.
+/test/fixtures/client/loaders/** -text
