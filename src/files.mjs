@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import zlib from 'node:zlib'
 import { parseProps, readProps, worldDirs } from './props.mjs'
 import { checkFormat, MANAGED_PROPS } from './config-files.mjs'
 import * as backup from './backup.mjs'
@@ -144,6 +145,111 @@ export async function readFile(inst, relative) {
   // A NUL early on means binary.
   if (buf.subarray(0, 8192).includes(0)) return { ...base, text: null, reason: 'binary' }
   return { ...base, text: buf.toString('utf8'), version: versionOf(buf) }
+}
+
+// The end of a text file that is too big for the editor. A log's last lines are the ones wanted,
+// and a busy server's latest.log passes the editor's limit in a day. Read-only: there is no
+// version, because nothing here is saved back.
+export const TAIL_BYTES = 256 * 1024
+// a packed log is read through; one that unpacks to more than this is left for a download
+const MAX_UNPACKED_BYTES = 256 * 1024 * 1024
+
+// Starts the text at a whole line: the cut lands mid-line, and may land mid-character.
+function fromWholeLine(buf) {
+  const nl = buf.indexOf(10)
+  return nl >= 0 && nl < buf.length - 1 ? buf.subarray(nl + 1) : buf
+}
+
+// The last `bytes` of what a .gz unpacks to, without holding the whole of it.
+function gunzipTail(full, bytes) {
+  return new Promise((resolve, reject) => {
+    let kept = Buffer.alloc(0)
+    let total = 0
+    const src = fs.createReadStream(full)
+    const gz = zlib.createGunzip()
+    const stop = (err) => { src.destroy(); gz.destroy(); reject(err) }
+    src.on('error', stop)
+    gz.on('error', stop)
+    gz.on('data', (chunk) => {
+      total += chunk.length
+      if (total > MAX_UNPACKED_BYTES) {
+        const err = new Error('too large unpacked')
+        err.code = 'too-large'
+        return stop(err)
+      }
+      kept = chunk.length >= bytes ? chunk.subarray(chunk.length - bytes) : Buffer.concat([kept, chunk])
+      if (kept.length > bytes) kept = kept.subarray(kept.length - bytes)
+    })
+    gz.on('end', () => resolve({ buf: Buffer.from(kept), total }))
+    src.pipe(gz)
+  })
+}
+
+export async function readTail(inst, relative, { bytes = TAIL_BYTES } = {}) {
+  const { base: root, full, rel } = resolvePath(inst, relative)
+  assertLinkStaysInside(root, full, rel)
+  const s = await fs.promises.stat(full)
+  if (!s.isFile()) fail(`${rel} is not a file`)
+  const base = { path: rel, size: s.size, modified: s.mtime.toISOString() }
+  let buf
+  let total = s.size
+  const packed = /\.gz$/i.test(rel) && !/\.tar\.gz$/i.test(rel)
+  if (packed) {
+    try {
+      ({ buf, total } = await gunzipTail(full, bytes))
+    } catch (err) {
+      // not a gzip after all, cut short, or too big once unpacked: it is a download either way
+      return { ...base, text: null, reason: err.code === 'too-large' ? 'large' : 'binary' }
+    }
+  } else {
+    const want = Math.min(s.size, bytes)
+    const fh = await fs.promises.open(full, 'r')
+    try {
+      buf = Buffer.alloc(want)
+      const { bytesRead } = await fh.read(buf, 0, want, s.size - want)
+      buf = buf.subarray(0, bytesRead)
+    } finally {
+      await fh.close()
+    }
+  }
+  if (buf.includes(0)) return { ...base, text: null, reason: 'binary' }
+  const whole = total <= buf.length
+  if (!whole) buf = fromWholeLine(buf)
+  // shown: how much of it this is; unpacked: the size of the text itself when the file is packed
+  return { ...base, text: buf.toString('utf8'), whole, shown: buf.length, of: total, packed }
+}
+
+// A picture the panel shows in place (server-icon.png is the usual one). Only the kinds a browser
+// draws without running anything, and told from the file's first bytes: a name ending .png proves
+// nothing about what is in it.
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
+export function imageKind(head) {
+  if (!Buffer.isBuffer(head) || head.length < 12) return null
+  if (head[0] === 0x89 && head.subarray(1, 4).toString('latin1') === 'PNG') return 'image/png'
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'image/jpeg'
+  if (/^GIF8[79]a/.test(head.subarray(0, 6).toString('latin1'))) return 'image/gif'
+  if (head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp'
+  return null
+}
+
+export async function imageFile(inst, relative) {
+  const { base: root, full, rel } = resolvePath(inst, relative)
+  assertLinkStaysInside(root, full, rel)
+  const s = await fs.promises.stat(full)
+  if (!s.isFile()) fail(`${rel} is not a file`)
+  if (s.size > MAX_IMAGE_BYTES) fail(`${rel} is ${humanBytes(s.size)}, too big to show here. Download it to look at it.`)
+  const fh = await fs.promises.open(full, 'r')
+  let head
+  try {
+    head = Buffer.alloc(12)
+    const { bytesRead } = await fh.read(head, 0, 12, 0)
+    head = head.subarray(0, bytesRead)
+  } finally {
+    await fh.close()
+  }
+  const type = imageKind(head)
+  if (!type) fail(`${rel} is not a picture that can be shown here`)
+  return { file: full, size: s.size, type }
 }
 
 // Copies what is about to change on its own, so Backups can restore exactly it. Paths that

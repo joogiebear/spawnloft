@@ -1121,3 +1121,65 @@ test('the backup history says what it holds, and asks plainly before several go 
   assert.match(html, /let showSmallCopies = false;/)
   assert.match(html, /data\.snapshots\.filter\(\(s\) => showSmallCopies \|\| !s\.copy\)/)
 })
+
+test('Files: a row says what can be done with it, and a rename or a move builds the path asked for', () => {
+  const { renamedPath, movedPath, pathsBetween, fileRowActions } = new Function(
+    `${constSource('ARCHIVE_RE')}\n${fnSource('renamedPath')}\n${fnSource('movedPath')}\n${fnSource('pathsBetween')}\n${fnSource('fileRowActions')}\nreturn { renamedPath, movedPath, pathsBetween, fileRowActions }`)()
+  assert.equal(renamedPath('plugins/Old/config.yml', 'settings.yml'), 'plugins/Old/settings.yml')
+  assert.equal(renamedPath('ops.json', 'ops.old.json'), 'ops.old.json')
+  assert.equal(movedPath('plugins/Old/config.yml', ''), 'config.yml')
+  assert.equal(movedPath('config.yml', ' /plugins\\Old/ '), 'plugins/Old/config.yml')
+  assert.equal(movedPath('a/b.txt', 'a'), 'a/b.txt')
+
+  const entries = ['a', 'b', 'c', 'd'].map((path) => ({ path }))
+  assert.deepEqual(pathsBetween(entries, 'b', 'd'), ['b', 'c', 'd'])
+  assert.deepEqual(pathsBetween(entries, 'c', 'a'), ['a', 'b', 'c'])
+  assert.deepEqual(pathsBetween(entries, 'b', 'b'), ['b'])
+  assert.equal(pathsBetween(entries, 'gone', 'b'), null)
+
+  const ids = (e) => fileRowActions(e).map((a) => a.id + (a.disabled ? '(off)' : ''))
+  assert.deepEqual(ids({ type: 'file', path: 'ops.json', name: 'ops.json' }), ['open', 'rename', 'move', 'download', 'delete'])
+  assert.deepEqual(ids({ type: 'dir', path: 'plugins', name: 'plugins' }), ['open', 'rename', 'move', 'download', 'delete'])
+  assert.equal(fileRowActions({ type: 'dir', path: 'plugins' }).find((a) => a.id === 'download').label, 'Download as a zip')
+  assert.deepEqual(ids({ type: 'file', path: 'pack.zip', name: 'pack.zip' }), ['open', 'rename', 'move', 'download', 'unzip', 'delete'])
+  // what the running server holds can be read and downloaded, and says why nothing else
+  const held = fileRowActions({ type: 'file', path: 'paper.jar', name: 'paper.jar', inUse: true })
+  assert.deepEqual(held.map((a) => a.id + (a.disabled ? '(off)' : '')), ['open', 'rename(off)', 'move(off)', 'download', 'delete(off)'])
+  assert.equal(held.find((a) => a.id === 'delete').hint, 'In use by the running server')
+  assert.equal(held.find((a) => a.id === 'delete').danger, true)
+  // a link that leads outside is shown and nothing more
+  assert.deepEqual(ids({ type: 'link', path: 'out', name: 'out' }), [])
+})
+
+test('Files: Find marks every match whatever its case, and a big file says how much of it is shown', () => {
+  const { findAll, markMatches, findWords, tailWords, notShownWords } = lifted(['fileSize', 'escHtml', 'findAll', 'markMatches', 'findWords', 'tailWords', 'notShownWords'])
+  const text = 'motd=A <b>Server</b>\nserver-port=25565\nSERVER-ip=\n'
+  const hit = findAll(text, 'server', 100)
+  assert.deepEqual(hit, { starts: [10, 21, 39], len: 6, capped: false })
+  // what is typed is looked for as it is, not as a pattern
+  assert.deepEqual(findAll('a.b a+b (x) [y] $1 \\d', '.', 10).starts, [1])
+  assert.deepEqual(findAll('a.b a+b (x) [y] $1 \\d', '(x) [y] $1 \\d', 10).starts, [8])
+  assert.deepEqual(findAll(text, '', 10), { starts: [], len: 0, capped: false })
+  assert.deepEqual(findAll('aaaa', 'a', 3), { starts: [0, 1, 2], len: 1, capped: true })
+  // the marked copy is the same text, escaped, with nothing of it run as markup
+  const html2 = markMatches(text, hit.starts, hit.len, 1)
+  assert.equal(html2, 'motd=A &lt;b&gt;<mark>Server</mark>&lt;/b&gt;\n<mark class="now">server</mark>-port=25565\n<mark>SERVER</mark>-ip=\n')
+  assert.equal(html2.replace(/<\/?mark[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), text)
+
+  assert.equal(findWords('', -1, 0, false), '')
+  assert.equal(findWords('zz', -1, 0, false), 'No matches')
+  assert.equal(findWords('s', 0, 3, false), '1 of 3')
+  assert.equal(findWords('s', 1999, 2000, true), '2000 of 2000+')
+
+  const KB = 1024
+  assert.equal(tailWords({ whole: false, shown: 256 * KB, of: 12 * KB * KB, packed: false }), 'The last 256 KB of 12 MB. Read only: download it for the whole file.')
+  assert.equal(tailWords({ whole: false, shown: 256 * KB, of: 40 * KB * KB, packed: true }), 'The last 256 KB of 40 MB once unpacked. Read only: download it for the whole file.')
+  assert.equal(tailWords({ whole: true, shown: 900, of: 900, packed: true }), 'Unpacked to read it here. Read only.')
+  assert.match(notShownWords('large', 5 * KB * KB, false), /^It is 5\.0 MB, too big for the editor, and is not text/)
+  assert.match(notShownWords('large', 1, true), /^It unpacks to more than can be read here/)
+  assert.match(notShownWords('binary', 1, false), /^It is not text/)
+  // a picture is shown from its own route, and a read-only file cannot be saved
+  assert.match(html, /\/files\/image\?path=/)
+  assert.match(html, /save\.hidden = readOnly;/)
+  assert.match(html, /ta\.readOnly = readOnly;/)
+})
