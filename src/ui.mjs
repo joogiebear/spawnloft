@@ -572,6 +572,11 @@ async function handleProps(req, res, name) {
   }
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
 
+  // The whitelist is the one setting here a running server can be told about, and the Players
+  // page shows this file as the state: written alone, the page said On while anyone could join.
+  if ('white-list' in updates && supervisor.isRunning(name)) {
+    try { await players.setWhitelistOn(inst, updates['white-list'] === 'true') } catch { /* the file is still written, for the next start */ }
+  }
   writeProps(file, updates)
   activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => settingWords(k, v)).join(', ') })
   return json(res, 200, {
@@ -1184,15 +1189,23 @@ async function handlePlayers(req, res, name, seg) {
       // names can only be recovered in online mode
       onlineMode: safeInstance(supervisor.statusOf(name)).onlineMode,
       whitelistOn: players.whitelistOn(inst),
+      whitelistEnforced: players.whitelistEnforced(inst),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
 
   const body = await readBody(req)
+  // Starting, stopping or out of reach: the server owns its files and cannot be asked. A change
+  // written now would be ignored, and then written over when the server saves its own lists.
+  if (verb !== 'forget' && supervisor.isActive(name) && !supervisor.isRunning(name)) {
+    return json(res, 409, { error: 'This server is starting, stopping or out of reach, so its player lists cannot be changed right now. Try again once it is running or stopped.' })
+  }
   // the switch: whether only listed players can join
   if (verb === 'whitelist-mode') {
-    const out = await players.setWhitelistOn(inst, body.on !== false)
-    activity.record(name, body.on !== false ? 'whitelist-on' : 'whitelist-off')
+    // said outright: a request that left it out would otherwise lock everyone out
+    if (typeof body.on !== 'boolean') return json(res, 400, { error: 'on or off?' })
+    const out = await players.setWhitelistOn(inst, body.on)
+    if (out.took !== false) activity.record(name, body.on ? 'whitelist-on' : 'whitelist-off')
     return json(res, 200, out)
   }
   // someone by name, who may never have joined
@@ -1208,17 +1221,17 @@ async function handlePlayers(req, res, name, seg) {
   const who = () => players.listPlayers(inst).find((p) => p.uuid === uuid)?.name ?? uuid
   if (verb === 'op') {
     const out = await players.setOp(inst, uuid, body.on !== false)
-    activity.record(name, body.on !== false ? 'player-op' : 'player-deop', { detail: who() })
+    if (out.took !== false) activity.record(name, body.on !== false ? 'player-op' : 'player-deop', { detail: who() })
     return json(res, 200, out)
   }
   if (verb === 'ban') {
     const out = await players.setBan(inst, uuid, body.on !== false, body.reason)
-    activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
+    if (out.took !== false) activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
     return json(res, 200, out)
   }
   if (verb === 'whitelist') {
     const out = await players.setWhitelisted(inst, uuid, body.on !== false)
-    activity.record(name, body.on !== false ? 'player-whitelist' : 'player-unwhitelist', { detail: who() })
+    if (out.took !== false) activity.record(name, body.on !== false ? 'player-whitelist' : 'player-unwhitelist', { detail: who() })
     return json(res, 200, out)
   }
   if (verb === 'forget') {

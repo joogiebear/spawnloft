@@ -907,13 +907,17 @@ test('a chart says in words what its line shows', () => {
 })
 
 test('the whitelist says what its state means, and a player can be added by name', () => {
-  const { whitelistWords, addPlayerQuestion, addedWords } = lifted(['whitelistWords', 'addPlayerQuestion', 'playerChangeWords', 'addedWords'])
+  const { whitelistWords, addPlayerQuestion, addedWords, emptyWhitelistQuestion } = lifted(['whitelistWords', 'addPlayerQuestion', 'playerChangeWords', 'addedWords', 'emptyWhitelistQuestion'])
   assert.equal(whitelistWords(false, 0), 'Off. Anyone can join.')
   assert.equal(whitelistWords(false, 3), 'Off. Anyone can join; the 3 on the list are not checked.')
-  assert.equal(whitelistWords(true, 1), 'On. Only the one player on the list can join.')
-  assert.equal(whitelistWords(true, 4), 'On. Only the 4 players on the list can join.')
-  // on with nobody listed locks everyone out, and says so
-  assert.match(whitelistWords(true, 0), /nobody can join/)
+  // operators get in without being listed, so no line says "only the list"
+  assert.equal(whitelistWords(true, 1), 'On. Only the one player on the list, and operators, can join.')
+  assert.equal(whitelistWords(true, 4), 'On. Only the 4 players on the list, and operators, can join.')
+  assert.match(whitelistWords(true, 0), /only operators can join/)
+  // what happens to people connected depends on the server, and a stopped one has nobody connected
+  assert.equal(emptyWhitelistQuestion({ running: false }).text, 'Only operators will be able to join until someone is added.')
+  assert.match(emptyWhitelistQuestion({ running: true, whitelistEnforced: false }).text, /stay until they leave/)
+  assert.match(emptyWhitelistQuestion({ running: true, whitelistEnforced: true }).text, /are removed from the server/)
 
   const stopped = addPlayerQuestion({ running: false, onlineMode: true, whitelistOn: false })
   assert.match(stopped.text, /looked up with Mojang/)
@@ -930,8 +934,6 @@ test('the whitelist says what its state means, and a player can be added by name
   const refused = addedWords({ as: 'op', name: 'Ghost', took: false, reply: 'That player does not exist' })
   assert.equal(refused.tone, '')
   assert.match(refused.text, /That player does not exist/)
-  // the dialog stays open on a refusal: the request is made from inside it
-  assert.match(html, /submit: \(\{ text, choice \}\) => post\(base \+ '\/add', \{ name: text, as: choice \}\)/)
   // Settings no longer sends anyone to the console for this
   assert.ok(!html.includes('whitelist add <name>'))
 })

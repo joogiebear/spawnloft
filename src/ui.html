@@ -7683,8 +7683,21 @@ const PLAYER_FILTERS = [
 /** The line beside the whitelist switch: what its state means for who gets in. */
 function whitelistWords(on, listed) {
   if (!on) return 'Off. Anyone can join' + (listed ? '; the ' + listed + ' on the list ' + (listed === 1 ? 'is' : 'are') + ' not checked.' : '.');
-  if (!listed) return 'On, with nobody on the list: nobody can join. Add the people who should get in.';
-  return 'On. Only the ' + (listed === 1 ? 'one player' : listed + ' players') + ' on the list can join.';
+  // operators get in whether or not they are listed: the game counts them as on it
+  if (!listed) return 'On, with nobody on the list: only operators can join. Add the people who should get in.';
+  return 'On. Only the ' + (listed === 1 ? 'one player' : listed + ' players') + ' on the list, and operators, can join.';
+}
+
+/** What to ask before the whitelist goes on with nobody on it. */
+function emptyWhitelistQuestion(data) {
+  const connected = !data.running ? ''
+    : data.whitelistEnforced ? ' People connected now who are not operators are removed from the server.'
+      : ' People connected now stay until they leave.';
+  return {
+    title: 'Turn the whitelist on with nobody on it?',
+    text: 'Only operators will be able to join until someone is added.' + connected,
+    confirmLabel: 'Turn on',
+  };
 }
 
 /** The Add a player dialog: a name, and what to do with them. */
@@ -7828,11 +7841,7 @@ async function renderPlayers(opts) {
   wlSwitch.onchange = async () => {
     const on = wlSwitch.checked;
     // turned on with nobody on it, a running server lets nobody in from the next join on
-    if (on && !listedCount && !(await ask({
-      title: 'Turn the whitelist on with nobody on it?',
-      text: 'Nobody will be able to join until someone is added. People already connected stay.',
-      confirmLabel: 'Turn on',
-    }))) { wlSwitch.checked = false; return; }
+    if (on && !listedCount && !(await ask(emptyWhitelistQuestion(data)))) { wlSwitch.checked = false; return; }
     wlSwitch.disabled = true;
     try {
       const out = await post(base + '/whitelist-mode', { on });
@@ -7853,7 +7862,13 @@ async function renderPlayers(opts) {
   addBtn.onclick = async () => {
     const got = await ask({
       ...addPlayerQuestion(data),
-      submit: ({ text, choice }) => post(base + '/add', { name: text, as: choice }),
+      // a running server that answers "That player does not exist" has added nobody: the dialog
+      // stays, with the answer, so a typo is fixed where it was typed
+      submit: async ({ text, choice }) => {
+        const out = await post(base + '/add', { name: text, as: choice });
+        if (out.took === false) throw new Error(addedWords(out).text);
+        return out;
+      },
     });
     if (!got || !got.out) return;
     const said = addedWords(got.out);

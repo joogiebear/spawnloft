@@ -165,8 +165,14 @@ function findPlayer(inst, uuid) {
 }
 
 // A console command needs a name, and an offline UUID can't be turned back into one.
+// A name read from the server's files goes into a console command as it is, so one that would
+// be read as something else is refused: "@a" is everyone, and a space starts the next argument.
+// Not held to Mojang's alphabet, because a Bedrock player's name through Floodgate starts with a dot.
 function requireName(who, verb) {
-  if (who.name) return who.name
+  if (who.name) {
+    if (/^@|[\s\u0000-\u001f\u007f]/.test(who.name)) fail(`"${who.name}" is not a name the server's console can take, so ${verb} has to be done with the server stopped.`)
+    return who.name
+  }
   fail(
     `SpawnLoft does not know the name behind ${who.uuid}, and ${verb} needs one. Offline-mode ids are `
       + 'made by hashing a name, so they cannot be turned back into one - have the player join '
@@ -235,7 +241,7 @@ export async function setBan(inst, uuid, on, reason, opts) {
 }
 
 async function applyBan(inst, who, on, reason, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
-  const why = String(reason || '').trim().slice(0, 200)
+  const why = String(reason || '').replace(/\s+/g, ' ').trim().slice(0, 200)
   if (running) {
     const name = requireName(who, on ? 'banning' : 'pardoning')
     // banning a connected player also kicks them
@@ -287,6 +293,11 @@ export function whitelistOn(inst) {
   return readProps(propsFile(inst)).get('white-list') === 'true'
 }
 
+/** Whether turning the whitelist on also removes people who are connected and not on it. */
+export function whitelistEnforced(inst) {
+  return readProps(propsFile(inst)).get('enforce-whitelist') === 'true'
+}
+
 // The switch itself. A running server is told, and the file is written as well once it says it
 // did: Paper turns the whitelist on or off in memory and leaves server.properties as it was, so
 // the change was gone at the next start and this page went on showing the old state. A stopped
@@ -315,13 +326,21 @@ const ADD_AS = ['whitelist', 'op', 'ban']
  * spells it, or null when no account has it. Only the name typed is sent.
  */
 export async function mojangLookup(name, { fetchImpl = fetch } = {}) {
-  const res = await fetchImpl(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(8000) })
+  // a redirect would be a second place contacted, and nothing but Mojang is to be
+  const res = await fetchImpl(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(8000), redirect: 'error' })
   if (res.status === 204 || res.status === 404) return null
   if (!res.ok) throw new Error(`Mojang answered ${res.status}`)
-  const body = await res.json()
+  const unreadable = () => new Error('Mojang sent an answer SpawnLoft could not read')
+  let body
+  try { body = await res.json() } catch { throw unreadable() }
+  if (!body || typeof body !== 'object') throw unreadable()
   const hex = String(body.id || '').toLowerCase()
-  if (!/^[0-9a-f]{32}$/.test(hex)) throw new Error('Mojang sent an answer SpawnLoft could not read')
-  return { uuid: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`, name: String(body.name || name) }
+  if (!/^[0-9a-f]{32}$/.test(hex)) throw unreadable()
+  // the name is kept in the server's files and later typed into its console: it has to be the
+  // name asked for, in the account's own capitals, and nothing else
+  const spelled = body.name === undefined ? name : String(body.name)
+  if (!PLAYER_NAME.test(spelled) || spelled.toLowerCase() !== String(name).toLowerCase()) throw unreadable()
+  return { uuid: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`, name: spelled }
 }
 
 /**
@@ -339,12 +358,15 @@ export async function addByName(inst, rawName, as, { reason, running = superviso
     : as === 'op' ? applyOp(inst, who, true, opts)
       : applyBan(inst, who, true, reason, opts))
 
-  // someone the server already knows keeps the id it knows them by
-  const known = listPlayers(inst).find((p) => (p.name || '').toLowerCase() === name.toLowerCase())
+  // Someone the server already knows keeps the id it knows them by, as long as it is the kind
+  // of id this server gives out now. After a switch between checking accounts and not, the old
+  // record's id is one nobody will join with again, and adding it would add nobody.
+  const checksAccounts = readProps(propsFile(inst)).get('online-mode') !== 'false'
+  const fits = (p) => running || p.uuid.charAt(14) === (checksAccounts ? '4' : '3')
+  const known = listPlayers(inst).find((p) => (p.name || '').toLowerCase() === name.toLowerCase() && fits(p))
   let who = known ? { uuid: known.uuid, name: known.name } : null
   if (!who && running) who = { uuid: '', name }
   if (!who) {
-    const checksAccounts = readProps(propsFile(inst)).get('online-mode') !== 'false'
     if (!checksAccounts) who = { uuid: offlineUuid(name), name }
     else {
       let found

@@ -158,6 +158,7 @@ test('a player is added by name: looked up with Mojang on a stopped server that 
 test('added by name without a lookup: someone already known, a server that checks nobody, a running server', async () => {
   // known already: the id the server knows them by
   const known = server('add-known')
+  fs.writeFileSync(path.join(known.dir, 'server.properties'), 'level-name=world\nonline-mode=false\n')
   const out = await players.addByName(known, 'steve', 'whitelist', { running: false, lookup: noLookup })
   assert.equal(out.name, 'Steve')
   assert.deepEqual(readJson(known, 'whitelist.json'), [{ uuid: STEVE, name: 'Steve' }])
@@ -197,4 +198,52 @@ test('Mojang\'s answer is read as an id and a name, or as nobody', async () => {
   assert.equal(await players.mojangLookup('Alex', { fetchImpl: answer(204, {}) }), null)
   await assert.rejects(players.mojangLookup('Alex', { fetchImpl: answer(429, {}) }), /Mojang answered 429/)
   await assert.rejects(players.mojangLookup('Alex', { fetchImpl: answer(200, { id: 'nope' }) }), /could not read/)
+  // the account's own capitals are kept; anything else in the name is not Mojang's answer to this question
+  const id = '069a79f444e94726a5befca90e38aaf5'
+  assert.equal((await players.mojangLookup('Alex', { fetchImpl: answer(200, { id, name: 'aLEX' }) })).name, 'aLEX')
+  for (const odd of ['@a', 'Alex extra words', 'Steve', '']) {
+    await assert.rejects(players.mojangLookup('Alex', { fetchImpl: answer(200, { id, name: odd }) }), /could not read/, odd)
+  }
+  await assert.rejects(players.mojangLookup('Alex', { fetchImpl: answer(200, null) }), /could not read/)
+  await assert.rejects(players.mojangLookup('Alex', { fetchImpl: async () => ({ status: 200, ok: true, json: async () => { throw new SyntaxError('x') } }) }), /could not read/)
+  // it gives up after a while, and follows Mojang nowhere else
+  await players.mojangLookup('Alex', { fetchImpl: async (url, opts) => {
+    assert.ok(opts.signal instanceof AbortSignal)
+    assert.equal(opts.redirect, 'error')
+    return { status: 404, ok: false, json: async () => ({}) }
+  } })
+})
+
+test('a stored name the console would read as something else is not sent to it', async () => {
+  const inst = server('odd-names')
+  const everyone = '11111111-1111-4111-8111-111111111111'
+  const spaced = '22222222-2222-4222-8222-222222222222'
+  const bedrock = '33333333-3333-4333-8333-333333333333'
+  fs.writeFileSync(path.join(inst.dir, 'whitelist.json'), JSON.stringify([
+    { uuid: everyone, name: '@a' }, { uuid: spaced, name: 'Steve extra' }, { uuid: bedrock, name: '.Steve' },
+  ]))
+  const sent = []
+  const exec = async (_inst, cmds) => { sent.push(...cmds); return ['ok'] }
+  await assert.rejects(players.setWhitelisted(inst, everyone, false, { running: true, exec }), /not a name the server's console can take/)
+  await assert.rejects(players.setOp(inst, spaced, true, { running: true, exec }), /not a name the server's console can take/)
+  assert.deepEqual(sent, [])
+  // a Bedrock player's name through Floodgate is a real name
+  await players.setWhitelisted(inst, bedrock, false, { running: true, exec })
+  assert.deepEqual(sent, ['whitelist remove .Steve'])
+  // a ban reason is one line
+  sent.length = 0
+  await players.setBan(inst, bedrock, true, 'line one\nline  two', { running: true, exec })
+  assert.deepEqual(sent, ['ban .Steve line one line two'])
+})
+
+test('a record from before the server changed how it checks accounts is not the one added', async () => {
+  // Steve is known by the id of a server that checked nobody; this one checks accounts now
+  const inst = server('add-switched')
+  assert.equal(STEVE.charAt(14), '3')
+  await players.addByName(inst, 'Steve', 'whitelist', { running: false, lookup: async () => ({ uuid: ALEX, name: 'Steve' }) })
+  assert.deepEqual(readJson(inst, 'whitelist.json'), [{ uuid: ALEX, name: 'Steve' }])
+  // a running server is told the name and sorts it out itself
+  const sent = []
+  await players.addByName(inst, 'Steve', 'op', { running: true, lookup: noLookup, exec: async (_i, cmds) => { sent.push(...cmds); return ['ok'] } })
+  assert.deepEqual(sent, ['op Steve'])
 })
