@@ -124,12 +124,15 @@ test('a daemon whose program files were deleted still diagnoses a crash and rest
   assert.equal(crash.ok, true)
   const deadline = Date.now() + 15000
   let recovered = false
-  while (Date.now() < deadline && !recovered) {
+  let text = ''
+  // the state file is written at once, the console log through a stream that lands a moment
+  // later (on Windows, sometimes after the restart): wait for both
+  while (Date.now() < deadline && !(recovered && /likely cause:/.test(text))) {
     await sleep(100)
     const { status, state } = readState(name)
     recovered = status === 'running' && state.javaPid !== first && state.restarts === 1
+    try { text = fs.readFileSync(consoleLog(name), 'utf8') } catch { text = '' }
   }
-  const text = fs.readFileSync(consoleLog(name), 'utf8')
   assert.ok(recovered, `did not recover: ${JSON.stringify(readState(name))}\n${text}`)
   assert.match(text, /likely cause: Something in the world crashed the server/)
 
