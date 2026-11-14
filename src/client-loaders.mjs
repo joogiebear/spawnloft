@@ -14,6 +14,7 @@
 //   ensureInstalled(mc, build)    leaves a complete versions/<id>/ and returns the id
 //   finishInstall(mc, build, o)   optional: what is left once the game's Java is picked and the
 //                                 vanilla game is downloaded (an installer's build steps)
+//   narrowJava(requirement)       optional: the Java the loader needs, narrower than the version's
 //   afterInstall(name, profile)   anything for the setup's mods folder
 import fs from 'node:fs'
 
@@ -30,6 +31,10 @@ import {
   neoforgeGameVersions, neoforgeAvailable, assertNeoforgeAvailable, neoforgeBuilds, pickNeoforge,
   neoforgeVersionId, neoforgeInstalled, ensureNeoforgeVersion, finishNeoforge,
 } from './client-neoforge.mjs'
+import {
+  forgeGameVersions, forgeAvailable, assertForgeAvailable, forgeBuilds, pickForge, forgeVersionId,
+  forgeInstalled, ensureForgeVersion, finishForge, forgeJava,
+} from './client-forge.mjs'
 
 const fabric = {
   id: 'fabric',
@@ -84,7 +89,24 @@ const neoforge = {
   afterInstall: null,
 }
 
-const MODULES = { fabric, quilt, neoforge }
+// Forge from Minecraft 1.13 on, by the same engine; on a Java 8 version it runs on Java 8 only.
+const forge = {
+  id: 'forge',
+  name: 'Forge',
+  gameVersions: (opts) => forgeGameVersions(opts),
+  available: (mc, list) => forgeAvailable(mc, list),
+  assertAvailable: (mc, opts) => assertForgeAvailable(mc, opts),
+  builds: (mc, opts) => forgeBuilds(mc, opts),
+  pick: (builds, wanted = null) => pickForge(builds, wanted),
+  versionId: (mc, build) => forgeVersionId(mc, build),
+  isInstalled: (mc, build) => forgeInstalled(mc, build),
+  ensureInstalled: async (mc, build, opts = {}) => ensureForgeVersion(mc, build, opts),
+  finishInstall: async (mc, build, opts = {}) => finishForge(mc, build, opts),
+  narrowJava: (requirement) => forgeJava(requirement),
+  afterInstall: null,
+}
+
+const MODULES = { fabric, quilt, forge, neoforge }
 
 // Every loader id a setup may name, vanilla first.
 export const LOADERS = ['vanilla', ...Object.keys(MODULES)]

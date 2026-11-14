@@ -37,6 +37,10 @@ fs.copyFileSync(path.join(fixtures, 'loaders', 'quilt', 'game-versions.json'), p
 fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'quilt-game-versions.json.fetched-at'), String(Date.now()))
 fs.copyFileSync(path.join(fixtures, 'loaders', 'neoforge', 'versions.json'), path.join(clientPaths.CLIENT_CACHE_DIR, 'neoforge-versions.json'))
 fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, 'neoforge-versions.json.fetched-at'), String(Date.now()))
+for (const [from, to] of [['maven-metadata.json', 'forge-maven-metadata.json'], ['promotions_slim.json', 'forge-promotions.json']]) {
+  fs.copyFileSync(path.join(fixtures, 'loaders', 'forge', from), path.join(clientPaths.CLIENT_CACHE_DIR, to))
+  fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, `${to}.fetched-at`), String(Date.now()))
+}
 
 function addServer(name, port, props) {
   const dir = path.join(scratch, 'data', 'instances', name)
@@ -158,7 +162,7 @@ test('the version picker reads the shared cache and lists every id Mojang does, 
   fs.truncateSync(clientPaths.versionJar(mc), json.downloads.client.size)
   out = await (await call('client/versions')).json()
   const [snapshot, newer, row] = out.versions
-  assert.deepEqual(row, { id: '1.21.11', type: 'release', kind: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, javaNeedsExact: true, harness: true, fabric: null, loaders: { fabric: null, quilt: null, neoforge: null }, refusal: platformRefusal(json), note: null })
+  assert.deepEqual(row, { id: '1.21.11', type: 'release', kind: 'release', releaseTime: row.releaseTime, downloaded: true, javaNeeds: 21, javaNeedsExact: true, harness: true, fabric: null, loaders: { fabric: null, quilt: null, forge: null, neoforge: null }, refusal: platformRefusal(json), note: null })
   assert.equal(newer.downloaded, false)
   assert.equal(newer.javaNeeds, 25)
   assert.equal(newer.javaNeedsExact, false, 'a guess from the id until the JSON is read')
@@ -560,7 +564,7 @@ test('a version this SpawnLoft cannot launch fails its job with the refusal\'s c
 })
 
 test('one version in full, and the lists read again on request', async () => {
-  for (const file of ['version_manifest_v2.json', 'fabric-game-versions.json', 'quilt-game-versions.json', 'neoforge-versions.json']) {
+  for (const file of ['version_manifest_v2.json', 'fabric-game-versions.json', 'quilt-game-versions.json', 'neoforge-versions.json', 'forge-maven-metadata.json', 'forge-promotions.json']) {
     fs.writeFileSync(path.join(clientPaths.CLIENT_CACHE_DIR, `${file}.fetched-at`), String(Date.now()))
   }
   const res = await call(`client/versions/${encodeURIComponent(mc)}`)
@@ -629,4 +633,23 @@ test('the Javas on this machine are listed, and a path is checked before a setup
     assert.equal(yes.major, real.major)
     assert.equal(yes.message, null)
   }
+})
+
+test('a mod loader\'s builds for one version, for the sheet\'s build list: newest first, the recommended one marked and picked', async () => {
+  const res = await call(`client/loaders/forge/${encodeURIComponent('1.20.1')}/builds`)
+  assert.equal(res.status, 200)
+  const body = await res.json()
+  assert.equal(body.loader, 'forge')
+  assert.equal(body.mc, '1.20.1')
+  assert.equal(body.picked, '47.4.28')
+  assert.equal(body.builds[0].version, '47.4.29')
+  assert.deepEqual(body.builds.filter((b) => b.recommended).map((b) => b.version), ['47.4.28'])
+  const neo = await (await call('client/loaders/neoforge/1.21.1/builds')).json()
+  assert.equal(neo.picked, '21.1.266')
+  for (const route of ['client/loaders/vanilla/1.20.1/builds', 'client/loaders/liteloader/1.20.1/builds', `client/loaders/forge/${encodeURIComponent('../x')}/builds`]) {
+    assert.equal((await call(route)).status, 400, route)
+  }
+  const none = await call('client/loaders/forge/1.12.2/builds')
+  assert.equal(none.status, 400)
+  assert.match((await none.json()).error, /Forge has no build for Minecraft 1\.12\.2/)
 })

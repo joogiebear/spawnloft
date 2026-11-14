@@ -1015,6 +1015,12 @@ async function handleClient(req, res, seg, url) {
     try { id = decodeURIComponent(seg[3]) } catch { fail('the version id in the address is not valid') }
     return json(res, 200, await client.describeVersion(id))
   }
+  // One mod loader's builds for one version: /api/client/loaders/<loader>/<mc>/builds
+  if (seg[2] === 'loaders' && seg[5] === 'builds' && seg.length === 6 && req.method === 'GET') {
+    let loader, mc
+    try { loader = decodeURIComponent(seg[3]); mc = decodeURIComponent(seg[4]) } catch { fail('the address is not valid') }
+    return json(res, 200, await client.loaderBuilds(loader, mc))
+  }
   if (seg[2] === 'launcher' && seg.length === 3 && req.method === 'GET') {
     return json(res, 200, launcherSummary())
   }

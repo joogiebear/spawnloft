@@ -20,6 +20,8 @@ const eras = F.loadErasManifest()
 const fabricList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'fabric-game-versions.json'), 'utf8'))
 const quiltList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'loaders', 'quilt', 'game-versions.json'), 'utf8'))
 const neoforgeList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'loaders', 'neoforge', 'versions.json'), 'utf8'))
+const forgeList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'loaders', 'forge', 'maven-metadata.json'), 'utf8'))
+const forgePromos = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'loaders', 'forge', 'promotions_slim.json'), 'utf8'))
 
 // the cached lists, as fetched a moment ago
 function seed(file, body, age = 0) {
@@ -112,6 +114,8 @@ test('the picker lists every id Mojang does, with its kind, newest first, and Fa
   seed('fabric-game-versions.json', fabricList)
   seed('quilt-game-versions.json', quiltList)
   seed('neoforge-versions.json', neoforgeList)
+  seed('forge-maven-metadata.json', forgeList)
+  seed('forge-promotions.json', forgePromos)
   const { versions } = await client.listVersions({ os: { name: 'linux', arch: 'x64', version: '6' }, fabric: true })
   assert.equal(versions.length, eras.versions.length)
   const times = versions.map((v) => Date.parse(v.releaseTime))
@@ -121,8 +125,8 @@ test('the picker lists every id Mojang does, with its kind, newest first, and Fa
   assert.equal(row('1.14.2 Pre-Release 4').fabric, true)
   assert.equal(row('1.12.2').fabric, false)
   // every loader's answer, Quilt's from its real list
-  assert.deepEqual(row('1.20.4').loaders, { fabric: true, quilt: true, neoforge: true })
-  assert.deepEqual(row('1.12.2').loaders, { fabric: false, quilt: false, neoforge: false })
+  assert.deepEqual(row('1.20.4').loaders, { fabric: true, quilt: true, forge: true, neoforge: true })
+  assert.deepEqual(row('1.12.2').loaders, { fabric: false, quilt: false, forge: false, neoforge: false })
   assert.equal(row('b1.7.3').kind, 'beta')
   assert.equal(row('b1.7.3').javaNeeds, 8)
   assert.equal(row('b1.7.3').javaNeedsExact, false)
@@ -138,10 +142,12 @@ test('describeVersion answers what a launch would decide, from the version\'s ow
   seed('fabric-game-versions.json', fabricList)
   seed('quilt-game-versions.json', quiltList)
   seed('neoforge-versions.json', neoforgeList)
+  seed('forge-maven-metadata.json', forgeList)
+  seed('forge-promotions.json', forgePromos)
   const d = await client.describeVersion('1.20.4', { os: { name: 'linux', arch: 'x64', version: '6' }, fetchImpl: noNetwork })
   assert.deepEqual({ ...d, java: undefined, problems: undefined }, {
     id: '1.20.4', type: 'release', kind: 'release', releaseTime: d.releaseTime, javaNeeds: 17, javaNeedsExact: true, java: undefined,
-    arch: 'x64', emulated: false, fabric: true, loaders: { fabric: true, quilt: true, neoforge: true }, harness: false, refusal: null, code: null, problems: undefined,
+    arch: 'x64', emulated: false, fabric: true, loaders: { fabric: true, quilt: true, forge: true, neoforge: true }, harness: false, refusal: null, code: null, problems: undefined,
   })
   const arm = await client.describeVersion('1.20.4', { os: { name: 'linux', arch: 'arm64', version: '6' }, fetchImpl: noNetwork })
   assert.equal(arm.code, 'no-natives-for-this-machine')
