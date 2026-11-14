@@ -41,6 +41,27 @@ after(async () => {
   fs.rmSync(scratch, { recursive: true, force: true })
 })
 
+test('where the server can be joined from is answered from this computer alone', async () => {
+  const at = `${panel.url}api/instances/${name}/join`
+  const info = await (await panelFetch(at)).json()
+  assert.equal(info.port, 41620)
+  assert.equal(info.here, 'localhost')
+  assert.ok(Array.isArray(info.lan) && Array.isArray(info.public))
+  assert.equal((await panelFetch(at, { method: 'POST' })).status, 405)
+  // the server's own file says where it listens
+  const props = path.join(dir, 'server.properties')
+  const was = fs.readFileSync(props, 'utf8')
+  try {
+    fs.writeFileSync(props, was + 'server-ip=127.0.0.1\n')
+    const closed = await (await panelFetch(at)).json()
+    assert.equal(closed.loopbackOnly, true)
+    assert.deepEqual(closed.lan, [])
+  } finally {
+    fs.writeFileSync(props, was)
+  }
+  assert.equal((await panelFetch(`${panel.url}api/instances/nobody-here/join`)).status, 404)
+})
+
 test('the whitelist switch has to be told on or off', async () => {
   for (const body of [{}, { on: 'false' }, { on: 1 }]) {
     const res = await send('whitelist-mode', body)

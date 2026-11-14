@@ -30,6 +30,49 @@ export function publicAddresses(interfaces = os.networkInterfaces()) {
     .map(entry => entry.address)
 }
 
+// an address a home router hands out: reachable from the same network, and from nowhere else
+export function isPrivateIPv4(address) {
+  const parts = String(address).split('.')
+  if (parts.length !== 4 || parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false
+  const [a, b] = parts.map(Number)
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+}
+
+// Adapters that software makes for itself: containers, virtual machines, VPN tunnels. They hold
+// private addresses too, and nobody on the home network can reach the computer through them.
+const VIRTUAL_ADAPTER = /^(docker|br-|veth|vboxnet|vmnet|virbr|tun|tap|utun|tailscale|wg|zt)|vEthernet|VirtualBox|VMware|Hyper-V|WSL|Tailscale|ZeroTier/i
+
+export function lanAddresses(interfaces = os.networkInterfaces()) {
+  const from = entries => entries
+    .flatMap(([, list]) => list ?? [])
+    .filter(entry => entry && !entry.internal && entry.family === 'IPv4' && isPrivateIPv4(entry.address))
+    .map(entry => entry.address)
+  const all = Object.entries(interfaces)
+  const real = from(all.filter(([name]) => !VIRTUAL_ADAPTER.test(name)))
+  // a machine whose only network is one of those (a server inside a VM) still has an address
+  return real.length ? real : from(all)
+}
+
+// Where a server can be joined from, as far as this computer can tell by looking at itself: its
+// own network interfaces and the address the server is told to listen on. Nothing is asked of
+// anything outside, so there is no public address for a computer behind a router - the router
+// has it, not this machine.
+export function joinInfo(inst, { interfaces = os.networkInterfaces(), bound = undefined } = {}) {
+  // the registry's bind is written into server-ip at every start, so it is the one that holds
+  const ip = String(bound ?? (inst.bind || boundAddress(inst.dir))).trim().replace(/^\[(.*)\]$/, '$1')
+  const everywhere = ip === '' || ip === '0.0.0.0' || ip === '::'
+  const loopbackOnly = !everywhere && (ip === 'localhost' || ip === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip))
+  const lan = lanAddresses(interfaces)
+  const open = publicAddresses(interfaces)
+  const base = { port: Number.isInteger(inst.port) ? inst.port : null, here: 'localhost', loopbackOnly, bindFixed: Boolean(inst.bind) }
+  if (loopbackOnly) return { ...base, lan: [], public: [] }
+  if (everywhere) return { ...base, lan, public: open }
+  // told to listen on one address: it answers on that one alone, and not on localhost
+  const held = Object.values(interfaces).flat().some(entry => entry?.address === ip)
+  const onlyKind = !held ? 'unknown' : isPrivateIPv4(ip) ? 'lan' : open.includes(ip) ? 'public' : 'here'
+  return { ...base, here: ip, only: ip, onlyKind, lan: onlyKind === 'lan' ? [ip] : [], public: onlyKind === 'public' ? [ip] : [] }
+}
+
 // True, false, or null for "could not tell". ufw and firewalld state can be read without root; hand-written
 // nftables/iptables rules cannot be listed, so a saved ruleset file gives null and false means none was found.
 export function firewallActive({ read = file => fs.readFileSync(file, 'utf8'), run = spawnSync } = {}) {

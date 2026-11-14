@@ -44,7 +44,7 @@ import * as clientLogin from './client-login.mjs'
 import { diagnose, crashReports } from './diagnose.mjs'
 import { buildBundle, writeBundle } from './diag-bundle.mjs'
 import { scrubber } from './mcp-tools.mjs'
-import { rconExposure } from './exposure.mjs'
+import { rconExposure, joinInfo } from './exposure.mjs'
 import { acceptableWebhook } from './notify.mjs'
 import { fail, refreshProcessTable, UserError, cleanLabel, slugFor, safeRelativePath, isInside, humanBytes } from './util.mjs'
 import { activeBlock } from './control.mjs'
@@ -2024,6 +2024,13 @@ async function route(req, res) {
   }
 
   // these take GET and POST, so they sit above the POST-only gate below
+  // where this server can be joined from; read off this computer, nothing outside is asked
+  if (seg[3] === 'join' && !seg[4]) {
+    if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+    const inst = registry.getInstance(name)
+    if (registry.isDatabase(inst)) return json(res, 404, { error: 'not found' })
+    return json(res, 200, joinInfo(inst))
+  }
   if (seg[3] === 'props' && seg[4] === 'raw') return handleRawProps(req, res, name)
   if (seg[3] === 'props') return handleProps(req, res, name)
   if (seg[3] === 'backups') return handleBackups(req, res, name, seg)
