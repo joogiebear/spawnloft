@@ -152,6 +152,7 @@ A profile is a few keys, all changeable with `set`:
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
 | `account` | A signed-in Microsoft account to play as (see [Accounts](#accounts)), or empty to play offline. |
 | `assistantAccount` | `true` lets an AI assistant launch this profile when it plays as a signed-in Microsoft account (`account=`). `false` by default for every profile, however it was made; only `set` turns it on. Offline profiles are not affected. |
+| `serverList` | `true` (the default) keeps SpawnLoft's servers on the profile's version in the game's own Multiplayer list (`servers.dat`), updated at each launch. `false` takes them out again and leaves the file alone. |
 | `harness` | `true` installs the harness mod and Fabric API into the profile's `mods/` on launch and opens the control channel. Needs `loader=fabric`. |
 
 Profile names follow the same rule as server names: letters, digits, dash and underscore, up to
@@ -184,15 +185,27 @@ and the files keep "profile".
   each with its own **Play here** (or **Start and play**). **Show all** brings the rest, where a
   server on another version offers a setup of that version instead; from seven servers up there
   is a search box too.
-- **Join** is one field. Its menu lists the SpawnLoft servers with their state (and a note when one
-  runs another version than the setup), plus *Title screen only*. A stopped server is started
-  first: the button then reads **Start server and play**, waits up to two minutes for it, launches
-  the game and joins it. Typing into the field instead joins any other server, `host` or
-  `host:port` (a bracketed IPv6 address works). An address is only checked for shape; whether the
-  server is reachable, and which accounts it lets in, is between the game and that server. The
-  field remembers where each setup went last, in the page's local storage; a typed address does
-  not become a saved server. Assistant control (the harness) works on your own SpawnLoft servers
-  only.
+- **Join** is one choice. Its menu lists the SpawnLoft servers on the setup's version with their
+  state (running ones first), then **Another address…** and **Title screen**. A stopped server
+  is started first: the button then reads **Start server and play**, waits up to two minutes for
+  it, launches the game and joins it. **Another address…** shows a box for any other server,
+  `host` or `host:port` (a bracketed IPv6 address works). An address is only checked for shape;
+  whether the server is reachable, and which accounts it lets in, is between the game and that
+  server. Join remembers where each setup went last, in the page's local storage; a typed
+  address does not become a saved server. Assistant control (the harness) works on your own
+  SpawnLoft servers only.
+- A server on **another version** than the setup stops Play before anything downloads, with
+  three ways on: use a setup of the server's version (one that exists is picked, else the New
+  sheet opens for it), play on the title screen, or play anyway if the server takes other
+  versions (SpawnLoft cannot see that). The command line launches with a warning instead.
+- **The game's own Multiplayer list.** Each time a setup's game starts, SpawnLoft puts its
+  servers on that version into the setup's `servers.dat`, so a game opened on the title screen
+  still shows them. Entries you added in the game are never changed. SpawnLoft's own entries
+  follow a rename or a new port, and go when the server goes or moves to another version. One
+  you rename or delete in the game is yours from then on and is not put back. The switch
+  **Show my SpawnLoft servers in the game** in the setup sheet (`serverList` on the command
+  line) turns it off; the next launch takes SpawnLoft's entries out again. A `servers.dat` that cannot be
+  read whole is left alone and the launch says so. Games older than 1.7 are left alone.
 - **The account chip** (top right) opens the account menu: who plays (click one to make it the
   default), **Add Microsoft account** (see [Signing in from the launcher](#signing-in-from-the-launcher)),
   an offline name for servers with `online-mode=false`, and sign out. A setup plays as its own

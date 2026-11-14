@@ -2051,7 +2051,7 @@ BOTS (plugin testing with scripted players)
 CLIENT (a game client for your own servers)
   spawnloft client list                  Profiles, with running state
   spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
-  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount
+  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList
   spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)
   spawnloft client install <name>        Download what the profile needs, with progress on stderr
   spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
@@ -2184,7 +2184,7 @@ async function cmdClient(positional, flags) {
     checkFlags(flags, ['json'])
     if (rest.length < 2) throw new UsageError(usage)
     const name = rest[0]
-    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness', 'account', 'assistantAccount']
+    const allowed = ['mc', 'loader', 'loaderVersion', 'memory', 'java', 'server', 'harness', 'account', 'assistantAccount', 'serverList']
     const patch = {}
     for (const arg of rest.slice(1)) {
       const m = arg.match(/^([a-zA-Z]+)=(.*)$/)
@@ -2192,7 +2192,7 @@ async function cmdClient(positional, flags) {
       const key = m[1]
       if (!allowed.includes(key)) fail(`unknown profile field "${key}"; one of ${allowed.join(', ')}`)
       let value = m[2]
-      if (key === 'harness' || key === 'assistantAccount') {
+      if (key === 'harness' || key === 'assistantAccount' || key === 'serverList') {
         if (value !== 'true' && value !== 'false') throw new UsageError(usage)
         value = value === 'true'
       } else if ((key === 'loaderVersion' || key === 'java' || key === 'server' || key === 'account') && value === '') {

@@ -54,6 +54,11 @@ export function clientPlayed(name) {
   return path.join(clientRunDir(name), 'played.json')
 }
 
+// Which entries of the profile's servers.dat SpawnLoft wrote (client-server-list.mjs).
+export function clientServerList(name) {
+  return path.join(clientRunDir(name), 'server-list.json')
+}
+
 export function clientLog(name) {
   return path.join(clientRunDir(name), 'client.log')
 }

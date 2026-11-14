@@ -5,10 +5,12 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import dns from 'node:dns'
 import net from 'node:net'
-import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, clientPlayed, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, clientPlayed, clientServerList, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { checkCancelled } from './cancel.mjs'
-import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
+import { parseMemoryGb, getInstance, isDatabase, listInstances } from './registry.mjs'
+import { mcVersionOf } from './plugins.mjs'
+import { syncServerList, versionKeepsServerList } from './client-server-list.mjs'
 import { pickClientJava, requiredMajor } from './java.mjs'
 import { mojangJava } from './client-java.mjs'
 import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
@@ -25,7 +27,7 @@ import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 export const LOADERS = ['vanilla', 'fabric']
 export const DEFAULT_MEMORY = '2G'
 
-const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'assistantAccount']
+const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'assistantAccount', 'serverList']
 // The keys that make up the running game's command line; the rest only matter at the next launch.
 const RUNNING_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness']
 
@@ -40,7 +42,7 @@ function validateMc(mc) {
 // Typed ids are trimmed: "1.21.11 " is 1.21.11.
 const trimMc = (mc) => (typeof mc === 'string' ? mc.trim() : mc)
 
-function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount }) {
+function validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, serverList = true }) {
   validateMc(mc)
   parseMemoryGb(memory)
   // -Xmx takes whole units only: 1.5G is refused by Java where a server's launcher would round it
@@ -50,6 +52,7 @@ function validateFields({ mc, loader, loaderVersion, java, memory, harness, serv
   }
   if (typeof harness !== 'boolean') fail('harness must be true or false')
   if (typeof assistantAccount !== 'boolean') fail('assistantAccount must be true or false')
+  if (typeof serverList !== 'boolean') fail('serverList must be true or false')
   if (harness && loader === 'vanilla') {
     fail('the harness mod needs the fabric loader')
   }
@@ -155,8 +158,9 @@ export function accountUuid(value) {
 
 // Profiles written before the key existed read as false: an assistant may not play as a
 // Microsoft account unless someone said so for that profile.
+// serverList (SpawnLoft's servers in the game's own Multiplayer list) reads as on.
 function withDefaults(cfg) {
-  return { assistantAccount: false, ...cfg }
+  return { assistantAccount: false, serverList: true, ...cfg }
 }
 
 export function listProfiles() {
@@ -181,21 +185,21 @@ export function getProfile(name) {
 }
 
 // assistantAccount starts false for every profile, whoever made it; only `set` turns it on.
-export function createProfile(name, { mc: typedMc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null }) {
+export function createProfile(name, { mc: typedMc, loader = 'vanilla', loaderVersion = null, java = null, memory = DEFAULT_MEMORY, harness = false, server = null, account = null, serverList = true }) {
   validateProfileName(name)
   const reg = loadProfiles()
   assertNameFree(reg, name)
   const assistantAccount = false
   const mc = trimMc(typedMc)
-  validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount })
+  validateFields({ mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, serverList })
   fs.mkdirSync(profileDir(name), { recursive: true })
   const optionsFile = path.join(profileDir(name), 'options.txt')
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
   // what a removed profile of this name left about its games is not this one's history
-  for (const file of [clientLastExit(name), clientPlayed(name)]) fs.rmSync(file, { force: true })
-  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account: accountKeyFor(account), assistantAccount, createdAt: new Date().toISOString() }
+  for (const file of [clientLastExit(name), clientPlayed(name), clientServerList(name)]) fs.rmSync(file, { force: true })
+  const profile = { mc, loader, loaderVersion, java, memory, harness, server, account: accountKeyFor(account), assistantAccount, ...(serverList ? {} : { serverList: false }), createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
   return { name, ...profile }
@@ -252,7 +256,7 @@ export function removeProfile(name, { purge = false } = {}) {
   }
   if (purge) fs.rmSync(clientRunDir(name), PURGE)
   // how the last game ended belongs to this profile, not to a later one of the same name
-  else for (const file of [clientLastExit(name), clientPlayed(name)]) fs.rmSync(file, { force: true })
+  else for (const file of [clientLastExit(name), clientPlayed(name), clientServerList(name)]) fs.rmSync(file, { force: true })
 }
 
 function assertNameFree(reg, name, { except = null } = {}) {
@@ -325,7 +329,7 @@ function moveRunDir(name, newName, { caseOnly = false } = {}) {
       return
     } catch { /* tried again */ }
   }
-  for (const file of [clientLastExit(name), clientPlayed(name)]) {
+  for (const file of [clientLastExit(name), clientPlayed(name), clientServerList(name)]) {
     try { fs.rmSync(file, { force: true }) } catch { /* left behind; createProfile clears them */ }
   }
 }
@@ -356,11 +360,16 @@ export function duplicateProfile(name, wanted = null) {
   if (fs.existsSync(profileDir(newName))) {
     fail(`a folder named "${newName}" is already in the profiles folder (left by a removed profile); pick another name or delete ${profileDir(newName)}`, 'name-taken')
   }
-  const made = createProfile(newName, { mc: from.mc, loader: from.loader, loaderVersion: from.loaderVersion, java: from.java, memory: from.memory, harness: from.harness, server: from.server, account: from.account })
+  const made = createProfile(newName, { mc: from.mc, loader: from.loader, loaderVersion: from.loaderVersion, java: from.java, memory: from.memory, harness: from.harness, server: from.server, account: from.account, serverList: from.serverList })
   try {
     for (const item of DUPLICATE_TAKES) {
       const src = path.join(profileDir(name), item)
       if (fs.existsSync(src)) fs.cpSync(src, path.join(profileDir(newName), item), { recursive: true, force: true })
+    }
+    // servers.dat came along, so which of its entries SpawnLoft wrote comes along too
+    if (fs.existsSync(clientServerList(name))) {
+      fs.mkdirSync(clientRunDir(newName), { recursive: true })
+      fs.copyFileSync(clientServerList(name), clientServerList(newName))
     }
   } catch (err) {
     removeProfile(newName, { purge: true })
@@ -536,6 +545,11 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   if (address && provisional.type === 'offline') {
     warnings.push(`${provisional.name} is an offline player, so ${addressText} will refuse the join unless it runs with online-mode=false; sign in to play on public servers`)
   }
+  // told, not refused: a server can be set up to take other versions, and SpawnLoft cannot see that
+  const serverMc = target ? mcVersionOf(getInstance(target)) : null
+  if (serverMc && serverMc !== profile.mc) {
+    warnings.push(`server "${target}" runs Minecraft ${serverMc} and this profile is ${profile.mc}, so the server will refuse the join unless it accepts other versions`)
+  }
   for (const w of warnings) onWarning(w)
 
   // The game shows an address it cannot parse or look up as "Unknown host" on its own screen,
@@ -653,6 +667,13 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onStage({ stage: 'server', message: `Starting ${target}` })
     await ensureServer(target)
   }
+  // the game reads its Multiplayer list as it starts, so this is the last moment to bring it in step
+  const listed = fillServerList(name, profile)
+  if (listed.skipped) {
+    const w = `the game's Multiplayer list was not brought up to date: ${listed.skipped}`
+    warnings.push(w)
+    onWarning(w)
+  }
   const harnessToken = profile.harness ? crypto.randomBytes(16).toString('hex') : null
   // a file from a crashed run would otherwise be read as this run's, before the mod replaces it
   if (harnessToken) removeHarnessFile(name)
@@ -664,6 +685,33 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const { pid } = await spawnClient(command, { name, state: { mode: account.type, account, harness: harnessToken ? { token: harnessToken, port: null } : null, server: target ?? null, address: address ? formatAddress(address) : null, launchedBy: by, launch: launchFacts(resolved, picked, profile, installed, assetsDir) } })
 
   return { pid, profile, version: versionId, account: { type: account.type, name: account.name }, warnings }
+}
+
+// The SpawnLoft servers a profile's game could join as it is: the ones on its version, at the
+// address the game reaches them on this machine.
+export function serversFor(profile) {
+  const out = []
+  for (const inst of listInstances()) {
+    try {
+      if (isDatabase(inst) || mcVersionOf(inst) !== profile.mc) continue
+      out.push({ key: inst.name, name: inst.label || inst.name, ip: formatAddress(localJoinAddress(inst)) })
+    } catch { /* no usable port or address: nothing the game could join */ }
+  }
+  return out
+}
+
+// Brings the profile's servers.dat in step with those servers (client-server-list.mjs). With
+// serverList off, what SpawnLoft wrote before is taken out again and the file is then left alone.
+// Never stops a launch: a list that cannot be read or written is reported and left.
+export function fillServerList(name, given = null) {
+  try {
+    const profile = given ?? getProfile(name)
+    const parent = readJson(versionJson(profile.mc), null)
+    if (!versionKeepsServerList(parent)) return { changed: false, skipped: null }
+    return syncServerList({ file: path.join(profileDir(name), 'servers.dat'), stateFile: clientServerList(name), wanted: profile.serverList === false ? [] : serversFor(profile) })
+  } catch (err) {
+    return { changed: false, skipped: err.message }
+  }
 }
 
 // A server outside SpawnLoft to join at launch: host[:port], a name, an IPv4 address or a

@@ -1026,7 +1026,7 @@ async function handleClient(req, res, seg, url) {
     if (typeof body.mc !== 'string') fail('a profile needs a Minecraft version')
     // assistantAccount is not taken here: a new profile starts with it off, whoever makes it
     const fields = {}
-    for (const key of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account']) {
+    for (const key of ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'serverList']) {
       if (body[key] !== undefined) fields[key] = body[key]
     }
     fields.mc = await client.checkProfileVersion({ mc: fields.mc, loader: fields.loader })
@@ -1124,7 +1124,7 @@ function clientProfileRow(p) {
   return {
     name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion, memory: p.memory, java: p.java,
     // the key may be a uuid; the page shows the name and tells offline from Microsoft by the type
-    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, accountUuid: client.accountUuid(p.account), assistantAccount: p.assistantAccount,
+    harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, accountUuid: client.accountUuid(p.account), assistantAccount: p.assistantAccount, serverList: p.serverList,
     running: st.running, pid: st.pid, startedAt: st.startedAt, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
     // how its last game ended, when the panel saw it end: { code, signal, startedAt, endedAt, stopped }
     lastExit: client.lastExit(p.name),
