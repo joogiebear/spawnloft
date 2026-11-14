@@ -210,7 +210,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
     let done = 0
     let bytes = 0
     const total = todo.length
-    if (total) onProgress({ phase: 'java', done, total, bytes })
+    if (total) onProgress({ phase: 'java', done, total, bytes, fetching: true })
     let index = 0
     let failed = false
     const worker = async () => {
@@ -230,7 +230,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
           throw err
         }
         bytes += d.size ?? 0
-        onProgress({ phase: 'java', done: ++done, total, bytes })
+        onProgress({ phase: 'java', done: ++done, total, bytes, fetching: true })
       }
     }
     await Promise.all(Array.from({ length: Math.min(PARALLEL, todo.length) }, worker))

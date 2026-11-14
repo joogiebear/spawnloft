@@ -196,6 +196,19 @@ export async function discover() {
   return { best, onPath, all: unique }
 }
 
+// The Javas on this machine as the game launcher last found them. Finding them starts every
+// Java there is once (a second or two with a few installed), which every Play used to wait for;
+// the panel runs for days and Javas are installed rarely, so the answer is kept for ten minutes.
+// A short-lived command (the CLI) has nothing remembered and looks as before.
+const JAVAS_KEPT_MS = 10 * 60 * 1000
+let javasKept = null
+export async function recentJavas({ fresh = false, now = Date.now(), find = discover } = {}) {
+  if (!fresh && javasKept && now - javasKept.at < JAVAS_KEPT_MS) return javasKept.all
+  const all = (await find()).all
+  javasKept = { at: now, all }
+  return all
+}
+
 // `java` by name when PATH has the best one (the registry stays readable and follows upgrades),
 // else an absolute path. Null when there is no usable Java.
 export async function defaultJava() {
@@ -347,8 +360,16 @@ export async function pickClientJava({ explicit = null, requirement, arch = null
     const warning = over ? `${what} wants ${need}; using Java ${state.major} at ${explicit}, which is newer, so the game may not start.` : null
     return { path: explicit, warning, source: 'explicit' }
   }
-  const all = found ?? (await discover()).all
-  const choice = chooseClientJava(all, requirement, arch)
+  // whether the list is a remembered one, asked before recentJavas() refreshes it
+  const remembered = !found && javasKept !== null
+  let all = found ?? await recentJavas()
+  let choice = chooseClientJava(all, requirement, arch)
+  // a remembered Java that has since been removed: look again before settling for less
+  // (and none that fits may only mean one was installed since the last look)
+  if (!found && (choice ? choice.path !== 'java' && !fsSync.existsSync(choice.path) : remembered)) {
+    all = await recentJavas({ fresh: true })
+    choice = chooseClientJava(all, requirement, arch)
+  }
   if (choice) return { path: choice.path, warning: null, source: 'installed' }
 
   let why = null

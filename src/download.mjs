@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
-import { fail, humanBytes } from './util.mjs'
+import { fail, humanBytes, UserError } from './util.mjs'
 import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
@@ -123,51 +123,104 @@ export function dropPart(tmp) {
   try { fs.rmSync(tmp, { force: true, maxRetries: 5, retryDelay: 100 }) } catch { /* left behind; nothing reads a .part */ }
 }
 
-export async function downloadFile(url, dest, { hash = null, expected = null, onProgress = null, minBytes = 0, label = null } = {}) {
-  const what = label ?? dest
-  // the job this download is part of, if it is part of one that can be cancelled
-  const signal = cancelSignal()
-  checkCancelled()
-  let res
-  try {
-    res = await fetchRetry(url, { headers: { 'User-Agent': UA }, ...(signal ? { signal } : {}) })
-  } catch (err) {
-    if (signal?.aborted) throw new Cancelled()
-    fail(`download of ${what} failed: ${err.cause?.message || err.message}`, 'download-failed')
-  }
-  if (!res.ok || !res.body) fail(`download of ${what} failed (${res.status}) from ${url}`, 'download-failed')
+// How long a download may go without a byte, from asking to the last one, before it is given up
+// and asked for again; and how many times one file is asked for. A connection that dies quietly
+// (a sleeping laptop, a router dropping state) otherwise holds its caller for ever: there are
+// thousands of files in a game install and one stuck one stops them all.
+export const STALL_MS = 30000
+const DOWNLOAD_ATTEMPTS = 3
 
-  const tmp = partPath(dest)
-  const digest = hash ? crypto.createHash(hash) : null
-  const source = Readable.fromWeb(res.body)
-  let received = 0
-  const total = Number(res.headers.get('content-length')) || 0
-  source.on('data', (chunk) => {
-    digest?.update(chunk)
-    received += chunk.length
-    onProgress?.({ received, total })
-  })
-  try {
-    await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
-  } catch (err) {
-    // cancelled half way: the half is not left for a later download to trip on
-    dropPart(tmp)
-    if (!signal?.aborted) throw err
-    throw new Cancelled()
-  }
-
-  const size = fs.statSync(tmp).size
-  if (size < minBytes) {
-    fs.rmSync(tmp, { force: true })
-    fail(`${what} came back ${humanBytes(size)}, which is not a server jar`)
-  }
-  if (digest && expected) {
-    const got = digest.digest('hex')
-    if (got.toLowerCase() !== String(expected).toLowerCase()) {
-      fs.rmSync(tmp, { force: true })
-      fail(`checksum mismatch for ${what}\n  expected ${expected}\n  got      ${got}`, 'checksum-mismatch')
+export async function downloadFile(url, dest, { hash = null, expected = null, onProgress = null, minBytes = 0, label = null, stallMs = STALL_MS, attempts = DOWNLOAD_ATTEMPTS, retryDelayMs = 1500 } = {}) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await downloadOnce(url, dest, { hash, expected, onProgress, minBytes, label, stallMs })
+    } catch (err) {
+      // a stall or a connection cut part way is worth asking again; a refusal, a wrong checksum
+      // and a cancelled job are not
+      if (!err?.retryable || attempt >= attempts) throw err
+      await wait(retryDelayMs * attempt)
+      checkCancelled()
     }
   }
-  fs.renameSync(tmp, dest)
-  return { size, sizeHuman: humanBytes(size) }
+}
+
+function retryable(message, code) {
+  const err = new UserError(message)
+  err.code = code
+  err.retryable = true
+  return err
+}
+
+async function downloadOnce(url, dest, { hash, expected, onProgress, minBytes, label, stallMs }) {
+  const what = label ?? dest
+  // the job this download is part of, if it is part of one that can be cancelled
+  const cancel = cancelSignal()
+  checkCancelled()
+  // the watchdog: armed before the request, wound back by every chunk
+  const stall = new AbortController()
+  let timer = null
+  const wind = () => {
+    clearTimeout(timer)
+    if (stallMs > 0) timer = setTimeout(() => stall.abort(new Error('stalled')), stallMs)
+  }
+  const signal = cancel ? AbortSignal.any([cancel, stall.signal]) : stall.signal
+  const stalled = () => retryable(`download of ${what} failed: nothing arrived for ${Math.round(stallMs / 1000)} seconds`, 'download-failed')
+  wind()
+  let tmp = null
+  try {
+    let res
+    try {
+      // each new request gets the full time: an answer, even a refusal, is not a stall
+      res = await fetchRetry(url, { headers: { 'User-Agent': UA }, signal }, { onRetry: wind })
+    } catch (err) {
+      if (cancel?.aborted) throw new Cancelled()
+      if (stall.signal.aborted) throw stalled()
+      fail(`download of ${what} failed: ${err.cause?.message || err.message}`, 'download-failed')
+    }
+    if (!res.ok || !res.body) {
+      await res.body?.cancel().catch(() => {})
+      fail(`download of ${what} failed (${res.status}) from ${url}`, 'download-failed')
+    }
+
+    tmp = partPath(dest)
+    const digest = hash ? crypto.createHash(hash) : null
+    const source = Readable.fromWeb(res.body)
+    let received = 0
+    const total = Number(res.headers.get('content-length')) || 0
+    source.on('data', (chunk) => {
+      wind()
+      digest?.update(chunk)
+      received += chunk.length
+      onProgress?.({ received, total })
+    })
+    try {
+      await pipeline(source, fs.createWriteStream(tmp), { signal })
+    } catch (err) {
+      // stopped half way: the half is not left for a later download to trip on
+      dropPart(tmp)
+      if (cancel?.aborted) throw new Cancelled()
+      if (stall.signal.aborted) throw stalled()
+      // the disk's own errors (full, read-only) are not the network's to retry
+      if (typeof err?.code === 'string' && /^E(NOSPC|ROFS|ACCES|PERM|DQUOT|IO)$/.test(err.code)) throw err
+      throw retryable(`download of ${what} failed part way: ${err.cause?.message || err.message}`, 'download-failed')
+    }
+    clearTimeout(timer)
+
+    const size = fs.statSync(tmp).size
+    if (size < minBytes) {
+      fs.rmSync(tmp, { force: true })
+      fail(`${what} came back ${humanBytes(size)}, which is not a server jar`)
+    }
+    if (digest && expected) {
+      const got = digest.digest('hex')
+      if (got.toLowerCase() !== String(expected).toLowerCase()) {
+        fs.rmSync(tmp, { force: true })
+        fail(`checksum mismatch for ${what}\n  expected ${expected}\n  got      ${got}`, 'checksum-mismatch')
+      }
+    }
+    fs.renameSync(tmp, dest)
+    return { size, sizeHuman: humanBytes(size) }
+  } finally {
+    clearTimeout(timer)
+  }
 }

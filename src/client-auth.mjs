@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 
 import { ACCOUNTS_FILE } from './client-paths.mjs'
-import { fail, readJson, writeJson, PRIVATE_FILE_MODE, sleep } from './util.mjs'
+import { fail, readJson, writeJson, PRIVATE_FILE_MODE, sleep, UserError } from './util.mjs'
 
 export function offlineUuid(name) {
   const bytes = crypto.createHash('md5').update('OfflinePlayer:' + name, 'utf8').digest()
@@ -49,6 +49,12 @@ function dashUuid(hex) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
 }
 
+// A server having a bad moment (5xx, 429, 408) is not a refusal: the code lets a refresh tell
+// "try again later" from "sign in again".
+function failStatus(message, status) {
+  fail(message, status >= 500 || status === 429 || status === 408 ? 'sign-in-unreachable' : undefined)
+}
+
 async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, now }) {
   const xblBody = JSON.stringify({
     Properties: { AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: 'd=' + accessToken },
@@ -56,7 +62,7 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
     TokenType: 'JWT',
   })
   const xblRes = await fetchImpl(XBL_URL, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: xblBody })
-  if (!xblRes.ok) fail(`Xbox Live sign-in failed (HTTP ${xblRes.status})`)
+  if (!xblRes.ok) failStatus(`Xbox Live sign-in failed (HTTP ${xblRes.status})`, xblRes.status)
   const xbl = await bodyOf(xblRes)
   const uhs = xbl.DisplayClaims?.xui?.[0]?.uhs
   if (!xbl.Token || !uhs) fail('Xbox Live answered without a token; try again in a minute')
@@ -77,7 +83,7 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
       if (xerr === 2148916236 || xerr === 2148916237) fail('this account has to finish the age verification Xbox asks for in South Korea; do it at https://account.xbox.com and sign in again')
       fail(`Xbox Live refused the sign-in (XErr ${xerr})`)
     }
-    fail(`Xbox Live sign-in failed (HTTP ${xstsRes.status})`)
+    failStatus(`Xbox Live sign-in failed (HTTP ${xstsRes.status})`, xstsRes.status)
   }
   const xsts = await bodyOf(xstsRes)
   if (!xsts.Token) fail('Xbox Live answered without a token; try again in a minute')
@@ -93,7 +99,7 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
       const said = String((await bodyOf(mcRes)).errorMessage ?? '').slice(0, 200)
       fail(`Minecraft refused the sign-in (HTTP 403) for client id ${MSA_CLIENT_ID}${said ? ` ("${said}")` : ''}. Either Mojang has not approved that id for Minecraft sign-in, or its Azure app registration does not allow public client flows (Authentication > Allow public client flows). Offline profiles still work`)
     }
-    fail(`Minecraft sign-in failed (HTTP ${mcRes.status})`)
+    failStatus(`Minecraft sign-in failed (HTTP ${mcRes.status})`, mcRes.status)
   }
   const mc = await bodyOf(mcRes)
   if (!mc.access_token) fail('Minecraft answered without a token; try again in a minute')
@@ -101,7 +107,7 @@ async function minecraftFromMicrosoft(accessToken, refreshToken, { fetchImpl, no
   const profRes = await fetchImpl(MC_PROFILE_URL, { method: 'GET', headers: { authorization: `Bearer ${mc.access_token}` } })
   if (!profRes.ok) {
     if (profRes.status === 404) fail('this Microsoft account owns no Minecraft: Java Edition; buy it at https://www.minecraft.net or sign in with another account')
-    fail(`could not read the Minecraft profile (HTTP ${profRes.status})`)
+    failStatus(`could not read the Minecraft profile (HTTP ${profRes.status})`, profRes.status)
   }
   const prof = await bodyOf(profRes)
   if (typeof prof.id !== 'string' || !/^[0-9a-f]{32}$/i.test(prof.id) || !prof.name) fail('Minecraft answered without a profile; try again in a minute')
@@ -240,16 +246,46 @@ export async function finishBrowserLogin({ code, verifier, redirectUri, fetchImp
 }
 
 const STEP_TIMEOUT_MS = 30_000
+// OAuth's ways of saying a refresh token is finished or needs the person again
+const EXPIRED_ERRORS = ['invalid_grant', 'interaction_required', 'consent_required', 'login_required']
 
+// Two ways a refresh ends without a token, told apart by `code`, because they call for opposite
+// things: 'sign-in-expired' is Microsoft saying this sign-in is over (sign in again), and
+// 'sign-in-unreachable' is not hearing from Microsoft at all, or hearing that it is having a bad
+// moment (wait and try again; the saved sign-in is as good as it was). Every request is bounded:
+// a hung connection must not hold a launch.
 export async function refreshAccount(account, { fetchImpl = fetch, now = Date.now } = {}) {
+  const unreachable = () => fail(`could not reach Microsoft to renew the sign-in for ${account.name}; check the internet connection and try again`, 'sign-in-unreachable')
+  const timed = (url, init) => fetchImpl(url, { ...init, signal: AbortSignal.timeout(STEP_TIMEOUT_MS) })
   const body = new URLSearchParams({ grant_type: 'refresh_token', client_id: MSA_CLIENT_ID, refresh_token: account.refreshToken, scope: SCOPES }).toString()
-  const res = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  let res
+  try {
+    res = await timed(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  } catch {
+    unreachable()
+  }
   const json = await bodyOf(res)
   if (!res.ok || !json.access_token) {
-    fail(`the saved sign-in for ${account.name} no longer works; run spawnloft client login again`)
+    // Only Microsoft's own refusal of the token ends a sign-in. Anything else (a busy server, a
+    // proxy's block page, a hotel's log-in page answering 200, a body cut short) says nothing
+    // about the token, which is as good as it was.
+    if (EXPIRED_ERRORS.includes(json.error)) {
+      fail(`the saved sign-in for ${account.name} no longer works; run spawnloft client login again`, 'sign-in-expired')
+    }
+    if (res.status >= 500 || res.status === 429 || res.status === 408) {
+      fail(`Microsoft's sign-in server could not renew the sign-in for ${account.name} just now (HTTP ${res.status}); try again in a few minutes`, 'sign-in-unreachable')
+    }
+    fail(`Microsoft's sign-in server did not answer as expected when renewing the sign-in for ${account.name} (HTTP ${res.status}); check the internet connection and try again`, 'sign-in-unreachable')
   }
   const refreshToken = json.refresh_token ?? account.refreshToken
-  return minecraftFromMicrosoft(json.access_token, refreshToken, { fetchImpl, now })
+  try {
+    return await minecraftFromMicrosoft(json.access_token, refreshToken, { fetchImpl: timed, now })
+  } catch (err) {
+    // Xbox's and Minecraft's own refusals are already sentences; a request that never got an
+    // answer is the connection again
+    if (!(err instanceof UserError)) unreachable()
+    throw err
+  }
 }
 
 export function loadAccounts() {
@@ -385,6 +421,10 @@ export async function accountFor(selector, { fetchImpl = fetch, now = Date.now }
     try {
       refreshed = await refreshAccount(account, { fetchImpl, now })
     } catch (err) {
+      // Only Microsoft saying the sign-in is over marks the account. A launch with the network
+      // down, or Xbox answering 503, used to mark it too, and Play then stayed greyed with "sign
+      // in again" long after the connection was back.
+      if (err?.code !== 'sign-in-expired') throw err
       // Marked on the entry (a time, no token values) so the accounts page can say "sign in
       // again"; a later login or refresh replaces the entry and clears it. The mark must not
       // hide the real error when the file cannot be written.

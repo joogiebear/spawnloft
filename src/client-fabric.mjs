@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -79,7 +80,11 @@ export async function ensureFabricProfile(mc, loader, { fetchImpl = fetchJson } 
   const safeLoader = assertSafeVersion(loader, 'Fabric loader version')
   const id = fabricVersionId(safeMc, safeLoader)
   const dest = versionJson(id)
-  if (fs.existsSync(dest)) return id
+  // A file that is there and reads as this profile is done. One cut short (a crash or a full disk
+  // while it was written) used to count as done too, and then failed to parse on every launch.
+  try {
+    if (JSON.parse(fs.readFileSync(dest, 'utf8'))?.id === id) return id
+  } catch { /* missing or damaged: fetched again */ }
   const json = await fetchImpl(`${META_URL}/versions/loader/${encodeURIComponent(safeMc)}/${encodeURIComponent(safeLoader)}/profile/json`, { label: `Fabric profile for ${safeMc} with loader ${safeLoader}` })
   if (json.id !== id) {
     fail('the Fabric meta answered for a different profile (expected ' + id + ', got ' + json.id + ')')
@@ -88,7 +93,10 @@ export async function ensureFabricProfile(mc, loader, { fetchImpl = fetchJson } 
     fail('the Fabric meta profile inherits from ' + json.inheritsFrom + ', not ' + safeMc)
   }
   fs.mkdirSync(versionDir(id), { recursive: true })
-  fs.writeFileSync(dest, JSON.stringify(json, null, 2))
+  // whole or not at all: a temp file of this write's own, renamed into place
+  const tmp = `${dest}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(json, null, 2))
+  fs.renameSync(tmp, dest)
   return id
 }
 

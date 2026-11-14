@@ -346,7 +346,9 @@ function jobUpdate(id, patch) {
   const job = jobs.get(id) ?? { id, stage: 'start', percent: null, message: '', done: false }
   Object.assign(job, patch)
   jobs.set(id, job)
-  for (const send of job.listeners ?? []) send(job)
+  // the stream's own bookkeeping stays here
+  const { listeners, ...shown } = job
+  for (const send of listeners ?? []) send(shown)
   // Map keeps insertion order, so this drops the oldest
   while (jobs.size > JOB_LIMIT) jobs.delete(jobs.keys().next().value)
 }
@@ -1115,6 +1117,8 @@ function clientProfileRow(p) {
     // the key may be a uuid; the page shows the name and tells offline from Microsoft by the type
     harness: p.harness, server: p.server, account: p.account, accountName: client.accountInfo(p.account).name, accountType: client.accountInfo(p.account).type, accountUuid: client.accountUuid(p.account), assistantAccount: p.assistantAccount,
     running: st.running, pid: st.pid, startedAt: st.startedAt, runningAccount: st.account, launchedBy: st.launchedBy, launchTarget: st.address ?? st.server,
+    // how its last game ended, when the panel saw it end: { code, signal, startedAt, endedAt, stopped }
+    lastExit: client.lastExit(p.name),
     // shown on the launcher's facts card; a browser tab cannot open it, so it shows the path
     folder: client.profileFolder(p.name),
   }
@@ -1173,9 +1177,11 @@ function launchJob(jobId, profileName, { startServer, ...opts }) {
     launchedBy: 'launcher',
     ensureServer: startServer ? startServerForLaunch : null,
     onStage: ({ stage, message }) => jobUpdate(jobId, { stage, message, percent: null }),
-    onProgress: ({ phase, done, total, bytes }) => jobUpdate(jobId, {
+    onProgress: ({ phase, done, total, bytes, fetching }) => jobUpdate(jobId, {
       stage: phase === 'harness mod' ? 'harness' : phase,
-      message: `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files · ${humanBytes(bytes)}`,
+      // nothing fetched so far in this step: the files on disk are being checked, not downloaded
+      // (a step that only ever counts files it fetches says so itself)
+      message: bytes || fetching ? `Downloading ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files${bytes ? ` · ${humanBytes(bytes)}` : ''}` : `Checking ${phase} · ${done.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} files`,
       percent: total ? Math.min(100, Math.round((done / total) * 100)) : null,
     }),
   })).then(

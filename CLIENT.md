@@ -347,8 +347,12 @@ redirect brings no cookie, and its one-time `state` is its proof):
 | `POST /api/client/accounts/default` `{ uuid }` | Sets the default account (`null` clears it) |
 | `DELETE /api/client/accounts/<uuid>` | Signs out a Microsoft account or removes an offline one |
 
-`refreshFailedAt` is set on a Microsoft account when a refresh at launch fails (the launch itself
-fails with "sign in again"); a new sign-in clears it. `expiresAt` is the day-long game token and
+`refreshFailedAt` is set on a Microsoft account when Microsoft refuses a refresh at launch (the
+launch fails with "sign in again", code `sign-in-expired`); a new sign-in clears it. A refresh
+that gets no answer (no internet, or Microsoft answering 5xx) sets nothing and has the code
+`sign-in-unreachable`: a launch to the title screen or to a SpawnLoft server that checks no
+accounts then goes ahead with the saved sign-in and a warning, and any other launch stops with
+that error. `expiresAt` is the day-long game token and
 means nothing about whether the account still works, which is why the launcher shows "sign in
 again" from `refreshFailedAt` and not from the expiry. Every write to `accounts.json` re-reads
 the file and changes only its own entry, so a sign-in in the launcher and a `client login` or
@@ -538,3 +542,25 @@ downloads. The panel, the launcher and the assistant's tools get the same words 
 - Drive the game through anything but the harness: no screen scraping, no input injection.
 - Create or delete profiles from an AI assistant. That stays with you, on the command line, so an
   assistant cannot fill the disk with game versions.
+
+## What a launch checks, and what it remembers
+
+- **Files are hashed once.** A library, asset or jar that passes its SHA-1 is noted in
+  `client/cache/verified.json` with its size and modification time, and later launches take a file
+  whose size and time still match as checked. A file that was replaced, cut short or touched is
+  hashed again and fetched again if it is wrong. `spawnloft client install <profile> --verify`
+  hashes every file of that profile's version again, whatever the list says, and repairs what is
+  wrong; deleting `verified.json` does the same for every version on the next launch.
+- **Downloads give up on a dead connection.** A file that gets no bytes for 30 seconds, or whose
+  connection is cut part way, is asked for again, three times in all, before the launch fails
+  with the code `download-failed`.
+- **How the game ended** is written to `client/run/<profile>/last-exit.json` (`code`, `signal`,
+  `startedAt`, `endedAt`, `stopped`) by the process that started it, and `GET /api/client/launcher`
+  and `GET /api/client/profiles` carry it as `lastExit` on each profile. It is `null` when nobody
+  saw the game end (the panel was restarted while it ran, or it was started from the command line).
+- **Whether a game is still running** is its saved process id, the program's name, on Linux the
+  process's own start time, and on every system a state file older than the machine's last start
+  counting as stopped.
+- **Refusals carry a code** beside the sentence, in the job's last event and in a route's error
+  body: `already-running`, `launching`, `download-failed`, `checksum-mismatch`, `sign-in-expired`,
+  `sign-in-unreachable`, and the version and Java codes listed above.

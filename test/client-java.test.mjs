@@ -116,7 +116,7 @@ test('a runtime is downloaded once, recorded, and repaired by size', async () =>
   assert.equal(calls.length, 5, 'the manifest and four files')
   assert.ok(calls.every((u) => !/lzma/.test(u)))
   assert.equal(fs.readFileSync(path.join(dir, 'lib', 'modules'), 'utf8'), 'runtime file lib/modules\n')
-  assert.deepEqual(progress.at(-1), { phase: 'java', done: 4, total: 4, bytes: progress.at(-1).bytes })
+  assert.deepEqual(progress.at(-1), { phase: 'java', done: 4, total: 4, bytes: progress.at(-1).bytes, fetching: true })
   if (process.platform !== 'win32') {
     assert.equal(fs.statSync(r.javaPath).mode & 0o111, 0o111, 'executable from the manifest')
     assert.equal(fs.statSync(path.join(dir, 'release')).mode & 0o111, 0)

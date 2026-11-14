@@ -10,8 +10,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-client-lifecycle-'))
 process.env.MCCTL_DATA_ROOT = scratch
 
-const { launch, status, stop, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
-const { readClientState } = await import('../src/client-launch.mjs')
+const { launch, status, stop, lastExit, tailClientLog, createProfile, removeProfile } = await import('../src/client.mjs')
+const { readClientState, fromBeforeBoot, procStartTicks } = await import('../src/client-launch.mjs')
 const { clientStateFile, clientRunDir, clientLaunchLock, versionDir, versionJson, ASSETS_DIR, profileDir } = await import('../src/client-paths.mjs')
 
 const fakeJava = path.join(here, 'fixtures', 'fake-client.mjs')
@@ -347,4 +347,63 @@ test("with no Java that fits, launch downloads Mojang's runtime and runs the gam
     try { await stop('mojang-java') } catch { /* not running */ }
     removeProfile('mojang-java')
   }
+})
+
+// ---- how the game ended, and whether a state file is still this game's ----
+
+const untilExit = async (name, pid) => {
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
+    const rec = lastExit(name)
+    if (rec && !status(name).running && Date.parse(rec.endedAt) >= pid.since) return rec
+    await new Promise((r) => setTimeout(r, 30))
+  }
+  return lastExit(name)
+}
+
+test('the exit of a game is recorded: stopped from here, or gone by itself with its code', async () => {
+  createProfile('ends', { mc })
+  assert.equal(lastExit('ends'), null, 'never run')
+  let since = Date.now()
+  await launch('ends', { fakeJava })
+  const startedAt = status('ends').startedAt
+  await stop('ends')
+  const asked = await untilExit('ends', { since })
+  assert.equal(asked.stopped, true)
+  assert.equal(asked.startedAt, startedAt, 'kept although Stop removes the state file first')
+  assert.ok(!('pid' in asked))
+
+  since = Date.now()
+  process.env.FAKE_CLIENT_FAIL = 'window'
+  try { await launch('ends', { fakeJava }) } finally { delete process.env.FAKE_CLIENT_FAIL }
+  const crashed = await untilExit('ends', { since })
+  assert.equal(crashed.stopped, false)
+  assert.equal(crashed.code, 1)
+  assert.ok(Date.parse(crashed.endedAt) >= Date.parse(crashed.startedAt))
+})
+
+test('a state file from before this machine started is nobody\'s game', () => {
+  const now = Date.parse('2026-11-14T12:00:00Z')
+  const uptime = 3600
+  assert.equal(fromBeforeBoot('2026-11-14T10:30:00Z', { now, uptime }), true)
+  assert.equal(fromBeforeBoot('2026-11-14T11:30:00Z', { now, uptime }), false)
+  assert.equal(fromBeforeBoot('2026-11-14T10:59:30Z', { now, uptime }), false, 'within the slack for a clock set at boot')
+  assert.equal(fromBeforeBoot('not a date', { now, uptime }), false)
+  // the live process's pid under the right name, but written before boot
+  fs.mkdirSync(path.dirname(clientStateFile('life')), { recursive: true })
+  fs.writeFileSync(clientStateFile('life'), JSON.stringify({ pid: process.pid, javaExe: path.basename(process.execPath), startedAt: new Date(Date.now() - os.uptime() * 1000 - 3600000).toISOString() }))
+  assert.equal(readClientState('life'), null)
+})
+
+test('the start time of a process is read from its stat line, whatever its name holds', { skip: process.platform !== 'linux' }, () => {
+  const line = '4242 (java) x) S 1 4242 4242 0 -1 4194304 100 0 0 0 5 3 0 0 20 0 30 0 987654 1000 200 18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0'
+  assert.equal(procStartTicks(4242, () => line), '987654')
+  assert.equal(procStartTicks(4242, () => { throw new Error('gone') }), null)
+  assert.match(procStartTicks(process.pid), /^\d+$/)
+  // the same live pid and name with another start time is another process
+  fs.writeFileSync(clientStateFile('life'), JSON.stringify({ pid: process.pid, javaExe: path.basename(process.execPath), startedAt: new Date().toISOString(), procStart: '1' }))
+  assert.equal(readClientState('life'), null)
+  fs.writeFileSync(clientStateFile('life'), JSON.stringify({ pid: process.pid, javaExe: path.basename(process.execPath), startedAt: new Date().toISOString(), procStart: procStartTicks(process.pid) }))
+  assert.equal(readClientState('life')?.pid, process.pid)
+  fs.rmSync(clientStateFile('life'), { force: true })
 })

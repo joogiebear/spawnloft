@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
 import dns from 'node:dns'
 import net from 'node:net'
-import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
+import { PROFILES_FILE, profileDir, versionJson, versionJar, versionsDir, clientLog, clientRunDir, clientLastExit, CLIENT_CACHE_DIR, clientLaunchLock } from './client-paths.mjs'
 import { readJson, writeJson, fail, validateName, acquireLock, lockHolder, sleep } from './util.mjs'
 import { checkCancelled } from './cancel.mjs'
 import { parseMemoryGb, getInstance, isDatabase } from './registry.mjs'
@@ -15,7 +15,7 @@ import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install
 import { plainClientLog } from './client-log.mjs'
 import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRefusal, nativeArches } from './client-meta.mjs'
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
-import { buildCommand, spawnClient, readClientState, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
+import { buildCommand, spawnClient, readClientState, readLastExit, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
 import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
 import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
@@ -216,11 +216,11 @@ export function updateProfile(name, patch, { launching = false } = {}) {
   const existing = getProfile(name)
   const changing = RUNNING_KEYS.filter((k) => Object.hasOwn(patch, k) && patch[k] !== existing[k])
   if (changing.length && status(name).running) {
-    fail(`profile "${name}" is running; stop it before changing ${changing.join(', ')}: spawnloft client stop ${name}`)
+    fail(`profile "${name}" is running; stop it before changing ${changing.join(', ')}: spawnloft client stop ${name}`, 'already-running')
   }
   // a launch under way read the profile at its start and reads it again while it downloads
   if (changing.length && !launching && lockHolder(clientLaunchLock(name)) !== null) {
-    fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it before changing ${changing.join(', ')}`)
+    fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it before changing ${changing.join(', ')}`, 'launching')
   }
   // a loader build is made for one Minecraft version; the next launch picks one for the new version
   if (Object.hasOwn(patch, 'mc') && patch.mc !== existing.mc && (!Object.hasOwn(patch, 'loaderVersion') || patch.loaderVersion === existing.loaderVersion)) {
@@ -254,6 +254,8 @@ export function removeProfile(name, { purge = false } = {}) {
     release()
   }
   if (purge) fs.rmSync(clientRunDir(name), PURGE)
+  // how the last game ended belongs to this profile, not to a later one of the same name
+  else fs.rmSync(clientLastExit(name), { force: true })
 }
 
 function holderText(name) {
@@ -338,7 +340,7 @@ export async function launch(name, opts = {}) {
   // taken over (see acquireLock); one held by this very process counts as held, which is the
   // panel's two Play clicks.
   const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })
-  if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`)
+  if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`, 'launching')
   try {
     return await launchLocked(name, opts)
   } finally {
@@ -371,7 +373,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   const profile = getProfile(name)
   const st = status(name)
   if (st.running) {
-    fail(`profile "${name}" is already running (pid ${st.pid}); stop it first`)
+    fail(`profile "${name}" is already running (pid ${st.pid}); stop it first`, 'already-running')
   }
   // a machine Mojang never built for is refused before Java is looked for or anything downloads
   const machineRefusal = platformRefusal(null, os)
@@ -511,7 +513,25 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   }
 
   checkCancelled()
-  const account = selector ? await accountFor(selector) : offlineAccount(playerName ?? defaultPlayerName(name))
+  let account
+  if (!selector) {
+    account = offlineAccount(playerName ?? defaultPlayerName(name))
+  } else {
+    try {
+      account = await accountFor(selector)
+    } catch (err) {
+      // No word from Microsoft is no reason to keep someone out of their own single-player world,
+      // or off a local server that checks no accounts: the game starts with the sign-in as it was
+      // saved, as Mojang's launcher does offline. Anywhere that checks the account (an address
+      // out on the network, a server in online mode) would only show "Invalid session", so there
+      // the launch stops with the reason instead.
+      if (err?.code !== 'sign-in-unreachable' || address || (target && serverChecksAccounts(target))) throw err
+      account = peekAccount(selector)
+      const w = `could not reach Microsoft to renew the sign-in for ${account.name}, so the game starts with the saved one; servers that check accounts will refuse it until this computer is online again`
+      warnings.push(w)
+      onWarning(w)
+    }
+  }
   checkCancelled()
   // last before the game, so a failed download or sign-in does not leave a server started for nothing
   if (stopped && ensureServer) {
@@ -684,6 +704,15 @@ function serverCheck(server, account) {
   return { refusal, warnings, stopped }
 }
 
+// Whether a SpawnLoft server checks accounts with Mojang (online-mode); unknown counts as yes.
+function serverChecksAccounts(server) {
+  try {
+    return checkInstance(server).problems.some((p) => /runs in online mode/.test(p))
+  } catch {
+    return true
+  }
+}
+
 function onlineModeRefusal(server, playerName) {
   return `server "${server}" runs in online mode and ${playerName} is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server`
 }
@@ -714,6 +743,13 @@ export function status(name) {
     address: st?.address ?? null,
     harness: st?.harness ? { port: readHarnessFile(name, { pid: st.pid })?.port ?? null } : null,
   }
+}
+
+// How the profile's last game ended, without the pid: null when no exit was seen (the game
+// outlived the process that started it, or has never run).
+export function lastExit(name) {
+  const rec = readLastExit(name)
+  return rec ? { code: rec.code, signal: rec.signal, startedAt: rec.startedAt, endedAt: rec.endedAt, stopped: Boolean(rec.stopped) } : null
 }
 
 const sessions = new Map()
