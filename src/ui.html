@@ -1861,6 +1861,8 @@
   /* Names are short; a field the width of the pane reads as a search over something far bigger. */
   .who-bar input[type="search"] { flex: 0 1 360px; min-width: 160px; }
   .who-bar .filters { margin-left: auto; }
+  .who-wl { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; margin-bottom: var(--s-3); }
+  .who-wl label { font-weight: 600; cursor: pointer; }
 
   .people { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
   .who {
@@ -5699,7 +5701,7 @@ function activityIcon(action) {
   if (/^plugin/.test(action)) return 'plug';
   if (/^(file|folder|config|undo)/.test(action)) return 'file';
   if (/^world/.test(action)) return 'map';
-  if (/^player/.test(action)) return 'user';
+  if (/^(player|whitelist)/.test(action)) return 'user';
   if (action === 'command') return 'terminal';
   if (action === 'crash' || action === 'kill') return 'alert';
   if (action === 'start' || action === 'stop') return 'pulse';
@@ -7675,7 +7677,40 @@ const PLAYER_FILTERS = [
   { key: 'all', label: 'Everyone', match: () => true },
   { key: 'operators', label: 'Operators', match: (p) => p.op },
   { key: 'banned', label: 'Banned', match: (p) => p.banned },
+  { key: 'whitelisted', label: 'Whitelisted', match: (p) => p.whitelisted },
 ];
+
+/** The line beside the whitelist switch: what its state means for who gets in. */
+function whitelistWords(on, listed) {
+  if (!on) return 'Off. Anyone can join' + (listed ? '; the ' + listed + ' on the list ' + (listed === 1 ? 'is' : 'are') + ' not checked.' : '.');
+  if (!listed) return 'On, with nobody on the list: nobody can join. Add the people who should get in.';
+  return 'On. Only the ' + (listed === 1 ? 'one player' : listed + ' players') + ' on the list can join.';
+}
+
+/** The Add a player dialog: a name, and what to do with them. */
+function addPlayerQuestion(data) {
+  return {
+    title: 'Add a player',
+    text: data.running
+      ? 'For someone who has not joined yet. The server finds them by name.'
+      : data.onlineMode === false
+        ? 'For someone who has not joined yet. The name has to be exactly the one they will join with.'
+        : 'For someone who has not joined yet. The name is looked up with Mojang, which needs the internet.',
+    input: { label: 'Player name', value: '', placeholder: 'Steve', required: true },
+    choices: [
+      { value: 'whitelist', label: 'Put them on the whitelist', hint: data.whitelistOn ? 'They can join.' : 'Counts once the whitelist is turned on.' },
+      { value: 'op', label: 'Make them an operator', hint: 'Operators can run every command on this server.' },
+      { value: 'ban', label: 'Ban them', hint: 'They cannot join.' },
+    ],
+    confirmLabel: 'Add',
+  };
+}
+
+/** What to say once someone was added by name. */
+function addedWords(out) {
+  const done = { whitelist: ' is on the whitelist.', op: ' is now an operator.', ban: ' is banned.' }[out.as] || ' was added.';
+  return playerChangeWords(out, out.name + done);
+}
 
 /** Kept across renders so filtering, searching and the chosen player do not lose their place on a refresh. */
 const playerView = { filter: 'all', search: '', selected: null };
@@ -7771,9 +7806,61 @@ async function renderPlayers(opts) {
     : 'Changes are written to the server\u2019s files, and take effect the next time it starts.';
   body.append(how);
 
+  // ---- the whitelist: its switch, here with the list it is about -----------
+  const listedCount = data.players.filter((p) => p.whitelisted).length;
+  const wl = document.createElement('div');
+  wl.className = 'who-wl';
+  const wlSwitch = document.createElement('input');
+  wlSwitch.type = 'checkbox';
+  wlSwitch.className = 'switch';
+  wlSwitch.id = 'playersWhitelist';
+  wlSwitch.checked = Boolean(data.whitelistOn);
+  const wlName = document.createElement('label');
+  wlName.htmlFor = wlSwitch.id;
+  wlName.textContent = 'Whitelist';
+  const wlSays = document.createElement('span');
+  wlSays.className = 'hint';
+  wlSays.id = 'playersWhitelistSays';
+  wlSays.textContent = whitelistWords(Boolean(data.whitelistOn), listedCount);
+  wlSwitch.setAttribute('aria-describedby', wlSays.id);
+  wl.append(wlSwitch, wlName, wlSays);
+  body.append(wl);
+  wlSwitch.onchange = async () => {
+    const on = wlSwitch.checked;
+    // turned on with nobody on it, a running server lets nobody in from the next join on
+    if (on && !listedCount && !(await ask({
+      title: 'Turn the whitelist on with nobody on it?',
+      text: 'Nobody will be able to join until someone is added. People already connected stay.',
+      confirmLabel: 'Turn on',
+    }))) { wlSwitch.checked = false; return; }
+    wlSwitch.disabled = true;
+    try {
+      const out = await post(base + '/whitelist-mode', { on });
+      const said = playerChangeWords(out, on ? 'The whitelist is on.' : 'The whitelist is off.');
+      toast(said.text, said.tone);
+      await again();
+    } catch (e) {
+      toast(e.message, 'bad');
+      wlSwitch.checked = !on;
+      wlSwitch.disabled = false;
+    }
+  };
+
   // ---- search and filter ---------------------------------------------------
   const bar = document.createElement('div');
   bar.className = 'who-bar';
+  const addBtn = iconButton('plus', 'Add a player');
+  addBtn.onclick = async () => {
+    const got = await ask({
+      ...addPlayerQuestion(data),
+      submit: ({ text, choice }) => post(base + '/add', { name: text, as: choice }),
+    });
+    if (!got || !got.out) return;
+    const said = addedWords(got.out);
+    toast(said.text, said.tone);
+    if (got.out.as === 'whitelist') playerView.filter = 'whitelisted';
+    await again();
+  };
   const search = document.createElement('input');
   search.type = 'search';
   search.placeholder = 'Search by name or id';
@@ -7788,6 +7875,7 @@ async function renderPlayers(opts) {
     all: data.players.length,
     operators: data.players.filter((p) => p.op).length,
     banned: data.players.filter((p) => p.banned).length,
+    whitelisted: listedCount,
   };
   for (const f of PLAYER_FILTERS) {
     const b = document.createElement('button');
@@ -7802,7 +7890,7 @@ async function renderPlayers(opts) {
     b.onclick = () => { playerView.filter = f.key; paint(); };
     filters.append(b);
   }
-  bar.append(search, filters);
+  bar.append(search, addBtn, filters);
   body.append(bar);
 
   // The list, and on an Ultra pane the chosen player's record beside it. The record is built for
@@ -7830,7 +7918,7 @@ async function renderPlayers(opts) {
     list.textContent = '';
     if (!data.players.length) {
       list.append(emptyState('user', 'Nobody has joined this server, and nobody is opped, banned '
-        + 'or whitelisted. People appear here the first time the server hears of them.'));
+        + 'or whitelisted. People appear here the first time they join, or when you add them by name.'));
       return;
     }
     if (!shown.length) {
@@ -8053,13 +8141,15 @@ function playerRow(p, data, base, again, select) {
   const banBtn = document.createElement('button');
   banBtn.className = p.banned ? '' : 'danger';
   banBtn.textContent = p.banned ? 'Unban' : 'Ban';
+  const wlBtn = document.createElement('button');
+  wlBtn.textContent = p.whitelisted ? 'Off whitelist' : 'Whitelist';
   const wipe = iconButton('trash', 'Delete data', 'danger');
   wipe.disabled = data.running || !p.joined;
   wipe.title = data.running
     ? 'Stop the server first - a running one writes this straight back'
     : p.joined ? 'Remove this player\u2019s inventory, position, stats and advancements'
       : 'This player has no world data to delete';
-  acts.append(opBtn, banBtn, wipe);
+  acts.append(wlBtn, opBtn, banBtn, wipe);
   el.append(name, meta, seen, id, acts);
 
   const label = p.name || p.uuid.slice(0, 8);
@@ -8077,6 +8167,10 @@ function playerRow(p, data, base, again, select) {
       busy(false);
     }
   };
+
+  wlBtn.setAttribute('aria-label', (p.whitelisted ? 'Take ' + label + ' off the whitelist' : 'Put ' + label + ' on the whitelist'));
+  wlBtn.onclick = () => run('/whitelist', { uuid: p.uuid, on: !p.whitelisted },
+    p.whitelisted ? label + ' is off the whitelist.' : label + ' is on the whitelist.' + (data.whitelistOn ? '' : ' The whitelist itself is off.'));
 
   opBtn.onclick = async () => {
     if (p.op) return run('/op', { uuid: p.uuid, on: false }, label + ' is no longer an operator.');
@@ -10841,6 +10935,7 @@ const ACTIVITY_TEXT = {
   'plugin-install': 'Installed', 'plugin-update': 'Updated', 'plugin-enable': 'Turned on', 'plugin-disable': 'Turned off', 'plugin-remove': 'Removed',
   upgrade: 'Changed the server software:', 'world-activate': 'Switched to the world', 'world-import': 'Imported the world', 'world-delete': 'Deleted the world',
   'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
+  'player-whitelist': 'Whitelisted', 'player-unwhitelist': 'Took off the whitelist:', 'whitelist-on': 'Turned the whitelist on', 'whitelist-off': 'Turned the whitelist off',
   'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
   'schedule-run': 'Ran the schedule now:',
   create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset:', delete: 'Removed this server:',

@@ -905,3 +905,33 @@ test('a chart says in words what its line shows', () => {
   assert.equal(chartWords('Memory', 'no readings yet', '', 60), 'Memory, last minute: no readings yet')
   assert.equal(chartWords('TPS', '19.9', '', 7), 'TPS: 19.9')
 })
+
+test('the whitelist says what its state means, and a player can be added by name', () => {
+  const { whitelistWords, addPlayerQuestion, addedWords } = lifted(['whitelistWords', 'addPlayerQuestion', 'playerChangeWords', 'addedWords'])
+  assert.equal(whitelistWords(false, 0), 'Off. Anyone can join.')
+  assert.equal(whitelistWords(false, 3), 'Off. Anyone can join; the 3 on the list are not checked.')
+  assert.equal(whitelistWords(true, 1), 'On. Only the one player on the list can join.')
+  assert.equal(whitelistWords(true, 4), 'On. Only the 4 players on the list can join.')
+  // on with nobody listed locks everyone out, and says so
+  assert.match(whitelistWords(true, 0), /nobody can join/)
+
+  const stopped = addPlayerQuestion({ running: false, onlineMode: true, whitelistOn: false })
+  assert.match(stopped.text, /looked up with Mojang/)
+  assert.deepEqual(stopped.choices.map((c) => c.value), ['whitelist', 'op', 'ban'])
+  assert.match(stopped.choices[0].hint, /once the whitelist is turned on/)
+  assert.equal(stopped.input.required, true)
+  assert.match(addPlayerQuestion({ running: true, whitelistOn: true }).text, /server finds them/)
+  assert.equal(addPlayerQuestion({ running: true, whitelistOn: true }).choices[0].hint, 'They can join.')
+  assert.match(addPlayerQuestion({ running: false, onlineMode: false }).text, /exactly the one they will join with/)
+
+  assert.deepEqual(addedWords({ as: 'whitelist', name: 'Alex' }), { text: 'Alex is on the whitelist.', tone: 'good' })
+  assert.deepEqual(addedWords({ as: 'ban', name: 'Griefer', took: true }), { text: 'Griefer is banned.', tone: 'good' })
+  // a running server that did not do it is not a success
+  const refused = addedWords({ as: 'op', name: 'Ghost', took: false, reply: 'That player does not exist' })
+  assert.equal(refused.tone, '')
+  assert.match(refused.text, /That player does not exist/)
+  // the dialog stays open on a refusal: the request is made from inside it
+  assert.match(html, /submit: \(\{ text, choice \}\) => post\(base \+ '\/add', \{ name: text, as: choice \}\)/)
+  // Settings no longer sends anyone to the console for this
+  assert.ok(!html.includes('whitelist add <name>'))
+})

@@ -353,7 +353,7 @@ const EDITABLE_PROPS = [
   { key: 'gamemode', group: 'gameplay', label: 'Default game mode', type: 'enum', fallback: 'survival', options: ['survival', 'creative', 'adventure', 'spectator'] },
   { key: 'max-players', group: 'access', label: 'Max players', type: 'int', fallback: '20', min: 1, max: 1000 },
   { key: 'pvp', group: 'gameplay', label: 'PvP', type: 'bool', fallback: 'true' },
-  { key: 'white-list', group: 'access', label: 'Whitelist', type: 'bool', fallback: 'false', note: 'Only listed players can join. Add them from the console with "whitelist add <name>".' },
+  { key: 'white-list', group: 'access', label: 'Whitelist', type: 'bool', fallback: 'false', note: 'Only listed players can join. The list is on the Players page, where people are added by name.' },
   { key: 'view-distance', group: 'world', label: 'View distance', type: 'int', fallback: '10', min: 2, max: 32 },
   { key: 'spawn-protection', group: 'gameplay', label: 'Spawn protection', type: 'int', fallback: '16', min: 0, max: 256 },
 ]
@@ -1183,11 +1183,25 @@ async function handlePlayers(req, res, name, seg) {
       running: supervisor.isRunning(name),
       // names can only be recovered in online mode
       onlineMode: safeInstance(supervisor.statusOf(name)).onlineMode,
+      whitelistOn: players.whitelistOn(inst),
     })
   }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
 
   const body = await readBody(req)
+  // the switch: whether only listed players can join
+  if (verb === 'whitelist-mode') {
+    const out = await players.setWhitelistOn(inst, body.on !== false)
+    activity.record(name, body.on !== false ? 'whitelist-on' : 'whitelist-off')
+    return json(res, 200, out)
+  }
+  // someone by name, who may never have joined
+  if (verb === 'add') {
+    const out = await players.addByName(inst, body.name, String(body.as ?? ''), { reason: body.reason })
+    const action = { whitelist: 'player-whitelist', op: 'player-op', ban: 'player-ban' }[out.as]
+    if (out.took !== false) activity.record(name, action, { detail: out.name + (out.as === 'ban' && body.reason ? `: ${body.reason}` : '') })
+    return json(res, 200, out)
+  }
   if (!body.uuid) return json(res, 400, { error: 'which player?' })
   const uuid = String(body.uuid)
 
@@ -1200,6 +1214,11 @@ async function handlePlayers(req, res, name, seg) {
   if (verb === 'ban') {
     const out = await players.setBan(inst, uuid, body.on !== false, body.reason)
     activity.record(name, body.on !== false ? 'player-ban' : 'player-unban', { detail: who() + (body.on !== false && body.reason ? `: ${body.reason}` : '') })
+    return json(res, 200, out)
+  }
+  if (verb === 'whitelist') {
+    const out = await players.setWhitelisted(inst, uuid, body.on !== false)
+    activity.record(name, body.on !== false ? 'player-whitelist' : 'player-unwhitelist', { detail: who() })
     return json(res, 200, out)
   }
   if (verb === 'forget') {

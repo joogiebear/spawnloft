@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { readProps } from './props.mjs'
+import { readProps, writeProps } from './props.mjs'
 import { fail, writeJson, withLock } from './util.mjs'
+import { offlineUuid } from './client-auth.mjs'
 import { rconExec, stripColors } from './rcon.mjs'
 import * as supervisor from './supervisor.mjs'
 
@@ -169,7 +170,7 @@ function requireName(who, verb) {
   fail(
     `SpawnLoft does not know the name behind ${who.uuid}, and ${verb} needs one. Offline-mode ids are `
       + 'made by hashing a name, so they cannot be turned back into one - have the player join '
-      + 'once while the server is running, or type the name in yourself.',
+      + 'once while the server is running, or add them by name with "Add a player".',
   )
 }
 
@@ -202,8 +203,12 @@ function listed(dir, file, who) {
 }
 
 // `running` and `exec` are the server's state and its console, named so a test can stand in for both.
-export async function setOp(inst, uuid, on, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
-  const who = findPlayer(inst, uuid)
+export async function setOp(inst, uuid, on, opts) {
+  return applyOp(inst, findPlayer(inst, uuid), on, opts)
+}
+
+// `who` is { uuid, name }: someone the server has a record of, or someone just looked up by name
+async function applyOp(inst, who, on, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
   if (running) {
     const name = requireName(who, on ? 'opping' : 'deopping')
     const [reply] = await exec(inst, [`${on ? 'op' : 'deop'} ${name}`])
@@ -225,8 +230,11 @@ export async function setOp(inst, uuid, on, { running = supervisor.isRunning(ins
   return { uuid: who.uuid, op: on, via: 'file' }
 }
 
-export async function setBan(inst, uuid, on, reason, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
-  const who = findPlayer(inst, uuid)
+export async function setBan(inst, uuid, on, reason, opts) {
+  return applyBan(inst, findPlayer(inst, uuid), on, reason, opts)
+}
+
+async function applyBan(inst, who, on, reason, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
   const why = String(reason || '').trim().slice(0, 200)
   if (running) {
     const name = requireName(who, on ? 'banning' : 'pardoning')
@@ -251,6 +259,106 @@ export async function setBan(inst, uuid, on, reason, { running = supervisor.isRu
     return filtered
   })
   return { uuid: who.uuid, banned: on, via: 'file' }
+}
+
+// On or off the whitelist. Being on it only matters while the whitelist itself is on (below).
+export async function setWhitelisted(inst, uuid, on, opts) {
+  return applyWhitelist(inst, findPlayer(inst, uuid), on, opts)
+}
+
+async function applyWhitelist(inst, who, on, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
+  if (running) {
+    const name = requireName(who, on ? 'whitelisting' : 'taking someone off the whitelist')
+    const [reply] = await exec(inst, [`whitelist ${on ? 'add' : 'remove'} ${name}`])
+    return { uuid: who.uuid, whitelisted: on, via: 'console', reply: stripColors(reply || '').trim(), took: listed(inst.dir, WHITELIST, who) === on }
+  }
+  updateList(inst.dir, WHITELIST, (rows) => {
+    const filtered = rows.filter((r) => String(r.uuid).toLowerCase() !== who.uuid)
+    if (on) filtered.push({ uuid: who.uuid, name: who.name || '' })
+    return filtered
+  })
+  return { uuid: who.uuid, whitelisted: on, via: 'file' }
+}
+
+const propsFile = (inst) => path.join(inst.dir, 'server.properties')
+
+/** Whether only listed players can join. */
+export function whitelistOn(inst) {
+  return readProps(propsFile(inst)).get('white-list') === 'true'
+}
+
+// The switch itself. A running server is told, and the file is written as well once it says it
+// did: Paper turns the whitelist on or off in memory and leaves server.properties as it was, so
+// the change was gone at the next start and this page went on showing the old state. A stopped
+// server has only the file. `enforce-whitelist` is left as it is: it decides whether people
+// already connected are removed, which is the owner's call in Settings.
+export async function setWhitelistOn(inst, on, { running = supervisor.isRunning(inst.name), exec = rconExec } = {}) {
+  if (running) {
+    const [raw] = await exec(inst, [`whitelist ${on ? 'on' : 'off'}`])
+    const reply = stripColors(raw || '').trim()
+    // "Whitelist is now turned on", or "Whitelist is already turned on": both are the state asked for
+    const took = new RegExp(`(now|already) turned ${on ? 'on' : 'off'}`, 'i').test(reply)
+    if (took) writeProps(propsFile(inst), { 'white-list': on ? 'true' : 'false' })
+    return { on, via: 'console', reply, took }
+  }
+  writeProps(propsFile(inst), { 'white-list': on ? 'true' : 'false' })
+  return { on, via: 'file' }
+}
+
+// What a player name can be. Mojang's own are 3 to 16 of these; older accounts and offline-mode
+// servers have shorter ones, so only the characters and the upper length are held to.
+const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/
+const ADD_AS = ['whitelist', 'op', 'ban']
+
+/**
+ * Mojang's public answer to "whose name is this": { uuid, name } with the name as the account
+ * spells it, or null when no account has it. Only the name typed is sent.
+ */
+export async function mojangLookup(name, { fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(8000) })
+  if (res.status === 204 || res.status === 404) return null
+  if (!res.ok) throw new Error(`Mojang answered ${res.status}`)
+  const body = await res.json()
+  const hex = String(body.id || '').toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(hex)) throw new Error('Mojang sent an answer SpawnLoft could not read')
+  return { uuid: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`, name: String(body.name || name) }
+}
+
+/**
+ * Whitelist, op or ban someone by name, whether or not they have ever joined.
+ *
+ * A running server is told the name and finds the player itself, as it does for a command typed
+ * in its console. A stopped one cannot: on a server that checks accounts the name is looked up
+ * with Mojang, and on one that does not the id is the one such a server makes from the name.
+ */
+export async function addByName(inst, rawName, as, { reason, running = supervisor.isRunning(inst.name), exec = rconExec, lookup = mojangLookup } = {}) {
+  const name = String(rawName ?? '').trim()
+  if (!PLAYER_NAME.test(name)) fail('A player name is up to 16 letters, digits or underscores, with no spaces.')
+  if (!ADD_AS.includes(as)) fail(`unknown way to add a player: ${as}`)
+  const apply = (who, opts) => (as === 'whitelist' ? applyWhitelist(inst, who, true, opts)
+    : as === 'op' ? applyOp(inst, who, true, opts)
+      : applyBan(inst, who, true, reason, opts))
+
+  // someone the server already knows keeps the id it knows them by
+  const known = listPlayers(inst).find((p) => (p.name || '').toLowerCase() === name.toLowerCase())
+  let who = known ? { uuid: known.uuid, name: known.name } : null
+  if (!who && running) who = { uuid: '', name }
+  if (!who) {
+    const checksAccounts = readProps(propsFile(inst)).get('online-mode') !== 'false'
+    if (!checksAccounts) who = { uuid: offlineUuid(name), name }
+    else {
+      let found
+      try {
+        found = await lookup(name)
+      } catch (err) {
+        fail(`Could not look up "${name}" with Mojang (${err?.message ?? err}). Check the connection, or start the server and add them again: a running server finds players itself.`)
+      }
+      if (!found) fail(`No Minecraft account is called "${name}". Check the spelling.`)
+      who = found
+    }
+  }
+  const out = await apply(who, { running, exec })
+  return { ...out, name: who.name, as }
 }
 
 // ban timestamps look like 2026-08-30 18:41:07 -0500, not ISO
