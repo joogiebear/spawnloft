@@ -1,0 +1,38 @@
+{
+  "net.fabricmc:sponge-mixin:0.17.4+mixin.0.8.7": {
+    "url": "https://maven.fabricmc.net/net/fabricmc/sponge-mixin/0.17.4+mixin.0.8.7/sponge-mixin-0.17.4+mixin.0.8.7.jar",
+    "sha1": "5f66cc9f59b8efaa942155a3d5a30599bf6640dd"
+  },
+  "org.quiltmc:quilt-json5:1.0.4+final": {
+    "url": "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-json5/1.0.4+final/quilt-json5-1.0.4+final.jar",
+    "sha1": "c7705a5fca3d4e85a8c8a1fc0c6c5758c0a0325c"
+  },
+  "org.ow2.asm:asm:9.10.1": {
+    "url": "https://maven.fabricmc.net/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+    "sha1": "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236"
+  },
+  "org.ow2.asm:asm-analysis:9.10.1": {
+    "url": "https://maven.fabricmc.net/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar",
+    "sha1": "8d49f14d51f632cb1d87c88d1ceaf50db0d8af1b"
+  },
+  "org.ow2.asm:asm-commons:9.10.1": {
+    "url": "https://maven.fabricmc.net/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+    "sha1": "4229e4c55fd8e01c23f9fe9884075cc628aacc50"
+  },
+  "org.ow2.asm:asm-tree:9.10.1": {
+    "url": "https://maven.fabricmc.net/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+    "sha1": "e244332a17564c1d1572449399a842de35881be2"
+  },
+  "org.ow2.asm:asm-util:9.10.1": {
+    "url": "https://maven.fabricmc.net/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar",
+    "sha1": "7bb9d450e8d4cbf9f9e04096c44bbfe7fba80b15"
+  },
+  "org.quiltmc:quilt-config:1.3.3": {
+    "url": "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-config/1.3.3/quilt-config-1.3.3.jar",
+    "sha1": "0545505bf3582359ec2bcafb14435a0621bca583"
+  },
+  "org.quiltmc:quilt-loader:0.30.2": {
+    "url": "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-loader/0.30.2/quilt-loader-0.30.2.jar",
+    "sha1": "6d9a96b5d366ea2d7c008a182c5148080dadfacb"
+  }
+}
