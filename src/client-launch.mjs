@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 
 import { currentOs, jvmArguments, gameArguments, libraries, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
 import { launchFeatures } from './client-version.mjs'
-import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLastExit, clientLog, logConfigPath } from './client-paths.mjs'
+import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLastExit, clientPlayed, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
 import { writeJson, readJson, fail, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
@@ -187,6 +187,7 @@ export async function spawnClient(command, { name, state }) {
   }
   child.on('exit', (code, signal) => {
     const mine = readJson(clientStateFile(name), null)?.pid === child.pid
+    if (startedAt) notePlayed(name, (rec) => ({ ...rec, totalMs: rec.totalMs + Math.max(0, Date.now() - Date.parse(startedAt)) }))
     try {
       writeJson(clientLastExit(name), {
         pid: child.pid,
@@ -224,6 +225,7 @@ export async function spawnClient(command, { name, state }) {
         // the version's Java, arch and folders as launch decided them (client-version)
         launch: state.launch ?? null,
       }, { mode: PRIVATE_FILE_MODE })
+      notePlayed(name, (rec) => ({ ...rec, lastPlayedAt: startedAt, launches: rec.launches + 1 }))
       child.unref()
       resolve({ pid: child.pid, child })
     })
@@ -235,6 +237,25 @@ export async function spawnClient(command, { name, state }) {
 // (the CLI stopping a game the panel started)
 const stopAsked = new Set()
 const stopMark = (name) => path.join(clientRunDir(name), 'stop-asked.json')
+
+// When a profile was last played, how many times, and for how long in all. The time is added
+// when the game exits, by the process that started it: a game started by a CLI command that has
+// since ended counts as a launch and adds no time.
+export function readPlayed(name) {
+  let rec = null
+  try { rec = readJson(clientPlayed(name), null) } catch { /* unreadable: starts again */ }
+  // no record yet (a profile older than the record): the last game known to have ended says when
+  const known = typeof rec?.lastPlayedAt === 'string' ? rec.lastPlayedAt : readLastExit(name)?.startedAt
+  return {
+    lastPlayedAt: typeof known === 'string' ? known : null,
+    totalMs: Number.isFinite(rec?.totalMs) && rec.totalMs > 0 ? rec.totalMs : 0,
+    launches: Number.isInteger(rec?.launches) && rec.launches > 0 ? rec.launches : 0,
+  }
+}
+
+function notePlayed(name, change) {
+  try { writeJson(clientPlayed(name), change(readPlayed(name))) } catch { /* a record, not a requirement */ }
+}
 
 // The last recorded exit of a profile's game, or null: { pid, code, signal, startedAt, endedAt, stopped }.
 export function readLastExit(name) {

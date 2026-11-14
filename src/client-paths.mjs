@@ -49,6 +49,11 @@ export function clientLastExit(name) {
   return path.join(clientRunDir(name), 'last-exit.json')
 }
 
+// When this profile was last played and for how long in all (client-launch.mjs).
+export function clientPlayed(name) {
+  return path.join(clientRunDir(name), 'played.json')
+}
+
 export function clientLog(name) {
   return path.join(clientRunDir(name), 'client.log')
 }

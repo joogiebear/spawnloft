@@ -554,6 +554,9 @@ downloads. The panel, the launcher and the assistant's tools get the same words 
 - **Downloads give up on a dead connection.** A file that gets no bytes for 30 seconds, or whose
   connection is cut part way, is asked for again, three times in all, before the launch fails
   with the code `download-failed`.
+- **When it was played** is kept in `client/run/<profile>/played.json` (`lastPlayedAt`,
+  `totalMs`, `launches`) and shown on the Play page. The time is added when the game exits, by
+  the process that started it, so a game started from the CLI counts as a launch and adds no time.
 - **How the game ended** is written to `client/run/<profile>/last-exit.json` (`code`, `signal`,
   `startedAt`, `endedAt`, `stopped`) by the process that started it, and `GET /api/client/launcher`
   and `GET /api/client/profiles` carry it as `lastExit` on each profile. It is `null` when nobody
