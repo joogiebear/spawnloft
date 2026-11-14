@@ -71,6 +71,6 @@ test('an update check with nothing it can ask about says so, and asks nobody', a
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'ByHand.jar'), 'not a real jar')
   fs.writeFileSync(path.join(inst.dir, 'plugins', 'Other.jar'), 'not a real jar')
   const report = await plugins.checkUpdatesReport(inst)
-  assert.deepEqual(report, { updates: [], checked: 0, byHand: 2, off: 0, pack: 0, unreachable: [] })
+  assert.deepEqual(report, { updates: [], checked: 0, byHand: 2, off: 0, pack: 0, unknown: 0, unreachable: [] })
   assert.deepEqual(await plugins.checkUpdates(inst), [])
 })

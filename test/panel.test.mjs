@@ -384,12 +384,20 @@ test('a tool drawn for a stopped server is drawn again when the server starts, u
   const { followPlan, playersDue } = lifted(['PLAYERS_EVERY_MS', 'followPlan', 'playersDue'])
   const stale = ['players', 'plugins', 'worlds', 'files', 'scheduler']
   // the open tool is redrawn; the hidden ones are forgotten, so they read afresh when opened
-  assert.deepEqual(followPlan(stale, 'worlds', false), { redraw: 'worlds', forget: ['players', 'plugins', 'files', 'scheduler'], keep: [] })
+  const none = () => false
+  assert.deepEqual(followPlan(stale, 'worlds', none), { redraw: 'worlds', forget: ['players', 'plugins', 'files', 'scheduler'], keep: [] })
   // somebody is typing in it: left as it is, and kept for the next look
-  assert.deepEqual(followPlan(stale, 'scheduler', true), { redraw: null, forget: ['players', 'plugins', 'worlds', 'files'], keep: ['scheduler'] })
+  assert.deepEqual(followPlan(stale, 'scheduler', (t) => t === 'scheduler'), { redraw: null, forget: ['players', 'plugins', 'worlds', 'files'], keep: ['scheduler'] })
+  // a hidden tool with an import path typed into it is not thrown away either
+  assert.deepEqual(followPlan(stale, 'players', (t) => t === 'worlds'), { redraw: 'players', forget: ['plugins', 'files', 'scheduler'], keep: ['worlds'] })
   // the console, or a tool that does not depend on the server being up, is open
-  assert.deepEqual(followPlan(stale, null, false).forget, stale)
-  assert.equal(followPlan(stale, 'backups', false).redraw, null)
+  assert.deepEqual(followPlan(stale, null, none).forget, stale)
+  assert.equal(followPlan(stale, 'backups', none).redraw, null)
+  // a server's tools are followed from the moment it is chosen, and a tool asked for with the
+  // server is opened once the server is, including after the question about unsaved settings
+  assert.match(html, /if \(chosen\) followFrom\(chosen\);/)
+  assert.match(html, /select\(name, \{ then: \(\) => showPane\(tool\) \}\)/)
+  assert.match(html, /if \(ok\) select\(name, \{ discard: true, then \}\)/)
 
   // an open Players list is read again while people can still come and go, and not otherwise
   const up = { status: 'running' }
@@ -439,6 +447,8 @@ test('unsaved Settings are asked about before another server is chosen, and surv
   assert.equal((dbs.match(/await again\(\)/g) || []).length, 3)
   // a page with unsaved settings asks before it closes, like one with an unsaved file
   assert.match(html, /!unsavedFiles\(filesByServer\)\.length && !settingsWaiting\(\)/)
+  // a form left behind by a server that was renamed or removed holds nobody up
+  assert.match(html, /state\.current !== row\.name \|\| !rowOf\(row\.name\)\) return null;/)
 })
 
 test('a change to a player is reported from what the server did, not from what it said', () => {
@@ -446,15 +456,18 @@ test('a change to a player is reported from what the server did, not from what i
   assert.deepEqual(playerChangeWords({ via: 'console', reply: 'Made Steve a server operator', took: true }, 'Steve is now an operator.'),
     { text: 'Steve is now an operator.', tone: 'good' })
   assert.deepEqual(playerChangeWords({ via: 'console', reply: 'That player does not exist', took: false }, 'Steve is now an operator.'),
-    { text: 'The server did not do that. It answered: That player does not exist', tone: 'bad' })
-  assert.equal(playerChangeWords({ via: 'console', reply: '', took: false }, 'x').tone, 'bad')
+    { text: 'The server’s own list does not show that change. It answered: That player does not exist', tone: '' })
+  // not a success and not called a refusal: a ban plugin keeps a list of its own
+  assert.equal(playerChangeWords({ via: 'console', reply: '', took: false }, 'x').text, 'The server’s own list does not show that change. It gave no answer.')
   // a stopped server's files were written by SpawnLoft itself: there is no reply to doubt
   assert.deepEqual(playerChangeWords({ via: 'file' }, 'Steve is banned.'), { text: 'Steve is banned.', tone: 'good' })
 })
 
 test('the update check says what it covered instead of an all-clear for nothing', () => {
   const { updateCheckWords } = lifted(['updateCheckWords'])
-  const none = { updates: [], checked: 0, byHand: 3, off: 0, pack: 0, unreachable: [] }
+  const none = { updates: [], checked: 0, byHand: 3, off: 0, pack: 0, unknown: 0, unreachable: [] }
+  assert.equal(updateCheckWords({ ...none, byHand: 0, checked: 2, unknown: 1 }, 'plugin'),
+    'Checked 2: all already the newest build. 1 plugin could not be matched to a listing, so nothing is known about it.')
   assert.equal(updateCheckWords(none, 'plugin'), 'Nothing was checked. 3 plugins added by hand cannot be checked.')
   assert.equal(updateCheckWords({ ...none, checked: 6, byHand: 0 }, 'plugin'), 'Checked 6: all already the newest build.')
   assert.equal(updateCheckWords({ ...none, checked: 1, byHand: 0 }, 'mod'), 'Checked 1: it is already the newest build.')

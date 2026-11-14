@@ -623,6 +623,8 @@ export async function checkUpdatesReport(inst, { gameVersion = null } = {}) {
     byHand: all.filter((p) => !p.managed).length,
     off: all.filter((p) => p.managed && !p.enabled).length,
     pack: rows.filter((p) => p.source === 'modpack').length,
+    // asked about, but the source had no listing to compare with: nothing is known either way
+    unknown: 0,
     unreachable: [],
   }
   if (!rows.length) return report
@@ -644,10 +646,10 @@ export async function checkUpdatesReport(inst, { gameVersion = null } = {}) {
       ...(gameVersion ? { game_versions: [gameVersion] } : {}),
     }
     const latest = await modrinth('/version_files/update', { method: 'POST', body: JSON.stringify(body) })
-    report.checked += byHash.size
     for (const [sha, p] of byHash) {
       const v = latest[sha]
-      if (!v) continue
+      if (!v) { report.unknown += 1; continue }
+      report.checked += 1
       const file = primaryFile(v)
       if (!file || file.hashes?.sha1 === sha) continue
       updates.push({
@@ -666,8 +668,9 @@ export async function checkUpdatesReport(inst, { gameVersion = null } = {}) {
   for (const p of rows.filter((r) => r.source === 'hangar')) {
     try {
       const picked = pickHangarVersion(await hangarVersions(p.project), { gameVersion })
+      if (!picked) { report.unknown += 1; continue }
       report.checked += 1
-      if (!picked || picked.version.name === p.installedVersion) continue
+      if (picked.version.name === p.installedVersion) continue
       updates.push({
         file: p.file,
         name: p.name,

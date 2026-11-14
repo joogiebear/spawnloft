@@ -5706,14 +5706,12 @@ $('#attMore').onclick = () => { overview.showAll = !overview.showAll; renderAtte
 
 /** "See why": that server, its console on screen. */
 function openServerConsole(name) {
-  select(name);
-  showPane('console');
+  select(name, { then: () => showPane('console') });
 }
 
 /** "Review", "Open Backups": that server, with the tool open. */
 function openServerTool(name, tool) {
-  select(name);
-  showPane(tool);
+  select(name, { then: () => showPane(tool) });
 }
 
 /** The default the Backups tool offers: every night at 03:00, keeping seven. */
@@ -6161,14 +6159,14 @@ const followed = { name: null, status: null, stale: new Set(), playersAt: 0 };
  * marked for the next look.
  *
  * Only the open tool is redrawn: a hidden one is forgotten instead, so it reads afresh when it is
- * opened. An open one somebody is typing in is left alone and tried again on the next poll, since
- * a redraw rebuilds the page and takes the typing with it.
+ * opened. One that holds something half done, open or hidden, is left alone and tried again on
+ * the next poll, since a redraw rebuilds the page and takes the typing with it.
  */
-function followPlan(stale, open, holding) {
+function followPlan(stale, open, holds) {
   const plan = { redraw: null, forget: [], keep: [] };
   for (const tool of stale) {
-    if (tool !== open) plan.forget.push(tool);
-    else if (holding) plan.keep.push(tool);
+    if (holds(tool)) plan.keep.push(tool);
+    else if (tool !== open) plan.forget.push(tool);
     else plan.redraw = tool;
   }
   return plan;
@@ -6184,7 +6182,14 @@ function paneHolds(body) {
   if (document.querySelector('dialog[open]')) return true;
   const at = document.activeElement;
   if (at && body.contains(at) && /^(INPUT|TEXTAREA|SELECT)$/.test(at.tagName)) return true;
-  return Boolean(body.querySelector('.task-form, [data-holding]'));
+  if (body.querySelector('.task-form, [data-holding]')) return true;
+  // Something typed and not yet sent: an import path, a search with its results under it. A box
+  // the page fills back in by itself after a redraw is marked data-kept and does not count.
+  for (const box of body.querySelectorAll('input, textarea')) {
+    if (box.dataset.kept || /^(checkbox|radio|file|hidden|button|submit)$/.test(box.type)) continue;
+    if (box.value.trim()) return true;
+  }
+  return false;
 }
 
 /** Redraw one tool where it stands: the same scroll position, since the page is rebuilt whole. */
@@ -6197,25 +6202,31 @@ async function redrawTool(tool) {
   if (pane) pane.scrollTop = top;
 }
 
+/** A server has just been chosen: this is the state its tools are about to be drawn for. */
+function followFrom(row) {
+  followed.name = row.name;
+  followed.status = row.status;
+  followed.stale.clear();
+  followed.playersAt = Date.now();
+}
+
 /** Called on every poll with the open server's row. */
 function followServer(row) {
   if (!row || isDb(row)) return;
-  if (followed.name !== row.name) {
-    followed.name = row.name;
-    followed.status = row.status;
-    followed.stale.clear();
-    followed.playersAt = Date.now();
-    return;
-  }
+  if (followed.name !== row.name) return followFrom(row);
   if (followed.status !== row.status) {
     followed.status = row.status;
     for (const tool of FOLLOWS_SERVER) followed.stale.add(tool);
   }
   const open = toolView.tool;
-  if (playersDue(row, open, followed.playersAt, Date.now())) followed.stale.add('players');
+  if (playersDue(row, open, followed.playersAt, Date.now())) {
+    // Counted from the asking, not the answer: a slow answer must not be asked for again on
+    // every poll while it is on its way.
+    followed.playersAt = Date.now();
+    followed.stale.add('players');
+  }
   if (!followed.stale.size) return;
-  const openBody = open && FOLLOWS_SERVER.includes(open) ? $('#' + open + 'Body') : null;
-  const plan = followPlan([...followed.stale], open, Boolean(openBody) && paneHolds(openBody));
+  const plan = followPlan([...followed.stale], open, (tool) => paneHolds($('#' + tool + 'Body')));
   // An open file is its own page and is never re-read from under its editor. The list behind it
   // is read again when the editor closes.
   const editing = Boolean(filesStateFor(row.name).editing);
@@ -6443,15 +6454,17 @@ function leaveSettingsWords(waiting, label) {
   };
 }
 
-function select(name, { discard = false } = {}) {
-  if (state.current === name && state.view === 'server' && state.streamName === name) return;
+function select(name, { discard = false, then = null } = {}) {
+  if (state.current === name && state.view === 'server' && state.streamName === name) { if (then) then(); return; }
   // Settings is one form per page, drawn for one server. Choosing another draws it again, so
   // whatever is typed and not saved is asked about first. The question is the only async step:
   // the choice is made again, for real, once it is answered.
   const waiting = settingsWaiting();
   if (waiting && waiting.name !== name && !discard) {
     const left = rowOf(waiting.name);
-    ask(leaveSettingsWords(waiting, (left && left.label) || waiting.name)).then((ok) => { if (ok) select(name, { discard: true }); });
+    // `then` is what the caller wanted done once the server is open, a tool to show for one. It
+    // waits for the answer with the choice, and is dropped with it.
+    ask(leaveSettingsWords(waiting, (left && left.label) || waiting.name)).then((ok) => { if (ok) select(name, { discard: true, then }); });
     return;
   }
   sheetStack.length = 0;
@@ -6486,6 +6499,8 @@ function select(name, { discard = false } = {}) {
   diagKey = '';
   const chosen = rowOf(name);
   renderServer(chosen);
+  // From now, not from the next poll: a Start pressed in the seconds between is a change too.
+  if (chosen) followFrom(chosen);
   const saved = recallTool(name);
   setTool(saved.tool);
   renderLog();
@@ -6513,6 +6528,7 @@ function select(name, { discard = false } = {}) {
     state.pausedAt = 0;
     renderLog();
   };
+  if (then) then();
   refresh();
 }
 
@@ -7360,6 +7376,7 @@ const PLAYER_FILTERS = [
 
 /** Kept across renders so filtering, searching and the chosen player do not lose their place on a refresh. */
 const playerView = { filter: 'all', search: '', selected: null };
+let playersAsked = 0;
 
 /**
  * Everyone this server knows about.
@@ -7381,6 +7398,7 @@ function updateCheckWords(out, noun) {
   if (out.updates.length) parts.push('Checked ' + checked + '. ' + n(out.updates.length, 'update') + ' ready.');
   else if (checked) parts.push('Checked ' + checked + ': ' + (checked === 1 ? 'it is already the newest build.' : 'all already the newest build.'));
   else parts.push('Nothing was checked.');
+  if (out.unknown) parts.push(n(out.unknown, noun) + ' could not be matched to a listing, so nothing is known about ' + (out.unknown === 1 ? 'it.' : 'them.'));
   if (out.unreachable && out.unreachable.length) parts.push('No answer about ' + out.unreachable.join(', ') + ', so try again later.');
   if (out.byHand) parts.push(n(out.byHand, noun) + ' added by hand cannot be checked.');
   if (out.pack) parts.push(n(out.pack, noun) + ' from the modpack ' + (out.pack === 1 ? 'is' : 'are') + ' updated with the pack.');
@@ -7391,11 +7409,13 @@ function updateCheckWords(out, noun) {
 /**
  * What to say after a change to a player. A running server answers in a sentence whether it did
  * the thing or refused, so the answer is not the result: `took` is, read back from the server's
- * own list. A refusal is shown as one, in the server's words.
+ * own list. When the list does not show the change, the server's words are passed on as they are.
  */
 function playerChangeWords(out, done) {
   if (out && out.took === false) {
-    return { text: out.reply ? 'The server did not do that. It answered: ' + out.reply : 'The server did not do that, and gave no reason.', tone: 'bad' };
+    // Not called a refusal: a ban plugin keeps its own list, and the server's would not show its
+    // ban either. The answer is given as the answer, and not dressed as a success.
+    return { text: 'The server\u2019s own list does not show that change. ' + (out.reply ? 'It answered: ' + out.reply : 'It gave no answer.'), tone: '' };
   }
   return { text: done, tone: 'good' };
 }
@@ -7409,15 +7429,19 @@ async function renderPlayers(opts) {
   if (body.dataset.for !== row.name) paneLoading(body);
   body.dataset.for = row.name;
 
+  // The newest asking is the one that is drawn: an older answer that arrives late would put a
+  // list from before a change back on screen.
+  const asked = ++playersAsked;
   let data;
   try {
     data = await api('/instances/' + encodeURIComponent(row.name) + '/players');
   } catch (e) {
+    if (asked !== playersAsked) return;
     paneError(body, e.message, () => renderPlayers({ force: true }));
     body.dataset.for = '';
     return;
   }
-  if (body.dataset.for !== row.name) return;
+  if (body.dataset.for !== row.name || asked !== playersAsked) return;
   followed.playersAt = Date.now();
   body.textContent = '';
   paneHead(body, 'user', 'Players',
@@ -7442,6 +7466,7 @@ async function renderPlayers(opts) {
   search.type = 'search';
   search.placeholder = 'Search by name or id';
   search.value = playerView.search;
+  search.dataset.kept = '1';
   const filters = document.createElement('div');
   filters.className = 'filters';
   const counts = {
@@ -8463,6 +8488,7 @@ async function renderWorlds(opts) {
     const name = wname.value.trim();
     if (!source || !name) { toast('A source and a name are both needed.', 'bad'); return; }
     go.disabled = true;
+    go.dataset.holding = '1'; // not redrawn mid-import: a fresh page would offer Import again
     go.textContent = 'Importing…';
     try {
       const out = await post(base + '/import', { source: source, name: name });
@@ -8472,6 +8498,7 @@ async function renderWorlds(opts) {
     } catch (e) {
       toast(e.message, 'bad');
       go.disabled = false;
+      delete go.dataset.holding;
       go.textContent = 'Import';
     }
   };
@@ -9414,7 +9441,8 @@ function taskCard(task, data, base, again, editor) {
 
   runNow.onclick = async () => {
     busy(true);
-    const server = state.current;
+    // The pane says whose tasks it is showing; `state` in here is this card's own status cell.
+    const server = $('#schedulerBody').dataset.for;
     try {
       await post(base + '/' + encodeURIComponent(task.id) + '/run');
       // Windows starts the task and returns immediately, so there is nothing to report yet beyond
@@ -9427,7 +9455,7 @@ function taskCard(task, data, base, again, editor) {
       // moves "Next" on.
       for (const ms of RUN_CHECKS_MS) {
         setTimeout(() => {
-          if (state.current !== server || toolView.tool !== 'scheduler') return;
+          if ($('#schedulerBody').dataset.for !== server || toolView.tool !== 'scheduler') return;
           if (!paneHolds($('#schedulerBody'))) redrawTool('scheduler');
         }, ms);
       }
@@ -9651,6 +9679,7 @@ async function renderFiles(opts) {
   search.placeholder = view.dir ? 'Find in this folder' : 'Find a file';
   search.setAttribute('aria-label', 'Find files by name');
   search.value = view.query;
+  search.dataset.kept = '1';
   search.onkeydown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -12182,7 +12211,9 @@ async function buildServerSettings(row, body) {
   let saving = false;
   let rawDirty = false;
   settingsWaiting = () => {
-    if (!body.isConnected || body.dataset.for !== row.name) return null;
+    // Only for the server that is open and still exists: a form left behind by a server that was
+    // renamed or removed has nowhere to be saved to, and must not hold anybody up.
+    if (body.dataset.for !== row.name || state.current !== row.name || !rowOf(row.name)) return null;
     const count = pending().count + (rawDirty ? 1 : 0);
     return count ? { name: row.name, count } : null;
   };
