@@ -416,7 +416,7 @@
   /* your servers: the ones on the selected setup's version, the rest behind "Show all" */
   .servers { display: grid; gap: var(--s-3); min-width: 0; }
   .servers .find { width: 200px; min-height: 32px; }
-  .scards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
+  .scards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s-3); }
   .scard { display: grid; gap: var(--s-2); align-content: start; padding: var(--s-4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
   .scard.cur { border-color: var(--lapis-edge); }
   .scard .nm { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
@@ -454,8 +454,6 @@
   .menu { flex: none; pointer-events: auto; width: 360px; max-height: min(70vh, 560px); overflow: auto; background: var(--raised); border: 1px solid var(--edge); border-radius: var(--r); box-shadow: var(--shadow-lg); padding: var(--s-2); display: grid; gap: 2px; align-content: start; }
   .menu.srv { width: 100%; }
   .menu.ask { width: 400px; }
-  .menu .mark { width: 16px; height: 16px; flex: none; color: var(--lapis-ink); }
-  .menu .mark .ico { width: 16px; height: 16px; }
   .menu .mhead { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); padding: var(--s-2) var(--s-2) var(--s-1); }
   .menu .row { display: flex; align-items: center; gap: var(--s-2); border-radius: var(--r-sm); font-size: var(--t-3); min-height: 36px; }
   .menu .row.cur { background: var(--lapis-wash); }
@@ -539,9 +537,15 @@
   .confirm b { font-weight: 600; }
   .confirm label { display: inline-flex; gap: var(--s-2); align-items: center; color: var(--ink-2); }
 
+  /* one column: the card, then the setups (the only way to change setup must not sit under a
+     long row of servers), then your servers */
   @media (max-width: 939px) {
     .playgrid { grid-template-columns: minmax(0, 1fr); }
-    .slist { max-height: none; }
+    .maincol { display: contents; }
+    .playbox { order: 1; }
+    .setups { order: 2; }
+    .servers { order: 3; }
+    .slist { max-height: 264px; }
   }
   /* narrow windows: the column fills, the Join label sits above, menus come up from the bottom */
   @media (max-width: 699px) {
@@ -553,7 +557,6 @@
     .playrow .play { flex-basis: 100%; }
     .servers .find { width: 100%; }
     .prog { padding: var(--s-4); }
-    .split .play { padding: 0 var(--s-5); }
     .join { grid-template-columns: minmax(0, 1fr); }
     .join > .hint { grid-column: 1; }
     .menupad { display: contents; }
@@ -1345,7 +1348,7 @@
     if (!was) return
     S.menu = null
     render()
-    if (refocus) $({ account: 'chip', join: 'join', ask: 'play' }[was])?.focus({ preventScroll: true })
+    if (refocus) ($(was === 'ask' && S.askFrom ? S.askFrom : { account: 'chip', join: 'join', ask: 'play' }[was]) ?? $('play'))?.focus({ preventScroll: true })
   }
 
   const toggleMenu = (which) => () => (S.menu === which ? closeMenu() : openMenu(which))
@@ -1521,7 +1524,7 @@
 
   // What the selected setup is: its name, and the facts a person picks a setup by.
   function setupName(q) {
-    return givenName(q) ?? `Minecraft ${q.mc}`
+    return givenName(q) ?? setupTitle(q)
   }
 
   function setupHead(p) {
@@ -1586,7 +1589,8 @@
 
   async function firstPlay() {
     const mc = latestRelease()
-    if (!mc || S.firstRun) return
+    // a machine Minecraft cannot run on gets no setup made for it, whichever button asked
+    if (!mc || S.firstRun || S.summary?.machineRefusal) return
     S.firstRun = true
     S.menu = null
     render()
@@ -1660,7 +1664,7 @@
   function playButton(p, plan) {
     const label = plan.startsServer ? 'Start server and play' : plan.state.kind === 'closed-early' ? 'Play again' : 'Play'
     return h('div', { class: 'playrow menuhost', 'data-menu': 'ask' },
-      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => startLaunch(p) }, ico('play'), label),
+      h('button', { class: 'primary play', id: 'play', disabled: plan.blocked, 'aria-describedby': plan.blocked ? 'why' : 'does', onclick: () => { S.askFrom = null; startLaunch(p) } }, ico('play'), label),
       h('button', { class: 'edit', id: 'editSetup', onclick: () => openSheet(p) }, ico('gear'), 'Edit setup'),
       S.menu === 'ask' && menuPad(askMenu(p)))
   }
@@ -1669,11 +1673,14 @@
   // whole id when it is not a release.
   function setupBadge(q) {
     const m = /^(\d+\.\d+)(?:\.\d+)?$/.exec(String(q.mc))
-    return m ? m[1] : String(q.mc).slice(0, 5)
+    return m ? m[1] : String(q.mc).slice(0, 5).replace(/[-. _]+$/, '')
   }
 
   function setupSub(q) {
-    return [givenName(q) ? q.mc : null, q.loader === 'fabric' ? 'Fabric' : 'Vanilla', q.played?.lastPlayedAt ? `played ${dayWords(q.played.lastPlayedAt)}` : null].filter(Boolean).join(' · ')
+    // a named setup says what it is; a second unnamed one of the same version shows its saved
+    // name ("1-21-11-2"), which is all that tells the two apart
+    const what = givenName(q) ? setupTitle(q) : String(q.name).toLowerCase() !== nameBase(q.mc, q.loader).toLowerCase() ? q.name : null
+    return [what, q.played?.lastPlayedAt ? `played ${dayWords(q.played.lastPlayedAt)}` : 'not played yet'].filter(Boolean).join(' · ')
   }
 
   // The setups, always in view beside the card. Picking one changes the card; the gear opens its
@@ -1683,14 +1690,14 @@
     return h('aside', { class: 'setups', id: 'setups', 'aria-labelledby': 'setupsTitle' },
       h('div', { class: 'shead' },
         h('h2', { class: 'label', id: 'setupsTitle', text: 'Setups' }),
-        h('button', { class: 'sm', id: 'newSetup', title: 'Any version, snapshots too', onclick: () => openSheet() }, ico('plus'), 'New')),
+        h('button', { class: 'sm', id: 'newSetup', title: 'Any version, snapshots too', 'aria-label': 'New setup', onclick: () => openSheet() }, ico('plus'), 'New')),
       !list.length && h('p', { class: 'note', text: 'No setups yet. Play makes one for the latest release, or make your own with New.' }),
-      list.length > 0 && h('ul', { class: 'slist' }, list.map((q) => h('li', { class: q === p ? 'srow cur' : 'srow' },
+      list.length > 0 && h('ul', { class: 'slist', role: 'list' }, list.map((q) => h('li', { class: q === p ? 'srow cur' : 'srow' },
         h('button', { class: 'pick', id: `setup-${q.name}`, 'aria-current': q === p ? 'true' : null, onclick: () => { pickProfile(q.name); S.menu = null; render() } },
           h('span', { class: 'badge', 'aria-hidden': 'true', text: setupBadge(q) }),
           h('span', { class: 'sub' }, h('b', { text: setupName(q) }), h('small', { text: setupSub(q) })),
           q.running ? pill('live', 'running', true) : S.job?.profile === q.name ? pill('accent', 'launching', true) : null),
-        h('button', { class: 'sm quiet icon', id: `edit-${q.name}`, title: `Edit ${setupName(q)}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear'))))),
+        h('button', { class: 'sm quiet icon', id: `edit-${q.name}`, title: `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, 'aria-label': `Edit ${setupTitle(q)}${givenName(q) ? ` (${givenName(q)})` : ''}`, onclick: () => openSheet(q) }, ico('gear'))))),
       list.length > 0 && h('p', { class: 'note', text: 'A setup keeps its own worlds, options and mods. The gear edits, renames or copies it.' }))
   }
 
@@ -1711,37 +1718,53 @@
     const all = plan.choices
     if (!all.length) return null
     const others = all.filter((c) => c.otherVersion).length
-    // the first run's draft has no version until Mojang's list is read: nothing to narrow by yet
-    const wide = S.serversAll || p.mc === 'latest'
-    // a search looks through every server, whatever the version
-    const shown = shownServers(all, { all: wide || Boolean(S.serverFind.trim()), find: S.serverFind })
+    // the box is there from seven servers up; what was typed counts only while it is
+    const find = all.length >= FIND_FROM ? S.serverFind.trim() : ''
+    // the first run's draft has no version until Mojang's list is read: nothing to narrow by yet;
+    // and a search looks through every server, whatever the version
+    const wide = S.serversAll || p.mc === 'latest' || Boolean(find)
+    const shown = shownServers(all, { all: wide, find })
     const busy = plan.state.kind === 'launching' || plan.state.kind === 'running' || Boolean(S.job) || Boolean(S.firstRun)
+    const stuck = cardsBlocked(plan, S.summary.machineRefusal)
     const card = (c) => {
       const cur = plan.picked?.name === c.name
       const act = c.otherVersion
-        ? h('button', { class: 'sm', id: `srv-${c.name}`, onclick: () => takePrefill({ mc: c.otherVersion, server: c.name }) }, `Use a ${c.otherVersion} setup`)
+        ? h('button', { class: 'sm', id: `srv-${c.name}`, disabled: Boolean(S.firstRun), onclick: () => { S.menu = null; takePrefill({ mc: c.otherVersion, server: c.name }) } }, `Use a ${c.otherVersion} setup`)
         : c.blocked
           ? h('small', { text: sentence(c.blocked) })
-          : h('button', { class: 'sm', id: `srv-${c.name}`, disabled: busy, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
-      return h('li', { class: cur ? 'scard cur' : 'scard' },
-        h('span', { class: 'nm' }, h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }), h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name })),
-        h('small', { text: `${c.mc ? `${c.mc} · ` : ''}${statusText(c.status).toLowerCase()}` }),
+          : h('button', { class: 'sm', id: `srv-${c.name}`, disabled: busy || stuck, title: stuck && !busy ? 'Play can\'t start yet: the card above says why.' : null, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
+      return h('li', { class: cur ? 'scard cur' : 'scard', 'aria-current': cur ? 'true' : null },
+        h('span', { class: 'nm' }, h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }), h('b', { title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
+        h('small', { text: `${c.mc ?? 'version unknown'} · ${statusText(c.status).toLowerCase()}` }),
         act)
     }
     return h('section', { class: 'servers', 'aria-labelledby': 'serversTitle' },
       h('div', { class: 'shead' },
         h('h2', { class: 'label', id: 'serversTitle', text: wide ? 'Your servers' : `Your servers on ${p.mc}` }),
-        all.length >= FIND_FROM && h('input', { class: 'find', id: 'serverFind', type: 'search', 'aria-label': 'Find a server', placeholder: 'Find a server', value: S.serverFind, autocomplete: 'off', spellcheck: 'false', oninput: (e) => { S.serverFind = e.target.value; render() } }),
-        others > 0 && p.mc !== 'latest' && h('button', { class: 'linkbtn', id: 'serversAll', 'aria-pressed': String(S.serversAll), onclick: () => { S.serversAll = !S.serversAll; render() } }, S.serversAll ? `Only ${p.mc}` : `Show all ${all.length}`)),
+        all.length >= FIND_FROM && h('input', { class: 'find', id: 'serverFind', type: 'search', 'aria-label': 'Find a server', placeholder: 'Find a server', value: S.serverFind, autocomplete: 'off', spellcheck: 'false', oninput: (e) => { S.serverFind = e.target.value; S.menu = null; render() } }),
+        // the label says what a press does; it is not a pressed/unpressed toggle
+        others > 0 && p.mc !== 'latest' && !find && h('button', { class: 'linkbtn', id: 'serversAll', onclick: () => { S.serversAll = !S.serversAll; S.menu = null; render() } }, S.serversAll ? `Only ${p.mc}` : `Show all ${all.length}`)),
       shown.length
-        ? h('ul', { class: 'scards', style: 'list-style:none;margin:0;padding:0' }, shown.map(card))
-        : h('p', { class: 'note', text: S.serverFind.trim() ? `No server matches \u201c${S.serverFind.trim()}\u201d.` : `None of your servers run Minecraft ${p.mc}.${wide ? '' : ' Show all to see the others.'}` }))
+        ? h('ul', { class: 'scards', role: 'list' }, shown.map(card))
+        : h('p', { class: 'note', text: find ? `No server matches \u201c${find}\u201d.` : `None of your servers run Minecraft ${p.mc}.${wide ? '' : ' Show all to see the others.'}` }))
   }
 
-  // A server card's own Play: this setup, joined to that server, now.
+  // Whether a server card's Play would go nowhere whichever server it is for: Play is blocked,
+  // and not by the server now picked (picking another is what the card does).
+  function cardsBlocked(plan, machineRefusal) {
+    if (machineRefusal) return true
+    return plan.state.kind === 'blocked' && !(plan.picked && (plan.picked.blocked || plan.picked.otherVersion))
+  }
+
+  // A server card's own Play: this setup, joined to that server, now. Focus follows to what the
+  // press brought up (Cancel on the launch, or the question of who is playing), since the button
+  // pressed is disabled the moment the launch starts.
   function playOn(p, c) {
+    S.menu = null
+    S.askFrom = `srv-${c.name}`
     setTarget(p, { server: c.name })
     startLaunch(p)
+    if (S.menu !== 'ask') (document.activeElement?.id ? null : $('cancelLaunch') ?? $('play'))?.focus({ preventScroll: true })
   }
 
   function joinField(p, plan, inert) {
@@ -2017,6 +2040,7 @@
   function openSheet(p = null, prefill = null, focus = null) {
     const servers = serversNow()
     S.menu = null
+    S.sheetFrom = document.activeElement?.id || null
     S.sheet = p
       ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false, removing: false }
       : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false, removing: false }
@@ -2028,10 +2052,18 @@
     $(focus ?? 'fMc')?.focus()
   }
 
+  // Focus goes back to what opened the sheet (a gear in the list, Edit setup, New), and to Play
+  // when that is gone.
   function closeSheet() {
     S.sheet = null
     render()
-    $('play')?.focus({ preventScroll: true })
+    backFromSheet()
+  }
+
+  function backFromSheet() {
+    const to = (S.sheetFrom && $(S.sheetFrom)) || $('play') || $('stop') || $('editSetup')
+    S.sheetFrom = null
+    to?.focus({ preventScroll: true })
   }
 
   // fabric=1: the rows say where Fabric builds; refresh asks Mojang and Fabric again now, for a
@@ -2327,7 +2359,7 @@
       f.saving = false
     }
     await refresh()
-    if (!S.sheet) $('play')?.focus({ preventScroll: true })
+    if (!S.sheet) backFromSheet()
   }
 
   async function saveSheet() {
@@ -2373,7 +2405,8 @@
       f.error = err.message
       f.saving = false
     }
-    refresh()
+    await refresh()
+    if (!S.sheet) backFromSheet()
   }
 
   // Focus goes to "Keep it" when the strip opens, so Enter twice does not remove anything.
@@ -2393,7 +2426,8 @@
       S.sheet.error = err.message
       S.sheet.removing = false
     }
-    refresh()
+    await refresh()
+    if (!S.sheet) backFromSheet()
   }
 
   // ---- accounts ------------------------------------------------------------------------------

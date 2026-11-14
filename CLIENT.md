@@ -172,11 +172,18 @@ SpawnLoft, not a separate product, and it is one screen: the **Play** page of th
 named by what it is (`1.21.11 · Vanilla`, `1.21.1 · Fabric (modded)`); the command line, the API
 and the files keep "profile".
 
-- **Play** is a split button. The big half plays; the small half shows the setup's version and
-  opens the setups menu: pick another setup, edit one (the gear), or make a **New setup**. A line
-  under the button says what will happen ("Opens Minecraft 1.21.11 and joins survival as
-  Wunga_."). The first launch of a version downloads the game (progress shows in the button's
-  place; leaving the page does not stop the download, and the files are used next time).
+- The page is a card, a list and a row. The card shows the selected setup (its name, version,
+  loader, memory and when it was last played) with **Play** and **Edit setup**. A line under
+  the button says what will happen ("Opens Minecraft 1.21.11 and joins survival as Wunga_.").
+  The first launch of a version downloads the game (progress shows in the button's place;
+  leaving the page does not stop the download, and the files are used next time).
+- **Your setups** is always in view beside the card: press one to select it, its gear to edit,
+  rename, duplicate or remove it, and **New** to make one. Two unnamed setups of one version
+  show their saved names so they can be told apart.
+- **Your servers** sits under the card and shows the SpawnLoft servers on the setup's version,
+  each with its own **Play here** (or **Start and play**). **Show all** brings the rest, where a
+  server on another version offers a setup of that version instead; from seven servers up there
+  is a search box too.
 - **Join** is one field. Its menu lists the SpawnLoft servers with their state (and a note when one
   runs another version than the setup), plus *Title screen only*. A stopped server is started
   first: the button then reads **Start server and play**, waits up to two minutes for it, launches
@@ -219,7 +226,7 @@ Play cannot work it is greyed with the reason where the line under it was, and a
 it: the account the setup names is no longer signed in or its sign-in expired, an online-mode
 server was picked for an offline player, another launch is under way, the machine cannot run the
 client (Linux arm64, for one), or the panel refused the version itself. The old `#profiles` and
-`#accounts` links open the setups menu and the account menu.
+`#accounts` links land on the setups list and open the account menu.
 
 Everything the page does goes through the panel's `/api/client/...` routes (profiles, versions,
 launch, stop, log, diag, accounts), behind the panel's sign-in and its localhost Host and Origin

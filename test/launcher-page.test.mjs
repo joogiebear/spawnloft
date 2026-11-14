@@ -614,7 +614,10 @@ test('your servers: the setup\'s version first, the rest behind Show all, and a 
   assert.deepEqual(names(shownServers(choices, { all: true, find: 'CREAT' })), ['creative'])
   assert.deepEqual(shownServers(choices, { all: true, find: 'nothing like it' }), [])
   // a search on the page looks through every server, and the row gets its box from seven up
-  assert.match(fnSource('serversRow'), /all: wide \|\| Boolean\(S\.serverFind\.trim\(\)\)/)
+  assert.match(fnSource('serversRow'), /const wide = S\.serversAll \|\| p\.mc === 'latest' \|\| Boolean\(find\)/)
+  assert.match(fnSource('serversRow'), /shownServers\(all, \{ all: wide, find \}\)/)
+  // what was typed counts only while the box is on the page
+  assert.match(fnSource('serversRow'), /const find = all\.length >= FIND_FROM \? S\.serverFind\.trim\(\) : ''/)
   assert.match(fnSource('serversRow'), /all\.length >= FIND_FROM && h\('input'/)
   // a server on another version offers a setup of that version instead of a Play that would fail
   assert.match(fnSource('serversRow'), /takePrefill\(\{ mc: c\.otherVersion, server: c\.name \}\)/)
@@ -625,8 +628,44 @@ test('a setup\'s badge is its version as far as the minor', () => {
   assert.equal(setupBadge({ mc: '1.21.11' }), '1.21')
   assert.equal(setupBadge({ mc: '1.20' }), '1.20')
   assert.equal(setupBadge({ mc: '26.3' }), '26.3')
-  assert.equal(setupBadge({ mc: '26.4-snapshot-6' }), '26.4-')
-  assert.equal(setupBadge({ mc: 'b1.7.3' }), 'b1.7.')
+  assert.equal(setupBadge({ mc: '26.4-snapshot-6' }), '26.4')
+  assert.equal(setupBadge({ mc: 'b1.7.3' }), 'b1.7')
+})
+
+test('a server card\'s Play is off when Play could not start for any server', () => {
+  const { cardsBlocked } = lifted(['cardsBlocked'])
+  const ready = { state: { kind: 'ready' }, picked: null }
+  assert.equal(cardsBlocked(ready, null), false)
+  assert.equal(cardsBlocked(ready, 'Linux arm64 is not supported'), true)
+  // blocked by the account, say: no card can help
+  assert.equal(cardsBlocked({ state: { kind: 'blocked' }, picked: null }, null), true)
+  assert.equal(cardsBlocked({ state: { kind: 'blocked' }, picked: { name: 'a', blocked: null, otherVersion: null } }, null), true)
+  // blocked by the server now picked: another card is the way out
+  assert.equal(cardsBlocked({ state: { kind: 'blocked' }, picked: { name: 'a', blocked: 'needs a Microsoft account' } }, null), false)
+  assert.equal(cardsBlocked({ state: { kind: 'blocked' }, picked: { name: 'a', otherVersion: '1.20.4' } }, null), false)
+})
+
+test('two setups of one version are told apart in the list', () => {
+  const { setupSub, setupName } = lifted(['nameBase', 'givenName', 'setupTitle', 'dayWords', 'setupName', 'setupSub'])
+  const first = { name: '1-21-11', mc: '1.21.11', loader: 'vanilla' }
+  const second = { name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla' }
+  assert.equal(setupName(first), setupName(second))
+  assert.equal(setupSub(first), 'not played yet')
+  assert.equal(setupSub(second), '1-21-11-2 \u00b7 not played yet')
+  const named = { name: 'Modded survival', mc: '1.21.1', loader: 'fabric' }
+  assert.equal(setupName(named), 'Modded survival')
+  assert.match(setupSub(named), /^1\.21\.1 \u00b7 Fabric.* \u00b7 not played yet$/)
+})
+
+test('the first Play makes no setup on a machine Minecraft cannot run on', () => {
+  assert.match(fnSource('firstPlay'), /if \(!mc \|\| S\.firstRun \|\| S\.summary\?\.machineRefusal\) return/)
+})
+
+test('focus goes back to what opened the sheet', () => {
+  assert.match(fnSource('openSheet'), /S\.sheetFrom = document\.activeElement\?\.id \|\| null/)
+  assert.match(fnSource('closeSheet'), /backFromSheet\(\)/)
+  assert.match(fnSource('saveSheet'), /if \(!S\.sheet\) backFromSheet\(\)/)
+  assert.match(fnSource('duplicateProfile'), /if \(!S\.sheet\) backFromSheet\(\)/)
 })
 
 test('the page is a fixed size, not a share of the window', () => {
