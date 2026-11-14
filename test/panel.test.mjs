@@ -845,8 +845,9 @@ test('Escape is about the box it was pressed in before it closes anything', () =
   // sheets close from anywhere but a box, and Add stays while a server is being made
   assert.equal(escapeMove({ view: 'settings', field: null }), 'back')
   assert.equal(escapeMove({ view: 'add', field: { search: true, value: 'all the mods' } }), 'clear')
-  assert.equal(escapeMove({ view: 'add', field: null, creating: true }), 'stay')
-  assert.equal(escapeMove({ view: 'add', field: null, creating: false }), 'back')
+  assert.equal(escapeMove({ view: 'add', field: null }), 'back')
+  // out of a box in a sheet focus goes to the sheet, not to the stage that holds every page
+  assert.match(html, /target\.closest\('\.view\.sheet'\)/)
   assert.equal(escapeMove({ view: 'overview', field: null }), null)
 
   const input = (type, value) => ({ tagName: 'INPUT', type: type || 'text', value, getAttribute: () => type })
@@ -876,6 +877,22 @@ test('after a redraw focus goes back to the control it was on', () => {
   // one that is turned off is passed over for the nearest that is not
   assert.equal(focusChoice(rows, { name: 'BUTTON|Delete', nth: 1, at: 3 }, [true, true, true, false, true, true]), 4)
   assert.equal(focusChoice([], { name: 'BUTTON|Delete', nth: 0, at: 0 }), -1)
+
+  // focus is put back only where the redraw took it
+  const { focusLost } = lifted(['focusLost'])
+  assert.equal(focusLost({ connected: false, disabled: false }, { nowhere: true }), true)
+  assert.equal(focusLost({ connected: true, disabled: true }, { nowhere: true }), true)
+  // the control is still there: a poll that redrew around it moves nothing, and neither does one
+  // that runs after the person clicked away from it
+  assert.equal(focusLost({ connected: true, disabled: false }, { nowhere: true }), false)
+  assert.equal(focusLost({ connected: true, disabled: false }, { nowhere: false }), false)
+  // the person went somewhere else while the request ran (a dialog, the console)
+  assert.equal(focusLost({ connected: false, disabled: false }, { nowhere: false }), false)
+  assert.equal(focusLost(null, { nowhere: true }), false)
+  // a click away from a control forgets it; a button turned off under the person is kept
+  assert.match(html, /if \(e\.target === lastInTool && !e\.relatedTarget && e\.target\.isConnected && !e\.target\.disabled\) lastInTool = null;/)
+  // the stats ranges keep the name that is written on them
+  assert.doesNotMatch(html, /setAttribute\('aria-label', r\.say\)/)
   // every tool that draws itself whole is wrapped
   for (const draw of ['renderPlayers', 'renderPlugins', 'renderWorlds', 'renderFiles', 'renderScheduler', 'renderBackups', 'renderActivity', 'paintPerformance']) {
     assert.ok(html.includes(`${draw} = holdingFocus(${draw});`), draw)

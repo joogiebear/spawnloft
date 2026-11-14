@@ -755,7 +755,7 @@
      the width of the pane - 620px of empty inset well beside 194px of buttons. */
   .ranges { justify-self: start; width: max-content; }
   /* Focus rests here when Escape steps out of a field; the tool is not a control, so no ring. */
-  #toolPanel:focus { outline: none; }
+  #toolPanel:focus, .view.sheet:focus { outline: none; }
   .filters .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
   .seg, .filters, .ranges {
     display: inline-flex;
@@ -4554,8 +4554,7 @@ function vitalCell(key, label, title) {
   const wrap = document.createElement('div');
   wrap.className = 'vital';
   wrap.dataset.v = key;
-  // what the number means is in its tip, which only a pointer could reach
-  if (title) { wrap.title = title; wrap.tabIndex = 0; }
+  if (title) wrap.title = title;
   const dt = document.createElement('dt');
   dt.textContent = label;
   const dd = document.createElement('dd');
@@ -4607,7 +4606,6 @@ function renderVitals(row) {
   else {
     bigNumber(backup.dd, shortAgo(vitalsView.backupAt), shortAgo(vitalsView.backupAt) === 'just now' ? '' : 'ago');
     backup.wrap.title = stamp(new Date(vitalsView.backupAt).toISOString());
-    backup.wrap.tabIndex = 0;
   }
 
   // Not running: three dashes said nothing about why they were dashes. One line says it, in the
@@ -5212,7 +5210,6 @@ function renderOverview() {
   const mem = document.createElement('li');
   mem.className = 'chip chip-mem';
   mem.title = 'Reserved is what the servers are allowed to use, added up, whether or not they are running.';
-  mem.tabIndex = 0;
   const words = document.createElement('span');
   const b = document.createElement('b');
   b.textContent = String(gbOf(reservedMb));
@@ -7555,7 +7552,7 @@ async function paintPerformance(name, opts) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = r.label;
-    b.setAttribute('aria-label', r.say);
+    b.title = r.say;
     b.setAttribute('aria-pressed', String(perfView.seconds === r.key));
     b.onclick = () => { perfView.seconds = r.key; paintPerformance(name); };
     ranges.append(b);
@@ -10282,7 +10279,7 @@ async function renderFiles(opts) {
     whenShort.textContent = stamp(e.modified);
     const whenLong = document.createElement('span');
     whenLong.className = 'long';
-    whenLong.textContent = stamp(e.modified);
+    whenLong.textContent = STAMP_YEAR.format(new Date(e.modified));
     when.append(whenShort, whenLong);
     when.title = whenLong.textContent;
     line.append(box, open, kind, size, when);
@@ -11065,6 +11062,7 @@ const STAMP_YEAR = new Intl.DateTimeFormat(undefined, {
  */
 function stamp(iso) {
   const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return String(iso);
   return (at.getFullYear() === new Date().getFullYear() ? STAMP : STAMP_YEAR).format(at);
 }
 
@@ -11904,7 +11902,7 @@ function renderBackupHistory(row, data, signature) {
       // each button says which backup it is for; they were five "Download"s and five "Delete"s
       const which = backupWords(snap);
       const restore = iconButton('restore', 'Restore');
-      restore.setAttribute('aria-label', 'Restore ' + which);
+      restore.setAttribute('aria-label', 'Restore: ' + which);
       restore.disabled = data.running;
       restore.title = data.running
         ? 'Stop the server first'
@@ -15272,9 +15270,7 @@ if (desktop && typeof desktop.appInfo === 'function') {
  *
  * In a box someone is typing in it is about the box: a search with something in it is cleared,
  * and from any other field focus steps out to the page around it, so the next Escape is the one
- * that closes. It closed the whole tool or sheet from inside any field, with what was typed. And
- * the Add sheet stays while a server is being made: closing it hid the progress of a download
- * that carried on.
+ * that closes. It closed the whole tool or sheet from inside any field, with what was typed.
  */
 function escapeMove(at) {
   if (at.dialog) return 'dialog';
@@ -15282,7 +15278,6 @@ function escapeMove(at) {
   const tool = at.view === 'server' && Boolean(at.tool) && at.inTool;
   if (!sheet && !tool) return null;
   if (at.field) return at.field.search && at.field.value ? 'clear' : 'leave';
-  if (at.view === 'add' && at.creating) return 'stay';
   return sheet ? 'back' : 'tool';
 }
 
@@ -15307,7 +15302,6 @@ document.addEventListener('keydown', (e) => {
     tool: toolView.tool,
     inTool: panel.contains(target),
     field: dlg.open ? null : typedField(target),
-    creating: [...document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')].some((t) => t.disabled),
   });
   if (!move) return;
   e.preventDefault();
@@ -15317,7 +15311,8 @@ document.addEventListener('keydown', (e) => {
     target.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (move === 'leave') {
     // out of the box and onto what holds it: in a tool, Escape only closes from inside the tool
-    const around = panel.contains(target) ? panel : target.closest('section, main') || document.body;
+    const around = panel.contains(target) ? panel : target.closest('.view.sheet');
+    if (!around) { target.blur(); return; }
     if (!around.hasAttribute('tabindex')) around.setAttribute('tabindex', '-1');
     around.focus({ preventScroll: true });
   } else if (move === 'back') back();
@@ -15355,19 +15350,36 @@ const FOCUSABLE = 'button, input, select, textarea, a[href], summary, [tabindex]
 let lastInTool = null;
 document.addEventListener('focusin', (e) => {
   const panel = $('#toolPanel');
-  if (panel && panel.contains(e.target)) lastInTool = e.target;
+  if (panel && panel.contains(e.target) && e.target !== panel) lastInTool = e.target;
   else if (e.target !== document.body) lastInTool = null;
 });
+// Focus that left for nowhere (a click on the header, on blank space) was taken away by the
+// person. A button turned off under them did not choose to give it up, and is still remembered.
+document.addEventListener('focusout', (e) => {
+  if (e.target === lastInTool && !e.relatedTarget && e.target.isConnected && !e.target.disabled) lastInTool = null;
+});
+
+/**
+ * Whether focus is put back after a redraw: only where the redraw is what took it. A control
+ * that is still there and can be used kept its focus, or lost it to the person; focus that
+ * stands anywhere else was moved on purpose (a dialog, the console, another tool).
+ */
+function focusLost(was, now) {
+  if (!was) return false;
+  if (was.connected && !was.disabled) return false;
+  return now.nowhere;
+}
 
 function focusMark(root) {
   let el = document.activeElement;
   // a button turned off while its request runs gives focus up; it is still where the person was
-  if ((!el || el === document.body) && lastInTool && lastInTool.isConnected) el = lastInTool;
+  if ((!el || el === document.body) && lastInTool && lastInTool.isConnected && lastInTool.offsetParent !== null) el = lastInTool;
   if (!el || el === root || !root.contains(el)) return null;
   const all = [...root.querySelectorAll(FOCUSABLE)];
   const name = controlName(el);
   const typed = typedField(el);
   return {
+    el,
     name,
     nth: all.filter((x) => controlName(x) === name).indexOf(el),
     at: all.indexOf(el),
@@ -15378,8 +15390,8 @@ function focusMark(root) {
 function focusBack(root, mark) {
   if (!mark || root.hidden) return;
   const now = document.activeElement;
-  // focus that went somewhere on purpose (a dialog, the console, the menu) is left there
-  if (now && now !== document.body && now.isConnected && now !== root) return;
+  const nowhere = !now || now === document.body || !now.isConnected || now === mark.el;
+  if (!focusLost({ connected: mark.el.isConnected, disabled: Boolean(mark.el.disabled) }, { nowhere })) return;
   const all = [...root.querySelectorAll(FOCUSABLE)];
   const pick = focusChoice(all.map(controlName), mark, all.map((x) => !x.disabled && x.offsetParent !== null));
   const to = all[pick];
