@@ -4114,6 +4114,7 @@ $('#tabConsole').onclick = () => setTool(null);
 
 function closeTool() {
   const was = toolView.tool;
+  rowMenu.close(false);
   setTool(null);
   // Focus goes back to the button that opened it, not to the top of the page with the panel gone.
   if (was) $('#' + dockId(was))?.focus();
@@ -10482,9 +10483,11 @@ const rowMenu = (() => {
     // under the button, its right edge on the button's; above it when there is no room below
     const at = button.getBoundingClientRect();
     const tall = menu.offsetHeight;
-    const below = at.bottom + 4 + tall <= window.innerHeight - 8;
+    // measured without the page's scrollbar, which innerWidth counts
+    const page = document.documentElement;
+    const below = at.bottom + 4 + tall <= page.clientHeight - 8;
     menu.style.top = Math.max(8, below ? at.bottom + 4 : at.top - 4 - tall) + 'px';
-    menu.style.right = Math.max(8, window.innerWidth - at.right) + 'px';
+    menu.style.right = Math.max(8, page.clientWidth - at.right) + 'px';
     button.setAttribute('aria-expanded', 'true');
     const first = menu.querySelector('[role="menuitem"]:not(:disabled)');
     if (first) first.focus();
@@ -10499,6 +10502,8 @@ async function renderFiles(opts) {
   if (!row) { body.textContent = ''; clearPaneHead(body); return; }
   if (!force && body.dataset.for === row.name && body.childElementCount) return;
   if (body.dataset.for !== row.name) paneLoading(body);
+  // a menu left open belongs to the rows of the server it was opened on
+  if (body.dataset.for !== row.name) rowMenu.close(false);
   body.dataset.for = row.name;
   const view = filesStateFor(row.name);
   if (view.editing) return renderFileEditor(row, view);
@@ -10788,6 +10793,8 @@ async function renderFiles(opts) {
     box.checked = view.selected.has(e.path);
     box.setAttribute('aria-label', 'Select ' + e.name);
     // Shift and a click ticks, or unticks, everything from the last box used to this one.
+    // Shift and a click would also pick the page's text between the two rows
+    line.addEventListener('mousedown', (ev) => { if (ev.shiftKey) ev.preventDefault(); });
     box.onclick = (ev) => {
       const range = ev.shiftKey && view.anchor ? pathsBetween(entries, view.anchor, e.path) : null;
       for (const p of range || [e.path]) {
@@ -10857,15 +10864,24 @@ async function renderFiles(opts) {
       more.setAttribute('aria-label', 'Actions for ' + e.name);
       more.setAttribute('aria-haspopup', 'menu');
       more.setAttribute('aria-expanded', 'false');
-      more.title = 'Rename, move, download, delete';
+      more.title = e.inUse ? 'Actions' : 'Rename, move, download, delete';
       more.onclick = () => rowMenu.open(more, actions, act);
       line.append(more);
       // F2 renames and Delete deletes the row that holds the focus, as a file manager does
       line.addEventListener('keydown', (ev) => {
-        if (ev.ctrlKey || ev.metaKey || ev.altKey || (ev.key !== 'F2' && ev.key !== 'Delete')) return;
+        const key = rowKey(ev);
+        if (!key) return;
         ev.preventDefault();
+        // with this row among the ticked ones, Delete means all of them, as the bar's Delete does
+        const ticked = [...view.selected];
+        if (key === 'delete' && ticked.length > 1 && view.selected.has(e.path)) {
+          const held = entries.find((x) => x.inUse && view.selected.has(x.path));
+          if (held) { toast(heldWords(held), 'bad'); return; }
+          deleteFiles(row, view, ticked, entries).then(again);
+          return;
+        }
         if (e.inUse) { toast(heldWords(e), 'bad'); return; }
-        act(ev.key === 'F2' ? 'rename' : 'delete');
+        act(key);
       });
     }
   }
@@ -11145,9 +11161,20 @@ function tailWords(tail) {
 }
 
 /** Why a file is not opened here, when it is not: what it is, and that a download is the way. */
+/** What a key pressed on a file's row asks for: F2 renames; Delete deletes, and on a Mac, where
+ *  that key is rare, Cmd+Backspace does, as in Finder. */
+function rowKey(ev) {
+  if (ev.altKey || ev.ctrlKey || ev.shiftKey) return null;
+  if (ev.key === 'F2' && !ev.metaKey) return 'rename';
+  if (ev.key === 'Delete' && !ev.metaKey) return 'delete';
+  if (ev.key === 'Backspace' && ev.metaKey) return 'delete';
+  return null;
+}
+
 function notShownWords(reason, size, packed) {
   if (reason === 'large' && packed) return 'It unpacks to more than can be read here. Download it and unpack it to read it.';
-  if (reason === 'large') return 'It is ' + fileSize(size) + ', too big for the editor, and is not text whose end could be shown. Download it to open it elsewhere.';
+  if (packed) return 'It could not be unpacked: it is cut short, or is not the packed text its name says. Download it to open it elsewhere.';
+  if (reason === 'large') return 'It is ' + fileSize(size) + ', too big to open here. Download it to open it elsewhere.';
   return 'It is not text - a jar, a world file or an archive. Download it to open it elsewhere.';
 }
 
@@ -11513,7 +11540,9 @@ function renderFileEditor(row, view) {
     if (left < ta.scrollLeft + 8 || left > ta.scrollLeft + ta.clientWidth - 80) ta.scrollLeft = Math.max(0, left - ta.clientWidth / 2);
     sync();
   }
-  const runFind = (from) => {
+  // `move` is off when the text changed under a search already made: the marks are counted again
+  // and the view stays where the typing is, not carried off to the next match.
+  const runFind = (from, move = true) => {
     hits = findAll(ta.value, q.value, FIND_CAP);
     if (!hits.starts.length) {
       at = -1;
@@ -11521,11 +11550,11 @@ function renderFileEditor(row, view) {
     } else {
       // the first match at or after where the reading is, so Find goes on from there
       at = hits.starts.findIndex((s) => s >= from);
-      if (at < 0) at = 0;
+      if (at < 0) at = move ? 0 : hits.starts.length - 1;
       marks.innerHTML = markMatches(ta.value, hits.starts, hits.len, at) + '\n ';
     }
     say();
-    reveal();
+    if (move) reveal(); else sync();
   };
   const step = (by) => {
     const n = hits.starts.length;
@@ -11541,13 +11570,13 @@ function renderFileEditor(row, view) {
   let findWaiting = null;
   const findNow = () => {
     clearTimeout(findTimer);
-    const from = findWaiting;
+    const waiting = findWaiting;
     findWaiting = null;
-    if (from && ta.isConnected) runFind(from());
+    if (waiting && ta.isConnected) runFind(waiting.from(), waiting.move);
   };
-  const findSoon = (from) => {
+  const findSoon = (from, move = true) => {
     clearTimeout(findTimer);
-    findWaiting = from;
+    findWaiting = { from, move };
     findTimer = setTimeout(findNow, 140);
   };
   q.addEventListener('input', () => findSoon(() => (at >= 0 ? hits.starts[at] : ta.selectionStart)));
@@ -11572,7 +11601,9 @@ function renderFileEditor(row, view) {
   const findKey = (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'f') return;
     e.preventDefault();
-    const picked = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    // what is picked in the text is what to look for; pressed in the Find box itself, the words
+    // already typed there stay
+    const picked = document.activeElement === ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : '';
     if (picked && picked.length <= 200 && !picked.includes('\n')) q.value = picked;
     q.focus();
     q.select();
@@ -11585,7 +11616,10 @@ function renderFileEditor(row, view) {
     ed.text = ta.value;
     paint();
     caret();
-    if (q.value) findSoon(() => ta.selectionStart);
+    if (q.value) {
+      const stood = at >= 0 ? hits.starts[at] : 0;
+      findSoon(() => stood, false);
+    }
   });
   ta.addEventListener('scroll', sync);
   ta.addEventListener('keyup', caret);
@@ -11650,6 +11684,8 @@ function renderFileEditor(row, view) {
   dl.onclick = () => downloadPath(row, ed.path);
 
   const write = async (force) => {
+    // the end of a file, or a picture, is not the file: there is nothing here to save over it
+    if (readOnly) return;
     save.disabled = true;
     save.textContent = 'Saving…';
     try {

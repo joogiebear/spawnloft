@@ -102,6 +102,49 @@ test('a picture is told from its first bytes, not its name', async () => {
   assert.equal(files.imageKind(null), null)
 })
 
+test('a packed file that unpacks past the limit is a download, and the tail is the same however it arrives', async () => {
+  const text = lines(40000)
+  put('logs/big.log.gz', zlib.gzipSync(text))
+  const whole = await files.readTail(inst, 'logs/big.log.gz')
+  assert.equal(whole.of, Buffer.byteLength(text))
+  assert.ok(text.endsWith(whole.text))
+  assert.ok(whole.shown <= files.TAIL_BYTES && whole.shown > files.TAIL_BYTES - 200)
+  // a tail smaller than one unpacked chunk, and one that is the whole file
+  const small = await files.readTail(inst, 'logs/big.log.gz', { bytes: 300 })
+  assert.ok(text.endsWith(small.text) && small.shown <= 300 && small.shown > 0)
+  const over = await files.readTail(inst, 'logs/big.log.gz', { maxUnpacked: 1024 * 1024 })
+  assert.deepEqual([over.text, over.reason], [null, 'large'])
+})
+
+test('a picture over the limit is not served', async () => {
+  // a png by its first bytes, and far too long: only its length is on disk
+  const big = path.join(dir, 'huge.png')
+  fs.writeFileSync(big, Buffer.concat([Buffer.from([0x89]), Buffer.from('PNG\r\n\x1a\n', 'latin1'), Buffer.alloc(8)]))
+  fs.truncateSync(big, files.MAX_IMAGE_BYTES + 1)
+  await assert.rejects(files.imageFile(inst, 'huge.png'), /too big to show here/)
+  fs.truncateSync(big, files.MAX_IMAGE_BYTES)
+  assert.equal((await files.imageFile(inst, 'huge.png')).type, 'image/png')
+  fs.rmSync(big)
+})
+
+test('a rename that only changes capitals is not stopped by the file itself', () => {
+  // what a disk that ignores case lists: the old spelling only
+  assert.equal(files.sameButForCase('plugins/Config.yml', 'plugins/config.yml', ['Config.yml', 'other.yml']), true)
+  // a disk that tells them apart, holding both: the other one is in the way
+  assert.equal(files.sameButForCase('plugins/Config.yml', 'plugins/config.yml', ['Config.yml', 'config.yml']), false)
+  assert.equal(files.sameButForCase('a.yml', 'a.yml', ['a.yml']), false)
+  assert.equal(files.sameButForCase('a.yml', 'b.yml', ['a.yml', 'b.yml']), false)
+  assert.equal(files.sameButForCase('a/Config.yml', 'b/config.yml', ['x']), false)
+  // here, where case counts, both ways still behave: the new capitals are a new name
+  put('Notes.txt', 'n')
+  files.movePath(inst, 'Notes.txt', 'notes.txt')
+  assert.deepEqual([fs.existsSync(path.join(dir, 'notes.txt')), fs.existsSync(path.join(dir, 'Notes.txt'))], [true, false])
+  put('Notes.txt', 'other')
+  assert.throws(() => files.movePath(inst, 'notes.txt', 'Notes.txt'), /already exists/)
+  assert.throws(() => files.movePath(inst, 'notes.txt', 'nowhere/notes.txt'), /there is no folder nowhere/)
+  assert.throws(() => files.movePath(inst, 'notes.txt', 'logs/short.log/notes.txt'), /logs\/short\.log is not a folder/)
+})
+
 test('the panel serves the end of a file and a picture, each as what it is', async () => {
   const registry = await import('../src/registry.mjs')
   const { serve } = await import('../src/ui.mjs')
