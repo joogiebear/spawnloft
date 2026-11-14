@@ -79,6 +79,7 @@ test('libraryKey: the name without its version, classifier and extension kept', 
   assert.equal(libraryKey('org.lwjgl:lwjgl:3.3.3:natives-linux'), 'org.lwjgl:lwjgl:natives-linux')
   assert.equal(libraryKey('net.minecraftforge:forge:1.20.1-47.4.28:client'), 'net.minecraftforge:forge:client')
   assert.equal(libraryKey('de.oceanlabs.mcp:mcp_config:1.20.1-20230612.114412@zip'), 'de.oceanlabs.mcp:mcp_config@zip')
+  assert.equal(libraryKey('g:a:2@jar'), libraryKey('g:a:1'))
 })
 
 test('classpath: one copy per library name, the loader\'s newer copy first, as Mojang\'s launcher does', () => {

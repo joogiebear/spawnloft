@@ -53,8 +53,11 @@ the tests below it are registered, which then run against a folder that is gone.
 ## Mod loaders (`loaders/`)
 
 Captured by the `loader-fixtures` Actions job (`tools/capture-loader-fixtures.mjs`), since the
-loaders' hosts cannot be reached from where the launcher code is written. Not trimmed or edited:
-re-run the job to change them. `loaders/manifest.json` lists every file with its source URL and
+loaders' hosts cannot be reached from where the launcher code is written. The job uploads them as
+its `loader-fixtures` artifact (no workflow writes to the repository), and they are committed from
+there. Not edited, except that the per-version loader lists (`quilt/loader-<mc>.json`,
+`fabric/loader-<mc>.json`) are cut to their newest 25 rows, as the script does: re-run the job to
+change them. `loaders/manifest.json` lists every file with its source URL and
 sha1, and when it was captured.
 
 - `forge/<forge version>/`: per pinned Forge installer, `install_profile.json` and (from the modern

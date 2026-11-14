@@ -158,7 +158,9 @@ export function libraryKey(name) {
   const text = String(name)
   const at = text.indexOf('@')
   const parts = (at === -1 ? text : text.slice(0, at)).split(':')
-  return [parts[0], parts[1], ...parts.slice(3)].join(':') + (at === -1 ? '' : text.slice(at))
+  // @jar is what a name without an extension means anyway
+  const ext = at === -1 || text.slice(at) === '@jar' ? '' : text.slice(at)
+  return [parts[0], parts[1], ...parts.slice(3)].join(':') + ext
 }
 
 // The rows that go on the classpath: the non-native ones, one per library (libraryKey), the first
@@ -347,7 +349,7 @@ export function libraries(version, { os = currentOs() } = {}) {
         rows.push({
           name: `${lib.name}:${resolved}`,
           path: clsPath,
-          url: clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + clsPath,
+          url: clsDl.url === '' || (clsDl.url === undefined && lib.url === '') ? null : clsDl.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + clsPath,
           sha1: clsDl.sha1 ?? null,
           size: clsDl.size ?? null,
           native: { extract: { exclude: lib.extract?.exclude ?? [] } },

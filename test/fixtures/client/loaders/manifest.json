@@ -220,8 +220,8 @@
     {
       "file": "quilt/loader-1.20.1.json",
       "url": "https://meta.quiltmc.org/v3/versions/loader/1.20.1",
-      "sha1": "952bf5356bd6f7bc9dd3c9e5ae713bb30fed7a61",
-      "bytes": 900547
+      "sha1": "a666e726ec9f3c5577f46a24d690fe39dbacb6f6",
+      "bytes": 73853
     },
     {
       "file": "quilt/profile-1.20.1-0.30.2.json",
@@ -238,8 +238,8 @@
     {
       "file": "quilt/loader-26.3.json",
       "url": "https://meta.quiltmc.org/v3/versions/loader/26.3",
-      "sha1": "a08a3d64265649811b532aac2257e2db7f247291",
-      "bytes": 730667
+      "sha1": "df2fffb7f23cf82204e3e906eb15b4d9ac5d8b5e",
+      "bytes": 60153
     },
     {
       "file": "quilt/profile-26.3-0.30.2.json",
@@ -262,14 +262,14 @@
     {
       "file": "fabric/loader-1.21.11.json",
       "url": "https://meta.fabricmc.net/v2/versions/loader/1.21.11",
-      "sha1": "1686999d5f28ab07a486b21f8e3d5282bae3b9a6",
-      "bytes": 599436
+      "sha1": "2f9b6256cf10fd3972bb5beb9a52f73dd94ab455",
+      "bytes": 108032
     },
     {
       "file": "fabric/loader-26.3.json",
       "url": "https://meta.fabricmc.net/v2/versions/loader/26.3",
-      "sha1": "b77be09ae3e8145fb2664e8d618dffe55db3cab8",
-      "bytes": 598416
+      "sha1": "2e2629fe03942e59c8da36d7bb27639227285376",
+      "bytes": 107932
     }
   ]
 }
