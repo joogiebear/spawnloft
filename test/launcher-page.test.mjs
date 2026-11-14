@@ -554,7 +554,7 @@ test('a launch can be cancelled, and the page says what that left', () => {
   const { cancelledNotice } = lifted(['cancelledNotice'])
   assert.deepEqual(cancelledNotice({ startsServer: false, reached: 2 }), { tone: '', title: 'Launch cancelled', text: 'The game was not started. What was downloaded is kept for next time.' })
   // the server it had started by then is not stopped for it, and that is said
-  assert.match(cancelledNotice({ startsServer: true, reached: 3 }).text, /The server it started is still running\.$/)
+  assert.match(cancelledNotice({ startsServer: true, reached: 3 }).text, /Its server had already been asked to start, and is left to\.$/)
   assert.doesNotMatch(cancelledNotice({ startsServer: true, reached: 2 }).text, /server/)
   // the card has the button, off once the game itself is starting or the cancel is under way
   assert.match(fnSource('launchingCard'), /id: 'cancelLaunch', disabled: Boolean\(job\.cancelling\) \|\| stepOf\(job\.stage\) >= 4, onclick: \(\) => cancelLaunch\(job\)/)

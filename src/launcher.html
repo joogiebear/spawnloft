@@ -1669,7 +1669,7 @@
   /** What the page says after a launch was cancelled. */
   function cancelledNotice(job) {
     const started = job.startsServer && job.reached >= 3
-    return { tone: '', title: 'Launch cancelled', text: 'The game was not started. What was downloaded is kept for next time.' + (started ? ' The server it started is still running.' : '') }
+    return { tone: '', title: 'Launch cancelled', text: 'The game was not started. What was downloaded is kept for next time.' + (started ? ' Its server had already been asked to start, and is left to.' : '') }
   }
 
   function runningCard(p) {

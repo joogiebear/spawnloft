@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, humanBytes, assertSafeVersion, isInside } from './util.mjs'
+import { partPath, dropPart } from './download.mjs'
 import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 const API = 'https://meta.fabricmc.net/v2'
@@ -82,7 +83,7 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
       : `download failed (${res.status}) for ${url}`)
   }
 
-  const tmp = `${dest}.part`
+  const tmp = partPath(dest)
   const source = Readable.fromWeb(res.body)
   let received = 0
   const total = Number(res.headers.get('content-length')) || 0
@@ -93,8 +94,8 @@ export async function fetchLauncher(game, { loader: pinned = null, force = false
   try {
     await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
   } catch (err) {
+    dropPart(tmp)
     if (!signal?.aborted) throw err
-    fs.rmSync(tmp, { force: true })
     throw new Cancelled()
   }
 

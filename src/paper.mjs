@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, humanBytes } from './util.mjs'
+import { partPath, dropPart } from './download.mjs'
 import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 // PaperMC downloads via the v3 "fill" API. The old api.papermc.io/v2 endpoints are sunset and answer
@@ -84,7 +85,7 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
     return { ...build, path: dest, cached: true }
   }
 
-  const tmp = `${dest}.part`
+  const tmp = partPath(dest)
   const signal = cancelSignal()
   checkCancelled()
   const res = await fetch(build.url, { headers: { 'User-Agent': HEADERS['User-Agent'] }, ...(signal ? { signal } : {}) })
@@ -104,8 +105,8 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
   try {
     await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
   } catch (err) {
+    dropPart(tmp)
     if (!signal?.aborted) throw err
-    fs.rmSync(tmp, { force: true })
     throw new Cancelled()
   }
 

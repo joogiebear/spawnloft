@@ -11,7 +11,7 @@ import { JARS_DIR } from './paths.mjs'
 import * as create from './create.mjs'
 import { removeInstance, updateInstance } from './registry.mjs'
 import { fail, UserError, humanBytes, assertSafeVersion, isInside } from './util.mjs'
-import { Cancelled, cancelSignal, checkCancelled, stopOnCancel } from './cancel.mjs'
+import { Cancelled, cancelSignal, checkCancelled, stopOnCancel, OWN_GROUP, inOwnGroup } from './cancel.mjs'
 
 const MAVEN = 'https://maven.neoforged.net'
 const API = `${MAVEN}/api/maven/versions/releases/net/neoforged/neoforge`
@@ -112,10 +112,11 @@ export async function fetchInstaller(neoVersion, { onProgress = () => {} } = {})
 export function installServer(dir, installerPath, { java = 'java', onProgress = () => {} } = {}) {
   return new Promise((resolve, reject) => {
     onProgress({ message: 'Installing NeoForge (this downloads its libraries and takes a few minutes)', percent: null })
-    const child = spawn(java, ['-jar', installerPath, '--install-server', dir, '--server-jar'], {
+    const child = inOwnGroup(spawn(java, ['-jar', installerPath, '--install-server', dir, '--server-jar'], {
       cwd: dir,
       windowsHide: true,
-    })
+      ...OWN_GROUP,
+    }))
     const cancelled = stopOnCancel(child)
     let tail = ''
     const keepTail = (c) => {
@@ -162,7 +163,8 @@ export async function createServer(name, mc, {
   } catch (err) {
     try {
       removeInstance(name)
-      fs.rmSync(inst.dir, { recursive: true, force: true })
+      // the installer was writing here a moment ago, and Windows lets go of a folder slowly
+      fs.rmSync(inst.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     } catch {
       /* the original error is the one worth reporting */
     }

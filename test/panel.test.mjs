@@ -1238,11 +1238,18 @@ test('Add: a create that is running can be cancelled from its own button', () =>
     classList: { contains: (c) => classes.has(c), remove: (c) => classes.delete(c), toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) },
   }
   let answer = { cancelling: true }
-  const cancelButtonFor = new Function('post', 'toast', `${fnSource('cancelButtonFor')}; return cancelButtonFor`)(
+  let now = 1000
+  const cancelButtonFor = new Function('post', 'toast', 'Date', `${fnSource('cancelButtonFor')}; return cancelButtonFor`)(
     async (route, body) => { calls.push([route, body]); if (answer instanceof Error) throw answer; return answer },
-    (message, kind) => calls.push(['toast', message, kind]))
+    (message, kind) => calls.push(['toast', message, kind]),
+    { now: () => now })
   const restore = cancelButtonFor(button, 'job 1')
   assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, classes.has('primary')], ['Cancel', 'button', false, 'job 1', false])
+  // the second half of a double click on Create lands here, and is not a Cancel
+  now += 200
+  button.onclick()
+  assert.deepEqual([button.textContent, button.disabled, calls.length], ['Cancel', false, 0])
+  now += 600
   const pressed = button.onclick()
   assert.deepEqual([button.textContent, button.disabled], ['Cancelling…', true])
   return pressed.then(async () => {
@@ -1252,10 +1259,10 @@ test('Add: a create that is running can be cancelled from its own button', () =>
     await button.onclick()
     assert.deepEqual([button.textContent, button.disabled], ['Cancel', false])
     assert.deepEqual(calls.at(-1), ['toast', 'the panel is not answering', 'bad'])
-    // the job had ended by itself in that moment
+    // nothing by that id is running yet, or any more: the button can be pressed again
     answer = { cancelling: false }
     await button.onclick()
-    assert.equal(button.textContent, 'Finishing…')
+    assert.deepEqual([button.textContent, button.disabled], ['Cancel', false])
     restore()
     assert.deepEqual([button.textContent, button.type, button.disabled, button.dataset.job, button.onclick, classes.has('primary')], ['Create server', 'submit', false, undefined, null, true])
     // both creates use it, and neither starts a second one from Enter while the first runs

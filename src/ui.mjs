@@ -2126,7 +2126,7 @@ async function route(req, res) {
           onlineMode: body.onlineMode !== false,
           onProgress: ({ message, percent }) => jobUpdate(jobId, { stage: 'pack', message, percent: percent ?? null }),
         })
-        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
+        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true, cancelling: undefined })
         return json(res, 200, { ...safeInstance(labelled(String(body.name), body.label)), pack: result })
       }
       // NeoForge is installer-laid and launched from a starter jar; see neoforge.createServer
@@ -2144,7 +2144,7 @@ async function route(req, res) {
           onlineMode: body.onlineMode !== false,
           onProgress: ({ message, percent }) => jobUpdate(jobId, { stage: 'neoforge', message, percent: percent ?? null }),
         })
-        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true })
+        jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${result.name}`, done: true, cancelling: undefined })
         return json(res, 200, safeInstance(labelled(String(body.name), body.label)))
       }
       // every jar-based loader: resolve the version, fetch or build the jar, place it.
@@ -2193,7 +2193,7 @@ async function route(req, res) {
         // the person clicking Create is the local operator; no second EULA prompt
         acceptEula: true,
       })
-      jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${inst.name}`, done: true })
+      jobUpdate(jobId, { stage: 'done', percent: 100, message: `Created ${inst.name}`, done: true, cancelling: undefined })
       return json(res, 200, safeInstance(labelled(inst.name, body.label)))
     } catch (err) {
       // stopped on purpose: said as that, on the stream and in the answer, and not as a failure

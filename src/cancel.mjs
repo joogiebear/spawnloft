@@ -59,6 +59,7 @@ export function orCancelled(promise) {
 /** Ends a child process, and what it started, when the job is cancelled. Returns a function that
  *  says whether that happened, for the child's close handler to tell a cancel from a failure. */
 export function stopOnCancel(child, { kill = killTree } = {}) {
+  // (start the child with `...OWN_GROUP` so that, off Windows, what it starts can be ended with it)
   const signal = cancelSignal()
   if (!signal) return () => false
   let stopped = false
@@ -74,20 +75,41 @@ export function stopOnCancel(child, { kill = killTree } = {}) {
   return () => stopped
 }
 
-// A build runs compilers and git under the Java that was started; on Windows ending the parent
-// leaves them running, so the whole tree is asked for. Elsewhere the child is asked to end, and
-// told to if it has not a few seconds on.
+// Spawn options for a child that a cancel must be able to end together with what it starts. Off
+// Windows that takes a process group of its own, which the signal is then sent to; on Windows
+// taskkill walks the tree by itself.
+export const OWN_GROUP = process.platform === 'win32' ? {} : { detached: true }
+
+// A build runs compilers and git under the Java that was started, and ending only that Java leaves
+// them running, writing into the folder the next attempt will use. So the whole tree is ended: by
+// taskkill on Windows, by a signal to the child's process group elsewhere (the child alone, if it
+// was not given a group). It is asked first and told a few seconds on, on every system.
 function killTree(child) {
-  if (child.exitCode !== null || child.signalCode !== null || !child.pid) return
+  const alive = () => child.exitCode === null && child.signalCode === null
+  if (!alive() || !child.pid) return
+  const signal = (sig) => {
+    if (process.platform !== 'win32' && child.spawnargs && isGroupLeader(child)) {
+      try { process.kill(-child.pid, sig); return } catch { /* no such group: the child itself, below */ }
+    }
+    try { child.kill(sig) } catch { /* already gone */ }
+  }
   if (process.platform === 'win32') {
     const tk = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
-    tk.on('error', () => { try { child.kill() } catch { /* already gone */ } })
-    return
+    // taskkill missing, or refusing: the child at least is ended
+    tk.on('error', () => signal())
+    tk.on('exit', (code) => { if (code !== 0 && alive()) signal() })
+  } else {
+    signal('SIGTERM')
   }
-  try { child.kill('SIGTERM') } catch { /* already gone */ }
-  const hard = setTimeout(() => {
-    if (child.exitCode === null && child.signalCode === null) { try { child.kill('SIGKILL') } catch { /* already gone */ } }
-  }, 4000)
+  const hard = setTimeout(() => { if (alive()) signal('SIGKILL') }, 4000)
   hard.unref()
-  child.once('close', () => clearTimeout(hard))
+  child.once('exit', () => clearTimeout(hard))
 }
+
+// started with OWN_GROUP: its pid is then its group's id
+const groups = new WeakSet()
+export function inOwnGroup(child) {
+  if (process.platform !== 'win32') groups.add(child)
+  return child
+}
+const isGroupLeader = (child) => groups.has(child)

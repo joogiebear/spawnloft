@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, UserError, humanBytes } from './util.mjs'
-import { Cancelled, checkCancelled, stopOnCancel } from './cancel.mjs'
+import { Cancelled, checkCancelled, stopOnCancel, OWN_GROUP, inOwnGroup } from './cancel.mjs'
 import { downloadFile } from './download.mjs'
 
 const BUILDTOOLS_URL = 'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar'
@@ -78,7 +78,7 @@ export async function build(mc, { flavour = 'spigot', java = 'java', force = fal
 
   checkCancelled()
   await new Promise((resolve, reject) => {
-    const child = spawn(java, args, { cwd: work, windowsHide: true })
+    const child = inOwnGroup(spawn(java, args, { cwd: work, windowsHide: true, ...OWN_GROUP }))
     const cancelled = stopOnCancel(child)
     let tail = ''
     let carry = ''

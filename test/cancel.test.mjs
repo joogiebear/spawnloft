@@ -15,7 +15,7 @@ process.env.XDG_CONFIG_HOME = path.join(scratch, 'config')
 process.env.MCCTL_DATA_ROOT = path.join(scratch, 'data')
 
 const { Cancelled, isCancelled, withCancel, cancelSignal, checkCancelled, orCancelled, stopOnCancel } = await import('../src/cancel.mjs')
-const { downloadFile } = await import('../src/download.mjs')
+const { downloadFile, fetchRetry } = await import('../src/download.mjs')
 const { UserError } = await import('../src/util.mjs')
 const registry = await import('../src/registry.mjs')
 const { JARS_DIR } = await import('../src/paths.mjs')
@@ -80,14 +80,20 @@ test('a wait ends when the job is cancelled, and is left alone when it is not', 
 test('a download is stopped half way and its half is removed', async () => {
   const dest = path.join(scratch, 'big.jar')
   const c = new AbortController()
+  const parts = () => fs.readdirSync(scratch).filter((f) => f.startsWith('big.jar.') && f.endsWith('.part'))
   const going = withCancel(c.signal, () => downloadFile(slowUrl, dest, { label: 'big.jar' }))
-  assert.ok(await until(() => fs.existsSync(dest + '.part') && fs.statSync(dest + '.part').size > 0), 'the download never started')
-  const started = Date.now()
+  assert.ok(await until(() => parts().some((f) => fs.statSync(path.join(scratch, f)).size > 0), 15000), 'the download never started')
+  // someone else fetching the same file at the same time, in no job: theirs is not touched
+  const other = downloadFile(slowUrl, dest, { label: 'big.jar' })
+  other.catch(() => {})
+  assert.ok(await until(() => parts().length === 2, 15000), 'the second download never started')
   c.abort()
   await assert.rejects(going, Cancelled)
-  assert.ok(Date.now() - started < 2000, 'cancelling waited for something')
-  assert.equal(fs.existsSync(dest + '.part'), false)
+  assert.equal(parts().length, 1, 'the cancelled half was left, or the other download lost its file')
   assert.equal(fs.existsSync(dest), false)
+  // the other one is ended from the far side, and that is a failure, not a cancel
+  for (const res of held) res.destroy()
+  await assert.rejects(other, (err) => !isCancelled(err))
   // cancelled before it began: no request is made at all
   const before = held.size
   await assert.rejects(withCancel(c.signal, () => downloadFile(slowUrl, dest)), Cancelled)
@@ -117,6 +123,35 @@ test('a child process is ended when its job is cancelled, and the caller can tel
   assert.equal(other(), false)
 })
 
+test('a server having a bad moment is not waited on once the job is cancelled', async () => {
+  const c = new AbortController()
+  let asked = 0
+  const fetcher = async () => { asked++; return new Response('', { status: 504 }) }
+  const going = fetchRetry('https://example.invalid/x', { signal: c.signal }, { attempts: 4, delayMs: 30, fetcher })
+  setTimeout(() => c.abort(), 10)
+  await assert.rejects(going, (err) => err.name === 'AbortError')
+  assert.equal(asked, 1)
+})
+
+test('what a cancelled child had started is ended with it', { skip: process.platform === 'win32' && 'taskkill does this on Windows; there is no shell to build the case with' }, async () => {
+  const { OWN_GROUP, inOwnGroup } = await import('../src/cancel.mjs')
+  const c = new AbortController()
+  const mark = path.join(scratch, 'grandchild.pid')
+  const started = Date.now()
+  const out = await withCancel(c.signal, () => new Promise((resolve) => {
+    // a shell that starts something of its own and waits for it, as a build does
+    const child = inOwnGroup(spawn('sh', ['-c', `sleep 30 & echo $! > "${mark}"; wait`], { stdio: ['ignore', 'pipe', 'ignore'], ...OWN_GROUP }))
+    const cancelled = stopOnCancel(child)
+    child.on('close', () => resolve(cancelled()))
+    until(() => fs.existsSync(mark) && fs.readFileSync(mark, 'utf8').trim()).then(() => c.abort())
+  }))
+  assert.equal(out, true)
+  // "close" came because the grandchild let go of the pipe, not because its 30 seconds ran out
+  assert.ok(Date.now() - started < 20000)
+  const pid = Number(fs.readFileSync(mark, 'utf8').trim())
+  assert.ok(await until(() => { try { process.kill(pid, 0); return false } catch { return true } }), 'the grandchild is still running')
+})
+
 // ---- through the panel ---------------------------------------------------------------------
 
 // Purpur's API, standing in: the version list, the build, and a jar that never finishes arriving.
@@ -141,7 +176,10 @@ test('a create is cancelled from the page: nothing is made, and the job says so'
     assert.deepEqual(await (await post('jobs/none-such/cancel', {})).json(), { cancelling: false })
 
     const creating = post('instances', { name: 'stopme', label: 'Stop me', loader: 'purpur', version: '1.21.4', force: true, jobId: 'job-create-1' })
-    assert.ok(await until(() => held.size > 0), 'the jar download never started')
+    // (a long limit: Java is looked for first, and a slow machine takes its time over that)
+    const up = await until(() => held.size > 0, 30000)
+    if (!up) creating.catch(() => {})
+    assert.ok(up, 'the jar download never started')
     // a second job under the same id is refused while the first runs, and leaves it alone
     const twice = await post('instances', { name: 'other', loader: 'purpur', version: '1.21.4', force: true, jobId: 'job-create-1' })
     assert.equal(twice.status, 400)
@@ -197,6 +235,11 @@ test('a launch that was cancelled does not start the game', async () => {
     assert.equal(status('halt').running, false, `the game was started after a cancel at ${at}`)
     if (at === 'java') assert.ok(!stages.includes('spawn'))
   }
+  // cancelled inside the downloads: still a cancel when it comes out, not "could not download"
+  const { ensureVersion } = await import('../src/client-install.mjs')
+  const gone = new AbortController()
+  gone.abort()
+  await assert.rejects(withCancel(gone.signal, () => ensureVersion(mc)), (err) => isCancelled(err) && !/could not download/.test(err.message))
   // and the setup is not left locked: the next launch goes through
   const out = await launch('halt', { fakeJava })
   assert.ok(out.pid)

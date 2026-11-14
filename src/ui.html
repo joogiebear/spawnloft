@@ -15489,13 +15489,18 @@ function cancelButtonFor(button, jobId) {
   button.classList.remove('primary');
   button.textContent = 'Cancel';
   button.disabled = false;
+  // The press that started the create can have a second one right behind it (a double click, a
+  // key held down), and that one would land on Cancel. For a moment the button takes none.
+  const armed = Date.now() + 700;
   button.onclick = async () => {
+    if (Date.now() < armed) return;
     button.disabled = true;
     button.textContent = 'Cancelling\u2026';
     try {
       const out = await post('/jobs/' + encodeURIComponent(jobId) + '/cancel', {});
-      // nothing by that id is running: it finished in the moment before the press
-      if (!out.cancelling && button.dataset.job === jobId) button.textContent = 'Finishing\u2026';
+      // nothing by that id is running: not started yet, or over in the moment before the press.
+      // The button is a Cancel again; if the create is over, its own answer is about to put it back.
+      if (!out.cancelling && button.dataset.job === jobId) { button.disabled = false; button.textContent = 'Cancel'; }
     } catch (err) {
       if (button.dataset.job !== jobId) return;
       button.disabled = false;

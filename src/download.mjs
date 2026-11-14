@@ -31,6 +31,7 @@ export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500,
       if (last || init.signal?.aborted) throw err
       onRetry?.({ attempt, reason: err.cause?.message || err.message })
       await wait(delayMs * attempt)
+      init.signal?.throwIfAborted()
       continue
     }
     if (last || !TRANSIENT.has(res.status)) return res
@@ -38,6 +39,7 @@ export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500,
     await res.body?.cancel().catch(() => {})
     onRetry?.({ attempt, reason: `HTTP ${res.status}` })
     await wait(delayMs * attempt)
+    init.signal?.throwIfAborted()
   }
 }
 
@@ -108,6 +110,19 @@ export async function fetchJson(url, { label = url } = {}) {
 
 // hash names the algorithm and expected the publisher's digest, both optional. A source that
 // publishes none gets TLS plus a size floor.
+// Where a download is written until it is whole. One name per attempt: two downloads of the same
+// file (two setups on one Minecraft version, started together) each write their own, and one of
+// them stopping or failing takes nothing from the other.
+export function partPath(dest) {
+  return `${dest}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.part`
+}
+
+/** Removes what a stopped download had written. Never the reason the caller hears about: a file
+ *  Windows still holds for a moment is tried again, and then left. */
+export function dropPart(tmp) {
+  try { fs.rmSync(tmp, { force: true, maxRetries: 5, retryDelay: 100 }) } catch { /* left behind; nothing reads a .part */ }
+}
+
 export async function downloadFile(url, dest, { hash = null, expected = null, onProgress = null, minBytes = 0, label = null } = {}) {
   const what = label ?? dest
   // the job this download is part of, if it is part of one that can be cancelled
@@ -122,7 +137,7 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
   }
   if (!res.ok || !res.body) fail(`download of ${what} failed (${res.status}) from ${url}`, 'download-failed')
 
-  const tmp = `${dest}.part`
+  const tmp = partPath(dest)
   const digest = hash ? crypto.createHash(hash) : null
   const source = Readable.fromWeb(res.body)
   let received = 0
@@ -136,8 +151,8 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
     await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
   } catch (err) {
     // cancelled half way: the half is not left for a later download to trip on
+    dropPart(tmp)
     if (!signal?.aborted) throw err
-    fs.rmSync(tmp, { force: true })
     throw new Cancelled()
   }
 
