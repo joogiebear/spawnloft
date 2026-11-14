@@ -1433,13 +1433,13 @@
     display: grid;
     /* Named areas, not auto-flow: an item with a definite grid-row is placed BEFORE the auto-flow
        items, so giving the buttons a row span sent them to column 1 and pushed the date right. */
-    grid-template-columns: minmax(0, 1fr) 132px 84px 262px;
+    grid-template-columns: 16px minmax(0, 1fr) 132px 84px 262px;
     column-gap: var(--s-4);
     align-items: center;
     padding: 0 var(--s-4);
   }
   .snaps-head {
-    grid-template-areas: "what tag size actions";
+    grid-template-areas: "pick what tag size actions";
     height: 34px;
     background: rgba(var(--ink-rgb), .02);
     border-bottom: 1px solid var(--line);
@@ -1448,10 +1448,12 @@
   .snaps-head > :nth-child(1) { grid-area: what; }
   .snaps-head > :nth-child(2) { grid-area: tag; }
   .snaps-head > :nth-child(3) { grid-area: size; text-align: right; }
+  /* Size is the last label; left to auto-placement it would take the tick-box column */
+  .snaps-head > :last-child { grid-area: size; text-align: right; }
   .snap {
     grid-template-areas:
-      "when tag size actions"
-      "what tag size actions";
+      "pick when tag size actions"
+      "pick what tag size actions";
     row-gap: 2px;
     padding-top: 10px;
     padding-bottom: 10px;
@@ -1461,6 +1463,13 @@
   }
   .snap:last-child { border-bottom: 0; }
   .snap:hover { background: rgba(var(--ink-rgb), .035); }
+  .snap .pick { grid-area: pick; }
+  .snap[data-picked] { background: var(--lapis-fill); }
+  .snap-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 8px; min-height: 30px; }
+  .snap-bar label { display: inline-flex; align-items: center; gap: 8px; font: var(--t-2)/1.3 var(--ui); color: var(--ink-2); cursor: pointer; }
+  .snap-bar .said { flex: 1 1 auto; font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); }
+  .snap-bar button { padding: 4px 10px; font-size: var(--t-2); flex: none; }
+  .hist-sum { margin: 0 0 8px; font: var(--t-2)/1.4 var(--ui); color: var(--ink-2); }
   .snap .when { grid-area: when; font: 500 var(--t-3)/1.4 var(--ui); color: var(--ink); }
   .snap .what { grid-area: what; font: var(--t-1)/1.45 var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color var(--ease); }
   .snap:hover .what { color: var(--ink-2); }
@@ -1484,16 +1493,16 @@
   .snap .items { font-family: var(--mono); text-align: right; }
   /* Wide: why the snapshot was taken. Ultra: how much it holds. */
   @container pane (min-width: 1280px) {
-    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 84px 262px; }
-    .snaps-head { grid-template-areas: "what tag why size actions"; }
-    .snap { grid-template-areas: "when tag why size actions" "what tag why size actions"; }
+    .snaps-head, .snap { grid-template-columns: 16px minmax(0, 1fr) 132px 130px 84px 262px; }
+    .snaps-head { grid-template-areas: "pick what tag why size actions"; }
+    .snap { grid-template-areas: "pick when tag why size actions" "pick what tag why size actions"; }
     .snap .why { display: block; grid-area: why; }
     .snaps-head > .h-why { display: block; grid-area: why; font: inherit; color: inherit; }
   }
   @container pane (min-width: 2000px) {
-    .snaps-head, .snap { grid-template-columns: minmax(0, 1fr) 132px 130px 80px 84px 262px; }
-    .snaps-head { grid-template-areas: "what tag why items size actions"; }
-    .snap { grid-template-areas: "when tag why items size actions" "what tag why items size actions"; }
+    .snaps-head, .snap { grid-template-columns: 16px minmax(0, 1fr) 132px 130px 80px 84px 262px; }
+    .snaps-head { grid-template-areas: "pick what tag why items size actions"; }
+    .snap { grid-template-areas: "pick when tag why items size actions" "pick what tag why items size actions"; }
     .snap .items { display: block; grid-area: items; }
     .snaps-head > .h-items { display: block; grid-area: items; text-align: right; font: inherit; color: inherit; }
   }
@@ -2662,8 +2671,8 @@
 
     .snaps-head { display: none; }
     .snap {
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: "when size" "what tag" "actions actions";
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      grid-template-areas: "pick when size" "pick what tag" "actions actions actions";
     }
     .snap .snap-actions { justify-content: flex-start; margin-top: 6px; opacity: 1; }
     .snap .tag { justify-self: end; }
@@ -11651,7 +11660,7 @@ async function renderBackups(opts) {
   // The selection can move while the request is in flight; the answer to the old question is not
   // an answer to the new one.
   if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
-  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror, data.pendingRoot]);
+  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror, data.pendingRoot, data.cleanCopies]);
   if (!force && history && history.isConnected) {
     body.querySelector('[data-backup-status]').textContent = '';
     // Only history changes in the background. Scope, schedule edits, focus and the archive
@@ -11797,6 +11806,101 @@ const scopeLabel = (sc) => SCOPE_LABELS[sc] || sc.charAt(0).toUpperCase() + sc.s
 function isWholeBackup(snap) {
   return !singleFileOf(snap) && !['files', 'plugins', 'config'].includes(snap.scope);
 }
+
+/**
+ * How much the history holds: backups of the server on one side, and on the other the small copies
+ * SpawnLoft keeps before it changes something (the core marks those, snap.copy).
+ */
+function backupTotals(snapshots) {
+  const out = { whole: { count: 0, size: 0 }, copies: { count: 0, size: 0 } };
+  for (const snap of snapshots || []) {
+    const side = snap.copy ? out.copies : out.whole;
+    side.count += 1;
+    side.size += Number(snap.size) || 0;
+  }
+  return out;
+}
+
+/** The line under History: how many there are and what they take, which no row says. */
+function historyWords(totals) {
+  const many = (n, one, more) => n + ' ' + (n === 1 ? one : more);
+  const whole = totals.whole.count
+    ? many(totals.whole.count, 'backup', 'backups') + ', ' + fileSize(totals.whole.size)
+    : 'No backup of the server yet';
+  if (!totals.copies.count) return whole + '.';
+  return whole + '. ' + many(totals.copies.count, 'small copy', 'small copies') + ' kept before changes, ' + fileSize(totals.copies.size) + '.';
+}
+
+/** Small copies old enough for the clean-up: what turning it on removes at once. */
+function copiesDue(snapshots, days, now) {
+  const before = (now ?? Date.now()) - days * 24 * 3600 * 1000;
+  return (snapshots || []).filter((s) => s.copy && !s.locked && !s.note && new Date(s.mtime).getTime() < before);
+}
+
+/** What is asked before the clean-up is turned on: what it removes, what it never does, what goes now. */
+function cleanCopiesQuestion(snapshots, days, now) {
+  const due = copiesDue(snapshots, days, now);
+  const size = due.reduce((n, s) => n + (Number(s.size) || 0), 0);
+  return {
+    title: 'Remove small copies after ' + days + ' days?',
+    text: 'A small copy is what SpawnLoft keeps before it changes something: the plugins folder before an install or an update, a file before an edit, a replace or a delete. '
+      + 'With this on, each one is removed once it is ' + days + ' days old. Undo in Activity stops working for a change when its copy has gone. '
+      + 'Backups of the server are never removed by this, and neither is a copy that is locked or has a note.'
+      + (due.length
+        ? ' ' + due.length + (due.length === 1 ? ' copy is' : ' copies are') + ' already that old (' + fileSize(size) + ') and ' + (due.length === 1 ? 'goes' : 'go') + ' now.'
+        : ' Nothing is that old yet, so nothing goes now.'),
+    confirmLabel: due.length ? 'Turn on and remove ' + due.length : 'Turn on',
+    danger: due.length > 0,
+  };
+}
+
+/** Beside the tick boxes: how many are ticked and what deleting them frees. */
+function pickedWords(chosen) {
+  if (!chosen.length) return '';
+  const size = chosen.reduce((n, s) => n + (Number(s.size) || 0), 0);
+  return chosen.length + ' selected, ' + fileSize(size);
+}
+
+/**
+ * What is asked before several are deleted. It says when backups of the server are among them,
+ * and when deleting them leaves the server with none.
+ */
+function deleteManyQuestion(chosen, snapshots) {
+  const size = chosen.reduce((n, s) => n + (Number(s.size) || 0), 0);
+  const copies = chosen.filter((s) => s.copy).length;
+  const names = new Set(chosen.map((s) => s.name));
+  // "no backup of this server" is about the ones that hold its worlds, not a Config only one
+  const whole = chosen.filter(isWholeBackup).length;
+  const wholeLeft = (snapshots || []).filter((s) => isWholeBackup(s) && !names.has(s.name)).length;
+  const things = chosen.length === 1 ? 'this backup' : 'these ' + chosen.length;
+  let mix = '';
+  if (copies && copies < chosen.length) mix = ' ' + copies + (copies === 1 ? ' is a small copy' : ' are small copies') + ' kept before a change; the rest are backups you or a schedule made.';
+  else if (copies) mix = copies === 1 ? ' It is a small copy kept before a change.' : ' All are small copies kept before changes.';
+  return {
+    title: chosen.length === 1 ? 'Delete this backup?' : 'Delete ' + chosen.length + ' backups?',
+    text: fileSize(size) + ' in all.' + mix + ' What ' + (chosen.length === 1 ? 'it holds goes with it' : 'they hold goes with them') + ', and there is no way back.'
+      + (whole && !wholeLeft ? ' Deleting ' + things + ' leaves no backup of this server.' : ''),
+    confirmLabel: chosen.length === 1 ? 'Delete backup' : 'Delete ' + chosen.length + ' backups',
+    danger: true,
+  };
+}
+
+/** What the toast says after several were deleted, with the ones that stayed and why. */
+function deletedManyWords(out) {
+  const n = (out.removed || []).length;
+  const skipped = out.skipped || [];
+  const locked = skipped.filter((s) => s.reason === 'locked').length;
+  const gone = skipped.length - locked;
+  const parts = [n ? 'Deleted ' + n + (n === 1 ? ' backup' : ' backups') + ', ' + fileSize(out.size || 0) + ' freed.' : 'Nothing was deleted.'];
+  if (locked) parts.push(locked + (locked === 1 ? ' is locked and stays.' : ' are locked and stay.'));
+  if (gone) parts.push(gone + (gone === 1 ? ' was already gone.' : ' were already gone.'));
+  return parts.join(' ');
+}
+
+/** Whether the history lists the small copies too. Off until asked for; kept while the panel is open. */
+let showSmallCopies = false;
+/** The backups ticked for deleting, by server, so a redraw of the list does not untick them. */
+const pickedBackups = new Map();
 
 /** The second line of the Backups strip when a task from Schedule, not this page's switch, backs the server up. */
 function scheduledBackupWords(tasks) {
@@ -12069,7 +12173,72 @@ function renderBackupHistory(row, data, signature) {
   hist.dataset.backupHistory = signature;
   const histTitle = document.createElement('h3');
   histTitle.className = 'hist-title';
-  histTitle.textContent = 'History (' + data.snapshots.length + ')';
+  histTitle.textContent = 'History';
+  // how many and how much: the count alone said nothing about the disk they take
+  const totals = backupTotals(data.snapshots);
+  const histSum = document.createElement('p');
+  histSum.className = 'hist-sum';
+  histSum.textContent = data.snapshots.length ? historyWords(totals) : '';
+  histSum.hidden = !data.snapshots.length;
+  const redraw = () => { if (hist.isConnected) hist.replaceWith(renderBackupHistory(row, data, signature)); };
+  // Small copies are out of the list until asked for: forty one-file copies hid the four backups.
+  const shown = data.snapshots.filter((s) => showSmallCopies || !s.copy);
+  if (!pickedBackups.has(row.name)) pickedBackups.set(row.name, new Set());
+  const picked = pickedBackups.get(row.name);
+  // a tick on something that is no longer listed, or is locked now, is not a tick
+  for (const name of [...picked]) {
+    if (!shown.some((s) => s.name === name && !s.locked)) picked.delete(name);
+  }
+  const copiesRow = document.createElement('div');
+  copiesRow.className = 'row where';
+  const copiesSaid = document.createElement('span');
+  copiesSaid.className = 'hint';
+  copiesSaid.textContent = data.cleanCopies
+    ? 'Small copies are removed once they are ' + data.copyDays + ' days old.'
+    : 'Small copies, kept before an install or an edit, stay until you delete them.';
+  const cleanBtn = document.createElement('button');
+  cleanBtn.className = 'ghost inline';
+  cleanBtn.type = 'button';
+  cleanBtn.dataset.cleanCopies = '';
+  cleanBtn.textContent = data.cleanCopies ? 'Keep them' : 'Remove after ' + data.copyDays + ' days';
+  cleanBtn.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
+  copiesRow.append(copiesSaid, cleanBtn);
+  if (totals.copies.count) {
+    const toggle = document.createElement('button');
+    toggle.className = 'ghost inline';
+    toggle.type = 'button';
+    toggle.dataset.showCopies = '';
+    toggle.setAttribute('aria-pressed', String(showSmallCopies));
+    toggle.textContent = (showSmallCopies ? 'Hide small copies (' : 'Show small copies (') + totals.copies.count + ')';
+    toggle.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
+    toggle.onclick = () => {
+      showSmallCopies = !showSmallCopies;
+      redraw();
+      const again = $('#backupsBody [data-show-copies]');
+      if (again) again.focus();
+    };
+    copiesRow.append(toggle);
+  }
+  cleanBtn.onclick = async () => {
+    if (data.cleanCopies) {
+      cleanBtn.disabled = true;
+      try {
+        await post(base + '/clean-copies', { on: false });
+        toast('Small copies are kept until you delete them.', 'good');
+        await renderBackups({ force: true });
+      } catch (e) { toast(e.message, 'bad'); cleanBtn.disabled = false; }
+      return;
+    }
+    const got = await ask({
+      ...cleanCopiesQuestion(data.snapshots, data.copyDays),
+      submit: () => post(base + '/clean-copies', { on: true }),
+    });
+    if (!got) return;
+    const gone = (got.out && got.out.removed) || [];
+    toast('Small copies are now removed after ' + data.copyDays + ' days.'
+      + (gone.length ? ' ' + gone.length + ' went now, ' + fileSize(got.out.size || 0) + ' freed.' : ''), 'good');
+    await renderBackups({ force: true });
+  };
   const where = document.createElement('div');
   where.className = 'row where';
   const wherePath = document.createElement('span');
@@ -12171,12 +12340,68 @@ function renderBackupHistory(row, data, signature) {
   stopFirst.style.margin = '0 0 8px';
   stopFirst.textContent = 'Stop the server to restore a backup. Everything else here works while it runs.';
   stopFirst.hidden = !(data.running && data.snapshots.length);
-  hist.append(histTitle, stopFirst, where, ...(pending ? [pending] : []), mirrorRow);
+  hist.append(histTitle, histSum, stopFirst, where, ...(pending ? [pending] : []), mirrorRow, copiesRow);
 
   if (!data.snapshots.length) {
     hist.append(emptyState('archive', 'Nothing here yet. Reset and delete both take one '
       + 'automatically before they run, so this fills up on its own.'));
+  } else if (!shown.length) {
+    hist.append(emptyState('archive', 'No backup of this server yet. What is here is small copies kept before changes: '
+      + '"Show small copies" lists them.'));
   } else {
+    // ---- several at once ------------------------------------------------------
+    const bar = document.createElement('div');
+    bar.className = 'snap-bar';
+    const allLabel = document.createElement('label');
+    const all = document.createElement('input');
+    all.type = 'checkbox';
+    all.dataset.pickAll = '';
+    allLabel.append(all, document.createTextNode('Select all'));
+    const said = document.createElement('span');
+    said.className = 'said';
+    said.setAttribute('role', 'status');
+    const dropMany = document.createElement('button');
+    dropMany.type = 'button';
+    dropMany.className = 'danger';
+    dropMany.dataset.deleteMany = '';
+    dropMany.textContent = 'Delete selected';
+    bar.append(allLabel, said, dropMany);
+    const free = shown.filter((s) => !s.locked);
+    const chosenNow = () => shown.filter((s) => picked.has(s.name));
+    const paintBar = () => {
+      const chosen = chosenNow();
+      said.textContent = pickedWords(chosen);
+      dropMany.hidden = !chosen.length;
+      all.disabled = !free.length;
+      all.checked = free.length > 0 && chosen.length === free.length;
+      all.indeterminate = chosen.length > 0 && chosen.length < free.length;
+      allLabel.title = free.length ? '' : 'Every backup here is locked';
+    };
+    all.onchange = () => {
+      const on = all.checked;
+      for (const s of free) {
+        if (on) picked.add(s.name); else picked.delete(s.name);
+      }
+      for (const box of hist.querySelectorAll('.snap .pick:not(:disabled)')) {
+        box.checked = on;
+        box.closest('.snap').toggleAttribute('data-picked', on);
+      }
+      paintBar();
+    };
+    dropMany.onclick = async () => {
+      const chosen = chosenNow();
+      if (!chosen.length) return;
+      const got = await ask({
+        ...deleteManyQuestion(chosen, data.snapshots),
+        submit: () => post(base + '/delete-many', { snapshots: chosen.map((s) => s.name) }),
+      });
+      if (!got) return;
+      picked.clear();
+      const out = got.out || {};
+      toast(deletedManyWords(out), (out.removed || []).length ? 'good' : 'bad');
+      await renderBackups({ force: true });
+    };
+    hist.append(bar);
     const list = document.createElement('div');
     list.className = 'snaps';
     // Column labels for the grid below. Presentation only: aria-hidden, since each row already
@@ -12191,10 +12416,23 @@ function renderBackupHistory(row, data, signature) {
       head.append(cell);
     }
     list.append(head);
-    for (const snap of data.snapshots) {
+    for (const snap of shown) {
       const el = document.createElement('div');
       el.className = 'snap';
       el.dataset.backupName = snap.name;
+      const pick = document.createElement('input');
+      pick.type = 'checkbox';
+      pick.className = 'pick';
+      pick.setAttribute('aria-label', 'Select ' + backupWords(snap));
+      pick.disabled = Boolean(snap.locked);
+      if (snap.locked) pick.title = 'Locked. Unlock it first.';
+      pick.checked = picked.has(snap.name);
+      el.toggleAttribute('data-picked', pick.checked);
+      pick.onchange = () => {
+        if (pick.checked) picked.add(snap.name); else picked.delete(snap.name);
+        el.toggleAttribute('data-picked', pick.checked);
+        paintBar();
+      };
       const when = document.createElement('div');
       when.className = 'when';
       const age = ago(snap.mtime);
@@ -12294,7 +12532,7 @@ function renderBackupHistory(row, data, signature) {
       }
       actions.append(lock, noteBtn, download, restore, drop);
       // in the order it is read; where each sits is the stylesheet's (grid areas)
-      el.append(when, what, tag, why, items, size, actions);
+      el.append(pick, when, what, tag, why, items, size, actions);
       list.append(el);
 
       lock.onclick = async () => {
@@ -12409,6 +12647,7 @@ function renderBackupHistory(row, data, signature) {
       };
     }
     hist.append(list);
+    paintBar();
   }
   lockRestoring(hist, row.name);
   return hist;

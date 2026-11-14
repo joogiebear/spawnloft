@@ -258,7 +258,17 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   // blocking the thread the first snapshot needs to finish.
   const release = await acquireLockAsync(path.join(dir, '.snapshot.lock'), { timeoutMs: 30 * 60 * 1000 })
   try {
-    return await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut })
+    const made = await createSnapshotLocked(inst, { scope, label, running, taskId, flush, only, quiet }, { members, base, dir, leaveOut })
+    // The clean-up a server turned on runs here, where something is being written anyway: never on
+    // a read, never in the middle of a restore, and it cannot fail the snapshot just taken.
+    if (inst.backupCleanCopies === true && !duringRestore) {
+      try {
+        cleanCopies(inst.name)
+      } catch {
+        // the next snapshot tries again
+      }
+    }
+    return made
   } finally {
     release()
   }
@@ -419,6 +429,18 @@ export function snapshotProblems(warnings) {
   return out
 }
 
+// A small copy: part of a server (its plugins, its config, or named files) that SpawnLoft took by
+// itself before a change, so the change can be undone. The page keeps these out of the way of the
+// backups of the server, and they are the only thing the clean-up below ever removes. Told from the
+// manifest, by the labels SpawnLoft itself writes: a "Config only" backup someone asked for is
+// theirs, and so is anything a schedule made. A deleted world's copy (world-delete) is not one
+// either: it can be the only copy of that world there is.
+const CHANGE_COPY_LABELS = new Set(['pre-install', 'pre-update', 'before-edit', 'file-edit', 'file-replace', 'file-delete'])
+const PARTIAL_SCOPES = new Set(['plugins', 'config', 'files'])
+export function isChangeCopy(manifest) {
+  return Boolean(manifest) && PARTIAL_SCOPES.has(manifest.scope) && CHANGE_COPY_LABELS.has(manifest.label) && !manifest.taskId
+}
+
 export function listSnapshots(name) {
   // a listing makes nothing: the panel answers it on a GET (test/panel-get-writes.test.mjs)
   const dir = path.join(BACKUPS_DIR, name)
@@ -442,6 +464,7 @@ export function listSnapshots(name) {
         members: manifest.members ?? [],
         locked: manifest.locked === true,
         note: manifest.note ?? null,
+        copy: isChangeCopy(manifest),
         excluded: manifest.excluded ?? [],
         databases: manifest.databases ?? [],
         problems: snapshotProblems(manifest.warnings),
@@ -752,4 +775,64 @@ export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) 
   }
   if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} removed, the newest ${keep} kept` })
   return remove
+}
+
+function removeFiles(name, snap) {
+  fs.rmSync(snap.path, { force: true })
+  fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
+  mirrorRemove(name, snap.name)
+}
+
+// Several at once, by their exact names as the history lists them: no "latest", no part of a name,
+// since a delete of many must not guess at any of them. A locked one, or one that is no longer
+// there, is left and said; the rest still go. One line in the activity for the lot.
+export const REMOVE_MANY_LIMIT = 500
+export function removeSnapshots(name, refs) {
+  refuseWhileRestoring(name, 'deleting backups')
+  if (!Array.isArray(refs) || !refs.length) fail('which backups?')
+  if (refs.length > REMOVE_MANY_LIMIT) fail(`at most ${REMOVE_MANY_LIMIT} backups at a time`)
+  const byName = new Map(listSnapshots(name).map((s) => [s.name, s]))
+  const removed = []
+  const skipped = []
+  let size = 0
+  for (const ref of [...new Set(refs.map(String))]) {
+    const snap = byName.get(ref)
+    if (!snap) {
+      skipped.push({ name: ref, reason: 'missing' })
+      continue
+    }
+    if (snap.locked) {
+      skipped.push({ name: ref, reason: 'locked' })
+      continue
+    }
+    removeFiles(name, snap)
+    removed.push(snap.name)
+    size += snap.size
+  }
+  if (removed.length === 1) activity.record(name, 'backup-delete', { detail: removed[0] })
+  else if (removed.length) activity.record(name, 'backup-delete', { detail: `${removed.length} backups, ${humanBytes(size)}` })
+  return { removed, size, skipped }
+}
+
+// The clean-up a server can turn on (registry: backupCleanCopies). It removes small copies, as
+// isChangeCopy defines them, once they are older than COPY_DAYS. Never a backup of the server, a
+// locked one, or one somebody put a note on. Off unless turned on.
+export const COPY_DAYS = 30
+export function oldCopies(name, { now = Date.now(), days = COPY_DAYS } = {}) {
+  const before = now - days * 24 * 3600 * 1000
+  return listSnapshots(name).filter((s) => s.copy && !s.locked && !s.note && new Date(s.mtime).getTime() < before)
+}
+
+export function cleanCopies(name, { now = Date.now(), days = COPY_DAYS } = {}) {
+  if (isRestoring(name)) return { removed: [], size: 0 }
+  const old = oldCopies(name, { now, days })
+  let size = 0
+  for (const snap of old) {
+    removeFiles(name, snap)
+    size += snap.size
+  }
+  if (old.length) {
+    activity.record(name, 'backup-prune', { detail: `${old.length} small ${old.length === 1 ? 'copy' : 'copies'} older than ${days} days, ${humanBytes(size)}` })
+  }
+  return { removed: old.map((s) => s.name), size }
 }

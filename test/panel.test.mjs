@@ -1044,3 +1044,70 @@ test('installing a plugin asks about a wrong version and about what it needs, an
   assert.match(html, /await refreshInstalled\(\);/)
   assert.ok(!html.includes('anything else installs with a note'))
 })
+
+test('the backup history says what it holds, and asks plainly before several go or a clean-up starts', () => {
+  const { backupTotals, historyWords, copiesDue, cleanCopiesQuestion, pickedWords, deleteManyQuestion, deletedManyWords } = lifted([
+    'fileSize', 'singleFileOf', 'isWholeBackup', 'backupTotals', 'historyWords', 'copiesDue', 'cleanCopiesQuestion', 'pickedWords', 'deleteManyQuestion', 'deletedManyWords',
+  ])
+  const MB = 1024 * 1024
+  const now = Date.parse('2026-11-14T12:00:00Z')
+  const daysAgo = (n) => new Date(now - n * 24 * 3600 * 1000).toISOString()
+  const whole = (name, size) => ({ name, size, copy: false, scope: 'standard', members: ['world', 'plugins'], mtime: daysAgo(1) })
+  const copy = (name, size, age, extra = {}) => ({ name, size, copy: true, scope: 'plugins', members: ['plugins'], mtime: daysAgo(age), ...extra })
+  const list = [whole('w1', 2048 * MB), whole('w2', 1024 * MB), copy('c1', 3 * MB, 40), copy('c2', 2 * MB, 31, { locked: true }), copy('c3', MB, 90, { note: 'keep' }), copy('c4', MB, 2)]
+
+  const totals = backupTotals(list)
+  assert.deepEqual(totals, { whole: { count: 2, size: 3072 * MB }, copies: { count: 4, size: 7 * MB } })
+  assert.equal(historyWords(totals), '2 backups, 3.0 GB. 4 small copies kept before changes, 7.0 MB.')
+  assert.equal(historyWords(backupTotals([whole('w', MB)])), '1 backup, 1.0 MB.')
+  assert.equal(historyWords(backupTotals([copy('c', MB, 1)])), 'No backup of the server yet. 1 small copy kept before changes, 1.0 MB.')
+  assert.deepEqual(backupTotals(undefined), { whole: { count: 0, size: 0 }, copies: { count: 0, size: 0 } })
+
+  // what the clean-up takes at once: old, a small copy, not locked, no note
+  assert.deepEqual(copiesDue(list, 30, now).map((s) => s.name), ['c1'])
+  const q = cleanCopiesQuestion(list, 30, now)
+  assert.equal(q.title, 'Remove small copies after 30 days?')
+  assert.match(q.text, /1 copy is already that old \(3\.0 MB\) and goes now\.$/)
+  assert.match(q.text, /Backups of the server are never removed by this/)
+  assert.match(q.text, /Undo in Activity stops working/)
+  assert.equal(q.confirmLabel, 'Turn on and remove 1')
+  assert.equal(q.danger, true)
+  const none = cleanCopiesQuestion([whole('w', MB), copy('c', MB, 3)], 30, now)
+  assert.match(none.text, /Nothing is that old yet, so nothing goes now\.$/)
+  assert.equal(none.confirmLabel, 'Turn on')
+  assert.equal(none.danger, false)
+  const two = cleanCopiesQuestion([copy('a', MB, 31), copy('b', MB, 32)], 30, now)
+  assert.match(two.text, /2 copies are already that old \(2\.0 MB\) and go now\.$/)
+
+  assert.equal(pickedWords([]), '')
+  assert.equal(pickedWords([list[2], list[5]]), '2 selected, 4.0 MB')
+
+  const mixed = deleteManyQuestion([list[0], list[2], list[5]], list)
+  assert.equal(mixed.title, 'Delete 3 backups?')
+  assert.equal(mixed.text, '2.0 GB in all. 2 are small copies kept before a change; the rest are backups you or a schedule made. What they hold goes with them, and there is no way back.')
+  assert.equal(mixed.confirmLabel, 'Delete 3 backups')
+  assert.equal(mixed.danger, true)
+  // every backup of the server is among them: said, since the small copies left do not back it up
+  const last = deleteManyQuestion([list[0], list[1]], list)
+  assert.match(last.text, /Deleting these 2 leaves no backup of this server\.$/)
+  const copies = deleteManyQuestion([list[2], list[5]], list)
+  assert.match(copies.text, /All are small copies kept before changes\./)
+  assert.doesNotMatch(copies.text, /leaves no backup/)
+  // a Config only backup someone made is not a small copy, and not a backup of the server either
+  const config = { name: 'cfg', size: MB, copy: false, scope: 'config', members: ['server.properties', 'bukkit.yml'], mtime: daysAgo(1) }
+  const lastWhole = deleteManyQuestion([list[0], list[1]], [...list, config])
+  assert.match(lastWhole.text, /leaves no backup of this server\.$/)
+  assert.doesNotMatch(deleteManyQuestion([config], [config]).text, /leaves no backup|small cop/)
+  const one = deleteManyQuestion([list[1]], [list[1]])
+  assert.equal(one.title, 'Delete this backup?')
+  assert.match(one.text, /What it holds goes with it, and there is no way back\. Deleting this backup leaves no backup of this server\.$/)
+
+  assert.equal(deletedManyWords({ removed: ['a', 'b'], size: 5 * MB, skipped: [] }), 'Deleted 2 backups, 5.0 MB freed.')
+  assert.equal(deletedManyWords({ removed: ['a'], size: MB, skipped: [{ name: 'x', reason: 'locked' }, { name: 'y', reason: 'missing' }, { name: 'z', reason: 'missing' }] }),
+    'Deleted 1 backup, 1.0 MB freed. 1 is locked and stays. 2 were already gone.')
+  assert.equal(deletedManyWords({ removed: [], size: 0, skipped: [{ name: 'x', reason: 'locked' }] }), 'Nothing was deleted. 1 is locked and stays.')
+
+  // the list starts without the small copies, and the page asks the core which they are
+  assert.match(html, /let showSmallCopies = false;/)
+  assert.match(html, /data\.snapshots\.filter\(\(s\) => showSmallCopies \|\| !s\.copy\)/)
+})

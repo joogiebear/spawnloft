@@ -609,6 +609,9 @@ async function handleBackups(req, res, name, seg) {
     const history = {
       snapshots: backup.listSnapshots(name),
       exclude: backup.excludePatterns(inst),
+      // the clean-up of small copies: whether this server has it on, and how old one has to be
+      cleanCopies: inst.backupCleanCopies === true,
+      copyDays: backup.COPY_DAYS,
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       // the folder saved for the next start, when it is not the one in use: the page says so until then
@@ -699,6 +702,28 @@ async function handleBackups(req, res, name, seg) {
   if (action === 'delete') {
     if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
     return json(res, 200, backup.removeSnapshot(name, String(body.snapshot)))
+  }
+
+  if (action === 'delete-many') {
+    if (!Array.isArray(body.snapshots) || !body.snapshots.length) return json(res, 400, { error: 'which backups?' })
+    if (body.snapshots.some((s) => typeof s !== 'string')) return json(res, 400, { error: 'each backup is named by its file name' })
+    return json(res, 200, backup.removeSnapshots(name, body.snapshots))
+  }
+
+  if (action === 'clean-copies') {
+    // a missing or misspelled "on" must not read as either answer
+    if (typeof body.on !== 'boolean') return json(res, 400, { error: 'on must be true or false' })
+    if (body.on) {
+      const refused = backup.isRestoring(name)
+      if (refused) return json(res, 409, { error: 'A backup is being restored. Turn the clean-up on when that is done.' })
+    }
+    registry.updateInstance(name, { backupCleanCopies: body.on ? true : null })
+    activity.record(name, 'settings', {
+      detail: body.on ? `small copies are removed after ${backup.COPY_DAYS} days` : 'small copies are kept until deleted',
+    })
+    // on: what is already old enough goes now, which is what the page said would happen
+    const cleaned = body.on ? backup.cleanCopies(name) : { removed: [], size: 0 }
+    return json(res, 200, { cleanCopies: body.on, removed: cleaned.removed, size: cleaned.size })
   }
 
   if (action === 'auto') {

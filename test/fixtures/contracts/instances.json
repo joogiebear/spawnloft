@@ -32,6 +32,7 @@
         "jvmFlags?": { "oneOf": [{ "array": "string" }, "null"] },
         "webhook?": "string|null",
         "backupExclude?": { "oneOf": [{ "array": "string" }, "null"] },
+        "backupCleanCopies?": "boolean|null",
         "bind?": "string"
       }
     },
@@ -78,6 +79,7 @@
     "origin": "how the server was made; uninstall keeps an adopted folder",
     "jvmFlags": "null or absent means the recommended flags (registry.mjs jvmFlagsFor); at most 60, each starting with -, never -Xms/-Xmx/-jar/-cp",
     "backupExclude": "relative /-separated paths, at most 40",
+    "backupCleanCopies": "true removes small copies taken before a change (backup.mjs isChangeCopy) once they are 30 days old; absent or null means they are kept",
     "bind": "read (server-ip in server.properties) but never written by SpawnLoft; only a hand edit sets it",
     "autoRestart": "absent means off; the daemon re-reads it at every exit",
     "webhook": "an http(s) URL; see webhook.json",
