@@ -1310,7 +1310,9 @@ test('the Mods choice: None and four loaders, each with its reason; Forge from 1
 
 test('the crash notice names the common Forge and NeoForge causes', () => {
   const at = html.indexOf('  const LOADER_CAUSES = [')
-  const causes = html.slice(at, html.indexOf('\n  ]\n', at) + 4)
+  // the page may be checked out with CRLF line endings (Windows)
+  const end = /\r?\n  \]\r?\n/.exec(html.slice(at))
+  const causes = html.slice(at, at + end.index + end[0].length)
   const { loaderCrashCause } = lifted(['LOADER_NAMES', 'INSTALLER_LOADERS', 'loaderName', 'loaderCrashCause'], causes)
   const say = (loader, ...lines) => loaderCrashCause(loader, lines, '1.20.1')
   assert.equal(say('forge', '[main/ERROR]: Missing or unsupported mandatory dependencies:', "\tMod ID: 'minecraft', Requested by: 'create', Expected range: '[1.21,1.22)', Actual version: '1.20.1'"),
