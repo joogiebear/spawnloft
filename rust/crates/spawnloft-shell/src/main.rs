@@ -25,7 +25,7 @@ use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use tauri::webview::PageLoadEvent;
-use tauri::{Manager, RunEvent};
+use tauri::{Listener, Manager, RunEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 mod bridge;
@@ -121,10 +121,15 @@ fn main() -> ExitCode {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(w) = app.get_webview_window(bridge::MAIN) {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
+            match app.get_webview_window(bridge::MAIN) {
+                Some(w) => {
+                    let _ = w.unminimize();
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+                // closed while a launcher or console window kept the app going: without this,
+                // starting SpawnLoft again did nothing and the panel could not be reached
+                None => bridge::reopen_main(app),
             }
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -146,6 +151,12 @@ fn main() -> ExitCode {
                     ),
                 );
             }
+            let again = app.handle().clone();
+            app.listen(bridge::RETRY_EVENT, move |_| {
+                let app = again.clone();
+                // off the event's thread: stopping a core that hangs takes up to a second
+                std::thread::spawn(move || retry_core(&app));
+            });
             start_core(app.handle().clone());
             if let Some(core) = core_binary() {
                 updater::start(app.handle().clone(), core);
@@ -242,6 +253,15 @@ fn resume_pending_handover() {
             Err(e) => local::log(&format!("{}: {e}", args.join(" "))),
         }
     }
+}
+
+/// "Try again" on the window's "could not start" state: whatever is left of the last core is
+/// stopped, and the count of restarts starts over.
+fn retry_core(app: &tauri::AppHandle) {
+    let core = app.state::<Core>();
+    core.restarts.store(0, std::sync::atomic::Ordering::SeqCst);
+    core.stop();
+    start_core(app.clone());
 }
 
 pub(crate) fn start_core(app: tauri::AppHandle) {
@@ -356,13 +376,9 @@ fn open_panel(app: &tauri::AppHandle, url: &str) {
         Ok(_) => {}
         Err(e) => local::log(&format!("could not ask the panel about first-run setup: {e}")),
     }
-    // the key is only ever used to sign; what goes in the address is a token that works once
-    let login = spawnloft_lib::panel_auth::load_key()
-        .and_then(|key| spawnloft_lib::panel_auth::login_path(&key, addr.port(), to));
-    let target = match login.map(|path| parsed.join(&path)) {
-        Ok(Ok(target)) => target,
-        Ok(Err(e)) => return cannot_start(app, &format!("could not build the panel's address: {e}")),
-        Err(e) => return cannot_start(app, &format!("could not sign the window in to the panel: {e}")),
+    let target = match bridge::login_url(app, to) {
+        Ok(target) => target,
+        Err(e) => return cannot_start(app, &e),
     };
     match app.get_webview_window(bridge::MAIN) {
         Some(w) => {
@@ -374,11 +390,16 @@ fn open_panel(app: &tauri::AppHandle, url: &str) {
     }
 }
 
-/// The window is up but the core is not: say so in a dialog (1.x showed one too), with where
-/// to look. Servers are separate processes and are not affected.
+/// The window is up but the core is not: the window itself says so, in a sentence for the person,
+/// with Try again, the log and Quit (a box with only OK over a window still reading "Starting"
+/// left nothing to do but close it). Servers are separate processes and are not affected.
 fn cannot_start(app: &tauri::AppHandle, why: &str) {
     local::log(&format!("could not start the panel: {why}"));
     let log = local::run_dir().join("panel.log");
+    if bridge::show_failure(app, why, &log) {
+        return;
+    }
+    // no main window to say it in
     app.dialog()
         .message(format!(
             "{why}\n\nRunning servers are not affected. Details are in {}.",

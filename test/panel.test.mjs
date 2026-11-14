@@ -645,3 +645,55 @@ test('the Add sheet holds its tabs while a create runs', () => {
   assert.equal((html.match(/lockAddTabs\(true\);/g) || []).length, 2)
   assert.equal((html.match(/lockAddTabs\(false\);/g) || []).length, 4)
 })
+
+test('the header offers a 2.x update that is ready, and nothing else', () => {
+  const { headerUpdateWords } = lifted(['headerUpdateWords'])
+  assert.equal(headerUpdateWords(null), null)
+  assert.equal(headerUpdateWords({ installed: '2.0.0', pending: null }), null)
+  // going back to an older version is chosen in Preferences, never offered from the header
+  assert.equal(headerUpdateWords({ pending: { version: '2.0.0', rollback: true } }), null)
+  const words = headerUpdateWords({ pending: { version: '2.1.0' } })
+  assert.equal(words.label, 'Update to 2.1.0')
+  assert.match(words.title, /Preferences/)
+  // About names the version in the 2.x app, which has no appInfo
+  assert.match(html, /info\.unshift\(\['Version', 'v' \+ coreUpd\.status\.installed/)
+})
+
+test('the Java chip asks again once Java may have been installed', () => {
+  assert.match(html, /window\.addEventListener\('focus', \(\) => \{ if \(javaChipShows\(\)\) recheckJava\(\); \}\);/)
+  assert.match(html, /setInterval\(\(\) => \{ if \(javaChipShows\(\) && !document\.hidden\) recheckJava\(\); \}, 60000\);/)
+})
+
+test('the first-run Java row says what was found', () => {
+  const setup = fs.readFileSync(new URL('../src/setup.html', import.meta.url), 'utf8')
+  const at = setup.indexOf('function javaWords(')
+  assert.ok(at > 0)
+  let depth = 0, end = -1
+  for (let i = setup.indexOf('{', at); i < setup.length; i++) {
+    if (setup[i] === '{') depth++
+    else if (setup[i] === '}' && --depth === 0) { end = i + 1; break }
+  }
+  const javaWords = new Function(`${setup.slice(at, end)}; return javaWords`)()
+
+  const fine = javaWords({ ok: true, found: true, reason: 'ok', version: 'openjdk version "25"', message: 'Java 25 is installed.' })
+  assert.deepEqual([fine.state, fine.title, fine.get], ['ok', 'Java is installed', false])
+  // a Java whose version could not be read is reported as fine by the check, and is said so
+  const unknown = javaWords({ ok: true, found: true, reason: 'unknown-version', message: 'Found weird 1.' })
+  assert.deepEqual([unknown.state, unknown.title, unknown.get], ['ok', 'Java is installed', false])
+  // one that runs older versions works: no "servers will not start"
+  const old = javaWords({ ok: true, found: true, reason: 'old', message: 'Java 21 will run older Minecraft versions, but current Paper needs 25.' })
+  assert.equal(old.state, 'warn')
+  assert.ok(!/needs updating/.test(old.title) && !/will not start/.test(old.why))
+  const tooOld = javaWords({ ok: false, found: true, reason: 'too-old', message: 'Java 8 is too old.' })
+  assert.deepEqual([tooOld.state, tooOld.title], ['bad', 'Java needs updating'])
+  assert.match(tooOld.why, /will not start/)
+  // there, but would not run: not "not installed"
+  const broken = javaWords({ ok: false, found: false, reason: 'unusable', message: 'Java could not be run: exit 1' })
+  assert.match(broken.title, /did not run/)
+  const none = javaWords({ ok: false, found: false, reason: 'not-installed', message: 'Java is not installed, or not on PATH.' })
+  assert.deepEqual([none.state, none.title, none.get], ['bad', 'Java is not installed', true])
+  assert.equal(javaWords(null).title, 'Could not check for Java')
+
+  assert.match(setup, /id="javaAgain"/)
+  assert.match(setup, /window\.addEventListener\('focus'/)
+})

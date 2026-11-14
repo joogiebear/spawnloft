@@ -418,3 +418,23 @@ test('spawnloft ui --launcher finds this user\'s panel already on the port', asy
   assert.ok(link, res.out)
   assert.match(await (await fetch(link)).text(), /content="0; url=\/launcher"/)
 })
+
+test('in the app, a page that lost its sign-in is sent to get a new one', async () => {
+  const { signInPage, AGAIN_PATH } = await import('../src/panel-auth.mjs')
+  assert.equal(AGAIN_PATH, '/auth/again')
+  // a browser has nobody to ask: the command stays
+  const browser = signInPage({ kind: 'unauthorized' }, { path: '/' })
+  assert.match(browser, /run <code>spawnloft ui<\/code>/)
+  assert.doesNotMatch(browser, /http-equiv/)
+  // the window answers a move to AGAIN_PATH, so the page goes there by itself, with where it was
+  const app = signInPage({ kind: 'unauthorized' }, { shell: true, path: '/' })
+  assert.match(app, /<meta http-equiv="refresh" content="0; url=\/auth\/again">/)
+  assert.match(app, /<a href="\/auth\/again">Sign in again<\/a>/)
+  assert.match(signInPage({ kind: 'unauthorized' }, { shell: true, path: '/launcher?x=1' }), /url=\/auth\/again\?to=\/launcher"/)
+  // nothing from the address is echoed into the page but the two known targets
+  assert.doesNotMatch(signInPage({ kind: 'unauthorized' }, { shell: true, path: '/"><script>x</script>' }), /script/)
+  // a refused link, or the path itself coming back unanswered, offers the link and does not loop
+  assert.doesNotMatch(signInPage({ kind: 'login-refused' }, { shell: true, path: '/auth?t=x' }), /http-equiv/)
+  assert.doesNotMatch(signInPage({ kind: 'unauthorized' }, { shell: true, path: '/auth/again?to=/launcher' }), /http-equiv/)
+  for (const page of [browser, app]) assert.doesNotMatch(page, /<script/i)
+})

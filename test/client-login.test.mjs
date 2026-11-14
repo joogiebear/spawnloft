@@ -258,7 +258,7 @@ test('a full sign-in: stream first, authorize URL, callback answered before Micr
   assert.match(cb.headers.get('content-security-policy'), /default-src 'none'/)
   assert.equal(cb.headers.get('cache-control'), 'no-store')
   const page = await cb.text()
-  assert.match(page, /Finishing the sign-in in SpawnLoft/)
+  assert.match(page, /Go back to SpawnLoft/)
   assert.ok(!/<script/i.test(page))
   assert.ok(!page.includes('the-code') && !page.includes(state))
   for (let i = 0; i < 100 && stream.events.length < 2; i++) await new Promise((r) => setTimeout(r, 20))

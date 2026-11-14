@@ -32,6 +32,8 @@
     openProfileFolder: (name) => call('open_profile_folder', { name: String(name ?? '') }),
     // the system browser; resolves at once with { ok, external: true }, the login stream says the rest
     openMicrosoftLogin: (url) => call('open_microsoft_login', { url: String(url ?? '') }),
+    // brings this window forward: the sign-in happened in the browser, which is now on top
+    focusWindow: () => call('focus_window'),
     // the first-run wizard (src/setup.html at /setup), answered by the panel itself
     getSetup: async () => (await getJson('/api/setup')).body,
     checkJava: async () => (await getJson('/api/setup/java')).body,

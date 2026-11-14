@@ -181,6 +181,16 @@ async function main() {
       record(`lock: no credential, no answer, on the core (${panel.port}); the Node panel's port was not found, so it was not called directly`)
     }
 
+    // 1c. a page that lost its sign-in asks the window for a new one by moving to /auth/again
+    // (src/panel-auth.mjs signInPage). The panel serves nothing there: the window answers, and
+    // the page is back on the panel, signed in.
+    await js('setTimeout(() => { location.href = "/auth/again" }, 0)')
+    await sleep(500)
+    await until(async () => new URL(await url()).pathname === '/' && await js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel after signing in again', 30000)
+    assert.equal(new URL(await url()).port, panel.port)
+    assert.equal(await pageGet('/api/setup'), 200, 'signed in again')
+    record('sign-in: a page that asks is signed in again by the window')
+
     if (process.env.SMOKE_SCREENSHOT) {
       await fill()
       await sleep(1500)
@@ -198,7 +208,8 @@ async function main() {
     const shape = await js('const d = window.spawnloftDesktop; return d && { shell: d.shell, keys: Object.keys(d).sort(), frozen: Object.isFrozen(d) }')
     assert.equal(shape.shell, 'tauri')
     assert.ok(shape.frozen)
-    for (const k of ['pickFolder', 'pickFile', 'getZoom', 'setZoom', 'openExternal', 'openProfileFolder', 'openMicrosoftLogin', 'getSetup', 'saveSetup', 'checkJava']) assert.ok(shape.keys.includes(k), k)
+    for (const k of ['pickFolder', 'pickFile', 'getZoom', 'setZoom', 'openExternal', 'openProfileFolder', 'openMicrosoftLogin', 'focusWindow', 'getSetup', 'saveSetup', 'checkJava']) assert.ok(shape.keys.includes(k), k)
+    assert.deepEqual((await bridge('window.spawnloftDesktop.focusWindow()')).v, { ok: true })
     assert.ok(!shape.keys.includes('appInfo'), 'no Electron updater calls')
     assert.deepEqual((await bridge('window.spawnloftDesktop.openExternal("file:///etc/passwd")')).v, { ok: false })
     assert.deepEqual((await bridge('window.spawnloftDesktop.openMicrosoftLogin("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=x")')).v, { ok: false })
@@ -250,7 +261,7 @@ async function main() {
       assert.equal(has, 'object', 'child windows get the bridge')
       // built by the shell, not by the page: signed in only because the app's windows share cookies
       assert.equal(await pageGet('/api/setup'), 200, `${u.pathname + u.search} shares the main window's session`)
-      assert.ok(await js('return !!document.querySelector("#uiSize, #app, main, body > *")') && !/Sign in to this panel/.test(await wd('GET', '/title')), 'the child shows its page, not the sign-in page')
+      assert.ok(await js('return !!document.querySelector("#uiSize, #app, main, body > *")') && !/not signed in to SpawnLoft/.test(await wd('GET', '/title')), 'the child shows its page, not the sign-in page')
     }
     assert.deepEqual(seen.sort(), ['/?console=smoke%20server', '/launcher'])
     await wd('POST', '/window', { handle: main })
@@ -306,6 +317,36 @@ async function main() {
     for (const p of node2) process.kill(p, 'SIGKILL')
     await until(async () => { const u = new URL(await url()); return u.port !== second.port && u.pathname === '/' }, 'the panel again after the Node panel was killed', 60000)
     record(`restart: a killed Node panel brought the core down and the window started both again (port ${new URL(await url()).port})`)
+
+    // 10. a core that keeps stopping: the window says so itself, in words for a person, and
+    // Try again starts it. (Killed four times in all by now, one more than the window retries.)
+    for (let i = 0; i < 4; i++) {
+      const now = await until(() => { const c = pids(CORE_UI); return c.length && c }, 'a core to kill', 30000).catch(() => null)
+      if (!now) break
+      for (const p of now) { try { process.kill(p, 'SIGKILL') } catch { /* gone */ } }
+      await sleep(1500)
+      if (/[?&]failed=/.test(await url())) break
+    }
+    await until(async () => /[?&]failed=/.test(await url()), 'the window to say it could not start', 60000)
+    const said = await until(() => js('const f = document.getElementById("failed"); return f && !f.hidden && { h: f.querySelector("h1").textContent, said: document.getElementById("said").textContent, detail: document.getElementById("detail").textContent, links: [...f.querySelectorAll("a")].map((a) => a.textContent) }'), 'the failure state')
+    assert.equal(said.h, 'SpawnLoft could not start')
+    assert.match(said.said, /background service keeps stopping/)
+    assert.match(said.detail, /panel\.log/)
+    assert.deepEqual(said.links, ['Try again', 'Open the log folder', 'Quit'])
+    if (process.env.SMOKE_SCREENSHOT) await shot(`${process.env.SMOKE_SCREENSHOT}-could-not-start`)
+    record(`failure: the window says "${said.said}"`)
+    // the log folder goes to the file manager, and the page stays where it is
+    if (!isWin) {
+      const before = fs.existsSync(opened) ? fs.readFileSync(opened, 'utf8') : ''
+      await js('document.querySelector("#failed a[href*=\\"do=log\\"]").click()')
+      await until(() => fs.existsSync(opened) && fs.readFileSync(opened, 'utf8').length > before.length, 'the log folder to be opened')
+      assert.match(await url(), /[?&]failed=/)
+    }
+    await js('setTimeout(() => document.getElementById("retry").click(), 0)')
+    await until(async () => { const u = new URL(await url()); return /^127\.0\.0\.1$/.test(u.hostname) && u.pathname === '/' }, 'the panel after Try again', 60000)
+    await until(() => js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel page after Try again')
+    assert.equal(await pageGet('/api/setup'), 200, 'signed in after Try again')
+    record('failure: Try again started the core and opened the panel')
 
     await wd('DELETE', '')
     sid = null

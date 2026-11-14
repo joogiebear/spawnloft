@@ -96,7 +96,7 @@ export function serve({ port = 8770, host = '127.0.0.1' } = {}) {
       const verdict = auth.decide({ method: req.method, target: req.url, headers }, { now: Date.now(), idleNow: idleNow() })
       // the page that carried this link (spawnloft ui) has done its job
       if (verdict.kind === 'login') panelOpen.removeOpenFile(verdict.nonce)
-      if (panelAuth.answer(res, verdict, auth.port)) return
+      if (panelAuth.answer(res, verdict, auth.port, { shell: process.env.SPAWNLOFT_SHELL === 'tauri', path: req.url })) return
       if (verdict.session) {
         // released once, when the response or its connection ends, whichever is first: a
         // response queued behind another on a connection that then drops never closes itself
@@ -1439,9 +1439,9 @@ function callbackUri() {
 // it. The outcome of the sign-in is never shown here (the stream carries it), so a replayed or
 // forged callback learns nothing but "not valid".
 function callbackPage(res, ok) {
-  const title = ok ? 'Finishing sign-in' : 'This sign-in link is not valid any more'
+  const title = ok ? 'Microsoft is done' : 'This sign-in link is not valid any more'
   const body = ok
-    ? 'Finishing the sign-in in SpawnLoft. You can close this window.'
+    ? 'Go back to SpawnLoft: it is finishing the sign-in, and says there how it went. You can close this tab.'
     : 'Start the sign-in again from the SpawnLoft launcher.'
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>body{font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;text-align:center}h1{font-size:20px;margin:0 0 8px}p{margin:0;color:#bbb}</style></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`
   res.writeHead(ok ? 200 : 400, {
@@ -1563,7 +1563,7 @@ async function route(req, res) {
   if (seg[1] === 'client') return handleClient(req, res, seg, url)
 
   if (seg[1] === 'health' && req.method === 'GET') {
-    return json(res, 200, { java: await java.health(), javaDownload: java.DOWNLOAD_URL, dataFormat: dataFormatWarning() })
+    return json(res, 200, { java: await java.health(), javaDownload: java.downloadUrlFor(), dataFormat: dataFormatWarning() })
   }
 
   if (seg[1] === 'java' && seg[2] === 'needs' && req.method === 'GET') {

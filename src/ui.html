@@ -3470,12 +3470,25 @@ const panelSession = (() => {
     title.textContent = 'This panel session has ended';
     const text = document.createElement('p');
     text.style.cssText = 'margin:0;color:#9aa4ba';
-    text.append('Open SpawnLoft again from the app, or run ');
-    const cmd = document.createElement('code');
-    cmd.style.color = '#e9ecf4';
-    cmd.textContent = 'spawnloft ui';
-    text.append(cmd, ' for a new sign-in link.');
     card.append(title, text);
+    if (window.spawnloftDesktop && window.spawnloftDesktop.shell === 'tauri') {
+      // In the app the window can sign itself in again: loading the page anew is answered with
+      // the sign-in page, which the window sends through a new one-use link (bridge.rs).
+      text.append('SpawnLoft restarted, or this window sat unused for a while. Anything typed and not saved here is lost.');
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.textContent = 'Sign in again';
+      again.style.cssText = 'margin-top:16px;padding:7px 14px;border:1px solid #4a67e8;border-radius:6px;background:#4a67e8;color:#fff;font:inherit;cursor:pointer';
+      again.onclick = () => location.reload();
+      card.append(again);
+      setTimeout(() => again.focus(), 0);
+    } else {
+      text.append('Open SpawnLoft again from the app, or run ');
+      const cmd = document.createElement('code');
+      cmd.style.color = '#e9ecf4';
+      cmd.textContent = 'spawnloft ui';
+      text.append(cmd, ' for a new sign-in link.');
+    }
     box.append(card);
     (document.body || document.documentElement).append(box);
   }
@@ -14459,6 +14472,9 @@ function renderSettings() {
       info.unshift(['Build', state.appInfo.commit + (state.appInfo.dirty ? ' (with uncommitted changes)' : '')]);
     }
     info.unshift(['Version', 'v' + state.appInfo.version + (state.appInfo.packaged ? '' : ' (' + state.appInfo.coreMode + ')')]);
+  } else if (coreUpd.status && coreUpd.status.installed) {
+    // the 2.x app: the core says which version this is
+    info.unshift(['Version', 'v' + coreUpd.status.installed + (coreUpd.status.channel === 'beta' ? ' (beta releases)' : '')]);
   }
   for (const r of info) {
     const dt = document.createElement('dt');
@@ -14866,10 +14882,31 @@ function renderJavaChip() {
     ? (short.length === 1 ? '1 server needs' : short.length + ' servers need') + ' Java ' + need + '.'
     : java.found ? 'Java needs updating.' : 'Java is not installed.';
   chip.setAttribute('aria-label', sentence + ' Get Java.');
-  chip.title = java.message + ' Servers will not start until it is sorted.';
+  chip.title = java.message + (java.ok ? '' : ' Servers will not start until it is sorted.') + ' This checks again by itself once Java is installed.';
 }
 
 $('#javaChip').onclick = () => { if (state.health) openOutside(state.health.javaDownload); };
+
+/*
+  The chip was drawn from one answer, asked when the page loaded, so it stayed after Java had been
+  installed and nothing said a reload was needed. While it shows, the question is asked again when
+  the window comes back to the front (from the installer, most likely) and once a minute. Not
+  otherwise: finding Java starts a process per candidate.
+*/
+let healthAsked = 0;
+async function recheckJava() {
+  const mine = ++healthAsked;
+  let health;
+  try { health = await api('/health'); } catch { return; }
+  if (mine !== healthAsked) return;
+  const was = state.health && state.health.java;
+  state.health = health;
+  renderJavaChip();
+  if (was && !was.ok && health.java && health.java.ok) toast('Java ' + (health.java.major || '') + ' found. Servers that needed it can start now.', 'good');
+}
+const javaChipShows = () => !$('#javaChip').hidden;
+window.addEventListener('focus', () => { if (javaChipShows()) recheckJava(); });
+setInterval(() => { if (javaChipShows() && !document.hidden) recheckJava(); }, 60000);
 
 api('/health').then((health) => {
   state.health = health;
@@ -15042,6 +15079,42 @@ document.addEventListener('keydown', (e) => {
 // feed, but still only ever set as textContent.
 
 const coreUpd = { on: false, status: null };
+
+/**
+ * What the header's update button says for the 2.x update status, or null to leave it hidden.
+ * The 1.x app drove that button from its own updater; in 2.x an update that was ready showed
+ * only to someone who opened Preferences and scrolled to Updates.
+ */
+function headerUpdateWords(st) {
+  const p = st && st.pending;
+  if (!p || p.rollback) return null;
+  return { label: 'Update to ' + p.version, title: 'SpawnLoft ' + p.version + ' is ready to install. Opens Preferences at Updates.' };
+}
+
+async function watchCoreUpdate() {
+  // the 1.x window has its own updater, and its own use for this button
+  if (desktop && typeof desktop.appInfo === 'function') return;
+  let st;
+  try { st = await updJson(''); } catch { return; }
+  coreUpd.on = true;
+  coreUpd.status = st;
+  const words = headerUpdateWords(st);
+  const b = $('#bUpdate');
+  b.hidden = !words;
+  if (!words) return;
+  b.textContent = words.label;
+  b.title = words.title;
+  b.classList.remove('ghost');
+  b.classList.add('primary');
+  b.onclick = () => {
+    if (state.view !== 'settings') openSheet('settings', renderSettings);
+    // the section is filled in by a request of its own
+    setTimeout(() => { const at = $('#setUpdCore'); if (at && !at.hidden) at.scrollIntoView({ block: 'start' }); }, 400);
+  };
+}
+watchCoreUpdate();
+// the core checks the feed by itself a few times a day; this only reads what it found
+setInterval(() => { if (!document.hidden) watchCoreUpdate(); }, 30 * 60 * 1000);
 
 const updWhen = (iso) => {
   const t = Date.parse(iso || '');

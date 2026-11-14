@@ -13,6 +13,7 @@ fn main() {
             "open_profile_folder",
             "open_microsoft_login",
             "restart_core",
+            "focus_window",
         ]),
     ))
     .expect("tauri-build");

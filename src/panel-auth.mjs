@@ -368,7 +368,28 @@ export const UNAUTHORIZED_ERROR = 'this panel needs a sign-in: open SpawnLoft fr
 
 // What the server sends for each answer of `decide` that ends the request here. Returns true
 // when it answered.
-export function answer(res, verdict, port) {
+//
+// `opts.shell` says the panel runs under the desktop window, which can sign a window in again by
+// itself: it watches for a move to AGAIN_PATH and answers it with a new one-use link. `opts.path`
+// is what was asked for, so a window that was on the launcher comes back to the launcher.
+export const AGAIN_PATH = '/auth/again'
+
+export function signInPage(verdict, opts = {}) {
+  const title = 'This page is not signed in to SpawnLoft'
+  if (!opts.shell) {
+    return page(title, 'Open SpawnLoft from the app, or run <code>spawnloft ui</code> to get a new link.')
+  }
+  const path = String(opts.path ?? '').split('?')[0]
+  const again = AGAIN_PATH + (LOGIN_TARGETS.includes(path) ? `?to=${path}` : '')
+  // A page that was never signed in, or whose sign-in ran out, goes straight through. One whose
+  // link was refused does not: going round again by itself would never end.
+  const auto = verdict.kind === 'unauthorized' && path !== AGAIN_PATH
+  return page(title,
+    `SpawnLoft restarted, or this window sat unused for a while. <a href="${again}">Sign in again</a>`,
+    auto ? `<meta http-equiv="refresh" content="0; url=${again}">` : '')
+}
+
+export function answer(res, verdict, port, opts = {}) {
   if (verdict.kind === 'forbidden') {
     res.writeHead(403, { 'content-type': 'application/json', 'cache-control': 'no-store' })
     res.end(JSON.stringify({ error: 'this panel only answers requests addressed to localhost' }))
@@ -387,7 +408,7 @@ export function answer(res, verdict, port) {
   }
   if (verdict.kind === 'login-refused' || (verdict.kind === 'unauthorized' && !verdict.api)) {
     res.writeHead(401, { ...pageHeaders, 'www-authenticate': AUTH_SCHEME })
-    res.end(page('Sign in to this panel', 'Open SpawnLoft from the app, or run <code>spawnloft ui</code> to get a new link.'))
+    res.end(signInPage(verdict, opts))
     return true
   }
   if (verdict.kind === 'unauthorized') {

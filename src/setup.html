@@ -406,7 +406,7 @@
   .check .lamp { grid-row: 1; grid-column: 1; align-self: center; }
   .check b { grid-row: 1; grid-column: 2; font-size: var(--t-3); font-weight: 600; }
   .check .why { grid-row: 2; grid-column: 2; color: var(--ink-3); font-size: var(--t-2); line-height: 1.5; }
-  .check button { grid-row: 1 / 3; grid-column: 3; }
+  .check .acts { grid-row: 1 / 3; grid-column: 3; display: flex; gap: var(--s-2); align-self: center; }
 
   .lamp {
     --lamp: var(--idle);
@@ -523,7 +523,10 @@
     <span class="lamp"></span>
     <b id="javaTitle">Checking for Java…</b>
     <span class="why" id="javaWhy">Minecraft servers run on Java. SpawnLoft needs one installed.</span>
-    <button type="button" class="sm" id="javaGet" hidden>Get Java</button>
+    <span class="acts">
+      <button type="button" class="sm" id="javaGet" hidden>Get Java</button>
+      <button type="button" class="sm" id="javaAgain" hidden>Check again</button>
+    </span>
   </div>
 
   <div class="err" id="err" hidden></div>
@@ -623,31 +626,54 @@ $('#pickServers').onclick = async () => {
   clearError();
 };
 
+/**
+ * What the Java row says for an answer from the check.
+ *
+ * Each answer gets its own title: "needs updating" was said of a Java that works, and "not
+ * installed" of one that is there and would not run. Only an answer that stops servers from
+ * starting says that they will not.
+ */
+function javaWords(res) {
+  const finish = ' You can finish setting up either way.';
+  if (!res) {
+    return { state: 'warn', title: 'Could not check for Java', why: 'Carry on. SpawnLoft will say so again if a server fails to start.', get: false };
+  }
+  if (res.ok && res.reason === 'ok') return { state: 'ok', title: 'Java is installed', why: res.version || res.message, get: false };
+  if (res.ok && res.reason === 'old') {
+    return { state: 'warn', title: 'Java is installed, but an older one', why: res.message + ' Get a newer Java to run the latest versions.' + finish, get: true };
+  }
+  if (res.ok) return { state: 'ok', title: 'Java is installed', why: res.message, get: false };
+  const stops = finish + ' Servers will not start until it is sorted.';
+  if (res.reason === 'too-old') return { state: 'bad', title: 'Java needs updating', why: res.message + stops, get: true };
+  if (res.reason === 'unusable') return { state: 'bad', title: 'Java is installed, but did not run', why: res.message + ' Installing it again usually mends this.' + stops, get: true };
+  return { state: 'bad', title: 'Java is not installed', why: 'Minecraft servers run on Java. Get it, install it, then press Check again.' + stops, get: true };
+}
+
+let javaAsked = 0;
 async function checkJava() {
-  const box = $('#javaCheck');
-  let res;
+  const mine = ++javaAsked;
+  const again = $('#javaAgain');
+  again.disabled = true;
+  let res = null;
   try {
     res = await d.checkJava();
-  } catch {
-    box.dataset.state = 'warn';
-    $('#javaTitle').textContent = 'Could not check for Java';
-    $('#javaWhy').textContent = 'Carry on — SpawnLoft will say so again if a server fails to start.';
-    return;
-  }
-  if (res.ok && res.reason === 'ok') {
-    box.dataset.state = 'ok';
-    $('#javaTitle').textContent = 'Java is installed';
-    $('#javaWhy').textContent = res.version || res.message;
-    return;
-  }
-  box.dataset.state = res.ok ? 'warn' : 'bad';
-  $('#javaTitle').textContent = res.found ? 'Java needs updating' : 'Java is not installed';
-  $('#javaWhy').textContent =
-    res.message + ' You can finish setting up either way — servers will not start until it is sorted.';
+  } catch { /* said as "could not check" */ }
+  // a slower, older answer does not replace a newer one
+  if (mine !== javaAsked) return;
+  again.disabled = false;
+  const words = javaWords(res);
+  $('#javaCheck').dataset.state = words.state;
+  $('#javaTitle').textContent = words.title;
+  $('#javaWhy').textContent = words.why;
   const get = $('#javaGet');
-  get.hidden = false;
-  get.onclick = () => d.openExternal(res.downloadUrl);
+  get.hidden = !words.get;
+  get.onclick = words.get && res.downloadUrl ? () => d.openExternal(res.downloadUrl) : null;
+  // Nothing to check again once Java is fine.
+  again.hidden = words.state === 'ok';
 }
+$('#javaAgain').onclick = checkJava;
+// Back from installing Java: the row answers without being asked.
+window.addEventListener('focus', () => { if ($('#javaCheck').dataset.state !== 'ok' && $('#javaCheck').dataset.state !== 'pending') checkJava(); });
 
 // A form, so Enter submits. The old screen ignored Enter entirely, which reads as a stuck window.
 $('#form').onsubmit = async (e) => {
