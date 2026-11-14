@@ -3366,16 +3366,22 @@
             &mdash; console lines, player names, plugin lists &mdash; goes to that app's provider.
             Passwords and webhooks never do.
           </p>
-          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
-            <input type="checkbox" id="mcpDestructive" class="switch" style="flex:none;margin-top:2px">
-            <span><strong>Allow restoring backups, force-kill and Minecraft version upgrades</strong>
-              <span class="hint" style="display:block;margin-top:2px">Off, the assistant is never offered them. On, each still describes what it would do and waits to be confirmed.</span></span>
-          </label>
-          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:12px">
-            <input type="checkbox" id="mcpIps" class="switch" style="flex:none;margin-top:2px">
-            <span><strong>Show players' IP addresses</strong>
-              <span class="hint" style="display:block;margin-top:2px">The console records one each time someone joins. Hidden unless this is on.</span></span>
-          </label>
+          <!-- Plain tick boxes, not switches: nothing here is saved or in force. They only change
+               the setup text below, and what an assistant may do is whatever its own copy says. -->
+          <fieldset id="mcpOptions" style="border:0;padding:0;margin:0 0 12px">
+            <legend style="padding:0;margin-bottom:4px"><strong>Choose what the setup text below asks for</strong></legend>
+            <p class="hint" style="margin:0 0 8px">These are not saved here and do not show what an app is using now. After changing one, copy the text again and put it in the app.</p>
+            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin-bottom:8px">
+              <input type="checkbox" id="mcpDestructive" style="flex:none;margin-top:3px">
+              <span><strong>Include restoring backups, force-kill and Minecraft version upgrades</strong>
+                <span class="hint" style="display:block;margin-top:2px">Left out, the assistant is never offered them. Included, each still describes what it would do and waits to be confirmed.</span></span>
+            </label>
+            <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+              <input type="checkbox" id="mcpIps" style="flex:none;margin-top:3px">
+              <span><strong>Include players' IP addresses</strong>
+                <span class="hint" style="display:block;margin-top:2px">The console records one each time someone joins. Left out, the assistant never sees them.</span></span>
+            </label>
+          </fieldset>
           <p class="hint" style="margin:0 0 6px">For Claude Desktop, add this to <code>claude_desktop_config.json</code> (Settings &rarr; Developer &rarr; Edit Config), then restart it:</p>
           <textarea id="mcpJson" class="mono" readonly rows="9" style="width:100%;resize:vertical" aria-label="Claude Desktop configuration"></textarea>
           <p class="hint" style="margin:10px 0 6px">For Claude Code, run this in a terminal:</p>
@@ -3858,8 +3864,10 @@ function setTool(tool) {
   if (t) $('#toolTitle').textContent = toolLabel(t);
   if (t === 'settings') renderServerSettings();
   if (t === 'backups') renderBackupsTool();
-  if (t === 'scheduler') renderScheduler();
-  if (t === 'players') renderPlayers();
+  // Read afresh each time they are opened, unless a half-filled form is waiting there: who is
+  // online and what ran last night are the point of these two, and both change with nobody here.
+  if (t === 'scheduler') renderScheduler({ force: !paneHolds($('#schedulerBody')) });
+  if (t === 'players') renderPlayers({ force: !paneHolds($('#playersBody')) });
   if (t === 'plugins') renderPlugins();
   if (t === 'worlds') renderWorlds();
   if (t === 'files') renderFiles();
@@ -6127,7 +6135,98 @@ async function refresh() {
     if (state.view === 'empty' || state.view === 'home') showHome();
     return;
   }
-  if (state.view === 'server') renderServer(rowOf(state.current));
+  if (state.view === 'server') {
+    renderServer(rowOf(state.current));
+    followServer(rowOf(state.current));
+  }
+}
+
+// ---------------------------------------------- tools that follow the server ----
+// Each tool draws its page once and keeps it. Five of them draw it differently for a running
+// server than a stopped one: Worlds offers Delete only when stopped, Players says whether a change
+// goes through the console or the files. A page drawn before Start was pressed went on offering
+// what a stopped server allows, and nothing short of choosing another server redrew it.
+
+/** The tools whose page says something that depends on whether the server is up. */
+const FOLLOWS_SERVER = ['players', 'plugins', 'worlds', 'files', 'scheduler'];
+/** How long an open Players list is trusted while people can still join and leave. */
+const PLAYERS_EVERY_MS = 20000;
+/** After "Run now": when to look for the run's line. A backup takes longer than a restart. */
+const RUN_CHECKS_MS = [2500, 10000, 30000, 60000];
+
+const followed = { name: null, status: null, stale: new Set(), playersAt: 0 };
+
+/**
+ * Which tools to redraw now, which to redraw the next time they are opened, and which to leave
+ * marked for the next look.
+ *
+ * Only the open tool is redrawn: a hidden one is forgotten instead, so it reads afresh when it is
+ * opened. An open one somebody is typing in is left alone and tried again on the next poll, since
+ * a redraw rebuilds the page and takes the typing with it.
+ */
+function followPlan(stale, open, holding) {
+  const plan = { redraw: null, forget: [], keep: [] };
+  for (const tool of stale) {
+    if (tool !== open) plan.forget.push(tool);
+    else if (holding) plan.keep.push(tool);
+    else plan.redraw = tool;
+  }
+  return plan;
+}
+
+/** Whether an open Players list is due another read: only a running server changes by itself. */
+function playersDue(row, open, readAt, now) {
+  return open === 'players' && Boolean(row) && row.status === 'running' && now - readAt >= PLAYERS_EVERY_MS;
+}
+
+/** Whether redrawing this pane now would throw away something half done. */
+function paneHolds(body) {
+  if (document.querySelector('dialog[open]')) return true;
+  const at = document.activeElement;
+  if (at && body.contains(at) && /^(INPUT|TEXTAREA|SELECT)$/.test(at.tagName)) return true;
+  return Boolean(body.querySelector('.task-form, [data-holding]'));
+}
+
+/** Redraw one tool where it stands: the same scroll position, since the page is rebuilt whole. */
+async function redrawTool(tool) {
+  const body = $('#' + tool + 'Body');
+  const pane = body.closest('.pane');
+  const top = pane ? pane.scrollTop : 0;
+  const draw = { players: renderPlayers, plugins: renderPlugins, worlds: renderWorlds, files: renderFiles, scheduler: renderScheduler }[tool];
+  await draw({ force: true });
+  if (pane) pane.scrollTop = top;
+}
+
+/** Called on every poll with the open server's row. */
+function followServer(row) {
+  if (!row || isDb(row)) return;
+  if (followed.name !== row.name) {
+    followed.name = row.name;
+    followed.status = row.status;
+    followed.stale.clear();
+    followed.playersAt = Date.now();
+    return;
+  }
+  if (followed.status !== row.status) {
+    followed.status = row.status;
+    for (const tool of FOLLOWS_SERVER) followed.stale.add(tool);
+  }
+  const open = toolView.tool;
+  if (playersDue(row, open, followed.playersAt, Date.now())) followed.stale.add('players');
+  if (!followed.stale.size) return;
+  const openBody = open && FOLLOWS_SERVER.includes(open) ? $('#' + open + 'Body') : null;
+  const plan = followPlan([...followed.stale], open, Boolean(openBody) && paneHolds(openBody));
+  // An open file is its own page and is never re-read from under its editor. The list behind it
+  // is read again when the editor closes.
+  const editing = Boolean(filesStateFor(row.name).editing);
+  for (const tool of plan.forget) {
+    followed.stale.delete(tool);
+    if (tool !== 'files' || !editing) $('#' + tool + 'Body').dataset.for = '';
+  }
+  if (plan.redraw) {
+    followed.stale.delete(plan.redraw);
+    if (plan.redraw !== 'files' || !editing) redrawTool(plan.redraw);
+  }
 }
 
 // Uptime ticks on its own second rather than waiting for the four-second poll, so a running server
@@ -6333,8 +6432,28 @@ function stopStream() {
   state.streamName = null;
 }
 
-function select(name) {
+/** What the question says before unsaved Settings changes are left behind for another server. */
+function leaveSettingsWords(waiting, label) {
+  const n = waiting.count;
+  return {
+    title: 'Leave ' + label + ' without saving?',
+    text: (n === 1 ? '1 change' : n + ' changes') + ' in its Settings ' + (n === 1 ? 'has' : 'have') + ' not been saved, and will be lost.',
+    confirmLabel: n === 1 ? 'Discard the change' : 'Discard the changes',
+    danger: true,
+  };
+}
+
+function select(name, { discard = false } = {}) {
   if (state.current === name && state.view === 'server' && state.streamName === name) return;
+  // Settings is one form per page, drawn for one server. Choosing another draws it again, so
+  // whatever is typed and not saved is asked about first. The question is the only async step:
+  // the choice is made again, for real, once it is answered.
+  const waiting = settingsWaiting();
+  if (waiting && waiting.name !== name && !discard) {
+    const left = rowOf(waiting.name);
+    ask(leaveSettingsWords(waiting, (left && left.label) || waiting.name)).then((ok) => { if (ok) select(name, { discard: true }); });
+    return;
+  }
   sheetStack.length = 0;
   state.current = name;
   clearLines();
@@ -6354,8 +6473,9 @@ function select(name) {
 
   stopStream();
   show('server');
-  // The settings pane caches which server it drew, so a different one must not inherit it.
-  $('#settingsBody').dataset.for = '';
+  // The settings pane caches which server it drew, so a different one must not inherit it. Coming
+  // back to the same server with changes waiting keeps the form those changes are in.
+  if (!waiting || waiting.name !== name) $('#settingsBody').dataset.for = '';
   $('#backupsBody').dataset.for = '';
   $('#schedulerBody').dataset.for = '';
   $('#playersBody').dataset.for = '';
@@ -7249,6 +7369,37 @@ const playerView = { filter: 'all', search: '', selected: null };
  * stopped one has its files edited. Deleting someone's world data is the one thing that only works
  * stopped, because a running server would write it straight back.
  */
+/**
+ * What the update check found, said for what it actually covered. "Everything is the newest
+ * build" was printed when nothing had been asked about at all: every jar added by hand, or the
+ * one source that held them not answering.
+ */
+function updateCheckWords(out, noun) {
+  const n = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+  const checked = out.checked || 0;
+  const parts = [];
+  if (out.updates.length) parts.push('Checked ' + checked + '. ' + n(out.updates.length, 'update') + ' ready.');
+  else if (checked) parts.push('Checked ' + checked + ': ' + (checked === 1 ? 'it is already the newest build.' : 'all already the newest build.'));
+  else parts.push('Nothing was checked.');
+  if (out.unreachable && out.unreachable.length) parts.push('No answer about ' + out.unreachable.join(', ') + ', so try again later.');
+  if (out.byHand) parts.push(n(out.byHand, noun) + ' added by hand cannot be checked.');
+  if (out.pack) parts.push(n(out.pack, noun) + ' from the modpack ' + (out.pack === 1 ? 'is' : 'are') + ' updated with the pack.');
+  if (out.off) parts.push(n(out.off, noun) + ' turned off ' + (out.off === 1 ? 'was' : 'were') + ' skipped.');
+  return parts.join(' ');
+}
+
+/**
+ * What to say after a change to a player. A running server answers in a sentence whether it did
+ * the thing or refused, so the answer is not the result: `took` is, read back from the server's
+ * own list. A refusal is shown as one, in the server's words.
+ */
+function playerChangeWords(out, done) {
+  if (out && out.took === false) {
+    return { text: out.reply ? 'The server did not do that. It answered: ' + out.reply : 'The server did not do that, and gave no reason.', tone: 'bad' };
+  }
+  return { text: done, tone: 'good' };
+}
+
 async function renderPlayers(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -7267,6 +7418,7 @@ async function renderPlayers(opts) {
     return;
   }
   if (body.dataset.for !== row.name) return;
+  followed.playersAt = Date.now();
   body.textContent = '';
   paneHead(body, 'user', 'Players',
     'Everyone this server knows about, and what it thinks of them.');
@@ -7572,7 +7724,8 @@ function playerRow(p, data, base, again, select) {
     busy(true);
     try {
       const out = await post(base + path, payload);
-      toast(out.reply || done, 'good');
+      const said = playerChangeWords(out, done);
+      toast(said.text, said.tone);
       await again();
     } catch (e) {
       toast(e.message, 'bad');
@@ -7836,6 +7989,8 @@ async function renderPlugins(opts) {
   const results = document.createElement('div');
   add.append(addRow, results);
   body.append(add);
+  // A search and its results are not redrawn from under whoever is reading them.
+  q.addEventListener('input', () => add.toggleAttribute('data-holding', Boolean(q.value.trim())));
 
   const doSearch = async () => {
     const term = q.value.trim();
@@ -7967,9 +8122,7 @@ async function renderPlugins(opts) {
       for (const u of out.updates) pluginView.updates[u.file] = u;
       saveUpdates(row.name, pluginView.updates);
       renderDockBadge();
-      checkNote.textContent = out.updates.length
-        ? ''
-        : 'Everything SpawnLoft installed is already the newest build.';
+      checkNote.textContent = updateCheckWords(out, mods ? 'mod' : 'plugin');
       paint();
     } catch (e) {
       checkNote.textContent = '';
@@ -8994,6 +9147,21 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
  * file it produced, and both are shown - the state from Windows, the detail from us.
  */
 /**
+ * The line under the Schedule title: what runs the tasks, and when they do not run.
+ *
+ * It used to end by saying they run with the panel open or not, which is true and reads as
+ * "always". Tasks belong
+ * to the signed-in account on every system, and stop when it signs out: that was said only inside
+ * a closed "How this runs". On Linux an account with lingering on is the one exception.
+ */
+function scheduleSubtitle(platform, linger) {
+  const by = platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'macOS' : 'your system';
+  const what = 'Backups, restarts and console commands on a clock, run by ' + by;
+  if (platform === 'linux' && linger === true) return what + ' even with SpawnLoft closed and after you log out.';
+  return what + ' while you are ' + (platform === 'linux' ? 'logged in' : 'signed in') + ' to this computer, even with SpawnLoft closed.';
+}
+
+/**
  * On Linux, scheduled work stops at logout unless lingering is on for the account.
  *
  * <p>On a desktop that is what Windows promises too. On a server someone reaches over SSH and
@@ -9060,7 +9228,7 @@ async function renderScheduler(opts) {
   body.textContent = '';
   paneHead(body, 'clock', 'Scheduled work',
     data.available === false ? 'Not available in this preview.'
-      : 'Backups, restarts and console commands on a clock, run by ' + (panelPlatform === 'win32' ? 'Windows' : panelPlatform === 'darwin' ? 'macOS' : 'your system') + ' whether or not this is open.');
+      : scheduleSubtitle(panelPlatform, data.background && data.background.linger));
   if (data.available === false) {
     const note = document.createElement('p');
     note.className = 'hint';
@@ -9246,6 +9414,7 @@ function taskCard(task, data, base, again, editor) {
 
   runNow.onclick = async () => {
     busy(true);
+    const server = state.current;
     try {
       await post(base + '/' + encodeURIComponent(task.id) + '/run');
       // Windows starts the task and returns immediately, so there is nothing to report yet beyond
@@ -9253,7 +9422,15 @@ function taskCard(task, data, base, again, editor) {
       toast('Started. Watch Recent runs for what it did.', 'good');
       // Only if nothing is being edited. The refresh rebuilds the whole pane, and doing that under
       // a half-filled form throws the typing away with nothing said.
-      setTimeout(() => { if (!editor.restore) again(); }, 2500);
+      // A restart is in the log in a couple of seconds and a backup of a large world in a minute,
+      // so it is looked for more than once. Each look reads the list whole, which is also what
+      // moves "Next" on.
+      for (const ms of RUN_CHECKS_MS) {
+        setTimeout(() => {
+          if (state.current !== server || toolView.tool !== 'scheduler') return;
+          if (!paneHolds($('#schedulerBody'))) redrawTool('scheduler');
+        }, ms);
+      }
     } catch (e) {
       toast(e.message, 'bad');
       busy(false);
@@ -9348,7 +9525,7 @@ function unsavedFiles(views) {
 // Unsaved text in the editor lives only in this page. Reloading or closing it asks first; the
 // browser words the question itself.
 window.addEventListener('beforeunload', (ev) => {
-  if (!unsavedFiles(filesByServer).length) return;
+  if (!unsavedFiles(filesByServer).length && !settingsWaiting()) return;
   ev.preventDefault();
   ev.returnValue = '';
 });
@@ -11354,6 +11531,23 @@ function renderBackupHistory(row, data, signature) {
  * more entry in the list, for the keys the form does not cover.
  */
 let settingsRender = null;
+/** What Settings holds unsaved, as { name, count }, or null. Each drawing of the page replaces it. */
+let settingsWaiting = () => null;
+
+/** Whether any of these changed settings waits for the next start. Ones marked live do not. */
+function needsRestart(changed) {
+  return changed.some((e) => !e.live);
+}
+
+/** What the toast says after a save: a restart is asked for only when one would do something. */
+function savedWords(count, opts) {
+  const { running, needsRestart: needed, restarting, name } = opts;
+  const saved = 'Saved ' + count + (count === 1 ? ' setting' : ' settings');
+  if (!needed) return saved + '. In force now.';
+  if (!running || restarting) return saved + '.';
+  return saved + '. Restart ' + name + ' to apply.';
+}
+
 async function renderServerSettings() {
   const row = rowOf(state.current);
   const body = $('#settingsBody');
@@ -11621,7 +11815,8 @@ async function buildServerSettings(row, body) {
       + 'of grinding all night; stopping it yourself always sticks.',
     control: arSwitch,
     entry: {
-      kind: 'own', key: 'autoRestart',
+      // Read again by the supervisor at every exit, so it is in force as soon as it is saved.
+      kind: 'own', key: 'autoRestart', live: true,
       changed: () => arSwitch.checked !== mine.autoRestart,
       value: () => arSwitch.checked,
       reset: () => { arSwitch.checked = mine.autoRestart; },
@@ -11653,7 +11848,7 @@ async function buildServerSettings(row, body) {
       + 'Leave it empty for none; Discord makes one under Server, Integrations, Webhooks.',
     control: whWrap,
     entry: {
-      kind: 'own', key: 'webhook',
+      kind: 'own', key: 'webhook', live: true,
       changed: () => whInput.value.trim() !== mine.webhook,
       value: () => whInput.value.trim(),
       invalid: () => !whCheck(),
@@ -11828,6 +12023,18 @@ async function buildServerSettings(row, body) {
     softOut.style.gap = '8px';
     soft.append(softNow, softRow, softOut);
 
+    // The whole page is drawn again after an upgrade, unless that would take unsaved changes in
+    // the other sections with it: then only this section is brought up to date.
+    const afterUpgrade = async () => {
+      await refresh();
+      if (!pending().count && !rawDirty) {
+        body.dataset.for = '';
+        return renderServerSettings();
+      }
+      softNow.textContent = (rowOf(row.name) || row).jar || '—';
+      softCheck.onclick();
+    };
+
     softCheck.onclick = async () => {
       softCheck.disabled = true;
       softOut.textContent = '';
@@ -11874,9 +12081,7 @@ async function buildServerSettings(row, body) {
           try {
             const out = await post(base + '/upgrade', {});
             toast('Now on ' + out.to + '.' + (out.running ? ' Restart to load it.' : ''), 'good');
-            await refresh();
-            body.dataset.for = '';
-            renderServerSettings();
+            await afterUpgrade();
           } catch (e) {
             toast(e.message, 'bad');
             go.disabled = false;
@@ -11912,9 +12117,7 @@ async function buildServerSettings(row, body) {
             const out = await post(base + '/upgrade', { version: next });
             note.remove();
             toast('Now on ' + out.to + '. Snapshot saved first.' + (out.running ? ' Restart to load it.' : ''), 'good');
-            await refresh();
-            body.dataset.for = '';
-            renderServerSettings();
+            await afterUpgrade();
           } catch (e) {
             note.remove();
             toast(e.message, 'bad');
@@ -11969,11 +12172,20 @@ async function buildServerSettings(row, body) {
       if (e.kind === 'prop') props[e.key] = controls.get(e.key).input.value.trim();
       else own[e.key] = e.value();
     }
-    return { props, own, count: Object.keys(props).length + Object.keys(own).length };
+    return {
+      props, own,
+      count: Object.keys(props).length + Object.keys(own).length,
+      needsRestart: needsRestart(entries.filter((e) => e.changed())),
+    };
   };
 
   let saving = false;
   let rawDirty = false;
+  settingsWaiting = () => {
+    if (!body.isConnected || body.dataset.for !== row.name) return null;
+    const count = pending().count + (rawDirty ? 1 : 0);
+    return count ? { name: row.name, count } : null;
+  };
   /** Every row's tags and edge, each section's dot, and the bar, from what is in the form now. */
   function update() {
     const changedSections = new Set();
@@ -11995,19 +12207,22 @@ async function buildServerSettings(row, body) {
       n.dot.hidden = key === 'raw' ? !rawDirty : !changedSections.has(key);
       n.button.setAttribute('aria-label', n.title + (n.dot.hidden ? '' : ', unsaved changes'));
     }
-    const n = pending().count;
+    const waiting = pending();
+    const n = waiting.count;
     const invalid = entries.some((e) => e.invalid && e.changed() && e.invalid());
     const running = (rowOf(row.name) || row).status === 'running';
     // The bar is there only while there is something to save: with nothing changed it was three
     // disabled buttons and a sentence saying so, on every visit.
     bar.hidden = !n && !saving;
     barCount.textContent = n + (n === 1 ? ' unsaved change' : ' unsaved changes');
-    barWhen.textContent = invalid ? 'Fix the field marked in red to save.' : applyWhen;
+    barWhen.textContent = invalid ? 'Fix the field marked in red to save.' : waiting.needsRestart ? applyWhen : 'In force as soon as it is saved.';
     discard.disabled = saving || !n;
     save.disabled = saving || !n || invalid;
     saveRestart.disabled = saving || !n || invalid;
-    saveRestart.hidden = !running;
-    save.className = running ? '' : 'primary';
+    // Offered only when a restart would do something: asking people to be disconnected for a
+    // change that is already in force is the one thing this bar must not do.
+    saveRestart.hidden = !running || !waiting.needsRestart;
+    save.className = saveRestart.hidden ? 'primary' : '';
   }
   form.addEventListener('input', update);
   form.addEventListener('change', update);
@@ -12018,7 +12233,7 @@ async function buildServerSettings(row, body) {
   };
 
   const doSave = async ({ restart = false } = {}) => {
-    const { props, own, count } = pending();
+    const { props, own, count, needsRestart: restartNeeded } = pending();
     if (!count) return;
     if ('java' in own && !own.java) { toast('Pick a Java, or paste the path to one.', 'bad'); return; }
     saving = true;
@@ -12037,12 +12252,11 @@ async function buildServerSettings(row, body) {
         Object.assign(mine, own);
       }
       const running = (rowOf(row.name) || row).status === 'running';
-      toast('Saved ' + count + (count === 1 ? ' setting' : ' settings')
-        + (running && !restart ? '. Restart ' + (row.label || row.name) + ' to apply.' : '.'), 'good');
+      toast(savedWords(count, { running, needsRestart: restartNeeded, restarting: restart, name: row.label || row.name }), 'good');
       saving = false;
       update();
       await refresh();
-      if (restart && state.current === row.name) await act('restart')();
+      if (restart && restartNeeded && state.current === row.name) await act('restart')();
     } catch (e) {
       toast(e.message, 'bad');
     } finally {
@@ -12154,7 +12368,9 @@ async function buildServerSettings(row, body) {
     rawOn = on;
     const beside = paneIsUltra(body);
     form.hidden = on && !beside;
-    bar.hidden = on && !beside;
+    // The bar is update()'s alone to show or hide. Setting it here showed "0 unsaved changes" on
+    // every change of section, and hid waiting changes behind the file.
+    update();
     rawView.hidden = !on && !beside;
     if (!rawView.hidden && rawLoaded === null) loadRaw();
     if (on) markNav('raw');
@@ -12556,8 +12772,12 @@ async function showCredentials(dbName, serverName) {
  * The Databases card on a server's Settings tab: what it is attached to, with credentials one
  * click away, and a way to attach it to another.
  */
-async function renderServerDatabases(row, body, into = body) {
-  const card = document.createElement('div');
+async function renderServerDatabases(row, body, into = body, reuse = null) {
+  // Drawn again in the card it already has after an attach or a detach, so the rest of Settings,
+  // and whatever is unsaved in it, stays as it is.
+  const card = reuse || document.createElement('div');
+  card.textContent = '';
+  const again = () => renderServerDatabases(row, body, into, card);
   card.className = 'section set-group';
   card.dataset.section = 'databases';
   // With the other sections, above the Save bar: it is one of them, not a footnote to them.
@@ -12573,7 +12793,7 @@ async function renderServerDatabases(row, body, into = body) {
   blurb.textContent = 'Attach a database, then use Show credentials to configure your plugins manually. SpawnLoft does not edit plugin configs.';
   head.append(mark, h, blurb);
   card.append(head);
-  if (foot) into.insertBefore(card, foot); else into.append(card);
+  if (!reuse) { if (foot) into.insertBefore(card, foot); else into.append(card); }
 
   const list = document.createElement('div');
   list.style.display = 'grid';
@@ -12628,8 +12848,7 @@ async function renderServerDatabases(row, body, into = body) {
       try {
         await post('/databases/' + encodeURIComponent(a.service) + '/detach', { server: row.name, drop: res.choice === 'drop' });
         toast('Detached.', 'good');
-        body.dataset.for = '';
-        renderServerSettings();
+        await again();
       } catch (e) {
         toast(e.message, 'bad');
       }
@@ -12673,9 +12892,8 @@ async function renderServerDatabases(row, body, into = body) {
       const out = await post('/instances/' + encodeURIComponent(row.name) + '/databases/create', { jobId: jobId });
       jobs.close();
       toast('Created ' + out.database.name + ' on port ' + out.database.port + ' and attached ' + row.name + '.', 'good');
-      body.dataset.for = '';
       await refresh();
-      renderServerSettings();
+      await again();
       showCredentials(out.database.name, row.name);
     } catch (e) {
       jobs.close();
@@ -12718,9 +12936,8 @@ async function renderServerDatabases(row, body, into = body) {
       try {
         await post('/databases/' + encodeURIComponent(target) + '/attach', { server: row.name });
         toast('Attached ' + row.name + ' to ' + target + '.', 'good');
-        body.dataset.for = '';
         await refresh();
-        renderServerSettings();
+        await again();
         showCredentials(target, row.name);
       } catch (e) {
         go.disabled = false;

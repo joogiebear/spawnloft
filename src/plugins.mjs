@@ -605,11 +605,29 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
 
 // Asks Modrinth by sha1 (version_files/update) for newer builds of the jars spawnloft installed.
 // Hand-dropped jars are never asked about; their hashes are not ours to send.
-export async function checkUpdates(inst, { gameVersion = null } = {}) {
-  const rows = listPlugins(inst).filter((p) => p.enabled && p.managed)
-  if (!rows.length) return []
+export async function checkUpdates(inst, opts = {}) {
+  return (await checkUpdatesReport(inst, opts)).updates
+}
+
+/**
+ * The same check, with what it covered: an empty list of updates means "nothing newer" only for
+ * the jars that were actually asked about. Jars added by hand, turned off, owned by a pack, or on
+ * a Hangar project that did not answer are counted so the page can say so instead of an all-clear.
+ */
+export async function checkUpdatesReport(inst, { gameVersion = null } = {}) {
+  const all = listPlugins(inst)
+  const rows = all.filter((p) => p.enabled && p.managed)
+  const report = {
+    updates: [],
+    checked: 0,
+    byHand: all.filter((p) => !p.managed).length,
+    off: all.filter((p) => p.managed && !p.enabled).length,
+    pack: rows.filter((p) => p.source === 'modpack').length,
+    unreachable: [],
+  }
+  if (!rows.length) return report
   const dir = pluginsDir(inst)
-  const updates = []
+  const updates = report.updates
 
   // Pack-owned jars are skipped: offering one mod an update out from under its pack breaks packs.
   const modrinthRows = rows.filter((p) => p.source !== 'hangar' && p.source !== 'modpack')
@@ -626,6 +644,7 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
       ...(gameVersion ? { game_versions: [gameVersion] } : {}),
     }
     const latest = await modrinth('/version_files/update', { method: 'POST', body: JSON.stringify(body) })
+    report.checked += byHash.size
     for (const [sha, p] of byHash) {
       const v = latest[sha]
       if (!v) continue
@@ -647,6 +666,7 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
   for (const p of rows.filter((r) => r.source === 'hangar')) {
     try {
       const picked = pickHangarVersion(await hangarVersions(p.project), { gameVersion })
+      report.checked += 1
       if (!picked || picked.version.name === p.installedVersion) continue
       updates.push({
         file: p.file,
@@ -657,10 +677,10 @@ export async function checkUpdates(inst, { gameVersion = null } = {}) {
         source: 'hangar',
       })
     } catch {
-      /* unreachable project: report nothing */
+      report.unreachable.push(p.name || p.file)
     }
   }
-  return updates
+  return report
 }
 
 function sha1File(file) {

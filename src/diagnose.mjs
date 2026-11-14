@@ -54,13 +54,21 @@ export const SHAPES = [
   },
   {
     id: 'missing-plugin-dependency',
-    test: /UnknownDependencyException:?\s*(?:Unknown[\/ ]dependenc\w+)?:?\s*([\w-]+)?/,
+    // Two wordings, both still in the wild: "Unknown dependency Vault." from Bukkit's loader, and
+    // Paper's "Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download...". The
+    // words before the name are skipped whole, so "Unknown" is never taken for the plugin.
+    test: /UnknownDependencyException:?\s*(?:Unknown(?:\/missing)?[\/ ]dependenc\w+(?:\s+plugins?)?:?\s*)?\[?([\w-]+(?:,\s*[\w-]+)*)?/,
     title: 'A plugin is missing a dependency',
-    advice: (m) => (m[1]
-      ? `A plugin needs "${m[1]}", which is not installed. Install it from the Plugins tab, or `
-        + 'disable the plugin that wants it.'
-      : 'A plugin depends on another plugin that is not installed - the lines above name it. '
-        + 'Install the missing one from the Plugins tab, or disable the one that wants it.'),
+    advice: (m) => {
+      const names = m[1] && !/^(unknown|missing)$/i.test(m[1]) ? m[1].split(/,\s*/) : []
+      if (!names.length) {
+        return 'A plugin depends on another plugin that is not installed - the lines above name it. '
+          + 'Install the missing one from the Plugins tab, or disable the one that wants it.'
+      }
+      const quoted = names.map((n) => `"${n}"`).join(' and ')
+      return `A plugin needs ${quoted}, which ${names.length === 1 ? 'is' : 'are'} not installed. `
+        + `Install ${names.length === 1 ? 'it' : 'them'} from the Plugins tab, or disable the plugin that wants ${names.length === 1 ? 'it' : 'them'}.`
+    },
   },
   {
     id: 'missing-mod-dependency',

@@ -379,3 +379,100 @@ test('the Backups strip counts only backups of the server, and a custom schedule
   // the choice that keeps a schedule made elsewhere exists, and is what Apply sends for it
   assert.match(html, /every\.value === KEEP_SCHEDULE \? \{ schedule: known\.auto\.schedule \}/)
 })
+
+test('a tool drawn for a stopped server is drawn again when the server starts, unless that would lose typing', () => {
+  const { followPlan, playersDue } = lifted(['PLAYERS_EVERY_MS', 'followPlan', 'playersDue'])
+  const stale = ['players', 'plugins', 'worlds', 'files', 'scheduler']
+  // the open tool is redrawn; the hidden ones are forgotten, so they read afresh when opened
+  assert.deepEqual(followPlan(stale, 'worlds', false), { redraw: 'worlds', forget: ['players', 'plugins', 'files', 'scheduler'], keep: [] })
+  // somebody is typing in it: left as it is, and kept for the next look
+  assert.deepEqual(followPlan(stale, 'scheduler', true), { redraw: null, forget: ['players', 'plugins', 'worlds', 'files'], keep: ['scheduler'] })
+  // the console, or a tool that does not depend on the server being up, is open
+  assert.deepEqual(followPlan(stale, null, false).forget, stale)
+  assert.equal(followPlan(stale, 'backups', false).redraw, null)
+
+  // an open Players list is read again while people can still come and go, and not otherwise
+  const up = { status: 'running' }
+  assert.equal(playersDue(up, 'players', 0, 20000), true)
+  assert.equal(playersDue(up, 'players', 0, 19999), false)
+  assert.equal(playersDue(up, 'worlds', 0, 60000), false)
+  assert.equal(playersDue({ status: 'stopped' }, 'players', 0, 60000), false)
+  assert.equal(playersDue(null, 'players', 0, 60000), false)
+
+  // Players and Schedule read afresh each time they are opened, and Run now looks more than once
+  assert.match(html, /if \(t === 'scheduler'\) renderScheduler\(\{ force: !paneHolds\(/)
+  assert.match(html, /if \(t === 'players'\) renderPlayers\(\{ force: !paneHolds\(/)
+  assert.match(html, /RUN_CHECKS_MS = \[2500, 10000, 30000, 60000\]/)
+  assert.ok(!/setTimeout\(\(\) => \{ if \(!editor\.restore\) again\(\); \}, 2500\)/.test(html))
+})
+
+test('Settings asks for a restart only when a changed setting needs one, and never shows an empty save bar', () => {
+  const { needsRestart, savedWords } = lifted(['needsRestart', 'savedWords'])
+  assert.equal(needsRestart([{ live: true }]), false)
+  assert.equal(needsRestart([{ live: true }, {}]), true)
+  assert.equal(needsRestart([]), false)
+  const on = { running: true, name: 'Hub' }
+  assert.equal(savedWords(1, { ...on, needsRestart: false }), 'Saved 1 setting. In force now.')
+  assert.equal(savedWords(3, { ...on, needsRestart: true }), 'Saved 3 settings. Restart Hub to apply.')
+  assert.equal(savedWords(3, { ...on, needsRestart: true, restarting: true }), 'Saved 3 settings.')
+  assert.equal(savedWords(2, { running: false, needsRestart: true, name: 'Hub' }), 'Saved 2 settings.')
+  // the two the supervisor reads again at every exit are the ones marked
+  assert.match(html, /kind: 'own', key: 'autoRestart', live: true/)
+  assert.match(html, /kind: 'own', key: 'webhook', live: true/)
+  assert.equal((html.match(/live: true/g) || []).length, 2)
+  // only update() shows or hides the bar
+  const hides = [...html.matchAll(/\bbar\.hidden = ([^;]+);/g)].map((m) => m[1])
+  assert.deepEqual(hides, ['true', '!n && !saving'])
+})
+
+test('unsaved Settings are asked about before another server is chosen, and survive an upgrade or a database change', () => {
+  const { leaveSettingsWords } = lifted(['leaveSettingsWords'])
+  const one = leaveSettingsWords({ name: 'hub', count: 1 }, 'Hub Lobby')
+  assert.equal(one.title, 'Leave Hub Lobby without saving?')
+  assert.equal(one.text, '1 change in its Settings has not been saved, and will be lost.')
+  assert.equal(one.confirmLabel, 'Discard the change')
+  assert.equal(leaveSettingsWords({ name: 'hub', count: 4 }, 'Hub').text, '4 changes in its Settings have not been saved, and will be lost.')
+  // nothing redraws the whole of Settings after an attach, a detach or a new database
+  const dbs = html.slice(html.indexOf('async function renderServerDatabases('), html.indexOf('async function renderDatabaseBackups('))
+  assert.ok(dbs.length > 1000)
+  assert.ok(!/renderServerSettings\(\)/.test(dbs))
+  assert.equal((dbs.match(/await again\(\)/g) || []).length, 3)
+  // a page with unsaved settings asks before it closes, like one with an unsaved file
+  assert.match(html, /!unsavedFiles\(filesByServer\)\.length && !settingsWaiting\(\)/)
+})
+
+test('a change to a player is reported from what the server did, not from what it said', () => {
+  const { playerChangeWords } = lifted(['playerChangeWords'])
+  assert.deepEqual(playerChangeWords({ via: 'console', reply: 'Made Steve a server operator', took: true }, 'Steve is now an operator.'),
+    { text: 'Steve is now an operator.', tone: 'good' })
+  assert.deepEqual(playerChangeWords({ via: 'console', reply: 'That player does not exist', took: false }, 'Steve is now an operator.'),
+    { text: 'The server did not do that. It answered: That player does not exist', tone: 'bad' })
+  assert.equal(playerChangeWords({ via: 'console', reply: '', took: false }, 'x').tone, 'bad')
+  // a stopped server's files were written by SpawnLoft itself: there is no reply to doubt
+  assert.deepEqual(playerChangeWords({ via: 'file' }, 'Steve is banned.'), { text: 'Steve is banned.', tone: 'good' })
+})
+
+test('the update check says what it covered instead of an all-clear for nothing', () => {
+  const { updateCheckWords } = lifted(['updateCheckWords'])
+  const none = { updates: [], checked: 0, byHand: 3, off: 0, pack: 0, unreachable: [] }
+  assert.equal(updateCheckWords(none, 'plugin'), 'Nothing was checked. 3 plugins added by hand cannot be checked.')
+  assert.equal(updateCheckWords({ ...none, checked: 6, byHand: 0 }, 'plugin'), 'Checked 6: all already the newest build.')
+  assert.equal(updateCheckWords({ ...none, checked: 1, byHand: 0 }, 'mod'), 'Checked 1: it is already the newest build.')
+  assert.equal(updateCheckWords({ updates: [{}, {}], checked: 5, byHand: 1, off: 1, pack: 2, unreachable: ['EssentialsX'] }, 'mod'),
+    'Checked 5. 2 updates ready. No answer about EssentialsX, so try again later. 1 mod added by hand cannot be checked. '
+    + '2 mods from the modpack are updated with the pack. 1 mod turned off was skipped.')
+  assert.ok(!html.includes('Everything SpawnLoft installed is already the newest build'))
+})
+
+test('the Schedule title says tasks run while signed in, and the assistant options do not pose as settings', () => {
+  const { scheduleSubtitle } = lifted(['scheduleSubtitle'])
+  assert.match(scheduleSubtitle('win32', undefined), /run by Windows while you are signed in to this computer, even with SpawnLoft closed\.$/)
+  assert.match(scheduleSubtitle('darwin', undefined), /run by macOS while you are signed in/)
+  assert.match(scheduleSubtitle('linux', false), /run by your system while you are logged in to this computer/)
+  assert.match(scheduleSubtitle('linux', true), /even with SpawnLoft closed and after you log out\.$/)
+  assert.ok(!html.includes('whether or not this is open'))
+  const options = html.slice(html.indexOf('<fieldset id="mcpOptions"'), html.indexOf('</fieldset>', html.indexOf('<fieldset id="mcpOptions"')))
+  assert.match(options, /not saved here/)
+  assert.ok(!/class="switch"/.test(options))
+  assert.equal((options.match(/type="checkbox"/g) || []).length, 2)
+})

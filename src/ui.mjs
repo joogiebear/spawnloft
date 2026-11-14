@@ -1129,7 +1129,7 @@ async function handlePlugins(req, res, name, seg, url) {
     return json(res, 200, await pluginActions.installWithSnapshot(inst, body.projectId, { source: body.source }))
   }
   if (verb === 'updates') {
-    return json(res, 200, { updates: await plugins.checkUpdates(inst, { gameVersion }) })
+    return json(res, 200, await plugins.checkUpdatesReport(inst, { gameVersion }))
   }
   if (verb === 'update') {
     return json(res, 200, await pluginActions.updateWithSnapshot(inst, body.file))

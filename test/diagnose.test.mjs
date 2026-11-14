@@ -123,3 +123,15 @@ test('a server with no crash-reports folder has an empty, unremarkable answer', 
   const out = crashReports({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-diag-')) })
   assert.deepEqual(out.reports, [])
 })
+
+test("Paper's wording for a missing dependency names the plugin, not the word Unknown", () => {
+  const f = one("org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'.")
+  assert.equal(f.id, 'missing-plugin-dependency')
+  assert.match(f.advice, /^A plugin needs "ProtocolLib", which is not installed\./)
+  const two = one('UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download')
+  assert.match(two.advice, /needs "ProtocolLib" and "Vault", which are not installed\. Install them/)
+  // a wording nobody has seen yet falls back to pointing at the log, and never names "Unknown"
+  const odd = one('org.bukkit.plugin.UnknownDependencyException: Unknown')
+  assert.ok(!/"Unknown"/.test(odd.advice))
+  assert.match(odd.advice, /the lines above name it/)
+})
