@@ -19,8 +19,8 @@ const client = await import('../src/client.mjs')
 
 const linux = { name: 'linux', arch: 'x64', version: '6.1.0' }
 
-test('the loader list: vanilla first, Fabric behind the shared shape, and the same list client.mjs checks a setup against', () => {
-  assert.deepEqual(LOADERS, ['vanilla', 'fabric'])
+test('the loader list: vanilla first, Fabric and Quilt behind the shared shape, and the same list client.mjs checks a setup against', () => {
+  assert.deepEqual(LOADERS, ['vanilla', 'fabric', 'quilt'])
   assert.equal(client.LOADERS, LOADERS)
   assert.equal(loaderFor('vanilla'), null)
   const fabric = loaderFor('fabric')
@@ -33,7 +33,7 @@ test('the loader list: vanilla first, Fabric behind the shared shape, and the sa
   assert.equal(fabric.available('1.21.11', [{ version: '1.21.11', stable: true }]), true)
   assert.equal(fabric.available('1.8.9', [{ version: '1.21.11', stable: true }]), false)
   assert.throws(() => loaderFor('forge'), /unknown loader/)
-  assert.throws(() => client.createProfile('bad-loader', { mc: '1.21.11', loader: 'forge' }), /unknown loader "forge" - use vanilla or fabric/)
+  assert.throws(() => client.createProfile('bad-loader', { mc: '1.21.11', loader: 'forge' }), /unknown loader "forge" - use vanilla or fabric or quilt/)
 })
 
 // A Forge 1.12.2 profile as the legacy installer writes it: its own full minecraftArguments line

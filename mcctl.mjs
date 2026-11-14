@@ -2151,7 +2151,7 @@ async function cmdBot(positional, flags) {
  */
 async function cmdClient(positional, flags) {
   const [sub, ...rest] = positional
-  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
+  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric|quilt] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
   const quiet = flags.json === true
   // Only a phase that fetches something is worth a line: a cached launch re-checks every file and
   // would otherwise print the whole list, reading as if it downloaded the game again.

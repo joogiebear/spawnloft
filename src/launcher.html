@@ -342,6 +342,9 @@
   .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); width: max-content; max-width: 100%; flex-wrap: wrap; }
   .seg button { min-height: 28px; padding: 0 var(--s-3); font-size: var(--t-2); font-weight: 600; background: transparent; border-color: transparent; box-shadow: none; color: var(--ink-2); border-radius: var(--r-xs); }
   .seg button[aria-pressed="true"] { background: var(--raised-hi); color: var(--ink); border-color: var(--line); }
+  /* the Mods choice: five buttons, a list on a narrow sheet */
+  .modspick { display: none; }
+  @media (max-width: 559px) { .modsseg { display: none; } .modspick { display: block; } }
 
   .sk { background: linear-gradient(90deg, var(--raised) 0%, var(--raised-hi) 50%, var(--raised) 100%); background-size: 200% 100%; animation: sk 1.4s ease-in-out infinite; border-radius: var(--r-xs); }
   @keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
@@ -811,7 +814,7 @@
     // the version file comes first: the Java is read from it
     if (stage === 'manifest' || stage === 'version') return 0
     if (stage === 'java') return 1
-    if (['client', 'libraries', 'assets', 'natives', 'fabric', 'harness'].includes(stage)) return 2
+    if (['client', 'libraries', 'assets', 'natives', 'fabric', 'quilt', 'harness'].includes(stage)) return 2
     if (stage === 'server') return 3
     if (stage === 'spawn' || stage === 'running') return 4
     return -1
@@ -1203,12 +1206,27 @@
     return account.type === 'offline' && current === `offline:${account.name}` ? current : account.uuid
   }
 
+  // The Mods choices in the sheet's order, by the names a person sees. COMING are listed and
+  // greyed out until SpawnLoft can set them up.
+  const LOADER_NAMES = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
+  const MOD_LOADERS = ['fabric', 'quilt', 'forge', 'neoforge']
+  const COMING = ['forge', 'neoforge']
+
+  function loaderName(loader) {
+    return Object.hasOwn(LOADER_NAMES, loader) ? LOADER_NAMES[loader] : 'Vanilla'
+  }
+
+  function modded(loader) {
+    return MOD_LOADERS.includes(loader)
+  }
+
   // The name a setup gets when nobody gives it one: its version, made into a profile name
-  // ("1.21.11" -> "1-21-11", "-fabric" for Fabric), then -2, -3... past the names already taken.
+  // ("1.21.11" -> "1-21-11", "-fabric" for Fabric, "-quilt" for Quilt), then -2, -3... past the
+  // names already taken.
   function nameBase(mc, loader) {
     let base = String(mc ?? '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^[-_]+|-+$/g, '').slice(0, 21)
     if (!base) base = 'setup'
-    return loader === 'fabric' ? `${base}-fabric` : base
+    return modded(loader) ? `${base}-${loader}` : base
   }
 
   function autoName(mc, loader, taken) {
@@ -1226,16 +1244,17 @@
     return low === base || (low.startsWith(base) && /^-\d+$/.test(low.slice(base.length))) ? null : name
   }
 
-  // A setup by what it is: "1.21.11 · Vanilla", "1.21.1 · Fabric".
+  // A setup by what it is: "1.21.11 · Vanilla", "1.21.1 · Fabric", "1.20.1 · Quilt".
   function setupTitle(p) {
-    return `${p.mc} · ${p.loader === 'fabric' ? 'Fabric' : 'Vanilla'}`
+    return `${p.mc} · ${loaderName(p.loader)}`
   }
 
   // The line under the Play button, as text and bold parts: [ 'Opens ', { b: 'Minecraft 1.21.11' }, ... ].
-  // `o` is { mc, fabric, who, server, address, startsServer }.
+  // `o` is { mc, loader, who, server, address, startsServer } (fabric: true still means Fabric).
   function playSentence(o) {
-    const { mc, fabric, who, server, address, startsServer } = o
-    const what = { b: `Minecraft ${mc}${fabric ? ' (Fabric)' : ''}` }
+    const { mc, who, server, address, startsServer } = o
+    const loader = o.loader ?? (o.fabric ? 'fabric' : 'vanilla')
+    const what = { b: `Minecraft ${mc}${modded(loader) ? ` (${loaderName(loader)})` : ''}` }
     const as = { b: who ?? 'an offline player' }
     if (server && startsServer) return ['Starts ', { b: server }, ' first (up to 2 minutes), then opens ', what, ' and joins it as ', as, '.']
     if (server) return ['Opens ', what, ' and joins ', { b: server }, ' as ', as, '.']
@@ -1308,20 +1327,25 @@
     return Number.isInteger(half) ? `${half}G` : `${half * 1024}M`
   }
 
-  // A new setup's memory: 2 GB for Vanilla, 4 GB for Fabric (mods want more).
+  // A new setup's memory: 2 GB for Vanilla, 4 GB with any mod loader (mods want more).
   function defaultMemory(loader) {
-    return loader === 'fabric' ? '4G' : '2G'
+    return modded(loader) ? '4G' : '2G'
   }
 
   // The facts line under the version field, from the picker row and the version's details when
-  // the panel has them (javaNeeds, fabric, harness, emulated); a fact nobody knows is left out.
+  // the panel has them (javaNeeds, loaders, harness, emulated); a fact nobody knows is left out.
   function versionFacts(row, details) {
     const d = { ...(row ?? {}), ...(details ?? {}) }
     const out = []
     // a guess from the id until the version's file has been read
     if (d.javaNeeds) out.push(d.javaNeedsExact === false ? `likely Java ${d.javaNeeds}` : `Java ${d.javaNeeds}`)
-    if (d.fabric === true) out.push('Fabric available')
-    else if (d.fabric === false) out.push('no Fabric')
+    // the loaders that build for it; a panel from before the loader list says only Fabric's
+    const loaders = d.loaders && typeof d.loaders === 'object' ? d.loaders : { fabric: d.fabric }
+    const known = MOD_LOADERS.filter((l) => loaders[l] === true || loaders[l] === false)
+    const has = known.filter((l) => loaders[l] === true)
+    if (has.length) out.push(`${has.map(loaderName).join(', ')} available`)
+    else if (known.length === 1) out.push(`no ${loaderName(known[0])}`)
+    else if (known.length) out.push('no mod loaders')
     if (d.harness === true) out.push('helper mod available')
     else if (d.harness === false) out.push('no helper mod yet')
     if (d.emulated) out.push('runs under emulation')
@@ -1334,8 +1358,30 @@
   }
 
   function loaderText(profile) {
-    if (profile.loader !== 'fabric') return 'Vanilla'
-    return profile.loaderVersion ? `Fabric ${profile.loaderVersion}` : 'Fabric'
+    if (!modded(profile.loader)) return 'Vanilla'
+    return profile.loaderVersion ? `${loaderName(profile.loader)} ${profile.loaderVersion}` : loaderName(profile.loader)
+  }
+
+  // Why a loader cannot be picked for a version, or null: it is not in this SpawnLoft yet, or the
+  // version facts say it has no build there. info is what the panel knows of the version.
+  function loaderBlock(loader, mc, info) {
+    if (!modded(loader)) return null
+    if (COMING.includes(loader)) return `${loaderName(loader)} is coming in a later SpawnLoft.`
+    const has = info?.loaders && typeof info.loaders === 'object' ? info.loaders[loader] : loader === 'fabric' ? info?.fabric : undefined
+    return has === false ? `${loaderName(loader)} has no build for ${mc}.` : null
+  }
+
+  // The line under the Mods choice: why the pick cannot be used, else what it does.
+  function loaderHint(loader) {
+    if (!modded(loader)) return 'None is plain Minecraft, also called Vanilla. Pick a mod loader to play with mods.'
+    return `${loaderName(loader)} loads mods. Put them in the mods folder inside the setup\u2019s folder.`
+  }
+
+  // Said in the sheet when an existing setup's loader is changed: its mods were made for the old one.
+  function loaderChangeWarning(from, to) {
+    if (!modded(from) || from === to) return null
+    if (!modded(to)) return `The mods in this setup\u2019s folder were made for ${loaderName(from)} and will not load without it. Duplicate the setup to keep both.`
+    return `The mods in this setup\u2019s folder were made for ${loaderName(from)} and will not load on ${loaderName(to)}. Duplicate the setup to keep both.`
   }
 
   function statusText(status) {
@@ -1902,7 +1948,7 @@
       h('h2', { id: 'setupName', text: setupName(p) }),
       h('div', { class: 'chips' },
         h('span', { class: 'pill', text: `Minecraft ${p.mc}` }),
-        h('span', { class: 'pill', text: p.loader === 'fabric' ? 'Fabric' : 'Vanilla' }),
+        h('span', { class: 'pill', text: loaderName(p.loader) }),
         h('span', { class: 'pill', text: memoryText(p.memory) }),
         played && !p.running && h('span', { class: 'pill', text: played })))
   }
@@ -2039,7 +2085,7 @@
     const who = acct.missing ? `${acct.name} (no longer signed in)` : acct.name
     const sentenceParts = custom && addrProblem
       ? [address ? 'Fix the server address under Join, or pick another place to join.' : 'Type a server address under Join, or pick another place to join.']
-      : playSentence({ mc: p.mc, fabric: p.loader === 'fabric', who, server: picked?.name, address, startsServer })
+      : playSentence({ mc: p.mc, loader: p.loader, who, server: picked?.name, address, startsServer })
     return { state, acct, t, choices, picked, custom, address, addrProblem, startsServer, blocked: state.kind !== 'ready' && state.kind !== 'closed-early', sentence: sentenceParts }
   }
 
@@ -2594,14 +2640,14 @@
     to?.focus({ preventScroll: true })
   }
 
-  // fabric=1: the rows say where Fabric builds; refresh asks Mojang and Fabric again now, for a
+  // loaders=1: the rows say where each mod loader builds; refresh asks Mojang and the loaders again now, for a
   // version out within the hour
   async function loadVersions({ refresh = false } = {}) {
     S.versions = { loading: true }
     // what a version's details said may be older than the lists now read
     if (refresh) S.details = {}
     try {
-      S.versions = await (refresh ? api('client/versions/refresh', { method: 'POST' }) : api('client/versions?fabric=1'))
+      S.versions = await (refresh ? api('client/versions/refresh', { method: 'POST' }) : api('client/versions?loaders=1'))
     } catch (err) {
       S.versions = { error: err.message }
     }
@@ -2645,9 +2691,9 @@
   // What the panel knows about a version: the picker row, with the details on top.
   const versionInfo = (id) => ({ ...(versionRow(id) ?? {}), ...(S.details[id] ?? {}) })
 
-  // Fabric where Fabric has the version; the harness where it is published (and Fabric is on).
-  function fabricBlock(f) {
-    return versionInfo(f.mc).fabric === false ? `Fabric has no build for ${f.mc}.` : null
+  // A loader where it has the version; the harness where it is published (and Fabric is on).
+  function sheetLoaderBlock(f, loader = f.loader) {
+    return loaderBlock(loader, f.mc, versionInfo(f.mc))
   }
 
   function harnessBlock(f) {
@@ -2660,7 +2706,7 @@
   }
 
   function fixLoader(f) {
-    if (fabricBlock(f) && f.loader === 'fabric' && !f.editing) f.loader = 'vanilla'
+    if (sheetLoaderBlock(f) && !f.editing) f.loader = 'vanilla'
     if (harnessBlock(f)) f.harness = false
   }
 
@@ -2847,7 +2893,7 @@
   // Segmented buttons: one of `choices` ([value, label, disabled]) is pressed.
   function segmented(label, choices, value, onpick) {
     return h('div', { class: 'seg', role: 'group', 'aria-label': label },
-      choices.map(([v, text, disabled]) => h('button', { type: 'button', 'aria-pressed': String(v === value), disabled: Boolean(disabled) && v !== value, onclick: () => onpick(v) }, text)))
+      choices.map(([v, text, disabled]) => h('button', { type: 'button', 'aria-pressed': String(v === value), disabled: Boolean(disabled) && v !== value, title: typeof disabled === 'string' && v !== value ? disabled : null, onclick: () => onpick(v) }, text)))
   }
 
   function sheetView() {
@@ -2872,15 +2918,30 @@
 
     const versionField = running ? ro('Version', f.mc, runningHint) : versionPicker(f, p, machine)
 
-    const fabricNo = fabricBlock(f)
-    const loaderField = running ? ro('Mods', f.loader === 'fabric' ? loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }) : 'None', runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Mods' }),
-      segmented('Mods', [['vanilla', 'None'], ['fabric', 'Fabric', fabricNo]], f.loader, (val) => {
-        f.loader = val
-        if (!f.editing && !f.memoryTouched) { f.memory = defaultMemory(val); f.custom = false }
-        fixLoader(f)
-        render()
-      }),
-      h('small', { class: fabricNo ? 'hint warn' : 'hint', text: fabricNo ?? (f.loader === 'fabric' ? 'Fabric loads mods. Put them in the mods folder inside the setup\'s folder.' : 'None is plain Minecraft, also called Vanilla. Pick Fabric to play with mods.') }))
+    const loaderNo = sheetLoaderBlock(f)
+    const loaderChoices = [['vanilla', 'None'], ...MOD_LOADERS.map((l) => [l, loaderName(l), sheetLoaderBlock(f, l)])]
+    const pickLoader = (val) => {
+      if (val === f.loader) return
+      f.loader = val
+      // a build is made for one loader
+      f.loaderVersion = ''
+      if (!f.editing && !f.memoryTouched) { f.memory = defaultMemory(val); f.custom = false }
+      fixLoader(f)
+      render()
+    }
+    const changed = p ? loaderChangeWarning(p.loader, f.loader) : null
+    // the reasons the others are greyed out, said once under the control
+    const others = loaderChoices.filter(([l, , why]) => why && l !== f.loader && !COMING.includes(l)).map(([, , why]) => why)
+    const coming = COMING.filter((l) => l !== f.loader)
+    if (coming.length) others.push(`${coming.map(loaderName).join(' and ')} ${coming.length > 1 ? 'are' : 'is'} coming in a later SpawnLoft.`)
+    const loaderField = running ? ro('Mods', modded(f.loader) ? loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }) : 'None', runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Mods' }),
+      h('div', { class: 'modsseg' }, segmented('Mods', loaderChoices, f.loader, pickLoader)),
+      // narrow sheets: the same five as a list
+      h('select', { class: 'modspick', id: 'fLoader', 'aria-labelledby': 'fLoaderLabel', value: f.loader, onchange: (e) => pickLoader(e.target.value) },
+        loaderChoices.map(([l, text, why]) => h('option', { value: l, disabled: Boolean(why) && l !== f.loader, text: why && l !== f.loader ? `${text} (${COMING.includes(l) ? 'coming' : 'not for this version'})` : text }))),
+      h('small', { class: loaderNo ? 'hint warn' : 'hint', text: loaderNo ?? loaderHint(f.loader) }),
+      changed && h('small', { class: 'hint warn', text: changed }),
+      others.length > 0 && !loaderNo && h('small', { class: 'hint', text: others.join(' ') }))
 
     const advice = memoryAdvice(f.memory, S.summary?.machine)
     const totalGb = advice.total ?? 16
@@ -2949,11 +3010,11 @@
       h('summary', { text: 'Advanced' }),
       h('div', { class: 'in' },
         running
-          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric version', f.loaderVersion || 'Newest stable'))
+          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), modded(f.loader) && ro(`${loaderName(f.loader)} version`, f.loaderVersion || 'Newest stable'))
           : h('div', { class: 'grid2' },
             javaField(f),
-            f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
-              h('small', { class: 'hint', text: 'The build of Fabric itself, like 0.17.3. Left empty, the first Play takes the newest stable one.' }))),
+            modded(f.loader) && h('label', { class: 'field' }, h('span', { text: `${loaderName(f.loader)} version` }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
+              h('small', { class: 'hint', text: `The build of ${loaderName(f.loader)} itself, like ${f.loader === 'quilt' ? '0.30.2' : '0.17.3'}. Left empty, the first Play takes the newest stable one.` }))),
         f.editing
           ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
             h('small', { text: msAccount ? `An AI assistant you connected to SpawnLoft may start this setup and play signed in as ${msAccount.name}.` : 'An AI assistant you connected to SpawnLoft may start this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
@@ -2994,9 +3055,9 @@
   // A typed field as the panel wants it: trimmed, and null when empty.
   function fieldText(s) { return String(s ?? '').trim() || null }
 
-  // The sheet's fields as the panel's profile routes take them. A Fabric build only goes with Fabric.
+  // The sheet's fields as the panel's profile routes take them. A loader build only goes with a loader.
   function profileFields(f) {
-    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account), serverList: f.serverList }
+    return { mc: f.mc, loader: f.loader, loaderVersion: modded(f.loader) ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account), serverList: f.serverList }
   }
 
   // What a New sheet POSTs: a name unless one was typed, and the fields.
