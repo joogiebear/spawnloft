@@ -14,7 +14,7 @@ missing features. A phase marked "needs a decision" will come with a question be
 | 2 | Backups that tell the truth | BK1, WO1, WO3, BK17, LV2, BK6, BK12, BK13 | `src/backup.mjs`, `src/ui.mjs`, `src/ui.html` (Backups, Worlds) |
 | 3 | Pages that follow the server | X1, PLY3, SCH3, SET1, SET5, SET4, F1, PLY4, PL10, LV3, PR2, SCH1 | `src/ui.html` (tools, Settings), `src/diagnose.mjs` |
 | 4 | Confirm before it hurts | A3, SCH17, DB4, PLY5 | `src/ui.html` (header, Schedule, Databases, Players) |
-| 5 | Plain errors and lasting progress | A1, HD2, LA3, LA4, DB9, A2, FI15, AD1, LA1, LA2, X4, F3, LV6 | `src/ui.html` (`api()`, toasts, dialogs), `src/launcher.html`, `src/ui.mjs` |
+| 5 | Plain errors and lasting progress | A1, HD2, LA3, LA4, DB9, A2, FI15, AD1 (tabs held; Cancel is phase 15), LA2, X4, F3, LV6 | `src/ui.html` (`api()`, toasts, dialogs), `src/launcher.html`, `src/ui.mjs` |
 | 6 | Shell, sign-in and first run | SH1, SH2, SI1, LV25, WZ1, WZ2, PG1, PG2, LA7 | `rust/crates/spawnloft-shell`, `src/setup.html`, `src/ui.mjs` (sign-in page), `src/ui.html` |
 | 7 | One word for each thing | B1, BK24, ACT1 to ACT4, LV15, LV18, C1 to C4, STA6, SET13, DB17, LV21 | `src/ui.html`, `src/activity.mjs`, messages in the core modules |
 | 8 | Fix once, everywhere | focus after actions (X2, ACT9, PLY12, STA5), Escape in text boxes (X3, PG9, PG10), tooltip-only help (PG12, FI19, PLY16, B6), unnamed controls (BK14, BK21, WO8, SCH13, PLY17, STA4), one time format (A10, BK16, SCH19, OV5) | `src/ui.html` |
@@ -24,6 +24,7 @@ missing features. A phase marked "needs a decision" will come with a question be
 | 12 | Backup history clean-up | BK4, BK5 | `src/backup.mjs`, `src/ui.html`. Needs a decision. |
 | 13 | Files: row actions, large logs, find and wrap | FI4, FI7, FI8 | `src/ui.html`, `src/ui.mjs` |
 | 14 | More game settings, explained | SET6, SET7 | `src/ui.html` (Settings) |
+| 15 | Cancel a create and a launch | AD1, LA1 | `src/create.mjs`, the client launch job, `src/ui.mjs`, `src/ui.html`, `src/launcher.html` |
 
 ## Phase 1 in detail
 
@@ -38,6 +39,15 @@ missing features. A phase marked "needs a decision" will come with a question be
   ignored, not opened.
 - **DB8**, **B8**: while a restore runs, its list is locked and the row shows progress.
 - **LA5**: "Remove setup" puts focus on Cancel.
+
+## Moved out of phase 5
+
+**AD1** and **LA1** ask for a Cancel button on a server being created and a game being launched.
+Both are long jobs in the core that download and unpack with nothing to stop them part way, so a
+button in the page would only hide a job that carried on. Stopping them for real means passing a
+stop signal through the downloads and cleaning up what was half written, which is its own piece of
+work: phase 15. Phase 5 does the part that needs no core change: the Add sheet holds its tabs while
+a create runs, so the progress bar cannot be lost.
 
 ## What is left out
 
