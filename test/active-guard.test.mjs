@@ -26,26 +26,35 @@ const manage = await import('../src/manage.mjs')
 const services = await import('../src/services.mjs')
 const worlds = await import('../src/worlds.mjs')
 const { INSTANCES_DIR, stateFile } = await import('../src/paths.mjs')
-const { writeJson, UserError } = await import('../src/util.mjs')
+const { writeJson, UserError, pidAlive } = await import('../src/util.mjs')
 
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const DEAD = spawnSync(process.execPath, ['-e', '0']).pid
+// A pid nothing runs under. Asked for anew each time a state is written, and checked: Windows
+// hands a finished process's pid to the next one within seconds, and a pid taken once when this
+// file loaded was sometimes alive again by the time a test read it ("stopping" read as "running").
+function deadPid() {
+  for (let i = 0; i < 20; i++) {
+    const pid = spawnSync(process.execPath, ['-e', '0']).pid
+    if (pid && !pidAlive(pid)) return pid
+  }
+  assert.fail('no finished process whose pid stayed free')
+}
 const ALIVE = process.pid
 
 // per readState: daemon and java pids, and whether the file says running
 const STATUSES = {
-  stopped: { running: false, daemonPid: DEAD, javaPid: DEAD },
-  stale: { running: true, daemonPid: DEAD, javaPid: DEAD },
-  running: { running: true, daemonPid: ALIVE, javaPid: ALIVE },
-  stopping: { running: true, daemonPid: ALIVE, javaPid: DEAD },
-  orphaned: { running: true, daemonPid: DEAD, javaPid: ALIVE },
+  stopped: (dead) => ({ running: false, daemonPid: dead, javaPid: dead }),
+  stale: (dead) => ({ running: true, daemonPid: dead, javaPid: dead }),
+  running: () => ({ running: true, daemonPid: ALIVE, javaPid: ALIVE }),
+  stopping: (dead) => ({ running: true, daemonPid: ALIVE, javaPid: dead }),
+  orphaned: (dead) => ({ running: true, daemonPid: dead, javaPid: ALIVE }),
 }
 const BLOCKED = ['running', 'stopping', 'orphaned']
 const FREE = ['stopped', 'stale']
 
 function setStatus(name, status) {
-  writeJson(stateFile(name), { name, ...STATUSES[status] })
+  writeJson(stateFile(name), { name, ...STATUSES[status](deadPid()) })
   assert.equal(readState(name).status, status, `the fixture did not produce "${status}"`)
 }
 
