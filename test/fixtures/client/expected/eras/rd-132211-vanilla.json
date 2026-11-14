@@ -1,0 +1,156 @@
+{
+  "windows-x64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "windows-arm64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "windows-x86": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "osx-arm64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "osx-x64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "linux-x64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  },
+  "linux-arm64": {
+    "bin": "/opt/java/bin/java",
+    "cwd": "<data>/client/profiles/guard",
+    "args": [
+      "-Djava.library.path=<data>/client/natives/rd-132211",
+      "-cp",
+      [
+        "<data>/client/libraries/net/minecraft/launchwrapper/1.6/launchwrapper-1.6.jar",
+        "<data>/client/libraries/net/sf/jopt-simple/jopt-simple/4.5/jopt-simple-4.5.jar",
+        "<data>/client/libraries/org/ow2/asm/asm-all/4.1/asm-all-4.1.jar",
+        "<data>/client/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar",
+        "<data>/client/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl/2.9.0/lwjgl-2.9.0.jar",
+        "<data>/client/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.0/lwjgl_util-2.9.0.jar",
+        "<data>/client/versions/rd-132211/rd-132211.jar"
+      ],
+      "-Xmx4G",
+      "com.mojang.rubydung.RubyDung",
+      "alice",
+      "token:0:40f5db53-a47a-33ee-b1f6-db0e20deded4"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+# Captures the mod loaders' real installer files and version lists into
+# test/fixtures/client/loaders/ (tools/capture-loader-fixtures.mjs), for the Forge, NeoForge and
+# Quilt launcher work: the loaders' hosts cannot be reached from where that code is written.
+#
+# A pull request that changes the capture runs it and commits the result to its own branch. Run by
+# hand, it commits to the branch it was started on, except main, v2 and dev, where it only uploads
+# the files as an artifact to look at.
+name: loader-fixtures
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/capture-loader-fixtures.mjs
+      - .github/workflows/loader-fixtures.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: loader-fixtures-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    # a fork's pull request gets no write token, and has no business committing here
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BRANCH: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capture the loaders' files
+        run: node tools/capture-loader-fixtures.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loader-fixtures
+          path: test/fixtures/client/loaders/
+      - name: Commit them to the branch
+        if: env.BRANCH != 'main' && env.BRANCH != 'v2' && env.BRANCH != 'dev'
+        run: |
+          git add test/fixtures/client/loaders
+          if git diff --cached --quiet; then
+            echo "No change in the captured files."
+            exit 0
+          fi
+          git -c user.name=joogiebear -c user.email=135996686+joogiebear@users.noreply.github.com \
+            commit -m "test(launcher): loader fixtures captured by the loader-fixtures job"
+          git push origin "HEAD:refs/heads/$BRANCH"

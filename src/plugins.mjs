@@ -48,6 +48,7 @@ function* zipEntries(fd, size) {
       name: cd.toString('utf8', at + 46, at + 46 + nameLen),
       method: cd.readUInt16LE(at + 10),
       compressed: cd.readUInt32LE(at + 20),
+      size: cd.readUInt32LE(at + 24),
       localOffset: cd.readUInt32LE(at + 42),
     }
     at += 46 + nameLen + extraLen + commentLen
@@ -77,6 +78,16 @@ export function readZipEntry(file, wanted) {
       if (entry.name === wanted) return readEntryData(fd, entry)
     }
     return null
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+// Every entry's name and unpacked size, in the archive's order.
+export function zipEntryList(file) {
+  const fd = fs.openSync(file, 'r')
+  try {
+    return [...zipEntries(fd, fs.fstatSync(fd).size)].map((e) => ({ name: e.name, size: e.size }))
   } finally {
     fs.closeSync(fd)
   }

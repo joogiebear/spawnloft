@@ -215,3 +215,34 @@ test('1.21.11 guard: the expectation files carry the log config and no unfilled 
     assert.ok(!JSON.stringify(cmd.args).includes('${'), pair)
   }
 })
+
+// The same guard for every era and every Fabric profile, made before the loader groundwork
+// (Forge, NeoForge and Quilt plan, phase 0) touched the merge and the classpath: vanilla and
+// Fabric must come out byte for byte as they did. A machine an era cannot run on keeps the
+// refusal's text instead. Regenerate only on purpose, as above.
+const ERA_GUARDS = [
+  ...F.ERA_IDS.map((id) => ({ name: `${id}-vanilla`, load: () => F.loadVersion(id), mc: id, loader: 'vanilla' })),
+  ...Object.keys(F.FABRIC_PROFILES).map((id) => ({ name: `${id}-fabric`, load: () => F.loadFabricMerged(id), mc: id, loader: 'fabric' })),
+]
+
+for (const guard of ERA_GUARDS) {
+  test(`era guard: ${guard.name} command line on every machine is unchanged`, () => {
+    const version = guard.load()
+    const profile = { mc: guard.mc, loader: guard.loader, memory: '4G', server: null }
+    const actual = {}
+    for (const os of F.OS_PAIRS) {
+      try {
+        const cmd = buildCommand({ version, profile, profileName: 'guard', account: offlineAccount('alice'), java: '/opt/java/bin/java', os, harnessToken: null, address: null })
+        actual[F.pairName(os)] = normalise(cmd)
+      } catch (err) {
+        actual[F.pairName(os)] = { refused: err.message }
+      }
+    }
+    const file = path.join(EXPECTED_DIR, 'eras', `${guard.name}.json`)
+    if (process.env.UPDATE_CLIENT_EXPECTATIONS === '1') {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, JSON.stringify(actual, null, 2) + '\n')
+    }
+    assert.deepEqual(actual, JSON.parse(fs.readFileSync(file, 'utf8')))
+  })
+}

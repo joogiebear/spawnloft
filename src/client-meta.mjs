@@ -142,10 +142,42 @@ export function mergeInherited(child, parent) {
     const childJvm = child.arguments?.jvm ?? []
     result.arguments = { game: [...parentGame, ...childGame], jvm: [...parentJvm, ...childJvm] }
   }
-  if (parent.minecraftArguments !== undefined) {
+  // The child's own wins: Forge 1.12.2 and older carries its --tweakClass there, in a full copy
+  // of the parent's line (Mojang's launcher reads the child's too)
+  if (child.minecraftArguments !== undefined) {
+    result.minecraftArguments = child.minecraftArguments
+  } else if (parent.minecraftArguments !== undefined) {
     result.minecraftArguments = parent.minecraftArguments
   }
   return result
+}
+
+// A library's name without its version: group:artifact, plus the classifier and extension when
+// it has them. Two rows with one key are one library in two versions.
+export function libraryKey(name) {
+  const text = String(name)
+  const at = text.indexOf('@')
+  const parts = (at === -1 ? text : text.slice(0, at)).split(':')
+  return [parts[0], parts[1], ...parts.slice(3)].join(':') + (at === -1 ? '' : text.slice(at))
+}
+
+// The rows that go on the classpath: the non-native ones, one per library (libraryKey), the first
+// listed kept. mergeInherited lists the loader's rows before the parent's, so a newer copy a loader
+// ships (Forge does, of libraries vanilla also lists) is the one used, as Mojang's launcher does.
+// A jar under two rows is one entry too.
+export function classpathRows(rows) {
+  const keys = new Set()
+  const paths = new Set()
+  const out = []
+  for (const row of rows) {
+    if (row.native !== false) continue
+    const key = libraryKey(row.name)
+    if (keys.has(key) || paths.has(row.path)) continue
+    keys.add(key)
+    paths.add(row.path)
+    out.push(row)
+  }
+  return out
 }
 
 export function libraryPath(name) {
@@ -280,7 +312,10 @@ export function libraries(version, { os = currentOs() } = {}) {
 
     const dl = lib.downloads
     const p = libraryRelPath(lib.name, dl?.artifact?.path ?? libraryPath(lib.name))
-    const u = dl?.artifact?.url ?? (lib.url ?? 'https://libraries.minecraft.net/') + p
+    // An empty URL is a file the loader's installer makes (Forge's and NeoForge's patched game
+    // jar): null, never a download (madeByInstaller)
+    const given = dl?.artifact?.url ?? (lib.url === '' ? '' : (lib.url ?? 'https://libraries.minecraft.net/') + p)
+    const u = given === '' ? null : given
     const s1 = dl?.artifact?.sha1 ?? lib.sha1 ?? null
     const sz = dl?.artifact?.size ?? lib.size ?? null
 

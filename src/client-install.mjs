@@ -411,6 +411,11 @@ async function ensureVersionWith(id, { os = currentOs(), onProgress = () => {}, 
   await inBatches(libDownloads, PARALLEL, async (row) => {
     const dest = path.join(LIBRARIES_DIR, row.path)
     const needs = await needsFetch(dest, { sha1: row.sha1, size: row.size }, ledger)
+    // made by the loader's installer, not downloaded: missing or damaged means setting the loader
+    // up again
+    if (needs && row.url === null) {
+      fail(`library ${row.name} is made when the mod loader is set up, and it is missing or damaged; set the loader up again`, 'loader-install-needed')
+    }
     if (needs) {
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       const opts = { hash: 'sha1', label: `library ${row.name}` }

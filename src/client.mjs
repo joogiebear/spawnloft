@@ -19,12 +19,12 @@ import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRef
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, readLastExit, readPlayed, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
-import { loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi, assertFabricAvailable, fabricGameVersions, fabricAvailable } from './client-fabric.mjs'
+import { LOADERS, loaderFor } from './client-loaders.mjs'
 import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { refreshHarnessIndex, harnessIndexStatus } from './client-harness-index.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
 
-export const LOADERS = ['vanilla', 'fabric']
+export { LOADERS }
 export const DEFAULT_MEMORY = '2G'
 
 const PROFILE_KEYS = ['mc', 'loader', 'loaderVersion', 'java', 'memory', 'harness', 'server', 'account', 'assistantAccount', 'serverList']
@@ -422,10 +422,11 @@ function nearIds(mc, manifest) {
   return near.length ? `. Did you mean ${near.slice(0, 5).join(', ')}?` : ''
 }
 
-// What a profile's save checks beyond the shape: the version exists, and Fabric builds for it.
+// What a profile's save checks beyond the shape: the version exists, and its loader builds for it.
 export async function checkProfileVersion({ mc, loader = 'vanilla' }, { fetchImpl } = {}) {
   const known = await assertVersionId(mc, { fetchImpl })
-  if (loader === 'fabric') await assertFabricAvailable(known.mc, { kind: versionKind({ id: known.mc, type: known.type }) })
+  const mod = loaderFor(loader)
+  if (mod) await mod.assertAvailable(known.mc, { kind: versionKind({ id: known.mc, type: known.type }) })
   return known.mc
 }
 
@@ -437,23 +438,20 @@ export async function prepareVersion(name, { onStage = () => {} } = {}) {
     onStage({ stage: 'version', message: `Downloading the version file for Minecraft ${profile.mc}` })
     await fetchVersionJson(profile.mc, { manifest, cacheDir: CLIENT_CACHE_DIR })
   }
-  if (profile.loader === 'fabric') {
-    let loaderVersion = profile.loaderVersion
-    // a loader profile already on disk was made for this version, so Fabric has it
-    if (loaderVersion === null || !fs.existsSync(versionJson(fabricVersionId(profile.mc, loaderVersion)))) {
-      const type = readJson(versionJson(profile.mc), null)?.type ?? 'release'
-      await assertFabricAvailable(profile.mc, { kind: versionKind({ id: profile.mc, type }) })
-    }
-    if (loaderVersion === null) {
-      onStage({ stage: 'fabric', message: `Finding a Fabric loader for Minecraft ${profile.mc}` })
-      const list = await loaderVersions(profile.mc)
-      loaderVersion = pickLoader(list).version
-      updateProfile(name, { loaderVersion }, { launching: true })
-    }
-    await ensureFabricProfile(profile.mc, loaderVersion)
-    return fabricVersionId(profile.mc, loaderVersion)
+  const mod = loaderFor(profile.loader)
+  if (!mod) return profile.mc
+  let loaderVersion = profile.loaderVersion
+  // a loader profile already on disk was made for this version, so the loader has it
+  if (loaderVersion === null || !mod.isInstalled(profile.mc, loaderVersion)) {
+    const type = readJson(versionJson(profile.mc), null)?.type ?? 'release'
+    await mod.assertAvailable(profile.mc, { kind: versionKind({ id: profile.mc, type }) })
   }
-  return profile.mc
+  if (loaderVersion === null) {
+    onStage({ stage: mod.id, message: `Finding a ${mod.name} loader for Minecraft ${profile.mc}` })
+    loaderVersion = mod.pick(await mod.builds(profile.mc)).version
+    updateProfile(name, { loaderVersion }, { launching: true })
+  }
+  return await mod.ensureInstalled(profile.mc, loaderVersion, { onStage })
 }
 
 export async function launch(name, opts = {}) {
@@ -567,11 +565,12 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // the fake game runs a version already on disk as it is, without installing it
   let fakeInstalled = false
   if (fakeJava) {
-    if (profile.loader === 'fabric') {
+    const mod = loaderFor(profile.loader)
+    if (mod) {
       if (profile.loaderVersion === null) {
-        fail(`profile "${name}" uses the fabric loader but has no loaderVersion; set one with spawnloft client set`)
+        fail(`profile "${name}" uses the ${mod.id} loader but has no loaderVersion; set one with spawnloft client set`)
       }
-      versionId = fabricVersionId(profile.mc, profile.loaderVersion)
+      versionId = mod.versionId(profile.mc, profile.loaderVersion)
     } else {
       versionId = profile.mc
     }
@@ -631,10 +630,8 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
     onWarning(w)
   }
   if (!fakeJava) {
-    if (profile.loader === 'fabric') {
-      onStage({ stage: 'fabric', message: 'Checking Fabric API' })
-      await ensureFabricApi(name, profile.mc, { onProgress })
-    }
+    const mod = loaderFor(profile.loader)
+    if (mod?.afterInstall) await mod.afterInstall(name, profile, { onStage, onProgress })
     if (profile.harness) {
       onStage({ stage: 'harness', message: 'Checking the harness mod' })
       await ensureHarnessJar(name, profile.mc, { onProgress })
@@ -1180,7 +1177,7 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
   // the two lists side by side: each fetch may take its full timeout on a slow network
   const [mojang, fabricList] = await Promise.all([
     fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) }).then((m) => ({ m }), (err) => ({ err })),
-    fabric || refresh ? fabricGameVersions({ force: refresh }).catch(() => null) : null,
+    fabric || refresh ? loaderFor('fabric').gameVersions({ force: refresh }).catch(() => null) : null,
     refreshHarnessIndex({ force: refresh }),
   ])
   if (mojang.err) offline = `the Minecraft version list could not be read (${mojang.err?.message ?? mojang.err}), so only downloaded versions are listed`
@@ -1208,7 +1205,7 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
       javaNeeds: disk ? javaRequirement(disk.json).major : javaHint(v),
       javaNeedsExact: Boolean(disk),
       harness: Boolean(harnessFor(v.id)),
-      fabric: fabricList ? fabricAvailable(v.id, fabricList) : null,
+      fabric: fabricList ? loaderFor('fabric').available(v.id, fabricList) : null,
       refusal: disk ? platformRefusal(disk.json, os, hostCaps) : null,
       note: notes.length ? notes.join('; ') : null,
     }
@@ -1229,8 +1226,8 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
   const resolved = resolveVersion(json, { os, hostCaps: needsCaps ? await hostCapabilities(os) : null })
   const refused = resolvedRefusal(resolved)
   let fabric = null
-  const [fabricList] = await Promise.all([fabricGameVersions().catch(() => null), refreshHarnessIndex()])
-  try { if (fabricList) fabric = fabricAvailable(mc, fabricList) } catch { /* unknown */ }
+  const [fabricList] = await Promise.all([loaderFor('fabric').gameVersions().catch(() => null), refreshHarnessIndex()])
+  try { if (fabricList) fabric = loaderFor('fabric').available(mc, fabricList) } catch { /* unknown */ }
   return {
     id: mc,
     type: json.type ?? 'release',
