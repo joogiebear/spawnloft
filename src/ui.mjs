@@ -441,7 +441,7 @@ async function handleRawProps(req, res, name) {
     content: configFiles.restoreHidden(before, body.text),
     hiddenRestored: true,
   })
-  const snap = await backup.createSnapshot(inst, { scope: 'config', label: 'before-edit', members: [plan.shown], flush: false })
+  const snap = await backup.createSnapshot(inst, { scope: 'config', label: 'before-edit', members: [plan.shown], flush: false, changeCopy: true })
   // the server may have rewritten its properties while the snapshot ran
   if (!configFiles.unchangedSince(plan)) fail('server.properties changed while it was being snapshotted; reload it and try again')
   configFiles.applyConfigWrite(plan)
@@ -538,7 +538,18 @@ function activityQuery(url, server = null) {
 
 // One server's history, plus undo for changes that kept a copy. An undo is recorded too.
 async function handleActivity(req, res, name, seg, url) {
-  if (req.method === 'GET' && !seg[4]) return json(res, 200, { ...activity.readActivity(activityQuery(url, name)), running: supervisor.isRunning(name) })
+  if (req.method === 'GET' && !seg[4]) {
+    const out = activity.readActivity(activityQuery(url, name))
+    // a change whose copy has since been deleted or cleaned up cannot be undone: said, so the page
+    // does not offer it
+    const kept = new Map()
+    const has = (server, snapshot) => {
+      if (!kept.has(server)) kept.set(server, /^[A-Za-z0-9_-]{1,32}$/.test(server) ? backup.snapshotNames(server) : new Set())
+      return kept.get(server).has(snapshot)
+    }
+    const entries = out.entries.map((e) => (e.snapshot && e.server && !has(e.server, e.snapshot) ? { ...e, snapshotGone: true } : e))
+    return json(res, 200, { ...out, entries, running: supervisor.isRunning(name) })
+  }
   if (req.method === 'POST' && seg[4] === 'undo') {
     const body = await readBody(req)
     if (!body.snapshot) return json(res, 400, { error: 'which change?' })
@@ -609,6 +620,9 @@ async function handleBackups(req, res, name, seg) {
     const history = {
       snapshots: backup.listSnapshots(name),
       exclude: backup.excludePatterns(inst),
+      // the clean-up of small copies: whether this server has it on, and how old one has to be
+      cleanCopies: inst.backupCleanCopies === true,
+      copyDays: backup.COPY_DAYS,
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
       // the folder saved for the next start, when it is not the one in use: the page says so until then
@@ -699,6 +713,30 @@ async function handleBackups(req, res, name, seg) {
   if (action === 'delete') {
     if (!body.snapshot) return json(res, 400, { error: 'which snapshot?' })
     return json(res, 200, backup.removeSnapshot(name, String(body.snapshot)))
+  }
+
+  if (action === 'delete-many') {
+    if (!Array.isArray(body.snapshots) || !body.snapshots.length) return json(res, 400, { error: 'which backups?' })
+    if (body.snapshots.some((s) => typeof s !== 'string')) return json(res, 400, { error: 'each backup is named by its file name' })
+    return json(res, 200, backup.removeSnapshots(name, body.snapshots))
+  }
+
+  if (action === 'clean-copies') {
+    // a missing or misspelled "on" must not read as either answer
+    if (typeof body.on !== 'boolean') return json(res, 400, { error: 'on must be true or false' })
+    if (body.on) {
+      const refused = backup.isRestoring(name)
+      if (refused) return json(res, 409, { error: 'A backup is being put back right now. Turn the clean-up on when that has finished.' })
+    }
+    registry.updateInstance(name, { backupCleanCopies: body.on ? true : null })
+    activity.record(name, 'settings', {
+      detail: body.on ? `small copies are removed after ${backup.COPY_DAYS} days` : 'small copies are kept until deleted',
+    })
+    // on: the old ones the page listed when it asked go now, and no others. Each is checked again
+    // here; anything else that is old goes when the next backup or copy is taken.
+    const listed = Array.isArray(body.remove) ? body.remove.filter((s) => typeof s === 'string').slice(0, backup.REMOVE_MANY_LIMIT) : []
+    const cleaned = body.on && listed.length ? backup.cleanCopies(name, { only: listed }) : { removed: [], size: 0 }
+    return json(res, 200, { cleanCopies: body.on, removed: cleaned.removed, size: cleaned.size })
   }
 
   if (action === 'auto') {

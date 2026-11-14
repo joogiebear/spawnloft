@@ -747,7 +747,9 @@ async function waitInWorld(name, server, waitMs) {
   const deadline = Date.now() + waitMs
   let st = await viaSession(name, (ch) => ch.call('status'))
   while (st.screen !== 'ingame' && !leftServer(st.screen) && Date.now() < deadline) {
-    await sleep(500)
+    // never past the wait that was asked for: a short one slept the full half second anyway, and
+    // on a slow machine came back saying the world had loaded when the caller had stopped waiting
+    await sleep(Math.max(1, Math.min(500, deadline - Date.now())))
     st = await viaSession(name, (ch) => ch.call('status'))
   }
   if (leftServer(st.screen)) {
