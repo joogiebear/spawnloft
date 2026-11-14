@@ -143,8 +143,33 @@ pub fn ignore_ctrl_c() {
 /// PLAN-2.0-REMAINING.md A6). Only that child is in the job: its own children break away
 /// silently, so a server daemon a `start` spawns outlives the command, as it must. Started
 /// suspended so it is in the job before it runs. Returns its exit code.
-pub fn run_in_kill_job(mut cmd: Command) -> std::io::Result<i32> {
-    cmd.creation_flags(CREATE_SUSPENDED);
+pub fn run_in_kill_job(cmd: Command) -> std::io::Result<i32> {
+    run_in_kill_job_with(cmd, CREATE_SUSPENDED)
+}
+
+/// [`run_in_kill_job`] for a caller that may have no console of its own: the windowed
+/// `SpawnLoft.exe` forwarding its argv compatibility form (`SpawnLoft.exe ...\mcctl.mjs mcp`, what a
+/// 1.x MCP config in Claude Desktop runs at every sign-in). A console program started from a
+/// process with no console gets a new console, and so a visible terminal window, unless it is
+/// started with `CREATE_NO_WINDOW`. A caller that does have a console (a debug build run from a
+/// terminal) keeps sharing it, so its output still shows there. Standard handles are inherited
+/// either way, so an MCP client's pipes are untouched.
+pub fn run_in_kill_job_no_new_window(cmd: Command) -> std::io::Result<i32> {
+    run_in_kill_job_with(cmd, CREATE_SUSPENDED | no_new_window_flag(has_console()))
+}
+
+/// `CREATE_NO_WINDOW` when the caller has no console to share, nothing otherwise.
+pub fn no_new_window_flag(has_console: bool) -> u32 {
+    if has_console { 0 } else { CREATE_NO_WINDOW }
+}
+
+fn has_console() -> bool {
+    // SAFETY: no arguments; returns this process's console window or null.
+    !unsafe { windows_sys::Win32::System::Console::GetConsoleWindow() }.is_null()
+}
+
+fn run_in_kill_job_with(mut cmd: Command, flags: u32) -> std::io::Result<i32> {
+    cmd.creation_flags(flags);
     let mut child = cmd.spawn()?;
     let job = kill_on_close_job();
     if let Some(job) = &job {
@@ -937,6 +962,20 @@ mod tests {
         ConvertSecurityDescriptorToStringSecurityDescriptorW, GetSecurityInfo, SE_KERNEL_OBJECT,
     };
     use windows_sys::Win32::Security::DACL_SECURITY_INFORMATION;
+
+    #[test]
+    fn a_forwarder_with_no_console_starts_its_child_without_a_window() {
+        assert_eq!(no_new_window_flag(false), CREATE_NO_WINDOW);
+        // one with a console (a terminal, this test runner) lets the child share it
+        assert_eq!(no_new_window_flag(true), 0);
+    }
+
+    #[test]
+    fn the_no_window_forwarder_still_passes_the_exit_code_back() {
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/d", "/c", "exit 7"]);
+        assert_eq!(run_in_kill_job_no_new_window(cmd).unwrap(), 7);
+    }
 
     #[test]
     fn the_pipe_admits_this_user_alone() {

@@ -467,11 +467,14 @@ fn argv_compat(args: &[std::ffi::OsString]) -> Option<ExitCode> {
 }
 
 /// The forwarded core in a kill-on-close job on Windows (a killed `SpawnLoft.exe` takes the core
-/// and its Node with it; PLAN-2.0-REMAINING.md A6), a plain child elsewhere.
+/// and its Node with it; PLAN-2.0-REMAINING.md A6), a plain child elsewhere. A release
+/// `SpawnLoft.exe` has no console, so the core is started without a window: otherwise every
+/// launch of a 1.x MCP config (Claude Desktop starts one at each sign-in) or task shim opened a
+/// terminal window that stayed until the command ended.
 #[cfg(windows)]
 fn run_forwarder(cmd: Command) -> std::io::Result<i32> {
     spawnloft_lib::platform::ignore_ctrl_c();
-    spawnloft_lib::platform::run_in_kill_job(cmd)
+    spawnloft_lib::platform::run_in_kill_job_no_new_window(cmd)
 }
 
 #[cfg(not(windows))]
