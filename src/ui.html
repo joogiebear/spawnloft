@@ -4534,7 +4534,7 @@ async function stopThenEdit(row) {
     confirmLabel: 'Stop and edit',
   });
   if (!ok || state.current !== row.name) return;
-  await act('stop')();
+  await act('stop', { sure: true })();
   const now = rowOf(row.name);
   if (now && now.status !== 'running' && now.status !== 'stopping') editServer(now);
 }
@@ -5780,6 +5780,9 @@ async function cardAct(name, what) {
   const row = rowOf(name);
   if (!row || overview.acting[name]) return;
   const verb = what ? { what } : cardVerb(row);
+  const question = stopQuestion(verb.what, row, state.rows);
+  if (question && !(await ask(question))) return;
+  if (overview.acting[name]) return;
   overview.acting[name] = verb.what;
   renderHomeCards();
   const note = toast(ACTION_ING[verb.what] + ' ' + name + '…');
@@ -6801,9 +6804,60 @@ $('#bJump').onclick = () => {
 const ACTION_ING = { start: 'Starting', stop: 'Stopping', restart: 'Restarting' };
 const ACTION_DONE = { start: 'started', stop: 'stopped', restart: 'restarted' };
 
-const act = (what) => async () => {
+/**
+ * The question before a stop or a restart that takes something from somebody: players who are
+ * online, or running servers that keep their data in this database. Null when there is nobody to
+ * ask about, and the button then acts at once as it always did.
+ */
+function stopQuestion(what, row, rows) {
+  if (!row || (what !== 'stop' && what !== 'restart')) return null;
+  const stop = what === 'stop';
+  const title = (stop ? 'Stop ' : 'Restart ') + (row.label || row.name) + '?';
+  const confirmLabel = stop ? 'Stop' : 'Restart';
+  if (row.kind === 'database') {
+    const users = Object.keys(row.attachments || {})
+      .map((name) => rows.find((r) => r.name === name))
+      .filter((r) => r && r.status === 'running')
+      .map((r) => r.label || r.name);
+    if (!users.length) return null;
+    const who = users.length === 1 ? users[0] + ' is running and keeps'
+      : users.slice(0, -1).join(', ') + ' and ' + users[users.length - 1] + ' are running and keep';
+    return {
+      title, confirmLabel,
+      text: who + ' data in this database. ' + (stop ? 'Until it is started again' : 'While it restarts')
+        + ', whatever reads or writes it there will fail.',
+    };
+  }
+  const online = row.status === 'running' && row.latest ? Number(row.latest.players) || 0 : 0;
+  if (!online) return null;
+  return {
+    title, confirmLabel,
+    text: (online === 1 ? '1 player is online and will be disconnected.' : online + ' players are online and will be disconnected.')
+      + (stop ? '' : ' They can join again once it is back.'),
+  };
+}
+
+/** Whether running this scheduled task now stops or restarts the server. */
+function taskDisconnects(task) {
+  const a = (task && task.action) || {};
+  if (a.type === 'restart' || a.type === 'stop') return a.type;
+  if (a.type === 'steps') {
+    const step = (a.steps || []).find((st) => st.do === 'restart' || st.do === 'stop');
+    if (step) return step.do;
+  }
+  return null;
+}
+
+// `sure` is for a caller that has already asked: a second question about the same stop would be
+// answered without being read.
+const act = (what, { sure = false } = {}) => async () => {
   const name = state.current;
   if (!name || state.busy) return;
+  if (!sure) {
+    const question = stopQuestion(what, rowOf(name), state.rows);
+    if (question && !(await ask(question))) return;
+    if (state.current !== name || state.busy) return;
+  }
   state.busy = true;
   // What is under way, so the state pill can say "Starting…" through the wait rather than
   // "Stopped" while the button that started it is already greyed out.
@@ -7406,6 +7460,15 @@ function updateCheckWords(out, noun) {
   return parts.join(' ');
 }
 
+/** Asked before one click hands somebody the whole server. */
+function operatorQuestion(label) {
+  return {
+    title: 'Make ' + label + ' an operator?',
+    text: 'Operators can run every command on this server: stop it, ban and unban anyone, change the game for everyone, and make more operators.',
+    confirmLabel: 'Make operator',
+  };
+}
+
 /**
  * What to say after a change to a player. A running server answers in a sentence whether it did
  * the thing or refused, so the answer is not the result: `took` is, read back from the server's
@@ -7729,7 +7792,7 @@ function playerRow(p, data, base, again, select) {
   const acts = document.createElement('div');
   acts.className = 'w-acts';
   const opBtn = document.createElement('button');
-  opBtn.textContent = p.op ? 'Remove op' : 'Make op';
+  opBtn.textContent = p.op ? 'Remove operator' : 'Make operator';
   const banBtn = document.createElement('button');
   banBtn.className = p.banned ? '' : 'danger';
   banBtn.textContent = p.banned ? 'Unban' : 'Ban';
@@ -7758,8 +7821,11 @@ function playerRow(p, data, base, again, select) {
     }
   };
 
-  opBtn.onclick = () => run('/op', { uuid: p.uuid, on: !p.op },
-    p.op ? label + ' is no longer an operator.' : label + ' is now an operator.');
+  opBtn.onclick = async () => {
+    if (p.op) return run('/op', { uuid: p.uuid, on: false }, label + ' is no longer an operator.');
+    if (!(await ask(operatorQuestion(label)))) return;
+    return run('/op', { uuid: p.uuid, on: true }, label + ' is now an operator.');
+  };
 
   banBtn.onclick = async () => {
     if (p.banned) return run('/ban', { uuid: p.uuid, on: false }, label + ' is unbanned.');
@@ -8203,7 +8269,7 @@ async function renderPlugins(opts) {
     }
     if (restart && out.updated.length && state.current === row.name) {
       progress.textContent = 'Restarting ' + (row.label || row.name) + '…';
-      await act('restart')();
+      await act('restart', { sure: true })();
     }
     await again();
   };
@@ -9440,9 +9506,12 @@ function taskCard(task, data, base, again, editor) {
   const busy = (on) => { for (const b of acts.children) b.disabled = on; };
 
   runNow.onclick = async () => {
-    busy(true);
     // The pane says whose tasks it is showing; `state` in here is this card's own status cell.
     const server = $('#schedulerBody').dataset.for;
+    // A task that stops or restarts the server does it to whoever is on, now and not at 4 a.m.
+    const question = stopQuestion(taskDisconnects(task), rowOf(server), []);
+    if (question && !(await ask({ ...question, title: 'Run \u201c' + task.name + '\u201d now?', confirmLabel: 'Run now' }))) return;
+    busy(true);
     try {
       await post(base + '/' + encodeURIComponent(task.id) + '/run');
       // Windows starts the task and returns immediately, so there is nothing to report yet beyond
@@ -12287,7 +12356,7 @@ async function buildServerSettings(row, body) {
       saving = false;
       update();
       await refresh();
-      if (restart && restartNeeded && state.current === row.name) await act('restart')();
+      if (restart && restartNeeded && state.current === row.name) await act('restart', { sure: true })();
     } catch (e) {
       toast(e.message, 'bad');
     } finally {
@@ -12296,7 +12365,12 @@ async function buildServerSettings(row, body) {
     }
   };
   save.onclick = () => doSave();
-  saveRestart.onclick = () => doSave({ restart: true });
+  // Asked before anything is saved, so "no" leaves the form exactly as it was.
+  saveRestart.onclick = async () => {
+    const question = stopQuestion('restart', rowOf(row.name), state.rows);
+    if (question && !(await ask({ ...question, title: 'Save and restart ' + (row.label || row.name) + '?', confirmLabel: 'Save and restart' }))) return;
+    doSave({ restart: true });
+  };
 
   // ---- the whole file -------------------------------------------------------------
 
