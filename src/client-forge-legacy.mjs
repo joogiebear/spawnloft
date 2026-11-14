@@ -81,6 +81,9 @@ export function convertLegacy(profile, { mc, id, installerPath, who = 'Forge' })
       if (info.inheritsFrom == null) continue
       unknown(`a library row for ${lib.name.slice(0, 60)} SpawnLoft does not know`)
     }
+    // and its copies of the game's other libraries: Forge marks the rows it adds (clientreq,
+    // serverreq or a maven); vanilla's own, checked rows stand for the rest
+    if (info.inheritsFrom == null && !lib.url && lib.clientreq == null && lib.serverreq == null) continue
     const url = legacyBaseUrl(lib.url) + rel
     assertLoaderHost(url, `The ${who} installer`)
     const sums = Array.isArray(lib.checksums) ? lib.checksums.filter(isSha1).map((s) => s.toLowerCase()) : []

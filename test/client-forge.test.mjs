@@ -73,6 +73,7 @@ test('Forge\'s lists from the real files: its versions, newest first, and the bu
   assert.equal(b263.at(-1).version, '66.0.0')
   // a build picked by hand, and one that is not published
   assert.equal(G.pickForge(b1201, '47.0.1').version, '47.0.1')
+  assert.equal(G.pickForge([{ version: '10.13.4.1614-1.7.10' }], '10.13.4.1614').version, '10.13.4.1614-1.7.10')
   assert.throws(() => G.pickForge(b1201, '47.9.9'), /not published/)
   // a version with no recommended build: the newest
   assert.equal(G.pickForge([{ version: '1.0.2', stable: true, recommended: false }, { version: '1.0.1', stable: true, recommended: false }]).version, '1.0.2')
@@ -277,11 +278,15 @@ test('the old installer is read into the newer shape: https Forge maven, the cli
   const p = read('1.7.10-10.13.4.1614-1.7.10/install_profile.json')
   delete p.versionInfo.inheritsFrom
   // as 1.6.4's lists the game's own libraries, native and per-OS rows among them
-  p.versionInfo.libraries.push({ name: 'org.lwjgl.lwjgl:lwjgl-platform:2.9.0', natives: { linux: 'natives-linux' } }, { name: 'org.lwjgl.lwjgl:lwjgl:2.9.0', rules: [{ action: 'allow' }] })
+  p.versionInfo.libraries.push({ name: 'org.lwjgl.lwjgl:lwjgl-platform:2.9.0', natives: { linux: 'natives-linux' } }, { name: 'org.lwjgl.lwjgl:lwjgl:2.9.0', rules: [{ action: 'allow' }] }, { name: 'argo:argo:2.25_fixed' })
   fs.writeFileSync(jar2, buildZip([['install_profile.json', Buffer.from(JSON.stringify(p))], [p.install.filePath, UNIVERSAL]]))
   const own = readInstaller(jar2, { mc: '1.7.10', id: 'x-forge', who: 'Forge', legacy: true }).version
   assert.equal(own.inheritsFrom, '1.7.10')
   assert.ok(!own.libraries.some((l) => l.name.startsWith('org.lwjgl')), 'the game\'s own native rows are left to vanilla')
+  // and its unmarked copies of the game's libraries; Forge's own rows stay
+  assert.ok(!own.libraries.some((l) => l.name === 'argo:argo:2.25_fixed'))
+  assert.ok(own.libraries.some((l) => l.name === 'com.google.guava:guava:17.0'), 'guava is a row Forge marks')
+  assert.ok(own.libraries.some((l) => l.name === 'net.minecraft:launchwrapper:1.12'))
   // in a file that inherits, such a row is one SpawnLoft does not know
   p.versionInfo.inheritsFrom = '1.7.10'
   fs.writeFileSync(jar2, buildZip([['install_profile.json', Buffer.from(JSON.stringify(p))], [p.install.filePath, UNIVERSAL]]))

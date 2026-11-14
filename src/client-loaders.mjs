@@ -89,7 +89,7 @@ const neoforge = {
   afterInstall: null,
 }
 
-// Forge from Minecraft 1.13 on, by the same engine; on a Java 8 version it runs on Java 8 only.
+// Forge from Minecraft 1.6.4 on, by the same engine; on a Java 8 version it runs on Java 8 only.
 const forge = {
   id: 'forge',
   name: 'Forge',

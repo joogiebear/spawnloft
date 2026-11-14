@@ -104,7 +104,9 @@ recommended for the version, else its newest. Forge for 1.6.4 to 1.12.2 (before 
 2851) has an older kind of installer with no build steps: SpawnLoft reads its version file, makes
 each library address https and points it at today's Forge maven, gets each library's checksum
 from the `.sha1` its maven publishes (and refuses one that is not in the installer's own list,
-where it has one), leaves out the rows only a server needs, and takes the Forge jar out of the
+where it has one; where the maven publishes none, the file itself is downloaded and must be one
+the installer lists), leaves out the rows only a server needs, leaves a 1.6.4 file's copies of
+the game's own libraries to the vanilla version it is made to inherit, and takes the Forge jar out of the
 installer. Its optional Mercurius statistics mod is not installed. SpawnLoft has started Forge
 by hand on 1.7.10 and 1.12.2; the versions between share their format, and the setup sheet says
 "not tested by SpawnLoft" for them. Forge for 1.6.3 and older patched the game jar itself and is

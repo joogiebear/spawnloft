@@ -117,7 +117,8 @@ export async function forgeBuilds(mc, opts = {}) {
 export function pickForge(list, wanted = null) {
   if (!list.length) fail('no Forge build to pick from', 'loader-not-available')
   if (wanted) {
-    const entry = list.find((e) => e.version === wanted)
+    // Forge's short name for a build with a version tail (10.13.4.1614 for 10.13.4.1614-1.7.10)
+    const entry = list.find((e) => e.version === wanted) ?? list.find((e) => e.version.startsWith(`${wanted}-`))
     if (!entry) fail(`Forge ${wanted} is not published for this Minecraft version; known: ${list.slice(0, 10).map((e) => e.version).join(', ')}`)
     return entry
   }
