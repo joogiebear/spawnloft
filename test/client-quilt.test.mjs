@@ -53,7 +53,7 @@ test('Quilt\'s builds: newest first, a -beta is a beta, and the first Play takes
   // only betas: the newest beta
   assert.deepEqual(Q.pickQuilt([{ version: '0.31.0-beta.2', stable: false }, { version: '0.31.0-beta.1', stable: false }]), { version: '0.31.0-beta.2', stable: false })
   assert.throws(() => Q.pickQuilt([]), { code: 'loader-not-available' })
-  for (const [v, stable] of [['0.30.2', true], ['0.30.2-beta.1', false], ['1.0.0-rc.1', false], ['0.17.0-pre.3', false], ['0.29.0+local', true]]) {
+  for (const [v, stable] of [['0.30.2', true], ['0.30.2-beta.1', false], ['1.0.0-rc.1', false], ['0.17.0-pre.3', false], ['0.29.0+local', true], ['0.20.0-pre1', false], ['0.18.0-rc2', false], ['0.19.0-SNAPSHOT', false]]) {
     assert.equal(Q.quiltBuildStable(v), stable, v)
   }
 })
@@ -103,6 +103,19 @@ test('a Quilt profile that names another id, parent or host is refused, and noth
     assert.ok(!fs.existsSync(versionJson('quilt-loader-0.30.2-26.3')))
   }
   await assert.rejects(Q.ensureQuiltProfile('26.3', '../0.30.2', { fetchImpl: async () => profile, fetchSha1Impl }), /not a valid version/)
+})
+
+test('a Quilt library base without its trailing slash is written with one, so the downloader fetches the URL that was checked', async () => {
+  const profile = read('profile-26.3-0.30.2.json')
+  const answer = structuredClone(profile)
+  answer.libraries = [{ name: 'org.quiltmc:quilt-loader:0.30.2', url: 'https://maven.quiltmc.org/repository/release' }]
+  const seen = []
+  fs.rmSync(path.dirname(versionJson('quilt-loader-0.30.2-26.3')), { recursive: true, force: true })
+  await Q.ensureQuiltProfile('26.3', '0.30.2', { fetchImpl: async () => answer, fetchSha1Impl: async (url) => { seen.push(url); return '1'.repeat(40) } })
+  const written = JSON.parse(fs.readFileSync(versionJson('quilt-loader-0.30.2-26.3'), 'utf8'))
+  assert.equal(written.libraries[0].url, 'https://maven.quiltmc.org/repository/release/')
+  assert.deepEqual(seen, ['https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-loader/0.30.2/quilt-loader-0.30.2.jar'])
+  fs.rmSync(path.dirname(versionJson('quilt-loader-0.30.2-26.3')), { recursive: true, force: true })
 })
 
 test('the loader hosts: https on the loaders\' and Mojang\'s own hosts only', () => {

@@ -2924,8 +2924,8 @@
     const pickLoader = (val) => {
       if (val === f.loader) return
       f.loader = val
-      // a build is made for one loader
-      f.loaderVersion = ''
+      // a build is made for one loader; going back to the setup's own loader keeps its pinned build
+      f.loaderVersion = p && val === p.loader && f.mc === p.mc ? (p.loaderVersion ?? '') : ''
       if (!f.editing && !f.memoryTouched) { f.memory = defaultMemory(val); f.custom = false }
       fixLoader(f)
       render()

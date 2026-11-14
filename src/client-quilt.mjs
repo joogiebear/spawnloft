@@ -19,9 +19,10 @@ function gameId(mc) {
   return mc
 }
 
-// Quilt's list has no stable flag: a build with a pre-release part in its name is a beta.
+// Quilt's list has no stable flag: a build with any pre-release part in its name (0.31.0-beta.6,
+// 0.20.0-pre1, 1.0.0-rc2) is a beta. Build metadata after a + does not count.
 export function quiltBuildStable(version) {
-  return !/-(beta|alpha|pre|rc)\b/i.test(String(version))
+  return !String(version).split('+')[0].includes('-')
 }
 
 // The Minecraft versions Quilt builds for ({ version, stable }, newest first), cached for an hour.
@@ -110,8 +111,11 @@ export function quiltVersionId(mc, loader) {
 
 function libraryUrl(lib) {
   if (typeof lib?.name !== 'string' || lib.name.split(':').length < 3) fail('Quilt\'s profile lists a library without a proper name')
-  const base = typeof lib.url === 'string' && lib.url !== '' ? lib.url : 'https://libraries.minecraft.net/'
-  return assertLoaderHost(`${base.endsWith('/') ? base : `${base}/`}${libraryPath(lib.name)}`, 'Quilt\'s profile')
+  const given = typeof lib.url === 'string' && lib.url !== '' ? lib.url : 'https://libraries.minecraft.net/'
+  const base = given.endsWith('/') ? given : `${given}/`
+  // the downloader joins url and path as written, so the profile keeps the base that was checked
+  if (typeof lib.url === 'string' && lib.url !== '') lib.url = base
+  return assertLoaderHost(`${base}${libraryPath(lib.name)}`, 'Quilt\'s profile')
 }
 
 async function fetchSha1(url) {
