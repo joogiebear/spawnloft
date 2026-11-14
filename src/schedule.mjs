@@ -39,6 +39,9 @@ function withTasksLock(fn) {
 }
 
 // one folder so uninstall can remove everything spawnloft created
+// What a task does, for the Activity list.
+const ACTION_WORDS = { backup: 'backs up', restart: 'restarts the server', command: 'runs a command', steps: 'runs several steps' }
+
 export const TASK_FOLDER = 'mcctl'
 
 const EMPTY = { version: 1, tasks: {} }
@@ -343,7 +346,7 @@ function createLocked({ instance, name, action, schedule, enabled = true, owner 
   // runs, while a trigger with no definition fails loudly
   data.tasks[id] = task
   writeJson(TASKS_FILE(), data)
-  activity.record(instance, 'schedule-add', { detail: `${task.name}: ${task.action.type}` })
+  activity.record(instance, 'schedule-add', { detail: `${task.name} (${ACTION_WORDS[task.action.type] ?? task.action.type})` })
   return { id, ...task }
 }
 

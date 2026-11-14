@@ -69,6 +69,19 @@ const SOURCES = {
   },
 }
 
+// "paper-1.21.4-100.jar to paper-1.21.4-130.jar" for the Activity list, said the way the software
+// names itself when both file names follow its pattern, and as the two names when they do not.
+export function jarChangeWords(from, to) {
+  const parts = (name) => /^([a-z]+)-(\d[\w.]*?)-(\d+)\.jar$/i.exec(String(name ?? ''))
+  const a = parts(from)
+  const b = parts(to)
+  if (!a || !b || a[1].toLowerCase() !== b[1].toLowerCase()) return `${from} to ${to}`
+  const software = b[1].charAt(0).toUpperCase() + b[1].slice(1).toLowerCase()
+  return a[2] === b[2]
+    ? `${software} ${b[2]}, build ${a[3]} to ${b[3]}`
+    : `${software} ${a[2]} (build ${a[3]}) to ${b[2]} (build ${b[3]})`
+}
+
 export const UPDATABLE = Object.keys(SOURCES)
 
 // paper-26.2-121.jar is Paper 26.2 build 121; asp-26.3-b77d5e97.jar is ASP 26.3 build b77d5e97.
@@ -155,7 +168,7 @@ export async function applyUpgrade(name, { version = null, build = null, running
   // mcVersion moves with the jar: it selects the Java version and offered plugin builds. An
   // instance that never recorded one reads it from the jar name instead.
   updateInstance(name, { jar: fetched.name, ...(inst.mcVersion ? { mcVersion: target } : {}) })
-  activity.record(name, 'upgrade', { detail: `${inst.jar} to ${fetched.name}`, snapshot: snapshot ? path.basename(snapshot) : null })
+  activity.record(name, 'upgrade', { detail: jarChangeWords(inst.jar, fetched.name), snapshot: snapshot ? path.basename(snapshot) : null })
   return {
     from: inst.jar,
     to: fetched.name,

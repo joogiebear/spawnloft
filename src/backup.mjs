@@ -617,7 +617,7 @@ export function setSnapshotNote(name, ref, note) {
   const snap = resolveSnapshot(name, ref)
   const clean = String(note ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80) || null
   updateManifest(snap, { note: clean })
-  activity.record(name, 'backup-note', { detail: `${snap.name}: ${clean ?? '(note removed)'}` })
+  activity.record(name, 'backup-note', { detail: clean ? `${snap.name}: ${clean}` : `${snap.name} (note removed)` })
   return { name: snap.name, note: clean }
 }
 
@@ -750,6 +750,6 @@ export function pruneSnapshots(name, keep, { only = null, taskId = null } = {}) 
     fs.rmSync(snap.path.replace(/\.tar\.gz$/, '.json'), { force: true })
     mirrorRemove(name, snap.name)
   }
-  if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} old snapshot${remove.length === 1 ? '' : 's'} removed, keeping ${keep}` })
+  if (remove.length) activity.record(name, 'backup-prune', { detail: `${remove.length} removed, the newest ${keep} kept` })
   return remove
 }

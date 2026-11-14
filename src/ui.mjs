@@ -325,6 +325,18 @@ function jobUpdate(id, patch) {
 // server.properties keys the panel offers. Allowlist: the ports and RCON password are owned by the
 // registry and rewritten by syncProps on every launch, so editing them here would silently revert.
 // `type` is what the page renders; `note` shows next to the control.
+// A changed setting for the Activity list, under the name the Settings page gives it: "Difficulty:
+// hard", not the file's "difficulty = hard".
+const INSTANCE_SETTING_LABELS = {
+  memory: 'Memory', port: 'Port', java: 'Java', jar: 'Server file', label: 'Display name',
+  autoRestart: 'Restart it automatically', autoStart: 'Start with this computer',
+}
+export function settingWords(key, value) {
+  const label = EDITABLE_PROPS.find((p) => p.key === key)?.label ?? INSTANCE_SETTING_LABELS[key] ?? key
+  const said = value === true || value === 'true' ? 'on' : value === false || value === 'false' ? 'off' : value === '' || value == null ? 'cleared' : String(value)
+  return `${label}: ${said}`
+}
+
 const EDITABLE_PROPS = [
   {
     key: 'online-mode',
@@ -561,7 +573,7 @@ async function handleProps(req, res, name) {
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
 
   writeProps(file, updates)
-  activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => `${k} = ${v}`).join(', ') })
+  activity.record(name, 'settings', { detail: Object.entries(updates).map(([k, v]) => settingWords(k, v)).join(', ') })
   return json(res, 200, {
     changed: Object.keys(updates),
     appliesOnRestart: supervisor.isRunning(name),
@@ -2131,7 +2143,7 @@ async function route(req, res) {
     // the webhook is a credential; history records that it changed, not the value
     const said = Object.entries(patch).map(([k, v]) => k === 'webhook' ? (v ? 'webhook set' : 'webhook removed')
       : k === 'jvmFlags' ? (v ? `Java arguments: ${v.join(' ')}` : 'Java arguments back to the recommended ones')
-      : `${k} = ${v}`)
+      : settingWords(k, v))
     if (said.length) activity.record(name, 'settings', { detail: said.join(', ') })
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
