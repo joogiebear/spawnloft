@@ -84,14 +84,31 @@ function stateLike(name, id) {
   return state
 }
 
+/**
+ * Every port the registry already holds, for servers and databases alike. A stopped server's
+ * port is free as far as the OS knows, but the registry refuses to hand it to anyone else, so a
+ * random pick that lands on one fails the test that made it.
+ */
+function registeredPorts() {
+  const ports = new Set()
+  let stored
+  try { stored = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8')) } catch { return ports }
+  const walk = (v, key) => {
+    if (typeof v === 'number' && /port$/i.test(key ?? '')) ports.add(v)
+    else if (v && typeof v === 'object') for (const [k, inner] of Object.entries(v)) walk(inner, k)
+  }
+  walk(stored)
+  return ports
+}
+
 async function makeInstance(suffix, extra = {}) {
   const name = `ct-${process.pid}-${suffix}`
   const dir = path.join(scratch, 'instances', name)
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'server.jar'), '')
   fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n')
-  const port = await findFreePort(35000 + Math.floor(Math.random() * 20000))
-  const rconPort = await findFreePort(port + 1)
+  const port = await findFreePort(35000 + Math.floor(Math.random() * 20000), registeredPorts())
+  const rconPort = await findFreePort(port + 1, registeredPorts())
   putInstance(name, { dir, jar: 'server.jar', java: FAKE_JAVA, memory: '1G', port, rcon: { port: rconPort, password: 'test' }, ...extra })
   made.push(name)
   return name
@@ -397,7 +414,7 @@ test('a database: its record, its state and its refusal of console input', { tim
   fs.mkdirSync(path.join(ENGINES_DIR, `garnet-${VERSION}`), { recursive: true })
   fs.cpSync(path.join(HERE, 'fixtures', 'fake-garnet'), path.join(ENGINES_DIR, `garnet-${VERSION}`), { recursive: true })
   const name = `ct-${process.pid}-db`
-  const port = await findFreePort(46500 + Math.floor(Math.random() * 3000))
+  const port = await findFreePort(46500 + Math.floor(Math.random() * 3000), registeredPorts())
   await services.createDatabase(name, { engine: 'garnet', version: VERSION, port })
   made.push(name)
   const stored = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8')).instances[name]

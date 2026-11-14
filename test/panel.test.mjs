@@ -353,7 +353,7 @@ test('a restore locks its list: every button off, and the row says it is restori
 
 test('the Backups strip counts only backups of the server, and a custom schedule or a bad keep number is not saved as something else', () => {
   const { isWholeBackup, keepProblem, scheduledBackupWords, backupsMoveWords } = new Function(
-    `const panelPlatform = 'linux';\n${constSource('DAY_NAMES')}\n  FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };\n${fnSource('describeSchedule')}\n${fnSource('singleFileOf')}\n${fnSource('isWholeBackup')}\n${fnSource('keepProblem')}\n${fnSource('scheduledBackupWords')}\n${fnSource('backupsMoveWords')}
+    `const panelPlatform = 'linux';\nconst CLOCK = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });\n${fnSource('clockWords')}\n${constSource('DAY_NAMES')}\n  FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };\n${fnSource('describeSchedule')}\n${fnSource('singleFileOf')}\n${fnSource('isWholeBackup')}\n${fnSource('keepProblem')}\n${fnSource('scheduledBackupWords')}\n${fnSource('backupsMoveWords')}
      return { isWholeBackup, keepProblem, scheduledBackupWords, backupsMoveWords }`)()
   assert.equal(isWholeBackup({ scope: 'standard', members: ['world', 'plugins'] }), true)
   assert.equal(isWholeBackup({ scope: 'worlds', members: ['world'] }), true)
@@ -801,4 +801,107 @@ test('the words a person does not need are gone from the page', () => {
   // the update's notice for it goes once it has been stopped, where it stayed and offered a stop that is refused
   assert.match(fnSource('forceStop'), /forceStopped\.add\(name\)/)
   assert.match(html, /e\.stop === 'orphaned' && !forceStopped\.has\(e\.name\)/)
+})
+
+test('a time of day is written the way the computer writes it, everywhere', () => {
+  const { clockWords } = new Function(`const CLOCK = null;\n${fnSource('clockWords')}; return { clockWords }`)()
+  const us = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' })
+  const de = new Intl.DateTimeFormat('de-DE', { hour: 'numeric', minute: '2-digit' })
+  assert.equal(clockWords('03:00', us).replace(/\s/g, ' '), '3:00 AM')
+  assert.equal(clockWords('15:30', us).replace(/\s/g, ' '), '3:30 PM')
+  assert.equal(clockWords('15:30', de), '15:30')
+  // what is not a time of day is left as it was written
+  for (const odd of ['', '25:00', '03:75', 'noon', null]) assert.equal(clockWords(odd, us), String(odd || ''))
+  // no schedule sentence writes the stored "03:00" straight out
+  assert.doesNotMatch(html, /' at ' \+ s\.at\b/)
+  assert.doesNotMatch(html, /backups at 03:00, keeping/)
+  // and one clock: nothing formats a time of day by itself
+  assert.doesNotMatch(html, /toLocaleTimeString\(/)
+})
+
+test('the header and the page count the same age in the same units', () => {
+  const { shortAgo } = lifted(['shortAgo'])
+  const { ago } = lifted(['ago'])
+  const H = 3600000
+  for (const [ms, short, long] of [[20000, 'just now', 'just now'], [12 * 60000, '12m', '12m ago'], [23 * H, '23h', '23h ago'], [30 * H, '1d', '1 day ago'], [72 * H, '3d', '3 days ago']]) {
+    assert.equal(shortAgo(Date.now() - ms), short)
+    assert.equal(ago(new Date(Date.now() - ms).toISOString()), long)
+  }
+})
+
+test('Escape is about the box it was pressed in before it closes anything', () => {
+  const { escapeMove, typedField } = lifted(['TYPED_INPUTS', 'escapeMove', 'typedField'])
+  const tool = { view: 'server', tool: 'plugins', inTool: true }
+  // a dialog first, whatever else is true
+  assert.equal(escapeMove({ ...tool, dialog: true, field: { search: true, value: 'x' } }), 'dialog')
+  // a search with something in it is cleared; from any other box focus steps out
+  assert.equal(escapeMove({ ...tool, field: { search: true, value: 'essentials' } }), 'clear')
+  assert.equal(escapeMove({ ...tool, field: { search: true, value: '' } }), 'leave')
+  assert.equal(escapeMove({ ...tool, field: { search: false, value: '/home/you/map.zip' } }), 'leave')
+  assert.equal(escapeMove({ ...tool, field: null }), 'tool')
+  // the command box under an open tool is not in the tool
+  assert.equal(escapeMove({ view: 'server', tool: 'plugins', inTool: false, field: { search: false, value: 'say hi' } }), null)
+  assert.equal(escapeMove({ view: 'server', tool: null, inTool: false, field: null }), null)
+  // sheets close from anywhere but a box, and Add stays while a server is being made
+  assert.equal(escapeMove({ view: 'settings', field: null }), 'back')
+  assert.equal(escapeMove({ view: 'add', field: { search: true, value: 'all the mods' } }), 'clear')
+  assert.equal(escapeMove({ view: 'add', field: null }), 'back')
+  // out of a box in a sheet focus goes to the sheet, not to the stage that holds every page
+  assert.match(html, /target\.closest\('\.view\.sheet'\)/)
+  assert.equal(escapeMove({ view: 'overview', field: null }), null)
+
+  const input = (type, value) => ({ tagName: 'INPUT', type: type || 'text', value, getAttribute: () => type })
+  assert.deepEqual(typedField(input('search', 'x')), { search: true, value: 'x' })
+  assert.deepEqual(typedField(input(null, 'x')), { search: false, value: 'x' })
+  assert.deepEqual(typedField({ tagName: 'TEXTAREA', value: 'y' }), { search: false, value: 'y' })
+  assert.deepEqual(typedField({ tagName: 'SELECT', value: 'z' }), { search: false, value: 'z' })
+  // a checkbox, a button and nothing at all are not boxes
+  assert.equal(typedField(input('checkbox', 'on')), null)
+  assert.equal(typedField({ tagName: 'BUTTON' }), null)
+  assert.equal(typedField(null), null)
+  // a tip is put away by itself: its Escape stops there
+  assert.match(html, /if \(showing\) \{ e\.preventDefault\(\); e\.stopImmediatePropagation\(\); \}/)
+})
+
+test('after a redraw focus goes back to the control it was on', () => {
+  const { focusChoice } = lifted(['focusChoice'])
+  const rows = ['BUTTON|Disable', 'BUTTON|Delete', 'BUTTON|Disable', 'BUTTON|Delete', 'BUTTON|Disable', 'BUTTON|Delete']
+  // the same control on the same row
+  assert.equal(focusChoice(rows, { name: 'BUTTON|Delete', nth: 1, at: 3 }), 3)
+  // its row was deleted: the same button on the row that took its place, or the last one
+  assert.equal(focusChoice(rows.slice(0, 4), { name: 'BUTTON|Delete', nth: 1, at: 3 }), 3)
+  assert.equal(focusChoice(rows.slice(0, 4), { name: 'BUTTON|Delete', nth: 2, at: 5 }), 3)
+  // it changed its name (Disable became Enable): what stands where it stood
+  const toggled = ['BUTTON|Disable', 'BUTTON|Delete', 'BUTTON|Enable', 'BUTTON|Delete']
+  assert.equal(focusChoice(toggled, { name: 'BUTTON|Disable', nth: 1, at: 2 }), 2)
+  // one that is turned off is passed over for the nearest that is not
+  assert.equal(focusChoice(rows, { name: 'BUTTON|Delete', nth: 1, at: 3 }, [true, true, true, false, true, true]), 4)
+  assert.equal(focusChoice([], { name: 'BUTTON|Delete', nth: 0, at: 0 }), -1)
+
+  // focus is put back only where the redraw took it
+  const { focusLost } = lifted(['focusLost'])
+  assert.equal(focusLost({ connected: false, disabled: false }, { nowhere: true }), true)
+  assert.equal(focusLost({ connected: true, disabled: true }, { nowhere: true }), true)
+  // the control is still there: a poll that redrew around it moves nothing, and neither does one
+  // that runs after the person clicked away from it
+  assert.equal(focusLost({ connected: true, disabled: false }, { nowhere: true }), false)
+  assert.equal(focusLost({ connected: true, disabled: false }, { nowhere: false }), false)
+  // the person went somewhere else while the request ran (a dialog, the console)
+  assert.equal(focusLost({ connected: false, disabled: false }, { nowhere: false }), false)
+  assert.equal(focusLost(null, { nowhere: true }), false)
+  // a click away from a control forgets it; a button turned off under the person is kept
+  assert.match(html, /if \(e\.target === lastInTool && !e\.relatedTarget && e\.target\.isConnected && !e\.target\.disabled\) lastInTool = null;/)
+  // the stats ranges keep the name that is written on them
+  assert.doesNotMatch(html, /setAttribute\('aria-label', r\.say\)/)
+  // every tool that draws itself whole is wrapped
+  for (const draw of ['renderPlayers', 'renderPlugins', 'renderWorlds', 'renderFiles', 'renderScheduler', 'renderBackups', 'renderActivity', 'paintPerformance']) {
+    assert.ok(html.includes(`${draw} = holdingFocus(${draw});`), draw)
+  }
+})
+
+test('a chart says in words what its line shows', () => {
+  const { chartWords } = new Function(`${html.slice(html.indexOf('const RANGES = ['), html.indexOf('];', html.indexOf('const RANGES = [')) + 2)}\n${fnSource('chartWords')}; return { chartWords }`)()
+  assert.equal(chartWords('Processor', '3.1%', 'peak 12%  ·  share of all 4 cores', 300), 'Processor, last 5 minutes: 3.1%, peak 12%, share of all 4 cores')
+  assert.equal(chartWords('Memory', 'no readings yet', '', 60), 'Memory, last minute: no readings yet')
+  assert.equal(chartWords('TPS', '19.9', '', 7), 'TPS: 19.9')
 })
