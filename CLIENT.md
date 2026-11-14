@@ -103,8 +103,10 @@ shows "Setting up Forge 47.4.28". The build a first Play takes is the one Forge 
 recommended for the version, else its newest. Forge for 1.12.2 and older uses an older kind of
 installer and comes in a later SpawnLoft; until then it is greyed out for those versions with
 that reason. Forge on a version Mojang ships with Java 8 (1.13 to 1.16.5) runs on Java 8 only,
-since Forge of that era fails on anything newer; when no Java 8 can be had, a newer one is used
-with a warning that mods often fail on a newer Java.
+since Forge of that era fails on anything newer. Mojang's own Java 8 is taken first, before an
+installed one, as Forge builds of that era from before early 2022 fail on Java 8 updates from
+8u321 on; when it cannot be had, an installed Java 8, and failing that a newer one with a warning
+that mods often fail on a newer Java.
 
 A Forge or NeoForge build is pinned once picked: a later Play keeps it, and the setup sheet's
 **Advanced** lists the loader's builds for the version, newest first with the recommended one

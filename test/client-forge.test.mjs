@@ -141,7 +141,7 @@ test('the launch follows Forge\'s version file: its main class, module path and 
 test('Forge on a version Mojang ships with Java 8 runs on Java 8 only; later versions keep their own rule', () => {
   const j1165 = javaRequirement(F.loadVersion('1.16.5'))
   assert.equal(j1165.max, 17)
-  assert.deepEqual(G.forgeJava(j1165), { ...j1165, max: 8, prefer: 8 })
+  assert.deepEqual(G.forgeJava(j1165), { ...j1165, max: 8, prefer: 8, mojangFirst: true })
   const j1182 = javaRequirement(F.loadVersion('1.18.2'))
   assert.deepEqual(G.forgeJava(j1182), j1182)
   assert.equal(loaderFor('forge').narrowJava(j1165).max, 8)
@@ -170,4 +170,36 @@ test('Forge behind the loader list: its id, its build steps and nothing for the 
   assert.equal(forge.versionId('26.3', '66.1.8'), '26.3-forge-66.1.8')
   assert.equal(typeof forge.finishInstall, 'function')
   assert.equal(forge.afterInstall, null)
+})
+
+test('a Forge setup on a Java 8 version takes Mojang\'s Java 8 before an installed one, and falls back when it cannot be had', async () => {
+  const client = await import('../src/client.mjs')
+  const java = javaRequirement(F.loadVersion('1.16.5'))
+  const resolved = { java, arch: 'x64', os: linux }
+  const j8 = { path: '/jdk8u400/bin/java', major: 8, arch: 'x64' }
+  const j17 = { path: '/jdk17/bin/java', major: 17, arch: 'x64' }
+  // Mojang's runtime, as a list fetch that names none for this machine: the installed Java 8
+  const none = async () => ({ linux: {} })
+  const fell = await client.javaFor({ mc: '1.16.5', loader: 'forge', java: null }, resolved, { foundJavas: [j17, j8], listFetchImpl: none })
+  assert.equal(fell.path, j8.path)
+  assert.deepEqual([fell.requirement.min, fell.requirement.max], [8, 8])
+  // only a Java 17, and no Mojang Java: the 17, with the louder warning
+  const warned = await client.javaFor({ mc: '1.16.5', loader: 'forge', java: null }, resolved, { foundJavas: [j17], listFetchImpl: none })
+  assert.equal(warned.path, j17.path)
+  assert.match(warned.warning, /wants Java 8; using Java 17.*Mods often fail on a newer Java\.$/)
+  // vanilla is not narrowed: the 17 fits, nothing downloaded
+  const plain = await client.javaFor({ mc: '1.16.5', loader: 'vanilla', java: null }, resolved, { foundJavas: [j17], listFetchImpl: async () => { throw new Error('network used') } })
+  assert.equal(plain.path, j17.path)
+  assert.equal(plain.warning, null)
+})
+
+test('Forge\'s version list holds without its recommended builds; the newest is picked then', async () => {
+  fs.rmSync(path.join(CLIENT_CACHE_DIR, 'forge-promotions.json'), { force: true })
+  fs.rmSync(path.join(CLIENT_CACHE_DIR, 'forge-promotions.json.fetched-at'), { force: true })
+  const fetchImpl = async (url) => { if (url.includes('promotions')) throw new Error('unreachable'); throw new Error('network used') }
+  const games = await G.forgeGameVersions({ fetchImpl })
+  assert.ok(G.forgeAvailable('1.20.1', games))
+  assert.equal(G.pickForge(await G.forgeBuilds('1.20.1', { fetchImpl })).version, '47.4.29')
+  await assert.rejects(G.forgeBuilds('1.12.2', { fetchImpl }), /coming in a later SpawnLoft/)
+  seedLists()
 })

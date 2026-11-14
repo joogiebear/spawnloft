@@ -651,5 +651,5 @@ test('a mod loader\'s builds for one version, for the sheet\'s build list: newes
   }
   const none = await call('client/loaders/forge/1.12.2/builds')
   assert.equal(none.status, 400)
-  assert.match((await none.json()).error, /Forge has no build for Minecraft 1\.12\.2/)
+  assert.match((await none.json()).error, /Forge for Minecraft 1\.12\.2 is coming in a later SpawnLoft/)
 })

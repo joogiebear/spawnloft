@@ -2749,6 +2749,11 @@
     const close = () => { f.vOpen = false; f.vFind = ''; f.vAt = -1; render(); $('fMc')?.focus({ preventScroll: true }) }
     const pick = (r) => {
       if (blocked(r)) return
+      // a build is made for one version; going back to the setup's own keeps its pinned build
+      if (r.id !== f.mc) {
+        const own = S.sheet === f && f.editing ? profileNamed(f.editing) : null
+        f.loaderVersion = own && own.mc === r.id && own.loader === f.loader ? (own.loaderVersion ?? '') : ''
+      }
       f.mc = r.id
       fixLoader(f)
       loadDetails(f.mc)
@@ -2799,12 +2804,14 @@
   const buildsKey = (loader, mc) => `${loader}@${mc}`
   async function loadBuilds(loader, mc) {
     const key = buildsKey(loader, mc)
-    if (S.builds[key]) return
-    S.builds[key] = { loading: true }
+    const had = S.builds[key]
+    // a list is read again after ten minutes, a failed read after one
+    if (had && (had.loading || Date.now() - had.at < (had.error ? 60e3 : 600e3))) return
+    S.builds[key] = { ...(had?.builds ? had : {}), loading: true, at: Date.now() }
     try {
-      S.builds[key] = await api(`client/loaders/${encodeURIComponent(loader)}/${encodeURIComponent(mc)}/builds`)
+      S.builds[key] = { ...(await api(`client/loaders/${encodeURIComponent(loader)}/${encodeURIComponent(mc)}/builds`)), at: Date.now() }
     } catch (err) {
-      S.builds[key] = { error: err.message }
+      S.builds[key] = { ...(had?.builds ? had : {}), error: err.message, at: Date.now() }
     }
     render()
   }
@@ -2817,24 +2824,31 @@
     const typed = () => h('label', { class: 'field' }, h('span', { text: `${name} version` }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: (e) => { f.loaderVersion = e.target.value } }),
       h('small', { class: 'hint', text: `The build of ${name} itself, like ${example}. Left empty, the first Play takes the newest stable one.` }))
     if (!INSTALLER_LOADERS.includes(f.loader) || !f.mc || loaderBlock(f.loader, f.mc, versionInfo(f.mc))) return typed()
+    // read when Advanced is open; until the list is in, the field to type one in
+    if (f.adv) loadBuilds(f.loader, f.mc)
     const got = S.builds[buildsKey(f.loader, f.mc)]
-    if (!got) loadBuilds(f.loader, f.mc)
-    if (!got?.builds?.length) return typed()
+    if (!got?.builds?.length) {
+      if (!got?.error) return typed()
+      return h('div', {}, typed(), h('small', { class: 'hint warn', text: `${name}\u2019s builds could not be read: ${got.error}` }))
+    }
     const builds = got.builds
     const by = got.picked && builds.find((b) => b.version === got.picked)
     const auto = by ? `${by.recommended ? 'Recommended' : 'Newest'}: ${by.version}` : 'Newest stable'
     const options = [['', auto], ...builds.map((b) => [b.version, b.recommended ? `${b.version} (recommended)` : b.stable ? b.version : `${b.version} (beta)`])]
-    if (f.loaderVersion && !builds.some((b) => b.version === f.loaderVersion)) options.splice(1, 0, [f.loaderVersion, f.loaderVersion])
+    const unknown = Boolean(f.loaderVersion) && !builds.some((b) => b.version === f.loaderVersion)
+    if (unknown) options.splice(1, 0, [f.loaderVersion, `${f.loaderVersion} (not published)`])
     // a pinned build with a newer default out says so; the setup keeps its build (design Q3)
     const pinned = f.loaderVersion && builds.findIndex((b) => b.version === f.loaderVersion)
     const newer = Boolean(got.picked) && got.picked !== f.loaderVersion && pinned > 0 && builds.findIndex((b) => b.version === got.picked) < pinned
-    const hint = newer
+    const hint = unknown
+      ? `${name} ${f.loaderVersion} is not published for ${f.mc}. Pick one from the list.`
+      : newer
       ? `${name} ${got.picked} is out. This setup stays on ${f.loaderVersion} until you pick another.`
       : f.loaderVersion ? `This setup stays on ${name} ${f.loaderVersion}.` : `Left on ${auto.split(':')[0].toLowerCase()}, the first Play takes that build and keeps it.`
     return h('label', { class: 'field' }, h('span', { text: `${name} version` }),
       h('select', { id: 'fLoaderVersion', value: f.loaderVersion, onchange: (e) => { f.loaderVersion = e.target.value; render() } },
         options.map(([v, text]) => h('option', { value: v, selected: v === (f.loaderVersion ?? '') || null, text }))),
-      h('small', { class: newer ? 'hint warn' : 'hint', text: hint }))
+      h('small', { class: newer || unknown ? 'hint warn' : 'hint', text: hint }))
   }
 
   async function loadJavas({ fresh = false } = {}) {
@@ -2901,8 +2915,10 @@
 
   // What the version in the sheet needs of a Java: its own file's bounds when the panel has
   // read it, else the guess from its id.
-  function javaNeeds(mc) {
+  function javaNeeds(mc, loader = null) {
     const d = S.details[mc]?.java
+    // Forge on a version Mojang ships with Java 8 runs on Java 8 only, as the launch decides
+    if (d?.min && loader === 'forge' && d.component === 'jre-legacy') return { min: 8, max: 8 }
     if (d?.min) return { min: d.min, max: d.max ?? null }
     const row = versionInfo(mc)
     return row.javaNeeds ? { min: row.javaNeeds, max: null, guess: row.javaNeedsExact === false } : null
@@ -2915,7 +2931,7 @@
     const picked = found.find((j) => j.path === f.java) ?? null
     const check = f.javaCheck && f.javaCheck.path === fieldText(f.java) ? f.javaCheck : null
     const major = picked?.major ?? (check?.found ? check.major : null)
-    const fit = javaFit(major, javaNeeds(f.mc), f.mc)
+    const fit = javaFit(major, javaNeeds(f.mc, f.loader), f.mc)
     const onpick = (e) => {
       const val = e.target.value
       // "Another Java" starts from the path the setup had, so that it is not lost by looking

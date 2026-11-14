@@ -30,7 +30,8 @@ async function forgeLists({ cacheDir = CLIENT_CACHE_DIR, force = false, fetchImp
   const opts = { cacheDir, force, ...(fetchImpl ? { fetchImpl } : {}) }
   const [meta, promos] = await Promise.all([
     cachedJson('forge-maven-metadata.json', `${FORGE_FILES}/maven-metadata.json`, { label: 'Forge\'s version list', ...opts }),
-    cachedJson('forge-promotions.json', `${FORGE_FILES}/promotions_slim.json`, { label: 'Forge\'s recommended builds', ...opts }),
+    // without the recommended builds, the newest is picked: no reason to lose the version list
+    cachedJson('forge-promotions.json', `${FORGE_FILES}/promotions_slim.json`, { label: 'Forge\'s recommended builds', ...opts }).catch(() => null),
   ])
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) fail('Forge\'s version list is not a list')
   return { meta, promos: promos?.promos && typeof promos.promos === 'object' ? promos.promos : {} }
@@ -70,6 +71,9 @@ export async function assertForgeAvailable(mc, { kind = 'release', ...opts } = {
 // Forge's builds for one Minecraft version, newest first; the one Forge recommends is marked.
 // Forge marks no betas: every build counts as stable.
 export async function forgeBuilds(mc, opts = {}) {
+  if (/^\d+\.\d+(\.\d+)?$/.test(String(mc)) && !forgeModernMc(mc)) {
+    fail(`Forge for Minecraft ${mc} is coming in a later SpawnLoft. Use None for now.`, 'loader-not-available')
+  }
   let lists
   try {
     lists = await forgeLists(opts)
@@ -142,7 +146,9 @@ export async function finishForge(mc, build, { name, java, javaArgs, verify = fa
 }
 
 // Forge on a version Mojang ships with Java 8 runs on Java 8 only: today's rule lets those
-// versions use up to 17, and Forge of that era fails on anything newer than 8.
+// versions use up to 17, and Forge of that era fails on anything newer than 8. Mojang's own Java 8
+// comes first (mojangFirst): Forge builds of that era from before early 2022 fail on Java 8
+// updates from 8u321 on, which an installed Java 8 usually is.
 export function forgeJava(requirement) {
-  return requirement?.component === 'jre-legacy' ? { ...requirement, max: 8, prefer: 8 } : requirement
+  return requirement?.component === 'jre-legacy' ? { ...requirement, max: 8, prefer: 8, mojangFirst: true } : requirement
 }

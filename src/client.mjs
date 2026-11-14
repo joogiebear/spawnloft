@@ -474,7 +474,7 @@ export async function prepareVersion(name, { onStage = () => {} } = {}) {
 
 // The Java a version runs on: the profile's own, one found on this machine, or Mojang's runtime
 // for the version's component, for the arch the game runs as (plan step V2).
-async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () => {}, fetchImpl = null, listFetchImpl = null, foundJavas = null } = {}) {
+export async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () => {}, fetchImpl = null, listFetchImpl = null, foundJavas = null } = {}) {
   const runtime = () => {
     onStage({ stage: 'java', message: `Getting Mojang's Java ${resolved.java.major}` })
     return mojangJava({ component: resolved.java.component, major: resolved.java.major, osName: resolved.os.name, arch: resolved.arch, onProgress, ...(fetchImpl ? { fetchImpl } : {}), ...(listFetchImpl ? { listFetchImpl } : {}) })
@@ -482,9 +482,19 @@ async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () 
   // a loader may narrow the version's Java (Forge on a Java 8 version runs on 8 only)
   const mod = loaderFor(profile.loader)
   const requirement = mod?.narrowJava ? mod.narrowJava(resolved.java) : resolved.java
+  // Mojang's Java first where the loader asks it, before any installed one; when it cannot be had
+  // (offline, none for this machine), the usual choice
+  if (requirement.mojangFirst && !profile.java) {
+    try {
+      const r = await runtime()
+      return { path: r.path, warning: null, source: 'mojang-runtime', requirement }
+    } catch (err) {
+      if (!['no-runtime-for-this-machine', 'runtime-offline', 'download-failed'].includes(err?.code)) throw err
+    }
+  }
   const picked = await pickClientJava({ explicit: profile.java, requirement, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
-  if (mod && picked.warning) return { ...picked, warning: `${picked.warning} Mods often fail on a newer Java.` }
-  return picked
+  const warning = mod && picked.warning ? `${picked.warning} Mods often fail on a newer Java.` : picked.warning
+  return { ...picked, warning, requirement }
 }
 
 // What a loader sets up once the game's Java is picked: an installer's build steps, which read the
@@ -873,7 +883,7 @@ function versionsInUse(except) {
 function launchFacts(resolved, picked, profile, installed, assetsDir) {
   return {
     id: resolved.id,
-    java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: picked.source, warning: picked.warning },
+    java: { major: resolved.java.major, component: resolved.java.component, min: (picked.requirement ?? resolved.java).min, max: (picked.requirement ?? resolved.java).max, chosenPath: picked.path, source: picked.source, warning: picked.warning },
     arch: resolved.arch,
     emulated: resolved.emulated,
     nativesDir: resolved.natives.dir,
