@@ -107,7 +107,7 @@ test('the reason names the way out, which differs for an orphan', () => {
 
   setStatus(name, 'orphaned')
   const orphan = activeBlock(name, 'deleting it')
-  assert.match(orphan, /orphaned java process \(pid \d+\)/)
+  assert.match(orphan, /out of reach \(java pid \d+/)
   assert.match(orphan, new RegExp(`spawnloft kill ${name}`), '"stop it" would send them to a command that refuses an orphan')
 
   for (const status of FREE) {

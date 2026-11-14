@@ -193,7 +193,7 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
   } catch {
     /* the instance is gone either way */
   }
-  activity.record(name, 'delete', { detail: purge ? 'files deleted' : 'unregistered, files kept', snapshot: snapshotFile ? path.basename(snapshotFile) : null })
+  activity.record(name, 'delete', { detail: purge ? 'files deleted' : 'files kept', snapshot: snapshotFile ? path.basename(snapshotFile) : null })
   return { name, purged: purge, snapshot: snapshotFile, tasksRemoved }
 }
 

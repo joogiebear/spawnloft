@@ -426,7 +426,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     assert.ok(firstMetrics.samples.some(sample => sample.cpu > 0 && sample.cpu <= 100), 'Measured CPU must reflect the fixture workload')
     assert.ok(firstMetrics.samples.every(sample => sample.rss >= 32), 'Measured resident memory must include the touched fixture buffer')
     await page.waitForFunction(count => {
-      const match = /Samples\s+(\d+)/.exec(document.querySelector('#performanceBody .facts')?.textContent || '')
+      const match = /Readings\s+(\d+)/.exec(document.querySelector('#performanceBody .facts')?.textContent || '')
       return match && Number(match[1]) > count
     }, firstMetrics.samples.length, { timeout: 30000 })
     await page.screenshot({ path: path.join(output, '06-performance-live.png') })

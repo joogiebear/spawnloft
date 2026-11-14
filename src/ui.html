@@ -2872,7 +2872,7 @@
             <h1 id="srvName">—</h1>
             <span class="srv-id" id="srvId" hidden title="The name the folder and the commands use"></span>
             <span class="spill" id="srvState"></span>
-            <span class="badge" id="srvOffline" hidden title="Anyone can join as any name. Players get name-derived UUIDs, and every log carries an OFFLINE/INSECURE banner.">Offline mode</span>
+            <span class="badge" id="srvOffline" hidden title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
           </div>
           <div class="srv-meta" id="srvMeta"></div>
         </div>
@@ -2925,7 +2925,7 @@
             <div class="menu" id="exportMenu" role="menu" aria-labelledby="bExport" hidden>
               <button role="menuitem" id="miExportFile" tabindex="-1">
                 <b>Save to a .log file</b>
-                <span>Keeps a copy beside this server's snapshots.</span>
+                <span>Keeps a copy beside this server's backups.</span>
               </button>
               <button role="menuitem" id="miExportShare" tabindex="-1">
                 <b>Upload to mclo.gs</b>
@@ -3058,15 +3058,13 @@
             <label>
               <input type="radio" name="onlineMode" value="online" checked>
               <b>Require a Minecraft account</b>
-              <span>Matches a real server. Players get their real UUIDs, so plugin behaviour and
-                bug reports match production.</span>
+              <span>Only people who own Minecraft can join, each under their own name. Recommended.</span>
             </label>
             <label>
               <input type="radio" name="onlineMode" value="offline">
               <b>Anyone, as any name</b>
-              <span>For testing with several accounts, or with no internet. Players get
-                name-derived UUIDs, and every log carries an OFFLINE/INSECURE banner that plugin
-                authors often refuse bug reports over.</span>
+              <span>Nobody's account is checked, so anyone can join under any name. For testing by
+                yourself, or with no internet. Not safe for a public server.</span>
             </label>
           </div>
         </div>
@@ -3125,7 +3123,7 @@
         <div class="field">
           <label for="aDir">Server folder</label>
           <div class="row">
-            <input id="aDir" class="mono" spellcheck="false" placeholder="C:\Minecraft\survival" autocomplete="off">
+            <input id="aDir" class="mono" spellcheck="false" placeholder="The folder the server is in" autocomplete="off">
             <button type="button" id="bBrowse" hidden>Browse…</button>
           </div>
           <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
@@ -3145,7 +3143,7 @@
         </div>
         <div class="row">
           <button type="submit" class="primary" id="bAdopt">Add server</button>
-          <span class="hint">Nothing is moved. Its port and RCON password are read from its own server.properties.</span>
+          <span class="hint">Nothing is moved. Its port and the rest of its settings are read from its own server.properties.</span>
         </div>
       </form>
 
@@ -3210,7 +3208,7 @@
           </div>
           <div class="field" style="flex:3" id="dToolsWrap">
             <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
-            <input id="dTools" class="mono" placeholder="C:\xampp\mysql\bin" autocomplete="off">
+            <input id="dTools" class="mono" placeholder="The bin folder of MySQL or MariaDB" autocomplete="off">
             <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
           </div>
         </div>
@@ -3270,7 +3268,7 @@
       <div class="sheet-body wide">
         <fieldset class="theme-picker">
           <legend>Appearance</legend>
-          <p class="hint">Choose your colors. Your selection is saved on this PC and applies immediately.</p>
+          <p class="hint">Choose your colors. Your selection is saved on this computer and applies immediately.</p>
           <div class="theme-options">
             <label class="theme-option">
               <input type="radio" name="appTheme" value="classic">
@@ -3298,8 +3296,8 @@
         <div>
           <h2>Where SpawnLoft keeps things</h2>
           <p class="hint" style="margin:0 0 12px">
-            Servers that already exist keep their own folders — the registry stores absolute paths,
-            so changing this only affects servers created from now on.
+            Servers that already exist stay in the folders they are in, so changing this only
+            affects servers created from now on.
           </p>
           <dl class="kv" id="setPaths"></dl>
         </div>
@@ -3355,7 +3353,7 @@
         </div>
         <div id="setClient">
           <h2>Game client</h2>
-          <p class="hint" style="margin:0 0 12px">Profiles for the real Minecraft client, launched pointed at one of your servers. Create profiles with <code>spawnloft client new</code>.</p>
+          <p class="hint" style="margin:0 0 12px">Setups for the real Minecraft game, each started pointed at one of your servers. They are made and changed on the Play page.</p>
           <dl class="kv" id="clientProfiles"></dl>
         </div>
         <div id="setMcp">
@@ -4118,16 +4116,16 @@ const STATE_TEXT = {
   reachable: 'Reachable',
   unreachable: 'Unreachable',
   stopping: 'Stopping…',
-  orphaned: 'Orphaned',
-  stale: 'Stale state',
+  orphaned: 'Out of reach',
+  stale: 'Not shut down cleanly',
   unknown: 'Unavailable',
 };
 
 // The states nobody can be expected to know the meaning of. Saying it here beats a support
 // question, and each one names its way out.
 const STATE_NOTE = {
-  orphaned: ['Orphaned', 'The Java process is still running but the supervisor that owned it is gone, so SpawnLoft can no longer talk to it. Stop it with "spawnloft kill" in a terminal, then start it again here.'],
-  stale: ['Stale state', 'A leftover state file from a session that did not shut down cleanly. Starting the server clears it.'],
+  orphaned: ['Still running, but out of reach.', 'The part of SpawnLoft that looked after this server has gone, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.'],
+  stale: ['Not shut down cleanly.', 'This server stopped without shutting down cleanly, as when the computer goes off while it runs. It is not running now, and starting it clears this.'],
   unknown: ['Unavailable', 'SpawnLoft could not read this server’s state. Its folder may have been moved or deleted.'],
   unreachable: ['Unreachable', 'This database runs elsewhere and is not answering at its address. Start it there, or check the host, port and password under Settings.'],
 };
@@ -4388,6 +4386,38 @@ function renderStatePill(row) {
 
 const FILE_MANAGER = panelPlatform === 'darwin' ? 'Finder' : panelPlatform === 'win32' ? 'Explorer' : 'your file manager';
 
+/**
+ * An example path as it looks on the computer the panel runs on. Every placeholder was a
+ * Windows one (C:\Downloads\..., java.exe), on a Mac and on Linux too.
+ */
+function examplePath(platform, what) {
+  const win = platform === 'win32';
+  const home = win ? 'C:\\Users\\you' : platform === 'darwin' ? '/Users/you' : '/home/you';
+  const join = (...parts) => parts.join(win ? '\\' : '/');
+  if (what === 'map') return join(home, 'Downloads', 'amazing-map.zip');
+  if (what === 'server') return win ? 'C:\\Minecraft\\survival' : join(home, 'minecraft', 'survival');
+  if (what === 'backups') return win ? 'D:\\spawnloft-backups' : platform === 'darwin' ? '/Volumes/Backup/spawnloft-backups' : '/mnt/backup/spawnloft-backups';
+  if (what === 'java') return win ? 'C:\\Program Files\\Java\\jdk-21\\bin\\java.exe' : platform === 'darwin' ? '/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/bin/java' : '/usr/lib/jvm/java-21/bin/java';
+  return home;
+}
+const JAVA_FILE = panelPlatform === 'win32' ? 'java.exe' : 'java';
+
+/**
+ * One line of the Java picker. "java" alone is the one the computer runs by default, which the
+ * list called "on PATH".
+ */
+function javaOptionWords(found, needs) {
+  const where = found.path === 'java' ? 'this computer\u2019s default' : found.path;
+  return 'Java ' + found.major + '  ·  ' + where + (needs && found.major < needs ? '  ·  too old for this server' : '');
+}
+
+/** What to say under the picker when the Java chosen cannot run this server, or '' when it can. */
+function javaTooOldWords(list, chosen, needs) {
+  const pick = (list || []).find((f) => f.path === chosen);
+  if (!needs || !pick || !(pick.major < needs)) return '';
+  return 'Java ' + pick.major + ' is too old: this server needs Java ' + needs + ' or newer, and will not start on it.';
+}
+
 /** Software and version, the address to connect to, and the Java it runs on. */
 function renderMeta(row) {
   const meta = $('#srvMeta');
@@ -4585,7 +4615,7 @@ function renderVitals(row) {
   }
 
   const players = vitalCell('players', 'Players',
-    latest == null ? 'Waiting for the server to answer over RCON' : '');
+    latest == null ? 'Waiting for the server to answer' : '');
   if (latest && latest.players != null) {
     bigNumber(players.dd, String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
     players.wrap.append(bar(latest.maxPlayers ? latest.players / latest.maxPlayers : 0));
@@ -4606,7 +4636,7 @@ function renderVitals(row) {
 
   const ceiling = memoryCeilingMb(row.memory);
   const memory = vitalCell('memory', 'Memory',
-    'The whole java process. It can sit above the ' + (row.memory || 'heap') + ' heap limit; that is normal.');
+    'Everything the server uses, Java itself included. It can sit above the ' + (row.memory ? row.memory + ' ' : '') + 'limit you set; that is normal.');
   if (latest && Number.isFinite(latest.rss)) {
     // Gigabytes once there is a gigabyte to count; "0.0 GB" for a server that is still warming up
     // says it uses nothing, which is not true.
@@ -4663,7 +4693,7 @@ function moreItems(row) {
       ? { label: 'Stop and edit…', hint: 'Name, memory and port. Stops the server first.', run: () => stopThenEdit(row) }
       : { label: 'Rename, memory and port…', hint: why || 'Takes effect the next time it starts.', run: () => editServer(row), disabled: up },
     'sep',
-    { label: 'Reset the world…', hint: why || 'Deletes worlds and generated state. A snapshot is taken first.', run: () => rebuildServer(row), disabled: up, danger: true },
+    { label: 'Reset the world…', hint: why || 'Deletes worlds and generated state. A backup is taken first.', run: () => rebuildServer(row), disabled: up, danger: true },
     { label: 'Delete this server…', hint: why || 'Removes it from SpawnLoft, and optionally its files.', run: () => deleteServer(row), disabled: up, danger: true },
   ];
 }
@@ -4760,7 +4790,8 @@ function renderServer(row) {
       tone: row.status === 'stale' ? 'warn' : 'fault',
       title: note[0],
       text: note[1],
-      actions: row.status === 'stale' ? [{ label: 'Start', run: () => $('#bStart').click() }] : [],
+      actions: row.status === 'stale' ? [{ label: 'Start', run: () => $('#bStart').click() }]
+        : row.status === 'orphaned' ? [{ label: 'Force stop', run: () => forceStop(row.name, row.label || row.name) }] : [],
       dismiss: () => dismissed.add(noteKey),
     }));
   }
@@ -4931,6 +4962,34 @@ function paintDbReach(row) {
   notice.setAttribute('role', 'status');
   box.append(notice);
 }
+
+/**
+ * The way out for a server that is running with nothing looking after it. It was a sentence
+ * telling the person to run "spawnloft kill" in a terminal.
+ */
+async function forceStop(name, label) {
+  const ok = await ask({
+    title: 'Force stop ' + label + '?',
+    text: 'It is ended at once, without saving. Whatever happened in the world since its last save is lost.',
+    confirmLabel: 'Force stop',
+    danger: true,
+  });
+  if (!ok) return false;
+  let done = false;
+  try {
+    await post('/instances/' + encodeURIComponent(name) + '/kill');
+    forceStopped.add(name);
+    done = true;
+    toast('Stopped ' + label + '.', 'good');
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+  await refresh();
+  return done;
+}
+// The update's record still lists a server as out of reach after it has been force stopped here;
+// its notice would stay, offering a stop that is refused.
+const forceStopped = new Set();
 
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
   const box = document.createElement('div');
@@ -5460,6 +5519,7 @@ const ACTIVITY_MANY = {
 // What a verb says when the entry did not record what it was done to: "Installed" alone reads as
 // a sentence cut off.
 const ACTIVITY_BARE = {
+  restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-lock': 'Locked a backup', 'backup-unlock': 'Unlocked a backup', 'backup-note': 'Put a note on a backup',
   'plugin-install': 'Installed a plugin', 'plugin-update': 'Updated a plugin', 'plugin-remove': 'Removed a plugin',
   'plugin-enable': 'Turned on a plugin', 'plugin-disable': 'Turned off a plugin',
   'file-edit': 'Edited a file', 'file-create': 'Created a file', 'file-upload': 'Uploaded a file', 'file-replace': 'Replaced a file',
@@ -5473,11 +5533,7 @@ const ACTIVITY_BARE = {
 function runText(run) {
   const n = run.entries.length;
   const e = run.entries[0];
-  if (n === 1) {
-    if (e.action === 'crash' && e.detail) return { verb: e.detail.charAt(0).toUpperCase() + e.detail.slice(1), detail: '' };
-    if (!e.detail && ACTIVITY_BARE[e.action]) return { verb: ACTIVITY_BARE[e.action], detail: '' };
-    return { verb: (ACTIVITY_TEXT[e.action] || e.action).replace(/:$/, ''), detail: e.detail || '' };
-  }
+  if (n === 1) return activityWords(e);
   const many = ACTIVITY_MANY[e.action];
   return { verb: many ? many.replace('{n}', n) : (ACTIVITY_TEXT[e.action] || e.action).replace(/:$/, '') + ' ×' + n, detail: '' };
 }
@@ -7481,14 +7537,13 @@ async function paintPerformance(name, opts) {
         + (wide ? ' - try ' + wide.label + '.' : '.');
     } else {
       none = data.running
-        ? 'Measuring. The first reading needs two samples ' + data.everySeconds + ' seconds apart, '
-          + 'because processor use is a rate rather than a number you can read off once.'
+        ? 'Measuring. The first reading takes about ' + data.everySeconds + ' seconds.'
         : 'Nothing recorded. This is measured while the server runs, and history is cleared when it '
           + 'starts so two runs are never drawn as one line.';
     }
     // The pane's own shape, empty: both gauges with their grids, the reason written once across
     // the processor chart, and the memory chart saying only what it will measure against.
-    const ceilingNote = data.memory ? data.memory + ' max heap' : '';
+    const ceilingNote = data.memory ? data.memory + ' allowed' : '';
     body.append(gauge({
       title: 'Processor', now: data.running ? '…' : '—',
       aside: data.cores ? 'share of all ' + data.cores + ' cores' : '',
@@ -7526,7 +7581,7 @@ async function paintPerformance(name, opts) {
   body.append(gauge({
     title: 'Memory',
     now: data.running ? last.rss + ' MB' : 'stopped',
-    aside: 'peak ' + peakRss + ' MB' + (ceiling ? '  ·  ' + data.memory + ' max heap' : ''),
+    aside: 'peak ' + peakRss + ' MB' + (ceiling ? '  ·  ' + data.memory + ' allowed' : ''),
     samples,
     pick: (s) => s.rss,
     max: rssMax,
@@ -7558,8 +7613,8 @@ async function paintPerformance(name, opts) {
   if (ceiling && peakRss > ceiling) {
     const note = document.createElement('div');
     note.className = 'hint';
-    note.textContent = 'Above the heap limit is normal: this is the whole java process, and '
-      + data.memory + ' is the ceiling on its heap alone.';
+    note.textContent = 'Memory can sit above the limit you set. That is normal: ' + data.memory
+      + ' is what the game itself may use, and Java needs some more on top of it.';
     body.append(note);
   }
 
@@ -7575,7 +7630,7 @@ async function paintPerformance(name, opts) {
   const up = humanUptime(data.uptimeMs);
   add('Uptime', up || (data.running ? 'just started' : 'not running'));
   if (data.startedAt) add('Started', stamp(new Date(data.startedAt).toISOString()));
-  add('Samples', samples.length + ' every ' + data.everySeconds + 's');
+  add('Readings', samples.length + ', one every ' + data.everySeconds + ' seconds');
   body.append(facts);
 }
 
@@ -8187,7 +8242,7 @@ async function renderPlugins(opts) {
       go.onclick = async () => {
         const ok = await ask({
           title: 'Update ' + data.pack.name + ' to ' + info.latest.version + '?',
-          text: 'The server must be stopped. A standard snapshot is taken first; only files the '
+          text: 'The server must be stopped. A backup is taken first; only files the '
             + 'old pack owned and the new one dropped are removed - the worlds and anything you '
             + 'added by hand are never touched. Players will need the matching new client pack.',
           confirmLabel: 'Update pack',
@@ -8207,7 +8262,7 @@ async function renderPlugins(opts) {
           jobs.close();
           toast(out.alreadyLatest
             ? 'Already on the newest release.'
-            : 'Updated to ' + out.to + '. Snapshot taken first; ' + out.removed + ' old pack file'
+            : 'Updated to ' + out.to + '. A backup was taken first; ' + out.removed + ' old pack file'
               + (out.removed === 1 ? '' : 's') + ' retired.'
               + (out.mcChanged ? ' Minecraft moved to ' + out.mc + ' - the worlds migrate on the next start.' : ''), 'good');
           await refresh();
@@ -8418,7 +8473,7 @@ async function renderPlugins(opts) {
     const what = known.length === 1 ? '1 ' + singular : known.length + ' ' + plural;
     const ok = await ask({
       title: (restart ? 'Update ' + what + ' and restart?' : 'Update ' + what + '?'),
-      text: 'A snapshot of the ' + data.kind + ' folder is taken first, then each is updated in turn'
+      text: 'A backup of the ' + data.kind + ' folder is taken first, then each is updated in turn'
         + (restart
           ? ', and ' + (row.label || row.name) + ' restarts to load them. Anyone online is disconnected for the restart.'
           : '. They load the next time the server starts.'),
@@ -8450,7 +8505,7 @@ async function renderPlugins(opts) {
     for (const f of out.failed) toast(nameOf(f.file) + ' was not updated: ' + f.error, 'bad');
     if (out.updated.length) {
       toast('Updated ' + (out.updated.length === 1 ? '1 ' + singular : out.updated.length + ' ' + plural)
-        + '. A snapshot of the ' + data.kind + ' folder was taken first.', 'good');
+        + '. A backup of the ' + data.kind + ' folder was taken first.', 'good');
     }
     if (restart && out.updated.length && state.current === row.name) {
       progress.textContent = 'Restarting ' + (row.label || row.name) + '…';
@@ -8590,7 +8645,7 @@ async function renderPlugins(opts) {
           forget(p.file);
           toast(out.alreadyLatest
             ? p.name + ' is already the newest build.'
-            : 'Updated ' + p.name + ' to ' + out.version + '. A plugins snapshot was taken first.', 'good');
+            : 'Updated ' + p.name + ' to ' + out.version + '. A backup of the plugins was taken first.', 'good');
           if (out.versionNote) toast(out.versionNote);
           await again();
         } catch (e) {
@@ -8699,7 +8754,7 @@ async function renderWorlds(opts) {
   src.className = 'mono';
   src.spellcheck = false;
   src.autocomplete = 'off';
-  src.placeholder = 'C:\\Downloads\\amazing-map.zip — a zip, tar.gz, or a folder';
+  src.placeholder = examplePath(panelPlatform, 'map') + ' — a zip, tar.gz, or a folder';
   src.style.flex = '1 1 260px';
   const browse = document.createElement('button');
   browse.type = 'button';
@@ -9303,7 +9358,7 @@ function taskForm({ actions, kinds, days, task, onCancel, onSubmit }) {
   keep.max = '365';
   keep.value = String(task?.action?.keep ?? 7);
   keep.style.maxWidth = '90px';
-  const keepField = mk('Snapshots to keep', keep);
+  const keepField = mk('Backups to keep', keep);
 
   const warn = document.createElement('input');
   warn.type = 'number';
@@ -9617,12 +9672,16 @@ async function renderScheduler(opts) {
       when.textContent = stamp(r.at);
       const who = document.createElement('span');
       who.className = 'r-who';
-      who.textContent = r.id || r.action;
+      const task = (data.tasks || []).find((t) => t.id === r.id);
+      who.textContent = (task && task.name) || r.id || r.action;
       const what = document.createElement('span');
       what.className = 'r-what';
       // A skip is neither a success nor a failure and reads as neither. Prefixing every line with
       // its outcome would be noise when almost all of them say ok.
-      what.textContent = (r.status === 'ok' ? '' : r.status + ': ') + r.detail;
+      // the folder a backup went to is the same every night; when it was taken is what differs
+      const said = backupNamesToWords(String(r.detail || '').replace(/^.*[\\/](?=[^\\/]*\.tar\.gz)/, ''));
+      what.textContent = (r.status === 'ok' ? '' : r.status + ': ') + said;
+      what.title = r.detail || '';
       el.append(when, who, what);
       runs.append(el);
     }
@@ -10708,7 +10767,7 @@ function renderFileEditor(row, view) {
  */
 const ACTIVITY_TEXT = {
   start: 'Started', stop: 'Stopped', kill: 'Forced to stop', command: 'Ran', crash: 'Crashed',
-  backup: 'Backed up', restore: 'Restored a backup', 'backup-delete': 'Deleted a backup', 'backup-prune': 'Cleared old backups', 'backup-lock': 'Locked the backup', 'backup-unlock': 'Unlocked the backup', 'backup-note': 'Noted the backup',
+  backup: 'Backed up:', restore: 'Restored', 'backup-delete': 'Deleted', 'backup-prune': 'Cleared old backups:', 'backup-lock': 'Locked', 'backup-unlock': 'Unlocked', 'backup-note': 'Put a note on',
   'file-edit': 'Edited', 'file-create': 'Created', 'folder-create': 'Made a folder', 'file-upload': 'Uploaded',
   'file-replace': 'Replaced', 'file-move': 'Moved', 'file-delete': 'Deleted', 'file-zip': 'Zipped', 'file-unzip': 'Unzipped',
   'config-edit': 'Changed', 'config-create': 'Created', undo: 'Put back', settings: 'Changed settings:',
@@ -10717,8 +10776,28 @@ const ACTIVITY_TEXT = {
   'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
   'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
   'schedule-run': 'Ran the schedule now:',
-  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset', delete: 'Deleted this server',
+  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset:', delete: 'Removed this server:',
 };
+
+/**
+ * One entry as a sentence in two parts: what was done, and to what.
+ *
+ * A verb that ends in a colon keeps it when there is something after it ("Changed settings:
+ * Difficulty: hard"); it was stripped everywhere, which left "Changed settings difficulty = hard".
+ * A start that failed says so in its words, where "Started" under a Failed pill said the opposite.
+ */
+function activityWords(e) {
+  if (e.action === 'crash' && e.detail) return { verb: e.detail.charAt(0).toUpperCase() + e.detail.slice(1), detail: '' };
+  if (e.action === 'start' && e.ok === false) return { verb: e.detail ? 'Could not start:' : 'Could not start', detail: e.detail || '' };
+  if (!e.detail && ACTIVITY_BARE[e.action]) return { verb: ACTIVITY_BARE[e.action], detail: '' };
+  const verb = ACTIVITY_TEXT[e.action] || e.action;
+  if (!e.detail) return { verb: verb.replace(/:$/, ''), detail: '' };
+  // a file that happens to be named like an archive is still a file
+  if (/^file-/.test(e.action)) return { verb, detail: e.detail };
+  const gone = e.action === 'backup-note' && / \(note removed\)$/.test(e.detail);
+  if (gone) return { verb: 'Took the note off', detail: backupNamesToWords(e.detail.replace(/ \(note removed\)$/, '')) };
+  return { verb, detail: backupNamesToWords(e.detail) };
+}
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
 // decides where a button is drawn.
 const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit', 'world-delete']);
@@ -10957,6 +11036,26 @@ const FILES_SNAPSHOT = {
   'world-delete': { tag: 'deleted world', why: 'as it was when it was deleted in Worlds' },
 };
 
+/**
+ * A backup as a person knows it: when it was taken, and its note if it has one. The archive's
+ * file name is how the disk knows it, and stays in the list for anyone who goes looking there.
+ */
+function backupWords(snap, capital) {
+  return (capital ? 'The' : 'the') + ' backup from ' + stamp(snap.mtime) + (snap.note ? ' (“' + snap.note + '”)' : '');
+}
+
+/** An archive's file name inside a sentence written by the core, said as when it was taken. */
+function backupNamesToWords(text) {
+  // [label_]scope_YYYY-MM-DD_HHMMSS[_n].tar.gz, standing by itself: a name with a folder in front
+  // of it is somebody's file, and a bracket or a quote around it is kept
+  return String(text).replace(/(?<![\w.\/\\-])(?:[\w.-]*_)?(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})(?:_\d+)?\.tar\.gz/g, (all, y, mo, d, h, mi, sec) => {
+    const at = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(sec));
+    // 99:99:99 rolls over to a real date, which is not when anything was taken
+    const real = at.getMonth() === Number(mo) - 1 && at.getDate() === Number(d) && at.getHours() === Number(h) && at.getMinutes() === Number(mi) && at.getSeconds() === Number(sec);
+    return real ? 'the backup from ' + stamp(at) : all;
+  });
+}
+
 /** The Reason column: what prompted a snapshot, from its label or the schedule that took it. */
 function snapshotReason(snap) {
   const label = snap.label || '';
@@ -10980,7 +11079,7 @@ function singleFileOf(snap) {
 }
 
 function describeMembers(members) {
-  if (!members || !members.length) return 'everything the snapshot holds';
+  if (!members || !members.length) return 'everything the backup holds';
   if (members.length <= 4) return members.join(', ');
   const rest = members.length - 3;
   return members.slice(0, 3).join(', ') + ' and ' + rest + ' other files and folders';
@@ -11126,7 +11225,7 @@ async function renderBackups(opts) {
   }
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
-    'Take a snapshot now, put one back, or leave it to a schedule.');
+    'Back up now, put a backup back, or leave it to a schedule.');
   const refreshStatus = document.createElement('div');
   refreshStatus.dataset.backupStatus = '';
   refreshStatus.className = 'bad';
@@ -11215,7 +11314,7 @@ async function renderBackups(opts) {
     try {
       const out = await post(base, { scope: scope.value });
       const problems = out.problems || [];
-      toast('Saved ' + out.created + (out.mirrored ? ', and mirrored' : '') + (problems.length ? ', with something missing.' : '.'), problems.length ? undefined : 'good');
+      toast('Backup saved' + (out.mirrored ? ', with a second copy' : '') + (problems.length ? ', with something missing.' : '.'), problems.length ? undefined : 'good');
       for (const p of problems) toast(p, 'bad');
       if (out.mirrorError) toast(out.mirrorError, 'bad');
       if (out.skipped?.length) toast('Left out, locked by the running server: ' + out.skipped.join(', '), 'bad');
@@ -11575,13 +11674,13 @@ function renderBackupHistory(row, data, signature) {
   const mirrorPath = document.createElement('span');
   mirrorPath.className = 'hint mono-path';
   mirrorPath.textContent = data.mirror
-    ? 'mirrored to ' + data.mirror
-    : 'No mirror: snapshots live on one drive, beside what they back up.';
+    ? 'also copied to ' + data.mirror
+    : 'No second copy: backups live on one drive, beside what they back up.';
   const mset = document.createElement('button');
   mset.className = 'ghost inline';
   mset.type = 'button';
-  mset.textContent = data.mirror ? 'Change' : 'Add a mirror';
-  mset.title = 'A second location - ideally another drive - every new snapshot is copied to';
+  mset.textContent = data.mirror ? 'Change' : 'Add a second copy';
+  mset.title = 'A second place, ideally another drive, that every new backup is copied to';
   mset.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
   mirrorRow.append(mirrorPath, mset);
   if (data.mirror) {
@@ -11594,7 +11693,7 @@ function renderBackupHistory(row, data, signature) {
     moff.onclick = async () => {
       try {
         await post('/settings', { backupsMirrorDir: '' });
-        toast('Mirroring turned off. Copies already made stay where they are.', 'good');
+        toast('Second copies turned off. The ones already made stay where they are.', 'good');
         await renderBackups({ force: true });
       } catch (e) { toast(e.message, 'bad'); }
     };
@@ -11603,15 +11702,15 @@ function renderBackupHistory(row, data, signature) {
     let chosen = null;
     let saved = null; // the answer, when the dialog itself did the saving
     if (desktop) {
-      chosen = await desktop.pickFolder('Where should snapshot copies go? Ideally another drive.');
+      chosen = await desktop.pickFolder('Where should the second copy of each backup go? Ideally another drive.');
       if (!chosen) return;
     } else {
       const answer = await ask({
-        title: 'Mirror snapshots to a second location',
-        text: 'Every new snapshot, for every server, is copied there as it is taken - ideally on '
+        title: 'Copy backups to a second place',
+        text: 'Every new backup, for every server, is copied there as it is taken - ideally on '
           + 'a different drive, so one disk failure cannot take the servers and their backups '
-          + 'together. Retention deletions follow the mirror too.',
-        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\spawnloft-backups', required: true },
+          + 'together. When old backups are cleared, their second copies go too.',
+        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: examplePath(panelPlatform, 'backups'), required: true },
         confirmLabel: 'Use this folder',
         submit: ({ text }) => post('/settings', { backupsMirrorDir: text }),
       });
@@ -11620,7 +11719,7 @@ function renderBackupHistory(row, data, signature) {
     }
     try {
       const out = saved || await post('/settings', { backupsMirrorDir: chosen });
-      toast('New snapshots now mirror to ' + out.backupsMirrorDir + '. No restart needed.', 'good');
+      toast('New backups are now also copied to ' + out.backupsMirrorDir + '. No restart needed.', 'good');
       await renderBackups({ force: true });
     } catch (e) { toast(e.message, 'bad'); }
   };
@@ -11638,7 +11737,7 @@ function renderBackupHistory(row, data, signature) {
     const head = document.createElement('div');
     head.className = 'snaps-head';
     head.setAttribute('aria-hidden', 'true');
-    for (const [label, cls] of [['Snapshot', ''], ['Contents', ''], ['Reason', 'h-why'], ['Items', 'h-items'], ['Size', '']]) {
+    for (const [label, cls] of [['Backup', ''], ['Contents', ''], ['Reason', 'h-why'], ['Items', 'h-items'], ['Size', '']]) {
       const cell = document.createElement('span');
       if (cls) cell.className = cls;
       cell.textContent = label;
@@ -11720,7 +11819,7 @@ function renderBackupHistory(row, data, signature) {
       restore.disabled = data.running;
       restore.title = data.running
         ? 'Stop the server first'
-        : 'Extract this snapshot back over the server files';
+        : 'Put this backup back over the server files';
       const glyph = (name, label) => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -11760,7 +11859,7 @@ function renderBackupHistory(row, data, signature) {
       };
       noteBtn.onclick = async () => {
         const got = await ask({
-          title: 'A note for this snapshot',
+          title: 'A note for this backup',
           text: 'A few words saying what it is - "before the 1.21 upgrade". Empty removes it.',
           input: { label: 'Note', value: snap.note || '', placeholder: 'before the 1.21 upgrade' },
           confirmLabel: 'Save',
@@ -11791,8 +11890,8 @@ function renderBackupHistory(row, data, signature) {
         const words = restoreWords(snap);
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
-          text: 'This puts back ' + covers + ' from ' + (snap.note ? '“' + snap.note + '” (' + snap.name + ')' : snap.name)
-            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs + flawed
+          text: 'This puts back ' + covers + ' from ' + backupWords(snap)
+            + '. Anything changed since then is overwritten.' + left + dbs + flawed
             + words.note,
           choices: [
             { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
@@ -11803,7 +11902,7 @@ function renderBackupHistory(row, data, signature) {
           typeToConfirm: row.name,
         });
         if (!ok) return;
-        const note = toast('Restoring ' + snap.name + '\u2026');
+        const note = toast('Restoring ' + backupWords(snap) + '\u2026');
         restoring.set(row.name, snap.name);
         lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
         const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
@@ -11829,7 +11928,7 @@ function renderBackupHistory(row, data, signature) {
           note.remove();
           const imported = (out.databases && out.databases.imported) || [];
           const skipped = (out.databases && out.databases.skipped) || [];
-          toast('Restored ' + snap.name + (imported.length ? ', with ' + imported.length + ' database' + (imported.length > 1 ? 's' : '') + ' imported' : '') + '.', 'good');
+          toast('Restored ' + backupWords(snap) + (imported.length ? ', with ' + imported.length + ' database' + (imported.length > 1 ? 's' : '') + ' imported' : '') + '.', 'good');
           for (const d of skipped) toast('Database ' + d.database + ' not imported: ' + d.reason, 'bad');
         } catch (e) {
           note.remove();
@@ -11843,15 +11942,15 @@ function renderBackupHistory(row, data, signature) {
 
       drop.onclick = async () => {
         const ok = await ask({
-          title: 'Delete this snapshot?',
-          text: snap.name + ', ' + snap.sizeHuman + '. What it holds goes with it.',
-          confirmLabel: 'Delete snapshot',
+          title: 'Delete this backup?',
+          text: backupWords(snap, true) + ', ' + snap.sizeHuman + '. What it holds goes with it.',
+          confirmLabel: 'Delete backup',
           danger: true,
         });
         if (!ok) return;
         try {
           await post(base + '/delete', { snapshot: snap.name });
-          toast('Deleted ' + snap.name + '.', 'good');
+          toast('Deleted ' + backupWords(snap) + '.', 'good');
           await renderBackups({ force: true });
         } catch (e) {
           toast(e.message, 'bad');
@@ -12213,7 +12312,7 @@ async function buildServerSettings(row, body) {
   const jvCustom = el('input', 'mono');
   jvCustom.autocomplete = 'off';
   jvCustom.spellcheck = false;
-  jvCustom.placeholder = 'C:\\Program Files\\Java\\jdk-17\\bin\\java.exe';
+  jvCustom.placeholder = examplePath(panelPlatform, 'java');
   jvCustom.setAttribute('aria-label', 'Path to java');
   jvCustom.hidden = true;
   jvWrap.append(jvSelect, jvCustom);
@@ -12224,7 +12323,7 @@ async function buildServerSettings(row, body) {
   const jvRow = addRow(jv, {
     id: jvSelect.id,
     label: 'Runs on',
-    help: 'Looking for installed Javas…',
+    help: 'Looking for Java on this computer…',
     control: jvWrap,
     entry: {
       kind: 'own', key: 'java',
@@ -12249,27 +12348,42 @@ async function buildServerSettings(row, body) {
       jvSelect.append(o);
     };
     const needs = row.javaNeeds;
-    for (const f of found.found) {
-      const where = f.path === 'java' ? 'on PATH' : f.path;
-      const tooOld = needs && f.major < needs;
-      addOpt(f.path, 'Java ' + f.major + '  ·  ' + where + (tooOld ? '  ·  too old for this server' : ''));
-    }
-    if (!found.found.some((f) => f.path === 'java')) addOpt('java', 'Whatever "java" resolves to on PATH');
-    addOpt('__custom', 'A path of my own…');
+    for (const f of found.found) addOpt(f.path, javaOptionWords(f, needs));
+    if (!found.found.some((f) => f.path === 'java')) addOpt('java', 'This computer\u2019s default Java');
+    addOpt('__custom', 'Choose another Java…');
     selectJava(mine.java);
     const needLine = needs ? 'This server needs Java ' + needs + ' or newer. ' : '';
     jvHint.textContent = found.found.length
-      ? needLine + 'Found ' + found.found.length + (found.found.length === 1 ? ' Java' : ' Javas') + ' on this machine; '
-        + 'for one installed somewhere else, pick the last option and paste the path to java.exe.'
-      : needLine + 'No Java was found on PATH or in the usual install folders. Paste the path to java.exe, or get one from ' + found.download;
+      ? needLine + 'Found ' + found.found.length + (found.found.length === 1 ? ' copy' : ' copies') + ' of Java on this computer. '
+        + 'For one installed somewhere else, pick the last option and paste the path to ' + JAVA_FILE + '.'
+      : needLine + 'No Java was found on this computer. Install one, or paste the path to ' + JAVA_FILE + '. ';
+    if (found.download && !found.found.length) {
+      const get = el('button', 'ghost');
+      get.type = 'button';
+      get.textContent = 'Get Java';
+      get.onclick = () => openOutside(found.download);
+      jvHint.append(get);
+    }
+    // A Java marked too old could be chosen and saved with nothing said
+    const jvOld = el('div', 'hint');
+    jvOld.style.color = 'var(--warn-ink)';
+    jvOld.setAttribute('aria-live', 'polite');
+    jvRow.left.append(jvOld);
+    const sayOld = () => {
+      jvOld.textContent = javaTooOldWords(found.found, chosenJava(), needs);
+      jvOld.hidden = !jvOld.textContent;
+    };
+    jvSelect.addEventListener('change', sayOld);
+    jvCustom.addEventListener('input', sayOld);
+    sayOld();
     javaReady = true;
     update();
   }).catch((e) => {
-    jvHint.textContent = 'Could not look for Javas: ' + e.message;
+    jvHint.textContent = 'Could not look for Java: ' + e.message;
     jvSelect.textContent = '';
     const o = el('option');
     o.value = '__custom';
-    o.textContent = 'A path of my own…';
+    o.textContent = 'Choose another Java…';
     jvSelect.append(o);
     jvCustom.hidden = false;
     jvCustom.value = mine.java;
@@ -12449,7 +12563,7 @@ async function buildServerSettings(row, body) {
           const ok = await ask({
             title: 'Upgrade ' + row.name + ' to Minecraft ' + next + '?',
             text: 'The first start migrates the worlds, and worlds do not migrate back. A standard '
-              + 'snapshot is taken first, but check your plugins support ' + next + ' too - a plugin '
+              + 'backup is taken first, but check your plugins support ' + next + ' too - a plugin '
               + 'built for ' + info.current.version + ' may refuse to load.',
             confirmLabel: 'Upgrade',
             danger: true,
@@ -12458,11 +12572,11 @@ async function buildServerSettings(row, body) {
           if (!ok) return;
           cross.disabled = true;
           cross.textContent = 'Downloading…';
-          const note = toast('Snapshotting, then downloading ' + info.label + ' ' + next + '…');
+          const note = toast('Backing up, then downloading ' + info.label + ' ' + next + '…');
           try {
             const out = await post(base + '/upgrade', { version: next });
             note.remove();
-            toast('Now on ' + out.to + '. Snapshot saved first.' + (out.running ? ' Restart to load it.' : ''), 'good');
+            toast('Now on ' + out.to + '. A backup was taken first.' + (out.running ? ' Restart to load it.' : ''), 'good');
             await afterUpgrade();
           } catch (e) {
             note.remove();
@@ -12693,7 +12807,7 @@ async function buildServerSettings(row, body) {
     rawNote.textContent = 'Saving…';
     try {
       const out = await post(base + '/props/raw', { text: rawText.value });
-      toast('Saved server.properties. A snapshot of it was taken first'
+      toast('Saved server.properties. A backup of it was taken first'
         + (out.appliesOnRestart ? '; restart ' + (row.label || row.name) + ' to apply.' : '.'), 'good');
       await loadRaw();
       await reloadFields();
@@ -12903,7 +13017,7 @@ async function editServer(row) {
         saving = false;
         if (mine !== askSeq || settled) return;
         if (renamed) { state.current = null; await refresh(); select(name); }
-        errBox.textContent = (renamed ? 'Renamed to ' + name + ', but the rest was not saved. ' : '') + e.message;
+        errBox.textContent = (renamed ? 'The folder name is now ' + name + ', but the rest was not saved. ' : '') + e.message;
         errBox.hidden = false;
         ok.disabled = false;
         $('#dlgCancel').disabled = false;
@@ -12918,7 +13032,8 @@ async function editServer(row) {
 
   if (result.renamed) {
     if (state.current !== result.name) { state.current = null; await refresh(); select(result.name); }
-    toast('Renamed to ' + result.name + '.', 'good');
+    const named = rowOf(result.name);
+    toast('Saved' + (named && named.label && named.label !== result.name ? ' ' + named.label : '') + '. Its folder name is now ' + result.name + '.', 'good');
     return;
   }
   await refresh();
@@ -12928,7 +13043,7 @@ async function editServer(row) {
 async function rebuildServer(row) {
   const res = await ask({
     title: 'Reset the world of ' + row.name + '?',
-    text: 'Worlds, logs and cached state are deleted. A snapshot is taken first, so this can be undone.',
+    text: 'Worlds, logs and cached state are deleted. A backup is taken first, so this can be undone.',
     confirmLabel: 'Reset world',
     danger: true,
     typeToConfirm: row.name,
@@ -12938,13 +13053,13 @@ async function rebuildServer(row) {
     ],
   });
   if (!res) return;
-  const note = toast('Taking a snapshot, then resetting ' + row.name + '…');
+  const note = toast('Backing up, then resetting ' + row.name + '…');
   try {
     const out = await post('/instances/' + encodeURIComponent(row.name) + '/rebuild', {
       keepPlugins: res.choice === 'keep',
     });
     note.remove();
-    toast('Reset. Snapshot saved to ' + (out.snapshot || 'the backups folder') + '.', 'good');
+    toast('Reset. What was there is in Backups.', 'good');
     clearLines();
     renderLog();
     await refresh();
@@ -12962,7 +13077,7 @@ async function deleteServer(row) {
     typeToConfirm: row.name,
     choices: [
       { value: 'keep', label: 'Remove from SpawnLoft, keep the files', hint: 'The folder stays where it is. You can add it again later.' },
-      { value: 'purge', label: 'Delete the files as well', hint: 'The whole server folder goes. A snapshot is taken first.' },
+      { value: 'purge', label: 'Delete the files as well', hint: 'The whole server folder goes. A backup is taken first.' },
     ],
   });
   if (!res) return;
@@ -12978,7 +13093,7 @@ async function deleteServer(row) {
     show('empty');
     await refresh();
     toast(out.purged
-      ? 'Deleted. Snapshot saved to ' + (out.snapshot || 'the backups folder') + '.'
+      ? 'Deleted. A backup of it was saved to ' + (out.snapshot || 'the backups folder') + '.'
       : 'Removed from SpawnLoft. The files are still in their folder.', 'good');
   } catch (e) {
     note.remove();
@@ -12999,9 +13114,9 @@ async function manageDatabase(row) {
       : 'Choose what to do with this database.',
     confirmLabel: 'Continue',
     choices: live
-      ? [{ value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in Explorer.' }]
+      ? [{ value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in ' + FILE_MANAGER + '.' }]
       : [
-          { value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in Explorer.' },
+          { value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in ' + FILE_MANAGER + '.' },
           { value: 'delete', label: 'Delete this database', hint: 'Removes it from SpawnLoft, and optionally its data.' },
         ],
   });
@@ -13048,7 +13163,7 @@ async function deleteDatabase(row) {
     typeToConfirm: row.name,
     choices: [
       { value: 'keep', label: 'Remove from SpawnLoft, keep the data', hint: 'The folder stays where it is.' },
-      { value: 'purge', label: 'Delete the data as well', hint: 'Every database and table on it goes. There is no snapshot of a database yet.' },
+      { value: 'purge', label: 'Delete the data as well', hint: 'Every database and table on it goes. Back it up first if you may want it again.' },
     ],
   });
   if (!res) return;
@@ -13407,7 +13522,7 @@ async function renderDatabaseBackups(opts) {
   const label = row.label || row.name;
   body.textContent = '';
   paneHead(body, 'archive', 'Backups',
-    'SQL dumps of this database, kept apart from the servers’ snapshots. Download one to keep a copy somewhere else.');
+    'Backups of this database, kept apart from the servers’ backups. Download one to keep a copy somewhere else.');
 
   if (!data.canDump) {
     body.append(emptyState('archive', (row.engineLabel || 'This engine') + ' keeps its own checkpoints on disk, so there is '
@@ -13439,7 +13554,7 @@ async function renderDatabaseBackups(opts) {
   take.onclick = async () => {
     dbBackupBusy = true;
     take.disabled = true;
-    take.textContent = 'Dumping…';
+    take.textContent = 'Backing up…';
     try {
       const out = await post(base, { label: tag.value.trim() || 'manual' });
       toast('Backed up ' + label + ' to ' + out.taken.name + ' (' + out.taken.sizeHuman + ').', 'good');
@@ -13562,7 +13677,7 @@ async function renderDatabaseSettings(row) {
   body.dataset.for = row.name;
   body.textContent = '';
   paneHead(body, 'sliders', 'Database settings',
-    'Where it listens, how to reach it as root, and which servers have a database on it.');
+    'Its address, the admin login, and which servers have a database on it.');
 
   const glyph = row.engineKind === 'redis' ? 'cache' : 'database';
   const groupHead = (mark, title, text) => {
@@ -13593,10 +13708,10 @@ async function renderDatabaseSettings(row) {
   // ---- how to reach it: every value a plugin config asks for, each copyable ----------------
   const conn = el('div', 'section set-group db-conn');
   conn.append(groupHead(glyph, 'Connection', row.external
-    ? 'Registered with its address and admin credentials; it is run and stopped where it lives. Servers are attached to it from their own Settings tab.'
+    ? 'SpawnLoft knows its address and admin login; it is started and stopped where it runs. Servers are attached to it from their own Settings tab.'
     : row.engineKind === 'redis'
-      ? 'Loopback only: nothing outside this machine can reach it. One password and one key space, shared by every server attached; plugins prefix their keys.'
-      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.'));
+      ? 'Only this computer can connect to it. Every attached server shares the one password and the one store, so each plugin puts its own prefix on what it keeps.'
+      : 'Only this computer can connect to it. Each server gets its own login and its own database; the admin login below is for you.'));
   const dl = el('dl', 'db-facts');
   fact(dl, 'Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : ''));
   fact(dl, 'Host', addrButton(row.host || '127.0.0.1', 'host'));
@@ -14131,7 +14246,7 @@ $('#formNew').onsubmit = async (e) => {
     paintSlug($('#nName'));
     await refresh();
     select(inst.name);
-    toast('Created ' + inst.name + ' on port ' + inst.port + '.', 'good');
+    toast('Created ' + (inst.label || inst.name) + ' on port ' + inst.port + '.', 'good');
   } catch (err) {
     forceJava = false;
     jobs.close();
@@ -14305,7 +14420,7 @@ $('#formPack').onsubmit = async (e) => {
     $('#bPackCreate').disabled = false;
     await refresh();
     select(inst.name);
-    toast('Created ' + inst.name + ' from ' + packView.chosen.title + '.', 'good');
+    toast('Created ' + (inst.label || inst.name) + ' from ' + packView.chosen.title + '.', 'good');
   } catch (err) {
     jobs.close();
     lockAddTabs(false);
@@ -14417,7 +14532,7 @@ function renderSettings() {
     ['Backups', l.backupsDir],
     ['Templates', l.templatesDir],
     ['Settings file', l.settingsFile],
-  ] : [['Locations', 'Could not read them from the core.']];
+  ] : [['Locations', 'Could not read them. Try again in a moment.']];
   for (const r of rows) {
     const dt = document.createElement('dt');
     dt.textContent = r[0];
@@ -14447,7 +14562,7 @@ function renderSettings() {
   } else {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'To move these, run: spawnloft config set-root <path>';
+    hint.textContent = 'These are moved from the SpawnLoft app, or in a terminal with: spawnloft config set-root <folder>';
     actions.append(hint);
   }
 
@@ -14553,9 +14668,13 @@ function renderClientProfiles() {
   dl.innerHTML = '';
   if (!state.clientProfiles.length) {
     const dt = el('dt');
-    dt.textContent = 'No profiles';
+    dt.textContent = 'No setups yet';
     const dd = el('dd');
-    dd.textContent = 'spawnloft client new <name> --mc 1.21.11';
+    const go = el('button', 'ghost');
+    go.type = 'button';
+    go.textContent = 'Make one on the Play page';
+    go.onclick = () => showPlay();
+    dd.append(go);
     dl.append(dt, dd);
     return;
   }
@@ -15144,7 +15263,7 @@ async function updJson(path, method, body) {
 function updOutcomeText(r) {
   if (r.result === 'update') return '';
   if (r.result === 'blocked') return 'A newer release exists but cannot be installed here: ' + (r.reason || 'it is not allowed') + '.';
-  if (r.result === 'unreachable') return 'The update feed could not be read (' + (r.reason || 'no answer') + '). Check your connection and try again.';
+  if (r.result === 'unreachable') return 'SpawnLoft could not check for updates (' + (r.reason || 'no answer') + '). Check your connection and try again.';
   return 'SpawnLoft ' + r.installed + ' is the newest ' + r.channel + ' release.';
 }
 
@@ -15281,7 +15400,7 @@ async function renderCoreUpdates(reportText) {
     e.target.disabled = true;
     try {
       await updJson('/channel', 'POST', { beta: e.target.checked });
-      await renderCoreUpdates('The next check will use the ' + (e.target.checked ? 'beta' : 'release') + ' channel.');
+      await renderCoreUpdates('The next check will look for ' + (e.target.checked ? 'beta releases too.' : 'finished releases only.'));
     } catch (err) { toast(err.message, 'bad'); e.target.checked = !e.target.checked; }
     e.target.disabled = false;
   };
@@ -15313,7 +15432,7 @@ function upgradeNoticeNodes(data) {
     const waiting = restarted.filter((e) => !e.start);
     const failed = restarted.filter((e) => e.start === 'failed' || e.start === 'skipped');
     const back1x = restarted.filter((e) => e.start === 'restored-1x');
-    const orphans = servers.filter((e) => e.stop === 'orphaned');
+    const orphans = servers.filter((e) => e.stop === 'orphaned' && !forceStopped.has(e.name));
     if (waiting.length) {
       out.push(noticeBox({ tone: 'warn', title: 'Updating.',
         text: 'Starting ' + joinNames(waiting.map((e) => e.name)) + ' again after the update.' }));
@@ -15339,8 +15458,13 @@ function upgradeNoticeNodes(data) {
         dismiss: dismissRec }));
     }
     for (const e of orphans) {
-      out.push(noticeBox({ tone: 'fault', title: e.name + ' has no supervisor.',
-        text: 'Its Java process has been running without one since before the update, so SpawnLoft cannot talk to it. Stop it with "spawnloft kill ' + e.name + '" in a terminal, then start it here.',
+      out.push(noticeBox({ tone: 'fault', title: e.name + ' is still running, but out of reach.',
+        text: 'It has been running since before the update with nothing looking after it, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.',
+        actions: [{ label: 'Force stop', run: async () => {
+          if (!(await forceStop(e.name, e.name))) return;
+          upgradeBanner.last = null;
+          pollUpgradeNotices();
+        } }],
         dismiss: dismissRec }));
     }
   }

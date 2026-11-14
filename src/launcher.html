@@ -1040,8 +1040,8 @@
     if (d.javaNeeds) out.push(d.javaNeedsExact === false ? `likely Java ${d.javaNeeds}` : `Java ${d.javaNeeds}`)
     if (d.fabric === true) out.push('Fabric available')
     else if (d.fabric === false) out.push('no Fabric')
-    if (d.harness === true) out.push('harness published')
-    else if (d.harness === false) out.push('harness not published')
+    if (d.harness === true) out.push('helper mod available')
+    else if (d.harness === false) out.push('no helper mod yet')
     if (d.emulated) out.push('runs under emulation')
     return out
   }
@@ -1365,7 +1365,7 @@
           oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline() } }),
         h('button', { class: 'sm', onclick: () => addOffline() }, 'Add')),
       o.error && h('small', { class: 'hint bad', text: sentence(o.error) }),
-      h('p', { class: 'note', text: 'An offline name plays on servers with online-mode=false, like the ones SpawnLoft makes. Online servers need a Microsoft account.' }),
+      h('p', { class: 'note', text: 'An offline name plays on servers that do not check accounts, like a SpawnLoft server set to let anyone join. Every other server needs a Microsoft account.' }),
       def && [h('hr'), h('button', { class: 'row act', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`)])
   }
 
@@ -1618,7 +1618,7 @@
         if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion) { meta = 'runs a different version'; warn = true }
         return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
           h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
-          h('span', { class: 'sub' }, h('b', { text: c.label && c.label !== c.name ? `${c.name} (${c.label})` : c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` · ${c.mc}` : ''}` })),
+          h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` · ${c.mc}` : ''}` })),
           h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
       }),
       h('hr'),
@@ -1650,7 +1650,6 @@
     const facts = [
       h('span', {}, 'since ', h('b', { text: clockTime(p.startedAt) })),
       p.runningAccount?.name && h('span', {}, 'as ', h('b', { text: p.runningAccount.name })),
-      h('span', { text: `pid ${p.pid}` }),
     ]
     return [
       h('div', { class: 'eyebrow' }, pill('live', 'Running', true), h('span', { class: 'hint', text: setupTitle(p) }), p.launchedBy === 'assistant' && pill('accent', 'Launched by an assistant')),
@@ -1902,8 +1901,8 @@
     if (f.loader !== 'fabric') return 'Needs Fabric. Pick Fabric above to turn it on.'
     const row = versionRow(f.mc)
     const info = versionInfo(f.mc)
-    if (info.harness === false) return `Not published for ${f.mc} yet, so it stays off for this version.`
-    if (!row && S.versions?.versions) return `Not published for ${f.mc || 'this version'} yet.`
+    if (info.harness === false) return `The helper mod is not out for ${f.mc} yet, so this stays off for this version.`
+    if (!row && S.versions?.versions) return `The helper mod is not out for ${f.mc || 'this version'} yet.`
     return null
   }
 
@@ -2010,7 +2009,7 @@
       loaderField,
       memoryField,
       f.editing
-        ? ro('Name', f.name, 'The profile name the command line uses.')
+        ? ro('Name', f.name, 'The name this setup is saved under. It stays as it is.')
         : h('label', { class: 'field' }, h('span', { text: 'Name (optional)' }),
           h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
           h('small', { class: 'hint', text: 'Shown in the setups menu. Letters, digits, dash and underscore.' })),
@@ -2022,11 +2021,11 @@
       h('label', { class: 'field' }, h('span', { text: 'Usually joins' }),
         h('select', { id: 'fServer', value: f.server, onchange: set('server') },
           h('option', { value: '', text: 'Title screen only' }),
-          servers.map((s) => h('option', { value: s.name, text: `${s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (another version)' : ''}` })),
+          servers.map((s) => h('option', { value: s.name, text: `${s.label || s.name}${s.mc ? ` · ${s.mc}` : ''}${s.mc && f.mc && s.mc !== f.mc ? ' (another version)' : ''}` })),
           f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))))
 
     const harness = !running && h('div', { class: 'switchrow' },
-      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds the harness mod, for diagnostics and the assistant tools. Off until you need it.' })),
+      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game, which diagnostics and the assistant tools need. Off until you need it.' })),
       h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
 
     if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
@@ -2058,7 +2057,7 @@
           h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
           h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : `${memoryText(p.memory)} · ${p.server ? `usually joins ${p.server}` : 'opens on the title screen'}`) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
-        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the harness can\'t change while the game is open. Stop it first to change them.' }),
+        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
         grid,
         harness,
