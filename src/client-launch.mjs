@@ -1,10 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import { spawn } from 'node:child_process'
 
 import { currentOs, jvmArguments, gameArguments, libraries, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
 import { launchFeatures } from './client-version.mjs'
-import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLog, logConfigPath } from './client-paths.mjs'
+import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLastExit, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
 import { boundAddress } from './exposure.mjs'
 import { writeJson, readJson, fail, UserError, pidAlive, sameProcess, killProcessGroup, sleep, PRIVATE_FILE_MODE } from './util.mjs'
@@ -173,21 +174,43 @@ export async function spawnClient(command, { name, state }) {
   }
 
   // A stopped client's exit event can arrive after the next launch wrote its own state; leave that one alone.
-  child.on('exit', () => {
-    if (readJson(clientStateFile(name), null)?.pid === child.pid) fs.rmSync(clientStateFile(name), { force: true })
+  // How it ended is written down first: the exit code is the one fact that says "crashed" for
+  // sure, and it is gone the moment this handler returns. Only the process that started the game
+  // hears it (a panel that was restarted, or a CLI launch, does not), so a missing or older
+  // record means "not known", and the log is still the fallback for those.
+  // set when the state is written; Stop removes the state file before this handler runs
+  let startedAt = null
+  child.on('exit', (code, signal) => {
+    const mine = readJson(clientStateFile(name), null)?.pid === child.pid
+    try {
+      writeJson(clientLastExit(name), {
+        pid: child.pid,
+        code: code ?? null,
+        signal: signal ?? null,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        // Stop was pressed (stopClient left its mark): however the process ended, it was asked to
+        stopped: stopAsked.delete(child.pid) || readJson(stopMark(name), null)?.pid === child.pid,
+      })
+    } catch { /* a record, not a requirement */ }
+    fs.rmSync(stopMark(name), { force: true })
+    if (mine) fs.rmSync(clientStateFile(name), { force: true })
   })
 
   return new Promise((resolve, reject) => {
     child.on('spawn', () => {
       // The state carries the harness token: owner-only, like the accounts file.
+      startedAt = new Date().toISOString()
       writeJson(clientStateFile(name), {
         pid: child.pid,
         // javaExe lets readClientState tell this process from a later owner of the same pid
         javaExe: path.basename(cmd),
-        startedAt: new Date().toISOString(),
+        startedAt,
         mode: state.mode ?? 'offline',
         account: { type: state.account.type, name: state.account.name },
         javaPid: child.pid,
+        // Linux: the process's own start time, which a later owner of the same pid cannot share
+        procStart: procStartTicks(child.pid),
         harness: state.harness ?? null,
         server: state.server ?? null,
         address: state.address ?? null,
@@ -203,8 +226,51 @@ export async function spawnClient(command, { name, state }) {
   })
 }
 
+// pids this process asked to stop, and the same as a file for a stop asked by another process
+// (the CLI stopping a game the panel started)
+const stopAsked = new Set()
+const stopMark = (name) => path.join(clientRunDir(name), 'stop-asked.json')
+
+// The last recorded exit of a profile's game, or null: { pid, code, signal, startedAt, endedAt, stopped }.
+export function readLastExit(name) {
+  try {
+    const rec = readJson(clientLastExit(name), null)
+    return rec && typeof rec === 'object' && typeof rec.endedAt === 'string' ? rec : null
+  } catch {
+    return null
+  }
+}
+
+// Field 22 of /proc/<pid>/stat: when the process started, in clock ticks since boot. The command
+// name (field 2) may hold spaces and brackets, so the fields are counted from the last ")".
+export function procStartTicks(pid, read = fs.readFileSync) {
+  if (process.platform !== 'linux') return null
+  try {
+    const stat = String(read(`/proc/${pid}/stat`, 'utf8'))
+    const ticks = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]
+    return /^\d+$/.test(ticks ?? '') ? ticks : null
+  } catch {
+    return null
+  }
+}
+
+// Whether a state file written before this machine last started: no process outlives a reboot,
+// but its pid is handed out again, quite possibly to a SpawnLoft server's Java, which has the
+// same image name as the game's. A minute's slack covers a clock set at boot.
+export function fromBeforeBoot(startedAt, { now = Date.now(), uptime = os.uptime() } = {}) {
+  const at = Date.parse(startedAt)
+  return Number.isFinite(at) && at < now - uptime * 1000 - 60000
+}
+
 function stateAlive(state) {
-  return pidAlive(state.pid) && sameProcess(state.pid, state.javaExe, Date.parse(state.startedAt) || 0)
+  if (fromBeforeBoot(state.startedAt)) return false
+  if (!pidAlive(state.pid)) return false
+  // the same pid with another start time is another process, whatever it is called
+  if (state.procStart) {
+    const now = procStartTicks(state.pid)
+    if (now && now !== state.procStart) return false
+  }
+  return sameProcess(state.pid, state.javaExe, Date.parse(state.startedAt) || 0)
 }
 
 export function readClientState(name) {
@@ -261,6 +327,9 @@ export async function stopClient(name, { timeout = 10000, quit = null } = {}) {
 
   // Politely first (the harness quit, else a close request so the JVM's shutdown hooks run),
   // then by force once the timeout passes.
+  // for the exit record: this exit, however it comes, was asked for
+  stopAsked.add(state.pid)
+  try { writeJson(stopMark(name), { pid: state.pid, at: new Date().toISOString() }) } catch { /* the in-process mark still holds */ }
   let asked = false
   if (typeof quit === 'function') {
     try {
@@ -274,7 +343,11 @@ export async function stopClient(name, { timeout = 10000, quit = null } = {}) {
     forceKill(state.pid)
     gone = await waitGone(state, 5000)
   }
-  if (!gone) return { stopped: false, wasRunning: true }
+  if (!gone) {
+    stopAsked.delete(state.pid)
+    fs.rmSync(stopMark(name), { force: true })
+    return { stopped: false, wasRunning: true }
+  }
 
   fs.rmSync(clientStateFile(name), { force: true })
   return { stopped: true, wasRunning: true }

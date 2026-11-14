@@ -2,12 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } from './client-paths.mjs'
+import { versionJson, versionJar, LIBRARIES_DIR, ASSETS_DIR, CLIENT_ROOT, CLIENT_CACHE_DIR, nativesDir, logConfigPath } from './client-paths.mjs'
 import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, assetLayout, platformRefusal, nativesLibrarySubdir, nativesExtraDirs, loggingConfig } from './client-meta.mjs'
 import { nativesStamp } from './client-version.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
-import { fail, safeRelativePath, isInside } from './util.mjs'
+import { fail, safeRelativePath, isInside, acquireLockAsync } from './util.mjs'
 import { isCancelled } from './cancel.mjs'
 
 export const PARALLEL = 8
@@ -23,6 +23,101 @@ export function needsDownload(file, { sha1 = null, size = null } = {}) {
   if (sha1 != null) {
     const actual = crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex')
     if (actual !== sha1.toLowerCase()) return true
+  }
+  return false
+}
+
+// ---- the checked-files list ----------------------------------------------------------------
+// Hashing every library and every asset on each Play read about half a gigabyte for a current
+// version, and the panel answered nothing while it did. A file is hashed once: when it passes, its
+// size and modification time are written down beside the hash it passed, and a later launch that
+// finds the same size and time takes it as checked. A file that was replaced, truncated or
+// touched no longer matches its line and is hashed again; `verify` hashes everything regardless
+// (a repair). The list is a cache: losing it costs one slow launch, never a wrong one.
+const VERIFIED_FILE = path.join(CLIENT_CACHE_DIR, 'verified.json')
+const VERIFIED_FORMAT = 1
+
+const ledgerKey = (file) => path.relative(CLIENT_ROOT, file).split(path.sep).join('/')
+
+function readLedgerFile() {
+  try {
+    const data = JSON.parse(fs.readFileSync(VERIFIED_FILE, 'utf8'))
+    if (data?.format === VERIFIED_FORMAT && data.files && typeof data.files === 'object' && !Array.isArray(data.files)) return data.files
+  } catch { /* none yet, or unreadable: every file is hashed once more */ }
+  return {}
+}
+
+export function openLedger({ verify = false } = {}) {
+  return { files: verify ? {} : readLedgerFile(), added: {}, dropped: new Set() }
+}
+
+// Written through a temp file of its own name, over whatever another launch wrote meanwhile: the
+// lines this launch added go on top of the file as it is now, so two launches lose nothing.
+export function saveLedger(ledger) {
+  if (!Object.keys(ledger.added).length && !ledger.dropped.size) return
+  try {
+    const files = readLedgerFile()
+    for (const key of ledger.dropped) delete files[key]
+    Object.assign(files, ledger.added)
+    fs.mkdirSync(path.dirname(VERIFIED_FILE), { recursive: true })
+    const tmp = `${VERIFIED_FILE}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
+    fs.writeFileSync(tmp, JSON.stringify({ format: VERIFIED_FORMAT, files }))
+    fs.renameSync(tmp, VERIFIED_FILE)
+    ledger.added = {}
+    ledger.dropped = new Set()
+  } catch { /* a cache: the next launch hashes again */ }
+}
+
+function sha1OfFile(file) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha1')
+    fs.createReadStream(file).on('data', (chunk) => hash.update(chunk)).on('error', reject).on('end', () => resolve(hash.digest('hex')))
+  })
+}
+
+// Notes a file as checked: it was just hashed here, or just downloaded against that hash.
+async function noteChecked(ledger, file, sha1) {
+  if (!ledger || sha1 == null) return
+  try {
+    const stat = await fs.promises.stat(file)
+    const key = ledgerKey(file)
+    const line = [stat.size, stat.mtimeMs, String(sha1).toLowerCase()]
+    ledger.files[key] = line
+    ledger.added[key] = line
+    ledger.dropped.delete(key)
+  } catch { /* gone again already: the next launch sees that */ }
+}
+
+// needsDownload for a launch: the same answer, without reading a file whose line still fits it,
+// and without holding the thread while it reads one that does not.
+export async function needsFetch(file, { sha1 = null, size = null } = {}, ledger = null) {
+  let stat
+  try {
+    stat = await fs.promises.stat(file)
+  } catch {
+    return true
+  }
+  if (size != null && stat.size !== size) return true
+  if (sha1 == null) return false
+  const want = String(sha1).toLowerCase()
+  const key = ledgerKey(file)
+  const line = ledger?.files[key]
+  if (line && line[0] === stat.size && line[1] === stat.mtimeMs && line[2] === want) return false
+  let actual
+  try {
+    actual = await sha1OfFile(file)
+  } catch {
+    return true
+  }
+  if (actual !== want) {
+    if (ledger && line) { delete ledger.files[key]; delete ledger.added[key]; ledger.dropped.add(key) }
+    return true
+  }
+  if (ledger) {
+    const entry = [stat.size, stat.mtimeMs, want]
+    ledger.files[key] = entry
+    ledger.added[key] = entry
+    ledger.dropped.delete(key)
   }
   return false
 }
@@ -178,7 +273,19 @@ export async function materialiseAssets({ file, sha1 }, dest, { copy = false } =
   return { files: rows.length }
 }
 
-export async function ensureVersion(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = new Set() } = {}) {
+// `verify` hashes every file again, whatever the checked-files list says (a repair).
+export async function ensureVersion(id, opts = {}) {
+  // one list for a version and the parent it inherits from, saved once, however the install ends
+  if (opts.ledger) return ensureVersionWith(id, opts)
+  const ledger = openLedger({ verify: opts.verify })
+  try {
+    return await ensureVersionWith(id, { ...opts, ledger })
+  } finally {
+    saveLedger(ledger)
+  }
+}
+
+async function ensureVersionWith(id, { os = currentOs(), onProgress = () => {}, fetchImpl = downloadFile, keepNatives = new Set(), ledger }) {
   let rawJson
   try {
     rawJson = JSON.parse(fs.readFileSync(versionJson(id), 'utf8'))
@@ -191,7 +298,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   let version = rawJson
   if (rawJson.inheritsFrom) {
-    await ensureVersion(rawJson.inheritsFrom, { os, onProgress, fetchImpl, keepNatives })
+    await ensureVersionWith(rawJson.inheritsFrom, { os, onProgress, fetchImpl, keepNatives, ledger })
     const parentJson = JSON.parse(fs.readFileSync(versionJson(rawJson.inheritsFrom), 'utf8'))
     version = mergeInherited(rawJson, parentJson)
   }
@@ -205,14 +312,15 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   const ai = plan.assetIndex
   const indexDest = path.join(ASSETS_DIR, 'indexes', `${ai.id}.json`)
   let indexBytes = 0
-  if (needsDownload(indexDest, { sha1: ai.sha1, size: ai.size })) {
+  if (await needsFetch(indexDest, { sha1: ai.sha1, size: ai.size }, ledger)) {
     fs.mkdirSync(path.dirname(indexDest), { recursive: true })
     try {
       await fetchImpl(ai.url, indexDest, { hash: 'sha1', expected: ai.sha1, label: `asset index ${ai.id}` })
     } catch (err) {
       if (isCancelled(err)) throw err
-      fail(`could not download asset index ${ai.id} from ${ai.url}: ${err.message}`)
+      fail(`could not download asset index ${ai.id} from ${ai.url}: ${err.message}`, err.code ?? 'download-failed')
     }
+    await noteChecked(ledger, indexDest, ai.sha1)
     indexBytes = ai.size ?? 0
   }
   const indexJson = JSON.parse(fs.readFileSync(indexDest, 'utf8'))
@@ -244,7 +352,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   const dl = version.downloads?.client
   if (dl) {
-    const needs = needsDownload(jarPath, { sha1: dl.sha1, size: dl.size })
+    const needs = await needsFetch(jarPath, { sha1: dl.sha1, size: dl.size }, ledger)
     if (needs) {
       fs.mkdirSync(path.dirname(jarPath), { recursive: true })
       if (rawJson.downloads?.client) {
@@ -252,8 +360,9 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
           await fetchImpl(dl.url, jarPath, { hash: 'sha1', expected: dl.sha1, label: `the client jar for ${id}` })
         } catch (err) {
           if (isCancelled(err)) throw err
-          fail(`could not download the client jar for ${id} from ${dl.url}: ${err.message}`)
+          fail(`could not download the client jar for ${id} from ${dl.url}: ${err.message}`, err.code ?? 'download-failed')
         }
+        await noteChecked(ledger, jarPath, dl.sha1)
         downloaded++
         totalBytes += dl.size ?? 0
       } else {
@@ -272,15 +381,16 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   const logCfg = loggingConfig(version)
   if (logCfg) {
     const dest = logConfigPath(logCfg.id)
-    const needs = needsDownload(dest, { sha1: logCfg.sha1, size: logCfg.size })
+    const needs = await needsFetch(dest, { sha1: logCfg.sha1, size: logCfg.size }, ledger)
     if (needs) {
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       try {
         await fetchImpl(logCfg.url, dest, { hash: 'sha1', expected: logCfg.sha1, label: `the log config ${logCfg.id}` })
       } catch (err) {
         if (isCancelled(err)) throw err
-        fail(`could not download the log config ${logCfg.id} from ${logCfg.url}: ${err.message}; without it ${id} would run open to Log4Shell, so it is not launched`)
+        fail(`could not download the log config ${logCfg.id} from ${logCfg.url}: ${err.message}; without it ${id} would run open to Log4Shell, so it is not launched`, err.code ?? 'download-failed')
       }
+      await noteChecked(ledger, dest, logCfg.sha1)
       downloaded++
       totalBytes += logCfg.size ?? 0
     }
@@ -302,7 +412,7 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   await inBatches(libDownloads, PARALLEL, async (row) => {
     const dest = path.join(LIBRARIES_DIR, row.path)
-    const needs = needsDownload(dest, { sha1: row.sha1, size: row.size })
+    const needs = await needsFetch(dest, { sha1: row.sha1, size: row.size }, ledger)
     if (needs) {
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       const opts = { hash: 'sha1', label: `library ${row.name}` }
@@ -311,8 +421,9 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
         await fetchImpl(row.url, dest, opts)
       } catch (err) {
         if (isCancelled(err)) throw err
-        fail(`could not download library ${row.name} from ${row.url}: ${err.message}`)
+        fail(`could not download library ${row.name} from ${row.url}: ${err.message}`, err.code ?? 'download-failed')
       }
+      await noteChecked(ledger, dest, row.sha1)
       libBytes += row.size ?? 0
       downloaded++
       totalBytes += row.size ?? 0
@@ -337,15 +448,16 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
 
   await inBatches(assetDownloads, PARALLEL, async (row) => {
     const dest = path.join(ASSETS_DIR, row.path)
-    const needs = needsDownload(dest, { sha1: row.hash, size: row.size })
+    const needs = await needsFetch(dest, { sha1: row.hash, size: row.size }, ledger)
     if (needs) {
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       try {
         await fetchImpl(row.url, dest, { hash: 'sha1', expected: row.hash, label: `asset ${row.hash}` })
       } catch (err) {
         if (isCancelled(err)) throw err
-        fail(`could not download asset ${row.hash} from ${row.url}: ${err.message}`)
+        fail(`could not download asset ${row.hash} from ${row.url}: ${err.message}`, err.code ?? 'download-failed')
       }
+      await noteChecked(ledger, dest, row.hash)
       assetBytes += row.size ?? 0
       downloaded++
       totalBytes += row.size ?? 0
@@ -360,7 +472,16 @@ export async function ensureVersion(id, { os = currentOs(), onProgress = () => {
   // keepNatives: the ids whose natives a running game has loaded; an extracted folder is left as it is
   const keep = keepNatives.has(id) && fs.existsSync(completeFile)
   if (nativeRows.length > 0 && !keep && (nativeWasDownloaded || !stamped)) {
-    await extractNatives(id, nativeRows, { stamp: plan.nativesStamp, subdir: plan.nativesSubdir, extraDirs: plan.nativesExtraDirs })
+    // Two setups on one version started together would each clear the folder under the other;
+    // the second waits, then finds the first one's stamp and leaves the folder as it is.
+    fs.mkdirSync(path.dirname(nativesDir(id)), { recursive: true })
+    const release = await acquireLockAsync(`${nativesDir(id)}.lock`, { timeoutMs: 60000 })
+    try {
+      const done = !nativeWasDownloaded && fs.existsSync(completeFile) && fs.readFileSync(completeFile, 'utf8') === plan.nativesStamp
+      if (!done) await extractNatives(id, nativeRows, { stamp: plan.nativesStamp, subdir: plan.nativesSubdir, extraDirs: plan.nativesExtraDirs })
+    } finally {
+      release()
+    }
   }
   emitEnd('natives', nativeRows.length, nativeRows.length, 0)
 

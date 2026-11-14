@@ -155,3 +155,28 @@ test('a profile account stored by uuid survives a Mojang name change, and an old
   assert.equal(loadAccounts().length, 1)
   saveAccounts([])
 })
+
+// ---- no word from Microsoft at launch: play what does not need it, refuse what does ----
+
+test('with Microsoft unreachable a signed-in account still reaches the title screen, with a warning, and is not marked', async () => {
+  const soon = new Date(Date.now() + 60000).toISOString()
+  saveAccounts([{ ...msAccount('Away'), expiresAt: soon }])
+  createProfile('offl', { mc, account: 'Away' })
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () => { throw new TypeError('fetch failed') }
+  try {
+    const res = await launch('offl', { fakeJava, launchedBy: 'launcher' })
+    assert.deepEqual(res.account, { type: 'microsoft', name: 'Away' })
+    assert.ok(res.warnings.some((w) => /could not reach Microsoft/.test(w) && /saved one/.test(w)), res.warnings.join(' | '))
+    await stop('offl')
+    assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+    // an address out on the network checks the account: there the launch stops, with the code
+    await assert.rejects(launch('offl', { fakeJava, address: '127.0.0.1:25565', launchedBy: 'launcher' }), (err) => err.code === 'sign-in-unreachable')
+    assert.equal(status('offl').running, false)
+    assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  } finally {
+    globalThis.fetch = realFetch
+    try { await stop('offl') } catch { /* not running */ }
+    saveAccounts([])
+  }
+})

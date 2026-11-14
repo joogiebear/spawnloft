@@ -44,6 +44,11 @@ export function clientStateFile(name) {
   return path.join(clientRunDir(name), 'state.json')
 }
 
+// How the last game of this profile ended (client-launch.mjs), kept after state.json is gone.
+export function clientLastExit(name) {
+  return path.join(clientRunDir(name), 'last-exit.json')
+}
+
 export function clientLog(name) {
   return path.join(clientRunDir(name), 'client.log')
 }

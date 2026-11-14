@@ -23,7 +23,7 @@ const INDEX = JSON.stringify({ objects: { 'minecraft/sounds/a.ogg': { hash: body
 const indexSha = crypto.createHash('sha1').update(INDEX).digest('hex')
 const indexSize = INDEX.length
 
-const { PARALLEL, needsDownload, ensureVersion, extractNatives, materialiseAssets, assetTreeDir } = await import('../src/client-install.mjs')
+const { PARALLEL, needsDownload, needsFetch, openLedger, ensureVersion, extractNatives, materialiseAssets, assetTreeDir } = await import('../src/client-install.mjs')
 const { versionJson, versionDir, versionJar, LIBRARIES_DIR, ASSETS_DIR, nativesDir, logConfigPath } = await import('../src/client-paths.mjs')
 const { libraries, assetObjects } = await import('../src/client-meta.mjs')
 const { createZip } = await import('../src/zip.mjs')
@@ -406,4 +406,56 @@ test('a library path that would leave the libraries folder is refused (review N-
 
 test('an asset hash that is not a sha1 is refused before it becomes a path', () => {
   assert.throws(() => assetObjects({ objects: { 'a.ogg': { hash: '../../../x', size: 1 } } }), /malformed hash/)
+})
+
+// ---- the checked-files list: a file is hashed once, not on every launch ----
+
+test('a file that passed its hash is not read again while its size and time stand', async () => {
+  const { fetchImpl } = makeStub()
+  await ensureVersion(mc, { os: winOs, fetchImpl })
+  const row = libraries(fixture, { os: winOs }).find((r) => r.native === false)
+  const file = path.join(LIBRARIES_DIR, row.path)
+  // a time utimes can set again exactly, checked once so the list holds it
+  const at = new Date(Math.floor(Date.now() / 1000) * 1000 - 60000)
+  fs.utimesSync(file, at, at)
+  await ensureVersion(mc, { os: winOs, fetchImpl })
+  // same size, same time, other bytes: only reading it would tell, and a launch no longer reads it
+  fs.writeFileSync(file, 'X'.repeat(bodySize))
+  fs.utimesSync(file, at, at)
+  const quiet = makeStub()
+  assert.equal((await ensureVersion(mc, { os: winOs, fetchImpl: quiet.fetchImpl })).downloaded, 0)
+  assert.equal(quiet.calls.length, 0)
+  // a repair reads everything, finds it and fetches it again
+  const repair = makeStub()
+  assert.equal((await ensureVersion(mc, { os: winOs, fetchImpl: repair.fetchImpl, verify: true })).downloaded, 1)
+  assert.deepEqual(repair.calls, [row.url])
+  assert.equal(fs.readFileSync(file, 'utf8'), BODY)
+})
+
+test('a file touched since it was checked is hashed again, and a wrong one fetched', async () => {
+  const row = libraries(fixture, { os: winOs }).find((r) => r.native === false)
+  const file = path.join(LIBRARIES_DIR, row.path)
+  // touched, bytes unchanged: hashed, found right, nothing fetched
+  fs.utimesSync(file, new Date(), new Date(Date.now() + 5000))
+  const same = makeStub()
+  await ensureVersion(mc, { os: winOs, fetchImpl: same.fetchImpl })
+  assert.equal(same.calls.length, 0)
+  // changed, same size, a new time: hashed, found wrong, fetched
+  fs.writeFileSync(file, 'Y'.repeat(bodySize))
+  fs.utimesSync(file, new Date(), new Date(Date.now() + 9000))
+  const fixed = makeStub()
+  await ensureVersion(mc, { os: winOs, fetchImpl: fixed.fetchImpl })
+  assert.deepEqual(fixed.calls, [row.url])
+})
+
+test('needsFetch answers as needsDownload does, with and without the list', async () => {
+  const file = path.join(scratch, 'ledger-probe.bin')
+  assert.equal(await needsFetch(file, { sha1: bodySha, size: bodySize }), true, 'missing')
+  fs.writeFileSync(file, BODY)
+  const ledger = openLedger()
+  assert.equal(await needsFetch(file, { sha1: bodySha, size: bodySize }, ledger), false)
+  assert.equal(await needsFetch(file, { sha1: bodySha, size: bodySize + 1 }, ledger), true, 'another size')
+  assert.equal(await needsFetch(file, { sha1: 'f'.repeat(40), size: bodySize }, ledger), true, 'another hash is never taken from the list')
+  assert.equal(await needsFetch(file, {}, ledger), false, 'nothing to check it by')
+  assert.equal(needsDownload(file, { sha1: bodySha.toUpperCase(), size: bodySize }), false)
 })

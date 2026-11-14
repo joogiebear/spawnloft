@@ -127,3 +127,15 @@ test('a Fabric API dropped into mods/ by hand is used, and two copies are refuse
     globalThis.fetch = realFetch
   }
 })
+
+test('ensureFabricProfile: a profile file cut short is fetched again, not kept as done', async () => {
+  const id = fabricVersionId('1.21.11', '0.19.5')
+  const good = fs.readFileSync(versionJson(id), 'utf8')
+  fs.writeFileSync(versionJson(id), good.slice(0, 40))
+  let asked = 0
+  const fetchImpl = async () => { asked++; return JSON.parse(good) }
+  assert.equal(await ensureFabricProfile('1.21.11', '0.19.5', { fetchImpl }), id)
+  assert.equal(asked, 1)
+  assert.equal(JSON.parse(fs.readFileSync(versionJson(id), 'utf8')).id, id)
+  assert.deepEqual(fs.readdirSync(path.dirname(versionJson(id))).filter((f) => f.endsWith('.tmp')), [], 'no temp file is left')
+})

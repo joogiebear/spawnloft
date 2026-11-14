@@ -600,3 +600,32 @@ test('a refresh and a login interleaved: both accounts survive (the re-read-and-
   assert.equal(loadAccounts().find((a) => a.name === 'first').accessToken, 'mc-token')
   saveAccounts([])
 })
+
+// ---- a refresh that fails: Microsoft saying no, against not hearing from Microsoft ----
+
+test('a refresh that cannot reach Microsoft does not mark the account, and says so with a code', async () => {
+  const soon = new Date(now() + 60000).toISOString()
+  const entry = { type: 'microsoft', name: 'away', uuid: 'd'.repeat(32), accessToken: 'saved', expiresAt: soon, refreshToken: 'good', xuid: '', userType: 'msa', clientId: MSA_CLIENT_ID }
+  saveAccounts([entry])
+  const down = async () => { throw new TypeError('fetch failed') }
+  await assert.rejects(accountFor('away', { fetchImpl: down, now }), (err) => err.code === 'sign-in-unreachable' && /could not reach Microsoft/.test(err.message))
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined, 'a dropped connection is not a dead sign-in')
+  // Microsoft having a bad moment is the same
+  const busy = scripted([{ match(url) { assert.equal(url, TOKEN_URL) }, reply: { status: 503, json: {} } }])
+  await assert.rejects(accountFor('away', { fetchImpl: busy, now }), (err) => err.code === 'sign-in-unreachable')
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  // and so is Xbox not answering after Microsoft did
+  let calls = 0
+  const half = async (url, init) => {
+    assert.ok(init.signal instanceof AbortSignal, 'every request of a refresh is bounded')
+    if (calls++ === 0) return { ok: true, status: 200, json: async () => tokenReply }
+    throw new TypeError('fetch failed')
+  }
+  await assert.rejects(accountFor('away', { fetchImpl: half, now }), (err) => err.code === 'sign-in-unreachable')
+  assert.equal(loadAccounts()[0].refreshFailedAt, undefined)
+  // Microsoft refusing the refresh token is the one that marks it
+  const refused = scripted([{ match() {}, reply: { status: 400, json: { error: 'invalid_grant' } } }])
+  await assert.rejects(accountFor('away', { fetchImpl: refused, now }), (err) => err.code === 'sign-in-expired')
+  assert.equal(loadAccounts()[0].refreshFailedAt, new Date(now()).toISOString())
+  saveAccounts([])
+})

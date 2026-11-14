@@ -246,3 +246,53 @@ test('a launch that was cancelled does not start the game', async () => {
   const { stop } = await import('../src/client.mjs')
   await stop('halt')
 })
+
+// ---- a download that stops arriving, or is cut part way, is asked for again ----
+
+test('a download that stalls is given up after its quiet time, retried, and then fails with a code', async () => {
+  let asked = 0
+  const quiet = http.createServer((req, res) => {
+    asked++
+    res.writeHead(200, { 'content-length': 1024 })
+    res.write(Buffer.alloc(16, 1))
+    // and nothing more
+  })
+  await new Promise((resolve) => quiet.listen(0, '127.0.0.1', resolve))
+  const dest = path.join(scratch, 'stalled.bin')
+  const began = Date.now()
+  try {
+    await assert.rejects(
+      downloadFile(`http://127.0.0.1:${quiet.address().port}/x`, dest, { stallMs: 150, attempts: 2, retryDelayMs: 10, label: 'the stalled file' }),
+      (err) => err instanceof UserError && err.code === 'download-failed' && /nothing arrived/.test(err.message),
+    )
+  } finally {
+    quiet.closeAllConnections()
+    quiet.close()
+  }
+  assert.equal(asked, 2)
+  assert.ok(Date.now() - began < 5000, 'it did not wait for ever')
+  assert.ok(!fs.existsSync(dest))
+  assert.deepEqual(fs.readdirSync(scratch).filter((f) => f.endsWith('.part')), [], 'no half file is left')
+})
+
+test('a download cut part way succeeds on the second ask', async () => {
+  let asked = 0
+  const body = Buffer.alloc(4096, 7)
+  const flaky = http.createServer((req, res) => {
+    asked++
+    res.writeHead(200, { 'content-length': body.length })
+    if (asked === 1) { res.write(body.subarray(0, 100)); setTimeout(() => res.destroy(), 20); return }
+    res.end(body)
+  })
+  await new Promise((resolve) => flaky.listen(0, '127.0.0.1', resolve))
+  const dest = path.join(scratch, 'flaky.bin')
+  try {
+    const out = await downloadFile(`http://127.0.0.1:${flaky.address().port}/x`, dest, { retryDelayMs: 10 })
+    assert.equal(out.size, body.length)
+  } finally {
+    flaky.closeAllConnections()
+    flaky.close()
+  }
+  assert.equal(asked, 2)
+  assert.deepEqual(fs.readFileSync(dest), body)
+})

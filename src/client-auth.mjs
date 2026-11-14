@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 
 import { ACCOUNTS_FILE } from './client-paths.mjs'
-import { fail, readJson, writeJson, PRIVATE_FILE_MODE, sleep } from './util.mjs'
+import { fail, readJson, writeJson, PRIVATE_FILE_MODE, sleep, UserError } from './util.mjs'
 
 export function offlineUuid(name) {
   const bytes = crypto.createHash('md5').update('OfflinePlayer:' + name, 'utf8').digest()
@@ -241,15 +241,37 @@ export async function finishBrowserLogin({ code, verifier, redirectUri, fetchImp
 
 const STEP_TIMEOUT_MS = 30_000
 
+// Two ways a refresh ends without a token, told apart by `code`, because they call for opposite
+// things: 'sign-in-expired' is Microsoft saying this sign-in is over (sign in again), and
+// 'sign-in-unreachable' is not hearing from Microsoft at all, or hearing that it is having a bad
+// moment (wait and try again; the saved sign-in is as good as it was). Every request is bounded:
+// a hung connection must not hold a launch.
 export async function refreshAccount(account, { fetchImpl = fetch, now = Date.now } = {}) {
+  const unreachable = () => fail(`could not reach Microsoft to renew the sign-in for ${account.name}; check the internet connection and try again`, 'sign-in-unreachable')
+  const timed = (url, init) => fetchImpl(url, { ...init, signal: AbortSignal.timeout(STEP_TIMEOUT_MS) })
   const body = new URLSearchParams({ grant_type: 'refresh_token', client_id: MSA_CLIENT_ID, refresh_token: account.refreshToken, scope: SCOPES }).toString()
-  const res = await fetchImpl(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  let res
+  try {
+    res = await timed(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  } catch {
+    unreachable()
+  }
   const json = await bodyOf(res)
   if (!res.ok || !json.access_token) {
-    fail(`the saved sign-in for ${account.name} no longer works; run spawnloft client login again`)
+    if (res.status >= 500 || res.status === 429 || res.status === 408) {
+      fail(`Microsoft's sign-in server could not renew the sign-in for ${account.name} just now (HTTP ${res.status}); try again in a few minutes`, 'sign-in-unreachable')
+    }
+    fail(`the saved sign-in for ${account.name} no longer works; run spawnloft client login again`, 'sign-in-expired')
   }
   const refreshToken = json.refresh_token ?? account.refreshToken
-  return minecraftFromMicrosoft(json.access_token, refreshToken, { fetchImpl, now })
+  try {
+    return await minecraftFromMicrosoft(json.access_token, refreshToken, { fetchImpl: timed, now })
+  } catch (err) {
+    // Xbox's and Minecraft's own refusals are already sentences; a request that never got an
+    // answer is the connection again
+    if (!(err instanceof UserError)) unreachable()
+    throw err
+  }
 }
 
 export function loadAccounts() {
@@ -385,6 +407,10 @@ export async function accountFor(selector, { fetchImpl = fetch, now = Date.now }
     try {
       refreshed = await refreshAccount(account, { fetchImpl, now })
     } catch (err) {
+      // Only Microsoft saying the sign-in is over marks the account. A launch with the network
+      // down, or Xbox answering 503, used to mark it too, and Play then stayed greyed with "sign
+      // in again" long after the connection was back.
+      if (err?.code !== 'sign-in-expired') throw err
       // Marked on the entry (a time, no token values) so the accounts page can say "sign in
       // again"; a later login or refresh replaces the entry and clears it. The mark must not
       // hide the real error when the file cannot be written.
