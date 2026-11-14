@@ -39,6 +39,7 @@ test('the block comes before the page\'s first request', () => {
 // a page with nothing but what the block uses
 function page({ answer, parent = null }) {
   const appended = []
+  const dialogs = [{ open: true, close() { this.open = false } }]
   const listeners = []
   const requests = []
   class FakeEventSource {
@@ -67,6 +68,8 @@ function page({ answer, parent = null }) {
     body: { children: [{ inert: false }, { inert: false }], append: (n) => appended.push(n) },
     documentElement: {},
     getElementById: (id) => appended.find((n) => n.id === id) ?? null,
+    // a dialog that was open when the notice came
+    querySelectorAll: (sel) => (sel === 'dialog[open]' ? dialogs : []),
     createElement: el,
     addEventListener: (...a) => listeners.push(a),
   }
@@ -87,7 +90,7 @@ function page({ answer, parent = null }) {
   const location = { origin: 'http://127.0.0.1:9' }
   const run = new Function('window', 'document', 'location', `${block('ui.html')}\nreturn panelSession`)
   const session = run(window, document, location)
-  return { window, document, appended, requests, session, FakeEventSource }
+  return { window, document, appended, dialogs, requests, session, FakeEventSource }
 }
 
 const settled = (promise, ms = 30) => Promise.race([promise.then(() => 'settled', () => 'settled'), new Promise((r) => setTimeout(() => r('pending'), ms))])
@@ -110,6 +113,7 @@ test('a 401 with code "auth" ends the session: one notice, streams closed, no mo
   // what is behind the notice is out of reach, and focus is on the notice
   assert.deepEqual(p.document.body.children.map((c) => c.inert), [true, true])
   assert.equal(p.appended[0].children[0].focused, true)
+  assert.equal(p.dialogs[0].open, false, 'a dialog on top of the notice is closed')
 
   const sent = p.requests.length
   assert.equal(await settled(p.window.fetch('/api/overview')), 'pending')

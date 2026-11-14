@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 
 import { fetchJson, downloadFile } from './download.mjs'
 import { versionJson, versionDir } from './client-paths.mjs'
-import { fail, safeRelativePath, renameOver, writeAtomic } from './util.mjs'
+import { fail, safeRelativePath, writeAtomic } from './util.mjs'
 
 export const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
 export const RESOURCES_URL = 'https://resources.download.minecraft.net'

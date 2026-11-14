@@ -695,6 +695,8 @@
       // nothing behind the notice works any more: it is taken out of reach of Tab and of screen
       // readers, and focus goes to the notice (to its button, where it has one)
       const host = document.body || document.documentElement;
+      // an open dialog would stay on top of the notice and keep it out of reach
+      for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* not a dialog that closes */ } }
       for (const el of host.children) el.inert = true;
       host.append(box);
       card.tabIndex = -1;
@@ -1433,11 +1435,16 @@
   // Read aloud by a screen reader: politely, or at once for a problem. The text is cleared
   // first so that the same words said twice (the same failure, a second time) are read twice.
   function say(text, urgent = false) {
-    const el = $(urgent ? 'sayNow' : 'say')
+    const id = urgent ? 'sayNow' : 'say'
+    const el = $(id)
     if (!el) return
+    // two things to say within the moment are said together, not the second over the first
+    saying[id].text = saying[id].text ? `${saying[id].text} ${text}` : text
     el.textContent = ''
-    setTimeout(() => { el.textContent = text }, 60)
+    clearTimeout(saying[id].timer)
+    saying[id].timer = setTimeout(() => { el.textContent = saying[id].text; saying[id].text = '' }, 60)
   }
+  const saying = { say: { text: '', timer: 0 }, sayNow: { text: '', timer: 0 } }
 
   // What changed on the page that someone not looking at it should hear, worked out after each
   // rebuild: a notice that was not there before, the reason Play is held back, the step a launch
@@ -1456,6 +1463,9 @@
 
   let wasSaid = { notices: [], why: '', step: '', running: false, pick: null }
   function announce() {
+    // while the panel cannot be reached the page says so itself; what stood before is not new
+    // when it comes back
+    if (S.down) return
     const p = S.summary && !S.down ? currentProfile() : null
     const job = S.job && !S.job.done ? S.job : null
     const now = {
@@ -3466,7 +3476,11 @@
   // so does the keyboard leaving it: Tab out of a menu, and it is not left open behind the focus
   document.addEventListener('focusin', (e) => {
     if (!S.menu || !e.target.isConnected) return
-    if (!(e.target.closest?.('[data-menu]')?.dataset.menu ?? '').split(' ').includes(S.menu)) closeMenu()
+    // only when focus was in the menu and left it: a rebuild that puts focus back where it was,
+    // or a menu the page opened by itself, comes from elsewhere and closes nothing
+    const menuOf = (el) => (el?.closest?.('[data-menu]')?.dataset.menu ?? '').split(' ')
+    if (!menuOf(e.relatedTarget).includes(S.menu)) return
+    if (!menuOf(e.target).includes(S.menu)) closeMenu()
   })
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return

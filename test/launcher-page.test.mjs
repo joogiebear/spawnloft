@@ -1135,11 +1135,73 @@ test('another setup launching is named, with a way to it', () => {
 test('good news goes by itself, a menu closes when focus leaves it, and the panel hears of the sheet', () => {
   assert.match(html, /const FLASH_MS = 8000/)
   assert.match(fnSource('pollOnce'), /FLASH_MS && !document\.activeElement\?\.closest\?\.\('\.notice'\)/)
-  assert.match(html, /addEventListener\('focusin'[\s\S]{0,260}closeMenu\(\)/)
   assert.match(fnSource('tellPanel'), /modal: Boolean\(S\.sheet && !S\.down\)/)
   const ui = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
-  assert.match(ui, /lockBehindPlay\(d\.modal === true\)/)
+  assert.match(ui, /lockBehindPlay\.on = d\.modal === true/)
+  // the lock follows the Play page: leaving it, or a new page in the frame, lets go
+  {
+    const header = { inert: false }
+    const side = { inert: false }
+    const vPlay = { offsetParent: {} }
+    const classes = new Set()
+    const doc = { body: { classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } }, querySelector: () => header }
+    const at = ui.indexOf('function lockBehindPlay()')
+    const lock = new Function('document', '$', `${ui.slice(at, ui.indexOf('\n}', at) + 2)}\nreturn lockBehindPlay`)(doc, (sel) => (sel === '#vPlay' ? vPlay : side))
+    lock.on = true
+    lock()
+    assert.deepEqual([header.inert, side.inert, classes.has('play-modal')], [true, true, true])
+    vPlay.offsetParent = null
+    lock()
+    assert.deepEqual([header.inert, side.inert, classes.has('play-modal')], [false, false, false])
+    vPlay.offsetParent = {}
+    lock()
+    assert.equal(header.inert, true, 'back on the Play page with the sheet still open')
+    lock.on = false
+    lock()
+    assert.equal(header.inert, false)
+  }
+  assert.match(ui, /function show\(view\) \{[\s\S]{0,400}lockBehindPlay\(\)/)
   assert.match(ui, /el\.inert = locked/)
   // no words left from the Electron window
   assert.ok(!/Electron/.test(html))
+})
+
+test('a menu closes only when focus was in it and left: a rebuild or a menu the page opened closes nothing', () => {
+  const at = html.indexOf("document.addEventListener('focusin'")
+  const src = html.slice(at, html.indexOf('\n  })', at) + 5)
+  let handler = null
+  let closed = 0
+  const S = { menu: 'ask' }
+  new Function('document', 'S', 'closeMenu', src)({ addEventListener: (kind, fn) => { handler = fn } }, S, () => { closed++ })
+  const el = (menu) => ({ isConnected: true, closest: () => (menu ? { dataset: { menu } } : null) })
+  // render() putting focus back on the address field as the question opens: from nowhere
+  handler({ target: el(null), relatedTarget: null })
+  // focus that was outside the menu and stays outside
+  handler({ target: el(null), relatedTarget: el(null) })
+  // moving about inside the menu, whose host can carry two names
+  handler({ target: el('ask account'), relatedTarget: el('ask') })
+  assert.equal(closed, 0)
+  // Tab out of it
+  handler({ target: el(null), relatedTarget: el('ask') })
+  assert.equal(closed, 1)
+  S.menu = null
+  handler({ target: el(null), relatedTarget: el('ask') })
+  assert.equal(closed, 1)
+})
+
+test('two things said in the same moment are said together, and nothing is said while the panel is down', async () => {
+  const at = html.indexOf('const saying = {')
+  const region = { say: { textContent: 'old' }, sayNow: { textContent: '' } }
+  const { say } = new Function('$', `${fnSource('say')}\n${html.slice(at, html.indexOf('\n', at))}\nreturn { say }`)((id) => region[id])
+  say('First thing.')
+  say('Second thing.')
+  say('A fault.', true)
+  assert.equal(region.say.textContent, '')
+  await new Promise((r) => setTimeout(r, 120))
+  assert.equal(region.say.textContent, 'First thing. Second thing.')
+  assert.equal(region.sayNow.textContent, 'A fault.')
+  say('Third.')
+  await new Promise((r) => setTimeout(r, 120))
+  assert.equal(region.say.textContent, 'Third.')
+  assert.match(fnSource('announce'), /if \(S\.down\) return/)
 })
