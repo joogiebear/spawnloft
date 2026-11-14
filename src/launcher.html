@@ -277,6 +277,7 @@
   code, .mono { font: var(--type-mono); font-size: var(--t-2); }
   .grow { flex: 1; }
   .hint { font: var(--type-meta); color: var(--ink-3); }
+  .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
   .label { font: var(--type-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-3); }
 
   button, select, input {
@@ -427,7 +428,7 @@
   .eyebrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: calc(var(--s-2) - var(--s-5)); font: var(--type-card); color: var(--ink-2); }
   .eyebrow .hint { font: var(--type-card); color: var(--ink-2); }
 
-  .does { font: var(--type-body); font-size: clamp(var(--t-4), .85vw, 18px); color: var(--ink-2); text-align: center; }
+  .does { font: var(--type-body); font-size: var(--t-4); color: var(--ink-2); text-align: center; }
   .does b { color: var(--ink); font-weight: 600; }
   .why { display: flex; gap: var(--s-2); align-items: flex-start; font: var(--type-body); font-size: var(--t-4); color: var(--warn-ink); justify-content: center; }
   .why .ico { margin-top: .3em; }
@@ -481,9 +482,9 @@
   .waiting .acts { display: flex; gap: var(--s-3); align-items: center; margin-left: auto; }
 
   /* a launch under way, or a game running: a well in the button's place, at the button's weight */
-  .prog { display: grid; gap: var(--s-3); min-height: clamp(72px, 4.2vw, 100px); padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--recess); box-shadow: var(--lift); }
+  .prog { display: grid; gap: var(--s-3); min-height: 84px; padding: var(--s-5); border: 1px solid var(--line); border-radius: var(--r); background: var(--recess); box-shadow: var(--lift); }
   .prog .line { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
-  .prog .line > b { font: 650 clamp(var(--t-5), 1.1vw, 22px)/1.2 var(--display); letter-spacing: -.01em; }
+  .prog .line > b { font: 650 var(--t-5)/1.2 var(--display); letter-spacing: -.01em; }
   .prog .line .hint { margin-left: auto; }
   .prog > .hint { font-size: var(--t-3); }
   .bar { height: 10px; border-radius: 999px; background: var(--sunken); border: 1px solid var(--line-soft); overflow: hidden; }
@@ -619,6 +620,10 @@
   </header>
   <main class="stage" id="stage"></main>
   <div id="sheet"></div>
+  <!-- what the page says aloud: these two stay put while everything above is rebuilt, so a
+       notice is read once when it appears and not again at every rebuild -->
+  <div class="sr" id="say" role="status" aria-live="polite"></div>
+  <div class="sr" id="sayNow" role="alert"></div>
 </div>
 
 <script>
@@ -643,6 +648,15 @@
 
     function notice() {
       if (document.getElementById('sessionEnded')) return;
+      // A page in a frame of the panel (the Play page) leaves the notice to the panel around it,
+      // so there is one notice and not two stacked. The panel is asked something, which ends
+      // its session the same way if it had not noticed yet.
+      try {
+        if (window.parent !== window && window.parent.location.origin === location.origin && typeof window.parent.fetch === 'function') {
+          window.parent.fetch('/api/appearance', { cache: 'no-store' }).catch(() => {});
+          return;
+        }
+      } catch (err) { /* a parent of another origin is not the panel: the notice shows here */ }
       const box = document.createElement('div');
       box.id = 'sessionEnded';
       box.setAttribute('role', 'alertdialog');
@@ -678,7 +692,13 @@
         text.append(cmd, ' for a new sign-in link.');
       }
       box.append(card);
-      (document.body || document.documentElement).append(box);
+      // nothing behind the notice works any more: it is taken out of reach of Tab and of screen
+      // readers, and focus goes to the notice (to its button, where it has one)
+      const host = document.body || document.documentElement;
+      for (const el of host.children) el.inert = true;
+      host.append(box);
+      card.tabIndex = -1;
+      if (!card.querySelector('button')) card.focus();
     }
 
     function end() {
@@ -751,6 +771,8 @@
   const LOG_SCAN = 200
   // a crash the panel recorded while this page was closed is still told, this long after
   const CRASH_REPLAY_MS = 12 * 60 * 60 * 1000
+  // how long a notice of something that went well stays before it goes by itself
+  const FLASH_MS = 8000
   // the memory segments; anything else is Custom, a slider in half-gigabyte steps
   const MEMORY_CHOICES = ['2G', '4G', '8G']
   // the version list shows this many rows; the rest are reached by typing
@@ -763,12 +785,14 @@
   // per profile, where Join pointed last: { server } or { address }; nothing is the title screen
   const JOIN_KEY = 'spawnloft.launcher.join'
   const STEPS = ['Version', 'Java', 'Files', 'Server', 'Start']
+  // the same steps as a screen reader hears them
+  const STEP_SAID = ['reading the version', 'finding Java', 'getting the game\'s files', 'starting the server', 'starting the game']
   // the all-versions plan's strict-mode codes: the version itself is refused, not this launch
   const STRICT_CODES = ['unknown-variable', 'unknown-rule-key', 'newer-launcher-format', 'unknown-asset-layout', 'no-natives-for-this-machine']
   const HOSTNAME_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/
   const LEVEL_RE = /\b(WARN|ERROR|FATAL)\b/
   // the desktop app's bridge; null in a browser tab
-  // Embedded in the panel, the Tauri bridge exists only on the parent frame; Electron injects its own here.
+  // Embedded in the panel, the bridge exists only on the parent frame; the launcher window has its own.
   const desktop = window.spawnloftDesktop ?? (() => {
     try { return window.self !== window.top ? window.parent.spawnloftDesktop ?? null : null } catch { return null }
   })()
@@ -993,7 +1017,7 @@
     if (c.machineRefusal) return { reason: ['Minecraft can\'t be launched on this computer: ', sentence(c.machineRefusal).replace(/\.?$/, '.')], fix: [] }
     if (c.refusal) return { reason: [sentence(c.refusal).replace(/\.?$/, '.')], fix: ['edit'] }
     if (c.busy) return { reason: ['Another launch of this setup is already under way. Play unlocks when it finishes.'], fix: [] }
-    if (c.otherJob) return { reason: ['Another setup is launching. Play unlocks when it finishes.'], fix: [] }
+    if (c.otherJob) return { reason: [{ b: c.otherJobName ?? 'Another setup' }, ' is launching. Play unlocks when it finishes.'], fix: c.otherJobName ? ['show-launching'] : [] }
     const own = Boolean(c.profile.account)
     if (c.acct.missing) return { reason: ['This setup plays as ', { b: c.acct.name }, ', who is no longer signed in.'], fix: ['pick-account', 'sign-in'] }
     if (c.acct.expired) return { reason: [own ? 'This setup plays as ' : 'You play as ', { b: c.acct.name }, ', whose saved sign-in no longer works.'], fix: ['sign-in-again', own ? 'pick-account' : 'switch-account'] }
@@ -1397,11 +1421,56 @@
   // { tone: 'fault' | 'warn' | 'live' | '', title, text, acts: [nodes], onclose, extra: node }
   function notice({ tone = '', title, text, acts = [], onclose, extra }) {
     const icon = tone === 'fault' ? 'alert' : tone === 'live' ? 'check' : 'info'
-    return h('div', { class: `notice ${tone}`.trim(), role: tone === 'fault' ? 'alert' : 'status' }, ico(icon),
+    // no live role of its own: it is rebuilt with the page, and would be read again each time.
+    // announce() reads a notice once, when it first shows.
+    return h('div', { class: `notice ${tone}`.trim(), role: 'group', 'aria-label': tone === 'fault' ? 'Problem' : 'Notice' }, ico(icon),
       h('div', { class: 'body' }, h('b', { text: title }), text && h('span', { text })),
       (acts.length || onclose) && h('div', { class: 'acts' }, acts,
         onclose && h('button', { class: 'sm quiet icon', 'aria-label': 'Dismiss', onclick: onclose }, ico('x'))),
       extra)
+  }
+
+  // Read aloud by a screen reader: politely, or at once for a problem. The text is cleared
+  // first so that the same words said twice (the same failure, a second time) are read twice.
+  function say(text, urgent = false) {
+    const el = $(urgent ? 'sayNow' : 'say')
+    if (!el) return
+    el.textContent = ''
+    setTimeout(() => { el.textContent = text }, 60)
+  }
+
+  // What changed on the page that someone not looking at it should hear, worked out after each
+  // rebuild: a notice that was not there before, the reason Play is held back, the step a launch
+  // has reached (the step, not each percent), a game that started, and the setup now in view.
+  // `was` is what the last rebuild had; answers { polite, urgent } and the new `was`.
+  function spoken(was, now) {
+    const polite = []
+    const urgent = []
+    for (const n of now.notices) if (!was.notices.some((o) => o.text === n.text)) (n.fault ? urgent : polite).push(n.text)
+    if (now.why && now.why !== was.why) polite.push(now.why)
+    if (now.step && now.step !== was.step) polite.push(now.step)
+    if (now.running && !was.running && was.pick === now.pick) polite.push('Minecraft is running.')
+    if (now.pick && was.pick && now.pick !== was.pick) polite.unshift(`${now.pickName} selected.`)
+    return { polite: polite.join(' '), urgent: urgent.join(' ') }
+  }
+
+  let wasSaid = { notices: [], why: '', step: '', running: false, pick: null }
+  function announce() {
+    const p = S.summary && !S.down ? currentProfile() : null
+    const job = S.job && !S.job.done ? S.job : null
+    const now = {
+      notices: [...document.querySelectorAll('.notice')].map((n) => ({ text: [...n.querySelectorAll('.body > *')].map((x) => x.textContent.trim()).filter(Boolean).join(' '), fault: n.classList.contains('fault') })),
+      why: $('why')?.textContent ?? '',
+      // the step, not its words, which change with every file counted
+      step: job ? `Launching ${setupName(profileNamed(job.profile) ?? { name: job.profile, mc: '' })}: ${STEP_SAID[stepOf(job.stage)] ?? 'getting ready'}.` : '',
+      running: Boolean(p?.running),
+      pick: p?.name ?? null,
+      pickName: p ? setupName(p) : '',
+    }
+    const out = spoken(wasSaid, now)
+    wasSaid = now
+    if (out.urgent) say(out.urgent, true)
+    if (out.polite) say(out.polite)
   }
 
   const sk = (style) => h('div', { class: 'sk', style })
@@ -1623,7 +1692,8 @@
   let loadedOnce = false
   function tellPanel() {
     if (window.parent === window) return
-    const state = { type: 'spawnloft-play-state', launching: S.job && !S.job.done ? S.job.profile : null, running: (S.summary?.profiles ?? []).filter((q) => q.running).map((q) => q.name) }
+    // modal: the setup sheet is open, and the panel around this frame dims and locks itself
+    const state = { type: 'spawnloft-play-state', launching: S.job && !S.job.done ? S.job.profile : null, running: (S.summary?.profiles ?? []).filter((q) => q.running).map((q) => q.name), modal: Boolean(S.sheet && !S.down) }
     const key = JSON.stringify(state)
     if (key === toldPanel) return
     toldPanel = key
@@ -1665,6 +1735,7 @@
       logNow.scrollTop = logAt && !logAt.end ? logAt.top : logNow.scrollHeight
       if (logAt) logNow.scrollLeft = logAt.left
     }
+    announce()
   }
 
   // ---- the account chip and its menu -----------------------------------------------------------
@@ -1755,7 +1826,6 @@
   }
 
   function waitingStrip(login) {
-    const where = desktop?.openMicrosoftLogin ? 'the window that opened. It closes itself.' : 'the tab that opened, then come back here.'
     if (login.external && login.status !== 'finishing') {
       return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
         h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
@@ -1766,10 +1836,9 @@
     }
     return h('div', { class: 'waiting', role: 'status' }, h('span', { class: 'spin' }),
       h('span', { class: 'grow' }, h('b', { text: 'Waiting for Microsoft… ' }),
-        login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in window did not open, maybe because of a pop-up blocker. ' : `Finish signing in in ${where}`,
+        login.status === 'finishing' ? 'Microsoft is done; finishing the sign-in with Xbox and Minecraft.' : login.blocked ? 'The sign-in tab did not open, maybe because of a pop-up blocker. ' : 'Finish signing in in the tab that opened, then come back here.',
         login.blocked && h('a', { href: login.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open Microsoft\'s sign-in page')),
       h('span', { class: 'acts' },
-        desktop?.openExternal && !login.blocked && !login.external && login.status !== 'finishing' && h('button', { class: 'linkbtn', onclick: () => desktop.openExternal(login.url) }, 'Sign in in your browser instead'),
         login.status !== 'finishing' && h('button', { class: 'sm', onclick: () => cancelLogin(login) }, 'Cancel')))
   }
 
@@ -1802,7 +1871,7 @@
     else if (state.kind === 'running') kids.push(runningCard(p))
     else {
       kids.push(playButton(p, plan))
-      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why', role: 'status' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
+      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
       else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
     }
     kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
@@ -1846,6 +1915,7 @@
     if (fix === 'switch-account') return link('pick another account', () => openMenu('account'))
     if (fix === 'title-screen') return link('play on the title screen', () => { setTarget(p, {}); render(); $('play')?.focus({ preventScroll: true }) })
     if (fix === 'edit') return link('pick another version', () => openSheet(p, null, 'fMc'))
+    if (fix === 'show-launching') return link('show it', () => { if (S.job) pickProfile(S.job.profile); render(); $('cancelLaunch')?.focus({ preventScroll: true }) })
     // a setup of the server's version: one that exists is picked, else the New sheet opens for it
     if (fix === 'other-setup' && other) return link(`use a ${other.mc} setup`, () => takePrefill({ mc: other.mc, server: other.server }))
     if (fix === 'anyway' && other) return link('play anyway if the server takes other versions', () => { setTarget(p, { server: other.server, anyway: other.server }); render(); $('play')?.focus({ preventScroll: true }) })
@@ -1950,6 +2020,7 @@
       machineRefusal: S.summary.machineRefusal,
       busy: Boolean(S.notice?.busy && S.notice.profile === p.name),
       otherJob: Boolean(S.job && !job),
+      otherJobName: S.job && !job && profileNamed(S.job.profile) ? setupName(profileNamed(S.job.profile)) : null,
       refusal: S.refusals[p.name]?.message ?? null,
       crashed: S.crash?.profile === p.name && !S.crash.pending,
     })
@@ -2133,20 +2204,23 @@
     const shown = STEPS.map((name, i) => ({ name, i })).filter((s) => s.name !== 'Server' || job.startsServer)
     return [
       h('div', { class: 'eyebrow' }, pill('accent', 'Launching', true)),
-      h('div', { class: 'prog', 'aria-live': 'polite' },
+      // not a live region: every counted file would be read out. announce() says each new step once.
+      h('div', { class: 'prog' },
         h('div', { class: 'line' }, h('b', { text: stepOf(job.stage) === -1 && !job.message ? 'Preparing…' : headline }), facts && h('span', { class: 'hint', text: facts })),
-        h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null },
+        h('div', { class: job.percent === null || job.percent === undefined ? 'bar indet' : 'bar', role: 'progressbar', 'aria-label': 'Launch progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': job.percent ?? null, 'aria-valuetext': job.percent === null || job.percent === undefined ? headline : null },
           h('i', { style: job.percent === null || job.percent === undefined ? null : `width:${Math.max(2, job.percent)}%` })),
-        h('div', { class: 'steps' }, shown.map((s) => {
+        // which steps are done and which one it is on, in words too, not by colour and a dot alone
+        h('div', { class: 'steps', role: 'list', 'aria-label': 'Steps of the launch' }, shown.map((s) => {
           const now = stepOf(job.stage)
-          if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done' }, ico('check'), s.name)
-          if (s.i === now) return h('span', { class: 'step now' }, '● ' + s.name)
-          return h('span', { class: 'step' }, s.name)
+          if (s.i < now || (s.i <= job.reached && s.i !== now)) return h('span', { class: 'step done', role: 'listitem' }, ico('check'), s.name, h('span', { class: 'sr', text: ', done' }))
+          if (s.i === now) return h('span', { class: 'step now', role: 'listitem', 'aria-current': 'step' }, h('span', { 'aria-hidden': 'true', text: '● ' }), s.name)
+          return h('span', { class: 'step', role: 'listitem' }, s.name)
         })),
         // the one thing to do while it runs; once the game itself is starting there is nothing left to cancel
         h('div', { class: 'runrow' },
           h('button', { id: 'cancelLaunch', disabled: Boolean(job.cancelling) || stepOf(job.stage) >= 4, onclick: () => cancelLaunch(job) }, job.cancelling ? 'Cancelling…' : 'Cancel')),
-        h('p', { class: 'hint', text: `${CLOSING} does not stop the download. It keeps going and the files are used next time. Cancel stops it; what is already downloaded is kept.` })),
+        // once the game itself is starting there is no download left to speak of
+        h('p', { class: 'hint', text: stepOf(job.stage) >= 4 ? 'The game is starting. Its window opens in a moment.' : `${CLOSING} does not stop the download. It keeps going and the files are used next time. Cancel stops it; what is already downloaded is kept.` })),
     ]
   }
 
@@ -3181,6 +3255,9 @@
     }
     if (S.menu !== 'ask') S.menu = 'account'
     refresh()
+    // the menu opened by itself to say how the sign-in went: focus goes to it, so it is not a
+    // menu left open somewhere the keyboard is not
+    if (S.menu === 'account' && !S.sheet && !$('menuAccount')?.contains(document.activeElement)) $('chip')?.focus({ preventScroll: true })
   }
 
   // Make an account the one this launcher plays as, then play `profile`.
@@ -3303,9 +3380,16 @@
     const asked = S.stopAsk && !profileNamed(S.stopAsk)?.running
     if (asked) S.stopAsk = null
     if (S.notice?.busy && Date.now() - (S.notice.at ?? 0) > 30000) S.notice = null
+    // "Saved", "Made a copy": good news goes by itself after a while, unless it is being read
+    // with the keyboard. A warning or a fault stays until it is dismissed.
+    if (S.flash) {
+      S.flash.at ??= Date.now()
+      const passing = S.flash.tone === 'live' || !S.flash.tone
+      if (passing && Date.now() - S.flash.at > FLASH_MS && !document.activeElement?.closest?.('.notice')) S.flash = null
+    }
     // the minute, while a game runs: "for 12 minutes" moves on though nothing else changed
     const minute = profilesNow().some((p) => p.running) ? Math.floor(Date.now() / 60000) : 0
-    const key = JSON.stringify([S.summary, S.down, S.downWhy, S.log, S.live, minute, S.notice, S.crash && { ...S.crash }])
+    const key = JSON.stringify([S.summary, S.down, S.downWhy, S.log, S.live, minute, S.notice, Boolean(S.flash), S.crash && { ...S.crash }])
     // lines being selected in a log are left alone: rebuilding the page would drop the selection,
     // and selecting is the way to copy when Copy cannot. The read after it is let go shows the rest.
     if (key !== lastKey && !selectingLog()) {
@@ -3378,6 +3462,11 @@
   document.addEventListener('click', (e) => {
     if (!S.menu || !e.target.isConnected) return
     if (!(e.target.closest('[data-menu]')?.dataset.menu ?? '').split(' ').includes(S.menu)) closeMenu()
+  })
+  // so does the keyboard leaving it: Tab out of a menu, and it is not left open behind the focus
+  document.addEventListener('focusin', (e) => {
+    if (!S.menu || !e.target.isConnected) return
+    if (!(e.target.closest?.('[data-menu]')?.dataset.menu ?? '').split(' ').includes(S.menu)) closeMenu()
   })
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return

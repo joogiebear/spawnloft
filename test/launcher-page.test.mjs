@@ -1095,3 +1095,51 @@ test('accounts: signing out asks first, the offline name has a label and is chec
   assert.match(menu, /offlineField\('offName', 'Add'/)
   assert.match(fnSource('askMenu'), /offlineField\('askName', 'Play'/)
 })
+
+test('what is read aloud: new notices, the step of a launch, the setup in view; nothing twice', () => {
+  const { spoken } = lifted(['spoken'])
+  const none = { notices: [], why: '', step: '', running: false, pick: 'a', pickName: 'A' }
+  assert.deepEqual(spoken(none, none), { polite: '', urgent: '' })
+  // a fault at once, good news politely, and neither again while it stays on the page
+  const fault = { ...none, notices: [{ text: 'Minecraft crashed.', fault: true }, { text: 'Saved.', fault: false }] }
+  assert.deepEqual(spoken(none, fault), { polite: 'Saved.', urgent: 'Minecraft crashed.' })
+  assert.deepEqual(spoken(fault, fault), { polite: '', urgent: '' })
+  // the step once, not each percent of it
+  const step = { ...none, step: 'Launching A: finding Java.' }
+  assert.equal(spoken(none, step).polite, 'Launching A: finding Java.')
+  assert.equal(spoken(step, step).polite, '')
+  // a game that started, but not one that was running in a setup just switched to
+  assert.equal(spoken(none, { ...none, running: true }).polite, 'Minecraft is running.')
+  assert.equal(spoken(none, { ...none, running: true, pick: 'b', pickName: 'B' }).polite, 'B selected.')
+  assert.equal(spoken(none, { ...none, pick: 'b', pickName: 'B', why: 'Sign in to play.' }).polite, 'B selected. Sign in to play.')
+  // the first rebuild has no setup before it: nothing is "selected"
+  assert.equal(spoken({ ...none, pick: null }, none).polite, '')
+})
+
+test('the page has one polite and one urgent live region, and notices are not alerts themselves', () => {
+  assert.match(html, /id="say"[^>]*aria-live="polite"/)
+  assert.match(html, /id="sayNow"[^>]*role="alert"/)
+  const notice = fnSource('notice')
+  assert.ok(!/role: '(alert|status)'/.test(notice), 'a notice is a group: the live regions speak for it')
+  assert.match(fnSource('render'), /announce\(\)/)
+})
+
+test('another setup launching is named, with a way to it', () => {
+  const { blockReason } = lifted(['STRICT_CODES', 'sentence', 'blockReason'])
+  const c = { profile: { name: 'a' }, acct: { name: 'x', type: 'offline' }, otherJob: true }
+  assert.deepEqual(blockReason({ ...c, otherJobName: 'Fabric 1.21' }).fix, ['show-launching'])
+  assert.deepEqual(blockReason({ ...c, otherJobName: 'Fabric 1.21' }).reason[0], { b: 'Fabric 1.21' })
+  assert.deepEqual(blockReason(c).fix, [])
+})
+
+test('good news goes by itself, a menu closes when focus leaves it, and the panel hears of the sheet', () => {
+  assert.match(html, /const FLASH_MS = 8000/)
+  assert.match(fnSource('pollOnce'), /FLASH_MS && !document\.activeElement\?\.closest\?\.\('\.notice'\)/)
+  assert.match(html, /addEventListener\('focusin'[\s\S]{0,260}closeMenu\(\)/)
+  assert.match(fnSource('tellPanel'), /modal: Boolean\(S\.sheet && !S\.down\)/)
+  const ui = fs.readFileSync(new URL('../src/ui.html', import.meta.url), 'utf8')
+  assert.match(ui, /lockBehindPlay\(d\.modal === true\)/)
+  assert.match(ui, /el\.inert = locked/)
+  // no words left from the Electron window
+  assert.ok(!/Electron/.test(html))
+})
