@@ -489,3 +489,62 @@ test('the Schedule title says tasks run while signed in, and the assistant optio
   assert.ok(!/class="switch"/.test(options))
   assert.equal((options.match(/type="checkbox"/g) || []).length, 2)
 })
+
+test('a stop or a restart asks first when it takes something from somebody, and only then', () => {
+  const { stopQuestion, taskDisconnects, operatorQuestion } = lifted(['stopQuestion', 'taskDisconnects', 'operatorQuestion'])
+  const smp = { name: 'smp', label: 'Survival SMP', status: 'running', latest: { players: 3 } }
+  assert.deepEqual(stopQuestion('stop', smp, []), {
+    title: 'Stop Survival SMP?', confirmLabel: 'Stop', text: '3 players are online and will be disconnected.',
+  })
+  assert.equal(stopQuestion('restart', { ...smp, latest: { players: 1 } }, []).text, '1 player is online and will be disconnected. They can join again once it is back.')
+  // nobody on, nothing known, not running, or a start: the button acts at once, as before
+  assert.equal(stopQuestion('stop', { ...smp, latest: { players: 0 } }, []), null)
+  assert.equal(stopQuestion('stop', { ...smp, latest: null }, []), null)
+  assert.equal(stopQuestion('stop', { ...smp, status: 'stopped' }, []), null)
+  assert.equal(stopQuestion('start', smp, []), null)
+  assert.equal(stopQuestion(null, smp, []), null)
+
+  // a database is asked about for the running servers that keep their data in it
+  const db = { name: 'main-db', label: 'Main MySQL', kind: 'database', status: 'running', attachments: { smp: {}, hub: {}, old: {} } }
+  const rows = [smp, { name: 'hub', status: 'running' }, { name: 'old', status: 'stopped' }]
+  const q = stopQuestion('stop', db, rows)
+  assert.equal(q.title, 'Stop Main MySQL?')
+  assert.equal(q.text, 'Survival SMP and hub are running and keep data in this database. Until it is started again, whatever reads or writes it there will fail.')
+  assert.match(stopQuestion('restart', db, [smp]).text, /^Survival SMP is running and keeps data in this database\. While it restarts/)
+  assert.equal(stopQuestion('stop', db, [{ name: 'smp', status: 'stopped' }]), null)
+  assert.equal(stopQuestion('stop', { ...db, attachments: {} }, rows), null)
+
+  // "Run now" on a task that stops or restarts is the same act
+  assert.equal(taskDisconnects({ action: { type: 'restart', warnMinutes: 5 } }), 'restart')
+  assert.equal(taskDisconnects({ action: { type: 'stop' } }), 'stop')
+  assert.equal(taskDisconnects({ action: { type: 'steps', steps: [{ do: 'say', text: 'x' }, { do: 'restart' }] } }), 'restart')
+  assert.equal(taskDisconnects({ action: { type: 'backup' } }), null)
+  assert.equal(taskDisconnects({ action: { type: 'steps', steps: [{ do: 'backup' }] } }), null)
+
+  assert.equal(taskDisconnects({ action: { type: 'command', line: '/stop' } }), 'stop')
+  assert.equal(taskDisconnects({ action: { type: 'command', line: 'say stop the lag' } }), null)
+  assert.equal(taskDisconnects({ action: { type: 'steps', steps: [{ do: 'command', line: 'restart' }] } }), 'restart')
+
+  // each way in asks before it acts: the question's "no" returns ahead of the request
+  const between = (from, to) => { const i = html.indexOf(from); assert.ok(i > 0, from); const j = html.indexOf(to, i); assert.ok(j > i, to); return html.slice(i, j) }
+  const asks = /if \(question && !\(await ask\(/
+  assert.match(between("const act = (what, { sure = false } = {}) => async () => {", 'state.busy = true;'), asks)
+  assert.match(between('async function cardAct(name, what) {', 'overview.acting[name] = verb.what;'), asks)
+  assert.match(between('saveRestart.onclick = async () => {', 'doSave({ restart: true });'), asks)
+  assert.match(between('runNow.onclick = async () => {', 'busy(true);'), asks)
+  assert.match(between('opBtn.onclick = async () => {', "on: true }"), /if \(!\(await ask\(operatorQuestion\(label\)\)\)\) return;/)
+  const { stillUp } = lifted(['stillUp'])
+  assert.equal(stillUp({ status: 'running' }), true)
+  assert.equal(stillUp({ status: 'stopped' }), false)
+  assert.equal(stillUp(null), false)
+
+  // a caller that asked already does not ask twice, and every other way to stop goes through the question
+  assert.equal((html.match(/act\('(?:stop|restart)', \{ sure: true \}\)/g) || []).length, 3)
+  assert.equal((html.match(/act\('(?:stop|restart)'\)\(\)/g) || []).length, 0)
+  assert.match(html, /const question = stopQuestion\(verb\.what, row, state\.rows\);/)
+
+  const op = operatorQuestion('Alex')
+  assert.equal(op.title, 'Make Alex an operator?')
+  assert.match(op.text, /every command/)
+  assert.ok(!/'Make op'/.test(html))
+})
