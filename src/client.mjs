@@ -233,6 +233,10 @@ export function updateProfile(name, patch, { launching = false } = {}) {
   return { name, ...withDefaults(reg.profiles[name]) }
 }
 
+// Windows lets go of a folder a moment after the game that had it open has exited, so a purge
+// straight after a stop is tried again for about a second before it is an error (EPERM, EBUSY).
+const PURGE = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }
+
 export function removeProfile(name, { purge = false } = {}) {
   if (status(name).running) fail(`profile "${name}" is running; stop it first: spawnloft client stop ${name}`)
   getProfile(name)
@@ -244,11 +248,11 @@ export function removeProfile(name, { purge = false } = {}) {
     const reg = loadProfiles()
     delete reg.profiles[name]
     saveProfiles(reg)
-    if (purge) fs.rmSync(profileDir(name), { recursive: true, force: true })
+    if (purge) fs.rmSync(profileDir(name), PURGE)
   } finally {
     release()
   }
-  if (purge) fs.rmSync(clientRunDir(name), { recursive: true, force: true })
+  if (purge) fs.rmSync(clientRunDir(name), PURGE)
 }
 
 function holderText(name) {
@@ -743,7 +747,9 @@ async function waitInWorld(name, server, waitMs) {
   const deadline = Date.now() + waitMs
   let st = await viaSession(name, (ch) => ch.call('status'))
   while (st.screen !== 'ingame' && !leftServer(st.screen) && Date.now() < deadline) {
-    await sleep(500)
+    // never past the wait that was asked for: a short one slept the full half second anyway, and
+    // on a slow machine came back saying the world had loaded when the caller had stopped waiting
+    await sleep(Math.max(1, Math.min(500, deadline - Date.now())))
     st = await viaSession(name, (ch) => ch.call('status'))
   }
   if (leftServer(st.screen)) {
