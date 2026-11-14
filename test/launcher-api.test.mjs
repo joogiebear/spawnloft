@@ -409,7 +409,17 @@ test('no client route hands a page a token, the log route included', async () =>
   const summary = await (await call('client/launcher')).json()
   assert.deepEqual(summary.accounts, [{ name: 'Wunga_', uuid: '11111111-2222-3333-4444-555555555555', type: 'microsoft', expiresAt: summary.accounts[0].expiresAt, refreshFailedAt: null }])
   assert.equal(summary.defaultAccount, null)
-  assert.deepEqual(summary.servers.map((s) => [s.name, s.mc, s.status, s.onlineMode]), [['open', mc, 'stopped', false], ['strict', mc, 'stopped', true]])
+  assert.deepEqual(summary.servers.map((s) => [s.name, s.mc, s.status, s.onlineMode, s.loader]), [['open', mc, 'stopped', false, null], ['strict', mc, 'stopped', true, null]])
+  // a Fabric or NeoForge server says so, for the Play page's loader warning; the others need none
+  for (const [loader, want] of [['neoforge', 'neoforge'], ['fabric', 'fabric'], ['vanilla', null], ['purpur', null]]) {
+    const dir = path.join(scratch, 'data', 'instances', `modded-${loader}`)
+    fs.mkdirSync(dir, { recursive: true })
+    registry.putInstance(`modded-${loader}`, { dir, jar: 'server.jar', memory: '2G', port: 45931, mcVersion: mc, loader, rcon: { port: 45932, password: 'x' } })
+    try {
+      const row = (await (await call('client/launcher')).json()).servers.find((s) => s.name === `modded-${loader}`)
+      assert.equal(row.loader, want, loader)
+    } finally { registry.removeInstance(`modded-${loader}`) }
+  }
   assert.ok(summary.profiles.some((p) => p.name === 'leaky'))
   assert.ok(Number.isInteger(summary.machine.totalMemory) && summary.machine.totalMemory > 0)
   assert.ok(Number.isInteger(summary.machine.freeMemory) && summary.machine.freeMemory <= summary.machine.totalMemory)

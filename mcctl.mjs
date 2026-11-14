@@ -2049,6 +2049,7 @@ BOTS (plugin testing with scripted players)
 
 CLIENT (a game client for your own servers)
   spawnloft client list                  Profiles, with running state
+  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)
   spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
   spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList
   spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)
@@ -2150,7 +2151,7 @@ async function cmdBot(positional, flags) {
  */
 async function cmdClient(positional, flags) {
   const [sub, ...rest] = positional
-  const usage = 'Usage: spawnloft client list | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
+  const usage = 'Usage: spawnloft client list | client versions [--snapshots | --all] [-n 30] | client new <name> --mc <v> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] | client set <name> key=value ... | client remove <name> [--purge] | client install <name> [--verify] | client launch <name> [--as <playerName>] [--account <account>] [--server <server>] [--wait] | client status <name> | client stop <name> | client logs <name> [-n 100] [--latest] | client login | client logout <name> | client accounts'
   const quiet = flags.json === true
   // Only a phase that fetches something is worth a line: a cached launch re-checks every file and
   // would otherwise print the whole list, reading as if it downloaded the game again.
@@ -2164,6 +2165,26 @@ async function cmdClient(positional, flags) {
     if (quiet) process.stdout.write(jsonLine('client', { profiles }))
     else if (!profiles.length) out('No client profiles yet. Make one: spawnloft client new <name> --mc 1.21.11')
     else for (const p of profiles) out(`${p.name}  ${p.mc}  ${p.loader}  ${p.memory}  ${p.account ? `account ${client.accountLabel(p.account)}` : 'offline'}  ${p.running ? 'running' : 'stopped'}`)
+    return
+  }
+
+  // Minecraft versions, newest first, with a column per mod loader: which ones build for each
+  if (sub === 'versions') {
+    checkFlags(flags, ['snapshots', 'all', 'n', 'json'])
+    if (rest.length) throw new UsageError(usage)
+    const count = flags.n === undefined ? 30 : Number(flags.n)
+    if (flags.n !== undefined && (typeof flags.n !== 'string' || !Number.isInteger(count) || count < 1)) throw new UsageError('-n must be a positive whole number')
+    const list = await client.listVersions({ fabric: true })
+    const show = flags.all === true ? 'all' : flags.snapshots === true ? 'snapshot' : 'release'
+    if (quiet) {
+      const kinds = show === 'all' ? null : show === 'snapshot' ? ['release', 'snapshot'] : ['release']
+      const rows = list.versions.filter((v) => !kinds || kinds.includes(v.type)).slice(0, count)
+      process.stdout.write(jsonLine('client', { offline: list.offline, versions: rows.map((v) => ({ id: v.id, type: v.type, downloaded: v.downloaded, loaders: v.loaders })) }))
+      return
+    }
+    if (list.offline) process.stderr.write(`Note: ${list.offline}.\n`)
+    out(table(client.versionTableRows(list.versions, { show, limit: count })))
+    out('? means that loader\'s list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>')
     return
   }
 

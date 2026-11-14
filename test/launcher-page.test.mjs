@@ -103,7 +103,7 @@ test('Play names the account a launch uses, the profile\'s own before the defaul
 })
 
 test('every server is marked for a setup: another version, and online servers blocked for offline players', () => {
-  const { serverChoices } = lifted(['STOPPED', 'serverChoices'])
+  const { serverChoices } = lifted(['STOPPED', 'serverLoader', 'loaderFits', 'serverChoices'])
   const servers = [
     { name: 'survival', label: null, mc: '1.21.11', status: 'running', onlineMode: false },
     { name: 'public-smp', label: 'Public', mc: '1.21.11', status: 'stopped', onlineMode: true },
@@ -124,8 +124,55 @@ test('every server is marked for a setup: another version, and online servers bl
   assert.equal(serverChoices({ mc: '1.21.11', server: null }, servers, null).find((c) => c.name === 'public-smp').blocked, 'needs a Microsoft account')
 })
 
+test('a Fabric or NeoForge server next to a setup on another loader is a warning, not a block', () => {
+  const { serverChoices } = lifted(['STOPPED', 'serverLoader', 'loaderFits', 'serverChoices'])
+  const servers = [
+    { name: 'neo', label: null, mc: '1.21.1', status: 'running', onlineMode: false, loader: 'neoforge' },
+    { name: 'fab', label: null, mc: '1.21.1', status: 'running', onlineMode: false, loader: 'fabric' },
+    { name: 'paper', label: null, mc: '1.21.1', status: 'running', onlineMode: false, loader: null },
+    { name: 'odd', label: null, mc: '1.21.1', status: 'running', onlineMode: false, loader: 'forge' },
+  ]
+  const of = (loader) => Object.fromEntries(serverChoices({ mc: '1.21.1', loader }, servers, 'offline').map((c) => [c.name, c.otherLoader]))
+  assert.deepEqual(of('vanilla'), { neo: 'neoforge', fab: 'fabric', paper: null, odd: null })
+  assert.deepEqual(of('neoforge'), { neo: null, fab: 'fabric', paper: null, odd: null })
+  // Quilt loads Fabric's mods
+  assert.deepEqual(of('quilt'), { neo: 'neoforge', fab: null, paper: null, odd: null })
+  assert.deepEqual(of('forge'), { neo: 'neoforge', fab: 'fabric', paper: null, odd: null })
+  const neo = serverChoices({ mc: '1.21.1', loader: 'fabric' }, servers, 'offline').find((c) => c.name === 'neo')
+  assert.equal(neo.loader, 'neoforge')
+  assert.equal(neo.blocked, null)
+  const { loaderWarning } = lifted(['LOADER_NAMES', 'loaderName', 'loaderWarning'])
+  assert.deepEqual(loaderWarning(neo, { loader: 'fabric' }), [{ b: 'neo' }, ' runs ', { b: 'NeoForge' }, ' and this setup is ', { b: 'Fabric' }, ', so the server will probably turn the join away.'])
+  assert.equal(loaderWarning({ name: 'paper', otherLoader: null }, { loader: 'fabric' }), null)
+  assert.equal(loaderWarning(null, { loader: 'fabric' }), null)
+  // Play stays open; the line sits under it with a way to a matching setup
+  assert.match(fnSource('playView'), /state\.kind !== 'blocked' && loaderWarning\(plan\.picked, p\)/)
+  assert.match(fnSource('fixButton'), /fix === 'loader-setup' && other\) return link\('use a setup that matches it', \(\) => takePrefill\(\{ mc: other\.mc, server: other\.server \}\)\)/)
+  assert.match(fnSource('joinMenu'), /else if \(c\.otherLoader\) \{ meta = `runs \$\{loaderName\(c\.otherLoader\)\}`; warn = true \}/)
+})
+
+test('a server card for a Fabric or NeoForge server picks a setup on its loader, or makes one', () => {
+  const { prefillPick } = lifted(['serverLoader', 'loaderFits', 'prefillPick'])
+  const profiles = [
+    { name: 'v', mc: '1.21.1', loader: 'vanilla', server: 'neo' },
+    { name: 'q', mc: '1.21.1', loader: 'quilt', server: null },
+    { name: 'n', mc: '1.21.1', loader: 'neoforge', server: null },
+  ]
+  const servers = [{ name: 'neo', loader: 'neoforge' }, { name: 'fab', loader: 'fabric' }, { name: 'paper', loader: null }]
+  assert.equal(prefillPick({ mc: '1.21.1', server: 'neo' }, profiles, servers).profile.name, 'n')
+  assert.equal(prefillPick({ mc: '1.21.1', server: 'fab' }, profiles, servers).profile.name, 'q')
+  assert.equal(prefillPick({ mc: '1.21.1', server: 'paper' }, profiles, servers).profile.name, 'v')
+  // none on its loader: the New sheet opens with it
+  const none = prefillPick({ mc: '1.21.1', server: 'neo' }, profiles.slice(0, 2), servers)
+  assert.equal(none.profile, null)
+  assert.equal(none.loader, 'neoforge')
+  assert.match(fnSource('takePrefill'), /openSheet\(null, \{ mc, server, loader \}\)/)
+  assert.match(fnSource('openSheet'), /const newLoader = MOD_LOADERS\.includes\(prefill\?\.loader\) \? prefill\.loader : 'vanilla'/)
+  assert.match(fnSource('openSheet'), /loader: newLoader, loaderVersion: '', memory: defaultMemory\(newLoader\)/)
+})
+
 test('Join offers the servers on the setup\'s version, running ones first, and the one picked now', () => {
-  const { serverChoices, joinChoices } = lifted(['STOPPED', 'serverChoices', 'joinChoices'])
+  const { serverChoices, joinChoices } = lifted(['STOPPED', 'serverLoader', 'loaderFits', 'serverChoices', 'joinChoices'])
   const servers = [
     { name: 'creative', label: null, mc: '1.21.11', status: 'stopped', onlineMode: false },
     { name: 'old', label: null, mc: '1.20.4', status: 'running', onlineMode: false },
@@ -587,7 +634,7 @@ test('an offline account a setup names by key is listed once in Play as', () => 
 })
 
 test('a server card\'s pre-fill picks the setup that fits, running or not', () => {
-  const { prefillPick } = lifted(['prefillPick'])
+  const { prefillPick } = lifted(['serverLoader', 'loaderFits', 'prefillPick'])
   const profiles = [
     { name: 'a', mc: '1.21.11', server: null, running: false },
     { name: 'b', mc: '1.21.11', server: 'survival', running: true },
@@ -596,9 +643,9 @@ test('a server card\'s pre-fill picks the setup that fits, running or not', () =
   assert.equal(prefillPick({ mc: '1.21.11', server: 'survival' }, profiles).profile.name, 'b')
   assert.equal(prefillPick({ mc: '1.21.11', server: 'creative' }, profiles).profile.name, 'a')
   assert.equal(prefillPick({ mc: '1.19.4', server: 'x' }, profiles).profile, null)
-  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', profile: profiles[0], play: false })
+  assert.deepEqual(prefillPick({ mc: 7, server: {} }, profiles), { mc: '', server: '', loader: null, profile: profiles[0], play: false })
   // the panel's Play names its setup, which wins over a fit; Play only goes with a setup that is there
-  assert.deepEqual(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'a', play: true }, profiles), { mc: '1.21.11', server: 'survival', profile: profiles[0], play: true })
+  assert.deepEqual(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'a', play: true }, profiles), { mc: '1.21.11', server: 'survival', loader: null, profile: profiles[0], play: true })
   assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'gone', play: true }, profiles).play, false)
   assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'gone', play: true }, profiles).profile.name, 'b')
   assert.equal(prefillPick({ mc: '1.21.11', server: 'survival', profile: 'a', play: 'yes' }, profiles).play, false)
@@ -1259,4 +1306,31 @@ test('the Mods choice: None and four loaders, each with its reason; Forge from 1
   assert.deepEqual(playSentence({ mc: '1.20.1', fabric: true, who: 'alice' })[1], { b: 'Minecraft 1.20.1 (Fabric)' })
   // narrow sheets get the same five as a list
   assert.match(html, /@media \(max-width: 559px\) \{ \.modsseg \{ display: none; \} \.modspick \{ display: block; \} \}/)
+})
+
+test('the crash notice names the common Forge and NeoForge causes', () => {
+  const at = html.indexOf('  const LOADER_CAUSES = [')
+  // the page may be checked out with CRLF line endings (Windows)
+  const end = /\r?\n  \]\r?\n/.exec(html.slice(at))
+  const causes = html.slice(at, at + end.index + end[0].length)
+  const { loaderCrashCause } = lifted(['LOADER_NAMES', 'INSTALLER_LOADERS', 'loaderName', 'loaderCrashCause'], causes)
+  const say = (loader, ...lines) => loaderCrashCause(loader, lines, '1.20.1')
+  assert.equal(say('forge', '[main/ERROR]: Missing or unsupported mandatory dependencies:', "\tMod ID: 'minecraft', Requested by: 'create', Expected range: '[1.21,1.22)', Actual version: '1.20.1'"),
+    'The mod create is made for another Minecraft version (it wants [1.21,1.22), and this setup is 1.20.1). Get the build of it for 1.20.1.')
+  assert.equal(say('neoforge', "\tMod ID: 'neoforge', Requested by: 'jei', Expected range: '[21.1.50,)', Actual version: '21.1.1'"), 'The mod jei needs another NeoForge build ([21.1.50,)). Pick one under Advanced in Edit setup.')
+  assert.equal(say('forge', "\tMod ID: 'architectury', Requested by: 'rei', Expected range: '[9,)', Actual version: '[MISSING]'"), 'The mod rei needs architectury, which is missing or the wrong version. Put the right build of architectury in the mods folder.')
+  assert.match(say('forge', 'net.minecraftforge.fml.common.MissingModsException: Mod ironchest requires [forge@[14.23.5.2847,)]'), /^A mod needs another mod/)
+  assert.match(say('neoforge', 'File mods/sodium-fabric.jar is a Fabric mod and cannot be loaded'), /made for Fabric or Quilt\. A NeoForge setup loads NeoForge mods only\.$/)
+  assert.match(say('forge', 'java.lang.ClassCastException: class jdk.internal.loader.ClassLoaders$AppClassLoader cannot be cast to class java.net.URLClassLoader'), /needs Java 8/)
+  assert.match(say('forge', 'Found duplicate mods:'), /two copies/)
+  assert.match(say('forge', 'org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error'), /failed to patch the game/)
+  // nothing known: the loader's usual causes; not a Forge or NeoForge setup: nothing
+  assert.match(say('forge', 'nothing here'), /^Forge usually closes like this/)
+  assert.equal(say('fabric', 'Found duplicate mods:'), null)
+  assert.equal(say('vanilla', 'x'), null)
+  // a game out of memory, or a log not read: the general line, which names memory and Java
+  assert.equal(say('neoforge', 'java.lang.OutOfMemoryError: Java heap space'), null)
+  assert.equal(loaderCrashCause('forge', [], '1.20.1'), null)
+  // the line takes the place of the general one
+  assert.match(fnSource('crashNotice'), /loaderCrashCause\(p\.loader, all, p\.mc\)\) \|\| 'Usually a mod, not enough memory, or the wrong Java\.'/)
 })

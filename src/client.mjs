@@ -1243,6 +1243,20 @@ function availability(mc, lists) {
   return { fabric: loaders.fabric, loaders }
 }
 
+// `spawnloft client versions` as table rows: the header, then each version with a column per mod
+// loader saying whether it builds for it (yes, blank for no, ? when its list could not be read).
+// show is 'release' (the default), 'snapshot' (releases and snapshots) or 'all'.
+export function versionTableRows(versions, { show = 'release', limit = Infinity } = {}) {
+  const kinds = show === 'all' ? null : show === 'snapshot' ? ['release', 'snapshot'] : ['release']
+  const mods = LOADERS.filter((l) => l !== 'vanilla')
+  const mark = (v) => (v === true ? 'yes' : v === false ? '' : '?')
+  const rows = versions.filter((v) => !kinds || kinds.includes(v.type)).slice(0, limit)
+  return [
+    ['Version', 'Type', ...mods.map((l) => loaderFor(l).name), 'Downloaded'],
+    ...rows.map((v) => [v.id, v.kind ?? v.type, ...mods.map((l) => mark(v.loaders?.[l])), v.downloaded ? 'yes' : '']),
+  ]
+}
+
 // The version picker's rows, newest first: every id Mojang lists. The per-version facts that
 // need the JSON (its exact Java, a platform refusal) are given for versions on disk; the rest
 // say so (javaNeedsExact false), and describeVersion answers for one. fabric is whether Fabric

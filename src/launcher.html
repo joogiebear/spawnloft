@@ -867,6 +867,19 @@
 
   // Every SpawnLoft server as a setup sees it: `otherVersion` on the ones that run another version
   // (Join lists only the rest), `blocked` on an online-mode server for an offline player.
+  // The mod loader a server needs on the player's side: a Fabric or NeoForge server's own, else null.
+  function serverLoader(s) {
+    return s?.loader === 'fabric' || s?.loader === 'neoforge' ? s.loader : null
+  }
+
+  // Whether a setup on `setupLoader` matches a server that runs `needs` (serverLoader's answer).
+  // Quilt loads Fabric's mods, so a Quilt setup matches a Fabric server.
+  function loaderFits(needs, setupLoader) {
+    if (!needs) return true
+    if (needs === 'fabric') return setupLoader === 'fabric' || setupLoader === 'quilt'
+    return setupLoader === needs
+  }
+
   function serverChoices(profile, servers, accountType) {
     return servers.map((s) => ({
       name: s.name,
@@ -875,6 +888,10 @@
       status: s.status,
       stopped: STOPPED.has(s.status),
       otherVersion: s.mc && s.mc !== profile.mc ? s.mc : null,
+      // the loader the server runs, and that one again when this setup is on another: a warning,
+      // not a block, since a server whose mods are all server-side lets anyone in
+      loader: serverLoader(s),
+      otherLoader: loaderFits(serverLoader(s), profile.loader) ? null : serverLoader(s),
       blocked: s.onlineMode === true && accountType !== 'microsoft' ? 'needs a Microsoft account' : null,
     }))
   }
@@ -1948,11 +1965,21 @@
       kids.push(playButton(p, plan))
       if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
       else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
+      const lw = state.kind !== 'blocked' && loaderWarning(plan.picked, p)
+      if (lw) kids.push(h('p', { class: 'why', id: 'loaderWarn' }, ico('alert'), h('span', {}, parts(lw), ' ', fixButton('loader-setup', p, true, { mc: plan.picked.mc ?? p.mc, server: plan.picked.name }), '.')))
     }
     kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
     return h('div', { class: 'playgrid' },
       h('div', { class: 'maincol' }, h('div', { class: 'playbox' }, kids), serversRow(p, plan)),
       setupsPanel(p))
+  }
+
+  // The line under Play when the server picked runs another mod loader than the setup: sentence
+  // parts, or null. The join will probably be turned away, but a server whose mods are all
+  // server-side takes anyone, so Play stays open.
+  function loaderWarning(picked, p) {
+    if (!picked?.otherLoader) return null
+    return [{ b: picked.label || picked.name }, ' runs ', { b: loaderName(picked.otherLoader) }, ' and this setup is ', { b: loaderName(p.loader) }, ', so the server will probably turn the join away.']
   }
 
   // What the selected setup is: its name, and the facts a person picks a setup by.
@@ -1993,6 +2020,8 @@
     if (fix === 'show-launching') return link('show it', () => { if (S.job) pickProfile(S.job.profile); render(); $('cancelLaunch')?.focus({ preventScroll: true }) })
     // a setup of the server's version: one that exists is picked, else the New sheet opens for it
     if (fix === 'other-setup' && other) return link(`use a ${other.mc} setup`, () => takePrefill({ mc: other.mc, server: other.server }))
+    // a setup on the server's loader: one that exists is picked, else the New sheet opens with it
+    if (fix === 'loader-setup' && other) return link('use a setup that matches it', () => takePrefill({ mc: other.mc, server: other.server }))
     if (fix === 'anyway' && other) return link('play anyway if the server takes other versions', () => { setTarget(p, { server: other.server, anyway: other.server }); render(); $('play')?.focus({ preventScroll: true }) })
     return null
   }
@@ -2182,7 +2211,7 @@
           : h('button', { class: 'sm', id: `srv-${c.name}`, disabled: busy || stuck, title: stuck && !busy ? 'Play can\'t start yet: the card above says why.' : null, onclick: () => playOn(p, c) }, ico('play'), c.stopped ? 'Start and play' : 'Play here')
       return h('li', { class: cur ? 'scard cur' : 'scard', 'aria-current': cur ? 'true' : null },
         h('span', { class: 'nm' }, h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }), h('b', { title: c.label && c.label !== c.name ? `${c.label} (folder name: ${c.name})` : c.name, text: c.label || c.name })),
-        h('small', { text: `${c.mc ?? 'version unknown'} · ${statusText(c.status).toLowerCase()}` }),
+        h('small', { text: `${c.mc ?? 'version unknown'}${c.loader ? ` · ${loaderName(c.loader)}` : ''} · ${statusText(c.status).toLowerCase()}` }),
         act)
     }
     return h('section', { class: 'servers', 'aria-labelledby': 'serversTitle' },
@@ -2262,7 +2291,7 @@
       list.map((c) => {
         let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
         let warn = false
-        if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion && p.mc !== 'latest') { meta = 'runs another version'; warn = true }
+        if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion && p.mc !== 'latest') { meta = 'runs another version'; warn = true } else if (c.otherLoader) { meta = `runs ${loaderName(c.otherLoader)}`; warn = true }
         return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
           h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
           h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` \u00b7 ${c.mc}` : ''}` })),
@@ -2360,6 +2389,33 @@
     ]
   }
 
+  // What a Forge or NeoForge log says went wrong, as one sentence for the crash notice, or null.
+  // The loader's own error screen names the mod; these are the shapes behind it. Forge before
+  // 1.13 says the same things in other words, so each test takes both.
+  const LOADER_CAUSES = [
+    // Forge 1.12.2 and older on Java 9 or newer
+    { test: /AppClassLoader cannot be cast to (?:class )?java\.net\.URLClassLoader/, say: (m, name) => `This ${name} needs Java 8, and the game ran on a newer Java. Set Java to Automatic under Edit setup.` },
+    { test: /Mod ID: '(?:minecraft)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/, say: (m, name, mc) => `The mod ${m[1]} is made for another Minecraft version (it wants ${m[2]}, and this setup is ${mc}). Get the build of it for ${mc}.` },
+    { test: /Mod ID: '(?:forge|neoforge)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/, say: (m, name) => `The mod ${m[1]} needs another ${name} build (${m[2]}). Pick one under Advanced in Edit setup.` },
+    { test: /Found duplicate mods|DuplicateModsFoundException|Duplicate mods? found/i, say: () => 'The mods folder has two copies of one mod. Remove the older file.' },
+    { test: /Mod ID: '([\w.-]+)', Requested by: '([\w.-]+)'/, say: (m) => `The mod ${m[2]} needs ${m[1]}, which is missing or the wrong version. Put the right build of ${m[1]} in the mods folder.` },
+    { test: /Missing or unsupported mandatory dependencies|MissingModsException|requires (?:mod )?[\w.-]+.*(?:missing|not installed)/i, say: () => 'A mod needs another mod that is missing or the wrong version. The game\u2019s error screen named it, and the log below does too.' },
+    { test: /fabric\.mod\.json|quilt\.mod\.json|is an? (?:Fabric|Quilt) mod/i, say: (m, name) => `A mod in the mods folder is made for Fabric or Quilt. A ${name} setup loads ${name} mods only.` },
+    { test: /MixinApplyError|InvalidMixinException|MixinTransformerError|Mixin apply (?:failed|for mod)/, say: () => 'A mod failed to patch the game, usually because two mods clash or one is made for another version.' },
+  ]
+  function loaderCrashCause(loader, lines, mc) {
+    // no log read yet, or a game out of memory: the general line says it better
+    if (!INSTALLER_LOADERS.includes(loader) || !lines.length || lines.some((l) => /OutOfMemoryError/.test(l))) return null
+    const name = loaderName(loader)
+    for (const cause of LOADER_CAUSES) {
+      for (const line of lines) {
+        const m = cause.test.exec(line)
+        if (m) return cause.say(m, name, mc)
+      }
+    }
+    return `${name} usually closes like this when a mod is missing, made for another Minecraft version, or made for another loader.`
+  }
+
   // A game that ended without a Stop from here and was not simply closed. The panel's record of
   // the exit, when it has one, says how it ended; the log's last lines say why, as far as anything does.
   function crashNotice(crash) {
@@ -2368,7 +2424,8 @@
     const all = S.log.profile === crash.profile ? S.log.lines : []
     const lines = S.logMore ? all : all.slice(-LOG_LINES)
     const how = exitWords(rec, rec && clockTime(rec.endedAt))
-    let text = `${how ? `${how} ` : ''}It was not stopped from here. Usually a mod, not enough memory, or the wrong Java. The last lines of its log:`
+    const cause = (p && loaderCrashCause(p.loader, all, p.mc)) || 'Usually a mod, not enough memory, or the wrong Java.'
+    let text = `${how ? `${how} ` : ''}It was not stopped from here. ${cause} The last lines of its log:`
     if (crash.report && typeof crash.report === 'object') {
       text = crash.report.error ? `The report could not be made: ${crash.report.error}` : `Saved the report to ${crash.report.file} (${crash.report.sizeHuman}). Attach it to the bug report.`
     }
@@ -2629,12 +2686,14 @@
   // the field to put the caret in.
   function openSheet(p = null, prefill = null, focus = null) {
     const servers = serversNow()
+    // a new setup for a Fabric or NeoForge server starts on that server's loader
+    const newLoader = MOD_LOADERS.includes(prefill?.loader) ? prefill.loader : 'vanilla'
     S.menu = null
     S.acctAsk = null
     S.sheetFrom = document.activeElement?.id || null
     S.sheet = p
       ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, serverList: p.serverList !== false, error: null, saving: false, removing: false }
-      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, serverList: true, error: null, saving: false, removing: false }
+      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: newLoader, loaderVersion: '', memory: defaultMemory(newLoader), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, serverList: true, error: null, saving: false, removing: false }
     if (!p && prefill?.server && !S.sheet.server) S.sheet.server = prefill.server
     S.sheet.custom = !MEMORY_CHOICES.includes(String(S.sheet.memory).toUpperCase())
     S.sheet.javaOther = false
@@ -3653,13 +3712,15 @@
 
   // A server card's Play with no fitting setup leaves { mc, server }: a setup of that version is
   // picked and joins the server, or the New setup sheet opens filled in for it.
-  function prefillPick(prefill, profiles) {
+  function prefillPick(prefill, profiles, servers = []) {
     const mc = typeof prefill?.mc === 'string' ? prefill.mc : ''
     const server = typeof prefill?.server === 'string' ? prefill.server : ''
-    const fits = profiles.filter((p) => !mc || p.mc === mc)
+    // a Fabric or NeoForge server wants a setup on its loader: one of those, or a new one with it
+    const loader = server ? serverLoader(servers.find((s) => s.name === server)) : null
+    const fits = profiles.filter((p) => (!mc || p.mc === mc) && loaderFits(loader, p.loader))
     // the panel names the setup its Play button stands for; one that is gone falls back to a fit
     const named = typeof prefill?.profile === 'string' ? profiles.find((p) => p.name === prefill.profile) ?? null : null
-    return { mc, server, profile: named ?? fits.find((q) => q.server === server) ?? fits[0] ?? null, play: prefill?.play === true && Boolean(named) }
+    return { mc, server, loader, profile: named ?? fits.find((q) => q.server === server) ?? fits[0] ?? null, play: prefill?.play === true && Boolean(named) }
   }
 
   function takePrefill(prefill) {
@@ -3669,7 +3730,7 @@
       S.sheet.error = 'Save or cancel this setup first, then press Play on the server again'
       return render()
     }
-    const { mc, server, profile: p, play } = prefillPick(prefill, profilesNow())
+    const { mc, server, loader, profile: p, play } = prefillPick(prefill, profilesNow(), serversNow())
     if (p) {
       // a running or launching setup is shown as it is; its Join changes from the next launch
       pickProfile(p.name)
@@ -3686,7 +3747,7 @@
         if (!document.activeElement || document.activeElement === document.body) ($('play') ?? $('stop'))?.focus({ preventScroll: true })
       }
     } else {
-      openSheet(null, { mc, server })
+      openSheet(null, { mc, server, loader })
     }
   }
 

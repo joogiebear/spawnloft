@@ -6431,8 +6431,11 @@ async function fetchClientProfiles() {
   renderHomeCards();
   if (state.current) buildMoreMenu();
 }
+// A Fabric or NeoForge server wants a setup on its loader (Quilt loads Fabric's mods); with none
+// of those, the launcher opens a new setup on that loader.
 function playProfileFor(row, profiles = state.clientProfiles) {
-  const fits = profiles.filter((p) => !row.mcVersion || p.mc === row.mcVersion);
+  const needs = row.loader === 'fabric' || row.loader === 'neoforge' ? row.loader : null;
+  const fits = profiles.filter((p) => (!row.mcVersion || p.mc === row.mcVersion) && (!needs || p.loader === needs || (needs === 'fabric' && p.loader === 'quilt')));
   return fits.find((p) => p.server === row.name) ?? fits[0] ?? null;
 }
 // The game launcher: the Play page, the /launcher document in a frame of the panel's own stage,

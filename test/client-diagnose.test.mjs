@@ -93,3 +93,14 @@ test('a healthy OpenGL version line is not a graphics failure', () => {
   const findings = clientDiagnose(['[12:00:00] [Render thread/INFO]: (sodium) OpenGL Version: 4.6.0 NVIDIA 560.35'], {})
   assert.ok(!findings.some(f => f.id === 'opengl'))
 })
+
+test('Forge and NeoForge dependency lines and the old-Forge Java 8 failure are named', () => {
+  const dep = one("\tMod ID: 'architectury', Requested by: 'rei', Expected range: '[9,)', Actual version: '[MISSING]'")
+  assert.equal(dep.id, 'mod-dependency-forge')
+  assert.match(dep.advice, /"rei" needs "architectury" \[9,\)/)
+  assert.match(one("\tMod ID: 'minecraft', Requested by: 'create', Expected range: '[1.21,1.22)', Actual version: '1.20.1'", { mc: '1.20.1' }).advice, /made for Minecraft \[1\.21,1\.22\), not 1\.20\.1/)
+  assert.match(one("\tMod ID: 'neoforge', Requested by: 'jei', Expected range: '[21.1.50,)', Actual version: '21.1.1'", { profile: 'p' }).advice, /another NeoForge build .* loaderVersion=/)
+  const java = one('java.lang.ClassCastException: class jdk.internal.loader.ClassLoaders$AppClassLoader cannot be cast to class java.net.URLClassLoader', { profile: 'old' })
+  assert.equal(java.id, 'forge-needs-java-8')
+  assert.match(java.advice, /client set old java=/)
+})
