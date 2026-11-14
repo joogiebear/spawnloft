@@ -19,6 +19,7 @@ import { createSnapshot } from './backup.mjs'
 import { readState } from './control.mjs'
 import { readProps, worldDirs } from './props.mjs'
 import { fail, UserError, writeJson, assertSafeVersion, safeRelativePath, humanBytes } from './util.mjs'
+import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 // Provenance record for a whole pack, in the instance root.
 export const PACK_FILE = '.mcctl-pack.json'
@@ -132,14 +133,17 @@ async function installLoader(inst, index, onProgress) {
 }
 
 async function download(url, { timeoutMs = 180000 } = {}) {
+  const job = cancelSignal()
+  checkCancelled()
   let res
   try {
-    res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    res = await fetch(url, { signal: job ? AbortSignal.any([job, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs) })
+    if (res.ok) return Buffer.from(await res.arrayBuffer())
   } catch (err) {
+    if (job?.aborted) throw new Cancelled()
     throw new UserError(`download failed: ${err.cause?.message || err.message} (${url})`)
   }
-  if (!res.ok) throw new UserError(`download failed: ${res.status} for ${url}`)
-  return Buffer.from(await res.arrayBuffer())
+  throw new UserError(`download failed: ${res.status} for ${url}`)
 }
 
 // Cap on a single pack file, so a pack can't fill the disk by lying about (or never ending) a download.
@@ -169,7 +173,9 @@ export async function downloadVerified(url, dest, {
     throw new UserError(`"${label}" says it is ${humanBytes(size)}, more than the ${humanBytes(MAX_PACK_FILE_BYTES)} a pack file may be; nothing was installed`)
   }
   const cap = size > 0 ? size : DEFAULT_PACK_FILE_BYTES
-  const signal = AbortSignal.timeout(timeoutMs)
+  const job = cancelSignal()
+  checkCancelled()
+  const signal = job ? AbortSignal.any([job, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs)
 
   let current = url
   let res
@@ -186,6 +192,7 @@ export async function downloadVerified(url, dest, {
     try {
       res = await fetchImpl(target.href, { redirect: 'manual', signal })
     } catch (err) {
+      if (job?.aborted) throw new Cancelled()
       throw new UserError(`download failed: ${err.cause?.message || err.message} (${url})`)
     }
     if (!REDIRECT_STATUS.has(res.status)) break
@@ -223,6 +230,7 @@ export async function downloadVerified(url, dest, {
     // open recreate the part file right after it is removed here.
     if (!sink.closed) await once(sink, 'close').catch(() => {})
     fs.rmSync(part, { force: true })
+    if (job?.aborted) throw new Cancelled()
     throw err instanceof UserError ? err : new UserError(`download failed: ${err.cause?.message || err.message} (${url})`)
   }
   if (size > 0 && received !== size) {
@@ -308,6 +316,8 @@ export async function createFromModpack(name, projectId, {
 
     staged = await stagePackFiles(index, tmp, onProgress)
 
+    // the last point where stopping leaves nothing behind but the scratch folder
+    checkCancelled()
     onProgress({ message: 'Creating the server', percent: null })
     inst = await create.newInstance(name, {
       jar: null,

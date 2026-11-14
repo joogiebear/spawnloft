@@ -6,6 +6,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 
 import { fail, humanBytes } from './util.mjs'
+import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
 
@@ -16,16 +17,18 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 // fetch, retried when a second request usually changes the answer (GitHub's download servers return
 // stray 504s). Refusals like 403/404, and the last answer if every attempt was transient, are returned
 // at once so the caller's message names the status. Only opening the response is retried; a download
-// that breaks half way is the caller's to report. timeoutMs instead of a signal because a fired
-// AbortSignal stays fired and each attempt needs its own.
+// that breaks half way is the caller's to report. timeoutMs for the per-attempt limit, because a
+// fired AbortSignal stays fired and each attempt needs its own; a signal in `init` is the caller's
+// way to give up on the whole thing, and ends the retrying too.
 export async function fetchRetry(url, init = {}, { attempts = 4, delayMs = 1500, timeoutMs = 0, fetcher = fetch, onRetry = null } = {}) {
   for (let attempt = 1; ; attempt++) {
     const last = attempt >= attempts
     let res
     try {
-      res = await fetcher(url, timeoutMs ? { ...init, signal: AbortSignal.timeout(timeoutMs) } : init)
+      res = await fetcher(url, timeoutMs ? { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs) } : init)
     } catch (err) {
-      if (last) throw err
+      // a cancelled job is not a server having a bad moment
+      if (last || init.signal?.aborted) throw err
       onRetry?.({ attempt, reason: err.cause?.message || err.message })
       await wait(delayMs * attempt)
       continue
@@ -107,10 +110,14 @@ export async function fetchJson(url, { label = url } = {}) {
 // publishes none gets TLS plus a size floor.
 export async function downloadFile(url, dest, { hash = null, expected = null, onProgress = null, minBytes = 0, label = null } = {}) {
   const what = label ?? dest
+  // the job this download is part of, if it is part of one that can be cancelled
+  const signal = cancelSignal()
+  checkCancelled()
   let res
   try {
-    res = await fetchRetry(url, { headers: { 'User-Agent': UA } })
+    res = await fetchRetry(url, { headers: { 'User-Agent': UA }, ...(signal ? { signal } : {}) })
   } catch (err) {
+    if (signal?.aborted) throw new Cancelled()
     fail(`download of ${what} failed: ${err.cause?.message || err.message}`, 'download-failed')
   }
   if (!res.ok || !res.body) fail(`download of ${what} failed (${res.status}) from ${url}`, 'download-failed')
@@ -125,7 +132,14 @@ export async function downloadFile(url, dest, { hash = null, expected = null, on
     received += chunk.length
     onProgress?.({ received, total })
   })
-  await pipeline(source, fs.createWriteStream(tmp))
+  try {
+    await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
+  } catch (err) {
+    // cancelled half way: the half is not left for a later download to trip on
+    if (!signal?.aborted) throw err
+    fs.rmSync(tmp, { force: true })
+    throw new Cancelled()
+  }
 
   const size = fs.statSync(tmp).size
   if (size < minBytes) {

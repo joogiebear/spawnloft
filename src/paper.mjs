@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, humanBytes } from './util.mjs'
+import { Cancelled, cancelSignal, checkCancelled } from './cancel.mjs'
 
 // PaperMC downloads via the v3 "fill" API. The old api.papermc.io/v2 endpoints are sunset and answer
 // {"ok":false,"error":"sunset"} instead of a 404, which reads like a network problem.
@@ -84,7 +85,10 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
   }
 
   const tmp = `${dest}.part`
-  const res = await fetch(build.url, { headers: { 'User-Agent': HEADERS['User-Agent'] } })
+  const signal = cancelSignal()
+  checkCancelled()
+  const res = await fetch(build.url, { headers: { 'User-Agent': HEADERS['User-Agent'] }, ...(signal ? { signal } : {}) })
+    .catch((err) => { if (signal?.aborted) throw new Cancelled(); throw err })
   if (!res.ok || !res.body) fail(`download failed (${res.status}) for ${build.url}`)
 
   const hash = crypto.createHash('sha256')
@@ -97,7 +101,13 @@ export async function fetchBuild(version, wanted = null, { force = false, onProg
     received += chunk.length
     onProgress?.({ received, total })
   })
-  await pipeline(source, fs.createWriteStream(tmp))
+  try {
+    await pipeline(source, fs.createWriteStream(tmp), ...(signal ? [{ signal }] : []))
+  } catch (err) {
+    if (!signal?.aborted) throw err
+    fs.rmSync(tmp, { force: true })
+    throw new Cancelled()
+  }
 
   const got = hash.digest('hex')
   if (build.sha256 && got !== build.sha256) {

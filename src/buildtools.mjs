@@ -6,6 +6,7 @@ import { spawn, spawnSync } from 'node:child_process'
 
 import { JARS_DIR } from './paths.mjs'
 import { fail, UserError, humanBytes } from './util.mjs'
+import { Cancelled, checkCancelled, stopOnCancel } from './cancel.mjs'
 import { downloadFile } from './download.mjs'
 
 const BUILDTOOLS_URL = 'https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar'
@@ -75,8 +76,10 @@ export async function build(mc, { flavour = 'spigot', java = 'java', force = fal
   if (flavour === 'craftbukkit') args.push('--compile', 'craftbukkit')
   onProgress?.({ message: `Building ${flavour} ${mc} - this takes several minutes the first time` })
 
+  checkCancelled()
   await new Promise((resolve, reject) => {
     const child = spawn(java, args, { cwd: work, windowsHide: true })
+    const cancelled = stopOnCancel(child)
     let tail = ''
     let carry = ''
     const onChunk = (c) => {
@@ -95,6 +98,8 @@ export async function build(mc, { flavour = 'spigot', java = 'java', force = fal
       err.code === 'ENOENT' ? `could not run ${java} to build ${flavour}` : `BuildTools failed to start: ${err.message}`)))
     child.on('close', (code) => {
       const built = path.join(outDir, name)
+      // a build stopped on purpose has no last words worth showing
+      if (cancelled()) return reject(new Cancelled())
       if (code === 0 && fs.existsSync(built)) {
         resolve()
       } else {

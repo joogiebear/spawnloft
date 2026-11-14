@@ -549,3 +549,16 @@ test('what the core says for a terminal is said for the launcher', () => {
   assert.ok(!/CALLBACK_URI/.test(html))
   assert.match(html, /SpawnLoft could not open the launcher/)
 })
+
+test('a launch can be cancelled, and the page says what that left', () => {
+  const { cancelledNotice } = lifted(['cancelledNotice'])
+  assert.deepEqual(cancelledNotice({ startsServer: false, reached: 2 }), { tone: '', title: 'Launch cancelled', text: 'The game was not started. What was downloaded is kept for next time.' })
+  // the server it had started by then is not stopped for it, and that is said
+  assert.match(cancelledNotice({ startsServer: true, reached: 3 }).text, /The server it started is still running\.$/)
+  assert.doesNotMatch(cancelledNotice({ startsServer: true, reached: 2 }).text, /server/)
+  // the card has the button, off once the game itself is starting or the cancel is under way
+  assert.match(fnSource('launchingCard'), /id: 'cancelLaunch', disabled: Boolean\(job\.cancelling\) \|\| stepOf\(job\.stage\) >= 4, onclick: \(\) => cancelLaunch\(job\)/)
+  assert.match(fnSource('cancelLaunch'), /api\(`jobs\/\$\{enc\(job\.id\)\}\/cancel`, \{ method: 'POST', body: \{\} \}\)/)
+  // a cancelled launch is not shown as a fault
+  assert.match(fnSource('finishJob'), /ev\?\.stage === 'cancelled' \|\| ev\?\.code === 'cancelled'\) \{\s+S\.notice = \{ profile: job\.profile, \.\.\.cancelledNotice\(job\)/)
+})
