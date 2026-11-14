@@ -1,0 +1,1428 @@
+{
+  "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34-installer.jar",
+  "sha1": "ab306b654c44d659ce69da5d4f87590b66dc91e8",
+  "publishedSha1": "ab306b654c44d659ce69da5d4f87590b66dc91e8",
+  "bytes": 8030981,
+  "entries": [
+    {
+      "name": "META-INF/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/MANIFEST.MF",
+      "size": 343
+    },
+    {
+      "name": "CREDITS.txt",
+      "size": 3317
+    },
+    {
+      "name": "LICENSE.txt",
+      "size": 27606
+    },
+    {
+      "name": "META-INF/maven/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/maven/com.google.code.gson/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/maven/com.google.code.gson/gson/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/maven/com.google.code.gson/gson/pom.properties",
+      "size": 60
+    },
+    {
+      "name": "META-INF/maven/com.google.code.gson/gson/pom.xml",
+      "size": 9365
+    },
+    {
+      "name": "META-INF/maven/net.sf.jopt-simple/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/maven/net.sf.jopt-simple/jopt-simple/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/maven/net.sf.jopt-simple/jopt-simple/pom.properties",
+      "size": 144
+    },
+    {
+      "name": "META-INF/maven/net.sf.jopt-simple/jopt-simple/pom.xml",
+      "size": 14128
+    },
+    {
+      "name": "META-INF/versions/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/versions/9/",
+      "size": 0
+    },
+    {
+      "name": "META-INF/versions/9/module-info.class",
+      "size": 305
+    },
+    {
+      "name": "big_logo.png",
+      "size": 2473
+    },
+    {
+      "name": "changelog.txt",
+      "size": 974968
+    },
+    {
+      "name": "com/",
+      "size": 0
+    },
+    {
+      "name": "com/google/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/ExclusionStrategy.class",
+      "size": 291
+    },
+    {
+      "name": "com/google/gson/FieldAttributes.class",
+      "size": 1964
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$1.class",
+      "size": 711
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$2.class",
+      "size": 837
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$3.class",
+      "size": 914
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$4.class",
+      "size": 993
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$5.class",
+      "size": 993
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$6.class",
+      "size": 993
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy$7.class",
+      "size": 993
+    },
+    {
+      "name": "com/google/gson/FieldNamingPolicy.class",
+      "size": 3292
+    },
+    {
+      "name": "com/google/gson/FieldNamingStrategy.class",
+      "size": 207
+    },
+    {
+      "name": "com/google/gson/Gson$1.class",
+      "size": 2003
+    },
+    {
+      "name": "com/google/gson/Gson$2.class",
+      "size": 2077
+    },
+    {
+      "name": "com/google/gson/Gson$3.class",
+      "size": 1928
+    },
+    {
+      "name": "com/google/gson/Gson$4.class",
+      "size": 1746
+    },
+    {
+      "name": "com/google/gson/Gson$5.class",
+      "size": 2584
+    },
+    {
+      "name": "com/google/gson/Gson$FutureTypeAdapter.class",
+      "size": 2301
+    },
+    {
+      "name": "com/google/gson/Gson.class",
+      "size": 25032
+    },
+    {
+      "name": "com/google/gson/GsonBuilder.class",
+      "size": 12064
+    },
+    {
+      "name": "com/google/gson/InstanceCreator.class",
+      "size": 302
+    },
+    {
+      "name": "com/google/gson/JsonArray.class",
+      "size": 5862
+    },
+    {
+      "name": "com/google/gson/JsonDeserializationContext.class",
+      "size": 413
+    },
+    {
+      "name": "com/google/gson/JsonDeserializer.class",
+      "size": 510
+    },
+    {
+      "name": "com/google/gson/JsonElement.class",
+      "size": 3894
+    },
+    {
+      "name": "com/google/gson/JsonIOException.class",
+      "size": 731
+    },
+    {
+      "name": "com/google/gson/JsonNull.class",
+      "size": 925
+    },
+    {
+      "name": "com/google/gson/JsonObject.class",
+      "size": 4825
+    },
+    {
+      "name": "com/google/gson/JsonParseException.class",
+      "size": 732
+    },
+    {
+      "name": "com/google/gson/JsonParser.class",
+      "size": 3134
+    },
+    {
+      "name": "com/google/gson/JsonPrimitive.class",
+      "size": 5419
+    },
+    {
+      "name": "com/google/gson/JsonSerializationContext.class",
+      "size": 301
+    },
+    {
+      "name": "com/google/gson/JsonSerializer.class",
+      "size": 437
+    },
+    {
+      "name": "com/google/gson/JsonSyntaxException.class",
+      "size": 743
+    },
+    {
+      "name": "com/google/gson/LongSerializationPolicy$1.class",
+      "size": 856
+    },
+    {
+      "name": "com/google/gson/LongSerializationPolicy$2.class",
+      "size": 978
+    },
+    {
+      "name": "com/google/gson/LongSerializationPolicy.class",
+      "size": 1507
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter$1.class",
+      "size": 1129
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter$2.class",
+      "size": 1120
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter$3.class",
+      "size": 1123
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter$4.class",
+      "size": 1127
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter$FilterResult.class",
+      "size": 1352
+    },
+    {
+      "name": "com/google/gson/ReflectionAccessFilter.class",
+      "size": 1015
+    },
+    {
+      "name": "com/google/gson/ToNumberPolicy$1.class",
+      "size": 967
+    },
+    {
+      "name": "com/google/gson/ToNumberPolicy$2.class",
+      "size": 911
+    },
+    {
+      "name": "com/google/gson/ToNumberPolicy$3.class",
+      "size": 2000
+    },
+    {
+      "name": "com/google/gson/ToNumberPolicy$4.class",
+      "size": 1577
+    },
+    {
+      "name": "com/google/gson/ToNumberPolicy.class",
+      "size": 1646
+    },
+    {
+      "name": "com/google/gson/ToNumberStrategy.class",
+      "size": 256
+    },
+    {
+      "name": "com/google/gson/TypeAdapter$1.class",
+      "size": 1665
+    },
+    {
+      "name": "com/google/gson/TypeAdapter.class",
+      "size": 3487
+    },
+    {
+      "name": "com/google/gson/TypeAdapterFactory.class",
+      "size": 384
+    },
+    {
+      "name": "com/google/gson/annotations/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/annotations/Expose.class",
+      "size": 523
+    },
+    {
+      "name": "com/google/gson/annotations/JsonAdapter.class",
+      "size": 548
+    },
+    {
+      "name": "com/google/gson/annotations/SerializedName.class",
+      "size": 566
+    },
+    {
+      "name": "com/google/gson/annotations/Since.class",
+      "size": 456
+    },
+    {
+      "name": "com/google/gson/annotations/Until.class",
+      "size": 456
+    },
+    {
+      "name": "com/google/gson/annotations/package-info.class",
+      "size": 133
+    },
+    {
+      "name": "com/google/gson/internal/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/internal/$Gson$Preconditions.class",
+      "size": 976
+    },
+    {
+      "name": "com/google/gson/internal/$Gson$Types$GenericArrayTypeImpl.class",
+      "size": 1636
+    },
+    {
+      "name": "com/google/gson/internal/$Gson$Types$ParameterizedTypeImpl.class",
+      "size": 3285
+    },
+    {
+      "name": "com/google/gson/internal/$Gson$Types$WildcardTypeImpl.class",
+      "size": 2372
+    },
+    {
+      "name": "com/google/gson/internal/$Gson$Types.class",
+      "size": 11930
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$1.class",
+      "size": 1268
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$10.class",
+      "size": 875
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$11.class",
+      "size": 881
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$12.class",
+      "size": 878
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$13.class",
+      "size": 877
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$14.class",
+      "size": 900
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$15.class",
+      "size": 896
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$16.class",
+      "size": 875
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$17.class",
+      "size": 881
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$18.class",
+      "size": 896
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$19.class",
+      "size": 1887
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$2.class",
+      "size": 1271
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$20.class",
+      "size": 1115
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$3.class",
+      "size": 1116
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$4.class",
+      "size": 1107
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$5.class",
+      "size": 1686
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$6.class",
+      "size": 1663
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$7.class",
+      "size": 1117
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$8.class",
+      "size": 1126
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor$9.class",
+      "size": 2342
+    },
+    {
+      "name": "com/google/gson/internal/ConstructorConstructor.class",
+      "size": 9467
+    },
+    {
+      "name": "com/google/gson/internal/Excluder$1.class",
+      "size": 2346
+    },
+    {
+      "name": "com/google/gson/internal/Excluder.class",
+      "size": 7221
+    },
+    {
+      "name": "com/google/gson/internal/JavaVersion.class",
+      "size": 1990
+    },
+    {
+      "name": "com/google/gson/internal/JsonReaderInternalAccess.class",
+      "size": 484
+    },
+    {
+      "name": "com/google/gson/internal/LazilyParsedNumber.class",
+      "size": 2222
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$1.class",
+      "size": 906
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$EntrySet$1.class",
+      "size": 1511
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$EntrySet.class",
+      "size": 2055
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$KeySet$1.class",
+      "size": 1312
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$KeySet.class",
+      "size": 1678
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$LinkedTreeMapIterator.class",
+      "size": 2021
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap$Node.class",
+      "size": 3601
+    },
+    {
+      "name": "com/google/gson/internal/LinkedTreeMap.class",
+      "size": 11779
+    },
+    {
+      "name": "com/google/gson/internal/NonNullElementWrapperList.class",
+      "size": 3540
+    },
+    {
+      "name": "com/google/gson/internal/ObjectConstructor.class",
+      "size": 262
+    },
+    {
+      "name": "com/google/gson/internal/PreJava9DateFormatProvider.class",
+      "size": 1943
+    },
+    {
+      "name": "com/google/gson/internal/Primitives.class",
+      "size": 1584
+    },
+    {
+      "name": "com/google/gson/internal/ReflectionAccessFilterHelper$1.class",
+      "size": 282
+    },
+    {
+      "name": "com/google/gson/internal/ReflectionAccessFilterHelper$AccessChecker$1.class",
+      "size": 1498
+    },
+    {
+      "name": "com/google/gson/internal/ReflectionAccessFilterHelper$AccessChecker$2.class",
+      "size": 955
+    },
+    {
+      "name": "com/google/gson/internal/ReflectionAccessFilterHelper$AccessChecker.class",
+      "size": 1639
+    },
+    {
+      "name": "com/google/gson/internal/ReflectionAccessFilterHelper.class",
+      "size": 3007
+    },
+    {
+      "name": "com/google/gson/internal/Streams$1.class",
+      "size": 219
+    },
+    {
+      "name": "com/google/gson/internal/Streams$AppendableWriter$CurrentWrite.class",
+      "size": 1478
+    },
+    {
+      "name": "com/google/gson/internal/Streams$AppendableWriter.class",
+      "size": 2306
+    },
+    {
+      "name": "com/google/gson/internal/Streams.class",
+      "size": 2432
+    },
+    {
+      "name": "com/google/gson/internal/UnsafeAllocator$1.class",
+      "size": 1187
+    },
+    {
+      "name": "com/google/gson/internal/UnsafeAllocator$2.class",
+      "size": 1230
+    },
+    {
+      "name": "com/google/gson/internal/UnsafeAllocator$3.class",
+      "size": 1109
+    },
+    {
+      "name": "com/google/gson/internal/UnsafeAllocator$4.class",
+      "size": 1210
+    },
+    {
+      "name": "com/google/gson/internal/UnsafeAllocator.class",
+      "size": 3202
+    },
+    {
+      "name": "com/google/gson/internal/bind/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/internal/bind/ArrayTypeAdapter$1.class",
+      "size": 2039
+    },
+    {
+      "name": "com/google/gson/internal/bind/ArrayTypeAdapter.class",
+      "size": 3440
+    },
+    {
+      "name": "com/google/gson/internal/bind/CollectionTypeAdapterFactory$Adapter.class",
+      "size": 3657
+    },
+    {
+      "name": "com/google/gson/internal/bind/CollectionTypeAdapterFactory.class",
+      "size": 2660
+    },
+    {
+      "name": "com/google/gson/internal/bind/DateTypeAdapter$1.class",
+      "size": 1165
+    },
+    {
+      "name": "com/google/gson/internal/bind/DateTypeAdapter.class",
+      "size": 4165
+    },
+    {
+      "name": "com/google/gson/internal/bind/DefaultDateTypeAdapter$1.class",
+      "size": 274
+    },
+    {
+      "name": "com/google/gson/internal/bind/DefaultDateTypeAdapter$DateType$1.class",
+      "size": 944
+    },
+    {
+      "name": "com/google/gson/internal/bind/DefaultDateTypeAdapter$DateType.class",
+      "size": 3043
+    },
+    {
+      "name": "com/google/gson/internal/bind/DefaultDateTypeAdapter.class",
+      "size": 7412
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonAdapterAnnotationTypeAdapterFactory.class",
+      "size": 4190
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonTreeReader$1.class",
+      "size": 691
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonTreeReader$2.class",
+      "size": 853
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonTreeReader.class",
+      "size": 8918
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonTreeWriter$1.class",
+      "size": 766
+    },
+    {
+      "name": "com/google/gson/internal/bind/JsonTreeWriter.class",
+      "size": 5985
+    },
+    {
+      "name": "com/google/gson/internal/bind/MapTypeAdapterFactory$Adapter.class",
+      "size": 7495
+    },
+    {
+      "name": "com/google/gson/internal/bind/MapTypeAdapterFactory.class",
+      "size": 3385
+    },
+    {
+      "name": "com/google/gson/internal/bind/NumberTypeAdapter$1.class",
+      "size": 1399
+    },
+    {
+      "name": "com/google/gson/internal/bind/NumberTypeAdapter$2.class",
+      "size": 802
+    },
+    {
+      "name": "com/google/gson/internal/bind/NumberTypeAdapter.class",
+      "size": 3054
+    },
+    {
+      "name": "com/google/gson/internal/bind/ObjectTypeAdapter$1.class",
+      "size": 1457
+    },
+    {
+      "name": "com/google/gson/internal/bind/ObjectTypeAdapter$2.class",
+      "size": 956
+    },
+    {
+      "name": "com/google/gson/internal/bind/ObjectTypeAdapter.class",
+      "size": 5241
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory$1.class",
+      "size": 5053
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory$Adapter.class",
+      "size": 4005
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory$BoundField.class",
+      "size": 1308
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory$FieldReflectionAdapter.class",
+      "size": 2646
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory$RecordAdapter.class",
+      "size": 7002
+    },
+    {
+      "name": "com/google/gson/internal/bind/ReflectiveTypeAdapterFactory.class",
+      "size": 12357
+    },
+    {
+      "name": "com/google/gson/internal/bind/SerializationDelegatingTypeAdapter.class",
+      "size": 710
+    },
+    {
+      "name": "com/google/gson/internal/bind/TreeTypeAdapter$1.class",
+      "size": 253
+    },
+    {
+      "name": "com/google/gson/internal/bind/TreeTypeAdapter$GsonContextImpl.class",
+      "size": 2087
+    },
+    {
+      "name": "com/google/gson/internal/bind/TreeTypeAdapter$SingleTypeFactory.class",
+      "size": 2653
+    },
+    {
+      "name": "com/google/gson/internal/bind/TreeTypeAdapter.class",
+      "size": 6159
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapterRuntimeTypeWrapper.class",
+      "size": 3167
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$1.class",
+      "size": 1730
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$10.class",
+      "size": 2686
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$11.class",
+      "size": 2043
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$12.class",
+      "size": 1926
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$13.class",
+      "size": 1856
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$14.class",
+      "size": 2312
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$15.class",
+      "size": 1865
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$16.class",
+      "size": 2288
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$17.class",
+      "size": 2288
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$18.class",
+      "size": 1878
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$19.class",
+      "size": 1866
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$2.class",
+      "size": 3002
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$20.class",
+      "size": 1861
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$21.class",
+      "size": 1930
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$22.class",
+      "size": 2124
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$23.class",
+      "size": 1886
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$24.class",
+      "size": 2332
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$25.class",
+      "size": 2144
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$26.class",
+      "size": 2930
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$27.class",
+      "size": 2400
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$28.class",
+      "size": 5914
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$29.class",
+      "size": 1592
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$3.class",
+      "size": 1900
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$30.class",
+      "size": 1427
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$31.class",
+      "size": 1797
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$32.class",
+      "size": 1975
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$33.class",
+      "size": 1986
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$34$1.class",
+      "size": 2208
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$34.class",
+      "size": 2068
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$35.class",
+      "size": 942
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$4.class",
+      "size": 1869
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$5.class",
+      "size": 2462
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$6.class",
+      "size": 2471
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$7.class",
+      "size": 2046
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$8.class",
+      "size": 1829
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$9.class",
+      "size": 1613
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$EnumTypeAdapter$1.class",
+      "size": 1998
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters$EnumTypeAdapter.class",
+      "size": 4175
+    },
+    {
+      "name": "com/google/gson/internal/bind/TypeAdapters.class",
+      "size": 9841
+    },
+    {
+      "name": "com/google/gson/internal/bind/util/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/internal/bind/util/ISO8601Utils.class",
+      "size": 7285
+    },
+    {
+      "name": "com/google/gson/internal/package-info.class",
+      "size": 130
+    },
+    {
+      "name": "com/google/gson/internal/reflect/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/internal/reflect/ReflectionHelper$1.class",
+      "size": 262
+    },
+    {
+      "name": "com/google/gson/internal/reflect/ReflectionHelper$RecordHelper.class",
+      "size": 1307
+    },
+    {
+      "name": "com/google/gson/internal/reflect/ReflectionHelper$RecordNotSupportedHelper.class",
+      "size": 2063
+    },
+    {
+      "name": "com/google/gson/internal/reflect/ReflectionHelper$RecordSupportedHelper.class",
+      "size": 3636
+    },
+    {
+      "name": "com/google/gson/internal/reflect/ReflectionHelper.class",
+      "size": 6864
+    },
+    {
+      "name": "com/google/gson/internal/sql/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlDateTypeAdapter$1.class",
+      "size": 1244
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlDateTypeAdapter.class",
+      "size": 3289
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTimeTypeAdapter$1.class",
+      "size": 1236
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTimeTypeAdapter.class",
+      "size": 3258
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTimestampTypeAdapter$1.class",
+      "size": 1516
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTimestampTypeAdapter.class",
+      "size": 2166
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTypesSupport$1.class",
+      "size": 1151
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTypesSupport$2.class",
+      "size": 1171
+    },
+    {
+      "name": "com/google/gson/internal/sql/SqlTypesSupport.class",
+      "size": 1841
+    },
+    {
+      "name": "com/google/gson/package-info.class",
+      "size": 121
+    },
+    {
+      "name": "com/google/gson/reflect/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/reflect/TypeToken.class",
+      "size": 9774
+    },
+    {
+      "name": "com/google/gson/reflect/package-info.class",
+      "size": 129
+    },
+    {
+      "name": "com/google/gson/stream/",
+      "size": 0
+    },
+    {
+      "name": "com/google/gson/stream/JsonReader$1.class",
+      "size": 1369
+    },
+    {
+      "name": "com/google/gson/stream/JsonReader.class",
+      "size": 20194
+    },
+    {
+      "name": "com/google/gson/stream/JsonToken.class",
+      "size": 1465
+    },
+    {
+      "name": "com/google/gson/stream/JsonWriter.class",
+      "size": 9887
+    },
+    {
+      "name": "com/google/gson/stream/MalformedJsonException.class",
+      "size": 755
+    },
+    {
+      "name": "com/google/gson/stream/package-info.class",
+      "size": 128
+    },
+    {
+      "name": "data/",
+      "size": 0
+    },
+    {
+      "name": "data/client.lzma",
+      "size": 2291374
+    },
+    {
+      "name": "data/server.lzma",
+      "size": 2308640
+    },
+    {
+      "name": "install_profile.json",
+      "size": 34526
+    },
+    {
+      "name": "joptsimple/",
+      "size": 0
+    },
+    {
+      "name": "joptsimple/AbstractOptionSpec.class",
+      "size": 5516
+    },
+    {
+      "name": "joptsimple/AlternativeLongOptionSpec.class",
+      "size": 1634
+    },
+    {
+      "name": "joptsimple/ArgumentAcceptingOptionSpec.class",
+      "size": 8076
+    },
+    {
+      "name": "joptsimple/ArgumentList.class",
+      "size": 1124
+    },
+    {
+      "name": "joptsimple/BuiltinHelpFormatter.class",
+      "size": 12143
+    },
+    {
+      "name": "joptsimple/ExceptionMessages.properties",
+      "size": 1740
+    },
+    {
+      "name": "joptsimple/HelpFormatter.class",
+      "size": 281
+    },
+    {
+      "name": "joptsimple/HelpFormatterMessages.properties",
+      "size": 804
+    },
+    {
+      "name": "joptsimple/IllegalOptionSpecificationException.class",
+      "size": 793
+    },
+    {
+      "name": "joptsimple/MissingRequiredOptionsException.class",
+      "size": 868
+    },
+    {
+      "name": "joptsimple/MultipleArgumentsForOptionException.class",
+      "size": 929
+    },
+    {
+      "name": "joptsimple/NoArgumentOptionSpec.class",
+      "size": 2355
+    },
+    {
+      "name": "joptsimple/NonOptionArgumentSpec.class",
+      "size": 4043
+    },
+    {
+      "name": "joptsimple/OptionArgumentConversionException.class",
+      "size": 1141
+    },
+    {
+      "name": "joptsimple/OptionDeclarer.class",
+      "size": 1000
+    },
+    {
+      "name": "joptsimple/OptionDescriptor.class",
+      "size": 617
+    },
+    {
+      "name": "joptsimple/OptionException.class",
+      "size": 4810
+    },
+    {
+      "name": "joptsimple/OptionMissingRequiredArgumentException.class",
+      "size": 942
+    },
+    {
+      "name": "joptsimple/OptionParser.class",
+      "size": 16423
+    },
+    {
+      "name": "joptsimple/OptionParserState$1.class",
+      "size": 950
+    },
+    {
+      "name": "joptsimple/OptionParserState$2.class",
+      "size": 1663
+    },
+    {
+      "name": "joptsimple/OptionParserState.class",
+      "size": 767
+    },
+    {
+      "name": "joptsimple/OptionSet.class",
+      "size": 8272
+    },
+    {
+      "name": "joptsimple/OptionSpec.class",
+      "size": 1000
+    },
+    {
+      "name": "joptsimple/OptionSpecBuilder.class",
+      "size": 5519
+    },
+    {
+      "name": "joptsimple/OptionSpecTokenizer.class",
+      "size": 3009
+    },
+    {
+      "name": "joptsimple/OptionalArgumentOptionSpec.class",
+      "size": 2240
+    },
+    {
+      "name": "joptsimple/ParserRules.class",
+      "size": 2447
+    },
+    {
+      "name": "joptsimple/RequiredArgumentOptionSpec.class",
+      "size": 1621
+    },
+    {
+      "name": "joptsimple/UnavailableOptionException.class",
+      "size": 847
+    },
+    {
+      "name": "joptsimple/UnconfiguredOptionException.class",
+      "size": 1025
+    },
+    {
+      "name": "joptsimple/UnrecognizedOptionException.class",
+      "size": 769
+    },
+    {
+      "name": "joptsimple/ValueConversionException.class",
+      "size": 627
+    },
+    {
+      "name": "joptsimple/ValueConverter.class",
+      "size": 753
+    },
+    {
+      "name": "joptsimple/internal/",
+      "size": 0
+    },
+    {
+      "name": "joptsimple/internal/AbbreviationMap.class",
+      "size": 5201
+    },
+    {
+      "name": "joptsimple/internal/Classes.class",
+      "size": 1790
+    },
+    {
+      "name": "joptsimple/internal/Columns.class",
+      "size": 3903
+    },
+    {
+      "name": "joptsimple/internal/ConstructorInvokingValueConverter.class",
+      "size": 1501
+    },
+    {
+      "name": "joptsimple/internal/Messages.class",
+      "size": 1663
+    },
+    {
+      "name": "joptsimple/internal/MethodInvokingValueConverter.class",
+      "size": 1561
+    },
+    {
+      "name": "joptsimple/internal/OptionNameMap.class",
+      "size": 667
+    },
+    {
+      "name": "joptsimple/internal/Reflection.class",
+      "size": 4621
+    },
+    {
+      "name": "joptsimple/internal/ReflectionException.class",
+      "size": 464
+    },
+    {
+      "name": "joptsimple/internal/Row.class",
+      "size": 886
+    },
+    {
+      "name": "joptsimple/internal/Rows.class",
+      "size": 2987
+    },
+    {
+      "name": "joptsimple/internal/SimpleOptionNameMap.class",
+      "size": 2385
+    },
+    {
+      "name": "joptsimple/internal/Strings.class",
+      "size": 1416
+    },
+    {
+      "name": "joptsimple/util/",
+      "size": 0
+    },
+    {
+      "name": "joptsimple/util/DateConverter.class",
+      "size": 2922
+    },
+    {
+      "name": "joptsimple/util/KeyValuePair.class",
+      "size": 1569
+    },
+    {
+      "name": "maven/",
+      "size": 0
+    },
+    {
+      "name": "maven/net/",
+      "size": 0
+    },
+    {
+      "name": "maven/net/minecraftforge/",
+      "size": 0
+    },
+    {
+      "name": "maven/net/minecraftforge/forge/",
+      "size": 0
+    },
+    {
+      "name": "maven/net/minecraftforge/forge/1.16.5-36.2.34/",
+      "size": 0
+    },
+    {
+      "name": "maven/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34-universal.jar",
+      "size": 2773337
+    },
+    {
+      "name": "maven/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34.jar",
+      "size": 212608
+    },
+    {
+      "name": "net/",
+      "size": 0
+    },
+    {
+      "name": "net/minecraftforge/",
+      "size": 0
+    },
+    {
+      "name": "net/minecraftforge/installer/",
+      "size": 0
+    },
+    {
+      "name": "net/minecraftforge/installer/DownloadUtils.class",
+      "size": 16151
+    },
+    {
+      "name": "net/minecraftforge/installer/HashFunction.class",
+      "size": 5119
+    },
+    {
+      "name": "net/minecraftforge/installer/InstallerPanel$1.class",
+      "size": 248
+    },
+    {
+      "name": "net/minecraftforge/installer/InstallerPanel$FileSelectAction.class",
+      "size": 1874
+    },
+    {
+      "name": "net/minecraftforge/installer/InstallerPanel$SelectButtonAction.class",
+      "size": 1166
+    },
+    {
+      "name": "net/minecraftforge/installer/InstallerPanel.class",
+      "size": 14018
+    },
+    {
+      "name": "net/minecraftforge/installer/ProgressFrame.class",
+      "size": 5514
+    },
+    {
+      "name": "net/minecraftforge/installer/SimpleInstaller$1.class",
+      "size": 1714
+    },
+    {
+      "name": "net/minecraftforge/installer/SimpleInstaller.class",
+      "size": 11967
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/",
+      "size": 0
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/Action.class",
+      "size": 8812
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ActionCanceledException.class",
+      "size": 531
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/Actions.class",
+      "size": 4841
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ClientInstall.class",
+      "size": 7750
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ExtractAction.class",
+      "size": 2420
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/OfflineAction.class",
+      "size": 12766
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors$1.class",
+      "size": 264
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors$ArtifactEntry.class",
+      "size": 936
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors$DataEntry.class",
+      "size": 946
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors$FileEntry.class",
+      "size": 702
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors$Output.class",
+      "size": 1266
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/PostProcessors.class",
+      "size": 19759
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ProgressCallback$1.class",
+      "size": 1002
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ProgressCallback$2.class",
+      "size": 1744
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ProgressCallback$MessagePriority.class",
+      "size": 1392
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ProgressCallback.class",
+      "size": 1497
+    },
+    {
+      "name": "net/minecraftforge/installer/actions/ServerInstall.class",
+      "size": 5868
+    },
+    {
+      "name": "net/minecraftforge/installer/json/",
+      "size": 0
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Artifact$Adapter.class",
+      "size": 2424
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Artifact.class",
+      "size": 2643
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Install$DataFile.class",
+      "size": 893
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Install$Processor.class",
+      "size": 1803
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Install.class",
+      "size": 6448
+    },
+    {
+      "name": "net/minecraftforge/installer/json/InstallV1.class",
+      "size": 1596
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Manifest$Info.class",
+      "size": 643
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Manifest.class",
+      "size": 2197
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Mirror.class",
+      "size": 1629
+    },
+    {
+      "name": "net/minecraftforge/installer/json/OptionalLibrary.class",
+      "size": 4172
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Spec.class",
+      "size": 420
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Util.class",
+      "size": 8077
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Version$Download.class",
+      "size": 961
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Version$Downloads.class",
+      "size": 1192
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Version$Library.class",
+      "size": 907
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Version$LibraryDownload.class",
+      "size": 753
+    },
+    {
+      "name": "net/minecraftforge/installer/json/Version.class",
+      "size": 1487
+    },
+    {
+      "name": "version.json",
+      "size": 13577
+    }
+  ]
+}

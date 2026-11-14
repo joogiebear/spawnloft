@@ -1,0 +1,275 @@
+{
+  "capturedAt": "2026-11-14T18:34:06.681Z",
+  "files": [
+    {
+      "file": "forge/maven-metadata.json",
+      "url": "https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json",
+      "sha1": "52362110e2a0f9d0ab491369702a1bd4813972ca",
+      "bytes": 122888
+    },
+    {
+      "file": "forge/promotions_slim.json",
+      "url": "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json",
+      "sha1": "69aa5bf8070c580f6390afcb07d1ebc36e0ab27e",
+      "bytes": 4153
+    },
+    {
+      "file": "forge/1.7.10-10.13.4.1614-1.7.10/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.7.10-10.13.4.1614-1.7.10/forge-1.7.10-10.13.4.1614-1.7.10-installer.jar!/install_profile.json",
+      "sha1": "c137fed2696db8911a035b51875c70a1727ae2ec",
+      "bytes": 5152
+    },
+    {
+      "file": "forge/1.7.10-10.13.4.1614-1.7.10/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.7.10-10.13.4.1614-1.7.10/forge-1.7.10-10.13.4.1614-1.7.10-installer.jar",
+      "sha1": "4f996cf45d637322f213aff561ebd8d58ba83ba3",
+      "bytes": 56138
+    },
+    {
+      "file": "forge/1.12.2-14.23.0.2486/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.0.2486/forge-1.12.2-14.23.0.2486-installer.jar!/install_profile.json",
+      "sha1": "5f21242596c82285cc5417b3fbbf713078b35409",
+      "bytes": 6049
+    },
+    {
+      "file": "forge/1.12.2-14.23.0.2486/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.0.2486/forge-1.12.2-14.23.0.2486-installer.jar",
+      "sha1": "6568a0494131c65161f02d89862df5caf35762d4",
+      "bytes": 60433
+    },
+    {
+      "file": "forge/1.12.2-14.23.5.2864/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2864/forge-1.12.2-14.23.5.2864-installer.jar!/install_profile.json",
+      "sha1": "140d8ba78427134129eeef92f0f9b768d3ef6aca",
+      "bytes": 11568
+    },
+    {
+      "file": "forge/1.12.2-14.23.5.2864/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2864/forge-1.12.2-14.23.5.2864-installer.jar!/version.json",
+      "sha1": "50cf3b75e3d075fb59ea07f5595709083ac39fb9",
+      "bytes": 11810
+    },
+    {
+      "file": "forge/1.12.2-14.23.5.2864/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2864/forge-1.12.2-14.23.5.2864-installer.jar",
+      "sha1": "0c226a17cbe4dac2271e798321cfd16176291b6b",
+      "bytes": 34093
+    },
+    {
+      "file": "forge/1.16.5-36.2.34/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34-installer.jar!/install_profile.json",
+      "sha1": "39afdc71d5568710b096c52aa25d36b502f040ba",
+      "bytes": 34526
+    },
+    {
+      "file": "forge/1.16.5-36.2.34/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34-installer.jar!/version.json",
+      "sha1": "2f8050c2d423a74e7361902224e0231810ce2b5b",
+      "bytes": 13577
+    },
+    {
+      "file": "forge/1.16.5-36.2.34/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.16.5-36.2.34/forge-1.16.5-36.2.34-installer.jar",
+      "sha1": "ba895ad7001cfca7ddc11750e7f59b6b96a8ee30",
+      "bytes": 34215
+    },
+    {
+      "file": "forge/1.18.2-40.3.0/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.18.2-40.3.0/forge-1.18.2-40.3.0-installer.jar!/install_profile.json",
+      "sha1": "3149a4e599df80e3f2baed9887b5e65b980c233b",
+      "bytes": 38566
+    },
+    {
+      "file": "forge/1.18.2-40.3.0/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.18.2-40.3.0/forge-1.18.2-40.3.0-installer.jar!/version.json",
+      "sha1": "3f9a42ecd25c6a18a52e8d96bdc4dc475c36a8be",
+      "bytes": 16555
+    },
+    {
+      "file": "forge/1.18.2-40.3.0/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.18.2-40.3.0/forge-1.18.2-40.3.0-installer.jar",
+      "sha1": "584b8bdf464c055a2546b32bfa2bf97d1010548d",
+      "bytes": 34163
+    },
+    {
+      "file": "forge/1.20.1-47.4.28/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.28/forge-1.20.1-47.4.28-installer.jar!/install_profile.json",
+      "sha1": "e6768dfb113e83b8bb9155b4ad567d9dce8efe89",
+      "bytes": 39149
+    },
+    {
+      "file": "forge/1.20.1-47.4.28/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.28/forge-1.20.1-47.4.28-installer.jar!/version.json",
+      "sha1": "1e01e1eea1385594a721c19b7cb8ded3c3772ede",
+      "bytes": 16629
+    },
+    {
+      "file": "forge/1.20.1-47.4.28/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.4.28/forge-1.20.1-47.4.28-installer.jar",
+      "sha1": "0da0b648f593d97779c5963db5ad55b6e01f4f74",
+      "bytes": 38070
+    },
+    {
+      "file": "forge/1.21.1-52.1.20/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.21.1-52.1.20/forge-1.21.1-52.1.20-installer.jar!/install_profile.json",
+      "sha1": "76c5157e92564ae1e8309a0ee174a64e6ab05eb9",
+      "bytes": 28909
+    },
+    {
+      "file": "forge/1.21.1-52.1.20/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.21.1-52.1.20/forge-1.21.1-52.1.20-installer.jar!/version.json",
+      "sha1": "41f596c93f4fc70d2e1952c02ad988ed2921f4f9",
+      "bytes": 24779
+    },
+    {
+      "file": "forge/1.21.1-52.1.20/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/1.21.1-52.1.20/forge-1.21.1-52.1.20-installer.jar",
+      "sha1": "002da4136e45f4d768d73580f054ce0673ddfbda",
+      "bytes": 36064
+    },
+    {
+      "file": "forge/26.3-66.1.8/install_profile.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/26.3-66.1.8/forge-26.3-66.1.8-installer.jar!/install_profile.json",
+      "sha1": "b1f152b7db8f5375f5fa1e7c797b48b8482939d4",
+      "bytes": 21664
+    },
+    {
+      "file": "forge/26.3-66.1.8/version.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/26.3-66.1.8/forge-26.3-66.1.8-installer.jar!/version.json",
+      "sha1": "f1871cde8f4662496be09300469a97cda7abb1b1",
+      "bytes": 17119
+    },
+    {
+      "file": "forge/26.3-66.1.8/installer.json",
+      "url": "https://maven.minecraftforge.net/net/minecraftforge/forge/26.3-66.1.8/forge-26.3-66.1.8-installer.jar",
+      "sha1": "0aaae2c8e5d245ddd87f42abcd668d6a045a5e9e",
+      "bytes": 36047
+    },
+    {
+      "file": "neoforge/versions.json",
+      "url": "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge",
+      "sha1": "37b50e5b08e8658e795a1b90cd5364b05ffd32c0",
+      "bytes": 25913
+    },
+    {
+      "file": "neoforge/20.4.253/install_profile.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.253/neoforge-20.4.253-installer.jar!/install_profile.json",
+      "sha1": "df62db018ce010823520f5db751110b30c7ce678",
+      "bytes": 157409
+    },
+    {
+      "file": "neoforge/20.4.253/version.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.253/neoforge-20.4.253-installer.jar!/version.json",
+      "sha1": "9a2869ce0523c3f005d84e6b9643510308e2e3eb",
+      "bytes": 17218
+    },
+    {
+      "file": "neoforge/20.4.253/installer.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.253/neoforge-20.4.253-installer.jar",
+      "sha1": "b9c4ae32888d96e75061afc5628ac1659dacf6f3",
+      "bytes": 39293
+    },
+    {
+      "file": "neoforge/21.1.266/install_profile.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.266/neoforge-21.1.266-installer.jar!/install_profile.json",
+      "sha1": "a6a272eb933f08206983e9eada7eb4487e721fea",
+      "bytes": 130597
+    },
+    {
+      "file": "neoforge/21.1.266/version.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.266/neoforge-21.1.266-installer.jar!/version.json",
+      "sha1": "42228b8f99c05d6683805d6e96c52db8a81dbdfe",
+      "bytes": 21253
+    },
+    {
+      "file": "neoforge/21.1.266/installer.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.266/neoforge-21.1.266-installer.jar",
+      "sha1": "28f26a32c29efe43d65ff5d37adbeacea5d2c12b",
+      "bytes": 39293
+    },
+    {
+      "file": "neoforge/26.3.0.103/install_profile.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.103/neoforge-26.3.0.103-installer.jar!/install_profile.json",
+      "sha1": "1869935e4058705d158f6fea82e104b320a1113b",
+      "bytes": 15440
+    },
+    {
+      "file": "neoforge/26.3.0.103/version.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.103/neoforge-26.3.0.103-installer.jar!/version.json",
+      "sha1": "495e1da5dde50c3a12e33918acc6bb1e7d4b7c4c",
+      "bytes": 11888
+    },
+    {
+      "file": "neoforge/26.3.0.103/installer.json",
+      "url": "https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.103/neoforge-26.3.0.103-installer.jar",
+      "sha1": "7bd1ddc4d89608a5fd5faaf844f5e75f7d330a88",
+      "bytes": 39226
+    },
+    {
+      "file": "quilt/game-versions.json",
+      "url": "https://meta.quiltmc.org/v3/versions/game",
+      "sha1": "3196d9c551e9e1f794d3c6d76c129e12614f65e8",
+      "bytes": 25255
+    },
+    {
+      "file": "quilt/loader-versions.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader",
+      "sha1": "112a520ec234dffc24d9e56712e6e30055b04cd3",
+      "bytes": 145519
+    },
+    {
+      "file": "quilt/loader-1.20.1.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/1.20.1",
+      "sha1": "a666e726ec9f3c5577f46a24d690fe39dbacb6f6",
+      "bytes": 73853
+    },
+    {
+      "file": "quilt/profile-1.20.1-0.30.2.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/1.20.1/0.30.2/profile/json",
+      "sha1": "8acac443d4b1fc50f70c2eec6a531faa30369f25",
+      "bytes": 1517
+    },
+    {
+      "file": "quilt/sidecars-1.20.1-0.30.2.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/1.20.1/0.30.2/profile/json",
+      "sha1": "8f7c20dd8d5017ab9731f42648d2898b1694af3a",
+      "bytes": 2208
+    },
+    {
+      "file": "quilt/loader-26.3.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/26.3",
+      "sha1": "df2fffb7f23cf82204e3e906eb15b4d9ac5d8b5e",
+      "bytes": 60153
+    },
+    {
+      "file": "quilt/profile-26.3-0.30.2.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/26.3/0.30.2/profile/json",
+      "sha1": "963840db1a770634706b9b6217dfe12bdc0ddaf9",
+      "bytes": 1290
+    },
+    {
+      "file": "quilt/sidecars-26.3-0.30.2.json",
+      "url": "https://meta.quiltmc.org/v3/versions/loader/26.3/0.30.2/profile/json",
+      "sha1": "8de48627490ddef0470c9e2a3676294c97c3e906",
+      "bytes": 1814
+    },
+    {
+      "file": "fabric/game-versions.json",
+      "url": "https://meta.fabricmc.net/v2/versions/game",
+      "sha1": "146467dcc5a128307d68d2c17db213c5bd3e8bdc",
+      "bytes": 30610
+    },
+    {
+      "file": "fabric/loader-1.21.11.json",
+      "url": "https://meta.fabricmc.net/v2/versions/loader/1.21.11",
+      "sha1": "2f9b6256cf10fd3972bb5beb9a52f73dd94ab455",
+      "bytes": 108032
+    },
+    {
+      "file": "fabric/loader-26.3.json",
+      "url": "https://meta.fabricmc.net/v2/versions/loader/26.3",
+      "sha1": "2e2629fe03942e59c8da36d7bb27639227285376",
+      "bytes": 107932
+    }
+  ]
+}

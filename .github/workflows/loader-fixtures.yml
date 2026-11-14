@@ -1,0 +1,38 @@
+# Captures the mod loaders' real installer files and version lists into
+# test/fixtures/client/loaders/ (tools/capture-loader-fixtures.mjs), for the Forge, NeoForge and
+# Quilt launcher work: the loaders' hosts cannot be reached from where that code is written.
+#
+# A pull request that changes the capture runs it, and it can be run by hand. Either way it only
+# uploads the files as the loader-fixtures artifact: no workflow here writes to the repository, so
+# the files are committed by hand from that artifact.
+name: loader-fixtures
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/capture-loader-fixtures.mjs
+      - .github/workflows/loader-fixtures.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loader-fixtures-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capture the loaders' files
+        run: node tools/capture-loader-fixtures.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loader-fixtures
+          path: test/fixtures/client/loaders/

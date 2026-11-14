@@ -141,6 +141,38 @@ test('a loader profile links the parent jar instead of downloading it again', as
   assert.equal(again.downloaded, 0)
 })
 
+test('a library row with an empty URL is made by the loader\'s installer: never downloaded, and missing means set the loader up again', async () => {
+  const child = {
+    id: 'forge-empty-url-test',
+    inheritsFrom: mc,
+    mainClass: 'x',
+    arguments: { game: [], jvm: [] },
+    libraries: [{ name: 'net.minecraftforge:forge:1.0-test:client', downloads: { artifact: { path: 'net/minecraftforge/forge/1.0-test/forge-1.0-test-client.jar', url: '', sha1: bodySha, size: bodySize } } }],
+  }
+  fs.mkdirSync(versionDir(child.id), { recursive: true })
+  fs.writeFileSync(versionJson(child.id), JSON.stringify(child))
+  const row = libraries(child, { os: winOs })[0]
+  assert.equal(row.url, null)
+
+  const { calls, fetchImpl } = makeStub()
+  await assert.rejects(ensureVersion(child.id, { os: winOs, fetchImpl }), (err) => err.code === 'loader-install-needed' && /set the loader up again/.test(err.message))
+  assert.ok(!calls.includes(''), 'no fetch of an empty URL')
+
+  // what the installer leaves: the file with its checksum, which the launch then takes as it is
+  const made = path.join(LIBRARIES_DIR, row.path)
+  fs.mkdirSync(path.dirname(made), { recursive: true })
+  fs.writeFileSync(made, BODY)
+  const done = makeStub()
+  await ensureVersion(child.id, { os: winOs, fetchImpl: done.fetchImpl })
+  assert.equal(done.calls.length, 0)
+
+  // damaged later: refused again, not fetched
+  fs.writeFileSync(made, 'damaged')
+  const again = makeStub()
+  await assert.rejects(ensureVersion(child.id, { os: winOs, fetchImpl: again.fetchImpl }), (err) => err.code === 'loader-install-needed')
+  assert.equal(again.calls.length, 0)
+})
+
 test('extractNatives skips META-INF and excluded prefixes', async () => {
   const cwd = fs.mkdtempSync(path.join(scratch, 'zip-src-'))
   fs.writeFileSync(path.join(cwd, 'a.dll'), 'native dll content')

@@ -3,7 +3,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
 
-import { currentOs, jvmArguments, gameArguments, libraries, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
+import { currentOs, jvmArguments, gameArguments, libraries, classpathRows, assetIndex, loggingConfig, log4jNoLookupsNeeded } from './client-meta.mjs'
 import { launchFeatures } from './client-version.mjs'
 import { LIBRARIES_DIR, ASSETS_DIR, profileDir, versionJar, nativesDir, clientRunDir, clientStateFile, clientLastExit, clientPlayed, clientLog, logConfigPath } from './client-paths.mjs'
 import { getInstance } from './registry.mjs'
@@ -68,16 +68,7 @@ export function buildCommand({ version, profile, profileName, account, java, os 
   const clientJar = versionJar(version.id)
   const natDir = nativesDir(version.id)
 
-  const nonNative = []
-  const seen = new Set()
-  for (const row of libraries(version, { os })) {
-    if (row.native !== false) continue
-    const p = path.join(LIBRARIES_DIR, row.path)
-    if (!seen.has(p)) {
-      seen.add(p)
-      nonNative.push(p)
-    }
-  }
+  const nonNative = classpathRows(libraries(version, { os })).map((row) => path.join(LIBRARIES_DIR, row.path))
   const classpath = [...nonNative, clientJar].join(path.delimiter)
 
   const launcherVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version

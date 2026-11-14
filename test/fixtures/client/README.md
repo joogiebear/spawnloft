@@ -49,3 +49,31 @@ client code, so a test sets `MCCTL_DATA_ROOT` before it imports the loader.
 A test file that removes its scratch folder in `after()` does every top-level `await` before its
 first `test()`: an await between tests lets the tests above it finish, and `after()` runs, before
 the tests below it are registered, which then run against a folder that is gone.
+
+## Mod loaders (`loaders/`)
+
+Captured by the `loader-fixtures` Actions job (`tools/capture-loader-fixtures.mjs`), since the
+loaders' hosts cannot be reached from where the launcher code is written. The job uploads them as
+its `loader-fixtures` artifact (no workflow writes to the repository), and they are committed from
+there. Not edited, except that the per-version loader lists (`quilt/loader-<mc>.json`,
+`fabric/loader-<mc>.json`) are cut to their newest 25 rows, as the script does: re-run the job to
+change them. `loaders/manifest.json` lists every file with its source URL and
+sha1, and when it was captured.
+
+- `forge/<forge version>/`: per pinned Forge installer, `install_profile.json` and (from the modern
+  format on) `version.json` as they are inside the jar, and `installer.json`: the jar's sha1, the
+  sha1 the maven publishes beside it, and its entry list (names and sizes; the jar itself is not
+  kept). Pinned: 1.7.10, 1.12.2 (14.23.0.2486, the legacy format, and 14.23.5.2864, the modern
+  one), 1.16.5, 1.18.2, 1.20.1, 1.21.1, 26.3. `forge/maven-metadata.json` and
+  `forge/promotions_slim.json` are Forge's version lists.
+- `neoforge/<version>/`: the same for NeoForge 20.4.253, 21.1.266 and 26.3.0.103;
+  `neoforge/versions.json` is the maven's versions list.
+- `quilt/`: Quilt meta's game and loader lists, the loader list and profile for Quilt Loader
+  0.30.2 on 1.20.1 and 26.3, and `sidecars-*.json`: per profile library, the `.sha1` file its maven
+  publishes (Quilt's rows carry no checksum).
+- `fabric/`: Fabric meta's real game list and the loader lists for 1.21.11 and 26.3, beside the
+  synthetic ones above.
+
+`expected/eras/`: the command line of every era (vanilla) and every Fabric profile on every
+machine, made with the launcher as it was before the loader groundwork; the groundwork must
+reproduce them byte for byte.
