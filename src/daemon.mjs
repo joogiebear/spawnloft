@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
-import { getInstance, serverJarPath, jvmFlagsFor, isDatabase, kindOf } from './registry.mjs'
+import { getInstance, serverJarPath, jvmFlagsFor, serverJvmArgs, isDatabase, kindOf } from './registry.mjs'
 import { runDir, stateFile, consoleLog, daemonLog, controlPath } from './paths.mjs'
 import { writeJson, killProcessGroup, maskSecretArgs } from './util.mjs'
 import { startSampler, metricsFile } from './metrics.mjs'
@@ -150,7 +150,7 @@ function programFor(inst) {
   }
   const jar = serverJarPath(inst)
   const flags = inst.jvmFlags?.length ? inst.jvmFlags : jvmFlagsFor(inst.memory)
-  const jvmArgs = [`-Xms${inst.memory}`, `-Xmx${inst.memory}`, ...flags, '-jar', path.basename(jar), '--nogui']
+  const jvmArgs = serverJvmArgs(inst.memory, flags, path.basename(jar))
   const { cmd, args, env } = javaCommand(inst, jvmArgs)
   return { cmd, args, env, cwd: inst.dir, stop: { stdin: 'stop\n' } }
 }

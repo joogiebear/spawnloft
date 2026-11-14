@@ -53,6 +53,16 @@ test('Java arguments: memory and the jar stay SpawnLoft\'s, the rest is the owne
   assert.throws(() => registry.cleanJvmFlags(Array.from({ length: 61 }, () => '-Dx=1')), /more than 60/)
 })
 
+test('a server starts with JLine off, so the "Advanced terminal features" warning never prints', () => {
+  const args = registry.serverJvmArgs('4G', registry.jvmFlagsFor('4G'), 'paper.jar')
+  assert.deepEqual(args.slice(0, 3), ['-Xms4G', '-Xmx4G', '-Dterminal.jline=false'])
+  assert.deepEqual(args.slice(-3), ['-jar', 'paper.jar', '--nogui'])
+  // Own flags replace the recommended set but not the property, and come after it so the owner
+  // can still turn JLine back on (the last -D for a name wins in Java).
+  const own = registry.serverJvmArgs('2G', ['-Dterminal.jline=true'], 'server.jar')
+  assert.deepEqual(own, ['-Xms2G', '-Xmx2G', '-Dterminal.jline=false', '-Dterminal.jline=true', '-jar', 'server.jar', '--nogui'])
+})
+
 test('Java arguments save through the panel, and empty goes back to the recommended set', async () => {
   let res = await api('instances/quick/settings', { jvmFlags: '-XX:+UseZGC -Dx=1' })
   assert.equal(res.status, 200)
