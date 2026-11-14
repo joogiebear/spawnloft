@@ -8,6 +8,7 @@ import zlib from 'node:zlib'
 import {
   readZipEntry, parsePluginYml, mcVersionOf, listPlugins, setPluginEnabled, removePlugin,
   pickVersion, primaryFile, LOADERS, readManaged, recordManaged, pickHangarVersion, searchHangar,
+  planInstall, installPlugin,
 } from '../src/plugins.mjs'
 import { UserError } from '../src/util.mjs'
 
@@ -266,4 +267,94 @@ test('Hangar search reports how often each project was downloaded', async (t) =>
   assert.equal(hit.downloads, 76528)
   assert.equal(hit.id, 'Chunky')
   assert.equal(hit.source, 'hangar')
+})
+
+// --- what an install would do, asked before it is done ---
+
+const answers = (routes) => async (url) => {
+  const hit = Object.entries(routes).find(([part]) => String(url).includes(part))
+  if (!hit) return new Response('not found', { status: 404 })
+  const body = hit[1]
+  return body instanceof Uint8Array ? new Response(body) : new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+}
+const mrVersion = (extra = {}) => ({
+  project_id: 'main1', version_number: '2.0', version_type: 'release', loaders: ['paper'], game_versions: ['1.21.4'],
+  files: [{ primary: true, filename: 'Main.jar', url: 'https://cdn.modrinth.com/Main.jar', hashes: {} }], dependencies: [], ...extra,
+})
+
+test('a plan lists what a build needs, and which of it is already here', async (t) => {
+  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  // Vault dropped in by hand is still Vault; ProtocolLib was installed by SpawnLoft under another file name
+  writeJar(path.join(inst.dir, 'plugins'), 'Vault-1.7.jar', 'name: Vault\n')
+  writeJar(path.join(inst.dir, 'plugins'), 'plib.jar', 'name: Something Else\n')
+  recordManaged(inst, 'plib.jar', { source: 'modrinth', project: 'plib1', version: '5.0' })
+  const asked = []
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    asked.push(String(url))
+    return answers({
+      '/project/main1/version': [mrVersion({ dependencies: [
+        { project_id: 'vault1', dependency_type: 'required' },
+        { project_id: 'plib1', dependency_type: 'required' },
+        { project_id: 'lp1', dependency_type: 'required' },
+        { project_id: 'opt1', dependency_type: 'optional' },
+        { project_id: null, version_id: 'v9', dependency_type: 'required' },
+      ] })],
+      '/projects?ids=': [{ id: 'vault1', slug: 'vault', title: 'Vault' }, { id: 'plib1', slug: 'protocollib', title: 'ProtocolLib' }, { id: 'lp1', slug: 'luckperms', title: 'LuckPerms' }],
+    })(url)
+  })
+  const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.equal(plan.version, '2.0')
+  assert.equal(plan.exactMatch, true)
+  assert.equal(plan.builtFor, null)
+  assert.deepEqual(plan.requires.map((d) => [d.title, d.installed]), [['Vault', true], ['ProtocolLib', true], ['LuckPerms', false]])
+  // nothing was downloaded to find this out
+  assert.ok(asked.every((u) => u.startsWith('https://api.modrinth.com/')), asked.join(' '))
+  assert.deepEqual(fs.readdirSync(path.join(inst.dir, 'plugins')).filter((f) => f.endsWith('.jar')).sort(), ['Vault-1.7.jar', 'plib.jar'])
+})
+
+test('a plan says when the only build is for another Minecraft version, and the install remembers it', async (t) => {
+  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ game_versions: ['1.20.1', '1.20.4'] })],
+    'cdn.modrinth.com/Main.jar': new TextEncoder().encode('jar'),
+  }))
+  const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.deepEqual([plan.exactMatch, plan.builtFor], [false, '1.20.4'])
+  const out = await installPlugin(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.match(out.versionNote, /lists 1\.20\.4, not 1\.21\.4/)
+  assert.equal(readManaged(inst).managed['Main.jar'].builtFor, '1.20.4')
+  assert.equal(listPlugins(inst).find((p) => p.file === 'Main.jar').builtFor, '1.20.4')
+})
+
+test('a matching build leaves no "built for" behind, and a failed name lookup still lists what is needed', async (t) => {
+  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  t.mock.method(globalThis, 'fetch', answers({
+    '/project/main1/version': [mrVersion({ dependencies: [{ project_id: 'lp1', dependency_type: 'required' }] })],
+    'cdn.modrinth.com/Main.jar': new TextEncoder().encode('jar'),
+  }))
+  const plan = await planInstall(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.deepEqual(plan.requires, [{ source: 'modrinth', id: 'lp1', title: 'lp1', installed: false, external: null }])
+  await installPlugin(inst, 'main1', { gameVersion: '1.21.4' })
+  assert.equal(readManaged(inst).managed['Main.jar'].builtFor, undefined)
+})
+
+test('a Hangar plan lists required plugins, and where one that is hosted elsewhere lives', async (t) => {
+  const inst = { ...fakeInstance(), jar: 'paper-1.21.4-100.jar' }
+  writeJar(path.join(inst.dir, 'plugins'), 'Vault.jar', 'name: Vault\n')
+  t.mock.method(globalThis, 'fetch', answers({
+    '/projects/Shop/versions': { result: [{
+      name: '3.1', channel: { name: 'Release' }, platformDependencies: { PAPER: ['1.20.4'] },
+      downloads: { PAPER: { downloadUrl: 'https://hangar/x.jar', fileInfo: { name: 'Shop.jar' } } },
+      pluginDependencies: { PAPER: [
+        { name: 'Vault', required: true, externalUrl: null },
+        { name: 'Citizens', required: true, externalUrl: 'https://ci.citizensnpcs.co' },
+        { name: 'PlaceholderAPI', required: false, externalUrl: null },
+        { name: 'ProtocolLib', required: true, externalUrl: null },
+      ] },
+    }] },
+  }))
+  const plan = await planInstall(inst, 'Shop', { source: 'hangar', gameVersion: '1.21.4' })
+  assert.deepEqual([plan.version, plan.exactMatch, plan.builtFor], ['3.1', false, '1.20.4'])
+  assert.deepEqual(plan.requires.map((d) => [d.title, d.installed, d.external]),
+    [['Vault', true, null], ['Citizens', false, 'https://ci.citizensnpcs.co'], ['ProtocolLib', false, null]])
 })

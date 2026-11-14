@@ -985,3 +985,43 @@ test('how friends join: an address for each place someone can be, and none that 
   // the shared dialog is emptied of the list by everything that opens it
   assert.equal(html.split('clearDlgDetail();').length - 1, 3)
 })
+
+test('installing a plugin asks about a wrong version and about what it needs, and says what happened', () => {
+  const { mismatchQuestion, dependencyQuestion, installedWords } = lifted(['mismatchQuestion', 'dependencyQuestion', 'installedWords'])
+  // a build that lists this version is not asked about
+  assert.equal(mismatchQuestion('Chunky', { exactMatch: true, builtFor: null }, '1.21.4'), null)
+  const wrong = mismatchQuestion('Chunky', { exactMatch: false, builtFor: '1.20.4' }, '1.21.4')
+  assert.match(wrong.text, /lists Minecraft 1\.20\.4, and this server runs 1\.21\.4/)
+  assert.equal(wrong.confirmLabel, 'Install anyway')
+
+  // nothing missing: nothing asked
+  assert.equal(dependencyQuestion('Shop', { requires: [{ title: 'Vault', installed: true }] }, 'plugin'), null)
+  assert.equal(dependencyQuestion('Shop', { requires: [] }, 'plugin'), null)
+  // one missing: offered by name, with a way to decline
+  const one = dependencyQuestion('Shop', { requires: [{ title: 'Vault', installed: false, id: 'v', source: 'modrinth' }, { title: 'Here', installed: true }] }, 'plugin')
+  assert.equal(one.title, 'Shop needs another plugin')
+  assert.match(one.text, /will not load without Vault\./)
+  assert.deepEqual(one.choices.map((c) => [c.value, c.label]), [['with', 'Install Vault too'], ['alone', 'Only Shop']])
+  assert.deepEqual(one.fetch.map((d) => d.id), ['v'])
+  // several, one of which lives elsewhere: it is named with where, and not offered
+  const some = dependencyQuestion('Shop', { requires: [
+    { title: 'Vault', installed: false, id: 'v' }, { title: 'ProtocolLib', installed: false, id: 'p' },
+    { title: 'Citizens', installed: false, id: 'c', external: 'https://ci.citizensnpcs.co' },
+  ] }, 'mod')
+  assert.equal(some.title, 'Shop needs 2 other mods')
+  assert.match(some.text, /Citizens is not on Hangar or Modrinth: get it from https:\/\/ci\.citizensnpcs\.co/)
+  assert.deepEqual(some.fetch.map((d) => d.id), ['v', 'p'])
+  // only things it cannot fetch: no choice to make but whether to go on
+  const none = dependencyQuestion('Shop', { requires: [{ title: 'Citizens', installed: false, external: 'https://x' }] }, 'plugin')
+  assert.equal(none.choices, undefined)
+  assert.deepEqual(none.fetch, [])
+  assert.equal(none.confirmLabel, 'Install Shop anyway')
+
+  assert.deepEqual(installedWords({ installed: 'Shop.jar', version: '3.1' }, [], []), { text: 'Installed Shop.jar (3.1).', tone: 'good' })
+  assert.equal(installedWords({ installed: 'Shop.jar', version: '3.1' }, [{ title: 'Vault' }, { title: 'ProtocolLib' }], []).text, 'Installed Shop.jar (3.1), with Vault and ProtocolLib.')
+  const partly = installedWords({ installed: 'Shop.jar', version: '3.1' }, [], [{ title: 'Vault', why: 'download failed: 503' }])
+  assert.equal(partly.tone, '')
+  assert.match(partly.text, /Could not install Vault \(download failed: 503\)\./)
+  // the search is kept: an install no longer redraws the whole pane
+  assert.match(html, /await refreshInstalled\(\);/)
+})

@@ -318,6 +318,8 @@ export function listPlugins(inst) {
       source: record?.source ?? null,
       project: record?.project ?? null,
       installedVersion: record?.version ?? null,
+      // set when the build installed lists other Minecraft versions than the server's
+      builtFor: record?.builtFor ?? null,
       name: meta.name || file.replace(/\.jar(\.disabled)?$/, ''),
       version: meta.version || null,
       description: meta.description || null,
@@ -487,6 +489,9 @@ export function pickHangarVersion(versions, { gameVersion = null } = {}) {
   return { version: pick, exactMatch: exact(pick) }
 }
 
+// the newest Minecraft version a Hangar build says it supports
+const hangarClaims = (version) => (version.platformDependencies?.PAPER ?? []).slice(-1)[0] ?? 'other versions'
+
 async function hangarVersions(slug) {
   const data = await hangar(`/projects/${encodeURIComponent(slug)}/versions?limit=25&platform=PAPER`)
   return data.result ?? []
@@ -529,6 +534,7 @@ export async function installFromHangar(inst, slug, { gameVersion = null } = {})
     project: slug,
     version: version.name,
     installedAt: new Date().toISOString(),
+    ...(exactMatch || !gameVersion ? {} : { builtFor: hangarClaims(version) }),
   })
   return {
     installed: name,
@@ -562,11 +568,12 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
   // the game version is a preference: fall back to the newest build for the loader and report the mismatch
   let version = pickVersion(versions, { gameVersion, loaders })
   let versionNote = null
+  let builtFor = null
   if (!version && gameVersion) {
     version = pickVersion(versions, { loaders })
     if (version) {
-      const claims = version.game_versions[version.game_versions.length - 1] ?? 'other versions'
-      versionNote = `Its newest build lists ${claims}, not ${gameVersion} - it may run anyway, but that is its author's claim, not SpawnLoft's.`
+      builtFor = modrinthClaims(version)
+      versionNote = `Its newest build lists ${builtFor}, not ${gameVersion} - it may run anyway, but that is its author's claim, not SpawnLoft's.`
     }
   }
   if (!version) fail(`no build of that ${word} supports a ${loaders[0]} server`)
@@ -599,8 +606,80 @@ export async function installPlugin(inst, projectId, { gameVersion = null } = {}
     project: String(version.project_id ?? projectId),
     version: version.version_number,
     installedAt: new Date().toISOString(),
+    ...(builtFor ? { builtFor } : {}),
   })
   return { installed: name, version: version.version_number, size: bytes.length, versionNote }
+}
+
+// the newest Minecraft version a Modrinth build says it supports
+const modrinthClaims = (version) => version.game_versions?.[version.game_versions.length - 1] ?? 'other versions'
+
+// Names as people and manifests write them: "Fabric API", "fabric-api" and "FabricAPI" are one thing.
+const nameKey = (name) => String(name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/**
+ * What installing a project would do, without doing it: which build would be fetched, whether
+ * that build lists this server's Minecraft version, and what it cannot load without.
+ *
+ * A dependency counts as installed when SpawnLoft installed that project here, or when a jar in
+ * the folder carries its name: Vault dropped in by hand is still Vault. One it cannot fetch (a
+ * Hangar dependency hosted elsewhere) is listed with where it lives, and no offer to install it.
+ */
+export async function planInstall(inst, projectId, { source = 'modrinth', gameVersion = null } = {}) {
+  const have = listPlugins(inst)
+  const names = new Set(have.map((p) => nameKey(p.name)))
+  const projects = new Set(have.map((p) => p.project).filter(Boolean).map(String))
+  const installed = (id, title) => projects.has(String(id)) || names.has(nameKey(title)) || names.has(nameKey(id))
+
+  if (source === 'hangar') {
+    const versions = await hangarVersions(String(projectId))
+    const picked = pickHangarVersion(versions, { gameVersion })
+    if (!picked) return { source, project: String(projectId), version: null, exactMatch: true, builtFor: null, requires: [] }
+    const { version, exactMatch } = picked
+    const requires = (version.pluginDependencies?.PAPER ?? [])
+      .filter((d) => d && d.required && d.name)
+      .map((d) => ({
+        source: 'hangar',
+        id: String(d.name),
+        title: String(d.name),
+        installed: installed(d.name, d.name),
+        external: d.externalUrl ? String(d.externalUrl) : null,
+      }))
+    return { source, project: String(projectId), version: version.name, exactMatch: exactMatch || !gameVersion, builtFor: exactMatch || !gameVersion ? null : hangarClaims(version), requires }
+  }
+
+  const loaders = loadersFor(inst)
+  const params = new URLSearchParams({ loaders: JSON.stringify(loaders) })
+  const versions = await modrinth(`/project/${encodeURIComponent(projectId)}/version?${params}`)
+  let version = pickVersion(versions, { gameVersion, loaders })
+  let builtFor = null
+  if (!version && gameVersion) {
+    version = pickVersion(versions, { loaders })
+    if (version) builtFor = modrinthClaims(version)
+  }
+  if (!version) return { source: 'modrinth', project: String(projectId), version: null, exactMatch: true, builtFor: null, requires: [] }
+  const ids = [...new Set((version.dependencies ?? [])
+    .filter((d) => d && d.dependency_type === 'required' && d.project_id)
+    .map((d) => String(d.project_id)))]
+  let titles = new Map()
+  if (ids.length) {
+    // one question for all of them; without an answer they are still listed, by id
+    try {
+      const found = await modrinth(`/projects?ids=${encodeURIComponent(JSON.stringify(ids))}`)
+      titles = new Map((Array.isArray(found) ? found : []).map((p) => [String(p.id), { title: String(p.title ?? p.slug ?? p.id), slug: String(p.slug ?? '') }]))
+    } catch { /* named by id below */ }
+  }
+  const requires = ids.map((id) => {
+    const known = titles.get(id)
+    return {
+      source: 'modrinth',
+      id,
+      title: known?.title ?? id,
+      installed: installed(id, known?.title) || Boolean(known?.slug && names.has(nameKey(known.slug))),
+      external: null,
+    }
+  })
+  return { source: 'modrinth', project: String(version.project_id ?? projectId), version: version.version_number, exactMatch: !builtFor, builtFor, requires }
 }
 
 // Asks Modrinth by sha1 (version_files/update) for newer builds of the jars spawnloft installed.

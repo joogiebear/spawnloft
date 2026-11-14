@@ -29,6 +29,11 @@ async function snapshotPlugins(inst, label) {
   return backup.createSnapshot(inst, { scope: 'plugins', label, running: supervisor.isRunning(inst.name), quiet: true })
 }
 
+// What an install would fetch and what it needs, for the page to ask about before anything is written.
+export async function planInstall(inst, projectId, { source = 'modrinth' } = {}) {
+  return plugins.planInstall(inst, String(projectId), { source: source === 'hangar' ? 'hangar' : 'modrinth', gameVersion: plugins.mcVersionOf(inst) })
+}
+
 export async function installWithSnapshot(inst, projectId, { source = 'modrinth' } = {}) {
   const gameVersion = plugins.mcVersionOf(inst)
   const snap = await snapshotPlugins(inst, 'pre-install')

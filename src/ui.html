@@ -1852,6 +1852,7 @@
   .plug-src { font: var(--t-2)/1.3 var(--ui); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plug-ver { font: var(--t-2)/1 var(--mono); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
   .plug-src code { font: var(--t-1)/1.3 var(--mono); color: var(--ink-3); }
+  .plug-built { color: var(--warn-ink); }
   .plug-state { display: inline-flex; align-items: center; gap: 6px; font: var(--t-2)/1 var(--ui); color: var(--ink-2); white-space: nowrap; }
   .plug-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--live); }
   .plug-state[data-on="false"] { color: var(--ink-3); }
@@ -8402,6 +8403,60 @@ function renderDockBadge() {
  * file rename or a download - the server picks them up at its next start, and the pane says
  * so once at the top instead of on every row.
  */
+/**
+ * What to ask before a build made for another Minecraft version goes in, or null when the build
+ * lists this server's version. It used to install unasked, with a note that left after five seconds.
+ */
+function mismatchQuestion(title, plan, gameVersion) {
+  if (!plan || plan.exactMatch || !plan.builtFor) return null;
+  return {
+    title: 'Made for a different Minecraft version',
+    text: 'The newest build of ' + title + ' lists Minecraft ' + plan.builtFor + ', and this server runs ' + (gameVersion || 'another version')
+      + '. It may work anyway, but its author has not said so.',
+    confirmLabel: 'Install anyway',
+  };
+}
+
+/**
+ * What to ask when something cannot load without other things that are not here yet, or null
+ * when it needs nothing more. `word` is "plugin" or "mod".
+ */
+function dependencyQuestion(title, plan, word) {
+  const missing = ((plan && plan.requires) || []).filter((d) => !d.installed);
+  if (!missing.length) return null;
+  const list = (items) => items.map((d) => d.title).join(', ');
+  const can = missing.filter((d) => !d.external);
+  const cannot = missing.filter((d) => d.external);
+  const elsewhere = cannot.length
+    ? ' ' + list(cannot) + (cannot.length === 1 ? ' is' : ' are') + ' not on Hangar or Modrinth: get ' + (cannot.length === 1 ? 'it' : 'them') + ' from ' + cannot.map((d) => d.external).join(', ') + ' and add ' + (cannot.length === 1 ? 'it' : 'them') + ' under Files.'
+    : '';
+  if (!can.length) {
+    return {
+      title: title + ' needs something SpawnLoft cannot fetch',
+      text: 'It will not load without ' + list(cannot) + '.' + elsewhere,
+      confirmLabel: 'Install ' + title + ' anyway',
+      fetch: [],
+    };
+  }
+  return {
+    title: title + ' needs ' + (can.length === 1 ? 'another ' + word : can.length + ' other ' + word + 's'),
+    text: 'It will not load without ' + list(missing) + '.' + elsewhere,
+    choices: [
+      { value: 'with', label: 'Install ' + (can.length === 1 ? can[0].title : 'them') + ' too', hint: can.length === 1 ? 'Both are downloaded.' : list(can) + '.' },
+      { value: 'alone', label: 'Only ' + title, hint: 'It stays unloaded until what it needs is added.' },
+    ],
+    confirmLabel: 'Install',
+    fetch: can,
+  };
+}
+
+/** One line for what an install did: the thing asked for, what came with it, and what did not. */
+function installedWords(main, extras, failed) {
+  const and = extras.length ? ', with ' + extras.map((e) => e.title).join(' and ') : '';
+  const not = failed.length ? ' Could not install ' + failed.map((f) => f.title + ' (' + f.why + ')').join(', ') + '.' : '';
+  return { text: 'Installed ' + main.installed + (main.version ? ' (' + main.version + ')' : '') + and + '.' + not, tone: failed.length ? '' : 'good' };
+}
+
 async function renderPlugins(opts) {
   const force = Boolean(opts && opts.force);
   const row = rowOf(state.current);
@@ -8664,26 +8719,60 @@ async function renderPlugins(opts) {
       const install = document.createElement('button');
       const have = installedNames.has(hit.title.toLowerCase());
       install.textContent = have ? 'Installed' : 'Install';
+      install.dataset.title = hit.title;
+      install.setAttribute('aria-label', (have ? 'Installed: ' : 'Install ') + hit.title);
       install.disabled = have;
       if (!have) install.className = 'primary';
       acts.append(install);
       el.append(mark, nm, meta, acts);
       list.append(el);
 
+      const reset = () => { install.disabled = false; install.textContent = 'Install'; };
       install.onclick = async () => {
         install.disabled = true;
-        install.textContent = 'Downloading…';
+        install.textContent = 'Checking…';
+        const extras = [];
+        const failed = [];
         try {
+          // asked first: what would be fetched, whether it is for this version, what it needs
+          const plan = await api(base + '/plan?projectId=' + encodeURIComponent(hit.id) + '&source=' + encodeURIComponent(hit.source || 'modrinth'));
+          const wrong = mismatchQuestion(hit.title, plan, data.gameVersion);
+          if (wrong && !(await ask(wrong))) return reset();
+          const needs = dependencyQuestion(hit.title, plan, singular);
+          let also = [];
+          if (needs) {
+            const got = await ask(needs);
+            if (!got) return reset();
+            if (!needs.choices || got.choice === 'with') also = needs.fetch;
+          }
+          install.textContent = 'Downloading…';
           const out = await post(base + '/install', { projectId: hit.id, source: hit.source });
-          toast('Installed ' + out.installed + ' (' + out.version + ').', 'good');
-          // A claims mismatch is information, not a blocker - said in its own toast so it
-          // is not lost behind the success line.
-          if (out.versionNote) toast(out.versionNote);
-          await again();
+          // what it needs comes after it: a failure there leaves the thing asked for in place
+          for (const dep of also) {
+            try {
+              await post(base + '/install', { projectId: dep.id, source: dep.source });
+              extras.push(dep);
+            } catch (e) {
+              failed.push({ title: dep.title, why: e.message });
+            }
+          }
+          const said = installedWords(out, extras, failed);
+          toast(said.text, said.tone);
+          // The search stays as it was: three plugins from one search is one search. Only the
+          // list of what is installed is fetched again.
+          install.textContent = 'Installed';
+          install.className = '';
+          for (const dep of extras) installedNames.add(dep.title.toLowerCase());
+          for (const other of list.querySelectorAll('.w-acts button')) {
+            if (other !== install && !other.disabled && installedNames.has((other.dataset.title || '').toLowerCase())) {
+              other.textContent = 'Installed'; other.disabled = true; other.className = '';
+            }
+          }
+          q.focus();
+          await refreshInstalled();
         } catch (e) {
           toast(e.message, 'bad');
-          install.disabled = false;
-          install.textContent = 'Install';
+          reset();
         }
       };
     }
@@ -8716,6 +8805,18 @@ async function renderPlugins(opts) {
 
   const singular = mods ? 'mod' : 'plugin';
   const plural = mods ? 'mods' : 'plugins';
+  // After an install: the list below and its count, and nothing above it.
+  const refreshInstalled = async () => {
+    try {
+      const fresh = await api(base);
+      if (body.dataset.for !== row.name) return;
+      data.plugins = fresh.plugins;
+      listTitle.textContent = 'Installed (' + data.plugins.length + ')';
+      paint();
+    } catch (e) {
+      toast(e.message, 'bad');
+    }
+  };
   const nameOf = (file) => (data.plugins.find((p) => p.file === file) || { name: file }).name;
   const knownUpdates = () => Object.values(pluginView.updates || {});
   const forget = (file) => {
@@ -8872,6 +8973,14 @@ async function renderPlugins(opts) {
       const file = document.createElement('code');
       file.textContent = p.file;
       src.append(document.createTextNode(' · '), file);
+    }
+    // Said on the row for as long as it is true, where it used to be a toast that left.
+    if (p.builtFor && data.gameVersion && p.builtFor !== data.gameVersion) {
+      const built = document.createElement('span');
+      built.className = 'plug-built';
+      built.textContent = 'Built for ' + p.builtFor;
+      built.title = 'This build lists Minecraft ' + p.builtFor + '. This server runs ' + data.gameVersion + '.';
+      src.append(document.createTextNode(' · '), built);
     }
     main.append(nm, src);
 

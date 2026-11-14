@@ -1132,6 +1132,12 @@ async function handlePlugins(req, res, name, seg, url) {
     if (!q) return json(res, 200, { results: [], errors: [] })
     return json(res, 200, await pluginActions.searchEverywhere(inst, q))
   }
+  // what an install would fetch and need; asks the source, writes nothing
+  if (req.method === 'GET' && verb === 'plan') {
+    const projectId = String(url.searchParams.get('projectId') || '')
+    if (!projectId) return json(res, 400, { error: 'projectId is required' })
+    return json(res, 200, await pluginActions.planInstall(inst, projectId, { source: url.searchParams.get('source') || 'modrinth' }))
+  }
   if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
   const body = await readBody(req)
 
