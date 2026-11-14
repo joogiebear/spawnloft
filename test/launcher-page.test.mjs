@@ -1031,7 +1031,7 @@ test('Java is a list, and a path is checked before it is saved', () => {
 })
 
 test('the sheet after review: Save asks about the Java again, typing with an IME is left whole, Enter takes an exact version', () => {
-  assert.match(fnSource('saveSheet'), /f\.javaCheck = null\n\s+const check = await checkJava\(f\)/)
+  assert.match(fnSource('saveSheet'), /f\.javaCheck = null\s+const check = await checkJava\(f\)/)
   const picker = fnSource('versionPicker')
   assert.match(picker, /if \(!e\.isComposing\) render\(\) \}, oncompositionend:/)
   assert.match(picker, /rows\.find\(\(x\) => x\.id\.toLowerCase\(\) === typed\.toLowerCase\(\)\)/)
@@ -1075,7 +1075,7 @@ test('accounts: signing out asks first, the offline name has a label and is chec
   assert.equal(setupPlaysAs({ account: 'f3d28cb0', accountUuid: null, accountName: 'f3d28cb0', accountType: null }, sam), null)
   // the question does not outlive the menu it was asked in
   for (const fn of ['setDefault', 'openSheet']) assert.match(fnSource(fn), /S\.acctAsk = null/, fn)
-  assert.match(html, /S\.menu = which\n\s+S\.acctAsk = null/)
+  assert.match(html, /S\.menu = which\s+S\.acctAsk = null/)
   assert.match(fnSource('removeAccount'), /await refresh\(\)[\s\S]*\$\('chip'\)\?\.focus/)
   assert.match(fnSource('accountChip'), /own && h\('small', \{ class: 'own', id: 'chipOwn', text: `This setup plays as \$\{own\}` \}\)/)
 
