@@ -336,8 +336,16 @@ export function settingWords(key, value) {
 
 // server.properties keys the panel offers. Allowlist: the ports and RCON password are owned by the
 // registry and rewritten by syncProps on every launch, so editing them here would silently revert.
-// `type` is what the page renders; `note` shows next to the control.
-const EDITABLE_PROPS = [
+// `type` is what the page renders; `note` shows next to the control, its first sentence at once and
+// the rest behind "More".
+//
+// Not every version reads every key. `since` is the first Minecraft version that has it; before
+// that the row is left out. `until` is the version that turned it into a game rule kept in the
+// world (1.21.9 did that to pvp, allow-nether, spawn-monsters and enable-command-block): from
+// then on the row stays, says so, and saves nothing, since a line in the file would be ignored.
+// Checked against Paper's own list of the file (PaperMC/docs, src/config/paper/server-properties.yml).
+const GAME_RULES_FROM = '1.21.9'
+export const EDITABLE_PROPS = [
   {
     key: 'online-mode',
     group: 'access',
@@ -348,15 +356,65 @@ const EDITABLE_PROPS = [
       + 'yourself; not safe for a public server. The game also counts everyone as a new player '
       + 'after a switch, so inventories and permissions do not carry over.',
   },
-  { key: 'motd', group: 'world', label: 'Message of the day', type: 'text', fallback: 'A Minecraft Server' },
-  { key: 'difficulty', group: 'gameplay', label: 'Difficulty', type: 'enum', fallback: 'easy', options: ['peaceful', 'easy', 'normal', 'hard'] },
-  { key: 'gamemode', group: 'gameplay', label: 'Default game mode', type: 'enum', fallback: 'survival', options: ['survival', 'creative', 'adventure', 'spectator'] },
-  { key: 'max-players', group: 'access', label: 'Max players', type: 'int', fallback: '20', min: 1, max: 1000 },
-  { key: 'pvp', group: 'gameplay', label: 'PvP', type: 'bool', fallback: 'true' },
+  { key: 'max-players', group: 'access', label: 'Max players', type: 'int', fallback: '20', min: 1, max: 1000,
+    note: 'How many can be on at once. More players need more memory and a faster processor.' },
   { key: 'white-list', group: 'access', label: 'Whitelist', type: 'bool', fallback: 'false', note: 'Only listed players can join. The list is on the Players page, where people are added by name.' },
-  { key: 'view-distance', group: 'world', label: 'View distance', type: 'int', fallback: '10', min: 2, max: 32 },
-  { key: 'spawn-protection', group: 'gameplay', label: 'Spawn protection', type: 'int', fallback: '16', min: 0, max: 256 },
+  { key: 'enforce-whitelist', group: 'access', label: 'Remove players who are not listed', type: 'bool', fallback: 'false',
+    note: 'With the whitelist on, someone online who is not on the list is removed, not just kept from joining next time. Without this, turning the whitelist on leaves whoever is already playing where they are.' },
+  { key: 'player-idle-timeout', group: 'access', label: 'Remove idle players after', type: 'int', fallback: '0', min: 0, max: 10080, unit: 'minutes',
+    note: 'Minutes a player can do nothing before being removed. 0 never removes anyone.' },
+  { key: 'hide-online-players', group: 'access', label: 'Hide who is online', type: 'bool', fallback: 'false', since: '1.18',
+    note: 'The server list does not show the names of who is playing.' },
+  { key: 'op-permission-level', group: 'access', label: 'What operators may do', type: 'int', fallback: '4', min: 0, max: 4, unit: 'level',
+    note: 'The level a player gets when made an operator, from 1 to 4. 1 can build inside spawn protection. 2 adds cheat commands and command blocks. 3 adds kicking, banning and making operators. 4 adds stopping the server.' },
+
+  { key: 'difficulty', group: 'gameplay', label: 'Difficulty', type: 'enum', fallback: 'easy', options: ['peaceful', 'easy', 'normal', 'hard'],
+    note: 'How hard monsters hit, and whether hunger can kill. Peaceful has no monsters, and health comes back by itself.' },
+  { key: 'gamemode', group: 'gameplay', label: 'Default game mode', type: 'enum', fallback: 'survival', options: ['survival', 'creative', 'adventure', 'spectator'],
+    note: 'The mode a player is in the first time they join. Someone who has played here before keeps the mode they had.' },
+  { key: 'force-gamemode', group: 'gameplay', label: 'Always join in the default mode', type: 'bool', fallback: 'false',
+    note: 'Puts every player back into the default game mode each time they join.' },
+  { key: 'hardcore', group: 'gameplay', label: 'Hardcore', type: 'bool', fallback: 'false',
+    note: 'A player who dies becomes a spectator.' },
+  { key: 'pvp', group: 'gameplay', label: 'PvP', type: 'bool', fallback: 'true', until: GAME_RULES_FROM,
+    note: 'Whether players can hurt each other.' },
+  { key: 'allow-flight', group: 'gameplay', label: 'Allow flying in survival', type: 'bool', fallback: 'false',
+    note: 'Off removes a survival player the server thinks is flying. That check can catch honest players, so turn this on when a plugin or mod lets people fly.' },
+  { key: 'spawn-protection', group: 'gameplay', label: 'Spawn protection', type: 'int', fallback: '16', min: 0, max: 256, unit: 'blocks',
+    note: 'How many blocks out from the world spawn only operators can build or break. 0 turns it off. It does nothing until the server has at least one operator.' },
+  { key: 'spawn-monsters', group: 'gameplay', label: 'Monsters', type: 'bool', fallback: 'true', until: GAME_RULES_FROM,
+    note: 'Off stops monsters appearing by themselves.' },
+  { key: 'allow-nether', group: 'gameplay', label: 'The Nether', type: 'bool', fallback: 'true', until: GAME_RULES_FROM,
+    note: 'Off stops nether portals taking anyone anywhere.' },
+  { key: 'enable-command-block', group: 'gameplay', label: 'Command blocks', type: 'bool', fallback: 'false', until: GAME_RULES_FROM,
+    note: 'Lets command blocks run their commands.' },
+
+  { key: 'motd', group: 'world', label: 'Message of the day', type: 'text', fallback: 'A Minecraft Server' },
+  { key: 'view-distance', group: 'world', label: 'View distance', type: 'int', fallback: '10', min: 2, max: 32, unit: 'chunks',
+    note: 'How far each player can see, in chunks of 16 blocks. Every step up sends and keeps more of the world per player, which costs memory and processor time.' },
+  { key: 'simulation-distance', group: 'world', label: 'Simulation distance', type: 'int', fallback: '10', min: 3, max: 32, unit: 'chunks', since: '1.18',
+    note: 'How far from a player the world keeps going, in chunks: mobs move, crops grow and redstone runs inside it. Lower is lighter on the server, and farms further away than this stand still.' },
+  { key: 'level-seed', group: 'world', label: 'World seed', type: 'text', fallback: '',
+    note: 'Used when a world is made; empty picks one at random. Changing it does nothing to a world that already exists, only to one made after.' },
+  { key: 'max-world-size', group: 'world', label: 'World size limit', type: 'int', fallback: '29999984', min: 1, max: 29999984, unit: 'blocks',
+    note: 'How far from the centre the world may reach, in blocks.' },
+  { key: 'resource-pack', group: 'world', label: 'Resource pack', type: 'url', fallback: '',
+    note: 'A link to a resource pack that players are offered when they join. Empty for none. It has to be a direct download link to the .zip.' },
+  { key: 'require-resource-pack', group: 'world', label: 'Require the resource pack', type: 'bool', fallback: 'false', since: '1.17',
+    note: 'A player who turns the pack down is disconnected.' },
 ]
+
+// What a server of this version is shown: rows it does not have yet are left out, and rows that
+// became game rules are marked. With no version known, every row is offered as the file's.
+export function propsFor(mcVersion) {
+  const known = typeof mcVersion === 'string' && /^\d+(\.\d+)*$/.test(mcVersion)
+  const out = []
+  for (const spec of EDITABLE_PROPS) {
+    if (known && spec.since && upgrade.compareMcVersions(mcVersion, spec.since) < 0) continue
+    out.push(known && spec.until && upgrade.compareMcVersions(mcVersion, spec.until) >= 0 ? { ...spec, gameRule: true } : spec)
+  }
+  return out
+}
 
 // A field with no group here still renders, in a section at the end.
 const PROP_GROUPS = [
@@ -372,6 +430,12 @@ const PROP_BY_KEY = new Map(EDITABLE_PROPS.map((p) => [p.key, p]))
 
 function coerceProp(spec, raw) {
   const value = String(raw).trim()
+  if (spec.type === 'url') {
+    // one line of the file, and a link the game will fetch: http or https, or empty for none
+    if (value === '') return value
+    if (/[\r\n\s]/.test(value) || !/^https?:\/\/[^\s/]+(\/\S*)?$/i.test(value)) fail(`${spec.key} must be a link starting with http:// or https://, or empty`)
+    return value
+  }
   if (spec.type === 'bool') {
     if (value !== 'true' && value !== 'false') fail(`${spec.key} must be true or false`)
     return value
@@ -577,7 +641,8 @@ async function handleProps(req, res, name) {
   const inst = registry.getInstance(name)
   const file = path.join(inst.dir, 'server.properties')
   // a server that has never booted lacks most keys; show the effective default, flagged as not set
-  const shape = (current) => EDITABLE_PROPS.map((spec) => ({
+  const offered = propsFor(plugins.mcVersionOf(inst))
+  const shape = (current) => offered.map((spec) => ({
     ...spec,
     value: current.get(spec.key) ?? spec.fallback,
     set: current.has(spec.key),
@@ -592,8 +657,10 @@ async function handleProps(req, res, name) {
   const body = await readBody(req)
   const updates = {}
   for (const [key, raw] of Object.entries(body)) {
-    const spec = PROP_BY_KEY.get(key)
+    const spec = offered.find((p) => p.key === key)
     if (!spec) return json(res, 400, { error: `${key} is not editable from here` })
+    // written, it would sit in the file and change nothing
+    if (spec.gameRule) return json(res, 400, { error: `${spec.label} is a game rule in this version of Minecraft, kept in the world and not in server.properties. Change it with /gamerule in the Console.` })
     updates[key] = coerceProp(spec, raw)
   }
   if (!Object.keys(updates).length) return json(res, 400, { error: 'nothing to change' })
