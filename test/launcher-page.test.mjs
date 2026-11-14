@@ -266,7 +266,7 @@ test('the sentence under Play says what will happen', () => {
 
 test('the one screen keeps the old screens\' links and the card\'s pre-fill', () => {
   // #profiles and #accounts were screens; they now open the setups and the account menu
-  assert.match(html, /hash === 'profiles' \? 'version' : hash === 'accounts' \? 'account'/)
+  assert.match(html, /hash === 'profiles' \? 'setups' : hash === 'accounts' \? 'account'/)
   // the storage keys the page and the panel's server cards share are unchanged
   for (const key of ['spawnloft.launcher.job', 'spawnloft.launcher.profile']) assert.ok(html.includes(`'${key}'`), key)
   // no sidebar, no screens
@@ -371,7 +371,7 @@ test('a re-render keeps focus on the same row of an open menu', () => {
   const src = fnSource('render')
   assert.match(src, /closest\?\.\('\.menu\[id\]'\)/)
   assert.match(src, /menuItems\(menu\)/)
-  for (const id of ['menuAccount', 'menuVersion', 'menuJoin', 'menuAsk']) assert.ok(html.includes(`id: '${id}'`), id)
+  for (const id of ['menuAccount', 'menuJoin', 'menuAsk']) assert.ok(html.includes(`id: '${id}'`), id)
 })
 
 test('an offline account a setup names by key is listed once in Play as', () => {
@@ -488,26 +488,31 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   // no ARIA menu or listbox: the panels hold headings, notes and an input, which those roles forbid
   assert.doesNotMatch(html, /role: '(menu|menuitem|menuitemradio|listbox|option)'/)
   assert.doesNotMatch(html, /'aria-haspopup': '(menu|listbox|true)'/)
-  for (const id of ['menuAccount', 'menuVersion']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
+  for (const id of ['menuAccount']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
   // Join is a combobox whose popup is a dialog, so the field that is focused carries the state
   assert.match(html, /id: 'join', role: 'combobox', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin'/)
   assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)
   // every opener names what it opens, and every menu renders inside the pad
-  for (const id of ['menuAccount', 'menuVersion', 'menuJoin']) assert.match(html, new RegExp(`'aria-expanded': String\\([^)]*\\), 'aria-controls': '${id}'`), id)
+  for (const id of ['menuAccount', 'menuJoin']) assert.match(html, new RegExp(`'aria-expanded': String\\([^)]*\\), 'aria-controls': '${id}'`), id)
   assert.match(fnSource('accountChip'), /menuPad\(accountMenu\(def\)\)/)
-  assert.match(fnSource('playButton'), /menuPad\(versionMenu\(p\)\)/)
   assert.match(fnSource('playButton'), /menuPad\(askMenu\(p\)\)/)
   assert.match(fnSource('joinField'), /menuPad\(joinMenu\(p, plan\)\)/)
-  // the first run shares the setups menu, which says there are none yet
-  assert.match(fnSource('firstRunView'), /menuPad\(versionMenu\(draft\)\)/)
-  assert.match(fnSource('versionMenu'), /!list\.length && h\('p', \{ class: 'note', text: 'No setups yet/)
+  // the setups are not a menu any more: a list always in view, which the first run shares and
+  // which says there are none yet
+  assert.match(fnSource('playView'), /setupsPanel\(p\)/)
+  assert.match(fnSource('firstRunView'), /setupsPanel\(draft\)/)
+  assert.match(fnSource('setupsPanel'), /!list\.length && h\('p', \{ class: 'note', text: 'No setups yet/)
+  assert.doesNotMatch(html, /menuVersion|verBtn/)
   assert.match(html, /querySelector\('\.menupad'\)\?\.scrollIntoView\(\{ block: 'nearest' \}\)/)
-  // the chosen setup carries a mark, the others an empty one, so the rows line up
-  assert.match(fnSource('versionMenu'), /h\('span', \{ class: 'mark' \}, q === p && ico\('check'\)\)/)
+  // the chosen setup is marked for the eye and for a screen reader, and every control in the
+  // list has an id, which is what lets a re-render keep focus on it
+  assert.match(fnSource('setupsPanel'), /class: q === p \? 'srow cur' : 'srow'/)
+  assert.match(fnSource('setupsPanel'), /id: `setup-\$\{q\.name\}`, 'aria-current': q === p \? 'true' : null/)
+  assert.match(fnSource('setupsPanel'), /id: `edit-\$\{q\.name\}`/)
   // the pad is positioned where the menu was and keeps a margin under it; alignment is the pad's
   assert.match(html, /\.menupad \{[^}]*position: absolute;[^}]*padding-bottom: var\(--s-6\)/)
-  assert.match(html, /\.menupad:has\(> \.who\), \.menupad:has\(> \.vmenu\) \{ justify-content: flex-end; \}/)
+  assert.match(html, /\.menupad:has\(> \.who\) \{ justify-content: flex-end; \}/)
 })
 
 test('removing a setup puts focus on the safe answer, and the button says when worlds go too', () => {
@@ -586,4 +591,46 @@ test('when a setup was last played, and for how long, in words', () => {
   assert.equal(playedLine({ running: false, played: { lastPlayedAt: null, totalMs: 0 } }), '')
   assert.equal(playedLine({ running: false }), '')
   assert.match(playedLine({ running: false, played: { lastPlayedAt: new Date().toISOString(), totalMs: 200 * 60000 } }), /^Played today · 3 h 20 min in all$/)
+})
+
+test('your servers: the setup\'s version first, the rest behind Show all, and a search across all', () => {
+  const { shownServers } = lifted(['shownServers'])
+  const servers = [
+    { name: 'survival', label: 'Survival', mc: '1.21.11', status: 'running', onlineMode: false },
+    { name: 'creative', label: 'Creative build', mc: '1.21.11', status: 'stopped', onlineMode: false },
+    { name: 't-1-20-4', label: null, mc: '1.20.4', status: 'stopped', onlineMode: false },
+    { name: 't-1-8-9', label: 'Old PvP', mc: '1.8.9', status: 'stopped', onlineMode: false },
+    { name: 'unknown', label: null, mc: null, status: 'stopped', onlineMode: false },
+  ]
+  // as serverChoices marks them: a server on another version carries that version
+  const choices = servers.map((v) => ({ ...v, otherVersion: v.mc && v.mc !== '1.21.11' ? v.mc : null }))
+  const names = (list) => list.map((c) => c.name)
+  // a server whose version is not known is not hidden: it may well be the right one
+  assert.deepEqual(names(shownServers(choices)), ['survival', 'creative', 'unknown'])
+  assert.deepEqual(names(shownServers(choices, { all: true })), ['survival', 'creative', 't-1-20-4', 't-1-8-9', 'unknown'])
+  // by name, by label, by version; whatever the case
+  assert.deepEqual(names(shownServers(choices, { all: true, find: 'pvp' })), ['t-1-8-9'])
+  assert.deepEqual(names(shownServers(choices, { all: true, find: ' 1.20 ' })), ['t-1-20-4'])
+  assert.deepEqual(names(shownServers(choices, { all: true, find: 'CREAT' })), ['creative'])
+  assert.deepEqual(shownServers(choices, { all: true, find: 'nothing like it' }), [])
+  // a search on the page looks through every server, and the row gets its box from seven up
+  assert.match(fnSource('serversRow'), /all: wide \|\| Boolean\(S\.serverFind\.trim\(\)\)/)
+  assert.match(fnSource('serversRow'), /all\.length >= FIND_FROM && h\('input'/)
+  // a server on another version offers a setup of that version instead of a Play that would fail
+  assert.match(fnSource('serversRow'), /takePrefill\(\{ mc: c\.otherVersion, server: c\.name \}\)/)
+})
+
+test('a setup\'s badge is its version as far as the minor', () => {
+  const { setupBadge } = lifted(['setupBadge'])
+  assert.equal(setupBadge({ mc: '1.21.11' }), '1.21')
+  assert.equal(setupBadge({ mc: '1.20' }), '1.20')
+  assert.equal(setupBadge({ mc: '26.3' }), '26.3')
+  assert.equal(setupBadge({ mc: '26.4-snapshot-6' }), '26.4-')
+  assert.equal(setupBadge({ mc: 'b1.7.3' }), 'b1.7.')
+})
+
+test('the page is a fixed size, not a share of the window', () => {
+  assert.match(html, /\.playgrid \{ width: min\(1120px, 100%\);[^}]*grid-template-columns: minmax\(0, 1fr\) 312px;/)
+  assert.doesNotMatch(html, /\.playbox \{[^}]*vw/)
+  assert.doesNotMatch(html, /\.playrow \.play \{[^}]*vw/)
 })
