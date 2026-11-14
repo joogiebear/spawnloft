@@ -14882,7 +14882,7 @@ function renderJavaChip() {
     ? (short.length === 1 ? '1 server needs' : short.length + ' servers need') + ' Java ' + need + '.'
     : java.found ? 'Java needs updating.' : 'Java is not installed.';
   chip.setAttribute('aria-label', sentence + ' Get Java.');
-  chip.title = java.message + (java.ok ? '' : ' Servers will not start until it is sorted.') + ' This checks again by itself once Java is installed.';
+  chip.title = java.message + (java.ok ? '' : ' Servers will not start until it is sorted. This checks again by itself once Java is installed.');
 }
 
 $('#javaChip').onclick = () => { if (state.health) openOutside(state.health.javaDownload); };
@@ -14890,8 +14890,8 @@ $('#javaChip').onclick = () => { if (state.health) openOutside(state.health.java
 /*
   The chip was drawn from one answer, asked when the page loaded, so it stayed after Java had been
   installed and nothing said a reload was needed. While it shows, the question is asked again when
-  the window comes back to the front (from the installer, most likely) and once a minute. Not
-  otherwise: finding Java starts a process per candidate.
+  the window comes back to the front (from the installer, most likely) and once a minute while
+  it is in front. Not otherwise: finding Java starts a process per candidate.
 */
 let healthAsked = 0;
 async function recheckJava() {
@@ -14904,9 +14904,11 @@ async function recheckJava() {
   renderJavaChip();
   if (was && !was.ok && health.java && health.java.ok) toast('Java ' + (health.java.major || '') + ' found. Servers that needed it can start now.', 'good');
 }
-const javaChipShows = () => !$('#javaChip').hidden;
-window.addEventListener('focus', () => { if (javaChipShows()) recheckJava(); });
-setInterval(() => { if (javaChipShows() && !document.hidden) recheckJava(); }, 60000);
+// Only while no usable Java was found. A Java that runs older versions keeps the chip for good,
+// and that is not a reason to start a process per candidate every minute.
+const javaMissing = () => Boolean(state.health && state.health.java && !state.health.java.ok);
+window.addEventListener('focus', () => { if (javaMissing()) recheckJava(); });
+setInterval(() => { if (javaMissing() && document.hasFocus()) recheckJava(); }, 60000);
 
 api('/health').then((health) => {
   state.health = health;

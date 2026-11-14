@@ -660,8 +660,10 @@ test('the header offers a 2.x update that is ready, and nothing else', () => {
 })
 
 test('the Java chip asks again once Java may have been installed', () => {
-  assert.match(html, /window\.addEventListener\('focus', \(\) => \{ if \(javaChipShows\(\)\) recheckJava\(\); \}\);/)
-  assert.match(html, /setInterval\(\(\) => \{ if \(javaChipShows\(\) && !document\.hidden\) recheckJava\(\); \}, 60000\);/)
+  assert.match(html, /window\.addEventListener\('focus', \(\) => \{ if \(javaMissing\(\)\) recheckJava\(\); \}\);/)
+  assert.match(html, /setInterval\(\(\) => \{ if \(javaMissing\(\) && document\.hasFocus\(\)\) recheckJava\(\); \}, 60000\);/)
+  // not for a Java that merely runs older versions: that chip stays for good
+  assert.match(html, /const javaMissing = \(\) => Boolean\(state\.health && state\.health\.java && !state\.health\.java\.ok\);/)
 })
 
 test('the first-run Java row says what was found', () => {
@@ -675,24 +677,32 @@ test('the first-run Java row says what was found', () => {
   }
   const javaWords = new Function(`${setup.slice(at, end)}; return javaWords`)()
 
-  const fine = javaWords({ ok: true, found: true, reason: 'ok', version: 'openjdk version "25"', message: 'Java 25 is installed.' })
+  const url = 'https://adoptium.net/temurin/releases/?version=25'
+  const fine = javaWords({ ok: true, found: true, reason: 'ok', version: 'openjdk version "25"', message: 'Java 25 is installed.', downloadUrl: url })
   assert.deepEqual([fine.state, fine.title, fine.get], ['ok', 'Java is installed', false])
   // a Java whose version could not be read is reported as fine by the check, and is said so
-  const unknown = javaWords({ ok: true, found: true, reason: 'unknown-version', message: 'Found weird 1.' })
+  const unknown = javaWords({ ok: true, found: true, reason: 'unknown-version', message: 'Found weird 1.', downloadUrl: url })
   assert.deepEqual([unknown.state, unknown.title, unknown.get], ['ok', 'Java is installed', false])
   // one that runs older versions works: no "servers will not start"
-  const old = javaWords({ ok: true, found: true, reason: 'old', message: 'Java 21 will run older Minecraft versions, but current Paper needs 25.' })
+  const old = javaWords({ ok: true, found: true, reason: 'old', message: 'Java 21 will run older Minecraft versions, but current Paper needs 25.', downloadUrl: url })
   assert.equal(old.state, 'warn')
   assert.ok(!/needs updating/.test(old.title) && !/will not start/.test(old.why))
-  const tooOld = javaWords({ ok: false, found: true, reason: 'too-old', message: 'Java 8 is too old.' })
+  // The check answers with health(): with no usable Java, `reason` is the PATH probe's and the
+  // message is its own. A Java 8 in a folder it searched is `found` whatever PATH said.
+  const tooOld = javaWords({ ok: false, found: true, reason: 'not-installed', message: 'Java 8 was found at C:\\java8, but a Minecraft server needs 17 or newer.', downloadUrl: url })
   assert.deepEqual([tooOld.state, tooOld.title], ['bad', 'Java needs updating'])
-  assert.match(tooOld.why, /will not start/)
-  // there, but would not run: not "not installed"
-  const broken = javaWords({ ok: false, found: false, reason: 'unusable', message: 'Java could not be run: exit 1' })
+  assert.match(tooOld.why, /Java 8 was found[\s\S]*will not start/)
+  // there, but would not run: not "not installed", and not the message that says it is not
+  const broken = javaWords({ ok: false, found: false, reason: 'unusable', message: 'Java is not installed, or is somewhere SpawnLoft did not look.', downloadUrl: url })
   assert.match(broken.title, /did not run/)
-  const none = javaWords({ ok: false, found: false, reason: 'not-installed', message: 'Java is not installed, or not on PATH.' })
+  assert.ok(!/not installed/.test(broken.why))
+  const none = javaWords({ ok: false, found: false, reason: 'not-installed', message: 'Java is not installed, or is somewhere SpawnLoft did not look.', downloadUrl: url })
   assert.deepEqual([none.state, none.title, none.get], ['bad', 'Java is not installed', true])
+  // no link to open, no button that does nothing
+  assert.equal(javaWords({ ok: false, found: false, reason: 'not-installed', message: 'x' }).get, false)
   assert.equal(javaWords(null).title, 'Could not check for Java')
+  // an answer that is not about Java (this window's sign-in ran out) is not "not installed"
+  assert.equal(javaWords({ error: 'this panel needs a sign-in', code: 'auth' }).title, 'Could not check for Java')
 
   assert.match(setup, /id="javaAgain"/)
   assert.match(setup, /window\.addEventListener\('focus'/)

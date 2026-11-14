@@ -181,15 +181,20 @@ async function main() {
       record(`lock: no credential, no answer, on the core (${panel.port}); the Node panel's port was not found, so it was not called directly`)
     }
 
-    // 1c. a page that lost its sign-in asks the window for a new one by moving to /auth/again
-    // (src/panel-auth.mjs signInPage). The panel serves nothing there: the window answers, and
-    // the page is back on the panel, signed in.
-    await js('setTimeout(() => { location.href = "/auth/again" }, 0)')
-    await sleep(500)
-    await until(async () => new URL(await url()).pathname === '/' && await js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel after signing in again', 30000)
+    // 1c. a window whose sign-in ran out. The cookie is taken away (what the panel's idle time
+    // does on its side); the page's next request is refused and it says its session has ended,
+    // with a button. The button reloads; the panel answers with its sign-in page, which under
+    // the window moves itself to /auth/again; the window answers that with a new one-use link,
+    // and the page is back, signed in.
+    await wd('DELETE', '/cookie')
+    await js('fetch("/api/setup").catch(() => {})')
+    await until(() => js('const b = document.querySelector("#sessionEnded button"); return !!b && b.textContent === "Sign in again"'), 'the session-ended notice with its button')
+    if (process.env.SMOKE_SCREENSHOT) await shot(`${process.env.SMOKE_SCREENSHOT}-session-ended`)
+    await js('setTimeout(() => document.querySelector("#sessionEnded button").click(), 0)')
+    await until(async () => new URL(await url()).pathname === '/' && await js('return document.readyState === "complete" && !!document.querySelector("#uiSize") && !document.getElementById("sessionEnded")'), 'the panel after signing in again', 30000)
     assert.equal(new URL(await url()).port, panel.port)
     assert.equal(await pageGet('/api/setup'), 200, 'signed in again')
-    record('sign-in: a page that asks is signed in again by the window')
+    record('sign-in: a window whose session ended is signed in again from its notice')
 
     if (process.env.SMOKE_SCREENSHOT) {
       await fill()
@@ -321,11 +326,12 @@ async function main() {
     // 10. a core that keeps stopping: the window says so itself, in words for a person, and
     // Try again starts it. (Killed four times in all by now, one more than the window retries.)
     for (let i = 0; i < 4; i++) {
-      const now = await until(() => { const c = pids(CORE_UI); return c.length && c }, 'a core to kill', 30000).catch(() => null)
-      if (!now) break
-      for (const p of now) { try { process.kill(p, 'SIGKILL') } catch { /* gone */ } }
-      await sleep(1500)
-      if (/[?&]failed=/.test(await url())) break
+      // each core is killed once it serves the window, as the two above were: one killed before
+      // it printed its address is a start that failed, which is said differently
+      const at = await until(async () => { const u = await url(); return (/[?&]failed=/.test(u) || (/^http:\/\/127\.0\.0\.1:\d+\/$/.test(u) && await js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'))) && u }, 'the panel, or the failure state', 60000)
+      if (/[?&]failed=/.test(at)) break
+      for (const p of pids(CORE_UI)) { try { process.kill(p, 'SIGKILL') } catch { /* gone */ } }
+      await until(async () => (await url()) !== at, 'the window to leave the killed core', 30000)
     }
     await until(async () => /[?&]failed=/.test(await url()), 'the window to say it could not start', 60000)
     const said = await until(() => js('const f = document.getElementById("failed"); return f && !f.hidden && { h: f.querySelector("h1").textContent, said: document.getElementById("said").textContent, detail: document.getElementById("detail").textContent, links: [...f.querySelectorAll("a")].map((a) => a.textContent) }'), 'the failure state')

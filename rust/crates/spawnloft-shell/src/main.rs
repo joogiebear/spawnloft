@@ -260,6 +260,8 @@ fn resume_pending_handover() {
 fn retry_core(app: &tauri::AppHandle) {
     let core = app.state::<Core>();
     core.restarts.store(0, std::sync::atomic::Ordering::SeqCst);
+    // the main window back on its plain start page; windows left on the old panel close
+    bridge::clear_panel(app);
     core.stop();
     start_core(app.clone());
 }
@@ -342,6 +344,8 @@ pub(crate) fn start_core(app: tauri::AppHandle) {
         }
         let n = core.restarts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
         if n > CORE_RESTARTS {
+            // no origin is the panel any more, and the other windows go with it
+            bridge::clear_panel(&app);
             return cannot_start(&app, "the core keeps stopping; see panel.log");
         }
         local::log(&format!(

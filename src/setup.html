@@ -635,18 +635,23 @@ $('#pickServers').onclick = async () => {
  */
 function javaWords(res) {
   const finish = ' You can finish setting up either way.';
-  if (!res) {
+  // no answer, or one that is not about Java at all (this window's sign-in ran out)
+  if (!res || typeof res.ok !== 'boolean') {
     return { state: 'warn', title: 'Could not check for Java', why: 'Carry on. SpawnLoft will say so again if a server fails to start.', get: false };
   }
-  if (res.ok && res.reason === 'ok') return { state: 'ok', title: 'Java is installed', why: res.version || res.message, get: false };
+  const get = Boolean(res.downloadUrl);
+  if (res.reason === 'ok') return { state: 'ok', title: 'Java is installed', why: res.version || res.message, get: false };
   if (res.ok && res.reason === 'old') {
-    return { state: 'warn', title: 'Java is installed, but an older one', why: res.message + ' Get a newer Java to run the latest versions.' + finish, get: true };
+    return { state: 'warn', title: 'Java is installed, but an older one', why: res.message + ' Get a newer Java to run the latest versions.' + finish, get };
   }
   if (res.ok) return { state: 'ok', title: 'Java is installed', why: res.message, get: false };
   const stops = finish + ' Servers will not start until it is sorted.';
-  if (res.reason === 'too-old') return { state: 'bad', title: 'Java needs updating', why: res.message + stops, get: true };
-  if (res.reason === 'unusable') return { state: 'bad', title: 'Java is installed, but did not run', why: res.message + ' Installing it again usually mends this.' + stops, get: true };
-  return { state: 'bad', title: 'Java is not installed', why: 'Minecraft servers run on Java. Get it, install it, then press Check again.' + stops, get: true };
+  // a Java was found somewhere, and it is too old: the message names it and where it is
+  if (res.found) return { state: 'bad', title: 'Java needs updating', why: res.message + stops, get };
+  if (res.reason === 'unusable') {
+    return { state: 'bad', title: 'Java is installed, but did not run', why: 'A Java was found, but it would not start. Installing Java again usually mends this.' + stops, get };
+  }
+  return { state: 'bad', title: 'Java is not installed', why: 'Minecraft servers run on Java. Get it, install it, then press Check again.' + stops, get };
 }
 
 let javaAsked = 0;
@@ -667,7 +672,7 @@ async function checkJava() {
   $('#javaWhy').textContent = words.why;
   const get = $('#javaGet');
   get.hidden = !words.get;
-  get.onclick = words.get && res.downloadUrl ? () => d.openExternal(res.downloadUrl) : null;
+  get.onclick = words.get ? () => d.openExternal(res.downloadUrl) : null;
   // Nothing to check again once Java is fine.
   again.hidden = words.state === 'ok';
 }

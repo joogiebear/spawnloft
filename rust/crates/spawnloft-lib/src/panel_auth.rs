@@ -689,12 +689,44 @@ pub fn login_page(to: &str) -> String {
     )
 }
 
-/// The page a browser without a session gets.
-pub fn unauthorized_page() -> String {
+/// Where a page that lost its sign-in goes to ask the desktop window for a new one. Nothing is
+/// served there: the window watches for the move and answers it with a new one-use link
+/// (spawnloft-shell `bridge.rs`). `AGAIN_PATH` in src/panel-auth.mjs is the same.
+pub const AGAIN_PATH: &str = "/auth/again";
+
+/// The page a browser without a session gets. `path` is what was asked for; `refused` says a
+/// login link was tried and turned down.
+///
+/// Under the desktop window (`shell`) the page sends itself to `AGAIN_PATH`, with where it was
+/// when that is one of the places a login can land. Not after a refused link, and not when the
+/// move itself came back unanswered: going round again by itself would never end. In a browser
+/// there is nobody to ask, and the command stays.
+pub fn unauthorized_page(shell: bool, path: &str, refused: bool) -> String {
+    const TITLE: &str = "This page is not signed in to SpawnLoft";
+    if !shell {
+        return page(
+            TITLE,
+            "Open SpawnLoft from the app, or run <code>spawnloft ui</code> to get a new link.",
+            "",
+        );
+    }
+    let at = path.split('?').next().unwrap_or("");
+    // only the two known targets are ever written into the page, never what was asked for
+    let again = match LOGIN_TARGETS.iter().find(|t| **t == at) {
+        Some(to) => format!("{AGAIN_PATH}?to={to}"),
+        None => AGAIN_PATH.to_string(),
+    };
+    let head = if refused || at == AGAIN_PATH {
+        String::new()
+    } else {
+        format!("<meta http-equiv=\"refresh\" content=\"0; url={again}\">")
+    };
     page(
-        "Sign in to this panel",
-        "Open SpawnLoft from the app, or run <code>spawnloft ui</code> to get a new link.",
-        "",
+        TITLE,
+        &format!(
+            "SpawnLoft restarted, or this window sat unused for a while. <a href=\"{again}\">Sign in again</a>"
+        ),
+        &head,
     )
 }
 
@@ -1063,8 +1095,29 @@ mod tests {
 
     #[test]
     fn the_pages_have_no_script() {
-        for html in [login_page("/launcher"), unauthorized_page()] {
+        let hostile = "/\"><script>x</script>";
+        for html in [
+            login_page("/launcher"),
+            unauthorized_page(false, "/", false),
+            unauthorized_page(true, "/", false),
+            unauthorized_page(true, hostile, false),
+        ] {
             assert!(!html.to_ascii_lowercase().contains("<script"));
+        }
+        // a browser keeps the command; the window is sent to ask for a new link, with where it was
+        let browser = unauthorized_page(false, "/", false);
+        assert!(browser.contains("run <code>spawnloft ui</code>") && !browser.contains("http-equiv"));
+        assert!(
+            unauthorized_page(true, "/", false)
+                .contains("<meta http-equiv=\"refresh\" content=\"0; url=/auth/again\">")
+        );
+        assert!(unauthorized_page(true, "/launcher?x=1", false).contains("url=/auth/again?to=/launcher\""));
+        // a refused link, or the move itself coming back unanswered, offers the link and stops
+        for stops in [
+            unauthorized_page(true, "/auth?t=x", true),
+            unauthorized_page(true, "/auth/again?to=/launcher", false),
+        ] {
+            assert!(stops.contains("Sign in again") && !stops.contains("http-equiv"));
         }
         assert!(login_page("/setup").contains("<meta http-equiv=\"refresh\" content=\"0; url=/setup\">"));
         assert_eq!(

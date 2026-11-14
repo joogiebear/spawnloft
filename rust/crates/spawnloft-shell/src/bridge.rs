@@ -91,6 +91,8 @@ pub struct Shell {
     main_state: Tracker,
     launcher_state: Tracker,
     reported: Mutex<Vec<PathBuf>>,
+    /// When a window was last signed in again because its page asked.
+    signed_in_again: Mutex<Option<std::time::Instant>>,
 }
 
 impl Shell {
@@ -105,6 +107,7 @@ impl Shell {
             main_state: Tracker::new(config.join("window-state.json")),
             launcher_state: Tracker::new(config.join("launcher-window-state.json")),
             reported: Mutex::new(Vec::new()),
+            signed_in_again: Mutex::new(None),
         }
     }
 
@@ -164,9 +167,13 @@ fn is_start_page(url: &Url) -> bool {
     }
 }
 
-/// A page that lost its sign-in moves here to ask for a new one (`AGAIN_PATH` in
-/// src/panel-auth.mjs). The panel never serves it to a signed-in window: the window answers.
-const AGAIN_PATH: &str = "/auth/again";
+/// A page that lost its sign-in moves here to ask for a new one. The panel serves nothing
+/// there: the window answers.
+const AGAIN_PATH: &str = spawnloft_lib::panel_auth::AGAIN_PATH;
+
+/// Two requests to be signed in again closer together than this are a sign-in that does not
+/// hold (the page asks by itself when it finds it has none), and the second is not answered.
+const AGAIN_GAP: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Asked of the window by the start page's "could not start" state, and by a second start of
 /// the app that found the main window gone: start the core (again). `main.rs` listens.
@@ -268,14 +275,30 @@ fn sign_in_again<R: Runtime>(app: &AppHandle<R>, label: &str, to: Option<&str>) 
     let Some(w) = app.get_webview_window(target) else {
         return reopen_main(app);
     };
-    match login_url(app, to) {
+    // The page asks by itself, so a sign-in that does not hold would ask for ever: a second
+    // request right after the first is told so and not answered.
+    let too_soon = app.state::<Shell>().signed_in_again.lock().is_ok_and(|mut last| {
+        let soon = last.is_some_and(|at| at.elapsed() < AGAIN_GAP);
+        *last = Some(std::time::Instant::now());
+        soon
+    });
+    let made = if too_soon {
+        Err("could not sign the window in to the panel: the sign-in did not hold".to_string())
+    } else {
+        login_url(app, to)
+    };
+    match made {
         Ok(url) => {
             if let Err(e) = w.navigate(url) {
                 local::log(&format!("sign in again: {e}"));
             }
             focus(&w);
         }
-        Err(e) => local::log(&format!("sign in again: {e}")),
+        // said in the main window: a link that was followed and did nothing reads as broken
+        Err(e) => {
+            local::log(&format!("sign in again: {e}"));
+            show_failure(app, &e, &local::run_dir().join("panel.log"));
+        }
     }
 }
 
@@ -296,8 +319,13 @@ pub fn reopen_main<R: Runtime>(app: &AppHandle<R>) {
                         local::log(&format!("reopen the main window: {e}"));
                     }
                 }
-                // the core is still starting: it opens the panel in this window when it is up
-                Err(e) => local::log(&format!("reopen the main window: {e}")),
+                // No panel to open: a core that is still starting, or one that never came up
+                // and said so in the window that has since been closed. Either way it is
+                // started over, and opens the panel in this window when it is up.
+                Err(e) => {
+                    local::log(&format!("reopen the main window: {e}"));
+                    let _ = app.emit(RETRY_EVENT, ());
+                }
             }
         }
         Err(e) => local::log(&format!("could not reopen the main window: {e}")),
@@ -310,21 +338,29 @@ fn on_navigation<R: Runtime>(app: &AppHandle<R>, label: &str, url: &Url) -> bool
     if label == MAIN
         && let Some(action) = start_action(url)
     {
-        return match action {
-            // the page goes to its plain "Starting" state while the core is started again
+        // Only from the start page itself. On Linux and macOS this is asked for the frames of a
+        // page as well, and a frame inside the panel has no business quitting the app.
+        let on_start_page = app
+            .get_webview_window(MAIN)
+            .and_then(|w| w.url().ok())
+            .is_some_and(|at| is_start_page(&at));
+        if !on_start_page {
+            local::log("a start page action asked from another page was refused");
+            return false;
+        }
+        // None of them is followed as a link: an address that restarts the core must not be
+        // left in the window's history for Back or Reload to find.
+        match action {
+            // the core is stopped and started; the window goes to its plain "Starting" state
             StartAction::Retry => {
                 let _ = app.emit(RETRY_EVENT, ());
-                true
             }
             StartAction::ShowLog => {
                 let _ = tauri_plugin_opener::open_path(local::run_dir(), None::<&str>);
-                false
             }
-            StartAction::Quit => {
-                app.exit(0);
-                false
-            }
-        };
+            StartAction::Quit => app.exit(0),
+        }
+        return false;
     }
     if let Some(to) = sign_in_request(url, app.state::<Shell>().panel().as_ref()) {
         let (app, label) = (app.clone(), label.to_string());
