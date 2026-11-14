@@ -36,11 +36,12 @@
     "adopt", "backup", "backup-delete", "backup-lock", "backup-note", "backup-prune", "backup-unlock",
     "command", "config-create", "config-edit", "crash", "create", "delete",
     "file-create", "file-delete", "file-edit", "file-move", "file-replace", "file-unzip", "file-upload", "file-zip", "folder-create",
-    "kill", "player-ban", "player-deop", "player-forget", "player-op", "player-unban",
+    "kill", "player-ban", "player-deop", "player-forget", "player-op", "player-unban", "player-unwhitelist", "player-whitelist",
     "plugin-disable", "plugin-enable", "plugin-install", "plugin-remove", "plugin-update",
     "rebuild", "rename", "restore",
     "schedule-add", "schedule-change", "schedule-disable", "schedule-enable", "schedule-remove", "schedule-run",
     "settings", "start", "stop", "undo", "upgrade",
+    "whitelist-off", "whitelist-on",
     "world-activate", "world-delete", "world-import"
   ],
   "record": [
