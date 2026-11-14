@@ -127,6 +127,11 @@ test('every launcher route refuses another origin and a non-loopback Host', asyn
     ['POST', 'client/profiles/guarded/launch'],
     ['GET', 'client/profiles/guarded/log'],
     ['POST', 'client/profiles/guarded/diag'],
+    ['POST', 'client/profiles/guarded/reveal'],
+    ['POST', 'client/profiles/guarded/exit-seen'],
+    ['GET', 'client/javas'],
+    // it starts the file a path names: never for another origin
+    ['POST', 'client/javas/check'],
   ]
   for (const [method, route] of routes) {
     // a plugin's web UI on another loopback port is another origin
@@ -574,4 +579,42 @@ test('one version in full, and the lists read again on request', async () => {
   assert.equal(body.versions.find((v) => v.id === '26.3').fabric, true)
   const fabricRows = await (await call('client/versions?fabric=1')).json()
   assert.equal(fabricRows.versions.find((v) => v.id === '26.4-snapshot-5').fabric, true)
+})
+
+test('the Javas on this machine are listed, and a path is checked before a setup is saved with it', async () => {
+  const list = await call('client/javas')
+  assert.equal(list.status, 200)
+  const { javas } = await list.json()
+  assert.ok(Array.isArray(javas))
+  for (const j of javas) assert.deepEqual(Object.keys(j), ['path', 'major', 'version', 'arch', 'onPath'])
+  assert.equal((await call('client/javas?fresh=1')).status, 200)
+
+  const check = async (p) => {
+    const res = await call('client/javas/check', { method: 'POST', body: { path: p } })
+    return { status: res.status, ...(await res.json()) }
+  }
+  const missing = path.join(scratch, 'no', 'such', 'java')
+  assert.deepEqual(await check(missing), { status: 200, path: missing, found: false, major: null, version: null, arch: null, message: 'There is no file at that path.' })
+  const folder = await check(scratch)
+  assert.equal(folder.found, false)
+  assert.match(folder.message, /^That is a folder\. Pick the java/)
+  const relative = await check('bin/java')
+  assert.equal(relative.found, false)
+  assert.match(relative.message, /^Give the whole path to java/)
+  // a file that is there and is no Java
+  const notJava = path.join(scratch, 'not-java.txt')
+  fs.writeFileSync(notJava, 'hello')
+  const no = await check(notJava)
+  assert.equal(no.found, false)
+  assert.equal(no.message, 'That file is not a Java: it did not answer the way Java does.')
+  assert.equal((await check(`  ${missing}  `)).path, missing, 'trimmed')
+  for (const bad of [undefined, '', '   ', 7, 'x'.repeat(1025)]) assert.equal((await check(bad)).status, 400)
+  // a Java that was found is one by the check too
+  const real = javas.find((j) => j.path !== 'java')
+  if (real) {
+    const yes = await check(real.path)
+    assert.equal(yes.found, true)
+    assert.equal(yes.major, real.major)
+    assert.equal(yes.message, null)
+  }
 })

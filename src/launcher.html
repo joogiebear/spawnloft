@@ -465,6 +465,10 @@
   .menu .sub small { font-size: var(--t-1); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
   .menu hr { border: 0; border-top: 1px solid var(--line-soft); margin: var(--s-1) 0; width: 100%; }
   .menu .inline { display: grid; grid-template-columns: 1fr auto; gap: var(--s-2); padding: var(--s-1) var(--s-2) var(--s-2); }
+  .menu .flabel { display: block; padding: 0 var(--s-2) var(--s-1); font: var(--type-meta); color: var(--ink-2); }
+  .menu small.hint { display: block; padding: 0 var(--s-2) var(--s-2); }
+  .menu .confirm { margin: var(--s-1) var(--s-2); }
+  .chip .who .own { color: var(--lapis-ink); }
   .menu .note { padding: var(--s-1) var(--s-2) var(--s-2); font: var(--type-meta); color: var(--ink-3); }
   .menu .notice { margin: var(--s-1) 0; }
   .menu > small.hint { padding: 0 var(--s-2) var(--s-2); }
@@ -521,6 +525,24 @@
   .sheet .sub { font: var(--type-meta); color: var(--ink-3); margin-top: 2px; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3) var(--s-4); }
   .grid2 .full { grid-column: 1 / -1; }
+  .vpick { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); width: 100%; text-align: left; background: var(--recess); box-shadow: none; font-weight: 400; }
+  .vpick .now { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; min-width: 0; }
+  .vpick[aria-expanded="true"] { border-color: var(--lapis-edge); background: var(--field-focus); }
+  .vbox { display: grid; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
+  .vtabs { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); flex-wrap: wrap; }
+  .vlist { max-height: 232px; overflow-y: auto; overscroll-behavior: contain; }
+  .vopts { display: grid; gap: 1px; align-content: start; }
+  .vlist > .hint { padding: var(--s-2); margin: 0; }
+  .vrow { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-1) var(--s-2); min-height: 32px; padding: var(--s-1) var(--s-2); border: 1px solid transparent; border-radius: var(--r-xs); cursor: pointer; }
+  .vrow .vid { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vrow .why { flex: 1 1 100%; font: var(--type-meta); color: var(--ink-3); }
+  .vrow .why.warn { color: var(--warn-ink); }
+  .vrow:hover, .vrow.at { background: var(--hover-hi); }
+  .vrow.at { border-color: var(--lapis-edge); }
+  .vrow[aria-selected="true"] { background: var(--lapis-fill); }
+  .vrow[aria-disabled="true"] { cursor: not-allowed; }
+  .vrow[aria-disabled="true"] .vid { color: var(--ink-3); font-weight: 400; }
+  .pathrow { display: grid; grid-template-columns: 1fr auto; gap: var(--s-2); }
   .switchrow { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3) var(--s-4); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
   .switchrow .txt { flex: 1; min-width: 0; font-size: var(--t-3); }
   .switchrow .txt b { display: block; font-weight: 600; }
@@ -731,6 +753,10 @@
   const CRASH_REPLAY_MS = 12 * 60 * 60 * 1000
   // the memory segments; anything else is Custom, a slider in half-gigabyte steps
   const MEMORY_CHOICES = ['2G', '4G', '8G']
+  // the version list shows this many rows; the rest are reached by typing
+  const VERSION_CAP = 80
+  // the Java list's last choice: a path typed or browsed to
+  const JAVA_OTHER = ':other'
   const STOPPED = new Set(['stopped', 'stale'])
   const JOB_KEY = 'spawnloft.launcher.job'
   const PICK_KEY = 'spawnloft.launcher.profile'
@@ -835,6 +861,103 @@
     if (show === 'all') return versions
     if (show === 'snapshot') return versions.filter((v) => v.type === 'release' || v.type === 'snapshot')
     return versions.filter((v) => v.type === 'release')
+  }
+
+  // The version list as the sheet shows it: { rows, more }. With nothing typed, the rows of the
+  // tab (`show`); with something typed, every version whose id has it, whatever the tab, so
+  // "24w" finds a snapshot from the Releases tab. Newest first as the panel sends them, ids that
+  // start with what was typed before ids that only contain it. `more` is how many were left out
+  // by `cap`: a long list is narrowed by typing, not by scrolling through a thousand rows.
+  function pickerRows(versions, show, query, cap = VERSION_CAP) {
+    const q = String(query ?? '').trim().toLowerCase()
+    let rows
+    if (!q) rows = versionRows(versions, show)
+    else {
+      const has = versions.filter((v) => v.id.toLowerCase().includes(q))
+      rows = [...has.filter((v) => v.id.toLowerCase().startsWith(q)), ...has.filter((v) => !v.id.toLowerCase().startsWith(q))]
+    }
+    return { rows: rows.slice(0, cap), more: Math.max(0, rows.length - cap) }
+  }
+
+  // The marks beside a version: [{ text, tone }]. What it is (unless a plain release), whether it
+  // is the newest release, and whether it is already on this computer.
+  function versionBadges(row, latestId) {
+    const out = []
+    if (row.id === latestId) out.push({ text: 'Latest', tone: 'live' })
+    if (row.type && row.type !== 'release') out.push({ text: kindLabel(row).replace(/^./, (c) => c.toUpperCase()), tone: '' })
+    if (row.downloaded) out.push({ text: 'Downloaded', tone: 'accent' })
+    return out
+  }
+
+  // The row the arrow keys land on next among `rows`, skipping the ones that cannot be picked;
+  // -1 when none can. `at` is the row they are on (-1: none yet), `step` 1 or -1.
+  function nextPickable(rows, at, step, blocked) {
+    const ok = rows.map((r, i) => (blocked(r) ? -1 : i)).filter((i) => i !== -1)
+    if (!ok.length) return -1
+    if (at === -1) return step > 0 ? ok[0] : ok[ok.length - 1]
+    const after = step > 0 ? ok.find((i) => i > at) : [...ok].reverse().find((i) => i < at)
+    return after ?? (step > 0 ? ok[0] : ok[ok.length - 1])
+  }
+
+  // Memory against this computer: { total, tooMuch(choice), warn, line }. `total` is its memory
+  // in half gigabytes (null when the panel did not say); a choice above it cannot be picked; one
+  // above three quarters of it gets a warning, since the game's Java takes more than it is
+  // given and everything else needs room too. `line` says what the computer has.
+  function memoryAdvice(memory, machine) {
+    const totalBytes = Number(machine?.totalMemory)
+    const total = totalBytes > 0 ? Math.max(2, Math.floor(totalBytes / 1024 ** 3 * 2) / 2) : null
+    const gb = memoryGb(memory)
+    const tooMuch = (choice) => total !== null && (memoryGb(choice) ?? 0) > total
+    let warn = null
+    if (total !== null && gb !== null) {
+      if (gb > total) warn = `This computer has ${gbText(totalBytes)} of memory, less than the ${memoryText(memory)} this setup is given. The game may not start.`
+      else if (gb > total * 0.75) warn = `That is most of this computer's ${gbText(totalBytes)}. The game and everything else open may slow down; ${memoryText(memoryFromGb(Math.max(2, Math.floor(total / 2))))} is a safer choice.`
+    }
+    const line = total === null ? 'Most setups need 2 to 4 GB.' : machine.freeMemory ? `This computer has ${gbText(machine.freeMemory)} free of ${gbText(totalBytes)}.` : `This computer has ${gbText(totalBytes)}.`
+    return { total, tooMuch, warn, line }
+  }
+
+  // The Java list of the setup sheet: [{ value, text }]. Automatic, Mojang's own, each Java found
+  // on this computer, the setup's saved path if it is none of those, and "Another Java…".
+  function javaChoices(javas, current) {
+    const out = [{ value: '', text: 'Automatic (recommended)' }, { value: 'mojang', text: 'Mojang\'s own Java for the version' }]
+    for (const j of javas ?? []) {
+      const what = `Java ${j.major ?? '?'}${j.arch ? ` (${j.arch})` : ''}`
+      out.push({ value: j.path, text: j.path === 'java' ? `${what} · the one programs find first` : `${what} · ${j.path}` })
+    }
+    if (current && !out.some((o) => o.value === current)) out.push({ value: current, text: current })
+    out.push({ value: JAVA_OTHER, text: 'Another Java\u2026' })
+    return out
+  }
+
+  // A Java against what a version needs: a sentence when it will not do or may not, else null.
+  // `needs` is { min, max } from the version's own file, or { min, guess: true } from its id.
+  function javaFit(major, needs, mc) {
+    if (!major || !needs?.min) return null
+    if (major < needs.min) return needs.guess ? `${mc} probably needs Java ${needs.min} or newer, and this is Java ${major}.` : `${mc} needs Java ${needs.min}${needs.max === needs.min ? '' : ' or newer'}, and this is Java ${major}. Play will refuse it.`
+    if (needs.max && major > needs.max) return `${mc} wants Java ${needs.max === needs.min ? needs.max : `${needs.min} to ${needs.max}`}, and this is Java ${major}, which is newer. The game may not start.`
+    return null
+  }
+
+  // An offline name as the panel takes it; what is wrong with one being typed, or null.
+  function offlineNameProblem(name) {
+    const text = String(name ?? '')
+    if (!text) return null
+    if (/[^A-Za-z0-9_]/.test(text)) return 'Only letters, digits and underscore.'
+    if (text.length < 3) return 'At least 3 characters.'
+    if (text.length > 16) return 'At most 16 characters.'
+    return null
+  }
+  function offlineNameOk(name) {
+    return /^[A-Za-z0-9_]{3,16}$/.test(String(name ?? ''))
+  }
+
+  // Whose game the setup in view starts when that is not the account the chip names: the
+  // setup's own "Play as". null when they are the same, or the setup has none.
+  function setupPlaysAs(profile, defaultUuid) {
+    if (!profile?.account || !profile.accountName) return null
+    if (profile.accountUuid && profile.accountUuid === defaultUuid) return null
+    return profile.accountName
   }
 
   // What a failed launch looks like on the Play screen. `fix` names the one control that helps.
@@ -1369,9 +1492,13 @@
     firstRun: false,
     versions: null,
     versionShow: 'release',
+    // the Javas on this computer: null until asked, { loading }, { javas } or { error }
+    javas: null,
     login: null,
     acctNotice: null,
     offline: { name: '', error: null },
+    // the account whose "Sign out?" is up in the account menu
+    acctAsk: null,
   }
 
   function loadTargets() {
@@ -1454,6 +1581,7 @@
     const was = S.menu
     if (!was) return
     S.menu = null
+    S.acctAsk = null
     render()
     if (refocus) ($(was === 'ask' && S.askFrom ? S.askFrom : { account: 'chip', join: 'join', ask: 'play' }[was]) ?? $('play'))?.focus({ preventScroll: true })
   }
@@ -1504,6 +1632,7 @@
     const inMenu = !keep && active?.closest?.('.menu[id]')
     const row = inMenu ? { menu: inMenu.id, at: menuItems(inMenu).indexOf(active) } : null
     // the running game's log stays at its end while it grows, and where it was scrolled to otherwise
+    const listWas = $('fMcList')?.scrollTop ?? null
     const logWas = $('liveLogPre')
     const logAt = logWas ? { top: logWas.scrollTop, left: logWas.scrollLeft, end: logWas.scrollTop + logWas.clientHeight >= logWas.scrollHeight - 12 } : null
     $('chipwrap').replaceChildren(...(S.down ? [] : accountChip()))
@@ -1521,6 +1650,7 @@
       const items = menu ? menuItems(menu) : []
       items[Math.min(row.at, items.length - 1)]?.focus({ preventScroll: true })
     }
+    if (listWas !== null && $('fMcList')) $('fMcList').scrollTop = listWas
     const logNow = $('liveLogPre')
     if (logNow) {
       logNow.scrollTop = logAt && !logAt.end ? logAt.top : logNow.scrollHeight
@@ -1534,9 +1664,12 @@
     const def = defaultAccount()
     const open = S.menu === 'account'
     const attrs = { id: 'chip', 'aria-expanded': String(open), 'aria-controls': 'menuAccount', onclick: toggleMenu('account') }
+    // the setup in view can be set to another player than the one named here: say so
+    const own = S.summary ? setupPlaysAs(currentProfile(), S.summary.defaultAccount) : null
     const chip = def
       ? h('button', { ...attrs, class: 'chip' }, tile(def), h('span', { class: 'who' }, h('b', { text: def.name }),
-        h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' })), ico('chev'))
+        h('small', { text: S.login ? 'Signing in…' : def.type === 'offline' ? 'Offline' : def.refreshFailedAt ? 'Microsoft · sign in again' : 'Microsoft' }),
+        own && h('small', { class: 'own', id: 'chipOwn', text: `This setup plays as ${own}` })), ico('chev'))
       : h('button', { ...attrs, class: 'chip empty' }, h('span', { class: 'tile', style: '--tile:var(--raised-hi);color:var(--ink-3)' }, ico('user')),
         h('span', { class: 'who' }, h('b', { text: 'Not signed in' }), h('small', { text: S.login ? 'Signing in…' : 'Sign in or play offline' })), ico('chev'))
     return [chip, open && menuPad(accountMenu(def))].filter(Boolean)
@@ -1544,10 +1677,16 @@
 
   function accountMenu(def) {
     const accounts = accountsNow()
-    const o = S.offline
+    const p = currentProfile()
+    const own = S.summary ? setupPlaysAs(p, S.summary.defaultAccount) : null
+    const verb = (a) => (a.type === 'offline' ? 'Remove' : 'Sign out')
+    const ask = (a) => { S.acctAsk = a.uuid; render(); $('acctKeep')?.focus({ preventScroll: true }) }
+    const asking = S.acctAsk ? accounts.find((a) => a.uuid === S.acctAsk) ?? null : null
     return h('div', { class: 'menu who', id: 'menuAccount', role: 'group', 'aria-label': 'Accounts', onkeydown: menuKeys },
       S.acctNotice && acctNotice(S.acctNotice),
       S.login && waitingStrip(S.login),
+      own && p && p.name !== FIRST && h('p', { class: 'note', id: 'ownNote' }, `${setupName(p)} is set to play as ${own}, whoever is picked here. `,
+        h('button', { class: 'linkbtn', onclick: () => { S.menu = null; openSheet(p, null, 'fAccount') } }, 'Change that')),
       accounts.length > 0 && [
         h('div', { class: 'mhead', text: 'Playing as' }),
         accounts.map((a) => {
@@ -1557,19 +1696,44 @@
             h('button', { class: 'pick', 'aria-current': a === def ? 'true' : null, onclick: () => setDefault(a.uuid) },
               tile(a, 'sm'), h('span', { text: a.name }), h('span', { class: a.refreshFailedAt ? 'meta warn' : 'meta', text: !offline && a.refreshFailedAt ? 'sign in again' : meta })),
             !offline && a.refreshFailedAt && h('button', { class: 'sm', disabled: Boolean(S.login), onclick: startLogin }, 'Sign in again'),
-            a !== def && h('button', { class: 'sm quiet icon', title: `${offline ? 'Remove' : 'Sign out'} ${a.name}`, 'aria-label': `${offline ? 'Remove' : 'Sign out'} ${a.name}`, onclick: () => removeAccount(a) }, ico('x')))
+            a !== def && h('button', { class: 'sm quiet icon', title: `${verb(a)} ${a.name}`, 'aria-label': `${verb(a)} ${a.name}`, onclick: () => ask(a) }, ico('x')))
         }),
+        // signing out is asked first, with the safe choice in focus: getting back in means
+        // Microsoft's page again, and setups set to this account stop playing until told another
+        asking && accountAsk(asking, verb(asking)),
         h('hr'),
       ],
       h('button', { class: 'row act', disabled: Boolean(S.login), onclick: startLogin }, ico('plus'), 'Add Microsoft account', h('span', { class: 'meta', text: 'opens Microsoft\'s page' })),
       h('div', { class: 'mhead', text: 'Play offline on local servers' }),
-      h('div', { class: 'inline' },
-        h('input', { id: 'offName', 'aria-label': 'Offline name', value: o.name, maxlength: '16', placeholder: 'Name, 3 to 16 characters', class: o.error ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
-          oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline() } }),
-        h('button', { class: 'sm', onclick: () => addOffline() }, 'Add')),
-      o.error && h('small', { class: 'hint bad', text: sentence(o.error) }),
+      offlineField('offName', 'Add', () => addOffline()),
       h('p', { class: 'note', text: 'An offline name plays on servers that do not check accounts, like a SpawnLoft server set to let anyone join. Every other server needs a Microsoft account.' }),
-      def && [h('hr'), h('button', { class: 'row act', onclick: () => removeAccount(def) }, ico('x'), `${def.type === 'offline' ? 'Remove' : 'Sign out'} ${def.name}`)])
+      def && !asking && [h('hr'), h('button', { class: 'row act', id: 'acctOut', onclick: () => ask(def) }, ico('x'), `${verb(def)} ${def.name}\u2026`)])
+  }
+
+  function accountAsk(a, verb) {
+    const using = profilesNow().filter((q) => q.accountUuid === a.uuid).length
+    const back = () => { S.acctAsk = null; render(); $('chip')?.focus({ preventScroll: true }) }
+    return h('div', { class: 'confirm', id: 'acctAsk', role: 'group', 'aria-label': `${verb} ${a.name}?` },
+      h('p', { id: 'acctWhy' }, h('b', { text: `${verb} ${a.name}?` }), a.type === 'offline' ? ' The name can be added again at any time.' : ' Signing in again goes through Microsoft\'s page.',
+        using > 0 && ` ${using === 1 ? 'One setup is' : `${using} setups are`} set to play as this account and will ask for another one.`),
+      h('button', { class: 'sm', id: 'acctKeep', onclick: back }, 'Keep'),
+      h('button', { class: 'sm danger', id: 'acctGo', 'aria-describedby': 'acctWhy', onclick: () => removeAccount(a) }, verb))
+  }
+
+  // The offline name: a label that stays, what is wrong as it is typed, and a button that
+  // works once the name is one the game takes.
+  function offlineField(id, action, go) {
+    const o = S.offline
+    const problem = offlineNameProblem(o.name)
+    const ok = offlineNameOk(o.name)
+    return [
+      h('label', { class: 'flabel', for: id, text: 'Offline name' }),
+      h('div', { class: 'inline' },
+        h('input', { id, value: o.name, maxlength: '16', placeholder: 'Like Steve_01', class: o.error || problem ? 'bad' : null, 'aria-describedby': `${id}Hint`, autocomplete: 'off', spellcheck: 'false',
+          oninput: (e) => { o.name = e.target.value; o.error = null; render() }, onkeydown: (e) => { if (e.key === 'Enter' && offlineNameOk(o.name)) go() } }),
+        h('button', { class: 'sm', id: `${id}Go`, disabled: !ok, onclick: go }, action)),
+      h('small', { class: o.error || problem ? 'hint bad' : 'hint', id: `${id}Hint`, role: o.error ? 'alert' : null, text: o.error ? sentence(o.error) : problem ?? '3 to 16 letters, digits or underscores.' }),
+    ]
   }
 
   function acctNotice(n) {
@@ -1750,11 +1914,7 @@
       h('p', { class: 'note', text: 'Opens Microsoft\'s own sign-in page. SpawnLoft never sees your password. Needed for online servers.' }),
       h('hr'),
       h('div', { class: 'mhead', text: 'Or play offline on local servers' }),
-      h('div', { class: 'inline' },
-        h('input', { id: 'askName', 'aria-label': 'Offline name', value: o.name, maxlength: '16', placeholder: 'Name, 3 to 16 characters', class: o.error ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
-          oninput: (e) => { o.name = e.target.value }, onkeydown: (e) => { if (e.key === 'Enter') addOffline(p.name) } }),
-        h('button', { class: 'sm', onclick: () => addOffline(p.name) }, 'Play')),
-      o.error && h('small', { class: 'hint bad', text: sentence(o.error) }))
+      offlineField('askName', 'Play', () => addOffline(p.name)))
   }
 
   function flashNotice() {
@@ -2318,6 +2478,8 @@
       : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, serverList: true, error: null, saving: false, removing: false }
     if (!p && prefill?.server && !S.sheet.server) S.sheet.server = prefill.server
     S.sheet.custom = !MEMORY_CHOICES.includes(String(S.sheet.memory).toUpperCase())
+    S.sheet.javaOther = false
+    S.sheet.javaCheck = null
     if (!S.versions || S.versions.error) loadVersions()
     else defaultVersion(S.sheet)
     render()
@@ -2419,6 +2581,168 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
   }
 
+  // The version field: a button that says the version, and under it, when opened, a box to type
+  // in and the list it narrows. Up and Down move through the list from the box, Enter picks,
+  // Escape closes. A version this computer cannot run is listed with the reason and cannot be picked.
+  function versionPicker(f, p, machine) {
+    const v = S.versions
+    const all = v?.versions ?? []
+    const latest = all.find((r) => r.type === 'release')?.id ?? null
+    const cur = versionRow(f.mc)
+    const badges = (r) => versionBadges(r, latest).map((b) => pill(b.tone, b.text))
+    const { rows, more } = pickerRows(all, S.versionShow, f.vFind)
+    const blocked = (r) => Boolean(r.refusal || machine)
+    if (f.vAt === undefined || f.vAt >= rows.length) f.vAt = -1
+    const close = () => { f.vOpen = false; f.vFind = ''; f.vAt = -1; render(); $('fMc')?.focus({ preventScroll: true }) }
+    const pick = (r) => {
+      if (blocked(r)) return
+      f.mc = r.id
+      fixLoader(f)
+      loadDetails(f.mc)
+      close()
+    }
+    const move = (step) => {
+      f.vAt = nextPickable(rows, f.vAt, step, blocked)
+      render()
+      $(`fMcRow${f.vAt}`)?.scrollIntoView({ block: 'nearest' })
+    }
+    const keys = (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : -1) }
+      else if (e.key === 'Enter') { e.preventDefault(); const r = rows[f.vAt] ?? (rows.length === 1 ? rows[0] : null); if (r) pick(r) }
+    }
+    const tab = (mode, text) => h('button', { type: 'button', id: `fMcShow-${mode}`, 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; f.vAt = -1; render() } }, text)
+    const typed = String(f.vFind ?? '').trim()
+    const facts = versionFacts(cur, S.details[f.mc])
+    const refused = S.details[f.mc]?.refusal ?? null
+    const changed = p && f.mc !== p.mc
+    const box = f.vOpen && h('div', { class: 'vbox', id: 'fMcBox' },
+      h('input', { id: 'fMcFind', type: 'text', role: 'combobox', 'aria-label': 'Find a version', 'aria-expanded': 'true', 'aria-controls': 'fMcOptions', 'aria-autocomplete': 'list', 'aria-activedescendant': f.vAt >= 0 ? `fMcRow${f.vAt}` : null,
+        placeholder: 'Type to find one, like 1.20', value: f.vFind ?? '', autocomplete: 'off', spellcheck: 'false', oninput: (e) => { f.vFind = e.target.value; f.vAt = -1; render() }, onkeydown: keys }),
+      h('div', { class: 'vtabs' },
+        h('div', { class: 'seg', role: 'group', 'aria-label': 'Which versions the list shows' }, tab('release', 'Releases'), tab('snapshot', 'And snapshots'), tab('all', 'Everything')),
+        h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), title: 'Ask Mojang for the list again, for a version out within the hour', onclick: () => loadVersions({ refresh: true }) }, v?.loading ? 'Reading\u2026' : 'Refresh')),
+      typed && h('small', { class: 'hint', text: 'Searching every version, snapshots and old ones included.' }),
+      // the options alone are the listbox; the notes under them are not options
+      h('div', { class: 'vlist', id: 'fMcList' }, h('div', { class: 'vopts', id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' },
+        rows.map((r, i) => h('div', { class: i === f.vAt ? 'vrow at' : 'vrow', id: `fMcRow${i}`, role: 'option', 'aria-selected': String(r.id === f.mc), 'aria-disabled': blocked(r) ? 'true' : null, onclick: () => pick(r) },
+          h('span', { class: 'vid', text: r.id }), badges(r),
+          (r.refusal || r.note) && h('small', { class: r.refusal ? 'why warn' : 'why', text: sentence(r.refusal ?? r.note) })))),
+        !rows.length && h('p', { class: 'hint', text: v?.loading ? 'Reading the version list\u2026' : typed ? `No version has \u201c${typed}\u201d in its name.` : 'No versions to pick.' }),
+        more > 0 && h('p', { class: 'hint', text: `${more} more. Type part of a version to find it.` })))
+    return h('div', { class: f.vOpen ? 'field full' : 'field' }, h('span', { class: 'label', id: 'fMcLabel', text: 'Version' }),
+      h('button', { type: 'button', class: 'vpick', id: 'fMc', 'aria-haspopup': 'listbox', 'aria-expanded': String(Boolean(f.vOpen)), 'aria-controls': f.vOpen ? 'fMcBox' : null, 'aria-labelledby': 'fMcLabel fMcNow',
+        onclick: () => { if (f.vOpen) return close(); f.vOpen = true; f.vAt = -1; render(); $('fMcFind')?.focus({ preventScroll: true }); $('fMcList')?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }) } },
+        h('span', { class: 'now', id: 'fMcNow' }, h('b', { text: f.mc || (v?.loading ? 'Reading the version list\u2026' : 'Pick a version') }), cur && badges(cur)), ico('chev')),
+      box,
+      changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
+      refused && h('small', { class: 'hint warn', text: sentence(refused) }),
+      (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint',
+        text: [v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : '', facts.length ? sentence(facts.join(' \u00b7 ')) : ''].filter(Boolean).join(' ') }))
+  }
+
+  // The Javas on this computer, for the sheet's Java list; asked for when Advanced is opened.
+  async function loadJavas({ fresh = false } = {}) {
+    if (S.javas?.loading) return
+    S.javas = { loading: true, javas: S.javas?.javas ?? null }
+    render()
+    try {
+      S.javas = await api(`client/javas${fresh ? '?fresh=1' : ''}`)
+    } catch (err) {
+      S.javas = { error: err.message, javas: [] }
+    }
+    render()
+  }
+
+  // Is the path in the sheet a Java: asked when the field is left, after Browse, and before Save.
+  // The answer is kept with the path it was for.
+  async function checkJava(f) {
+    const path = fieldText(f.java)
+    if (!path || path === 'mojang') { f.javaCheck = null; return null }
+    if (f.javaCheck?.path === path && !f.javaCheck.checking) return f.javaCheck
+    f.javaCheck = { path, checking: true }
+    renderSoon()
+    let out
+    try {
+      out = await api('client/javas/check', { method: 'POST', body: { path } })
+    } catch (err) {
+      if (err instanceof PanelDown) throw err
+      out = { path, found: false, message: sentence(err.message) }
+    }
+    if (S.sheet === f && fieldText(f.java) === path) { f.javaCheck = out; renderSoon() }
+    return out
+  }
+
+  // A render that nobody asked for by clicking (an answer that arrived) waits while a mouse
+  // button is down: rebuilding the page between press and release would swallow the click, as
+  // when Save is pressed straight from the Java path field, whose check starts as it is left.
+  let pressed = false
+  let renderWaits = false
+  document.addEventListener('pointerdown', () => { pressed = true }, true)
+  for (const ev of ['pointerup', 'pointercancel']) {
+    document.addEventListener(ev, () => {
+      pressed = false
+      if (renderWaits) { renderWaits = false; setTimeout(render, 0) }
+    }, true)
+  }
+  function renderSoon() {
+    if (pressed) renderWaits = true
+    else render()
+  }
+
+  async function browseJava(f) {
+    let picked = null
+    try { picked = await desktop.pickFile('Choose the java program', 'program') } catch { /* closed, or no picker here */ }
+    if (!picked || S.sheet !== f) return
+    f.java = picked
+    f.javaCheck = null
+    render()
+    checkJava(f).catch(() => {})
+  }
+
+  // What the version in the sheet needs of a Java: its own file's bounds when the panel has
+  // read it, else the guess from its id.
+  function javaNeeds(mc) {
+    const d = S.details[mc]?.java
+    if (d?.min) return { min: d.min, max: d.max ?? null }
+    const row = versionInfo(mc)
+    return row.javaNeeds ? { min: row.javaNeeds, max: null, guess: row.javaNeedsExact === false } : null
+  }
+
+  function javaField(f) {
+    const found = S.javas?.javas ?? []
+    const other = f.javaOther
+    const choices = javaChoices(found, other ? null : fieldText(f.java))
+    const picked = found.find((j) => j.path === f.java) ?? null
+    const check = f.javaCheck && f.javaCheck.path === fieldText(f.java) ? f.javaCheck : null
+    const major = picked?.major ?? (check?.found ? check.major : null)
+    const fit = javaFit(major, javaNeeds(f.mc), f.mc)
+    const onpick = (e) => {
+      const val = e.target.value
+      f.javaOther = val === JAVA_OTHER
+      f.java = f.javaOther ? '' : val
+      f.javaCheck = null
+      render()
+      if (f.javaOther) $('fJavaPath')?.focus()
+    }
+    let hint = 'SpawnLoft picks a Java that fits the version, and gets Mojang\'s own when none on this computer does.'
+    if (other) hint = `The whole path to ${/Win/.test(navigator.platform) ? 'javaw.exe or java.exe' : 'the java program'}, in a Java's bin folder.`
+    else if (f.java === 'mojang') hint = 'The Java that Mojang ships for this version, downloaded on the first Play. It is the one the official launcher uses.'
+    else if (f.java) hint = 'This setup always starts with this Java.'
+    return h('div', { class: 'field' }, h('label', { class: 'label', for: 'fJava', text: 'Java' }),
+      h('select', { id: 'fJava', value: other ? JAVA_OTHER : f.java, onchange: onpick }, choices.map((c) => h('option', { value: c.value, text: c.text }))),
+      other && h('div', { class: 'pathrow' },
+        h('input', { id: 'fJavaPath', 'aria-label': 'Path to Java', value: f.java, class: check && check.found === false ? 'bad' : null, autocomplete: 'off', spellcheck: 'false',
+          oninput: (e) => { f.java = e.target.value; f.javaCheck = null }, onchange: () => checkJava(f).catch(() => {}) }),
+        desktop?.pickFile && h('button', { type: 'button', class: 'sm', id: 'fJavaBrowse', onclick: () => browseJava(f) }, 'Browse\u2026')),
+      check?.checking && h('small', { class: 'hint', role: 'status', text: 'Checking that it is a Java\u2026' }),
+      check && check.found === false && h('small', { class: 'hint bad', id: 'fJavaBad', role: 'alert', text: sentence(check.message) }),
+      check?.found && h('small', { class: 'hint', id: 'fJavaGood', role: 'status', text: `That is Java ${check.major ?? 'of a version it does not say'}${check.arch ? ` (${check.arch})` : ''}.` }),
+      fit && h('small', { class: 'hint warn', id: 'fJavaFit', text: fit }),
+      h('small', { class: 'hint' }, hint, ' ',
+        h('button', { type: 'button', class: 'linkbtn', id: 'javasRefresh', disabled: Boolean(S.javas?.loading), title: 'Look for the Javas on this computer again, after installing one', onclick: () => loadJavas({ fresh: true }) }, S.javas?.loading ? 'Looking\u2026' : 'Look again'),
+        S.javas?.error && ` The Javas on this computer could not be listed: ${sentence(S.javas.error)}`))
+  }
+
   // Segmented buttons: one of `choices` ([value, label, disabled]) is pressed.
   function segmented(label, choices, value, onpick) {
     return h('div', { class: 'seg', role: 'group', 'aria-label': label },
@@ -2445,46 +2769,20 @@
     const edited = Boolean(p && (fieldText(f.name) !== p.name || Object.keys(profilePatch(p, editedProfile(f))).length))
     const busyHere = Boolean(p && S.job?.profile === p.name)
 
-    let versionField
-    if (running) {
-      versionField = ro('Version', f.mc, runningHint)
-    } else {
-      const rows = v?.versions ? versionRows(v.versions, S.versionShow) : []
-      const latest = rows.find((r) => r.type === 'release')
-      const options = rows.map((r) => h('option', {
-        value: r.id,
-        disabled: Boolean(r.refusal || machine),
-        text: `${r.id}${r === latest ? ' (latest release)' : r.type !== 'release' ? ` (${kindLabel(r)})` : ''}${r.downloaded ? ' · downloaded' : ''}${r.refusal ? ' · ' + r.refusal : r.note ? ' · ' + r.note : ''}`,
-      }))
-      if (f.mc && !rows.some((r) => r.id === f.mc)) options.unshift(h('option', { value: f.mc, text: f.mc }))
-      if (!options.length) options.push(h('option', { value: '', text: v?.loading ? 'Loading versions…' : 'No versions to pick' }))
-      const show = (mode, text) => h('button', { type: 'button', class: 'linkbtn', 'aria-pressed': String(S.versionShow === mode), onclick: () => { S.versionShow = mode; render() } }, text)
-      const facts = versionFacts(versionRow(f.mc), S.details[f.mc])
-      const refused = S.details[f.mc]?.refusal ?? null
-      const changed = p && f.mc !== p.mc
-      versionField = h('label', { class: 'field' }, h('span', { text: 'Version' }),
-        h('select', { id: 'fMc', value: f.mc, onchange: set('mc', true) }, options),
-        changed && h('small', { class: 'hint warn', text: 'Changing it may stop the mods in its folder from loading.' }),
-        refused && h('small', { class: 'hint warn', text: sentence(refused) }),
-        (v?.error || v?.offline || facts.length > 0) && h('small', { class: v?.offline || v?.error ? 'hint warn' : 'hint',
-          text: [v?.error ? `The version list could not be read: ${v.error}.` : v?.offline ? sentence(v.offline) + '.' : '', facts.length ? sentence(facts.join(' · ')) : ''].filter(Boolean).join(' ') }),
-        h('small', { class: 'hint' },
-          show('release', 'Releases'), ' · ', show('snapshot', 'Show snapshots'), ' · ', show('all', 'Show all'), ' · ',
-          h('button', { type: 'button', class: 'linkbtn', id: 'versionsRefresh', disabled: Boolean(v?.loading), onclick: () => loadVersions({ refresh: true }) }, 'Refresh')))
-    }
+    const versionField = running ? ro('Version', f.mc, runningHint) : versionPicker(f, p, machine)
 
     const fabricNo = fabricBlock(f)
-    const loaderField = running ? ro('Loader', loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }), runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Loader' }),
-      segmented('Loader', [['vanilla', 'Vanilla'], ['fabric', 'Fabric', fabricNo]], f.loader, (val) => {
+    const loaderField = running ? ro('Mods', f.loader === 'fabric' ? loaderText({ loader: f.loader, loaderVersion: f.loaderVersion }) : 'None', runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', id: 'fLoaderLabel', text: 'Mods' }),
+      segmented('Mods', [['vanilla', 'None'], ['fabric', 'Fabric', fabricNo]], f.loader, (val) => {
         f.loader = val
         if (!f.editing && !f.memoryTouched) { f.memory = defaultMemory(val); f.custom = false }
         fixLoader(f)
         render()
       }),
-      h('small', { class: fabricNo ? 'hint warn' : 'hint', text: fabricNo ?? 'Fabric for mods. Put them in the setup\'s mods folder.' }))
+      h('small', { class: fabricNo ? 'hint warn' : 'hint', text: fabricNo ?? (f.loader === 'fabric' ? 'Fabric loads mods. Put them in the mods folder inside the setup\'s folder.' : 'None is plain Minecraft, also called Vanilla. Pick Fabric to play with mods.') }))
 
-    const machineInfo = S.summary?.machine
-    const totalGb = machineInfo?.totalMemory ? Math.max(2, Math.floor(machineInfo.totalMemory / 1024 ** 3 * 2) / 2) : 16
+    const advice = memoryAdvice(f.memory, S.summary?.machine)
+    const totalGb = advice.total ?? 16
     const gb = memoryGb(f.memory) ?? 2
     const pickMemory = (val) => {
       f.memoryTouched = true
@@ -2493,12 +2791,14 @@
       if (val === 'custom') $('fMemory')?.focus()
     }
     const memoryField = running ? ro('Memory', memoryText(f.memory), runningHint) : h('div', { class: 'field' }, h('span', { class: 'label', text: 'Memory' }),
-      segmented('Memory', [['2G', '2 GB'], ['4G', '4 GB'], ['8G', '8 GB'], ['custom', 'Custom']], f.custom ? 'custom' : String(f.memory).toUpperCase(), pickMemory),
+      // a choice this computer does not have the memory for cannot be picked
+      segmented('Memory', [...MEMORY_CHOICES.map((c) => [c, memoryText(c), advice.tooMuch(c)]), ['custom', 'Custom']], f.custom ? 'custom' : String(f.memory).toUpperCase(), pickMemory),
       f.custom && h('div', { class: 'slider' },
         h('input', { type: 'range', id: 'fMemory', min: '1', max: String(Math.max(totalGb, gb)), step: '0.5', value: String(gb), 'aria-label': 'Memory in gigabytes', 'aria-valuetext': memoryText(f.memory),
           oninput: (e) => { f.memory = memoryFromGb(e.target.value); f.memoryTouched = true; render() } }),
         h('output', { for: 'fMemory', text: `${gb} GB` })),
-      f.custom && h('small', { class: 'hint', text: machineInfo?.freeMemory ? `You have ${gbText(machineInfo.freeMemory)} free of ${gbText(machineInfo.totalMemory)}.` : 'Most setups need 2 to 4 GB.' }))
+      advice.warn && h('small', { class: 'hint warn', id: 'fMemoryWarn', text: advice.warn }),
+      h('small', { class: 'hint', id: 'fMemoryLine', text: advice.line }))
 
     const servers = serversNow()
     const def = defaultAccount()
@@ -2518,7 +2818,7 @@
             h('small', { class: 'hint', text: 'Renaming moves its folder too. Letters, digits, dash and underscore.' })))
         : h('label', { class: 'field' }, h('span', { text: 'Name (optional)' }),
           h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
-          h('small', { class: 'hint', text: 'Shown in the setups menu. Letters, digits, dash and underscore.' })),
+          h('small', { class: 'hint', text: 'Shown in the setups list. Letters, digits, dash and underscore.' })),
       h('label', { class: 'field' }, h('span', { text: 'Play as' }),
         h('select', { id: 'fAccount', value: f.account, onchange: set('account') },
           h('option', { value: '', text: def ? `Whoever is signed in (${def.name})` : 'Whoever is signed in' }),
@@ -2531,7 +2831,7 @@
           f.server && !servers.some((s) => s.name === f.server) && h('option', { value: f.server, text: `${f.server} (not found)` }))))
 
     const harness = !running && h('div', { class: 'switchrow' },
-      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game, which diagnostics and the assistant tools need. Off until you need it.' })),
+      h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game. With it, a problem report and an AI assistant you connected can read what is on screen and send chat. Off until you need it.' })),
       h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
 
     const serverList = h('div', { class: 'switchrow' },
@@ -2543,21 +2843,21 @@
       const a = f.account ? accountsNow().find((x) => x.uuid === f.account) : def
       return a?.type === 'microsoft' ? a : null
     })()
-    const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open } },
+    if (f.adv && !running && !S.javas) loadJavas()
+    const advanced = h('details', { class: 'adv', open: f.adv || null, ontoggle: (e) => { f.adv = e.target.open; if (f.adv && !S.javas) loadJavas() } },
       h('summary', { text: 'Advanced' }),
       h('div', { class: 'in' },
         running
-          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's Java" : f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric loader version', f.loaderVersion || 'Newest stable'))
+          ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), f.loader === 'fabric' && ro('Fabric version', f.loaderVersion || 'Newest stable'))
           : h('div', { class: 'grid2' },
-            h('label', { class: 'field' }, h('span', { text: 'Java' }), h('input', { id: 'fJava', value: f.java, placeholder: 'Automatic (recommended)', oninput: set('java') }),
-              h('small', { class: 'hint', text: 'A path to java or javaw, or mojang for Mojang\'s own Java for the version. Checked at launch.' })),
-            f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric loader version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
-              h('small', { class: 'hint', text: 'Left empty, the first launch picks the newest stable loader.' }))),
+            javaField(f),
+            f.loader === 'fabric' && h('label', { class: 'field' }, h('span', { text: 'Fabric version' }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
+              h('small', { class: 'hint', text: 'The build of Fabric itself, like 0.17.3. Left empty, the first Play takes the newest stable one.' }))),
         f.editing
           ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
-            h('small', { text: msAccount ? `An AI assistant connected through MCP may play this setup signed in as ${msAccount.name}.` : 'An AI assistant connected through MCP may play this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
+            h('small', { text: msAccount ? `An AI assistant you connected to SpawnLoft may start this setup and play signed in as ${msAccount.name}.` : 'An AI assistant you connected to SpawnLoft may start this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),
           h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.assistantAccount), 'aria-labelledby': 'fAssistLabel', onclick: toggle('assistantAccount') }))
-          : h('p', { class: 'hint', text: 'An assistant connected through MCP plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
+          : h('p', { class: 'hint', text: 'An AI assistant you connected to SpawnLoft plays a new setup as an offline player. To let it use a Microsoft account, turn that on after the setup exists.' })))
 
     const given = p && givenName(p)
     return h('div', { class: 'backdrop', onclick: (e) => { if (e.target === e.currentTarget) closeSheet() } },
@@ -2566,7 +2866,7 @@
           h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
           h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : [playedLine(p), memoryText(p.memory), p.server ? `usually joins ${p.server}` : 'opens on the title screen'].filter(Boolean).join(' · ')) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
-        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
+        running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, mods, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
         grid,
         serverList,
@@ -2649,6 +2949,18 @@
     f.error = null
     render()
     try {
+      // a path typed or browsed to is started once before it is saved: a typo is found here,
+      // not at the next Play
+      const javaWas = f.editing ? profileNamed(f.editing)?.java ?? null : null
+      const typedJava = fieldText(f.java)
+      if (f.javaOther && !typedJava) f.javaOther = false
+      if (typedJava && typedJava !== 'mojang' && typedJava !== javaWas && !(S.javas?.javas ?? []).some((j) => j.path === typedJava)) {
+        const check = await checkJava(f)
+        if (check && check.found === false) {
+          f.adv = true
+          throw new Error(`The Java was not saved: ${check.message}`)
+        }
+      }
       if (!f.editing) {
         const body = newProfileBody(f, profilesNow().map((q) => q.name))
         const made = await api('client/profiles', { method: 'POST', body })
@@ -2904,9 +3216,10 @@
   }
 
   async function removeAccount(a) {
+    S.acctAsk = null
     try {
       await api(`client/accounts/${enc(a.uuid)}`, { method: 'DELETE' })
-      S.acctNotice = { tone: '', title: a.type === 'offline' ? `Removed ${a.name}` : `Signed out ${a.name}`, text: 'A setup that named this account asks for another one before it plays.' }
+      S.acctNotice = { tone: '', title: a.type === 'offline' ? `Removed ${a.name}` : `Signed out ${a.name}`, text: 'A setup that was set to play as this account asks for another one before it plays.' }
     } catch (err) {
       S.acctNotice = { tone: 'fault', title: `Couldn't remove ${a.name}`, text: sentence(err.message) }
     }
@@ -3046,6 +3359,8 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return
     if (S.menu) closeMenu({ refocus: true })
+    // the version list first, then the sheet it is in
+    else if (S.sheet?.vOpen) { S.sheet.vOpen = false; S.sheet.vFind = ''; render(); $('fMc')?.focus({ preventScroll: true }) }
     else if (S.sheet) closeSheet()
     else if (S.stopAsk) { S.stopAsk = null; render(); $('stop')?.focus({ preventScroll: true }) }
   })

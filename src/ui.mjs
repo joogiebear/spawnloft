@@ -1016,6 +1016,19 @@ async function handleClient(req, res, seg, url) {
   if (seg[2] === 'launcher' && seg.length === 3 && req.method === 'GET') {
     return json(res, 200, launcherSummary())
   }
+  // The Javas on this machine, for the setup sheet's list: the ones launch chooses among.
+  // fresh=1 looks again now (one was just installed).
+  if (seg[2] === 'javas' && seg.length === 3 && req.method === 'GET') {
+    const all = await java.recentJavas({ fresh: url.searchParams.get('fresh') === '1' })
+    return json(res, 200, { javas: all.map((j) => ({ path: j.path, major: j.major ?? null, version: j.version ?? null, arch: j.arch ?? null, onPath: j.source === 'PATH' })) })
+  }
+  // One Java by its path, started once to see that it is one: the sheet asks before it saves a
+  // path someone typed or browsed to, where a typo used to wait for the next Play. It runs what
+  // the path names, as a launch of a setup saved with it would.
+  if (seg[2] === 'javas' && seg[3] === 'check' && seg.length === 4 && req.method === 'POST') {
+    const body = (await readBody(req)) ?? {}
+    return json(res, 200, await client.checkJava(body.path))
+  }
   if (seg[2] !== 'profiles') return json(res, 404, { error: 'not found' })
 
   if (seg.length === 3) {

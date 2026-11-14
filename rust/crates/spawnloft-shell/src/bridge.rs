@@ -493,15 +493,30 @@ async fn pick_folder<R: Runtime>(
 }
 
 /// A file (world archives first), or null when cancelled. Windows cannot offer files and folders
-/// in one native dialog, so the page has a text field for a folder path, as in 1.x.
+/// in one native dialog, so the page has a text field for a folder path, as in 1.x. `kind`
+/// "program" is for picking a program such as Java: no archive filter, and on Windows the
+/// programs first.
 #[tauri::command]
-async fn pick_file<R: Runtime>(webview: Webview<R>, title: Option<String>) -> Result<Option<String>, String> {
+async fn pick_file<R: Runtime>(
+    webview: Webview<R>,
+    title: Option<String>,
+    kind: Option<String>,
+) -> Result<Option<String>, String> {
     from_panel(&webview)?;
     let dialog = webview
         .dialog()
         .file()
-        .set_title(short_title(title, "Choose a file"))
-        .add_filter("World archives", &["zip", "gz", "tgz"])
+        .set_title(short_title(title, "Choose a file"));
+    let dialog = if kind.as_deref() == Some("program") {
+        if cfg!(windows) {
+            dialog.add_filter("Programs", &["exe"])
+        } else {
+            dialog
+        }
+    } else {
+        dialog.add_filter("World archives", &["zip", "gz", "tgz"])
+    };
+    let dialog = dialog
         .add_filter("All files", &["*"])
         .set_parent(&webview.window());
     let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file())
