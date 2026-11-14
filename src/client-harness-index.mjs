@@ -11,7 +11,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { UserError, renameOver } from './util.mjs'
+import { UserError, writeAtomic } from './util.mjs'
 import { CLIENT_CACHE_DIR } from './client-paths.mjs'
 import { isSafeVersionId } from './client-version.mjs'
 import { fetchCapped } from './download.mjs'
@@ -128,17 +128,6 @@ export function parseHarnessIndex(bytes, sigText, { keys = HARNESS_INDEX_KEYS, m
 // ---- the cache -------------------------------------------------------------------------------
 
 const file = (cacheDir, name) => path.join(cacheDir, name)
-
-function writeAtomic(dest, data) {
-  const tmp = `${dest}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
-  fs.writeFileSync(tmp, data)
-  try {
-    renameOver(tmp, dest)
-  } catch (err) {
-    fs.rmSync(tmp, { force: true })
-    throw err
-  }
-}
 
 function readJsonFile(dest, fallback) {
   try {

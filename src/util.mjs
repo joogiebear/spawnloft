@@ -189,6 +189,25 @@ export function renameOver(from, to) {
   }
 }
 
+// Written beside the file and renamed over it, so a reader never sees half of it.
+export function writeAtomic(dest, data) {
+  const tmp = `${dest}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
+  fs.writeFileSync(tmp, data)
+  try {
+    renameOver(tmp, dest)
+  } catch (err) {
+    fs.rmSync(tmp, { force: true })
+    throw err
+  }
+}
+
+// Streamed, so a file of any size is hashed without being held in memory.
+export async function sha1OfFile(file) {
+  const hash = crypto.createHash('sha1')
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
+  return hash.digest('hex')
+}
+
 // Cross-process lock via an exclusively created file (CLI, panel and daemon all use it). The
 // file carries the holder's pid, and a lock whose pid is no longer alive is taken over, which
 // beats a fixed age that would steal from a slow holder or sit on a dead one.

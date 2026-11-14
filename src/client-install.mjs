@@ -7,7 +7,7 @@ import { currentOs, mergeInherited, libraries, assetIndex, assetObjects, assetLa
 import { nativesStamp } from './client-version.mjs'
 import { downloadFile } from './download.mjs'
 import { extractZip } from './plugins.mjs'
-import { fail, safeRelativePath, isInside, acquireLockAsync } from './util.mjs'
+import { fail, safeRelativePath, isInside, acquireLockAsync, sha1OfFile } from './util.mjs'
 import { isCancelled } from './cancel.mjs'
 
 export const PARALLEL = 8
@@ -66,13 +66,6 @@ export function saveLedger(ledger) {
     ledger.added = {}
     ledger.dropped = new Set()
   } catch { /* a cache: the next launch hashes again */ }
-}
-
-function sha1OfFile(file) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha1')
-    fs.createReadStream(file).on('data', (chunk) => hash.update(chunk)).on('error', reject).on('end', () => resolve(hash.digest('hex')))
-  })
 }
 
 // Notes a file as checked: it was just hashed here, or just downloaded against that hash.

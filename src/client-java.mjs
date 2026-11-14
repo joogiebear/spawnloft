@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 import { fetchJson, downloadFile } from './download.mjs'
 import { cachedJson } from './client-meta.mjs'
 import { CLIENT_CACHE_DIR, RUNTIME_DIR } from './client-paths.mjs'
-import { fail, safeRelativePath, isInside, renameOver, acquireLock, acquireLockAsync, readJson } from './util.mjs'
+import { fail, safeRelativePath, isInside, renameOver, acquireLock, acquireLockAsync, readJson, sha1OfFile } from './util.mjs'
 
 // Mojang's index of its Java runtimes. The URL carries the file's hash and is what the official
 // launcher reads; it can rotate, which the drift job (V4) notices.
@@ -105,13 +105,6 @@ export function runtimePlan(manifest, { platform }) {
   return { dirs, downloads, links, java, count: Object.keys(files).length }
 }
 
-// streamed: lib/modules is over 100 MB on the newer runtimes
-async function fileSha1(file) {
-  const hash = crypto.createHash('sha1')
-  for await (const chunk of fs.createReadStream(file)) hash.update(chunk)
-  return hash.digest('hex')
-}
-
 function readRuntimeIndex() {
   const index = readJson(RUNTIME_INDEX_FILE, null)
   return index && typeof index === 'object' && index.runtimes && typeof index.runtimes === 'object' ? index : { runtimes: {} }
@@ -205,7 +198,7 @@ export async function ensureRuntime(component, platform, { entry = null, fetchIm
       if (!isInside(dir, dest)) fail(`the Java runtime manifest names "${d.rel}", which would land outside its folder`)
       let st = null
       try { st = fs.lstatSync(dest) } catch { /* missing */ }
-      if (!st || !st.isFile() || (d.size != null && st.size !== d.size) || (thorough && (await fileSha1(dest)) !== d.sha1)) todo.push(d)
+      if (!st || !st.isFile() || (d.size != null && st.size !== d.size) || (thorough && (await sha1OfFile(dest)) !== d.sha1)) todo.push(d)
     }
     let done = 0
     let bytes = 0

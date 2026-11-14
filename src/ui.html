@@ -386,6 +386,7 @@
     The header, the server strip's tabs and the tool dock are the frame around the work, in
     --chrome, one step below the page so what is being worked on sits forward of it.
   */
+  body.play-modal > header, body.play-modal .side { opacity: .4; transition: opacity .15s; }
   header {
     display: flex;
     align-items: center;
@@ -3502,6 +3503,15 @@ const panelSession = (() => {
 
   function notice() {
     if (document.getElementById('sessionEnded')) return;
+    // A page in a frame of the panel (the Play page) leaves the notice to the panel around it,
+    // so there is one notice and not two stacked. The panel is asked something, which ends
+    // its session the same way if it had not noticed yet.
+    try {
+      if (window.parent !== window && window.parent.location.origin === location.origin && typeof window.parent.fetch === 'function') {
+        window.parent.fetch('/api/appearance', { cache: 'no-store' }).catch(() => {});
+        return;
+      }
+    } catch (err) { /* a parent of another origin is not the panel: the notice shows here */ }
     const box = document.createElement('div');
     box.id = 'sessionEnded';
     box.setAttribute('role', 'alertdialog');
@@ -3537,7 +3547,15 @@ const panelSession = (() => {
       text.append(cmd, ' for a new sign-in link.');
     }
     box.append(card);
-    (document.body || document.documentElement).append(box);
+    // nothing behind the notice works any more: it is taken out of reach of Tab and of screen
+    // readers, and focus goes to the notice (to its button, where it has one)
+    const host = document.body || document.documentElement;
+    // an open dialog would stay on top of the notice and keep it out of reach
+    for (const d of document.querySelectorAll('dialog[open]')) { try { d.close(); } catch { /* not a dialog that closes */ } }
+    for (const el of host.children) el.inert = true;
+    host.append(box);
+    card.tabIndex = -1;
+    if (!card.querySelector('button')) card.focus();
   }
 
   function end() {
@@ -3995,6 +4013,8 @@ const VIEW_EL = { empty: '#vEmpty', home: '#vHome', server: '#vServer', play: '#
 function show(view) {
   state.view = view;
   for (const key of Object.keys(VIEW_EL)) $(VIEW_EL[key]).toggleAttribute('data-active', key === view);
+  // leaving the Play page with its setup sheet open must not leave the panel locked behind it
+  lockBehindPlay();
   // The sections list belongs to the server screen; on the overview or a sheet the sidebar is servers only.
   if ($('#dock')) markTabs();
 }
@@ -6470,7 +6490,17 @@ window.addEventListener('message', (e) => {
   if (!d || d.type !== 'spawnloft-play-state') return;
   playState = { launching: typeof d.launching === 'string' ? d.launching : null, running: Array.isArray(d.running) ? d.running.filter((n) => typeof n === 'string') : [] };
   showPlayState();
+  lockBehindPlay.on = d.modal === true;
+  lockBehindPlay();
 });
+// The Play page's setup sheet is a dialog, but the page is a frame: what is around the frame
+// (the top bar, the sidebar) would stay clickable and in the Tab order behind it. While the
+// sheet is open the panel dims those and takes them out of reach; they come back when it closes.
+function lockBehindPlay() {
+  const locked = lockBehindPlay.on === true && $('#vPlay').offsetParent !== null;
+  document.body.classList.toggle('play-modal', locked);
+  for (const el of [document.querySelector('body > header'), $('#side')]) if (el) el.inert = locked;
+}
 function showPlayState() {
   // before the frame has loaded, the profiles poll is what is known
   const running = playState.running.length ? playState.running : state.clientProfiles.filter((p) => p.running).map((p) => p.name);
@@ -15305,6 +15335,9 @@ for (const b of $$('.tabs [data-tab]')) b.onclick = () => selectTab(b.dataset.ta
 $('#bNew').onclick = () => openAdd('new');
 $('#bLauncher').onclick = () => showPlay();
 $('#playFrame').addEventListener('load', () => {
+  // a new page in the frame has no sheet open until it says so
+  lockBehindPlay.on = false;
+  lockBehindPlay();
   showTheme(document.documentElement.dataset.theme);
   if (state.view === 'play') focusPlay();
 });

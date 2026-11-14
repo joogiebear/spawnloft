@@ -5,7 +5,7 @@ import crypto from 'node:crypto'
 
 import { fetchJson, downloadFile } from './download.mjs'
 import { versionJson, versionDir } from './client-paths.mjs'
-import { fail, safeRelativePath, renameOver } from './util.mjs'
+import { fail, safeRelativePath, writeAtomic } from './util.mjs'
 
 export const MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json'
 export const RESOURCES_URL = 'https://resources.download.minecraft.net'
@@ -457,18 +457,6 @@ function flattenArgs(args, ctx) {
 // another fetch within the minute (forced, or of a list past its hour) would only wait for the
 // same timeout again, so the copy on disk answers.
 const lastTried = new Map()
-
-// Written beside the file and renamed over it, so a reader never sees half a list (review V1b S-3).
-function writeAtomic(file, text) {
-  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`
-  fs.writeFileSync(tmp, text)
-  try {
-    renameOver(tmp, file)
-  } catch (err) {
-    fs.rmSync(tmp, { force: true })
-    throw err
-  }
-}
 
 // A small JSON list kept in the cache folder with the time it was fetched: used while younger
 // than maxAgeMs, fetched again after; a failed fetch falls back to the stale copy, since a stale
