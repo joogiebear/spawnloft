@@ -276,8 +276,16 @@ test('the old installer is read into the newer shape: https Forge maven, the cli
   const jar2 = path.join(tmp, 'noparent.jar')
   const p = read('1.7.10-10.13.4.1614-1.7.10/install_profile.json')
   delete p.versionInfo.inheritsFrom
+  // as 1.6.4's lists the game's own libraries, native and per-OS rows among them
+  p.versionInfo.libraries.push({ name: 'org.lwjgl.lwjgl:lwjgl-platform:2.9.0', natives: { linux: 'natives-linux' } }, { name: 'org.lwjgl.lwjgl:lwjgl:2.9.0', rules: [{ action: 'allow' }] })
   fs.writeFileSync(jar2, buildZip([['install_profile.json', Buffer.from(JSON.stringify(p))], [p.install.filePath, UNIVERSAL]]))
-  assert.equal(readInstaller(jar2, { mc: '1.7.10', id: 'x-forge', who: 'Forge', legacy: true }).version.inheritsFrom, '1.7.10')
+  const own = readInstaller(jar2, { mc: '1.7.10', id: 'x-forge', who: 'Forge', legacy: true }).version
+  assert.equal(own.inheritsFrom, '1.7.10')
+  assert.ok(!own.libraries.some((l) => l.name.startsWith('org.lwjgl')), 'the game\'s own native rows are left to vanilla')
+  // in a file that inherits, such a row is one SpawnLoft does not know
+  p.versionInfo.inheritsFrom = '1.7.10'
+  fs.writeFileSync(jar2, buildZip([['install_profile.json', Buffer.from(JSON.stringify(p))], [p.install.filePath, UNIVERSAL]]))
+  assert.throws(() => readInstaller(jar2, { mc: '1.7.10', id: 'x-forge', who: 'Forge', legacy: true }), (err) => err.code === 'loader-installer-unknown')
   // a host the allowlist does not have
   const p3 = read('1.7.10-10.13.4.1614-1.7.10/install_profile.json')
   p3.versionInfo.libraries[3].url = 'https://evil.example/'
@@ -303,9 +311,17 @@ test('checksums of the old installer\'s rows come from their mavens and must be 
   // a maven file that is not the one the installer lists
   ;({ version, pending } = read2())
   await assert.rejects(L.fillLegacyChecksums(version, pending, { sha1Impl: async () => '0'.repeat(40) }), (err) => err.code === 'loader-installer-unknown')
-  // a maven without checksum files: only rows the installer names one sum for
+  // a maven without checksum files: the file itself, which must be one the installer lists; a row
+  // the installer lists none for is refused
+  const got = []
   ;({ version, pending } = read2())
-  await assert.rejects(L.fillLegacyChecksums(version, pending, { sha1Impl: async () => { throw new Error('404') } }), /Could not read the checksum/)
+  await assert.rejects(L.fillLegacyChecksums(version, pending, { sha1Impl: async () => { throw new Error('404') }, fileSha1Impl: async (url) => { got.push(url); return maven(url) } }), /Could not read the checksum of net\.minecraft:launchwrapper:1\.12 .*lists none/)
+  ;({ version, pending } = read2())
+  const listedOnly = pending.filter((p) => p.sums.length)
+  await L.fillLegacyChecksums(version, listedOnly, { sha1Impl: async () => { throw new Error('404') }, fileSha1Impl: maven })
+  assert.ok(listedOnly.every((p) => p.sums.includes(version.libraries[p.index].downloads.artifact.sha1)))
+  ;({ version, pending } = read2())
+  await assert.rejects(L.fillLegacyChecksums(version, listedOnly, { sha1Impl: async () => { throw new Error('404') }, fileSha1Impl: async () => 'f'.repeat(40) }), (err) => err.code === 'loader-installer-unknown')
 })
 
 test('an old Forge build is set up end to end: its version file with every checksum, the Forge jar taken out of the installer, the stamp', async () => {

@@ -11,11 +11,15 @@
 // that does not inherit from vanilla is made to. `optionals` (Mercurius, a statistics mod) is
 // not installed.
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 
 import { readZipEntry } from './plugins.mjs'
 import { assertLoaderHost } from './client-loader-hosts.mjs'
-import { fetchCapped } from './download.mjs'
-import { fail, safeRelativePath } from './util.mjs'
+import { fetchCapped, downloadFile } from './download.mjs'
+import { fail, safeRelativePath, sha1OfFile } from './util.mjs'
+import { LIBRARIES_DIR } from './client-paths.mjs'
+import { checkCancelled, isCancelled } from './cancel.mjs'
 import { isSafeVersionId } from './client-version.mjs'
 import { libraryPath } from './client-meta.mjs'
 
@@ -71,7 +75,12 @@ export function convertLegacy(profile, { mc, id, installerPath, who = 'Forge' })
       libraries.push({ name: lib.name, downloads: { artifact: { path: rel, url: '', sha1: sha1Of(jar), size: jar.length } } })
       continue
     }
-    if (lib.natives || lib.rules) unknown(`a library row for ${lib.name.slice(0, 60)} SpawnLoft does not know`)
+    // a file that lists the game's own libraries (1.6.4): their native and per-OS rows are vanilla's,
+    // which it now inherits
+    if (lib.natives || lib.rules) {
+      if (info.inheritsFrom == null) continue
+      unknown(`a library row for ${lib.name.slice(0, 60)} SpawnLoft does not know`)
+    }
     const url = legacyBaseUrl(lib.url) + rel
     assertLoaderHost(url, `The ${who} installer`)
     const sums = Array.isArray(lib.checksums) ? lib.checksums.filter(isSha1).map((s) => s.toLowerCase()) : []
@@ -98,17 +107,38 @@ async function publishedSha1(url) {
   return m[0].toLowerCase()
 }
 
+// The file itself, downloaded into the libraries folder and hashed: for a maven that publishes no
+// checksum beside it. The installer's list then decides.
+async function downloadedSha1(url, rel) {
+  const file = path.join(LIBRARIES_DIR, rel)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  await downloadFile(url, file, { label: `library ${rel.split('/').pop()}` })
+  return sha1OfFile(file)
+}
+
 // Each pending row's checksum, from its maven: it must be one the installer lists when it lists
-// any. A maven with no checksum file is taken at the installer's word only when that names one.
-export async function fillLegacyChecksums(version, pending, { sha1Impl = publishedSha1, who = 'Forge' } = {}) {
+// any. Where the maven has no checksum file, the file itself is fetched and must be one the
+// installer lists; a row the installer lists no checksum for is then refused.
+export async function fillLegacyChecksums(version, pending, { sha1Impl = publishedSha1, fileSha1Impl = downloadedSha1, who = 'Forge' } = {}) {
   for (const p of pending) {
+    checkCancelled()
     const row = version.libraries[p.index]
     let sum = null
     try {
       sum = await sha1Impl(p.url)
     } catch (err) {
-      if (p.sums.length !== 1) fail(`Could not read the checksum of ${row.name} from ${p.url}: ${err.message}`, err.code ?? 'loader-unreachable')
-      sum = p.sums[0]
+      if (isCancelled(err)) throw err
+      if (!p.sums.length) fail(`Could not read the checksum of ${row.name} from ${p.url}, and the ${who} installer lists none: ${err.message}`, err.code ?? 'loader-unreachable')
+      try {
+        sum = await fileSha1Impl(p.url, row.downloads.artifact.path)
+      } catch (err2) {
+        if (isCancelled(err2)) throw err2
+        fail(`Could not download library ${row.name} from ${p.url}: ${err2.message}`, err2.code ?? 'download-failed')
+      }
+      if (!p.sums.includes(sum)) {
+        fs.rmSync(path.join(LIBRARIES_DIR, row.downloads.artifact.path), { force: true })
+        fail(`${row.name} on ${new URL(p.url).host} is not the file the ${who} installer lists. Pick another ${who} build in Advanced.`, 'loader-installer-unknown')
+      }
     }
     if (p.sums.length && !p.sums.includes(sum)) fail(`${row.name} on ${new URL(p.url).host} is not the file the ${who} installer lists. Pick another ${who} build in Advanced.`, 'loader-installer-unknown')
     row.downloads.artifact.sha1 = sum
