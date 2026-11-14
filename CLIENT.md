@@ -97,12 +97,20 @@ or a crash leaves the finished steps in place, and the next Play carries on from
 profiles on the same build share its files, and the second one waits for the first rather than
 building them again. A NeoForge profile gets nothing in its `mods/` folder.
 
-Forge builds for 1.13 and newer here, and is set up the same way, from Forge's own maven: its
+Forge builds for 1.6.4 and newer here, and is set up the same way, from Forge's own maven: its
 version file goes under `versions/<mc>-forge-<build>/` (1.20.1-forge-47.4.28), and the card
 shows "Setting up Forge 47.4.28". The build a first Play takes is the one Forge marks
-recommended for the version, else its newest. Forge for 1.12.2 and older uses an older kind of
-installer and comes in a later SpawnLoft; until then it is greyed out for those versions with
-that reason. Forge on a version Mojang ships with Java 8 (1.13 to 1.16.5) runs on Java 8 only,
+recommended for the version, else its newest. Forge for 1.6.4 to 1.12.2 (before 1.12.2's build
+2851) has an older kind of installer with no build steps: SpawnLoft reads its version file, makes
+each library address https and points it at today's Forge maven, gets each library's checksum
+from the `.sha1` its maven publishes (and refuses one that is not in the installer's own list,
+where it has one; where the maven publishes none, the file itself is downloaded and must be one
+the installer lists), leaves out the rows only a server needs, leaves a 1.6.4 file's copies of
+the game's own libraries to the vanilla version it is made to inherit, and takes the Forge jar out of the
+installer. Its optional Mercurius statistics mod is not installed. SpawnLoft has started Forge
+by hand on 1.7.10 and 1.12.2; the versions between share their format, and the setup sheet says
+"not tested by SpawnLoft" for them. Forge for 1.6.3 and older patched the game jar itself and is
+not offered. Forge on a version Mojang ships with Java 8 (1.6.4 to 1.16.5) runs on Java 8 only,
 since Forge of that era fails on anything newer. Mojang's own Java 8 is taken first, before an
 installed one, as Forge builds of that era from before early 2022 fail on Java 8 updates from
 8u321 on; when it cannot be had, an installed Java 8, and failing that a newer one with a warning
@@ -178,7 +186,7 @@ A profile is a few keys, all changeable with `set`:
 
 | Key | Meaning |
 | --- | --- |
-| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; Forge: 1.13 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
+| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; Forge: 1.6.4 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
 | `loader` | `vanilla`, `fabric`, `quilt` or `neoforge`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
 | `loaderVersion` | The loader's own build (Fabric's, Quilt's, Forge's or NeoForge's). Left empty, the newest stable one (Forge's recommended one) is picked at the first launch and recorded; a beta only where there is nothing else. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
@@ -259,7 +267,7 @@ snapshots, or everything, marks for the latest release, snapshots and what is al
 downloaded, and a version this computer cannot run listed with the reason and not pickable. The
 list is Mojang's, cached for an hour so it works offline once fetched; **Refresh** reads it
 again, for a version out within the hour. Then **Mods** (None, which is plain "Vanilla"
-Minecraft, Fabric, Quilt, Forge or NeoForge; Forge is greyed out on 1.12.2 and older until a later SpawnLoft;
+Minecraft, Fabric, Quilt, Forge or NeoForge; Forge is greyed out on 1.6.3 and older;
 a loader with no build for the picked version is greyed out with the reason; a list on a narrow
 window), memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory; a
 choice above the machine's memory cannot be picked, one above three quarters of it is warned

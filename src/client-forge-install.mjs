@@ -32,6 +32,7 @@ import { assertLoaderHost } from './client-loader-hosts.mjs'
 import { needsFetch, noteChecked, openLedger, saveLedger } from './client-install.mjs'
 import { downloadFile, fetchCapped } from './download.mjs'
 import { readZipEntry } from './plugins.mjs'
+import { isLegacyProfile, convertLegacy } from './client-forge-legacy.mjs'
 import { fail, safeRelativePath, isInside, acquireLockAsync, sha1OfFile, writeAtomic } from './util.mjs'
 import { Cancelled, cancelSignal, checkCancelled, isCancelled, stopOnCancel, OWN_GROUP, inOwnGroup } from './cancel.mjs'
 
@@ -119,8 +120,9 @@ export async function fetchInstaller(url, { name, label, fetchImpl = downloadFil
 
 // install_profile.json and version.json out of the jar, refused unless this engine knows them and
 // they are for this game version and this id. who: "NeoForge"; build: its own version, for the
-// refusal.
-export function readInstaller(jarPath, { mc, id, who }) {
+// refusal. legacy: Forge's older installer (1.6.4 to 1.12.2) is read into the newer shape, its
+// version file given the id asked for; pending then lists the rows still to get a checksum.
+export function readInstaller(jarPath, { mc, id, who, legacy = false }) {
   const unknown = (why) => fail(`This ${who} build needs a newer SpawnLoft (${why}). Update SpawnLoft, or pick an older ${who} build in Advanced.`, 'loader-installer-unknown')
   let profile
   let version
@@ -132,7 +134,10 @@ export function readInstaller(jarPath, { mc, id, who }) {
     unknown('its installer could not be read')
   }
   if (!profile || typeof profile !== 'object') unknown('no install_profile.json')
-  if (profile.install || profile.versionInfo) unknown('the old installer format')
+  if (isLegacyProfile(profile)) {
+    if (!legacy) unknown('the old installer format')
+    return convertLegacy(profile, { mc, id, installerPath: jarPath, who })
+  }
   if (!KNOWN_SPECS.includes(profile.spec ?? 0)) unknown(`installer format ${String(profile.spec).slice(0, 10)}`)
   if (!Array.isArray(profile.processors) || !Array.isArray(profile.libraries) || (profile.data != null && typeof profile.data !== 'object')) unknown('an installer profile SpawnLoft does not know')
   if (!version || typeof version !== 'object') unknown('no version file')
@@ -294,7 +299,7 @@ async function ensureLibraries({ profile, version, installerPath, who, fetchImpl
     if (row.url && !row.sha1) fail(`The ${who} installer lists ${row.name} without a checksum; SpawnLoft does not run or load an unchecked file. Pick another ${who} build in Advanced.`, 'loader-installer-unknown')
     if (await needsFetch(row.file, { sha1: row.sha1, size: row.size }, ledger)) {
       if (row.url === '') {
-        const data = readZipEntry(installerPath, `maven/${row.rel}`)
+        const data = readZipEntry(installerPath, profile.installerFiles?.[row.rel] ?? `maven/${row.rel}`)
         if (data) {
           if (row.sha1 && sha1Of(data) !== row.sha1) fail(`The ${who} installer's copy of ${row.name} does not match its checksum`, 'loader-installer-unknown')
           fs.mkdirSync(path.dirname(row.file), { recursive: true })
@@ -411,7 +416,7 @@ function removeFolder(dir) {
 // log; installer: a function giving { path, sha1 }, only called when there is something to build;
 // java: the Java to run the steps on (javaArgs before -cp: the tests' fake one); verify: hash the
 // stamped files again whatever earlier launches noted.
-export async function runInstaller({ id, mc, who, build, stage, name, installer, java, javaArgs = [], verify = false, fetchImpl = downloadFile, spawnImpl = defaultSpawn, onStage = () => {}, onProgress = () => {}, onNote = () => {} }) {
+export async function runInstaller({ id, mc, who, build, stage, name, installer, java, javaArgs = [], legacy = false, verify = false, fetchImpl = downloadFile, spawnImpl = defaultSpawn, onStage = () => {}, onProgress = () => {}, onNote = () => {} }) {
   const ledger = openLedger({ verify })
   try {
     if (isStamped(id) && await stampHolds(id, ledger)) return { built: false }
@@ -424,7 +429,7 @@ export async function runInstaller({ id, mc, who, build, stage, name, installer,
         fs.rmSync(stampFile(id), { force: true })
       }
       const inst = typeof installer === 'function' ? await installer() : installer
-      return await buildAll({ id, mc, who, build, stage, name, installer: inst, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger })
+      return await buildAll({ id, mc, who, build, stage, name, installer: inst, java, javaArgs, legacy, fetchImpl, spawnImpl, onStage, onProgress, ledger })
     } finally {
       release()
     }
@@ -433,8 +438,8 @@ export async function runInstaller({ id, mc, who, build, stage, name, installer,
   }
 }
 
-async function buildAll({ id, mc, who, build, stage, name, installer, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger }) {
-  const { profile, version } = readInstaller(installer.path, { mc, id, who })
+async function buildAll({ id, mc, who, build, stage, name, installer, java, javaArgs, legacy, fetchImpl, spawnImpl, onStage, onProgress, ledger }) {
+  const { profile, version } = readInstaller(installer.path, { mc, id, who, legacy })
   onStage({ stage, message: `Downloading ${who} ${build}'s libraries` })
   await ensureLibraries({ profile, version, installerPath: installer.path, who, fetchImpl, ledger, onProgress })
 

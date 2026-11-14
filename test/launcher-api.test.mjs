@@ -649,7 +649,9 @@ test('a mod loader\'s builds for one version, for the sheet\'s build list: newes
   for (const route of ['client/loaders/vanilla/1.20.1/builds', 'client/loaders/liteloader/1.20.1/builds', `client/loaders/forge/${encodeURIComponent('../x')}/builds`]) {
     assert.equal((await call(route)).status, 400, route)
   }
-  const none = await call('client/loaders/forge/1.12.2/builds')
+  const none = await call('client/loaders/forge/1.5.2/builds')
   assert.equal(none.status, 400)
-  assert.match((await none.json()).error, /Forge for Minecraft 1\.12\.2 is coming in a later SpawnLoft/)
+  assert.match((await none.json()).error, /Forge for Minecraft 1\.5\.2 is older than SpawnLoft offers/)
+  const old = await (await call('client/loaders/forge/1.7.10/builds')).json()
+  assert.equal(old.picked, '10.13.4.1614-1.7.10')
 })
