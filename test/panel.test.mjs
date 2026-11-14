@@ -238,6 +238,14 @@ test('Play picks the profile for the server\'s version, preferring the one point
   assert.equal(playProfileFor({ name: 'x', mcVersion: '1.21.11' }, []), null)
 })
 
+test('Play on a Fabric or NeoForge server picks a setup on its loader, or none so a new one is made', () => {
+  const profiles = [{ name: 'v', mc: '1.21.1', loader: 'vanilla', server: 'neo' }, { name: 'q', mc: '1.21.1', loader: 'quilt', server: null }, { name: 'n', mc: '1.21.1', loader: 'neoforge', server: null }]
+  assert.equal(playProfileFor({ name: 'neo', mcVersion: '1.21.1', loader: 'neoforge' }, profiles).name, 'n')
+  assert.equal(playProfileFor({ name: 'fab', mcVersion: '1.21.1', loader: 'fabric' }, profiles).name, 'q', 'Quilt loads Fabric mods')
+  assert.equal(playProfileFor({ name: 'neo', mcVersion: '1.21.1', loader: 'neoforge' }, profiles.slice(0, 2)), null)
+  assert.equal(playProfileFor({ name: 'neo', mcVersion: '1.21.1', loader: 'paper' }, profiles).name, 'v', 'a plugin server takes any setup')
+})
+
 test('deleting in Files names what goes, and asks for the server name when the server itself would go', () => {
   const { deleteConfirm } = lifted(['deleteConfirm'])
   const entries = [

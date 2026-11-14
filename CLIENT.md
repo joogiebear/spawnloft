@@ -125,7 +125,10 @@ When Mojang changes the format of a version file in a way this SpawnLoft does no
 new launcher format, a platform rule or a launcher setting it has not seen), the launch is
 refused with "Update SpawnLoft" before anything downloads, rather than starting a game that
 would crash halfway. A weekly check in SpawnLoft's own CI runs the newest release and snapshot
-through the same code, so a new format is usually handled before it reaches you.
+through the same code, so a new format is usually handled before it reaches you. The same check
+sets Quilt, Forge and NeoForge up for the newest release (each one's newest build and the one a
+setup gets by default), and fails on an installer format, a download host or a launcher setting
+SpawnLoft does not know.
 
 ## Java
 
@@ -177,17 +180,22 @@ builds for it: Mojang's Java there stops at 17, so 1.20.4 and older.
 
 ```
 spawnloft client list
+spawnloft client versions [--snapshots | --all] [-n 30]
 spawnloft client new <name> --mc <version> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
 spawnloft client set <name> key=value ...
 spawnloft client remove <name> [--purge]
 ```
+
+`client versions` lists Mojang's versions newest first (releases only unless `--snapshots` or
+`--all`, the newest 30 unless `-n`), with a column per mod loader saying whether it builds for
+that version (`?` when that loader's list could not be read) and whether the game is downloaded.
 
 A profile is a few keys, all changeable with `set`:
 
 | Key | Meaning |
 | --- | --- |
 | `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; Forge: 1.6.4 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
-| `loader` | `vanilla`, `fabric`, `quilt` or `neoforge`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
+| `loader` | `vanilla`, `fabric`, `quilt`, `forge` or `neoforge`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
 | `loaderVersion` | The loader's own build (Fabric's, Quilt's, Forge's or NeoForge's). Left empty, the newest stable one (Forge's recommended one) is picked at the first launch and recorded; a beta only where there is nothing else. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
 | `java` | A specific Java to use, `mojang` for Mojang's own runtime for the version, or empty to let SpawnLoft pick (an installed Java that fits, else Mojang's runtime, downloaded once into `client/runtime/`). |
@@ -240,6 +248,12 @@ and the files keep "profile".
   three ways on: use a setup of the server's version (one that exists is picked, else the New
   sheet opens for it), play on the title screen, or play anyway if the server takes other
   versions (SpawnLoft cannot see that). The command line launches with a warning instead.
+- A **Fabric or NeoForge server** shows its loader on its card. Picked for a setup on another
+  loader, it is a warning under Play, not a block: the server will probably turn the join away
+  (a server whose mods are all server-side lets anyone in), with a link to a setup that matches.
+  A Quilt setup matches a Fabric server, since Quilt loads Fabric's mods. Join's menu marks such
+  a server "runs NeoForge". A server's Play in the panel, and the "use a setup" links, pick a
+  setup on the server's loader, and when there is none the New sheet opens with it chosen.
 - **The game's own Multiplayer list.** Each time a setup's game starts, SpawnLoft puts its
   servers on that version into the setup's `servers.dat`, so a game opened on the title screen
   still shows them. Entries you added in the game are never changed. SpawnLoft's own entries
@@ -291,7 +305,11 @@ the folder is instead.
 If the game goes away without a Stop from the page and did not simply quit, a notice says so,
 with when and how it ended (the exit code, or the signal), the last lines of the game log
 (**Show N lines** for all of them, up to 200, **Copy log**), **Show crash reports**, **Open log folder** and
-**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. The
+**Report a problem**, which writes the same diagnostics bundle as `spawnloft diag --client`. On a
+Forge or NeoForge setup the notice names the likely cause from the log in place of the general
+line: a mod made for another Minecraft version, a mod that needs another loader build, a mod
+missing another mod, a Fabric or Quilt mod in the mods folder, two copies of one mod, a mod that
+failed to patch the game (a Mixin error), or old Forge started on a Java newer than 8. The
 panel records every game's exit itself, so a crash is told even if the page was closed when it
 happened (within twelve hours, until it is dismissed or the setup is played again; the
 dismissal is kept with the record, so it holds across restarts of the app). A crash on a setup
@@ -604,7 +622,8 @@ assistant gets the same through the `diagnostics` tool with `client: "<profile>"
 
 The findings the client side knows: out of memory, a graphics driver that cannot open a window
 (a headless machine cannot run the client; bots are the way to test there), a mod missing a
-dependency or built for another version, a server that could not be reached, a version mismatch
+dependency or built for another version (Forge's and NeoForge's dependency lines too), old Forge
+started on a Java newer than 8, a server that could not be reached, a version mismatch
 with the server, an expired or offline login refused by an online-mode server, a resource pack
 that would not load, a crash, and a Java too old for the version.
 

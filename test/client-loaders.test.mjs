@@ -126,3 +126,18 @@ test('library rows: an empty URL is null (made by the installer), and a missing 
   }, { os: linux })
   assert.deepEqual(rows.map((r) => r.url), [null, null, 'https://libraries.minecraft.net/a/mojang/1/mojang-1.jar', 'https://maven.example.net/a/maven/1/maven-1.jar'])
 })
+
+test('client versions shows a column per mod loader', async () => {
+  const { versionTableRows } = await import('../src/client.mjs')
+  const versions = [
+    { id: '26.3', type: 'release', kind: 'release', downloaded: true, loaders: { fabric: true, quilt: true, forge: true, neoforge: true } },
+    { id: '26.3-pre1', type: 'snapshot', kind: 'pre-release', downloaded: false, loaders: { fabric: true, quilt: null, forge: false, neoforge: false } },
+    { id: '1.12.2', type: 'release', kind: 'release', downloaded: false, loaders: { fabric: false, quilt: false, forge: true, neoforge: false } },
+  ]
+  assert.deepEqual(versionTableRows(versions), [
+    ['Version', 'Type', 'Fabric', 'Quilt', 'Forge', 'NeoForge', 'Downloaded'],
+    ['26.3', 'release', 'yes', 'yes', 'yes', 'yes', 'yes'],
+    ['1.12.2', 'release', '', '', 'yes', '', ''],
+  ])
+  assert.deepEqual(versionTableRows(versions, { show: 'snapshot', limit: 2 }).slice(1).map((r) => r.slice(0, 4)), [['26.3', 'release', 'yes', 'yes'], ['26.3-pre1', 'pre-release', 'yes', '?']])
+})

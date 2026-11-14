@@ -1194,7 +1194,10 @@ function launcherSummary() {
   const servers = registry.listInstances().map((inst) => {
     let row
     try { row = safeInstance(supervisor.statusOf(inst.name)) } catch { row = { ...inst, status: 'unknown', onlineMode: null } }
-    return { name: row.name, label: row.label ?? null, mc: plugins.mcVersionOf(row) ?? null, status: row.status, onlineMode: row.onlineMode }
+    // the mod loader a player needs to join: a Fabric or NeoForge server's own; null for the rest
+    const family = software.softwareOf(registry.loaderOf(inst)).family
+    const loader = family === 'fabric' || family === 'neoforge' ? family : null
+    return { name: row.name, label: row.label ?? null, mc: plugins.mcVersionOf(row) ?? null, status: row.status, onlineMode: row.onlineMode, loader }
   })
   return {
     profiles: client.listProfiles().map(clientProfileRow),

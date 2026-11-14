@@ -11,7 +11,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-version-drift-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { checkDrift, checkHarnessList, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
+const { checkDrift, checkLoaders, checkHarnessList, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
 const { HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, SIGNATURE_DOMAIN, harnessJarUrl } = await import('../src/client-harness-index.mjs')
 const { MANIFEST_URL } = await import('../src/client-meta.mjs')
 const { RUNTIME_INDEX_URL } = await import('../src/client-java.mjs')
@@ -19,6 +19,8 @@ const { META_URL } = await import('../src/client-fabric.mjs')
 
 const fixture = (...p) => JSON.parse(fs.readFileSync(path.join(here, 'fixtures', 'client', ...p), 'utf8'))
 const baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'))
+// the loaders past Fabric are left out of these, which are about Mojang's formats; their own tests follow
+const loaders = async () => ({ versions: [], failures: [], notes: [] })
 
 // Mojang and Fabric as the fixtures have them, with 26.3 the newest release and `snapshot` the
 // newest snapshot.
@@ -46,7 +48,7 @@ function world(snapshot) {
 }
 
 test('the formats of today pass, and the baseline is what they show', async () => {
-  const result = await checkDrift({ get: world(fixture('versions', '26.4-snapshot-6.json')), baseline })
+  const result = await checkDrift({ get: world(fixture('versions', '26.4-snapshot-6.json')), baseline, loaders })
   assert.deepEqual(result.failures, [])
   assert.deepEqual(result.facts, baseline, 'tools/version-drift-baseline.json matches the fixtures')
   // three versions (release, snapshot, release + Fabric), seven machines, two feature sets
@@ -56,7 +58,7 @@ test('the formats of today pass, and the baseline is what they show', async () =
 })
 
 test('a snapshot in a format SpawnLoft does not know fails the check, naming each thing', async () => {
-  const result = await checkDrift({ get: world(fixture('future.json')), baseline })
+  const result = await checkDrift({ get: world(fixture('future.json')), baseline, loaders })
   const text = result.failures.join('\n')
   assert.match(text, /^27\.1 \(snapshot\): Minecraft 27\.1 needs launcher format 22; this SpawnLoft knows 21\. Update SpawnLoft\. \(on windows-x64, windows-x64 \(all flags\), /m)
   assert.match(text, /launcher setting SpawnLoft does not know \(\$\{render_backend\}\)/)
@@ -69,7 +71,7 @@ test('a snapshot in a format SpawnLoft does not know fails the check, naming eac
 })
 
 test('an unreadable list, a manifest type the picker does not know and a missing runtime each fail', async () => {
-  const down = await checkDrift({ get: async () => { throw new Error('offline') }, baseline })
+  const down = await checkDrift({ get: async () => { throw new Error('offline') }, baseline, loaders })
   assert.deepEqual(down.failures, ['the version list: offline'])
 
   const base = world(fixture('versions', '26.4-snapshot-6.json'))
@@ -79,9 +81,66 @@ test('an unreadable list, a manifest type the picker does not know and a missing
     if (u === RUNTIME_INDEX_URL) body.linux['java-runtime-epsilon'] = []
     return body
   }
-  const result = await checkDrift({ get: odd, baseline })
+  const result = await checkDrift({ get: odd, baseline, loaders })
   assert.ok(result.failures.includes('the version list has types the picker does not know: april_fools'))
   assert.ok(result.failures.some((f) => /has no java-runtime-epsilon \(for 26\.3 \(release\)\) on linux/.test(f)))
+})
+
+// ---- Quilt, Forge and NeoForge for the newest release -----------------------------------------
+
+const forge263 = fixture('loaders', 'forge', '26.3-66.1.8', 'version.json')
+// a loader module as checkLoaders uses it: its builds, its default pick, and a set-up that
+// writes a version file (here: hands back the id readVersion answers for) or refuses
+function fakeLoader(name, { builds = [{ version: '2.0' }, { version: '1.0', recommended: true }], ensure = async (mc, build) => `${mc}-${name}-${build}`, failBuilds = null } = {}) {
+  return {
+    name,
+    builds: async () => { if (failBuilds) throw failBuilds; return builds },
+    pick: (list) => list.find((b) => b.recommended) ?? list[0],
+    ensureInstalled: ensure,
+  }
+}
+const coded = (message, code) => Object.assign(new Error(message), { code })
+
+test('Quilt, Forge and NeoForge are set up for the newest release, their newest build and their default', async () => {
+  const release = fixture('versions', '26.3.json')
+  const asked = []
+  const mods = { quilt: fakeLoader('Quilt'), forge: fakeLoader('Forge'), neoforge: fakeLoader('NeoForge', { builds: [{ version: '26.3.0.103' }] }) }
+  for (const m of Object.values(mods)) {
+    const ensure = m.ensureInstalled
+    m.ensureInstalled = async (mc, build) => { asked.push(`${m.name} ${build}`); return ensure(mc, build) }
+  }
+  const out = await checkLoaders(release, { loader: (id) => mods[id], readVersion: () => structuredClone(forge263) })
+  assert.deepEqual(asked, ['Quilt 2.0', 'Quilt 1.0', 'Forge 2.0', 'Forge 1.0', 'NeoForge 26.3.0.103'])
+  assert.deepEqual(out.failures, [])
+  assert.deepEqual(out.versions.map((v) => v.label), ['26.3 + Quilt 2.0', '26.3 + Quilt 1.0', '26.3 + Forge 2.0', '26.3 + Forge 1.0', '26.3 + NeoForge 26.3.0.103'])
+  assert.ok(out.versions.every((v) => v.modded && v.json.mainClass === forge263.mainClass && v.json.assetIndex))
+
+  // and the resolver runs on each, so the rows grow and today's Forge passes
+  const result = await checkDrift({ get: world(fixture('versions', '26.4-snapshot-6.json')), baseline, loaders: (r) => checkLoaders(r, { loader: (id) => mods[id], readVersion: () => structuredClone(forge263) }) })
+  assert.deepEqual(result.failures, [])
+  assert.equal(result.rows.length, (3 + 5) * 7 * 2)
+  assert.deepEqual(result.facts, baseline)
+})
+
+test('an installer SpawnLoft does not know, a host off the list or a new launch variable is drift; an unreachable loader is a note', async () => {
+  const release = fixture('versions', '26.3.json')
+  const mods = {
+    quilt: fakeLoader('Quilt', { failBuilds: coded('Could not reach Quilt', 'loader-unreachable') }),
+    forge: fakeLoader('Forge', { builds: [{ version: '67.0.1' }], ensure: async () => { throw coded('This Forge build needs a newer SpawnLoft (installer spec 2)', 'loader-installer-unknown') } }),
+    neoforge: fakeLoader('NeoForge', { builds: [{ version: '26.3.0.200' }], ensure: async () => { throw coded("NeoForge's installer names a download at https://example.net/x.jar, which is not one of the places", 'loader-host-refused') } }),
+  }
+  const out = await checkLoaders(release, { loader: (id) => mods[id] })
+  assert.deepEqual(out.notes, ["Quilt's builds for 26.3 could not be read: Could not reach Quilt"])
+  assert.deepEqual(out.failures, ['Forge 67.0.1 for 26.3: This Forge build needs a newer SpawnLoft (installer spec 2)', "NeoForge 26.3.0.200 for 26.3: NeoForge's installer names a download at https://example.net/x.jar, which is not one of the places"])
+  assert.deepEqual((await checkLoaders(release, { loader: () => fakeLoader('Quilt', { builds: [] }), loaders: ['quilt'] })).notes, ['Quilt has no build for 26.3 yet'])
+
+  // a version file with a launch variable this SpawnLoft does not know fails as Mojang's would
+  const future = structuredClone(forge263)
+  future.arguments = { ...(future.arguments ?? {}), game: [...(future.arguments?.game ?? []), '--loaderThing', '${loader_thing}'] }
+  const only = { forge: fakeLoader('Forge', { builds: [{ version: '67.0.1' }] }) }
+  const result = await checkDrift({ get: world(fixture('versions', '26.4-snapshot-6.json')), baseline, loaders: (r) => checkLoaders(r, { loaders: ['forge'], loader: (id) => only[id], readVersion: () => structuredClone(future) }) })
+  assert.ok(result.failures.length > 0)
+  assert.ok(result.failures.every((f) => f.startsWith('26.3 + Forge 67.0.1: ') && /\$\{loader_thing\}/.test(f)), result.failures.join('\n'))
 })
 
 // ---- the signed harness list ---------------------------------------------------------------

@@ -33,6 +33,20 @@ export const CLIENT_SHAPES = [
       + 'Re-download it for the right version, or switch the profile to the version it wants.',
   },
   {
+    // Forge and NeoForge (1.13+) list each missing or mismatched dependency like this
+    id: 'mod-dependency-forge',
+    test: /Mod ID: '([\w.-]+)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/,
+    title: 'A mod is missing a dependency, or has the wrong version of it',
+    advice: (m) => `The mod "${m[2]}" needs "${m[1]}" ${m[3]}. Put the right build of it into the profile's mods/ folder.`,
+  },
+  {
+    // Forge for 1.12.2 and older, started on Java 9 or newer
+    id: 'forge-needs-java-8',
+    test: /AppClassLoader cannot be cast to (?:class )?java\.net\.URLClassLoader/,
+    title: 'This Forge needs Java 8',
+    advice: (m, ctx) => `Forge for this Minecraft version runs on Java 8 only. Clear the profile's Java with "spawnloft client set ${ctx.profile ?? '<profile>'} java=" so SpawnLoft picks it.`,
+  },
+  {
     id: 'connection-refused',
     test: /Connection refused|Failed to connect to the server|io\.netty\.channel\.AbortedException/i,
     title: 'The client could not reach the server',

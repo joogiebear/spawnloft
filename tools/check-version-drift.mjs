@@ -6,7 +6,11 @@
 // classifiers, runtime platforms) are compared with tools/version-drift-baseline.json. It also
 // checks the signed harness list as the mod repo publishes it: the list verifies with the keys this
 // SpawnLoft trusts, and every jar it and HARNESS_RELEASES name still downloads with its sha256, so a
-// deleted or replaced release shows up here before a user's launch finds it.
+// deleted or replaced release shows up here before a user's launch finds it. And it sets Quilt,
+// Forge and NeoForge up for the newest release as a first Play does up to the build steps (the
+// newest build and the one a setup gets by default): an installer spec, a download host or a
+// launch variable this SpawnLoft does not know is drift. Run it in a data folder of its own
+// (MCCTL_DATA_ROOT), since that writes the loaders' version files and libraries there.
 //
 //   node tools/check-version-drift.mjs [--report <file.md>] [--update-baseline]
 import crypto from 'node:crypto'
@@ -21,6 +25,8 @@ import { META_URL, pickLoader } from '../src/client-fabric.mjs'
 import { RUNTIME_INDEX_URL, platformKey } from '../src/client-java.mjs'
 import { HARNESS_INDEX_KEYS, HARNESS_INDEX_MIN_SERIAL, HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, MAX_INDEX_BYTES, MAX_SIG_BYTES, harnessJarUrl, parseHarnessIndex } from '../src/client-harness-index.mjs'
 import { HARNESS_RELEASES } from '../src/client-harness.mjs'
+import { loaderFor } from '../src/client-loaders.mjs'
+import { versionJson } from '../src/client-paths.mjs'
 
 export const BASELINE_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'version-drift-baseline.json')
 
@@ -65,11 +71,53 @@ function placeable(classifier) {
   return !!m && OS_PARTS.includes(m[1]) && SUFFIXES.includes(m[2])
 }
 
+// The loaders set up here, past Fabric (whose profile is read above as it always was)
+export const DRIFT_LOADERS = ['quilt', 'forge', 'neoforge']
+
+// What a loader that cannot be reached or has no build yet says: a note. Anything else (an
+// installer spec, a host, a file the installer does not list) is drift.
+const PASSING = ['loader-unreachable', 'loader-not-available', 'download-failed']
+
+// Each loader for one release: { versions: [{ label, json, modded }], failures, notes }. The
+// version file each writes is merged with the release, so the resolver below sees what a launch
+// would. `loader(id)` is the module; `readVersion(id)` reads a version file it wrote.
+export async function checkLoaders(release, {
+  loaders = DRIFT_LOADERS,
+  loader = loaderFor,
+  readVersion = (id) => JSON.parse(fs.readFileSync(versionJson(id), 'utf8')),
+} = {}) {
+  const versions = []
+  const failures = []
+  const notes = []
+  const mc = release.id
+  for (const id of loaders) {
+    const mod = loader(id)
+    let builds
+    try {
+      builds = await mod.builds(mc)
+    } catch (err) {
+      ;(PASSING.includes(err.code) ? notes : failures).push(`${mod.name}'s builds for ${mc} could not be read: ${err.message}`)
+      continue
+    }
+    if (!builds.length) { notes.push(`${mod.name} has no build for ${mc} yet`); continue }
+    const picks = [builds[0].version, mod.pick(builds).version].filter((b, i, all) => all.indexOf(b) === i)
+    for (const build of picks) {
+      try {
+        const vid = await mod.ensureInstalled(mc, build, {})
+        versions.push({ label: `${mc} + ${mod.name} ${build}`, json: mergeInherited(readVersion(vid), release), modded: true })
+      } catch (err) {
+        ;(PASSING.includes(err.code) ? notes : failures).push(`${mod.name} ${build} for ${mc}: ${err.message}`)
+      }
+    }
+  }
+  return { versions, failures, notes }
+}
+
 const sameSet = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())
 
 // Everything the check found: { rows, failures, notes, facts }. `get(url, label)` fetches JSON;
 // a baseline of null skips the comparisons (it is being written).
-export async function checkDrift({ get = (url, label) => fetchJson(url, { label }), baseline = null } = {}) {
+export async function checkDrift({ get = (url, label) => fetchJson(url, { label }), baseline = null, loaders = (release) => checkLoaders(release) } = {}) {
   const failures = []
   const notes = []
   const rows = []
@@ -99,11 +147,15 @@ export async function checkDrift({ get = (url, label) => fetchJson(url, { label 
       } else {
         const loader = pickLoader(loaders.map((e) => ({ version: e.loader.version, stable: e.loader.stable === true }))).version
         const profile = await get(`${META_URL}/versions/loader/${encodeURIComponent(release.json.id)}/${encodeURIComponent(loader)}/profile/json`, 'the Fabric profile')
-        versions.push({ label: `${release.json.id} + Fabric ${loader}`, json: mergeInherited(profile, release.json) })
+        versions.push({ label: `${release.json.id} + Fabric ${loader}`, json: mergeInherited(profile, release.json), modded: true })
       }
     } catch (err) {
       notes.push(`Fabric for ${release.json.id} could not be read: ${err.message}`)
     }
+    const more = await loaders(release.json)
+    versions.push(...more.versions)
+    failures.push(...more.failures)
+    notes.push(...more.notes)
   }
 
   for (const { label, json } of versions) {
@@ -128,7 +180,7 @@ export async function checkDrift({ get = (url, label) => fetchJson(url, { label 
   }
 
   // asset indexes: a new layout needs a release
-  for (const { label, json } of versions.filter((v) => !v.label.includes('Fabric'))) {
+  for (const { label, json } of versions.filter((v) => !v.modded)) {
     if (!json.assetIndex?.url) { failures.push(`${label} names no asset index`); continue }
     const index = await fact(`${label}'s asset index`, () => get(json.assetIndex.url, `asset index ${json.assetIndex.id}`))
     if (index && assetLayout(index) === null) failures.push(`${label}'s asset index ${json.assetIndex.id} is laid out in a way SpawnLoft does not know (keys: ${Object.keys(index).join(', ')})`)
@@ -138,7 +190,7 @@ export async function checkDrift({ get = (url, label) => fetchJson(url, { label 
   // machines SpawnLoft supports
   const all = await fact("Mojang's Java runtime list", () => get(RUNTIME_INDEX_URL, "Mojang's Java runtime list"))
   if (all) {
-    for (const { label, json } of versions.filter((v) => !v.label.includes('Fabric'))) {
+    for (const { label, json } of versions.filter((v) => !v.modded)) {
       const component = json.javaVersion?.component
       if (!component) continue
       for (const pair of MUST_LAUNCH) {
