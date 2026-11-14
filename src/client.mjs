@@ -456,6 +456,47 @@ export async function prepareVersion(name, { onStage = () => {} } = {}) {
   return await mod.ensureInstalled(profile.mc, loaderVersion, { onStage })
 }
 
+// The Java a version runs on: the profile's own, one found on this machine, or Mojang's runtime
+// for the version's component, for the arch the game runs as (plan step V2).
+async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () => {}, fetchImpl = null, listFetchImpl = null, foundJavas = null } = {}) {
+  const runtime = () => {
+    onStage({ stage: 'java', message: `Getting Mojang's Java ${resolved.java.major}` })
+    return mojangJava({ component: resolved.java.component, major: resolved.java.major, osName: resolved.os.name, arch: resolved.arch, onProgress, ...(fetchImpl ? { fetchImpl } : {}), ...(listFetchImpl ? { listFetchImpl } : {}) })
+  }
+  return pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
+}
+
+// What a loader sets up once the game's Java is picked: an installer's build steps, which read the
+// vanilla game's jar, so the vanilla game is downloaded first when the loader is not set up yet.
+async function finishLoader(name, { java, os, onStage = () => {}, onProgress = () => {}, onNote = () => {}, keepNatives = new Set(), fetchImpl = null }) {
+  const profile = getProfile(name)
+  const mod = loaderFor(profile.loader)
+  if (!mod?.finishInstall) return
+  if (!mod.isInstalled(profile.mc, profile.loaderVersion)) {
+    await ensureVersion(profile.mc, { os, onProgress, keepNatives, ...(fetchImpl ? { fetchImpl } : {}) })
+  }
+  await mod.finishInstall(profile.mc, profile.loaderVersion, { name, java, onStage, onProgress, onNote, ...(fetchImpl ? { fetchImpl } : {}) })
+}
+
+// Everything a launch downloads and sets up, without starting the game (spawnloft client install).
+export async function installProfile(name, { onStage = () => {}, onProgress = () => {}, onNote = () => {}, verify = false, os = currentOs() } = {}) {
+  const versionId = await prepareVersion(name, { onStage })
+  const profile = getProfile(name)
+  if (loaderFor(profile.loader)?.finishInstall) {
+    let version = JSON.parse(fs.readFileSync(versionJson(versionId), 'utf8'))
+    if (version.inheritsFrom) version = mergeInherited(version, JSON.parse(fs.readFileSync(versionJson(version.inheritsFrom), 'utf8')))
+    const caps = nativeArches(version, os).has(os.arch) ? null : await hostCapabilities(os)
+    const resolved = resolveVersion(version, { os, features: launchFeatures({ hasServer: false }), hostCaps: caps })
+    const refused = resolvedRefusal(resolved)
+    if (refused) fail(refused.message, refused.code)
+    onStage({ stage: 'java', message: 'Finding Java' })
+    const picked = await javaFor(profile, resolved, { onStage, onProgress })
+    if (picked.warning) onNote(picked.warning)
+    await finishLoader(name, { java: picked.path, os: resolved.os, onStage, onProgress, onNote })
+  }
+  return ensureVersion(versionId, { onProgress, verify })
+}
+
 export async function launch(name, opts = {}) {
   getProfile(name)
   // Taken before anything else, released once state.json names the new process (or on any
@@ -604,16 +645,18 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // fetched is thrown away, so the next launch starts from there.
   checkCancelled()
   onStage({ stage: 'java', message: 'Finding Java' })
-  // Mojang's runtime for the version's component, for the arch the game runs as (plan step V2)
-  const runtime = () => {
-    onStage({ stage: 'java', message: `Getting Mojang's Java ${resolved.java.major}` })
-    return mojangJava({ component: resolved.java.component, major: resolved.java.major, osName: runOs.name, arch: resolved.arch, onProgress, ...(fetchImpl ? { fetchImpl } : {}), ...(listFetchImpl ? { listFetchImpl } : {}) })
-  }
-  const picked = fakeJava ? { path: fakeJava, warning: null, source: 'installed' } : await pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
+  const picked = fakeJava ? { path: fakeJava, warning: null, source: 'installed' } : await javaFor(profile, resolved, { onStage, onProgress, fetchImpl, listFetchImpl, foundJavas })
   const java = picked.path
   if (picked.warning) {
     warnings.push(picked.warning)
     onWarning(picked.warning)
+  }
+
+  checkCancelled()
+  // a loader's own build steps, on the Java just picked (the fake game has none to run)
+  if (!fakeJava) {
+    const note = (w) => { warnings.push(w); onWarning(w) }
+    await finishLoader(name, { java, os: runOs, onStage, onProgress, onNote: note, keepNatives: versionsInUse(name), fetchImpl })
   }
 
   checkCancelled()

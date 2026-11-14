@@ -64,6 +64,8 @@ test('the launch strip puts every job stage on a step', () => {
   assert.deepEqual(['java', 'manifest', 'version', 'client', 'libraries', 'assets', 'natives', 'fabric', 'harness', 'server', 'spawn', 'running'].map(stepOf),
     [1, 0, 0, 2, 2, 2, 2, 2, 2, 3, 4, 4])
   assert.equal(stepOf('start'), -1)
+  assert.equal(stepOf('quilt'), 2)
+  assert.equal(stepOf('neoforge'), 2)
   assert.equal(stepOf('something-new'), -1)
   assert.deepEqual(splitMessage('Downloading libraries · 212 of 1,049 files · 143 MB'), ['Downloading libraries', '212 of 1,049 files · 143 MB'])
   assert.deepEqual(splitMessage('Finding Java'), ['Finding Java', ''])
@@ -1207,7 +1209,7 @@ test('two things said in the same moment are said together, and nothing is said 
   assert.match(fnSource('announce'), /if \(S\.down\) return/)
 })
 
-test('the Mods choice: None and four loaders, Forge and NeoForge greyed out as coming, each with its reason', () => {
+test('the Mods choice: None and four loaders, Forge greyed out as coming, each with its reason', () => {
   const L = ['LOADER_NAMES', 'MOD_LOADERS', 'COMING', 'loaderName', 'modded']
   const { loaderBlock, loaderHint, loaderChangeWarning, loaderText, nameBase, setupTitle, defaultMemory, versionFacts, playSentence, MOD_LOADERS } = lifted([...L, 'loaderBlock', 'loaderHint', 'loaderChangeWarning', 'loaderText', 'nameBase', 'setupTitle', 'defaultMemory', 'versionFacts', 'playSentence'], '', ['MOD_LOADERS'])
   assert.deepEqual(MOD_LOADERS, ['fabric', 'quilt', 'forge', 'neoforge'])
@@ -1219,7 +1221,11 @@ test('the Mods choice: None and four loaders, Forge and NeoForge greyed out as c
   assert.equal(loaderBlock('quilt', '1.20.1', {}), null)
   assert.equal(loaderBlock('fabric', '1.8.9', { fabric: false }), 'Fabric has no build for 1.8.9.')
   assert.equal(loaderBlock('forge', '1.20.1', info), 'Forge is coming in a later SpawnLoft.')
-  assert.equal(loaderBlock('neoforge', '1.21.1', info), 'NeoForge is coming in a later SpawnLoft.')
+  assert.equal(loaderBlock('neoforge', '1.21.1', info), null)
+  assert.equal(loaderBlock('neoforge', '1.12.2', { loaders: { neoforge: false } }), 'NeoForge has no build for 1.12.2.')
+  assert.equal(nameBase('1.21.1', 'neoforge'), '1-21-1-neoforge')
+  assert.equal(setupTitle({ mc: '1.21.1', loader: 'neoforge' }), '1.21.1 \u00b7 NeoForge')
+  assert.deepEqual(versionFacts({ loaders: { fabric: true, quilt: true, neoforge: true } }), ['Fabric, Quilt, NeoForge available'])
   assert.match(loaderHint('quilt'), /^Quilt loads mods\./)
   assert.match(loaderHint('vanilla'), /^None is plain Minecraft/)
   assert.equal(loaderChangeWarning('vanilla', 'quilt'), null)
