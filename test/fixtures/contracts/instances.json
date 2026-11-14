@@ -107,7 +107,8 @@
         "autoRestart": true,
         "jvmFlags": ["-XX:+UseZGC", "-Dfile.encoding=UTF-8"],
         "webhook": "https://discord.com/api/webhooks/1/abc?wait=true",
-        "backupExclude": ["logs", "plugins/dynmap/web"]
+        "backupExclude": ["logs", "plugins/dynmap/web"],
+        "backupCleanCopies": true
       },
       "creative": {
         "dir": "/home/v/.local/share/spawnloft/instances/creative",
@@ -123,7 +124,8 @@
         "autoRestart": false,
         "jvmFlags": null,
         "webhook": null,
-        "backupExclude": null
+        "backupExclude": null,
+        "backupCleanCopies": null
       },
       "copy": {
         "dir": "/home/v/.local/share/spawnloft/instances/copy",
