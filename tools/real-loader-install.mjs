@@ -5,7 +5,10 @@
 // Run by .github/workflows/loader-install.yml (the loaders' hosts cannot be reached from where
 // SpawnLoft is written); it runs anywhere with network access, in a data folder of its own:
 //
-//   node tools/real-loader-install.mjs --loader neoforge --mc 26.3 --build 26.3.0.103
+//   node tools/real-loader-install.mjs --loader neoforge --mc 26.3 --build 26.3.0.103 [--and <build>]
+//
+// --and sets a second build for the same version up after the first, in a setup of its own, and
+// checks that the first build's files still hold (the two share the build steps' middle files).
 //
 // Nothing outside that folder is touched, and the folder is removed after unless --keep.
 import fs from 'node:fs'
@@ -19,6 +22,7 @@ const arg = (name, fallback = null) => {
 const loader = arg('loader')
 const mc = arg('mc')
 const build = arg('build')
+const also = arg('and')
 const keep = process.argv.includes('--keep')
 if (!loader || !mc || !build) {
   console.error('usage: node tools/real-loader-install.mjs --loader <id> --mc <version> --build <build> [--keep]')
@@ -67,6 +71,15 @@ async function main() {
   const t = Date.now()
   await client.installProfile(`${name}-2`, { onStage: ({ message }) => { if (/step \d+ of/.test(message)) throw new Error(`a second setup ran a build step: ${message}`) } })
   console.log(`second setup: ${((Date.now() - t) / 1000).toFixed(1)}s, no build steps`)
+
+  if (also) {
+    client.createProfile(`${name}-and`, { mc: checkedMc, loader, loaderVersion: also, memory: '4G' })
+    await client.installProfile(`${name}-and`, { onStage: ({ stage, message }) => console.log(`[${secs()}] ${stage}: ${message}`) })
+    const id2 = mod.versionId(mc, also)
+    if (mod.finishInstall && !(await stampHolds(id2))) throw new Error(`${also}'s stamp does not hold`)
+    if (mod.finishInstall && !(await stampHolds(id))) throw new Error(`setting ${also} up changed ${build}'s files`)
+    console.log(`${also} set up beside ${build}; both stamps hold`)
+  }
 
   // the launch command, and every file on its classpath and module path
   let version = JSON.parse(fs.readFileSync(versionJson(id), 'utf8'))

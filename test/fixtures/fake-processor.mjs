@@ -1,8 +1,9 @@
 // Stands in for Java running an installer's build step (test/client-forge-install.test.mjs):
 //   node fake-processor.mjs -cp <classpath> <MainClass> <args...>
 // It writes one line per run to SL_FAKE_PROC_LOG, then makes each file named after --output,
-// --slim or --extra with the text "made by <MainClass>". SL_FAKE_PROC_FAIL, _WRONG and _HANG name
-// a main class to fail (exit 3 after a few lines), make the wrong file, or never finish.
+// --slim or --extra with the text "made by <MainClass>". SL_FAKE_PROC_FAIL, _WRONG, _HANG and
+// _SKIP name a main class to fail (exit 3 after a few lines), make the wrong file, never finish, or
+// end well having made nothing.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -24,6 +25,8 @@ if (process.env.SL_FAKE_PROC_HANG === main) {
   console.error('first problem line')
   console.error(`Exception in thread "main" java.lang.IllegalStateException: ${main} broke`)
   process.exit(3)
+} else if (process.env.SL_FAKE_PROC_SKIP === main) {
+  console.log('nothing to do, apparently')
 } else {
   for (let i = 0; i < args.length - 1; i++) {
     if (['--output', '--slim', '--extra'].includes(args[i])) {

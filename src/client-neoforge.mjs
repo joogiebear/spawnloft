@@ -116,18 +116,21 @@ export function neoforgeInstalled(mc, build) {
   return fs.existsSync(versionJson(id)) && isStamped(id)
 }
 
-// Step 1: the installer, checked, and its version file under versions/<id>/.
+// Step 1: the installer, checked, and its version file under versions/<id>/. A build already set
+// up needs neither the installer nor the network.
 export async function ensureNeoforgeVersion(mc, build, { onStage = () => {}, fetchImpl, sha1Impl } = {}) {
   const c = checked(mc, build)
+  if (fs.existsSync(versionJson(c.id)) && isStamped(c.id)) return c.id
   const inst = await installer(c.build, { onStage, ...(fetchImpl ? { fetchImpl } : {}), ...(sha1Impl ? { sha1Impl } : {}) })
   const { version } = readInstaller(inst.path, { mc, id: c.id, who: 'NeoForge' })
   writeVersionFile(c.id, version)
   return c.id
 }
 
-// Steps 2 to 5, on the game's Java.
-export async function finishNeoforge(mc, build, { name, java, javaArgs, onStage = () => {}, onProgress = () => {}, onNote = () => {}, fetchImpl, sha1Impl, spawnImpl } = {}) {
+// Steps 2 to 5, on the game's Java. The installer is read again only when there is something to
+// build.
+export async function finishNeoforge(mc, build, { name, java, javaArgs, verify = false, onStage = () => {}, onProgress = () => {}, onNote = () => {}, fetchImpl, sha1Impl, spawnImpl } = {}) {
   const c = checked(mc, build)
-  const inst = await installer(c.build, { onStage, ...(fetchImpl ? { fetchImpl } : {}), ...(sha1Impl ? { sha1Impl } : {}) })
-  return runInstaller({ id: c.id, mc, who: 'NeoForge', build: c.build, stage: 'neoforge', name, installer: inst, java, ...(javaArgs ? { javaArgs } : {}), ...(fetchImpl ? { fetchImpl } : {}), ...(spawnImpl ? { spawnImpl } : {}), onStage, onProgress, onNote })
+  const getInstaller = () => installer(c.build, { onStage, ...(fetchImpl ? { fetchImpl } : {}), ...(sha1Impl ? { sha1Impl } : {}) })
+  return runInstaller({ id: c.id, mc, who: 'NeoForge', build: c.build, stage: 'neoforge', name, installer: getInstaller, java, verify, ...(javaArgs ? { javaArgs } : {}), ...(fetchImpl ? { fetchImpl } : {}), ...(spawnImpl ? { spawnImpl } : {}), onStage, onProgress, onNote })
 }

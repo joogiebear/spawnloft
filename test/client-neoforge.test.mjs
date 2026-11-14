@@ -88,6 +88,8 @@ test('step 1: the installer is fetched, checked, and its version file written; t
   assert.equal(neo.isInstalled('1.21.1', build), false)
   fs.writeFileSync(stampFile(id), JSON.stringify({ format: 1, files: {} }))
   assert.equal(neo.isInstalled('1.21.1', build), true)
+  // set up: a Play needs neither the installer nor the network
+  assert.equal(await N.ensureNeoforgeVersion('1.21.1', build, { fetchImpl: async () => { throw new Error('network used') }, sha1Impl: async () => { throw new Error('network used') } }), id)
   // a build for another version, or a name that is no build, is refused before any download
   await assert.rejects(N.ensureNeoforgeVersion('1.20.4', build, { fetchImpl }), /not a build for Minecraft 1\.20\.4/)
   await assert.rejects(N.ensureNeoforgeVersion('1.21.1', '../21.1.266', { fetchImpl }), /not a valid version/)

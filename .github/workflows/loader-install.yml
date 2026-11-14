@@ -35,7 +35,7 @@ jobs:
       matrix:
         include:
           - { loader: neoforge, mc: '26.3', build: '26.3.0.103' }
-          - { loader: neoforge, mc: '1.21.1', build: '21.1.266' }
+          - { loader: neoforge, mc: '1.21.1', build: '21.1.266', and: '21.1.265' }
     name: ${{ matrix.loader }} ${{ matrix.build }}
     steps:
       - uses: actions/checkout@v4
@@ -43,4 +43,4 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Set ${{ matrix.loader }} ${{ matrix.build }} up for Minecraft ${{ matrix.mc }}
-        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }}
+        run: node tools/real-loader-install.mjs --loader ${{ matrix.loader }} --mc ${{ matrix.mc }} --build ${{ matrix.build }} ${{ matrix.and && format('--and {0}', matrix.and) || '' }}

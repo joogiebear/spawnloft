@@ -24,6 +24,7 @@ const LOADERS = path.join(here, 'fixtures', 'client', 'loaders')
 const sha1 = (b) => crypto.createHash('sha1').update(b).digest('hex')
 const made = (main) => sha1(`made by ${main}`)
 const lib = (rel) => path.join(P.LIBRARIES_DIR, rel)
+const STEPS_DIR = path.join(P.CLIENT_CACHE_DIR, 'loader-steps')
 
 const MC = '1.21.1'
 const ID = 'testloader-1'
@@ -53,7 +54,7 @@ function syntheticProfile(over = {}) {
       { sides: ['server'], jar: 'test:serveronly:1', classpath: [], args: ['--output', '{ROOT}/server.jar'] },
       { jar: 'test:split:1', classpath: [], args: ['--input', '{MINECRAFT_JAR}', '--slim', '{SLIM}', '--ver', '{MCV}', '--side', '{SIDE}'], outputs: { '{SLIM}': '{SLIM_SHA}' } },
       { sides: ['client'], jar: 'test:patch:1', classpath: ['test:helper:1'], args: ['--clean', '{SLIM}', '--output', '{PATCHED}', '--apply', '{BINPATCH}'] },
-      { jar: 'test:final:1', classpath: ['test:helper:1'], args: ['--input', '[test:patched:1]', '--output', '{ROOT}/libraries/test/final/1/final-1.jar'] },
+      { jar: 'test:final:1', classpath: ['test:helper:1'], args: ['--input', '[test:patched:1]', '--output', '{ROOT}/libraries/test/final-out/1/final-out-1.jar'] },
     ],
     libraries: libs,
     ...over,
@@ -91,12 +92,12 @@ const calls = () => (fs.existsSync(procLog) ? fs.readFileSync(procLog, 'utf8').t
 const mains = () => calls().map((c) => c.main)
 
 beforeEach(() => {
-  for (const d of [P.LIBRARIES_DIR, P.versionsDir(), path.join(P.CLIENT_ROOT, 'run'), E.INSTALLERS_DIR, path.join(P.CLIENT_CACHE_DIR, 'verified.json')]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [P.LIBRARIES_DIR, P.versionsDir(), path.join(P.CLIENT_ROOT, 'run'), E.INSTALLERS_DIR, STEPS_DIR, path.join(P.CLIENT_CACHE_DIR, 'verified.json')]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(P.versionDir(MC), { recursive: true })
   fs.writeFileSync(P.versionJar(MC), 'vanilla game')
   procLog = path.join(scratch, `proc-${crypto.randomBytes(3).toString('hex')}.log`)
   process.env.SL_FAKE_PROC_LOG = procLog
-  for (const k of ['SL_FAKE_PROC_FAIL', 'SL_FAKE_PROC_WRONG', 'SL_FAKE_PROC_HANG']) delete process.env[k]
+  for (const k of ['SL_FAKE_PROC_FAIL', 'SL_FAKE_PROC_WRONG', 'SL_FAKE_PROC_HANG', 'SL_FAKE_PROC_SKIP']) delete process.env[k]
   fetched = []
 })
 
@@ -116,7 +117,8 @@ test('the build steps run in order on the given Java, with every value filled in
   assert.equal(patch.args[5], path.join(E.INSTALLERS_DIR, `${ID}-data`, 'data', 'client.lzma'))
   assert.deepEqual(patch.classpath, [lib('test/patch/1/patch-1.jar'), lib('test/helper/1/helper-1.jar')])
   assert.equal(fin.args[1], lib('test/patched/1/patched-1.jar'))
-  assert.equal(fin.args[3], path.join(P.CLIENT_ROOT, 'libraries', 'test', 'final', '1', 'final-1.jar'))
+  // filled in as the installers do it: the text around a value is kept as written, slashes and all
+  assert.equal(fin.args[3], `${P.CLIENT_ROOT}/libraries/test/final-out/1/final-out-1.jar`)
   // each in a working folder of its own, removed after
   for (const c of calls()) {
     assert.ok(!c.cwd.startsWith(P.CLIENT_ROOT))
@@ -131,7 +133,8 @@ test('the build steps run in order on the given Java, with every value filled in
   const stamp = JSON.parse(fs.readFileSync(E.stampFile(ID), 'utf8'))
   assert.equal(stamp.installer, inst.sha1)
   assert.ok(Object.keys(stamp.files).includes('libraries/test/patched/1/patched-1.jar'))
-  assert.ok(!fs.existsSync(path.join(P.versionDir(ID), '.loader-steps.json')))
+  // the steps without outputs are on record for the next build of this Minecraft version
+  assert.equal(Object.keys(JSON.parse(fs.readFileSync(path.join(STEPS_DIR, `${MC}.json`), 'utf8')).steps).length, 2)
   assert.ok(!fs.existsSync(path.join(E.INSTALLERS_DIR, `${ID}-data`)))
   const log = fs.readFileSync(path.join(P.clientRunDir('setup-a'), 'loader-install.log'), 'utf8')
   assert.match(log, /-- step 3 of 3: done/)
@@ -209,6 +212,42 @@ test('two setups on the same build at once: the second waits and builds nothing'
   assert.deepEqual(mains(), ['t.Split', 't.Patch', 't.Final'])
 })
 
+test('a second build for the same Minecraft version reuses the steps that are the same, and builds only its own', async () => {
+  const inst = writeInstaller()
+  await run(inst)
+  const id2 = 'testloader-2'
+  const inst2 = writeInstaller(syntheticProfile(), syntheticVersion({ id: id2 }), { file: path.join(scratch, 'installer-2.jar') })
+  assert.deepEqual(await run(inst2, { id: id2, build: '2' }), { built: true, steps: 3 })
+  // the split by its output, the last step by its record; the patch reads this build's own patches
+  assert.deepEqual(mains(), ['t.Split', 't.Patch', 't.Final', 't.Patch'])
+  assert.equal(await E.stampHolds(ID), true)
+  assert.equal(await E.stampHolds(id2), true)
+})
+
+test('a step that ends well without making what it names stops the setup', async () => {
+  const inst = writeInstaller()
+  process.env.SL_FAKE_PROC_SKIP = 't.Patch'
+  await assert.rejects(run(inst), (err) => err.code === 'loader-install-failed' && /stopped at step 2 of 3: patched-1\.jar was not made/.test(err.message))
+  assert.equal(E.isStamped(ID), false)
+})
+
+test('a Play waiting behind another setup of the same version can be cancelled', async () => {
+  const inst = writeInstaller()
+  process.env.SL_FAKE_PROC_HANG = 't.Split'
+  const first = new AbortController()
+  let started
+  const running = new Promise((r) => { started = r })
+  const a = withCancel(first.signal, () => run(inst, { onStage: (s) => { if (/step 1 of 3/.test(s.message)) started() } }))
+  await running
+  const second = new AbortController()
+  setTimeout(() => second.abort(), 300)
+  const t = Date.now()
+  await assert.rejects(withCancel(second.signal, () => run(inst, { name: 'setup-b' })), (err) => isCancelled(err))
+  assert.ok(Date.now() - t < 5000)
+  first.abort()
+  await assert.rejects(a, (err) => isCancelled(err))
+})
+
 test('a version-file row the steps were to make, still missing at the end, stops the setup', async () => {
   const version = syntheticVersion({ libraries: [...syntheticVersion().libraries, { name: 'test:never:1', downloads: { artifact: { path: 'test/never/1/never-1.jar', url: '', sha1: 'b'.repeat(40), size: 3 } } }] })
   const inst = writeInstaller(syntheticProfile(), version)
@@ -238,6 +277,9 @@ test('refusals: an unknown format, another game version or id, a host off the li
   const climbing = syntheticProfile()
   climbing.data.PATCHED.client = '[test:..:1]'
   await refuses(climbing, syntheticVersion(), /cannot place in its libraries folder/)
+  const unchecked = syntheticProfile()
+  delete unchecked.libraries.at(-1).downloads.artifact.sha1
+  await refuses(unchecked, syntheticVersion(), /lists test:helper:1 without a checksum/)
   const climbingRow = syntheticProfile()
   climbingRow.libraries.at(-1).downloads.artifact.path = '../../evil.jar'
   await refuses(climbingRow, syntheticVersion(), /outside the libraries folder/)

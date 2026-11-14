@@ -468,14 +468,14 @@ async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () 
 
 // What a loader sets up once the game's Java is picked: an installer's build steps, which read the
 // vanilla game's jar, so the vanilla game is downloaded first when the loader is not set up yet.
-async function finishLoader(name, { java, os, onStage = () => {}, onProgress = () => {}, onNote = () => {}, keepNatives = new Set(), fetchImpl = null }) {
+async function finishLoader(name, { java, os, onStage = () => {}, onProgress = () => {}, onNote = () => {}, keepNatives = new Set(), fetchImpl = null, verify = false }) {
   const profile = getProfile(name)
   const mod = loaderFor(profile.loader)
   if (!mod?.finishInstall) return
-  if (!mod.isInstalled(profile.mc, profile.loaderVersion)) {
+  if (!mod.isInstalled(profile.mc, profile.loaderVersion) || !fs.existsSync(versionJar(profile.mc))) {
     await ensureVersion(profile.mc, { os, onProgress, keepNatives, ...(fetchImpl ? { fetchImpl } : {}) })
   }
-  await mod.finishInstall(profile.mc, profile.loaderVersion, { name, java, onStage, onProgress, onNote, ...(fetchImpl ? { fetchImpl } : {}) })
+  await mod.finishInstall(profile.mc, profile.loaderVersion, { name, java, onStage, onProgress, onNote, verify, ...(fetchImpl ? { fetchImpl } : {}) })
 }
 
 // Everything a launch downloads and sets up, without starting the game (spawnloft client install).
@@ -492,7 +492,7 @@ export async function installProfile(name, { onStage = () => {}, onProgress = ()
     onStage({ stage: 'java', message: 'Finding Java' })
     const picked = await javaFor(profile, resolved, { onStage, onProgress })
     if (picked.warning) onNote(picked.warning)
-    await finishLoader(name, { java: picked.path, os: resolved.os, onStage, onProgress, onNote })
+    await finishLoader(name, { java: picked.path, os: resolved.os, onStage, onProgress, onNote, verify })
   }
   return ensureVersion(versionId, { onProgress, verify })
 }

@@ -32,7 +32,7 @@ import { assertLoaderHost } from './client-loader-hosts.mjs'
 import { needsFetch, noteChecked, openLedger, saveLedger } from './client-install.mjs'
 import { downloadFile, fetchCapped } from './download.mjs'
 import { readZipEntry } from './plugins.mjs'
-import { fail, safeRelativePath, isInside, acquireLockAsync, sha1OfFile } from './util.mjs'
+import { fail, safeRelativePath, isInside, acquireLockAsync, sha1OfFile, writeAtomic } from './util.mjs'
 import { Cancelled, cancelSignal, checkCancelled, isCancelled, stopOnCancel, OWN_GROUP, inOwnGroup } from './cancel.mjs'
 
 export const INSTALLERS_DIR = path.join(CLIENT_CACHE_DIR, 'installers')
@@ -40,9 +40,13 @@ export const INSTALLERS_DIR = path.join(CLIENT_CACHE_DIR, 'installers')
 export const KNOWN_SPECS = [0, 1]
 const STAMP_FORMAT = 1
 const STAMP = '.loader-installed.json'
-const STEPS = '.loader-steps.json'
-// a second setup on the same build waits for the first one's build steps
+// A second setup waits for the first one's build steps. The lock and the record of finished steps
+// are per Minecraft version, not per build: two builds for one version share the steps' middle
+// files (client-…-slim.jar, the mappings), so one build's steps must not run under another's, and
+// a step one build already ran with the same arguments is not run again for the next.
 const LOCK_WAIT_MS = 30 * 60 * 1000
+const STEPS_DIR = path.join(CLIENT_CACHE_DIR, 'loader-steps')
+const ARTIFACTS = Symbol('artifact paths')
 const TAIL_LINES = 8
 
 const sha1Of = (buf) => crypto.createHash('sha1').update(buf).digest('hex')
@@ -50,14 +54,15 @@ const isSha1 = (v) => typeof v === 'string' && /^[0-9a-f]{40}$/i.test(v)
 const ledgerKey = (file) => path.relative(CLIENT_ROOT, file).split(path.sep).join('/')
 
 export const stampFile = (id) => path.join(versionDir(id), STAMP)
-const stepsFile = (id) => path.join(versionDir(id), STEPS)
+const stepsFile = (mc) => path.join(STEPS_DIR, `${mc}.json`)
 
+// through a temp file, waiting out a virus scanner that holds the old one for a moment
 function writeJsonAtomic(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
-  fs.renameSync(tmp, file)
+  writeAtomic(file, JSON.stringify(data, null, 2))
 }
+
+const fileRow = (v) => Array.isArray(v) && v.length === 2 && (v[0] === null || Number.isInteger(v[0])) && isSha1(v[1])
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null }
@@ -143,9 +148,7 @@ export function writeVersionFile(id, version) {
   const text = JSON.stringify(version, null, 2)
   try { if (fs.readFileSync(dest, 'utf8') === text) return false } catch { /* not there yet */ }
   fs.mkdirSync(versionDir(id), { recursive: true })
-  const tmp = `${dest}.${process.pid}-${crypto.randomBytes(4).toString('hex')}.tmp`
-  fs.writeFileSync(tmp, text)
-  fs.renameSync(tmp, dest)
+  writeAtomic(dest, text)
   return true
 }
 
@@ -159,13 +162,8 @@ export function isStamped(id) {
 // reading the patched jars on each Play.
 export async function stampHolds(id, ledger = null) {
   const stamp = readJson(stampFile(id))
-  if (stamp?.format !== STAMP_FORMAT || !stamp.files || typeof stamp.files !== 'object') return false
-  for (const [key, [size, sha1]] of Object.entries(stamp.files)) {
-    const rel = safeRelativePath(key)
-    if (!rel) return false
-    if (await needsFetch(path.join(CLIENT_ROOT, rel), { sha1, size }, ledger)) return false
-  }
-  return true
+  if (stamp?.format !== STAMP_FORMAT) return false
+  return filesStillMatch(stamp.files, ledger)
 }
 
 // ---- 3. the data table and the arguments -------------------------------------------------
@@ -174,20 +172,16 @@ export async function stampHolds(id, ledger = null) {
 // /data/... to a file taken out of the installer into dataDir. Plus the names every installer
 // knows.
 export function resolveData(profile, { installerPath, mc, dataDir, who }) {
-  const out = {
-    SIDE: 'client',
-    MINECRAFT_JAR: versionJar(mc),
-    MINECRAFT_VERSION: mc,
-    ROOT: CLIENT_ROOT,
-    INSTALLER: installerPath,
-    LIBRARY_DIR: LIBRARIES_DIR,
-  }
+  const out = {}
+  const artifacts = new Set()
   for (const [key, sides] of Object.entries(profile.data ?? {})) {
     if (!/^[A-Z0-9_]+$/i.test(key)) fail(`The ${who} installer names a value "${key.slice(0, 40)}" SpawnLoft does not know`, 'loader-installer-unknown')
     const value = sides?.client
     if (typeof value !== 'string') continue
-    if (value.startsWith('[') && value.endsWith(']')) out[key] = artifactFile(value.slice(1, -1), `The ${who} installer`)
-    else if (value.startsWith("'") && value.endsWith("'")) out[key] = value.slice(1, -1)
+    if (value.startsWith('[') && value.endsWith(']')) {
+      out[key] = artifactFile(value.slice(1, -1), `The ${who} installer`)
+      artifacts.add(out[key])
+    } else if (value.startsWith("'") && value.endsWith("'")) out[key] = value.slice(1, -1)
     else {
       const entry = safeRelativePath(value.replace(/^\//, ''))
       if (!entry) fail(`The ${who} installer names a file "${value.slice(0, 80)}" SpawnLoft cannot take out of it`, 'loader-installer-unknown')
@@ -200,6 +194,16 @@ export function resolveData(profile, { installerPath, mc, dataDir, who }) {
       out[key] = dest
     }
   }
+  // the names every installer knows, set last as the installers do, so a table cannot move them
+  Object.assign(out, {
+    SIDE: 'client',
+    MINECRAFT_JAR: versionJar(mc),
+    MINECRAFT_VERSION: mc,
+    ROOT: CLIENT_ROOT,
+    INSTALLER: installerPath,
+    LIBRARY_DIR: LIBRARIES_DIR,
+  })
+  Object.defineProperty(out, ARTIFACTS, { value: artifacts })
   return out
 }
 
@@ -217,7 +221,7 @@ export function fillArgument(arg, data, who) {
       const end = text.indexOf('}', i)
       if (end === -1) { out += text.slice(i); break }
       const key = text.slice(i + 1, end)
-      if (!(key in data)) fail(`The ${who} installer's build steps use a value {${key.slice(0, 40)}} it does not give. Update SpawnLoft, or pick an older ${who} build in Advanced.`, 'loader-installer-unknown')
+      if (!Object.hasOwn(data, key)) fail(`The ${who} installer's build steps use a value {${key.slice(0, 40)}} it does not give. Update SpawnLoft, or pick an older ${who} build in Advanced.`, 'loader-installer-unknown')
       out += data[key]
       i = end
       continue
@@ -238,6 +242,10 @@ export function planStep(proc, data, who) {
   const jar = artifactFile(proc.jar, `The ${who} installer`)
   const classpath = [jar, ...(proc.classpath ?? []).map((n) => artifactFile(n, `The ${who} installer`))]
   const args = (proc.args ?? []).map((a) => fillArgument(a, data, who))
+  // the libraries-folder files the step names by maven name: each must be there once it ran (an
+  // input already was; an output it was to make)
+  const artifacts = data[ARTIFACTS] ?? new Set()
+  const named = (proc.args ?? []).map(String).map((a, i) => ((a.startsWith('[') && a.endsWith(']')) || artifacts.has(args[i]) ? args[i] : null)).filter(Boolean)
   const outputs = Object.entries(proc.outputs ?? {}).map(([file, sha1]) => {
     const f = fillArgument(file, data, who)
     const s = fillArgument(sha1, data, who).toLowerCase()
@@ -245,7 +253,7 @@ export function planStep(proc, data, who) {
     return { file: f, sha1: s }
   })
   const key = sha1Of(JSON.stringify([proc.jar, proc.classpath ?? [], args]))
-  return { jar, classpath, args, outputs, key }
+  return { jar, classpath, args, outputs, key, named }
 }
 
 // The Main-Class of a step's jar, from its manifest (a line may run on after a space).
@@ -266,7 +274,7 @@ function libraryRows(list, who) {
     if (!lib?.name) continue
     const rel = a?.path ? safeRelativePath(a.path) : artifactPath(lib.name)
     if (!rel) fail(`The ${who} installer names a library at "${String(a?.path ?? lib.name).slice(0, 80)}", outside the libraries folder`, 'loader-installer-unknown')
-    rows.push({ name: lib.name, file: path.join(LIBRARIES_DIR, rel), rel, url: a?.url ?? '', sha1: isSha1(a?.sha1) ? a.sha1.toLowerCase() : null, size: Number.isInteger(a?.size) ? a.size : null })
+    rows.push({ name: lib.name, file: path.join(LIBRARIES_DIR, rel), rel, url: a ? (a.url ?? '') : null, sha1: isSha1(a?.sha1) ? a.sha1.toLowerCase() : null, size: Number.isInteger(a?.size) ? a.size : null })
   }
   return rows
 }
@@ -282,6 +290,8 @@ async function ensureLibraries({ profile, version, installerPath, who, fetchImpl
   let bytes = 0
   for (const row of rows) {
     checkCancelled()
+    // a jar the build steps may run: never one that cannot be checked, downloaded or already there
+    if (row.url && !row.sha1) fail(`The ${who} installer lists ${row.name} without a checksum; SpawnLoft does not run or load an unchecked file. Pick another ${who} build in Advanced.`, 'loader-installer-unknown')
     if (await needsFetch(row.file, { sha1: row.sha1, size: row.size }, ledger)) {
       if (row.url === '') {
         const data = readZipEntry(installerPath, `maven/${row.rel}`)
@@ -292,7 +302,7 @@ async function ensureLibraries({ profile, version, installerPath, who, fetchImpl
           await noteChecked(ledger, row.file, row.sha1)
         }
         // else made by a build step
-      } else {
+      } else if (row.url !== null) {
         assertLoaderHost(row.url, `The ${who} installer`)
         fs.mkdirSync(path.dirname(row.file), { recursive: true })
         try {
@@ -303,6 +313,8 @@ async function ensureLibraries({ profile, version, installerPath, who, fetchImpl
         }
         await noteChecked(ledger, row.file, row.sha1)
         bytes += row.size ?? 0
+      } else {
+        fail(`The ${who} installer lists ${row.name} with no download SpawnLoft knows. Update SpawnLoft, or pick another ${who} build in Advanced.`, 'loader-installer-unknown')
       }
     }
     done++
@@ -363,26 +375,47 @@ async function filesNamedBy(step) {
 }
 
 async function filesStillMatch(files, ledger) {
-  if (!files || typeof files !== 'object') return false
-  for (const [key, [size, sha1]] of Object.entries(files)) {
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return false
+  for (const [key, row] of Object.entries(files)) {
     const rel = safeRelativePath(key)
-    if (!rel || await needsFetch(path.join(CLIENT_ROOT, rel), { sha1, size }, ledger)) return false
+    if (!rel || !fileRow(row) || await needsFetch(path.join(CLIENT_ROOT, rel), { sha1: row[1], size: row[0] }, ledger)) return false
   }
   return true
 }
 
 // ---- 2 to 5 ----------------------------------------------------------------------------------
 
+// The lock for one Minecraft version's loader builds, waited for in short turns so a cancel ends
+// the wait.
+async function lockFor(mc) {
+  fs.mkdirSync(STEPS_DIR, { recursive: true })
+  const file = path.join(STEPS_DIR, `${mc}.lock`)
+  const deadline = Date.now() + LOCK_WAIT_MS
+  for (;;) {
+    checkCancelled()
+    try {
+      return await acquireLockAsync(file, { timeoutMs: 500 })
+    } catch (err) {
+      if (!/timed out waiting for lock/.test(err.message) || Date.now() > deadline) throw err
+    }
+  }
+}
+
+function removeFolder(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) } catch { /* a temp folder: left to the system */ }
+}
+
 // Everything after the version file, for one build: what a launch runs once the game's Java is
 // picked and the vanilla game is downloaded. Returns { built: false } when the stamp already
 // holds. who: "NeoForge"; build: "21.1.266"; stage: the launch stage id; name: the setup, for the
-// log; java: the Java to run the steps on (javaArgs before -cp: the tests' fake one).
-export async function runInstaller({ id, mc, who, build, stage, name, installer, java, javaArgs = [], fetchImpl = downloadFile, spawnImpl = defaultSpawn, onStage = () => {}, onProgress = () => {}, onNote = () => {} }) {
-  const ledger = openLedger()
+// log; installer: a function giving { path, sha1 }, only called when there is something to build;
+// java: the Java to run the steps on (javaArgs before -cp: the tests' fake one); verify: hash the
+// stamped files again whatever earlier launches noted.
+export async function runInstaller({ id, mc, who, build, stage, name, installer, java, javaArgs = [], verify = false, fetchImpl = downloadFile, spawnImpl = defaultSpawn, onStage = () => {}, onProgress = () => {}, onNote = () => {} }) {
+  const ledger = openLedger({ verify })
   try {
     if (isStamped(id) && await stampHolds(id, ledger)) return { built: false }
-    fs.mkdirSync(path.dirname(versionDir(id)), { recursive: true })
-    const release = await acquireLockAsync(`${versionDir(id)}.install.lock`, { timeoutMs: LOCK_WAIT_MS })
+    const release = await lockFor(mc)
     try {
       // another setup may have finished it while this one waited
       if (isStamped(id) && await stampHolds(id, ledger)) return { built: false }
@@ -390,7 +423,8 @@ export async function runInstaller({ id, mc, who, build, stage, name, installer,
         onNote(`${who} ${build}'s files were changed or removed since it was set up, so it is set up again`)
         fs.rmSync(stampFile(id), { force: true })
       }
-      return await build_({ id, mc, who, build, stage, name, installer, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger })
+      const inst = typeof installer === 'function' ? await installer() : installer
+      return await buildAll({ id, mc, who, build, stage, name, installer: inst, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger })
     } finally {
       release()
     }
@@ -399,26 +433,27 @@ export async function runInstaller({ id, mc, who, build, stage, name, installer,
   }
 }
 
-async function build_({ id, mc, who, build, stage, name, installer, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger }) {
+async function buildAll({ id, mc, who, build, stage, name, installer, java, javaArgs, fetchImpl, spawnImpl, onStage, onProgress, ledger }) {
   const { profile, version } = readInstaller(installer.path, { mc, id, who })
   onStage({ stage, message: `Downloading ${who} ${build}'s libraries` })
   await ensureLibraries({ profile, version, installerPath: installer.path, who, fetchImpl, ledger, onProgress })
 
   const dataDir = path.join(INSTALLERS_DIR, `${id}-data`)
-  fs.rmSync(dataDir, { recursive: true, force: true })
+  removeFolder(dataDir)
   const data = resolveData(profile, { installerPath: installer.path, mc, dataDir, who })
-  const procs = clientProcessors(profile)
-  const steps = procs.map((p) => planStep(p, data, who))
+  const steps = clientProcessors(profile).map((p) => planStep(p, data, who))
   const total = steps.length
 
-  // the steps already finished by an earlier try at this same installer
-  let record = readJson(stepsFile(id))
-  if (record?.installer !== installer.sha1 || !record.steps || typeof record.steps !== 'object') record = { installer: installer.sha1, steps: {} }
+  // the steps already run for this Minecraft version, by their command (see STEPS_DIR)
+  let record = readJson(stepsFile(mc))
+  if (record?.format !== 1 || !record.steps || typeof record.steps !== 'object' || Array.isArray(record.steps)) record = { format: 1, steps: {} }
   const stampFiles = {}
 
   const logFile = path.join(clientRunDir(name), 'loader-install.log')
   fs.mkdirSync(path.dirname(logFile), { recursive: true })
   const log = fs.createWriteStream(logFile, { flags: 'a' })
+  // the log is a help, not a step: a disk too full to write it fails the step itself, if anything
+  log.on('error', () => {})
   log.write(`\n==== ${new Date().toISOString()} setting up ${who} ${build} (${id}), ${total} steps ====\n`)
   try {
     for (let i = 0; i < total; i++) {
@@ -426,23 +461,24 @@ async function build_({ id, mc, who, build, stage, name, installer, java, javaAr
       const step = steps[i]
       const n = i + 1
       onStage({ stage, message: `Setting up ${who} ${build} (step ${n} of ${total})` })
-      // a step with outputs is done when they match; one without is done when it ran with these
-      // arguments and the files it named are still as it left them
+      // a step with outputs is done when they match; one without is done when it ran with this
+      // same command and the files it named are still as it left them
       let done
       if (step.outputs.length) {
         done = true
         for (const o of step.outputs) if (await needsFetch(o.file, { sha1: o.sha1 }, ledger)) { done = false; break }
       } else {
-        const prev = record.steps[i]
-        done = prev?.key === step.key && await filesStillMatch(prev.files, ledger)
+        done = await filesStillMatch(record.steps[step.key], ledger)
       }
       if (done) {
         log.write(`-- step ${n} of ${total}: already done\n`)
-        Object.assign(stampFiles, step.outputs.length ? outputsAsFiles(step) : record.steps[i].files)
+        Object.assign(stampFiles, step.outputs.length ? outputsAsFiles(step) : record.steps[step.key])
         continue
       }
-      delete record.steps[i]
-      writeJsonAtomic(stepsFile(id), record)
+      if (record.steps[step.key]) {
+        delete record.steps[step.key]
+        writeJsonAtomic(stepsFile(mc), record)
+      }
       const main = mainClassOf(step.jar)
       if (!main) fail(`Setting up ${who} stopped at step ${n} of ${total}: its tool ${path.basename(step.jar)} names no main class. Pick another ${who} build in Advanced.`, 'loader-install-failed')
       const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-loader-step-'))
@@ -454,7 +490,7 @@ async function build_({ id, mc, who, build, stage, name, installer, java, javaAr
         if (isCancelled(err)) throw err
         fail(`Setting up ${who} stopped at step ${n} of ${total}: Java could not be started (${err.message}).`, 'loader-install-failed')
       } finally {
-        fs.rmSync(cwd, { recursive: true, force: true })
+        removeFolder(cwd)
       }
       const stopped = (why) => {
         for (const o of step.outputs) fs.rmSync(o.file, { force: true })
@@ -468,9 +504,14 @@ async function build_({ id, mc, who, build, stage, name, installer, java, javaAr
         if (actual !== o.sha1) stopped(`: ${path.basename(o.file)} ${actual ? 'did not come out as the installer says it should' : 'was not made'}`)
         await noteChecked(ledger, o.file, o.sha1)
       }
+      for (const f of step.named) {
+        if (!fs.existsSync(f)) stopped(`: ${path.basename(f)} was not made`)
+      }
       const files = step.outputs.length ? outputsAsFiles(step) : await filesNamedBy(step)
-      record.steps[i] = { key: step.key, files }
-      writeJsonAtomic(stepsFile(id), record)
+      if (!step.outputs.length) {
+        record.steps[step.key] = files
+        writeJsonAtomic(stepsFile(mc), record)
+      }
       Object.assign(stampFiles, files)
       log.write(`-- step ${n} of ${total}: done\n`)
     }
@@ -483,8 +524,7 @@ async function build_({ id, mc, who, build, stage, name, installer, java, javaAr
     }
     checkCancelled()
     writeJsonAtomic(stampFile(id), { format: STAMP_FORMAT, id, installer: installer.sha1, at: new Date().toISOString(), files: stampFiles })
-    fs.rmSync(stepsFile(id), { force: true })
-    fs.rmSync(dataDir, { recursive: true, force: true })
+    removeFolder(dataDir)
     log.write(`==== ${who} ${build} is set up ====\n`)
     return { built: true, steps: total }
   } finally {
