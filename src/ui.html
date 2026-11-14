@@ -754,6 +754,9 @@
   /* A grid item, unlike the other two, so inline-flex blockifies to flex and the trough stretched
      the width of the pane - 620px of empty inset well beside 194px of buttons. */
   .ranges { justify-self: start; width: max-content; }
+  /* Focus rests here when Escape steps out of a field; the tool is not a control, so no ring. */
+  #toolPanel:focus { outline: none; }
+  .filters .count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
   .seg, .filters, .ranges {
     display: inline-flex;
     background: rgba(var(--ink-rgb), .025);
@@ -2870,9 +2873,9 @@
         <div class="srv-title">
           <div class="srv-name">
             <h1 id="srvName">—</h1>
-            <span class="srv-id" id="srvId" hidden title="The name the folder and the commands use"></span>
+            <span class="srv-id" id="srvId" hidden tabindex="0" title="The name the folder and the commands use"></span>
             <span class="spill" id="srvState"></span>
-            <span class="badge" id="srvOffline" hidden title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
+            <span class="badge" id="srvOffline" hidden tabindex="0" title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
           </div>
           <div class="srv-meta" id="srvMeta"></div>
         </div>
@@ -2957,7 +2960,7 @@
         </div>
       </section>
 
-      <section class="tool" id="toolPanel" aria-labelledby="toolTitle" hidden>
+      <section class="tool" id="toolPanel" aria-labelledby="toolTitle" tabindex="-1" hidden>
         <div class="tool-head">
           <h2 id="toolTitle"></h2>
           <button type="button" class="icon-btn" id="toolClose" aria-label="Close" title="Close"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
@@ -4522,14 +4525,18 @@ async function pollVitals(name) {
   if (state.current === name && state.view === 'server' && vitalsView.name === name) renderVitals(rowOf(name));
 }
 
-/** "now", "12m", "3h", "4d": how long ago, in the one unit that matters at that distance. */
+/**
+ * "just now", "12m", "3h", "4d": how long ago, in the one unit that matters at that distance. It
+ * changes unit where ago() does, so the header and the page beside it say the same thing: they
+ * said "now" and "just now", and "30h" and "1 day ago", for one backup.
+ */
 function shortAgo(ms) {
   const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
-  if (s < 60) return 'now';
+  if (s < 60) return 'just now';
   const m = Math.floor(s / 60);
   if (m < 60) return m + 'm';
   const h = Math.floor(m / 60);
-  if (h < 48) return h + 'h';
+  if (h < 24) return h + 'h';
   return Math.floor(h / 24) + 'd';
 }
 
@@ -4547,7 +4554,8 @@ function vitalCell(key, label, title) {
   const wrap = document.createElement('div');
   wrap.className = 'vital';
   wrap.dataset.v = key;
-  if (title) wrap.title = title;
+  // what the number means is in its tip, which only a pointer could reach
+  if (title) { wrap.title = title; wrap.tabIndex = 0; }
   const dt = document.createElement('dt');
   dt.textContent = label;
   const dd = document.createElement('dd');
@@ -4597,8 +4605,9 @@ function renderVitals(row) {
   if (vitalsView.name !== row.name || vitalsView.backupAt === undefined) bigNumber(backup.dd, '…');
   else if (vitalsView.backupAt === null) bigNumber(backup.dd, 'Never');
   else {
-    bigNumber(backup.dd, shortAgo(vitalsView.backupAt), shortAgo(vitalsView.backupAt) === 'now' ? '' : 'ago');
+    bigNumber(backup.dd, shortAgo(vitalsView.backupAt), shortAgo(vitalsView.backupAt) === 'just now' ? '' : 'ago');
     backup.wrap.title = stamp(new Date(vitalsView.backupAt).toISOString());
+    backup.wrap.tabIndex = 0;
   }
 
   // Not running: three dashes said nothing about why they were dashes. One line says it, in the
@@ -5203,6 +5212,7 @@ function renderOverview() {
   const mem = document.createElement('li');
   mem.className = 'chip chip-mem';
   mem.title = 'Reserved is what the servers are allowed to use, added up, whether or not they are running.';
+  mem.tabIndex = 0;
   const words = document.createElement('span');
   const b = document.createElement('b');
   b.textContent = String(gbOf(reservedMb));
@@ -5703,7 +5713,7 @@ function activityIcon(action) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const sameDay = (ms) => new Date(ms).toDateString() === new Date().toDateString();
-const clockOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const clockOf = (ms) => CLOCK.format(new Date(ms));
 
 /**
  * Whether a server needs a newer Java than it will get. Its own Java where the panel knows which
@@ -5811,7 +5821,7 @@ function attentionItems() {
       const days = b.none ? 0 : Math.floor((Date.now() - b.lastAt) / DAY_MS);
       if (!b.none && !(r.status === 'running' && days >= 7)) continue;
       const offer = data.automaticAvailable
-        ? 'Turn on nightly backups at 03:00, keeping the last 7.'
+        ? 'Turn on nightly backups at ' + clockWords('03:00') + ', keeping the last 7.'
         : 'Automatic backups are not available here; take one from Backups.';
       items.push({
         key: 'backup|' + r.name + '|' + (b.gone ? 'gone' : b.none ? 'never' : days), tone: 'warn', icon: 'archive',
@@ -5917,7 +5927,7 @@ async function turnOnBackups(row) {
   const nightly = AUTO_INTERVALS.find((o) => o.label === 'Daily at 03:00');
   try {
     await post('/instances/' + encodeURIComponent(row.name) + '/backups/auto', { enabled: true, schedule: nightly.schedule, keep: 7 });
-    toast('Nightly backups of ' + (row.label || row.name) + ' at 03:00, keeping the last 7.', 'good');
+    toast('Nightly backups of ' + (row.label || row.name) + ' at ' + clockWords('03:00') + ', keeping the last 7.', 'good');
   } catch (e) {
     toast(e.message, 'bad');
   }
@@ -7269,7 +7279,14 @@ function busy(button, on, label) {
   });
   document.addEventListener('focusout', hide);
   document.addEventListener('pointerdown', hide, true);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  // Escape puts the tip away and does nothing else: this listener is on the document before the
+  // page's own, which closed the sheet or the tool the tip was in with the same press.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const showing = tip.hasAttribute('data-on');
+    hide();
+    if (showing) { e.preventDefault(); e.stopImmediatePropagation(); }
+  });
   addEventListener('scroll', hide, true);
   addEventListener('blur', hide);
 })();
@@ -7323,13 +7340,30 @@ function paneHead(bodyEl, name, title, subtitle) {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// One clock for the whole page, the computer's own: "3:00 AM" or "03:00" as it is set. A schedule
+// said "every day at 03:00" beside "next Nov 15, 3:00 AM".
+const CLOCK = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** A schedule's "03:00" as this computer writes a time of day. */
+function clockWords(at, clock) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(at || ''));
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return String(at || '');
+  return (clock || CLOCK).format(new Date(2000, 0, 1, Number(m[1]), Number(m[2])));
+}
+
 const RANGES = [
-  { key: 60, label: '1m' },
-  { key: 300, label: '5m' },
-  { key: 1800, label: '30m' },
-  { key: 3600, label: '1h' },
-  { key: 14400, label: '4h' },
+  { key: 60, label: '1m', say: 'Last minute' },
+  { key: 300, label: '5m', say: 'Last 5 minutes' },
+  { key: 1800, label: '30m', say: 'Last 30 minutes' },
+  { key: 3600, label: '1h', say: 'Last hour' },
+  { key: 14400, label: '4h', say: 'Last 4 hours' },
 ];
+
+/** A chart in words, for someone who cannot see its line: "Processor, last 5 minutes: 3.1%, peak 12%". */
+function chartWords(title, now, aside, seconds) {
+  const range = RANGES.find((r) => r.key === seconds);
+  return title + (range ? ', ' + range.say.toLowerCase() : '') + ': ' + now + (aside ? ', ' + String(aside).replace(/\s*·\s*/g, ', ') : '');
+}
 
 const perfView = { seconds: 300 };
 let perfTimer = null;
@@ -7354,12 +7388,13 @@ function svg(tag, attrs) {
  * look identical to 90% - the shape is the same and only the axis label differs, which is exactly
  * the mistake a glance at a graph is meant to avoid.
  */
-function chart(samples, { pick, max, colour }) {
+function chart(samples, { pick, max, colour, label }) {
   const W = 600;
   const H = 96;
   const el = svg('svg', {
     class: 'chart', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img',
   });
+  if (label) el.setAttribute('aria-label', label);
 
   for (let i = 1; i < 4; i++) {
     const y = (H / 4) * i;
@@ -7404,7 +7439,7 @@ function gauge({ title, now, aside, samples, pick, max, colour, empty, fmt }) {
   head.append(h, value, note);
   const plot = document.createElement('div');
   plot.className = 'chart-wrap';
-  plot.append(chart(samples, { pick, max, colour }));
+  plot.append(chart(samples, { pick, max, colour, label: chartWords(title, empty ? 'no readings yet' : now, empty ? '' : aside, perfView.seconds) }));
   if (empty) {
     const p = document.createElement('p');
     p.className = 'chart-note';
@@ -7514,10 +7549,13 @@ async function paintPerformance(name, opts) {
   // ---- how far back to look ------------------------------------------------
   const ranges = document.createElement('div');
   ranges.className = 'ranges';
+  ranges.setAttribute('role', 'group');
+  ranges.setAttribute('aria-label', 'Time range');
   for (const r of RANGES) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = r.label;
+    b.setAttribute('aria-label', r.say);
     b.setAttribute('aria-pressed', String(perfView.seconds === r.key));
     b.onclick = () => { perfView.seconds = r.key; paintPerformance(name); };
     ranges.append(b);
@@ -7732,7 +7770,7 @@ async function renderPlayers(opts) {
   how.className = 'hint';
   how.style.marginBottom = '12px';
   how.textContent = data.running
-    ? 'Changes go through the running server\u2019s console, so they take effect at once.'
+    ? 'Changes go through the running server\u2019s console, so they take effect at once. Deleting a player\u2019s data needs the server stopped.'
     : 'Changes are written to the server\u2019s files, and take effect the next time it starts.';
   body.append(how);
 
@@ -7742,10 +7780,13 @@ async function renderPlayers(opts) {
   const search = document.createElement('input');
   search.type = 'search';
   search.placeholder = 'Search by name or id';
+  search.setAttribute('aria-label', 'Search players by name or id');
   search.value = playerView.search;
   search.dataset.kept = '1';
   const filters = document.createElement('div');
   filters.className = 'filters';
+  filters.setAttribute('role', 'group');
+  filters.setAttribute('aria-label', 'Which players to show');
   const counts = {
     all: data.players.length,
     operators: data.players.filter((p) => p.op).length,
@@ -7754,7 +7795,12 @@ async function renderPlayers(opts) {
   for (const f of PLAYER_FILTERS) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = f.label + ' ' + counts[f.key];
+    // the count apart from the name, which was read as "Everyone 12"
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = String(counts[f.key]);
+    b.append(f.label + ' ', count);
+    b.setAttribute('aria-label', f.label + ', ' + counts[f.key]);
     b.setAttribute('aria-pressed', String(playerView.filter === f.key));
     b.onclick = () => { playerView.filter = f.key; paint(); };
     filters.append(b);
@@ -7858,13 +7904,13 @@ function playerDetail(p, data, base, again) {
   };
   fact('UUID', p.uuid, true);
   fact('Status', p.online ? 'Connected now' : data.running ? 'Not connected' : 'Server stopped');
-  fact('Last seen', p.online ? 'Now' : p.lastSeen ? new Date(p.lastSeen).toLocaleString() : p.joined ? 'Unknown' : 'Has never joined');
+  fact('Last seen', p.online ? 'Now' : p.lastSeen ? stamp(p.lastSeen) : p.joined ? 'Unknown' : 'Has never joined');
   fact('World data', p.joined ? 'Kept in this world' : 'None yet');
   fact('Operator', p.op ? 'Yes' + (p.opLevel != null ? ', level ' + p.opLevel : '') : 'No');
   if (p.banned) {
     fact('Ban reason', p.banReason || 'None given');
     fact('Banned by', p.banSource);
-    fact('Ban expires', p.banExpires ? new Date(p.banExpires).toLocaleString() : 'Never');
+    fact('Ban expires', p.banExpires ? stamp(p.banExpires) : 'Never');
   }
   fact('Whitelist', p.whitelisted ? 'On the list' : 'Not on the list');
 
@@ -8755,6 +8801,7 @@ async function renderWorlds(opts) {
   src.spellcheck = false;
   src.autocomplete = 'off';
   src.placeholder = examplePath(panelPlatform, 'map') + ' — a zip, tar.gz, or a folder';
+  src.setAttribute('aria-label', 'Where the world is: the path to a zip, a tar.gz or a folder');
   src.style.flex = '1 1 260px';
   const browse = document.createElement('button');
   browse.type = 'button';
@@ -8765,6 +8812,7 @@ async function renderWorlds(opts) {
   nameRow.className = 'row';
   const wname = document.createElement('input');
   wname.placeholder = 'Name it — letters, numbers, dash, underscore';
+  wname.setAttribute('aria-label', 'A name for the world: letters, numbers, dash, underscore');
   wname.autocomplete = 'off';
   wname.spellcheck = false;
   wname.style.maxWidth = '260px';
@@ -8964,8 +9012,8 @@ function describeSchedule(s) {
   }
   if (s.kind === 'minutes') return s.every === 1 ? 'every minute' : 'every ' + s.every + ' minutes';
   if (s.kind === 'hourly') return s.every === 1 ? 'every hour' : 'every ' + s.every + ' hours';
-  if (s.kind === 'weekly') return 'every ' + (DAY_NAMES[s.day] || s.day) + ' at ' + s.at;
-  return 'every day at ' + s.at;
+  if (s.kind === 'weekly') return 'every ' + (DAY_NAMES[s.day] || s.day) + ' at ' + clockWords(s.at);
+  return 'every day at ' + clockWords(s.at);
 }
 
 /** Windows hands back its own date format; keep it, but drop the seconds nobody reads. */
@@ -9228,6 +9276,12 @@ function stepsEditor(action) {
     return i;
   };
 
+  const focusStep = (at, label) => {
+    const row = list.children[at];
+    const buttons = row ? [...row.querySelectorAll('button')].filter((b) => !b.disabled) : [];
+    const to = buttons.find((b) => b.getAttribute('aria-label') === label) || buttons[0] || add;
+    to.focus();
+  };
   const draw = () => {
     list.textContent = '';
     steps.forEach((st, i) => {
@@ -9242,24 +9296,36 @@ function stepsEditor(action) {
         t.maxLength = 400;
         t.value = st.do === 'say' ? (st.text || '') : (st.line || '');
         t.placeholder = st.do === 'say' ? 'What the players see' : 'save-all';
+        t.setAttribute('aria-label', st.do === 'say' ? 'What the players see' : 'The command to run');
         t.oninput = () => { if (st.do === 'say') st.text = t.value; else st.line = t.value; };
         fields.append(t);
       } else if (st.do === 'wait') {
         const n = num(st.seconds != null ? Math.round(st.seconds / 60 * 10) / 10 : 1, 0.1, 60);
         n.step = '0.5';
+        n.setAttribute('aria-label', 'Minutes to wait');
         n.oninput = () => { st.seconds = Math.round(Number(n.value) * 60); };
         fields.append(n, document.createTextNode(' minutes'));
       } else if (st.do === 'countdown') {
         const n = num(st.minutes || 5, 1, 60);
-        n.oninput = () => { st.minutes = Number(n.value); };
+        n.setAttribute('aria-label', 'Minutes of countdown');
         const m = document.createElement('input');
         m.maxLength = 120;
         m.value = st.message || 'Server restarting';
-        m.title = 'Said as "<this> in 5 minutes", then at one minute and ten seconds';
-        m.oninput = () => { st.message = m.value; };
-        fields.append(n, document.createTextNode(' minutes: '), m);
+        m.setAttribute('aria-label', 'What the countdown says');
+        // what the players will read, shown: it was a tip on the box
+        const eg = document.createElement('span');
+        eg.className = 'hint';
+        const sayEg = () => {
+          const mins = Number(n.value) || 5;
+          eg.textContent = 'Players see \u201c' + (m.value || 'Server restarting') + ' in ' + mins + (mins === 1 ? ' minute' : ' minutes') + '\u201d, then again at one minute and at ten seconds.';
+        };
+        n.oninput = () => { st.minutes = Number(n.value); sayEg(); };
+        m.oninput = () => { st.message = m.value; sayEg(); };
+        sayEg();
+        fields.append(n, document.createTextNode(' minutes: '), m, eg);
       } else if (st.do === 'backup') {
         const n = num(st.keep || 7, 1, 365);
+        n.setAttribute('aria-label', 'How many backups to keep');
         n.oninput = () => { st.keep = Number(n.value); };
         fields.append(document.createTextNode('keeping '), n);
       }
@@ -9274,7 +9340,8 @@ function stepsEditor(action) {
         b.title = label;
         const j = i + d;
         b.disabled = j < 0 || j >= steps.length;
-        b.onclick = () => { [steps[i], steps[j]] = [steps[j], steps[i]]; draw(); };
+        // the step moved, and focus goes with it: on the same arrow, or the other one at an end
+        b.onclick = () => { [steps[i], steps[j]] = [steps[j], steps[i]]; draw(); focusStep(j, label); };
         return b;
       };
       const rm = document.createElement('button');
@@ -9283,7 +9350,7 @@ function stepsEditor(action) {
       rm.setAttribute('aria-label', 'Remove this step');
       rm.title = 'Remove this step';
       rm.append(icon('close'));
-      rm.onclick = () => { steps.splice(i, 1); draw(); };
+      rm.onclick = () => { steps.splice(i, 1); draw(); focusStep(Math.min(i, steps.length - 1), 'Remove this step'); };
       acts.append(mv('Move up', '\u2191', -1), mv('Move down', '\u2193', 1), rm);
       li.append(name, fields, acts);
       list.append(li);
@@ -9957,8 +10024,8 @@ async function renderFiles(opts) {
   if (running) {
     const how = document.createElement('div');
     how.className = 'hint';
-    how.textContent = 'The server is running: files it holds open are marked In use and cannot be moved, replaced or deleted until it stops.';
-    how.title = 'The active world, its jar and the plugins it loaded. They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.';
+    how.textContent = 'The server is running: files it holds open (the active world, its jar, the plugins it loaded) are marked In use and cannot be moved, replaced or deleted until it stops. '
+      + 'They can still be read and edited; a changed config applies when the plugin reloads or the server restarts.';
     body.append(how);
   }
 
@@ -10074,17 +10141,20 @@ async function renderFiles(opts) {
     unzip.hidden = !(sel.length === 1 && selEntries[0] && selEntries[0].type === 'file' && ARCHIVE_RE.test(sel[0]));
     const del = iconButton('trash', 'Delete', 'danger');
     const busy = selEntries.filter((e) => e.inUse);
+    // said beside the buttons: a button that is off cannot take focus to show a tip
+    const whyOff = document.createElement('span');
+    whyOff.className = 'hint';
+    whyOff.hidden = !busy.length;
     if (busy.length) {
       del.disabled = true;
-      del.title = busy[0].name + ' is in use by the running server';
       rename.disabled = true;
-      rename.title = del.title;
+      whyOff.textContent = busy[0].name + ' is in use by the running server, so it cannot be renamed or deleted until the server stops.';
     }
     const clear = document.createElement('button');
     clear.type = 'button';
     clear.className = 'ghost';
     clear.textContent = 'Clear';
-    acts.append(count, dl, rename, zip, unzip, del, clear);
+    acts.append(count, dl, rename, zip, unzip, del, clear, whyOff);
     body.append(acts);
 
     clear.onclick = () => { view.selected.clear(); again(); };
@@ -10212,7 +10282,7 @@ async function renderFiles(opts) {
     whenShort.textContent = stamp(e.modified);
     const whenLong = document.createElement('span');
     whenLong.className = 'long';
-    whenLong.textContent = new Date(e.modified).toLocaleString();
+    whenLong.textContent = stamp(e.modified);
     when.append(whenShort, whenLong);
     when.title = whenLong.textContent;
     line.append(box, open, kind, size, when);
@@ -10887,7 +10957,7 @@ async function renderActivity(opts) {
   const clock = (iso) => {
     const t = el('time', 'act-when');
     t.dateTime = iso;
-    t.textContent = new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    t.textContent = CLOCK.format(new Date(iso));
     t.title = new Date(iso).toLocaleString();
     return t;
   };
@@ -10985,10 +11055,17 @@ async function renderActivity(opts) {
 const STAMP = new Intl.DateTimeFormat(undefined, {
   month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
 });
+const STAMP_YEAR = new Intl.DateTimeFormat(undefined, {
+  year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+});
 
-/** Seconds are noise on something taken minutes apart at most; the age beside it carries the rest. */
+/**
+ * Seconds are noise on something taken minutes apart at most; the age beside it carries the rest.
+ * The year is said when it is not this one.
+ */
 function stamp(iso) {
-  return STAMP.format(new Date(iso));
+  const at = new Date(iso);
+  return (at.getFullYear() === new Date().getFullYear() ? STAMP : STAMP_YEAR).format(at);
 }
 
 function ago(iso) {
@@ -11465,6 +11542,8 @@ function autoBackupSection(base, data) {
   onOff.type = 'checkbox';
   onOff.className = 'switch';
   onOff.checked = Boolean(known.auto);
+  // the word beside it is "On" or "Off", which named the switch "Off, checkbox"
+  onOff.setAttribute('aria-label', 'Automatic backups');
   const onOffLabel = document.createElement('label');
   onOffLabel.className = 'row';
   onOffLabel.style.cursor = 'pointer';
@@ -11480,7 +11559,8 @@ function autoBackupSection(base, data) {
   for (const opt of AUTO_INTERVALS) {
     const o = document.createElement('option');
     o.value = opt.label;
-    o.textContent = opt.label;
+    // the label is the choice's key; what is shown says the time this computer's way
+    o.textContent = opt.schedule.at ? opt.label.replace(opt.schedule.at, clockWords(opt.schedule.at)) : opt.label;
     o.selected = known.auto ? sameSchedule(opt.schedule, known.auto.schedule) : opt.label === 'Daily at 03:00';
     every.append(o);
   }
@@ -11724,7 +11804,13 @@ function renderBackupHistory(row, data, signature) {
     } catch (e) { toast(e.message, 'bad'); }
   };
 
-  hist.append(histTitle, where, ...(pending ? [pending] : []), mirrorRow);
+  // Restore is off while the server runs, and only a tip on a button that cannot take focus said why
+  const stopFirst = document.createElement('p');
+  stopFirst.className = 'hint';
+  stopFirst.style.margin = '0 0 8px';
+  stopFirst.textContent = 'Stop the server to restore a backup. Everything else here works while it runs.';
+  stopFirst.hidden = !(data.running && data.snapshots.length);
+  hist.append(histTitle, stopFirst, where, ...(pending ? [pending] : []), mirrorRow);
 
   if (!data.snapshots.length) {
     hist.append(emptyState('archive', 'Nothing here yet. Reset and delete both take one '
@@ -11815,7 +11901,10 @@ function renderBackupHistory(row, data, signature) {
       }
       const actions = document.createElement('div');
       actions.className = 'snap-actions';
+      // each button says which backup it is for; they were five "Download"s and five "Delete"s
+      const which = backupWords(snap);
       const restore = iconButton('restore', 'Restore');
+      restore.setAttribute('aria-label', 'Restore ' + which);
       restore.disabled = data.running;
       restore.title = data.running
         ? 'Stop the server first'
@@ -11825,7 +11914,7 @@ function renderBackupHistory(row, data, signature) {
         b.type = 'button';
         b.className = 'icon-btn';
         b.append(icon(name));
-        b.setAttribute('aria-label', label);
+        b.setAttribute('aria-label', label + ': ' + which);
         b.title = label;
         return b;
       };
@@ -11843,7 +11932,8 @@ function renderBackupHistory(row, data, signature) {
         drop.title = 'Locked. Unlock it first.';
       }
       actions.append(lock, noteBtn, download, restore, drop);
-      el.append(when, size, tag, why, items, actions, what);
+      // in the order it is read; where each sits is the stylesheet's (grid areas)
+      el.append(when, what, tag, why, items, size, actions);
       list.append(el);
 
       lock.onclick = async () => {
@@ -15177,22 +15267,147 @@ if (desktop && typeof desktop.appInfo === 'function') {
   so ask() and the edit dialog see exactly what they already listen for. Where the browser does
   close it first, the dialog is no longer open by the time this runs and nothing happens twice.
 */
+/**
+ * What Escape does, from where it was pressed.
+ *
+ * In a box someone is typing in it is about the box: a search with something in it is cleared,
+ * and from any other field focus steps out to the page around it, so the next Escape is the one
+ * that closes. It closed the whole tool or sheet from inside any field, with what was typed. And
+ * the Add sheet stays while a server is being made: closing it hid the progress of a download
+ * that carried on.
+ */
+function escapeMove(at) {
+  if (at.dialog) return 'dialog';
+  const sheet = at.view === 'add' || at.view === 'settings' || at.view === 'feedback';
+  const tool = at.view === 'server' && Boolean(at.tool) && at.inTool;
+  if (!sheet && !tool) return null;
+  if (at.field) return at.field.search && at.field.value ? 'clear' : 'leave';
+  if (at.view === 'add' && at.creating) return 'stay';
+  return sheet ? 'back' : 'tool';
+}
+
+const TYPED_INPUTS = new Set(['', 'text', 'search', 'number', 'url', 'email', 'password', 'time', 'date', 'tel']);
+/** The box Escape was pressed in, if it is one somebody types or chooses in. */
+function typedField(el) {
+  if (!el || !el.tagName) return null;
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'textarea' || tag === 'select') return { search: false, value: el.value };
+  if (tag !== 'input' || !TYPED_INPUTS.has((el.getAttribute('type') || '').toLowerCase())) return null;
+  return { search: el.type === 'search', value: el.value };
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const dlg = $('#dlg');
-  if (dlg.open) {
-    e.preventDefault();
-    dlg.dispatchEvent(new Event('cancel', { cancelable: true }));
-    return;
-  }
-  if (state.view === 'add' || state.view === 'settings' || state.view === 'feedback') { back(); return; }
-  // A tool lying over the console, or filling its space, closes from inside itself the way a
-  // sheet does - but only from inside it, so Escape in the command box never closes a panel.
-  if (state.view === 'server' && toolView.tool && $('#toolPanel').contains(document.activeElement)) {
-    e.preventDefault();
-    closeTool();
-  }
+  const panel = $('#toolPanel');
+  const target = document.activeElement;
+  const move = escapeMove({
+    dialog: dlg.open,
+    view: state.view,
+    tool: toolView.tool,
+    inTool: panel.contains(target),
+    field: dlg.open ? null : typedField(target),
+    creating: [...document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')].some((t) => t.disabled),
+  });
+  if (!move) return;
+  e.preventDefault();
+  if (move === 'dialog') dlg.dispatchEvent(new Event('cancel', { cancelable: true }));
+  else if (move === 'clear') {
+    target.value = '';
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (move === 'leave') {
+    // out of the box and onto what holds it: in a tool, Escape only closes from inside the tool
+    const around = panel.contains(target) ? panel : target.closest('section, main') || document.body;
+    if (!around.hasAttribute('tabindex')) around.setAttribute('tabindex', '-1');
+    around.focus({ preventScroll: true });
+  } else if (move === 'back') back();
+  else if (move === 'tool') closeTool();
 });
+
+/*
+  Focus after a redraw (X2).
+
+  Every tool draws itself again, whole, after an action: the button that was pressed is gone, and
+  focus fell to the page, so the next Tab started from the top. The control is found again by what
+  it is (its name, among others of the same name), or failing that by where it stood: a button that
+  changed its name (Lock, then Unlock) or whose row went stands where the old one did.
+*/
+function controlName(el) {
+  return el.tagName + '|' + (el.id || el.getAttribute('aria-label') || el.getAttribute('placeholder') || (el.textContent || '').trim().slice(0, 60));
+}
+
+/** Which of `names` (the controls now, in order) takes focus for a mark made before the redraw, or -1. */
+function focusChoice(names, mark, usable) {
+  const ok = (i) => i >= 0 && i < names.length && (!usable || usable[i]);
+  const same = [];
+  names.forEach((n, i) => { if (n === mark.name) same.push(i); });
+  if (ok(same[mark.nth])) return same[mark.nth];
+  // not there under that name: what stands where it stood (a row that went hands over to the
+  // next, a button that changed its name is still in its place)
+  for (let step = 0; step < names.length; step++) {
+    if (ok(mark.at + step)) return mark.at + step;
+    if (ok(mark.at - step)) return mark.at - step;
+  }
+  return -1;
+}
+
+const FOCUSABLE = 'button, input, select, textarea, a[href], summary, [tabindex]:not([tabindex="-1"])';
+let lastInTool = null;
+document.addEventListener('focusin', (e) => {
+  const panel = $('#toolPanel');
+  if (panel && panel.contains(e.target)) lastInTool = e.target;
+  else if (e.target !== document.body) lastInTool = null;
+});
+
+function focusMark(root) {
+  let el = document.activeElement;
+  // a button turned off while its request runs gives focus up; it is still where the person was
+  if ((!el || el === document.body) && lastInTool && lastInTool.isConnected) el = lastInTool;
+  if (!el || el === root || !root.contains(el)) return null;
+  const all = [...root.querySelectorAll(FOCUSABLE)];
+  const name = controlName(el);
+  const typed = typedField(el);
+  return {
+    name,
+    nth: all.filter((x) => controlName(x) === name).indexOf(el),
+    at: all.indexOf(el),
+    caret: typed && typeof el.selectionStart === 'number' ? [el.selectionStart, el.selectionEnd] : null,
+  };
+}
+
+function focusBack(root, mark) {
+  if (!mark || root.hidden) return;
+  const now = document.activeElement;
+  // focus that went somewhere on purpose (a dialog, the console, the menu) is left there
+  if (now && now !== document.body && now.isConnected && now !== root) return;
+  const all = [...root.querySelectorAll(FOCUSABLE)];
+  const pick = focusChoice(all.map(controlName), mark, all.map((x) => !x.disabled && x.offsetParent !== null));
+  const to = all[pick];
+  if (!to) return;
+  to.focus({ preventScroll: true });
+  if (mark.caret && controlName(to) === mark.name) { try { to.setSelectionRange(mark.caret[0], mark.caret[1]); } catch { /* not a text box */ } }
+}
+
+/** A tool's draw function that puts focus back where it was. */
+function holdingFocus(draw) {
+  return async function (...args) {
+    const root = $('#toolPanel');
+    const mark = focusMark(root);
+    try {
+      return await draw.apply(this, args);
+    } finally {
+      focusBack(root, mark);
+    }
+  };
+}
+renderPlayers = holdingFocus(renderPlayers);
+renderPlugins = holdingFocus(renderPlugins);
+renderWorlds = holdingFocus(renderWorlds);
+renderFiles = holdingFocus(renderFiles);
+renderScheduler = holdingFocus(renderScheduler);
+renderBackups = holdingFocus(renderBackups);
+renderActivity = holdingFocus(renderActivity);
+paintPerformance = holdingFocus(paintPerformance);
 
 // ---- 2.x updates and the handover banners ------------------------------------
 // The Rust core answers /api/update* and /api/handover* itself. A panel served by the old Node
@@ -15239,7 +15454,7 @@ setInterval(() => { if (!document.hidden) watchCoreUpdate(); }, 30 * 60 * 1000);
 
 const updWhen = (iso) => {
   const t = Date.parse(iso || '');
-  return Number.isFinite(t) ? new Date(t).toLocaleString() : 'never';
+  return Number.isFinite(t) ? stamp(t) : 'never';
 };
 
 function updEl(tag, cls, text) {
