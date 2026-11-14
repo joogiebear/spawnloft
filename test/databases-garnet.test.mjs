@@ -136,7 +136,8 @@ test('an external database is registered only if it answers, and attaches like o
   } finally {
     server.close()
   }
-  services.removeDatabase(EXT, { purge: true })
+  // an external database is only forgotten, whatever was asked: the answer must not say its data went
+  assert.equal(services.removeDatabase(EXT, { purge: true }).purged, false)
   assert.ok(!listServices().some((d) => d.name === EXT))
 })
 

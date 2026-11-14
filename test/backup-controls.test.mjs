@@ -86,9 +86,18 @@ test('a clean restore ends exactly as the snapshot was, and keeps what it cleare
   fs.writeFileSync(path.join(inst.dir, 'plugins/A.jar'), 'changed')
 
   const over = backup.resolveSnapshot(inst.name, path.basename(snap.file))
-  await backup.restoreSnapshot(inst, over)
+  const plain = await backup.restoreSnapshot(inst, over)
   assert.ok(fs.existsSync(path.join(inst.dir, 'plugins/New.jar')), 'an ordinary restore only adds and overwrites')
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins/A.jar'), 'utf8'), 'a')
+  // an ordinary restore overwrites too, so it keeps a copy of how things were as well
+  const kept = backup.listSnapshots(inst.name).find((s) => s.name === plain.safety)
+  assert.equal(kept.label, 'pre-restore')
+  const undo = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-undo-'))
+  execFileSync(tarBinary(), ['-xzf', kept.path, '-C', undo])
+  assert.equal(fs.readFileSync(path.join(undo, 'plugins/A.jar'), 'utf8'), 'changed', 'the overwritten file is in the copy')
+  fs.rmSync(undo, { recursive: true, force: true })
+  // a caller that is itself an undo asks for no copy
+  assert.equal((await backup.restoreSnapshot(inst, over, { safety: false })).safety, null)
 
   const out = await backup.restoreSnapshot(inst, over, { clean: true })
   assert.ok(!fs.existsSync(path.join(inst.dir, 'plugins/New.jar')))
@@ -97,4 +106,95 @@ test('a clean restore ends exactly as the snapshot was, and keeps what it cleare
   const safety = backup.listSnapshots(inst.name).find((s) => s.name === out.safety)
   assert.equal(safety.label, 'pre-restore')
   assert.ok(listing(safety.path).includes('plugins/New.jar'), 'what was cleared is kept')
+})
+
+test('while a restore runs, a second restore, a delete, a new backup and a change to its files are refused', async () => {
+  const control = await import('../src/control.mjs')
+  const files = await import('../src/files.mjs')
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'standard' })
+  const ref = backup.resolveSnapshot(inst.name, path.basename(snap.file))
+  const first = backup.restoreSnapshot(inst, ref)
+  assert.equal(backup.isRestoring(inst.name), true)
+  await assert.rejects(backup.restoreSnapshot(inst, ref), /being put back.*restoring another/)
+  assert.throws(() => backup.removeSnapshot(inst.name, ref.name), /being put back.*deleting a backup/)
+  await assert.rejects(backup.createSnapshot(inst, { scope: 'config' }), /being put back.*taking a new one/)
+  // everything that asks "may I touch this server's files" hears about it: delete, rename, worlds
+  assert.match(control.activeBlock(inst.name, 'deleting it'), /being put back.*deleting it/)
+  await assert.rejects(files.deletePaths(inst, ['plugins/A.jar'], { running: false }), /being put back/)
+  await first
+  assert.equal(backup.isRestoring(inst.name), false)
+  assert.equal(control.activeBlock(inst.name, 'deleting it'), null)
+  // a restore that fails releases the server too
+  await assert.rejects(backup.restoreSnapshot({ ...inst, dir: path.join(scratch, 'gone') }, ref), /missing/)
+  assert.equal(backup.isRestoring(inst.name), false)
+
+  // The mark is a file, so another process sees it, and one left by a process that died is not
+  // believed: a crash halfway through a restore must not lock the server for good.
+  const done = control.beginRestore(inst.name)
+  const { stateFile } = await import('../src/paths.mjs')
+  const marker = path.join(path.dirname(stateFile(inst.name)), 'restoring.json')
+  assert.equal(JSON.parse(fs.readFileSync(marker, 'utf8')).pid, process.pid)
+  fs.writeFileSync(marker, JSON.stringify({ pid: 2 ** 22 + 12345, at: new Date().toISOString() }))
+  assert.equal(control.isRestoring(inst.name), false)
+  done()
+  await backup.restoreSnapshot(inst, ref)
+})
+
+test('"latest" is the newest real backup, not the copy a restore kept', async () => {
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'standard' })
+  const out = await backup.restoreSnapshot(inst, backup.resolveSnapshot(inst.name, 'latest'))
+  assert.match(out.safety, /^pre-restore_/)
+  assert.equal(backup.listSnapshots(inst.name)[0].label, 'pre-restore')
+  assert.equal(backup.resolveSnapshot(inst.name, 'latest').name, path.basename(snap.file))
+  // by name it can still be restored, which is how the first restore is undone
+  assert.equal(backup.resolveSnapshot(inst.name, out.safety).name, out.safety)
+})
+
+test('a restore whose copy cannot be kept changes nothing, and goes ahead only when asked to', async () => {
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'config' })
+  const ref = backup.resolveSnapshot(inst.name, path.basename(snap.file))
+  fs.writeFileSync(path.join(inst.dir, 'server.properties'), 'level-name=changed\n')
+  // the backups folder cannot be written: the copy fails the way a full disk makes it fail
+  const dir = path.dirname(ref.path)
+  const lock = path.join(dir, '.snapshot.lock')
+  fs.rmSync(lock, { recursive: true, force: true })
+  fs.chmodSync(dir, 0o500)
+  try {
+    if (process.platform !== 'win32' && process.getuid() !== 0) {
+      await assert.rejects(backup.restoreSnapshot(inst, ref), (err) => err.code === 'no-copy' && /nothing was changed/.test(err.message))
+      assert.equal(fs.readFileSync(path.join(inst.dir, 'server.properties'), 'utf8'), 'level-name=changed\n')
+      await assert.rejects(backup.restoreSnapshot(inst, ref, { clean: true }), (err) => err.code === undefined && /nothing was changed/.test(err.message))
+    }
+  } finally {
+    fs.chmodSync(dir, 0o700)
+  }
+  const out = await backup.restoreSnapshot(inst, ref, { safety: false })
+  assert.equal(out.safety, null)
+  assert.equal(fs.readFileSync(path.join(inst.dir, 'server.properties'), 'utf8'), 'level-name=world\n')
+})
+
+test('a snapshot that may be torn or is missing a database says so in the listing, in plain words', async () => {
+  assert.deepEqual(backup.snapshotProblems([
+    'could not flush the world before the snapshot (RCON timed out); the copy may be torn',
+    'database survival on main-db not included: the database is not running',
+    'database cache on fast not included: Redis (Garnet) keeps its own checkpoints; it is not dumped',
+    'world/session.lock not included: another program has it locked, usually the running server',
+    'tar: something harmless',
+  ]), [
+    'Taken while the server was running and it could not be asked to save first, so the world in it may be incomplete.',
+    'Does not include the database survival (main-db): the database is not running.',
+  ])
+  assert.deepEqual(backup.snapshotProblems(undefined), [])
+
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'config' })
+  const manifest = snap.file.replace(/\.tar\.gz$/, '.json')
+  const body = JSON.parse(fs.readFileSync(manifest, 'utf8'))
+  assert.deepEqual(backup.listSnapshots(inst.name)[0].problems, [])
+  body.warnings = ['database survival on main-db not included: the database is not running']
+  fs.writeFileSync(manifest, JSON.stringify(body))
+  assert.deepEqual(backup.listSnapshots(inst.name)[0].problems, ['Does not include the database survival (main-db): the database is not running.'])
 })

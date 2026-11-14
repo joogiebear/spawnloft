@@ -1489,6 +1489,10 @@
   }
   .snap-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; opacity: .45; transition: opacity var(--ease); }
   .snap:hover .snap-actions, .snap:focus-within .snap-actions { opacity: 1; }
+  .snap .snap-warn { display: flex; gap: 6px; align-items: flex-start; font: var(--t-1)/1.45 var(--ui); color: var(--warn-ink, var(--ink)); white-space: normal; }
+  .snap .snap-warn svg { flex: none; width: 14px; height: 14px; margin-top: 2px; }
+  .snap[data-restoring] { background: var(--lapis-fill); }
+  .snap[data-restoring] .when { white-space: normal; }
   .snap[data-locked] .snap-actions { opacity: 1; }
   .snap-actions .icon-btn[data-tone="danger"]:hover:not(:disabled) { color: var(--fault-ink); border-color: var(--fault-edge); background: var(--fault-fill); }
   .snap[data-locked] .snap-actions [aria-pressed="true"] { color: var(--lapis-ink); background: var(--lapis-fill); border-color: var(--lapis-edge); }
@@ -5067,16 +5071,28 @@ const nestedDb = (db) => {
 };
 
 /** An address as a button that copies it, with the glyph that says so. */
-function addrButton(text, what = 'address') {
+/**
+ * The words around a copy button. An address is repeated in them, which is what makes "Copied
+ * 127.0.0.1:25565" worth reading. A secret never is: the page masks a password so that it is not
+ * left on screen, and a tooltip, a screen reader label or a toast that spells it out undoes that.
+ */
+function copyWords(text, what, secret) {
+  return secret
+    ? { title: 'Copy the ' + what, label: 'Copy the ' + what, said: 'the ' + what }
+    : { title: 'Copy ' + text, label: 'Copy ' + what + ' ' + text, said: text };
+}
+
+function addrButton(text, what = 'address', secret = false) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'addr-copy';
   b.append(document.createTextNode(text), icon('copy'));
-  b.title = 'Copy ' + text;
-  b.setAttribute('aria-label', 'Copy ' + what + ' ' + text);
+  const words = copyWords(text, what, secret);
+  b.title = words.title;
+  b.setAttribute('aria-label', words.label);
   b.onclick = async (ev) => {
     ev.stopPropagation();
-    if (!(await copyText(text, text))) return;
+    if (!(await copyText(text, words.said))) return;
     // The glyph turns to a tick where the eye already is; the toast is in a corner.
     b.dataset.copied = '';
     b.querySelector('use').setAttribute('href', '#i-check');
@@ -9303,6 +9319,37 @@ function filesStateFor(name) {
   return filesByServer.get(name);
 }
 
+/** The servers with a file open in the editor whose text is not what was last saved. */
+function unsavedFiles(views) {
+  const out = [];
+  for (const [name, view] of views) {
+    if (view.editing && view.editing.text !== view.editing.original) out.push(name);
+  }
+  return out;
+}
+
+// Unsaved text in the editor lives only in this page. Reloading or closing it asks first; the
+// browser words the question itself.
+window.addEventListener('beforeunload', (ev) => {
+  if (!unsavedFiles(filesByServer).length) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+
+// A file dropped anywhere that does not take files would make the browser open it in place of the
+// panel, and everything unsaved goes with the page. Whatever accepts a drop has already called
+// preventDefault() by the time the event gets here; everything else is refused, and shown as
+// refused by the pointer.
+window.addEventListener('dragover', (ev) => {
+  if (ev.defaultPrevented || !ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'none';
+});
+window.addEventListener('drop', (ev) => {
+  if (ev.defaultPrevented || !ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+  ev.preventDefault();
+});
+
 function fileSize(n) {
   if (n == null) return '';
   if (n < 1024) return n + ' B';
@@ -9538,7 +9585,7 @@ async function renderFiles(opts) {
         go(out.path);
       } catch (e) { toast(e.message, 'bad'); unzip.disabled = false; }
     };
-    del.onclick = () => deleteFiles(row, view, sel).then(again);
+    del.onclick = () => deleteFiles(row, view, sel, entries).then(again);
   }
 
   // ---- the listing ------------------------------------------------------------
@@ -9657,14 +9704,20 @@ async function renderFiles(opts) {
   const pane = body.closest('.pane');
   pane.ondragover = (ev) => {
     if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+    // With a file open in the editor there is no list to drop onto, and these handlers belong to
+    // the server whose list was drawn last, which may not be the one on screen now. Either way the
+    // page-wide guard refuses the drop.
+    if (state.current !== row.name || filesStateFor(row.name).editing) return;
     ev.preventDefault();
     pane.setAttribute('data-drop', '');
   };
   pane.ondragleave = (ev) => { if (!pane.contains(ev.relatedTarget)) pane.removeAttribute('data-drop'); };
   pane.ondrop = async (ev) => {
     pane.removeAttribute('data-drop');
-    if (!ev.dataTransfer || filesStateFor(row.name).editing) return;
+    if (!ev.dataTransfer || ![...ev.dataTransfer.types].includes('Files')) return;
+    // before anything else: the browser's own answer to a dropped file is to open it over the panel
     ev.preventDefault();
+    if (state.current !== row.name || filesStateFor(row.name).editing) return;
     // The entries must be taken before the first await: the browser empties the drop's item list
     // once the event handler has returned.
     const roots = [...ev.dataTransfer.items]
@@ -9708,17 +9761,23 @@ async function collectDropped(roots) {
   return out;
 }
 
+function uploadUrl(base, dir, name, overwrite) {
+  return base + '?dir=' + encodeURIComponent(dir) + '&name=' + encodeURIComponent(name) + (overwrite ? '&overwrite=1' : '');
+}
+
 /** `list` is [{ file, name }]: name is the path inside the upload folder, slashes for subfolders. */
 async function uploadFiles(row, view, list) {
   list = list.map((it) => (it instanceof File ? { file: it, name: it.webkitRelativePath || it.name } : it));
   if (!list.length) return;
   const base = '/api/instances/' + encodeURIComponent(row.name) + '/files/upload';
-  const where = view.dir || 'the server folder';
+  // Taken once: the upload belongs to the folder it was started in, and view.dir changes when
+  // someone opens another folder while a large one is still going up.
+  const dir = view.dir;
+  const where = dir || 'the server folder';
   const top = new Set(list.map((it) => it.name.split('/')[0]));
   const label = list.length === 1 ? list[0].name : list.length + ' files';
   const note = toast('Uploading ' + label + ' to ' + where + '…');
-  const send = (it, overwrite) => fetch(base + '?dir=' + encodeURIComponent(view.dir) + '&name=' + encodeURIComponent(it.name)
-    + (overwrite ? '&overwrite=1' : ''), { method: 'POST', body: it.file });
+  const send = (it, overwrite) => fetch(uploadUrl(base, dir, it.name, overwrite), { method: 'POST', body: it.file });
   let done = 0;
   const exists = [];
   for (const it of list) {
@@ -9762,14 +9821,48 @@ async function uploadFiles(row, view, list) {
   }
 }
 
-async function deleteFiles(row, view, paths) {
+/**
+ * What the Delete dialog in Files says for a selection.
+ *
+ * One file is named in the title. Several are named in the text, since "14 items" does not say
+ * that the world and the server jar are among them. A selection that takes a world, the plugins,
+ * the jar or server.properties from the top of the server's folder is the server itself going:
+ * that one says which, and asks for the server's name, the way removing a server does.
+ */
+function deleteConfirm(serverName, paths, entries, levelName) {
+  const nameOf = (p) => p.split('/').pop();
+  const level = levelName || 'world';
+  const byPath = new Map((entries || []).map((e) => [e.path, e]));
+  // What the server is made of, at the top of its folder: its worlds, what it loads, its jar and
+  // its settings. A folder of logs or crash reports is not, and is not asked about as if it were.
+  const VITAL_FOLDERS = [level, level + '_nether', level + '_the_end', 'plugins', 'mods', 'config', 'libraries', 'versions'];
+  const isVital = (p) => !p.includes('/') && ((byPath.get(p) || {}).type === 'dir'
+    ? VITAL_FOLDERS.includes(p)
+    : /\.jar$/i.test(p) || p === 'server.properties');
+  const vital = paths.filter(isVital);
+  const warn = vital.length ? 'The server cannot run as it is without ' + vital.map(nameOf).join(', ') + '. ' : '';
+  if (paths.length === 1) {
+    return { what: nameOf(paths[0]), text: warn + 'A copy is kept first, so Backups can put it back.', typeToConfirm: vital.length ? serverName : null };
+  }
+  const shown = paths.slice(0, 6).map(nameOf).join(', ');
+  const rest = paths.length - 6;
+  return {
+    what: paths.length + ' items',
+    text: 'This deletes ' + shown + (rest > 0 ? ' and ' + rest + ' more' : '') + '. ' + warn + 'A copy is kept first, so Backups can put them back.',
+    typeToConfirm: vital.length ? serverName : null,
+  };
+}
+
+async function deleteFiles(row, view, paths, entries) {
   const base = '/instances/' + encodeURIComponent(row.name) + '/files';
-  const what = paths.length === 1 ? paths[0].split('/').pop() : paths.length + ' items';
+  const confirm = deleteConfirm(row.name, paths, entries, row.levelName);
+  const what = confirm.what;
   const ok = await ask({
     title: 'Delete ' + what + '?',
-    text: 'A copy is kept first, so Backups can put ' + (paths.length === 1 ? 'it' : 'them') + ' back.',
+    text: confirm.text,
     confirmLabel: 'Delete',
     danger: true,
+    typeToConfirm: confirm.typeToConfirm || undefined,
   });
   if (!ok) return;
   try {
@@ -10562,7 +10655,9 @@ async function renderBackups(opts) {
     nowNote.textContent = 'Archiving. Large worlds take a moment.';
     try {
       const out = await post(base, { scope: scope.value });
-      toast('Saved ' + out.created + (out.mirrored ? ', and mirrored.' : '.'), 'good');
+      const problems = out.problems || [];
+      toast('Saved ' + out.created + (out.mirrored ? ', and mirrored' : '') + (problems.length ? ', with something missing.' : '.'), problems.length ? undefined : 'good');
+      for (const p of problems) toast(p, 'bad');
       if (out.mirrorError) toast(out.mirrorError, 'bad');
       if (out.skipped?.length) toast('Left out, locked by the running server: ' + out.skipped.join(', '), 'bad');
       if (out.saveOnWarning) toast(out.saveOnWarning, 'bad');
@@ -10582,6 +10677,7 @@ async function renderBackups(opts) {
   body.append(auto);
   body.append(renderBackupHistory(row, data, signature));
   paintBackupStanding(standing, row, data, null, go);
+  lockRestoring(body, row.name);
   let automatic;
   try {
     automatic = await api(base + '/auto');
@@ -10593,6 +10689,7 @@ async function renderBackups(opts) {
   if (!auto.isConnected || state.current !== row.name || body.dataset.for !== row.name) return;
   auto.replaceWith(autoBackupSection(base, automatic));
   paintBackupStanding(standing, row, data, automatic, go);
+  lockRestoring(body, row.name);
 }
 
 const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only', config: 'Config only', plugins: 'Plugins only' };
@@ -10761,6 +10858,47 @@ function autoBackupSection(base, data) {
   return auto;
 }
 
+// A restore in progress, by server or database name, and the backup it is putting back. While
+// one runs every button in its list is off and the row says so: a second restore, a delete or a
+// new backup pressed on top of it is how a world is lost, and a toast that leaves after five
+// seconds says nothing about a job that runs for minutes. The API refuses those as well; this is
+// so nobody has to find that out.
+const restoring = new Map();
+function lockRestoring(scope, owner) {
+  const which = restoring.get(owner);
+  if (!which || !scope) return;
+  for (const b of scope.querySelectorAll('button')) {
+    b.disabled = true;
+    b.title = 'Wait for the restore to finish';
+  }
+  for (const line of scope.querySelectorAll('[data-backup-name]')) {
+    if (line.dataset.backupName !== which || line.hasAttribute('data-restoring')) continue;
+    line.setAttribute('data-restoring', '');
+    line.setAttribute('aria-busy', 'true');
+    const when = line.querySelector('.when');
+    if (when) {
+      when.setAttribute('role', 'status');
+      when.textContent = 'Restoring this one\u2026 it can take a few minutes.';
+    }
+  }
+}
+
+/**
+ * What the Restore dialog may promise about the copy kept first. The copy holds the files the
+ * backup lists, as they are now. A backup that lists nothing (made by hand, or by an old version)
+ * gets no copy, and the databases a backup carries are never in it: both are said, not implied.
+ */
+function restoreWords(snap) {
+  const files = (snap.members || []).some((m) => m !== 'databases');
+  const dbs = (snap.databases || []).length > 0;
+  return {
+    copy: files
+      ? 'A copy of the files as they are now is kept in this list first.'
+      : 'This backup does not record what it holds, so no copy of how things are now can be kept.',
+    note: dbs ? ' The databases are not part of the copy kept first: back them up from their own page if you may want them back.' : '',
+  };
+}
+
 function renderBackupHistory(row, data, signature) {
   const base = '/instances/' + encodeURIComponent(row.name) + '/backups';
   // ---- what is already there ------------------------------------------------
@@ -10861,6 +10999,7 @@ function renderBackupHistory(row, data, signature) {
     for (const snap of data.snapshots) {
       const el = document.createElement('div');
       el.className = 'snap';
+      el.dataset.backupName = snap.name;
       const when = document.createElement('div');
       when.className = 'when';
       const age = ago(snap.mtime);
@@ -10887,6 +11026,15 @@ function renderBackupHistory(row, data, signature) {
           ? onlyWhat + ' ' + fromFiles.why + '. Restoring puts back ' + (onlyFile ? 'this file' : 'these') + ' and nothing else.'
           : 'Restoring puts back ' + onlyWhat + ' and nothing else.';
         what.append(which);
+      }
+      // A backup that is missing a database, or may hold a half-written world, says so on its row:
+      // the moment that matters is the restore, long after the toast that reported it has gone.
+      if (snap.problems && snap.problems.length) {
+        el.setAttribute('data-problem', '');
+        const warn = document.createElement('div');
+        warn.className = 'snap-warn';
+        warn.append(icon('alert'), document.createTextNode(snap.problems.join(' ')));
+        what.append(warn);
       }
       if (snap.note) {
         const note = document.createElement('div');
@@ -10993,13 +11141,16 @@ function renderBackupHistory(row, data, signature) {
         const left = snap.excluded && snap.excluded.length
           ? ' It was taken leaving out ' + snap.excluded.join(', ') + ', which it cannot bring back.'
           : '';
+        const flawed = snap.problems && snap.problems.length ? ' Note: ' + snap.problems.join(' ') : '';
+        const words = restoreWords(snap);
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
           text: 'This puts back ' + covers + ' from ' + (snap.note ? '“' + snap.note + '” (' + snap.name + ')' : snap.name)
-            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs,
+            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs + flawed
+            + words.note,
           choices: [
-            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. Not undoable; take a backup first if you are unsure.' },
-            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. A copy of what was there is kept in this list, so this can be undone.' },
+            { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
+            { value: 'clean', label: 'Clear first, so it ends up exactly as the backup was', hint: 'What it holds is removed, then put back. ' + words.copy },
           ],
           confirmLabel: 'Restore',
           danger: true,
@@ -11007,9 +11158,28 @@ function renderBackupHistory(row, data, signature) {
         });
         if (!ok) return;
         const note = toast('Restoring ' + snap.name + '.');
+        restoring.set(row.name, snap.name);
+        lockRestoring($('#backupsBody').dataset.for === row.name ? $('#backupsBody') : hist, row.name);
+        const send = (withoutCopy) => post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean', withoutCopy: withoutCopy });
         try {
-          const out = await post(base + '/restore', { snapshot: snap.name, clean: ok.choice === 'clean' });
-          if (out.safety) toast('What was there before is kept as ' + out.safety + '.', 'good');
+          let out;
+          try {
+            out = await send(false);
+          } catch (e) {
+            // The copy could not be kept, usually a full disk. Nothing has changed; going ahead
+            // without it is a second, separate yes.
+            if (e.code !== 'no-copy') throw e;
+            const sure = await ask({
+              title: 'Restore without keeping a copy?',
+              text: e.message + ' Restoring now overwrites what is there with no way back.',
+              confirmLabel: 'Restore without a copy',
+              danger: true,
+              typeToConfirm: row.name,
+            });
+            if (!sure) { note.remove(); return; }
+            out = await send(true);
+          }
+          if (out.safety) toast('How it was before is kept as ' + out.safety + '.', 'good');
           note.remove();
           const imported = (out.databases && out.databases.imported) || [];
           const skipped = (out.databases && out.databases.skipped) || [];
@@ -11018,6 +11188,10 @@ function renderBackupHistory(row, data, signature) {
         } catch (e) {
           note.remove();
           toast(e.message, 'bad');
+        } finally {
+          restoring.delete(row.name);
+          // only when this server's Backups is still what is on screen; elsewhere the next visit draws it
+          if (state.current === row.name) await renderBackups({ force: true });
         }
       };
 
@@ -11040,6 +11214,7 @@ function renderBackupHistory(row, data, signature) {
     }
     hist.append(list);
   }
+  lockRestoring(hist, row.name);
   return hist;
 }
 
@@ -12076,16 +12251,8 @@ async function deleteServer(row) {
 // ------------------------------------------------------------ databases ----
 
 async function manageDatabase(row) {
-  if (row.external) {
-    const res = await ask({
-      title: 'Manage ' + row.name,
-      text: 'This database runs elsewhere. Forgetting it here leaves it exactly as it is; only the record and its attachments go.',
-      confirmLabel: 'Continue',
-      choices: [{ value: 'delete', label: 'Forget this database', hint: 'Servers attached to it keep whatever their plugin configs say.' }],
-    });
-    if (!res) return;
-    return deleteDatabase(row);
-  }
+  // A database that runs elsewhere has one thing to manage, so it is asked directly.
+  if (row.external) return forgetDatabase(row);
   const live = row.status === 'running';
   const res = await ask({
     title: 'Manage ' + row.name,
@@ -12105,7 +12272,35 @@ async function manageDatabase(row) {
   if (res.choice === 'delete') return deleteDatabase(row);
 }
 
+/** What the dialog and the toast say when an external database is forgotten. Nothing is deleted. */
+function forgetWords(name, attached) {
+  return {
+    title: 'Forget ' + name + '?',
+    text: 'It keeps running where it is, with everything in it. SpawnLoft only forgets its address and sign-in.'
+      + (attached.length ? ' Attached: ' + attached.join(', ') + '. Their plugin settings will still name this database.' : ''),
+    done: 'Forgot ' + name + '. It is still running where it was, and nothing in it was touched.',
+  };
+}
+
+async function forgetDatabase(row) {
+  const words = forgetWords(row.label || row.name, Object.keys(row.attachments || {}));
+  const ok = await ask({ title: words.title, text: words.text, confirmLabel: 'Forget it' });
+  if (!ok) return;
+  try {
+    await post('/databases/' + encodeURIComponent(row.name) + '/delete', { purge: false });
+    stopStream();
+    state.current = null;
+    clearLines();
+    show('empty');
+    await refresh();
+    toast(words.done, 'good');
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+}
+
 async function deleteDatabase(row) {
+  if (row.external) return forgetDatabase(row);
   const attached = Object.keys(row.attachments || {});
   const res = await ask({
     title: 'Delete ' + row.name + '?',
@@ -12533,6 +12728,7 @@ async function renderDatabaseBackups(opts) {
   list.append(head);
   for (const b of data.backups) {
     const line = el('div', 'snap');
+    line.dataset.backupName = b.name;
     line.append(
       el('span', 'when', stamp(new Date(b.mtime).toISOString())),
       el('span', 'what', b.databases.length ? b.databases.join(', ') : b.name),
@@ -12583,6 +12779,8 @@ async function renderDatabaseBackups(opts) {
       if (!ok) return;
       dbBackupBusy = true;
       const note = toast('Putting back ' + b.name + '…');
+      restoring.set(row.name, b.name);
+      lockRestoring(body, row.name);
       try {
         const out = await post(base + '/restore', { file: b.name });
         note.remove();
@@ -12592,7 +12790,8 @@ async function renderDatabaseBackups(opts) {
         toast(e.message, 'bad');
       } finally {
         dbBackupBusy = false;
-        await renderDatabaseBackups({ force: true });
+        restoring.delete(row.name);
+        if (state.current === row.name) await renderDatabaseBackups({ force: true });
       }
     };
 
@@ -12614,6 +12813,7 @@ async function renderDatabaseBackups(opts) {
     };
   }
   body.append(list);
+  lockRestoring(body, row.name);
 }
 
 /** A database's Settings tab: how to reach it as root, and who is attached. */
@@ -12701,13 +12901,14 @@ async function renderDatabaseSettings(row) {
       const c = await rootCreds();
       // Host and port are already on the lines above; only what was hidden is shown, each copyable.
       const creds = el('dl', 'creds');
-      for (const [term, value, what] of [['User', c.user, 'user'], ['Password', c.password, 'password'], ['URL', c.url, 'URL']]) {
+      // the URL carries the password inside it, so it is as much a secret as the password is
+      for (const [term, value, what, secret] of [['User', c.user, 'user', false], ['Password', c.password, 'password', true], ['URL', c.url, 'URL', true]]) {
         if (!value) continue;
         const div = el('div');
         const dt = el('dt');
         dt.textContent = term;
         const dd = el('dd');
-        dd.append(addrButton(String(value), what));
+        dd.append(addrButton(String(value), what, secret));
         div.append(dt, dd);
         creds.append(div);
       }

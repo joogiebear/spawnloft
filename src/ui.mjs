@@ -639,6 +639,8 @@ async function handleBackups(req, res, name, seg) {
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
       saveOnWarning: out.saveOnWarning,
+      // a backup that missed a database, or was copied while the server wrote, is not just "Saved"
+      problems: backup.snapshotProblems(out.manifest?.warnings),
     })
   }
 
@@ -652,7 +654,8 @@ async function handleBackups(req, res, name, seg) {
       })
     }
     const snap = backup.resolveSnapshot(name, String(body.snapshot))
-    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true })
+    // withoutCopy is the answer to "the copy could not be kept; restore anyway?", never the default
+    const out = await backup.restoreSnapshot(inst, snap, { clean: body.clean === true, safety: body.withoutCopy !== true })
     return json(res, 200, out)
   }
 
@@ -2026,6 +2029,7 @@ async function route(req, res) {
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'restart') {
+    backup.refuseWhileRestoring(name, 'restarting it')
     await supervisor.stop(name).catch(() => {})
     return started()
   }
@@ -2047,7 +2051,7 @@ async function route(req, res) {
   }
   if (seg[3] === 'reveal') {
     const body = await readBody(req)
-    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
+    return json(res, 200, { dir: await manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
   }
   if (seg[3] === 'settings') {
     const body = await readBody(req)

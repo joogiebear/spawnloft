@@ -9,6 +9,7 @@ import { createZip, extractZip, isZip } from './zip.mjs'
 import { runTar } from './tar.mjs'
 import { fail, humanBytes, isInside } from './util.mjs'
 import * as activity from './activity.mjs'
+import { restoreBlock } from './control.mjs'
 
 // The owner's view of a server folder in the Files tool: every file, unlike the assistant's
 // text-only view in config-files.mjs. It keeps that module's confinement (nothing outside the
@@ -82,6 +83,9 @@ export function inUse(inst, running) {
 // `removing`: the path goes away (deleted, or moved from), so the plugins or mods folder itself
 // counts too - it takes every jar the server loaded with it.
 function assertFree(inst, rel, running, doing, { removing = false } = {}) {
+  // a restore is extracting over these files; nothing else writes to them until it has finished
+  const restoring = restoreBlock(inst.name, `changing its files`)
+  if (restoring) fail(restoring)
   if (!running) return
   const top = rel.split('/')[0].toLowerCase()
   const busy = inUse(inst, true)
@@ -450,7 +454,7 @@ export async function undoSnapshot(inst, snapshotName, { running = false } = {})
     fail(`${snap.name} is a backup of the server, not a copy of one change. Restore it from Backups, with the server stopped.`)
   }
   for (const m of members) assertFree(inst, m, running, 'put back')
-  await backup.restoreSnapshot(inst, snap, { quiet: true })
+  await backup.restoreSnapshot(inst, snap, { quiet: true, safety: false })
   activity.record(inst.name, 'undo', { detail: members.join(', '), snapshot: snap.name })
   return { restored: snap.name, members }
 }

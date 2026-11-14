@@ -2022,14 +2022,15 @@
         advanced,
         f.removing && p && h('div', { class: 'confirm', role: 'alert' },
           h('span', {}, h('b', { text: `Remove ${setupTitle(p)}?` }), ' Its folder with worlds, options and mods is kept.'),
-          h('label', {}, h('input', { type: 'checkbox', id: 'purge' }), ' Also delete its folder'),
+          // The button says what it will do: with the box ticked it deletes worlds, and reads so.
+          h('label', {}, h('input', { type: 'checkbox', id: 'purge', onchange: (ev) => { $('confirmRemove').textContent = removeLabel(ev.target.checked) } }), ' Also delete its folder, worlds included'),
           h('span', { class: 'grow' }),
-          h('button', { class: 'sm', onclick: () => { f.removing = false; render() } }, 'Keep it'),
-          h('button', { class: 'sm danger', id: 'confirmRemove', onclick: () => removeProfile(p, $('purge').checked) }, 'Remove setup')),
+          h('button', { class: 'sm', id: 'keepSetup', onclick: () => { f.removing = false; render() } }, 'Keep it'),
+          h('button', { class: 'sm danger', id: 'confirmRemove', onclick: () => removeProfile(p, $('purge').checked) }, removeLabel(false))),
         h('div', { class: 'foot' },
           p
             ? [desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
-              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); $('confirmRemove')?.focus() } }, 'Remove setup…'),
+              h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); const keep = $('keepSetup'); keep?.scrollIntoView({ block: 'nearest' }); keep?.focus() } }, 'Remove setup…'),
               h('span', { class: 'grow' })]
             : h('span', { class: 'hint', text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
           h('button', { onclick: closeSheet }, 'Cancel'),
@@ -2082,6 +2083,11 @@
       f.saving = false
     }
     refresh()
+  }
+
+  // Focus goes to "Keep it" when the strip opens, so Enter twice does not remove anything.
+  function removeLabel(purge) {
+    return purge ? 'Remove and delete worlds' : 'Remove setup'
   }
 
   async function removeProfile(p, purge) {

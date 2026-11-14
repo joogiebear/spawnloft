@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { getInstance, assertInstanceDir, updateInstance, isDatabase } from './registry.mjs'
 import * as java from './java.mjs'
 import { mcVersionOf } from './plugins.mjs'
-import { readState, clearState, controlRequest, isActiveStatus } from './control.mjs'
+import { readState, clearState, controlRequest, isActiveStatus, restoreBlock } from './control.mjs'
 import { consoleLog, daemonLog, runDir, stateFile } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { fail, sleep, pidAlive, killProcessGroup, UserError, acquireLock } from './util.mjs'
@@ -92,6 +92,9 @@ export async function start(name, options = {}) {
 
 async function launch(name, { wait = true, timeout = 180000, sync = true, force = false } = {}, attempt = {}) {
   let inst = getInstance(name)
+  // a server started over a folder that is halfway through a restore loads a world that is neither
+  const restoring = isDatabase(inst) ? null : restoreBlock(name, 'starting it')
+  if (restoring) fail(restoring)
   if (inst.external) fail(`"${name}" is a database that runs elsewhere (${inst.host ?? '127.0.0.1'}:${inst.port}); it is not started or stopped from here`)
   assertInstanceDir(inst)
   // EULA, Java and server.properties are Minecraft's; a database's launch spec checks its engine.

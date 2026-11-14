@@ -504,3 +504,11 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   assert.match(html, /\.menupad \{[^}]*position: absolute;[^}]*padding-bottom: var\(--s-6\)/)
   assert.match(html, /\.menupad:has\(> \.who\), \.menupad:has\(> \.vmenu\) \{ justify-content: flex-end; \}/)
 })
+
+test('removing a setup puts focus on the safe answer, and the button says when worlds go too', () => {
+  const { removeLabel } = lifted(['removeLabel'])
+  assert.equal(removeLabel(false), 'Remove setup')
+  assert.equal(removeLabel(true), 'Remove and delete worlds')
+  assert.ok(!/\$\('confirmRemove'\)\?\.focus\(\)/.test(html), 'the destructive button must not take focus when the strip opens')
+  assert.match(html, /keep\?\.focus\(\)/)
+})

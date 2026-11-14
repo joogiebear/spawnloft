@@ -130,7 +130,10 @@ async function main() {
     let said = ''
     child.stdout.on('data', (chunk) => { said += chunk; log.push(`[ui] ${chunk}`) })
     child.stderr.on('data', (chunk) => { said += chunk; log.push(`[ui:err] ${chunk}`) })
-    await until(() => /Opening the panel in your browser/.test(said) || child.exitCode !== null, 'spawnloft ui must start and open its sign-in page', 60000)
+    // The two lines can arrive in separate chunks, so wait for both: checking for the link the
+    // moment the first line shows failed on a slow Windows runner with the link still in the pipe.
+    const announced = () => /Opening the panel in your browser/.test(said) && /\/auth\?t=v1\.login\./.test(said)
+    await until(() => announced() || child.exitCode !== null, 'spawnloft ui must start and open its sign-in page', 60000)
     assert.equal(child.exitCode, null, `spawnloft ui exited: ${said}`)
     assert.ok(!said.includes('SPAWNLOFT_') && /\/auth\?t=v1\.login\./.test(said), 'The sign-in link is printed as well')
     const made = openPages().filter((f) => !before.has(f))
