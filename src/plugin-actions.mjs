@@ -29,14 +29,35 @@ async function snapshotPlugins(inst, label) {
   return backup.createSnapshot(inst, { scope: 'plugins', label, running: supervisor.isRunning(inst.name), quiet: true })
 }
 
-export async function installWithSnapshot(inst, projectId, { source = 'modrinth' } = {}) {
+// What an install would fetch and what it needs, for the page to ask about before anything is written.
+export async function planInstall(inst, projectId, { source = 'modrinth' } = {}) {
+  return plugins.planInstall(inst, String(projectId), { source: source === 'hangar' ? 'hangar' : 'modrinth', gameVersion: plugins.mcVersionOf(inst) })
+}
+
+// `also` is what the thing asked for cannot load without: fetched after it, under the same one
+// snapshot (the folder can be hundreds of MB). One that fails is reported and the rest carry on;
+// the thing asked for stays in either way.
+export async function installWithSnapshot(inst, projectId, { source = 'modrinth', also = [] } = {}) {
   const gameVersion = plugins.mcVersionOf(inst)
+  const fetchOne = (id, from) => (from === 'hangar'
+    ? plugins.installFromHangar(inst, String(id), { gameVersion })
+    : plugins.installPlugin(inst, String(id), { gameVersion }))
   const snap = await snapshotPlugins(inst, 'pre-install')
-  const result = source === 'hangar'
-    ? await plugins.installFromHangar(inst, String(projectId), { gameVersion })
-    : await plugins.installPlugin(inst, String(projectId), { gameVersion })
-  activity.record(inst.name, 'plugin-install', { detail: `${result.installed} ${result.version ?? ''}`.trim(), snapshot: snap ? path.basename(snap.file) : null })
-  return { ...result, snapshot: snap?.file ?? null }
+  const snapshot = snap ? path.basename(snap.file) : null
+  const result = await fetchOne(projectId, source)
+  activity.record(inst.name, 'plugin-install', { detail: `${result.installed} ${result.version ?? ''}`.trim(), snapshot })
+  const extras = []
+  const failed = []
+  for (const dep of also) {
+    try {
+      const got = await fetchOne(dep.projectId, dep.source)
+      extras.push({ projectId: String(dep.projectId), installed: got.installed, version: got.version ?? null })
+      activity.record(inst.name, 'plugin-install', { detail: `${got.installed} ${got.version ?? ''}`.trim(), snapshot })
+    } catch (err) {
+      failed.push({ projectId: String(dep.projectId), error: err?.message ?? String(err) })
+    }
+  }
+  return { ...result, extras, failed, snapshot: snap?.file ?? null }
 }
 
 export async function updateWithSnapshot(inst, file) {

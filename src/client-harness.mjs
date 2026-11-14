@@ -64,7 +64,16 @@ export async function ensureHarnessJar(profileName, mc, { onProgress } = {}) {
 // With `pid`, a file left by an earlier run of the game (a crash skips the mod's cleanup) is
 // treated as absent: its port may belong to another program by now, and the token must not go there.
 export function readHarnessFile(profileName, { pid = null } = {}) {
-  const data = readJson(path.join(profileDir(profileName), HARNESS_FILE), null)
+  let data
+  try {
+    data = readJson(path.join(profileDir(profileName), HARNESS_FILE), null)
+  } catch (err) {
+    // The game writes this file as it starts and deletes it as it quits. On Windows a file that is
+    // being deleted cannot be opened (EPERM) for a moment before it is gone, and one being written
+    // can be held (EBUSY): either way there is no harness to talk to right now.
+    if (!['EPERM', 'EBUSY', 'EACCES'].includes(err?.code)) throw err
+    return null
+  }
   if (data === null || typeof data !== 'object' || typeof data.port !== 'number') return null
   if (pid !== null && data.pid !== pid) return null
   return data
