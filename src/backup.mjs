@@ -150,13 +150,31 @@ function reserveSnapshot(dir, base) {
   }
 }
 
+// The folders at the top of a server folder that hold a world: the ones with a level.dat.
+export function worldFolders(dir) {
+  let entries = []
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  return entries
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(dir, e.name, 'level.dat')))
+    .map((e) => e.name)
+    .sort()
+}
+
 function membersFor(inst, scope) {
   const props = readProps(path.join(inst.dir, 'server.properties'))
   const exists = (p) => fs.existsSync(path.join(inst.dir, p))
 
   // the plugins scope covers mods too (Fabric servers)
   const plugins = [...(exists('plugins') ? ['plugins'] : []), ...(exists('mods') ? ['mods'] : [])]
-  const worlds = worldDirs(props).filter(exists)
+  // Every world in the folder, not only the one server.properties names: a server with a
+  // multi-world plugin, or worlds brought in from the Worlds page, keeps the others beside it, and
+  // "Standard" and "Worlds only" promise worlds. The active world's own folders come first, and
+  // are kept even without a level.dat (a world that has never been saved).
+  const worlds = [...new Set([...worldDirs(props).filter(exists), ...worldFolders(inst.dir)])]
   const config = [...ROOT_CONFIG_FILES.filter(exists), ...(exists('config') ? ['config'] : [])]
 
   switch (scope) {
@@ -425,17 +443,28 @@ export function listSnapshots(name) {
 
 // Newest snapshot time and how many there are. Used by the panel overview for every server at
 // once, so it only stats archives: no manifests, no folder created, async.
+// A snapshot that holds part of a server (its plugins, its config, or named files) is a copy
+// taken before a change, not a backup of the server: a plugin install must not read as "backed up
+// just now". Told from the file name (label_scope_stamp), since the overview stats archives for
+// every server at once and opens no manifest. A name that does not say is counted as a backup.
+const PARTIAL_SCOPE_RE = /(?:^|_)(?:plugins|config|files)_\d{4}-\d{2}-\d{2}[_.]/
+export function isPartialSnapshotName(file) {
+  return PARTIAL_SCOPE_RE.test(String(file))
+}
+
 export async function snapshotSummary(name) {
   const dir = path.join(BACKUPS_DIR, name)
   let files
   try {
     files = (await fs.promises.readdir(dir)).filter((f) => f.endsWith('.tar.gz'))
   } catch {
-    return { newestAt: null, count: 0 }
+    return { newestAt: null, newestBackupAt: null, count: 0 }
   }
   const times = await Promise.all(files.map((f) => fs.promises.stat(path.join(dir, f)).then((s) => s.mtimeMs, () => 0)))
   const newest = Math.max(0, ...times)
-  return { newestAt: newest || null, count: times.filter(Boolean).length }
+  // newestBackupAt: the newest one that holds the worlds
+  const newestBackup = Math.max(0, ...times.filter((_, i) => !isPartialSnapshotName(files[i])))
+  return { newestAt: newest || null, newestBackupAt: newestBackup || null, count: times.filter(Boolean).length }
 }
 
 export async function newestSnapshotAt(name) {

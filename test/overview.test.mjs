@@ -27,8 +27,9 @@ test('the newest backup is the newest archive, and a server with none has none',
   at('newest_standard_2026-09-22.tar.gz.pending', 1_799_000_000)
 
   assert.equal(await newestSnapshotAt('survival'), 1_790_000_000 * 1000)
-  assert.deepEqual(await snapshotSummary('survival'), { newestAt: 1_790_000_000 * 1000, count: 2 })
-  assert.deepEqual(await snapshotSummary('never-backed-up'), { newestAt: null, count: 0 })
+  // the newer of the two holds only the plugins: it is the newest archive, not the newest backup of the server
+  assert.deepEqual(await snapshotSummary('survival'), { newestAt: 1_790_000_000 * 1000, newestBackupAt: 1_780_000_000 * 1000, count: 2 })
+  assert.deepEqual(await snapshotSummary('never-backed-up'), { newestAt: null, newestBackupAt: null, count: 0 })
   assert.equal(await newestSnapshotAt('never-backed-up'), null)
   assert.equal(fs.existsSync(path.join(BACKUPS_DIR, 'never-backed-up')), false, 'Asking makes no folder')
 })

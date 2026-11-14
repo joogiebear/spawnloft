@@ -594,6 +594,8 @@ async function handleBackups(req, res, name, seg) {
       exclude: backup.excludePatterns(inst),
       dir: path.join(LAYOUT.backupsDir, name),
       root: LAYOUT.backupsDir,
+      // the folder saved for the next start, when it is not the one in use: the page says so until then
+      pendingRoot: pendingBackupsDir(),
       mirror: backup.mirrorRoot(),
       running: supervisor.isRunning(name),
       scopes: backup.SCOPES,
@@ -612,6 +614,8 @@ async function handleBackups(req, res, name, seg) {
         lastResult: auto.windows ? schedule.describeResult(auto.windows.lastResult) : null,
         nextRun: auto.windows?.nextRun ?? null,
       },
+      // other enabled tasks from Schedule that back this server up
+      scheduled: backupTasksOf(await schedule.list(), name).others.map((t) => ({ id: t.id, name: t.name, schedule: t.schedule })),
       automaticAvailable: platformCapabilities().scheduler,
       automaticUnavailableReason: PREVIEW_LIMITS.scheduler,
       background: schedule.background(),
@@ -704,11 +708,35 @@ async function handleBackups(req, res, name, seg) {
 // The automatic backup the Backups tab owns. Match by owner mark, not by action type: the
 // Scheduler tab can make backup tasks too. The fallback adopts an unowned task with the exact
 // default name (made before the mark existed).
+// The backups folder is read once at startup. A different one saved since then is not in use
+// yet, and until the restart nothing else says that a change is waiting.
+function pendingBackupsDir() {
+  try {
+    const next = settings.resolveRoots().backupsDir
+    return next && next !== LAYOUT.backupsDir ? next : null
+  } catch {
+    return null
+  }
+}
+
 async function autoBackupTask(name) {
-  const mine = (await schedule.list()).filter((t) => t.instance === name && t.action.type === 'backup')
-  return mine.find((t) => t.owner === schedule.OWNER_BACKUPS)
-    ?? mine.find((t) => !t.owner && t.name === 'Automatic backup')
+  return backupTasksOf(await schedule.list(), name).auto
+}
+
+// What backs a server up on a schedule. `auto` is the one task the Backups page's own switch
+// makes and edits. `others` are enabled tasks made in Schedule that take a backup, on their own or
+// as a step: the server is being backed up by those just as much, and a page that says "nothing
+// backs this server up" beside a backup one of them made is wrong.
+export function backupTasksOf(tasks, name) {
+  const mine = tasks.filter((t) => t.instance === name)
+  const plain = mine.filter((t) => t.action?.type === 'backup')
+  const auto = plain.find((t) => t.owner === schedule.OWNER_BACKUPS)
+    ?? plain.find((t) => !t.owner && t.name === 'Automatic backup')
     ?? null
+  const backsUp = (t) => t.action?.type === 'backup'
+    || (t.action?.type === 'steps' && (t.action.steps ?? []).some((step) => step.do === 'backup'))
+  const others = mine.filter((t) => t !== auto && t.enabled !== false && backsUp(t))
+  return { auto, others }
 }
 
 // Read from the file the daemon writes: the panel may have started after the server, and CPU is
@@ -1028,8 +1056,8 @@ async function handleWorlds(req, res, name, seg) {
     return json(res, 200, await worlds.exportWorld(inst, String(body.name)))
   }
   if (verb === 'delete') {
-    const out = worlds.deleteWorld(inst, String(body.name))
-    activity.record(name, 'world-delete', { detail: String(body.name) })
+    const out = await worlds.deleteWorldKeepingCopy(inst, String(body.name), { withoutCopy: body.withoutCopy === true })
+    activity.record(name, 'world-delete', { detail: String(body.name), snapshot: out.snapshot })
     return json(res, 200, out)
   }
   return json(res, 404, { error: 'not found' })
@@ -1795,13 +1823,15 @@ async function route(req, res) {
     const tasks = Object.values(schedule.load().tasks)
     const servers = {}
     await Promise.all(registry.listInstances().map(async (i) => {
-      const mine = tasks.filter((t) => t.instance === i.name && t.action?.type === 'backup')
-      const auto = mine.find((t) => t.owner === schedule.OWNER_BACKUPS) ?? mine.find((t) => !t.owner && t.name === 'Automatic backup') ?? null
+      const { auto, others } = backupTasksOf(tasks, i.name)
+      // the switch on the Backups page if it is on, else whatever task in Schedule backs it up
+      const by = auto && auto.enabled !== false ? auto : others[0] ?? auto
       const kept = await backup.snapshotSummary(i.name)
       servers[i.name] = {
-        lastBackupAt: kept.newestAt,
+        // a copy of the plugins taken before an install is not the server being backed up
+        lastBackupAt: kept.newestBackupAt,
         backupCount: kept.count,
-        autoBackup: auto ? { enabled: auto.enabled !== false, schedule: auto.schedule, keep: auto.action.keep ?? null } : null,
+        autoBackup: by ? { enabled: by.enabled !== false, schedule: by.schedule, keep: by.action.keep ?? null } : null,
       }
     }))
     // No archive on disk is either "never backed up" or "backed up, then deleted"; the log tells

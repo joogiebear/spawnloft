@@ -350,3 +350,29 @@ test('a restore locks its list: every button off, and the row says it is restori
   assert.equal(html.split('restoring.set(row.name,').length - 1, 2)
   assert.equal(html.split('restoring.delete(row.name);').length - 1, 2)
 })
+
+test('the Backups strip counts only backups of the server, and a custom schedule or a bad keep number is not saved as something else', () => {
+  const { isWholeBackup, keepProblem, scheduledBackupWords, backupsMoveWords } = new Function(
+    `const panelPlatform = 'linux';\n${constSource('DAY_NAMES')}\n  FRI: 'Friday', SAT: 'Saturday', SUN: 'Sunday' };\n${fnSource('describeSchedule')}\n${fnSource('singleFileOf')}\n${fnSource('isWholeBackup')}\n${fnSource('keepProblem')}\n${fnSource('scheduledBackupWords')}\n${fnSource('backupsMoveWords')}
+     return { isWholeBackup, keepProblem, scheduledBackupWords, backupsMoveWords }`)()
+  assert.equal(isWholeBackup({ scope: 'standard', members: ['world', 'plugins'] }), true)
+  assert.equal(isWholeBackup({ scope: 'worlds', members: ['world'] }), true)
+  assert.equal(isWholeBackup({ scope: 'full', members: ['a', 'b'] }), true)
+  // a copy of the plugins before an install, or of the config, is not "backed up just now"
+  assert.equal(isWholeBackup({ scope: 'plugins', members: ['plugins'] }), false)
+  assert.equal(isWholeBackup({ scope: 'config', members: ['server.properties', 'config'] }), false)
+  assert.equal(isWholeBackup({ scope: 'files', members: ['a', 'b'] }), false)
+
+  for (const bad of ['', ' ', '0', '-3', '2.5', 'abc', '366']) assert.equal(keepProblem(bad), 'Use a whole number from 1 to 365.', bad)
+  for (const good of ['1', '7', '365', ' 14 ']) assert.equal(keepProblem(good), null, good)
+
+  assert.equal(scheduledBackupWords([{ name: 'Weekly world backup', schedule: { kind: 'weekly', day: 'SUN', at: '03:00' } }]),
+    '“Weekly world backup” runs every Sunday at 03:00. Change it in Schedule.')
+  assert.match(scheduledBackupWords([{ name: 'A', schedule: { kind: 'daily', at: '04:30' } }, { name: 'B', schedule: { kind: 'hourly', every: 1 } }]), /every day at 04:30, and 1 more\./)
+
+  const words = backupsMoveWords('/old/backups', '/new/backups')
+  for (const text of [words.before, words.after]) assert.match(text, /not moved|nothing was moved/)
+  assert.match(words.pending, /^Changes to \/new\/backups when SpawnLoft restarts\./)
+  // the choice that keeps a schedule made elsewhere exists, and is what Apply sends for it
+  assert.match(html, /every\.value === KEEP_SCHEDULE \? \{ schedule: known\.auto\.schedule \}/)
+})

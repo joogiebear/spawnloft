@@ -69,11 +69,11 @@ test('Mac panel exposes scheduling and automatic backups without changing server
     // comes separately
     const history = await get(base + '/backups/history')
     assert.deepEqual(history, Object.fromEntries(
-      ['snapshots', 'exclude', 'dir', 'root', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),
+      ['snapshots', 'exclude', 'dir', 'root', 'pendingRoot', 'mirror', 'running', 'scopes'].map(key => [key, backups[key]]),
     ))
     const automatic = await get(base + '/backups/auto')
     assert.deepEqual(automatic, Object.fromEntries(
-      ['auto', 'automaticAvailable', 'automaticUnavailableReason', 'background'].map(key => [key, backups[key]]),
+      ['auto', 'scheduled', 'automaticAvailable', 'automaticUnavailableReason', 'background'].map(key => [key, backups[key]]),
     ))
     assert.deepEqual({ ...history, ...automatic }, backups)
     assert.equal(fs.readFileSync(REGISTRY_FILE, 'utf8'), registryBefore)
