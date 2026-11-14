@@ -567,6 +567,8 @@ test('a failed request is said in words someone can act on', () => {
   assert.equal(plainMessage('a version is required - see: spawnloft db versions'), 'Choose a version first.')
   assert.equal(plainMessage('"main" is not running, so its data cannot be dropped - start it first, or detach without --drop'),
     'main is not running, so its data cannot be dropped. Start it first, or detach and keep the data.')
+  // a program on this computer that could not be run is not an internet problem
+  assert.equal(plainMessage('could not reach schtasks to delete "nightly": spawn ENOENT'), 'could not reach schtasks to delete "nightly": spawn ENOENT')
   // everything else is passed on untouched
   assert.equal(plainMessage('That port is taken by "lobby".'), 'That port is taken by "lobby".')
 
@@ -588,6 +590,8 @@ test('toasts stay while work runs, and the stack is capped', () => {
   // the oldest idle ones go first; one that says work is under way is never dropped
   assert.deepEqual(toastsToDrop([t(1, true), t(2), t(3), t(4), t(5), t(6)], 4).map((x) => x.id), [2, 3])
   assert.deepEqual(toastsToDrop([t(1, true), t(2, true), t(3, true), t(4, true), t(5, true)], 4), [])
+  // the one just shown is never the one dropped
+  assert.deepEqual(toastsToDrop([t(1, true), t(2, true), t(3, true), t(4, true), t(5)], 4), [])
   assert.match(html, /const TOAST_MAX = 4;/)
 })
 
@@ -631,7 +635,7 @@ test('an upload says how far it has got', () => {
 })
 
 test('a search that failed never says nothing matches', () => {
-  const at = html.indexOf('const searchFailed = (reasons) => {')
+  const at = html.indexOf('const searchFailed = (reasons, again = true) => {')
   assert.ok(at > 0)
   assert.match(html.slice(at, at + 1400), /Try again/)
 })

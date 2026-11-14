@@ -781,7 +781,7 @@
   // What a failed launch looks like on the Play screen. `fix` names the one control that helps.
   function launchNotice(message) {
     const text = String(message ?? 'the launch failed')
-    if (/is being launched/.test(text)) {
+    if (/is being launched|is already starting/.test(text)) {
       return { tone: 'warn', title: `Another launch is already in progress: ${text}`, text: 'This page checks again every few seconds and unlocks when it finishes.', busy: true }
     }
     if (/requires a Microsoft account/.test(text)) {
@@ -1474,7 +1474,7 @@
     try {
       made = await api('client/profiles', { method: 'POST', body: firstProfileBody(mc, profilesNow().map((q) => q.name)) })
     } catch (err) {
-      if (err instanceof PanelDown) S.down = true
+      if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       S.flash = { tone: 'fault', title: 'Couldn\'t make a setup', text: sentence(err.message) }
     }
     S.firstRun = false
@@ -2108,7 +2108,7 @@
       }
       S.sheet = null
     } catch (err) {
-      if (err instanceof PanelDown) S.down = true
+      if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       f.error = err.message
       f.saving = false
     }
@@ -2157,7 +2157,7 @@
       S.acctNotice = err.status === 409
         ? { tone: 'warn', title: 'A sign-in is already open in another window', text: 'Finish it there, or close that window and try again.', retry: 'Try again' }
         : { tone: 'fault', title: 'Couldn\'t start the sign-in', text: sentence(err.message), retry: 'Try again' }
-      if (err instanceof PanelDown) S.down = true
+      if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       return render()
     }
     if (!/^https:\/\/login\.microsoftonline\.com\//.test(String(made?.authorizeUrl ?? ''))) {
@@ -2296,7 +2296,7 @@
       o.error = null
     } catch (err) {
       o.error = err.message
-      if (err instanceof PanelDown) S.down = true
+      if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       return refresh()
     }
     if (thenPlay) {
@@ -2377,7 +2377,7 @@
       S.down = false
       S.downWhy = null
     } catch (err) {
-      if (err instanceof PanelDown) S.down = true
+      if (err instanceof PanelDown) { S.down = true; S.downWhy = null }
       // An answer that is an error is not "still loading": with nothing to show yet, the page
       // says so and why, where it used to sit on the loading shapes for as long as it lasted.
       else if (!S.summary) { S.down = true; S.downWhy = sentence(err.message) }

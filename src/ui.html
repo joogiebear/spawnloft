@@ -3643,7 +3643,8 @@ function plainMessage(message) {
   const dropped = /^"(.+)" is not running, so its data cannot be dropped - start it first, or detach without --drop$/.exec(text);
   if (dropped) return dropped[1] + ' is not running, so its data cannot be dropped. Start it first, or detach and keep the data.';
   const m = /^could not reach (.+?): (.+)$/is.exec(text);
-  if (!m) return text;
+  // Only a host: "could not reach schtasks to delete ..." is about a program on this computer.
+  if (!m || !/^[\w.-]+(\.[a-z]{2,}|:\d+)$/i.test(m[1])) return text;
   const what = m[1];
   if (/:\d+$/.test(what)) return 'Could not reach ' + what + '. Nothing answered at that address.';
   return 'Could not reach ' + what + '. Check this computer\u2019s internet connection, then try again.';
@@ -3699,7 +3700,8 @@ function toastStays(message, kind, opts) {
 function toastsToDrop(list, max) {
   const over = list.length - max;
   if (over <= 0) return [];
-  const idle = list.filter((t) => !t.working);
+  // Never the newest: it was shown this instant, and may be the error that matters.
+  const idle = list.slice(0, -1).filter((t) => !t.working);
   return idle.slice(0, over);
 }
 
@@ -3718,7 +3720,8 @@ function toast(message, kind, opts) {
   // The tone is said by a glyph as well as the edge colour, so it does not rest on colour alone.
   el.append(icon(kind === 'bad' ? 'alert' : kind === 'good' ? 'check' : 'bolt'), text, close);
   const stays = toastStays(message, kind, opts);
-  if (stays && kind !== 'bad' && !(opts && opts.stay)) el.dataset.working = '1';
+  // Work under way, or something to read or copy: neither is dropped to make room.
+  if (stays && kind !== 'bad') el.dataset.working = '1';
   $('#toasts').append(el);
   $('#live').textContent = message;
   // A plain acknowledgement goes by itself: one that has to be dismissed is just more work.
@@ -3862,7 +3865,13 @@ function ask(opts) {
     };
     // A stale 'close' - queued by the dialog this one replaced, arriving after showModal() - finds
     // the dialog open again; a real close finds it shut. Only the real one is an answer.
-    const onClose = () => { if (mine === askSeq && !dlg.open) done(null); };
+    const onClose = () => {
+      if (mine !== askSeq || dlg.open) return;
+      // Closed under a save that is still running (a second Escape is not always offered to
+      // 'cancel'): put it back, so there is somewhere for the answer to be said.
+      if (submitting) return dlg.showModal();
+      done(null);
+    };
     dlg.addEventListener('cancel', onCancel);
     dlg.addEventListener('close', onClose);
     ok.onclick = async () => {
@@ -8221,7 +8230,7 @@ async function renderPlugins(opts) {
   q.addEventListener('input', () => add.toggleAttribute('data-holding', Boolean(q.value.trim())));
 
   /** A search that could not be made: why, and the way to make it again. */
-  const searchFailed = (reasons) => {
+  const searchFailed = (reasons, again = true) => {
     const box = document.createElement('div');
     box.style.display = 'grid';
     box.style.gap = '8px';
@@ -8232,6 +8241,7 @@ async function renderPlugins(opts) {
       bad.textContent = reason;
       box.append(bad);
     }
+    if (!again) return box;
     const retry = document.createElement('button');
     retry.type = 'button';
     retry.textContent = 'Try again';
@@ -8264,7 +8274,8 @@ async function renderPlugins(opts) {
     // A source that was not reached found nothing because it was not asked, which is not the
     // same as there being nothing: no "nothing matches" under a failure.
     if (failed.length && !found.results.length) {
-      results.append(searchFailed(failed));
+      // "Fabric runs no plugins or mods" is an answer, not a failure: no button that cannot help.
+      results.append(searchFailed(failed, !failed.every((why) => /runs no plugins or mods/.test(why))));
       return;
     }
     for (const err of failed) {
@@ -10299,7 +10310,7 @@ async function uploadFiles(row, view, list) {
     }
   }
   // One question for the lot, so a folder dropped over an older copy of itself is not a hundred prompts.
-  if (exists.length) {
+  if (exists.length && !cancelled) {
     const ok = await ask({
       title: exists.length === 1 ? 'Replace ' + exists[0].name + '?' : 'Replace ' + exists.length + ' files?',
       text: (exists.length === 1 ? exists[0].name + ' is' : exists.length + ' of the files are') + ' already in ' + where
@@ -12826,10 +12837,20 @@ async function editServer(row) {
       resolve(v);
     };
     // 'cancel' first and 'close' as the net, for the reasons spelled out in ask().
-    const onCancel = () => { if (mine === askSeq) done(null); };
+    // Escape while a save runs would leave the rename going with nobody to hear how it went.
+    let saving = false;
+    const onCancel = (e) => {
+      if (mine !== askSeq) return;
+      if (saving) return e.preventDefault();
+      done(null);
+    };
     // A stale 'close' - queued by the dialog this one replaced, arriving after showModal() - finds
     // the dialog open again; a real close finds it shut. Only the real one is an answer.
-    const onClose = () => { if (mine === askSeq && !dlg.open) done(null); };
+    const onClose = () => {
+      if (mine !== askSeq || dlg.open) return;
+      if (saving) return dlg.showModal();
+      done(null);
+    };
     dlg.addEventListener('cancel', onCancel);
     dlg.addEventListener('close', onClose);
     const errBox = $('#dlgError');
@@ -12844,9 +12865,12 @@ async function editServer(row) {
         memory: $('#edMem').value.trim(),
         port: $('#edPort').value.trim(),
       };
-      const now = rowOf(name) || row;
+      // After a rename that took and a save that did not, the list may not have caught up: the
+      // server is planned from under its new name either way, so the rename is not asked twice.
+      const now = rowOf(name) || { ...row, name };
       const plan = editPlan(now, typed);
-      if (!plan.rename && !plan.patch) return done({ changed: false });
+      if (!plan.rename && !plan.patch) return done(name === row.name ? { changed: false } : { changed: true, name, renamed: true, patched: false });
+      saving = true;
       ok.disabled = true;
       $('#dlgCancel').disabled = true;
       errBox.hidden = true;
@@ -12860,8 +12884,10 @@ async function editServer(row) {
           renamed = true;
         }
         if (plan.patch) await post('/instances/' + encodeURIComponent(name) + '/settings', plan.patch);
+        saving = false;
         done({ changed: true, name, renamed: name !== row.name, patched: Boolean(plan.patch) });
       } catch (e) {
+        saving = false;
         if (mine !== askSeq || settled) return;
         if (renamed) { state.current = null; await refresh(); select(name); }
         errBox.textContent = (renamed ? 'Renamed to ' + name + ', but the rest was not saved. ' : '') + e.message;
@@ -12899,7 +12925,7 @@ async function rebuildServer(row) {
     ],
   });
   if (!res) return;
-  const note = toast('Resetting ' + row.name + '… taking a snapshot first.');
+  const note = toast('Taking a snapshot, then resetting ' + row.name + '…');
   try {
     const out = await post('/instances/' + encodeURIComponent(row.name) + '/rebuild', {
       keepPlugins: res.choice === 'keep',
@@ -13756,6 +13782,8 @@ function lockAddTabs(on) {
 
 function openAdd(tab) {
   openSheet('add');
+  // A create is running: its tab, with its progress, is the one to come back to.
+  if ([...document.querySelectorAll('.tabs[role="tablist"] [role="tab"]')].some((t) => t.disabled)) return;
   selectTab(tab);
   setTimeout(() => $(tab === 'adopt' ? '#aDir' : tab === 'pack' ? '#pSearch' : tab === 'db' ? '#dName' : '#nName').focus(), 0);
 }

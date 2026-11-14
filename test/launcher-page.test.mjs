@@ -538,6 +538,10 @@ test('what the core says for a terminal is said for the launcher', () => {
   assert.equal(plain('Java 21 is needed for 1.21.'), 'Java 21 is needed for 1.21.')
   assert.equal(plain(null), '')
 
+  // the busy notice still knows a launch in progress once it is said in plain words
+  const { launchNotice } = lifted(['sentence', 'launchNotice'])
+  assert.equal(launchNotice(plain('profile "main" is being launched (pid 4242); wait for it')).busy, true)
+
   assert.match(plainStatus(401), /no longer signed in/)
   assert.match(plainStatus(503), /error 503/)
   assert.match(plainStatus(418), /error 418/)
