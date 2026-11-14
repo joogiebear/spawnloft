@@ -198,3 +198,105 @@ test('a snapshot that may be torn or is missing a database says so in the listin
   fs.writeFileSync(manifest, JSON.stringify(body))
   assert.deepEqual(backup.listSnapshots(inst.name)[0].problems, ['Does not include the database survival (main-db): the database is not running.'])
 })
+
+// a server folder that holds only worlds, for the tests about them
+function worldServer(active) {
+  const name = `bw${++seq}`
+  const dir = path.join(scratch, name)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'server.properties'), `level-name=${active}\n`)
+  return { name, dir, jar: 'paper.jar' }
+}
+function world(dir, name) {
+  fs.mkdirSync(path.join(dir, name, 'region'), { recursive: true })
+  fs.writeFileSync(path.join(dir, name, 'level.dat'), 'nbt')
+  fs.writeFileSync(path.join(dir, name, 'region', 'r.0.0.mca'), 'chunks')
+}
+
+test('deleting a world from the Worlds page keeps a copy in Backups first', async () => {
+  const { deleteWorldKeepingCopy, MAX_WORLD_COPY_BYTES } = await import('../src/worlds.mjs')
+  const inst = worldServer('keep')
+  world(inst.dir, 'keep')
+  world(inst.dir, 'old')
+  world(inst.dir, 'old_nether')
+  await assert.rejects(deleteWorldKeepingCopy(inst, 'keep'), /active world/)
+  assert.equal(backup.listSnapshots(inst.name).length, 0, 'a refusal takes no copy')
+
+  const res = await deleteWorldKeepingCopy(inst, 'old')
+  assert.deepEqual(res.removed, ['old', 'old_nether'])
+  assert.ok(!fs.existsSync(path.join(inst.dir, 'old')))
+  const copy = backup.listSnapshots(inst.name).find((s) => s.name === res.snapshot)
+  assert.deepEqual(copy.members.sort(), ['old', 'old_nether'])
+  assert.equal(copy.label, 'world-delete')
+  // and the copy puts it back
+  await backup.restoreSnapshot(inst, copy, { safety: false })
+  assert.ok(fs.existsSync(path.join(inst.dir, 'old', 'level.dat')))
+  assert.ok(fs.existsSync(path.join(inst.dir, 'old_nether', 'level.dat')))
+
+  // asked to, it deletes with no copy
+  const before = backup.listSnapshots(inst.name).length
+  const bare = await deleteWorldKeepingCopy(inst, 'old', { withoutCopy: true })
+  assert.equal(bare.snapshot, null)
+  assert.equal(backup.listSnapshots(inst.name).length, before)
+  assert.ok(MAX_WORLD_COPY_BYTES >= 1024 ** 3)
+})
+
+test('Standard and Worlds backups hold every world in the folder, not only the active one', async () => {
+  const inst = worldServer('world')
+  world(inst.dir, 'world')
+  world(inst.dir, 'world_nether')
+  world(inst.dir, 'creative')
+  world(inst.dir, 'minigames_the_end')
+  // a world being imported is unpacked into a hidden folder: not a member
+  world(inst.dir, '.mcctl-import-123')
+  fs.mkdirSync(path.join(inst.dir, 'logs'))
+  fs.mkdirSync(path.join(inst.dir, 'not-a-world'))
+  assert.deepEqual(backup.worldFolders(inst.dir), ['creative', 'minigames_the_end', 'world', 'world_nether'])
+  const worlds = await backup.createSnapshot(inst, { scope: 'worlds' })
+  assert.deepEqual(worlds.members, ['world', 'world_nether', 'creative', 'minigames_the_end'])
+  const standard = await backup.createSnapshot(inst, { scope: 'standard' })
+  for (const w of ['world', 'world_nether', 'creative', 'minigames_the_end']) assert.ok(standard.members.includes(w), w)
+  assert.ok(!standard.members.includes('not-a-world') && !standard.members.includes('logs'))
+})
+
+test('"last backed up" is the newest backup that holds the worlds, not a copy of the plugins', async () => {
+  for (const [name, partial] of [
+    ['standard_2026-11-14_030000.tar.gz', false], ['scheduled_standard_2026-11-14_030000.tar.gz', false],
+    ['manual_full_2026-11-14_030000.tar.gz', false], ['worlds_2026-11-14_030000.tar.gz', false],
+    ['pre-install_plugins_2026-11-14_030000.tar.gz', true], ['config_2026-11-14_030000.tar.gz', true],
+    ['file-delete_files_2026-11-14_030000.tar.gz', true], ['pre-restore_files_2026-11-14_030000.tar.gz', true],
+    ['my-own-archive.tar.gz', false], ['plugins_world.tar.gz', false],
+  ]) assert.equal(backup.isPartialSnapshotName(name), partial, name)
+
+  const inst = server()
+  assert.deepEqual(await backup.snapshotSummary(inst.name), { newestAt: null, newestBackupAt: null, count: 0 })
+  const whole = await backup.createSnapshot(inst, { scope: 'standard' })
+  // on a whole second: some filesystems keep no finer time
+  const old = new Date(Math.floor(Date.now() / 1000) * 1000 - 3 * 24 * 3600 * 1000)
+  fs.utimesSync(whole.file, old, old)
+  await backup.createSnapshot(inst, { scope: 'plugins', label: 'pre-install' })
+  const summary = await backup.snapshotSummary(inst.name)
+  assert.equal(summary.count, 2)
+  assert.equal(Math.round(summary.newestBackupAt / 1000), Math.round(old.getTime() / 1000))
+  assert.ok(summary.newestAt > summary.newestBackupAt)
+})
+
+test('a server is backed up on a schedule by the Backups switch or by any enabled Schedule task that takes a backup', async () => {
+  const { backupTasksOf } = await import('../src/ui.mjs')
+  const tasks = [
+    { id: 'a', instance: 's', name: 'Automatic backup', owner: 'backups', enabled: true, action: { type: 'backup' } },
+    { id: 'b', instance: 's', name: 'Weekly world backup', enabled: true, action: { type: 'backup' } },
+    { id: 'c', instance: 's', name: 'Nightly restart', enabled: true, action: { type: 'steps', steps: [{ do: 'countdown' }, { do: 'backup' }, { do: 'restart' }] } },
+    { id: 'd', instance: 's', name: 'Off', enabled: false, action: { type: 'backup' } },
+    { id: 'e', instance: 's', name: 'Restart only', enabled: true, action: { type: 'restart' } },
+    { id: 'f', instance: 'other', name: 'Elsewhere', enabled: true, action: { type: 'backup' } },
+  ]
+  const both = backupTasksOf(tasks, 's')
+  assert.equal(both.auto.id, 'a')
+  assert.deepEqual(both.others.map((t) => t.id), ['b', 'c'])
+  // with the switch never used, the tasks from Schedule still count
+  const only = backupTasksOf(tasks.slice(1), 's')
+  assert.equal(only.auto, null)
+  assert.deepEqual(only.others.map((t) => t.id), ['b', 'c'])
+  assert.deepEqual(backupTasksOf(tasks, 'nobody'), { auto: null, others: [] })
+})

@@ -8253,6 +8253,11 @@ async function renderWorlds(opts) {
     ? 'The server is running: importing works now; switching, deleting and exporting the active world need it stopped.'
     : 'Switching worlds takes effect the next time the server starts.';
   body.append(how);
+  // Said here because this is where a second world arrives: every one of them is backed up.
+  const covered = document.createElement('div');
+  covered.className = 'hint';
+  covered.textContent = 'Standard, Worlds only and automatic backups cover every world listed here, not only the active one.';
+  body.append(covered);
 
   // ---- import ----------------------------------------------------------------
   const add = document.createElement('div');
@@ -8414,10 +8419,8 @@ async function renderWorlds(opts) {
     drop.onclick = async () => {
       const ok = await ask({
         title: 'Delete the world "' + w.name + '"?',
-        text: 'Gone for good: only the ACTIVE world is ever included in snapshots, so an inactive '
-          + 'world deleted here has no way back unless it was exported. '
-          + (w.dimensions.length ? 'Its ' + w.dimensions.join(' and ') + ' go with it. ' : '')
-          + 'Export it first if there is any doubt.',
+        text: (w.dimensions.length ? 'Its ' + w.dimensions.join(' and ') + ' go with it. ' : '')
+          + 'A copy is kept first, so Backups can put it back.',
         confirmLabel: 'Delete world',
         danger: true,
         typeToConfirm: w.name,
@@ -8425,8 +8428,22 @@ async function renderWorlds(opts) {
       if (!ok) return;
       busy(true);
       try {
-        const out = await post(base + '/delete', { name: w.name });
-        toast('Deleted ' + out.removed.join(', ') + '.', 'good');
+        let out;
+        try {
+          out = await post(base + '/delete', { name: w.name });
+        } catch (e) {
+          if (e.code !== 'large') throw e;
+          const sure = await ask({
+            title: 'Delete "' + w.name + '" without a copy?',
+            text: e.message + '. Deleted without one, the only way back is a backup that already holds it. Export it first if there is any doubt.',
+            confirmLabel: 'Delete for good',
+            danger: true,
+            typeToConfirm: w.name,
+          });
+          if (!sure) { busy(false); return; }
+          out = await post(base + '/delete', { name: w.name, withoutCopy: true });
+        }
+        toast('Deleted ' + out.removed.join(', ') + '.' + (out.snapshot ? ' A copy is in Backups.' : ''), 'good');
         await again();
       } catch (e) {
         toast(e.message, 'bad');
@@ -10182,7 +10199,7 @@ const ACTIVITY_TEXT = {
 };
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
 // decides where a button is drawn.
-const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit']);
+const ACTIVITY_UNDOABLE = new Set(['file-edit', 'file-replace', 'file-delete', 'config-edit', 'world-delete']);
 // SpawnLoft's own entries - the crash guard, its restarts - are under All: nobody goes looking for
 // them on their own, and a fifth button made the row of filters the loudest thing on the screen.
 const ACTIVITY_FILTERS = [['', 'All'], ['you', 'You'], ['schedule', 'Schedule'], ['assistant', 'Assistant']];
@@ -10415,6 +10432,7 @@ const FILES_SNAPSHOT = {
   'file-edit': { tag: 'before an edit', why: 'as it was before it was edited in Files' },
   'file-replace': { tag: 'before a replace', why: 'as it was before an upload replaced it' },
   'file-delete': { tag: 'deleted', why: 'as it was when it was deleted in Files' },
+  'world-delete': { tag: 'deleted world', why: 'as it was when it was deleted in Worlds' },
 };
 
 /** The Reason column: what prompted a snapshot, from its label or the schedule that took it. */
@@ -10423,7 +10441,7 @@ function snapshotReason(snap) {
   const named = {
     'pre-restore': 'Before a restore', 'before-edit': 'Before an AI edit', 'pre-delete': 'Before a delete',
     'pre-rebuild': 'Before a reset', 'pre-upgrade': 'Before an upgrade', 'pre-pack-update': 'Before a pack update',
-    'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete',
+    'file-edit': 'Before an edit', 'file-replace': 'Before a replace', 'file-delete': 'On delete', 'world-delete': 'On delete',
     manual: 'Manual', nightly: 'Nightly',
   };
   if (named[label]) return named[label];
@@ -10464,16 +10482,35 @@ function sameSchedule(a, b) {
  * The path is resolved when spawnloft starts, for the reason spelled out in paths.mjs, so this takes
  * effect on the next launch rather than pretending to apply now.
  */
+/** What changing the backups folder does and does not do, said before the choice and after it. */
+function backupsMoveWords(from, to) {
+  return {
+    before: 'This is where every server writes its backups. The ones already taken are not moved: they stay in '
+      + from + ', and the history here starts empty in the new folder. To bring them along, move the folders inside '
+      + from + ' into the new folder yourself before you restart SpawnLoft.',
+    after: 'New backups go to ' + to + ' once SpawnLoft has been closed and opened again. Until then they still go to '
+      + from + '. The backups already taken stay in ' + from + '; nothing was moved or deleted. To bring them along, move the folders inside it into '
+      + to + ' before you restart.',
+    pending: 'Changes to ' + to + ' when SpawnLoft restarts. Backups already taken stay here.',
+  };
+}
+
 async function changeBackupsLocation(current) {
   let chosen = null;
   if (desktop) {
+    // said before the folder picker opens, not after the choice has been saved
+    const go = await ask({
+      title: 'Change where backups are kept?',
+      text: backupsMoveWords(current, 'the new folder').before,
+      confirmLabel: 'Choose a folder',
+    });
+    if (!go) return;
     chosen = await desktop.pickFolder('Where should SpawnLoft keep backups?');
     if (!chosen) return;
   } else {
     const answer = await ask({
       title: 'Where should backups be kept?',
-      text: 'This is where every server writes its snapshots. Backups already taken stay where they '
-        + 'are - nothing is moved - so this history will look empty until new ones are made.',
+      text: backupsMoveWords(current, 'the new folder').before,
       input: { label: 'Full path to a folder', value: '', placeholder: current },
       confirmLabel: 'Use this folder',
     });
@@ -10483,16 +10520,14 @@ async function changeBackupsLocation(current) {
 
   try {
     const out = await post('/settings', { backupsDir: chosen });
+    await renderBackups({ force: true });
     if (!out.restartRequired) {
-      toast('Backups are already kept there.', 'good');
+      toast('Backups are kept there already.', 'good');
       return;
     }
     await ask({
       title: 'Restart SpawnLoft to use the new folder',
-      text: 'New backups will be written to ' + out.backupsDir + '. The snapshots already taken '
-        + 'stay where they are - nothing was moved or deleted - so this history will look empty '
-        + 'until the next backup runs. SpawnLoft reads this path once at startup, so the change takes '
-        + 'effect the next time it launches.',
+      text: backupsMoveWords(current, out.backupsDir).after,
       confirmLabel: 'Got it',
       tellOnly: true,
     });
@@ -10555,7 +10590,7 @@ async function renderBackups(opts) {
   // The selection can move while the request is in flight; the answer to the old question is not
   // an answer to the new one.
   if (request !== backupRequest || state.current !== row.name || body.dataset.for !== row.name) return;
-  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror]);
+  const signature = JSON.stringify([data.snapshots, data.running, data.dir, data.root, data.mirror, data.pendingRoot]);
   if (!force && history && history.isConnected) {
     body.querySelector('[data-backup-status]').textContent = '';
     // Only history changes in the background. Scope, schedule edits, focus and the archive
@@ -10606,8 +10641,8 @@ async function renderBackups(opts) {
   const nowNote = document.createElement('div');
   nowNote.className = 'hint';
   nowNote.textContent = data.running
-    ? 'Standard covers plugins, worlds and config. Safe while running - the one file the server holds locked is left out.'
-    : 'Standard covers plugins, worlds and config. Full is everything except caches and logs.';
+    ? 'Standard covers plugins, every world in the folder and config. Safe while running - the one file the server holds locked is left out.'
+    : 'Standard covers plugins, every world in the folder and config. Full is everything except caches and logs.';
   now.append(nowTitle, nowRow, nowNote);
   body.append(now);
 
@@ -10696,7 +10731,19 @@ const SCOPE_LABELS = { standard: 'Standard', full: 'Full', worlds: 'Worlds only'
 const scopeLabel = (sc) => SCOPE_LABELS[sc] || sc.charAt(0).toUpperCase() + sc.slice(1);
 
 /** A backup in the sense of "the server is backed up": not the one-file copy an edit takes. */
-const isWholeBackup = (snap) => !singleFileOf(snap) && snap.scope !== 'files';
+// A backup of the server, as against a copy of its plugins, its config or a few files taken before
+// a change. Only the first kind answers "when was this server last backed up".
+function isWholeBackup(snap) {
+  return !singleFileOf(snap) && !['files', 'plugins', 'config'].includes(snap.scope);
+}
+
+/** The second line of the Backups strip when a task from Schedule, not this page's switch, backs the server up. */
+function scheduledBackupWords(tasks) {
+  const first = tasks[0];
+  const rest = tasks.length - 1;
+  return '\u201c' + first.name + '\u201d runs ' + describeSchedule(first.schedule)
+    + (rest > 0 ? ', and ' + rest + ' more' : '') + '. Change it in Schedule.';
+}
 
 /**
  * The line at the top of Backups: is anything backing this server up, when it last was, and the
@@ -10710,10 +10757,13 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
   const week = 7 * 24 * 3600 * 1000;
   const stale = !latest || Date.now() - latest > week;
   const known = automatic && !automatic.error;
-  const on = known && automatic.auto;
-  box.dataset.tone = stale ? 'warn' : on ? 'live' : '';
+  // paused in Schedule is not on, whatever made it
+  const on = known && automatic.auto && automatic.auto.enabled !== false;
+  // a task made in Schedule that backs this server up counts: the server is being backed up
+  const elsewhere = known && !on && automatic.scheduled && automatic.scheduled.length ? automatic.scheduled : null;
+  box.dataset.tone = stale ? 'warn' : on || elsewhere ? 'live' : '';
 
-  box.append(icon(stale ? 'alert' : on ? 'check' : 'archive'));
+  box.append(icon(stale ? 'alert' : on || elsewhere ? 'check' : 'archive'));
   const text = document.createElement('div');
   text.className = 'bk-text';
   const head = document.createElement('b');
@@ -10729,8 +10779,11 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
     const every = AUTO_INTERVALS.find((o) => sameSchedule(o.schedule, automatic.auto.schedule));
     const next = whenNext(automatic.auto.nextRun);
     head.textContent = 'Automatic backups on';
-    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 7)
+    sub.textContent = (every ? every.label : 'On a schedule') + ', keeping ' + (automatic.auto.keep || 'all of them')
       + (next ? ' · next ' + next : '');
+  } else if (elsewhere) {
+    head.textContent = 'Backed up on a schedule';
+    sub.textContent = scheduledBackupWords(elsewhere);
   } else {
     head.textContent = 'Automatic backups off';
     sub.textContent = automatic.automaticAvailable === false
@@ -10746,7 +10799,7 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
 
   // Off, and able to be on: turning it on is the one thing this screen should ask for, so it
   // takes the primary and Back up now steps down to a plain button beside it.
-  const offer = known && !on && automatic.automaticAvailable !== false;
+  const offer = known && !on && !elsewhere && automatic.automaticAvailable !== false;
   backUpNow.classList.toggle('primary', !offer);
   if (offer) {
     const turnOn = iconButton('clock', 'Turn on nightly backups', 'primary');
@@ -10757,6 +10810,18 @@ function paintBackupStanding(box, row, data, automatic, backUpNow) {
     };
     box.append(turnOn);
   }
+}
+
+const KEEP_SCHEDULE = '__as-it-is';
+
+/** Why the "keeping" number cannot be saved, or null. The schedule keeps between 1 and 365. */
+function keepProblem(value, emptyKeepsAll) {
+  const text = String(value).trim();
+  // left empty on a task that already keeps everything: it goes on keeping everything
+  if (!text && emptyKeepsAll) return null;
+  const n = Number(text);
+  if (!text || !Number.isInteger(n) || n < 1 || n > 365) return 'Use a whole number from 1 to 365.';
+  return null;
 }
 
 /**
@@ -10796,6 +10861,17 @@ function autoBackupSection(base, data) {
     o.selected = known.auto ? sameSchedule(opt.schedule, known.auto.schedule) : opt.label === 'Daily at 03:00';
     every.append(o);
   }
+  // A schedule made elsewhere (daily at 04:30, say) matches none of the choices. Without a choice
+  // of its own the list would show the first one, "Every hour", and Apply would save that.
+  const custom = known.auto && !AUTO_INTERVALS.some((opt) => sameSchedule(opt.schedule, known.auto.schedule));
+  if (custom) {
+    const o = document.createElement('option');
+    o.value = KEEP_SCHEDULE;
+    o.textContent = capital(describeSchedule(known.auto.schedule)) + ' (as it is now)';
+    o.selected = true;
+    every.prepend(o);
+  }
+  every.setAttribute('aria-label', 'How often');
   every.style.maxWidth = '190px';
 
   const keepLabel = document.createElement('span');
@@ -10805,8 +10881,13 @@ function autoBackupSection(base, data) {
   keep.type = 'number';
   keep.min = '1';
   keep.max = '365';
-  keep.value = String((known.auto && known.auto.keep) || 7);
+  // A task that keeps everything (made elsewhere) shows as that, not as 7: Apply would otherwise
+  // start deleting its older backups for someone who only changed the time.
+  const keepsAll = Boolean(known.auto) && known.auto.keep == null;
+  keep.value = keepsAll ? '' : String((known.auto && known.auto.keep) || 7);
+  if (keepsAll) keep.placeholder = 'all';
   keep.style.maxWidth = '68px';
+  keep.setAttribute('aria-label', 'How many automatic backups to keep');
   const keepAfter = document.createElement('span');
   keepAfter.className = 'hint';
   keepAfter.textContent = 'of them';
@@ -10833,12 +10914,30 @@ function autoBackupSection(base, data) {
     for (const control of [onOff, every, keep, apply]) control.disabled = true;
   }
 
+  // What the number means, and what it does not touch, where the number is.
+  const keepNote = document.createElement('div');
+  keepNote.className = 'hint';
+  keepNote.setAttribute('role', 'status');
+  const sayKeep = (problem) => {
+    keepNote.textContent = problem || 'Keeps the newest automatic backups, up to that many. Backups you make by hand are never removed.';
+    keepNote.classList.toggle('bad', Boolean(problem));
+    keep.setAttribute('aria-invalid', String(Boolean(problem)));
+  };
+  sayKeep(null);
+  keepNote.hidden = known.automaticAvailable === false;
+  keep.addEventListener('input', () => sayKeep(keepProblem(keep.value, keepsAll)));
+  auto.append(keepNote);
+
   apply.onclick = async () => {
+    // an empty or impossible number used to be saved as "keep everything", with a toast that said scheduled
+    const problem = onOff.checked ? keepProblem(keep.value, keepsAll) : null;
+    sayKeep(problem);
+    if (problem) { keep.focus(); return; }
     apply.disabled = true;
     try {
-      const chosen = AUTO_INTERVALS.find((o) => o.label === every.value);
+      const chosen = every.value === KEEP_SCHEDULE ? { schedule: known.auto.schedule } : AUTO_INTERVALS.find((o) => o.label === every.value);
       await post(base + '/auto', onOff.checked
-        ? { enabled: true, schedule: chosen.schedule, keep: Number(keep.value) }
+        ? { enabled: true, schedule: chosen.schedule, keep: keep.value.trim() ? Number(keep.value) : null }
         : { enabled: false });
       toast(onOff.checked ? 'Automatic backups scheduled.' : 'Automatic backups turned off.', 'good');
       await renderBackups({ force: true });
@@ -10920,6 +11019,30 @@ function renderBackupHistory(row, data, signature) {
   change.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
   where.append(wherePath, change);
   change.onclick = () => changeBackupsLocation(data.root);
+  // A change that is saved but waiting for a restart is said here, with the way back.
+  let pending = null;
+  if (data.pendingRoot) {
+    pending = document.createElement('div');
+    pending.className = 'row where';
+    const said = document.createElement('span');
+    said.className = 'hint';
+    said.setAttribute('role', 'status');
+    said.textContent = backupsMoveWords(data.root, data.pendingRoot).pending;
+    const undo = document.createElement('button');
+    undo.className = 'ghost inline';
+    undo.type = 'button';
+    undo.textContent = 'Keep the current folder';
+    undo.style.cssText = 'padding:3px 8px;font-size:12px;flex:none';
+    undo.onclick = async () => {
+      undo.disabled = true;
+      try {
+        await post('/settings', { backupsDir: data.root });
+        toast('Backups stay in ' + data.root + '.', 'good');
+        await renderBackups({ force: true });
+      } catch (e) { toast(e.message, 'bad'); undo.disabled = false; }
+    };
+    pending.append(said, undo);
+  }
 
   // The mirror: a second drive every snapshot is copied to as it is taken. Its absence is
   // stated as the risk it is, because servers and snapshots on one disk fail together.
@@ -10976,7 +11099,7 @@ function renderBackupHistory(row, data, signature) {
     } catch (e) { toast(e.message, 'bad'); }
   };
 
-  hist.append(histTitle, where, mirrorRow);
+  hist.append(histTitle, where, ...(pending ? [pending] : []), mirrorRow);
 
   if (!data.snapshots.length) {
     hist.append(emptyState('archive', 'Nothing here yet. Reset and delete both take one '

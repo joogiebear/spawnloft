@@ -6,10 +6,11 @@ import path from 'node:path'
 import { BACKUPS_DIR } from './paths.mjs'
 import { readProps, writeProps } from './props.mjs'
 import { readState, activeBlock, isActiveStatus } from './control.mjs'
-import { runTar, tarMember, EXCLUDE_ARGS } from './backup.mjs'
+import { runTar, tarMember, EXCLUDE_ARGS, createSnapshot } from './backup.mjs'
 import { tarHandlesZip } from './tar.mjs'
 import { createZip, extractZip, isZip } from './zip.mjs'
 import { fail, dirSizeAsync, humanBytes, stamp, validateName } from './util.mjs'
+import { MAX_COPY_BYTES } from './files.mjs'
 
 // dimension folders a Bukkit-family server keeps beside a world
 const DIM_SUFFIXES = ['_nether', '_the_end']
@@ -190,8 +191,41 @@ export async function exportWorld(inst, name) {
   return { file, size, sizeHuman: humanBytes(size), members }
 }
 
-// Callers must confirm with the person first: only the active world appears in snapshots, so an
-// inactive world deleted here is gone unless it was exported.
+// A copy is taken before a world is deleted, up to the size Files copies before a delete. Past
+// it, gzip takes minutes and as much disk again, so the caller is told (code "large") and can ask
+// again with withoutCopy.
+export const MAX_WORLD_COPY_BYTES = MAX_COPY_BYTES
+
+// What the Worlds page calls: the world is copied into Backups first, the way Files copies what
+// it deletes, so the page made for worlds is not the less safe way to remove one.
+export async function deleteWorldKeepingCopy(inst, name, { withoutCopy = false } = {}) {
+  const members = deletableWorld(inst, name)
+  let snapshot = null
+  if (!withoutCopy) {
+    let bytes = 0
+    for (const m of members) bytes += await dirSizeAsync(path.join(inst.dir, m))
+    if (bytes > MAX_WORLD_COPY_BYTES) {
+      fail(`"${name}" is ${humanBytes(bytes)}; keeping a copy first would take a while and as much space again`, 'large')
+    }
+    const res = await createSnapshot(inst, { scope: 'files', label: 'world-delete', members, flush: false, quiet: true })
+    snapshot = path.basename(res.file)
+  }
+  return { ...deleteWorld(inst, name), snapshot }
+}
+
+// The folders a world is made of, after checking it may be deleted at all.
+function deletableWorld(inst, name) {
+  safeWorldName(name)
+  const why = activeBlock(inst.name, 'deleting worlds')
+  if (why) fail(why)
+  if (name === activeWorld(inst)) {
+    fail(`"${name}" is the active world - switch to another world first, or use rebuild to reset it`)
+  }
+  if (!isWorldDir(path.join(inst.dir, name))) fail(`"${name}" is not a world in ${inst.dir}`)
+  return [name, ...DIM_SUFFIXES.map((s) => `${name}${s}`).filter((d) => fs.existsSync(path.join(inst.dir, d)))]
+}
+
+// Deletes with no copy. Callers must confirm with the person first.
 export function deleteWorld(inst, name) {
   safeWorldName(name)
   const why = activeBlock(inst.name, 'deleting worlds')
