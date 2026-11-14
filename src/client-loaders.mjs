@@ -20,6 +20,10 @@ import {
   loaderVersions, pickLoader, fabricVersionId, ensureFabricProfile, ensureFabricApi,
   assertFabricAvailable, fabricGameVersions, fabricAvailable,
 } from './client-fabric.mjs'
+import {
+  quiltGameVersions, quiltAvailable, assertQuiltAvailable, quiltBuilds, pickQuilt, quiltVersionId,
+  ensureQuiltProfile,
+} from './client-quilt.mjs'
 
 const fabric = {
   id: 'fabric',
@@ -38,7 +42,26 @@ const fabric = {
   },
 }
 
-const MODULES = { fabric }
+// Quilt loads Fabric API too, and retired its own libraries (QSL) from Minecraft 26.1 on: one
+// rule for every version (design Q4)
+const quilt = {
+  id: 'quilt',
+  name: 'Quilt',
+  gameVersions: (opts) => quiltGameVersions(opts),
+  available: (mc, list) => quiltAvailable(mc, list),
+  assertAvailable: (mc, opts) => assertQuiltAvailable(mc, opts),
+  builds: (mc, opts) => quiltBuilds(mc, opts),
+  pick: (builds, wanted = null) => pickQuilt(builds, wanted),
+  versionId: (mc, build) => quiltVersionId(mc, build),
+  isInstalled: (mc, build) => fs.existsSync(versionJson(quiltVersionId(mc, build))),
+  ensureInstalled: async (mc, build, opts = {}) => ensureQuiltProfile(mc, build, opts),
+  afterInstall: async (name, profile, { onStage = () => {}, onProgress = () => {} } = {}) => {
+    onStage({ stage: 'quilt', message: 'Checking Fabric API' })
+    await ensureFabricApi(name, profile.mc, { onProgress })
+  },
+}
+
+const MODULES = { fabric, quilt }
 
 // Every loader id a setup may name, vanilla first.
 export const LOADERS = ['vanilla', ...Object.keys(MODULES)]
@@ -50,4 +73,22 @@ export function loaderFor(id) {
   const mod = MODULES[id]
   if (!mod) throw new Error(`unknown loader "${id}"`)
   return mod
+}
+
+// Which loaders build for each version, from their game lists read side by side: { fabric: true,
+// quilt: false } per id, a loader whose list could not be read null. refresh asks them again now.
+export async function loaderLists({ force = false } = {}) {
+  const ids = Object.keys(MODULES)
+  const lists = await Promise.all(ids.map((id) => MODULES[id].gameVersions({ force }).catch(() => null)))
+  return Object.fromEntries(ids.map((id, i) => [id, lists[i]]))
+}
+
+export function loadersFor(mc, lists) {
+  const out = {}
+  for (const [id, list] of Object.entries(lists)) {
+    let has = null
+    try { if (list) has = MODULES[id].available(mc, list) } catch { /* unknown */ }
+    out[id] = has
+  }
+  return out
 }

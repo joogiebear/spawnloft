@@ -221,7 +221,7 @@ test('a refused launch says why in the words the launcher uses', () => {
 })
 
 test('small display helpers', () => {
-  const { memoryText, initials, tileClass, loaderText } = lifted(['memoryText', 'initials', 'tileClass', 'loaderText'])
+  const { memoryText, initials, tileClass, loaderText } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'memoryText', 'initials', 'tileClass', 'loaderText'])
   assert.equal(memoryText('4G'), '4 GB')
   assert.equal(memoryText('1536M'), '1536 MB')
   assert.equal(memoryText('weird'), 'weird')
@@ -430,7 +430,7 @@ test('the Edit form sends only what changed, and nothing a running game cannot c
 })
 
 test('a setup is named by its version unless someone gave it a name', () => {
-  const { nameBase, autoName, givenName, setupTitle } = lifted(['nameBase', 'autoName', 'givenName', 'setupTitle'])
+  const { nameBase, autoName, givenName, setupTitle } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'nameBase', 'autoName', 'givenName', 'setupTitle'])
   assert.equal(autoName('1.21.11', 'vanilla', []), '1-21-11')
   assert.equal(autoName('1.21.11', 'fabric', []), '1-21-11-fabric')
   assert.equal(autoName('1.21.11', 'vanilla', ['1-21-11', '1-21-11-2']), '1-21-11-3')
@@ -454,7 +454,7 @@ test('a setup is named by its version unless someone gave it a name', () => {
 })
 
 test('the sentence under Play says what will happen', () => {
-  const { playSentence } = lifted(['playSentence'])
+  const { playSentence } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'playSentence'])
   const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : `*${x.b}*`)).join('')
   assert.equal(text(playSentence({ mc: '1.21.11', who: 'Joogiebear', server: 'survival' })), 'Opens *Minecraft 1.21.11* and joins *survival* as *Joogiebear*.')
   assert.equal(text(playSentence({ mc: '1.21.1', fabric: true, who: 'Wunga_' })), 'Opens *Minecraft 1.21.1 (Fabric)* on the title screen as *Wunga_*.')
@@ -537,7 +537,7 @@ test('a version the panel refuses outright is told apart from a launch that fail
 })
 
 test('the setup sheet\'s memory and facts', () => {
-  const { memoryGb, memoryFromGb, defaultMemory, versionFacts } = lifted(['memoryGb', 'memoryFromGb', 'defaultMemory', 'versionFacts'])
+  const { memoryGb, memoryFromGb, defaultMemory, versionFacts } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'memoryGb', 'memoryFromGb', 'defaultMemory', 'versionFacts'])
   assert.equal(memoryGb('4G'), 4)
   assert.equal(memoryGb('1536M'), 1.5)
   assert.equal(memoryGb('4096m'), 4)
@@ -654,7 +654,7 @@ test('what Join remembered in localStorage is cleaned before the page trusts it'
 })
 
 test('the New sheet POSTs the fields the panel\'s route takes, named by the version unless a name was typed', () => {
-  const { newProfileBody, editedProfile } = lifted(['nameBase', 'autoName', 'fieldText', 'profileFields', 'newProfileBody', 'editedProfile'])
+  const { newProfileBody, editedProfile } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'nameBase', 'autoName', 'fieldText', 'profileFields', 'newProfileBody', 'editedProfile'])
   const f = { name: '  ', mc: '1.21.11', loader: 'vanilla', loaderVersion: '0.17.3', memory: '2G', java: ' ', harness: false, server: '', account: null, assistantAccount: true, serverList: true }
   assert.deepEqual(newProfileBody(f, ['1-21-11']), {
     name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla', loaderVersion: null, memory: '2G', java: null, harness: false, server: null, account: null, serverList: true,
@@ -678,7 +678,7 @@ test('the New sheet POSTs the fields the panel\'s route takes, named by the vers
 })
 
 test('on a fresh install Play makes a vanilla setup for the latest release and keeps where Join pointed', () => {
-  const { firstProfileBody } = lifted(['nameBase', 'autoName', 'defaultMemory', 'firstProfileBody'])
+  const { firstProfileBody } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'nameBase', 'autoName', 'defaultMemory', 'firstProfileBody'])
   assert.deepEqual(firstProfileBody('1.21.11', []), { name: '1-21-11', mc: '1.21.11', loader: 'vanilla', memory: '2G' })
   assert.deepEqual(firstProfileBody('1.21.11', ['1-21-11']).name, '1-21-11-2')
   const src = fnSource('firstPlay')
@@ -859,7 +859,7 @@ test('a server card\'s Play is off when Play could not start for any server', ()
 })
 
 test('two setups of one version are told apart in the list', () => {
-  const { setupSub, setupName } = lifted(['nameBase', 'givenName', 'setupTitle', 'dayWords', 'setupName', 'setupSub'])
+  const { setupSub, setupName } = lifted(['LOADER_NAMES', 'MOD_LOADERS', 'loaderName', 'modded', 'nameBase', 'givenName', 'setupTitle', 'dayWords', 'setupName', 'setupSub'])
   const first = { name: '1-21-11', mc: '1.21.11', loader: 'vanilla' }
   const second = { name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla' }
   assert.equal(setupName(first), setupName(second))
@@ -1045,8 +1045,9 @@ test('the sheet says things in plain words', () => {
   const sheet = fnSource('sheetView')
   assert.doesNotMatch(html, /through MCP/)
   assert.doesNotMatch(sheet, /'Loader'/)
-  assert.match(sheet, /segmented\('Mods', \[\['vanilla', 'None'\], \['fabric', 'Fabric', fabricNo\]\]/)
-  assert.match(sheet, /None is plain Minecraft, also called Vanilla/)
+  assert.match(sheet, /const loaderChoices = \[\['vanilla', 'None'\], \.\.\.MOD_LOADERS\.map/)
+  assert.match(sheet, /segmented\('Mods', loaderChoices, f\.loader, pickLoader\)/)
+  assert.match(fnSource('loaderHint'), /None is plain Minecraft, also called Vanilla/)
   assert.doesNotMatch(html, /or mojang for Mojang/)
 })
 
@@ -1204,4 +1205,37 @@ test('two things said in the same moment are said together, and nothing is said 
   await new Promise((r) => setTimeout(r, 120))
   assert.equal(region.say.textContent, 'Third.')
   assert.match(fnSource('announce'), /if \(S\.down\) return/)
+})
+
+test('the Mods choice: None and four loaders, Forge and NeoForge greyed out as coming, each with its reason', () => {
+  const L = ['LOADER_NAMES', 'MOD_LOADERS', 'COMING', 'loaderName', 'modded']
+  const { loaderBlock, loaderHint, loaderChangeWarning, loaderText, nameBase, setupTitle, defaultMemory, versionFacts, playSentence, MOD_LOADERS } = lifted([...L, 'loaderBlock', 'loaderHint', 'loaderChangeWarning', 'loaderText', 'nameBase', 'setupTitle', 'defaultMemory', 'versionFacts', 'playSentence'], '', ['MOD_LOADERS'])
+  assert.deepEqual(MOD_LOADERS, ['fabric', 'quilt', 'forge', 'neoforge'])
+  // the version facts decide: per loader, then Fabric's old flag from a panel without the list
+  const info = { loaders: { fabric: true, quilt: false } }
+  assert.equal(loaderBlock('vanilla', '1.8.9', info), null)
+  assert.equal(loaderBlock('fabric', '1.20.1', info), null)
+  assert.equal(loaderBlock('quilt', '1.20.1', info), 'Quilt has no build for 1.20.1.')
+  assert.equal(loaderBlock('quilt', '1.20.1', {}), null)
+  assert.equal(loaderBlock('fabric', '1.8.9', { fabric: false }), 'Fabric has no build for 1.8.9.')
+  assert.equal(loaderBlock('forge', '1.20.1', info), 'Forge is coming in a later SpawnLoft.')
+  assert.equal(loaderBlock('neoforge', '1.21.1', info), 'NeoForge is coming in a later SpawnLoft.')
+  assert.match(loaderHint('quilt'), /^Quilt loads mods\./)
+  assert.match(loaderHint('vanilla'), /^None is plain Minecraft/)
+  assert.equal(loaderChangeWarning('vanilla', 'quilt'), null)
+  assert.equal(loaderChangeWarning('fabric', 'fabric'), null)
+  assert.match(loaderChangeWarning('fabric', 'quilt'), /made for Fabric and will not load on Quilt\. Duplicate the setup to keep both\.$/)
+  assert.match(loaderChangeWarning('quilt', 'vanilla'), /made for Quilt and will not load without it/)
+  assert.equal(loaderText({ loader: 'quilt', loaderVersion: '0.30.2' }), 'Quilt 0.30.2')
+  assert.equal(loaderText({ loader: 'quilt', loaderVersion: null }), 'Quilt')
+  assert.equal(nameBase('1.20.1', 'quilt'), '1-20-1-quilt')
+  assert.equal(setupTitle({ mc: '1.20.1', loader: 'quilt' }), '1.20.1 \u00b7 Quilt')
+  assert.equal(defaultMemory('quilt'), '4G')
+  assert.deepEqual(versionFacts({ javaNeeds: 17, loaders: { fabric: true, quilt: true } }), ['Java 17', 'Fabric, Quilt available'])
+  assert.deepEqual(versionFacts({ loaders: { fabric: false, quilt: false } }), ['no mod loaders'])
+  assert.deepEqual(versionFacts({ loaders: { fabric: null, quilt: null } }), [])
+  assert.deepEqual(playSentence({ mc: '1.20.1', loader: 'quilt', who: 'alice' })[1], { b: 'Minecraft 1.20.1 (Quilt)' })
+  assert.deepEqual(playSentence({ mc: '1.20.1', fabric: true, who: 'alice' })[1], { b: 'Minecraft 1.20.1 (Fabric)' })
+  // narrow sheets get the same five as a list
+  assert.match(html, /@media \(max-width: 559px\) \{ \.modsseg \{ display: none; \} \.modspick \{ display: block; \} \}/)
 })

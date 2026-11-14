@@ -1002,7 +1002,9 @@ async function handleConsole(req, res, name, seg) {
 // rest of the panel, which matters because a profile's `java` is a path launch runs.
 async function handleClient(req, res, seg, url) {
   if (seg[2] === 'versions' && seg.length === 3 && req.method === 'GET') {
-    return json(res, 200, await client.listVersions({ fabric: ['1', 'true'].includes(url.searchParams.get('fabric') ?? '') }))
+    // loaders=1 reads every mod loader's list; fabric=1 is what pages from before the loader list send
+    const asked = (key) => ['1', 'true'].includes(url.searchParams.get(key) ?? '')
+    return json(res, 200, await client.listVersions({ fabric: asked('loaders') || asked('fabric') }))
   }
   // Mojang's and Fabric's lists read again now, for a release out within the hour
   if (seg[2] === 'versions' && seg[3] === 'refresh' && seg.length === 4 && req.method === 'POST') {

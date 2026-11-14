@@ -19,7 +19,7 @@ import { mergeInherited, fetchManifest, fetchVersionJson, currentOs, platformRef
 import { resolveVersion, resolvedRefusal, launchFeatures, isSafeVersionId, versionKind, javaRequirement } from './client-version.mjs'
 import { buildCommand, spawnClient, readClientState, readLastExit, readPlayed, stopClient, localJoinAddress, HOSTNAME, IPV6 } from './client-launch.mjs'
 import { offlineAccount, defaultPlayerName, accountFor, assertPlayerName, peekAccount, loadAccounts, findAccount, sameUuid } from './client-auth.mjs'
-import { LOADERS, loaderFor } from './client-loaders.mjs'
+import { LOADERS, loaderFor, loaderLists, loadersFor } from './client-loaders.mjs'
 import { harnessFor, publishedHarnessIds, ensureHarnessJar, readHarnessFile, removeHarnessFile, connectHarness, waitForHarness } from './client-harness.mjs'
 import { refreshHarnessIndex, harnessIndexStatus } from './client-harness-index.mjs'
 import { checkInstance, REFUSED_CONSOLE, commandVerb } from './bots.mjs'
@@ -53,7 +53,7 @@ function validateFields({ mc, loader, loaderVersion, java, memory, harness, serv
   if (typeof harness !== 'boolean') fail('harness must be true or false')
   if (typeof assistantAccount !== 'boolean') fail('assistantAccount must be true or false')
   if (typeof serverList !== 'boolean') fail('serverList must be true or false')
-  if (harness && loader === 'vanilla') {
+  if (harness && loader !== 'fabric') {
     fail('the harness mod needs the fabric loader')
   }
   for (const [key, value] of Object.entries({ loaderVersion, java, server, account })) {
@@ -223,8 +223,10 @@ export function updateProfile(name, patch, { launching = false } = {}) {
   if (changing.length && !launching && lockHolder(clientLaunchLock(name)) !== null) {
     fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it before changing ${changing.join(', ')}`, 'launching')
   }
-  // a loader build is made for one Minecraft version; the next launch picks one for the new version
-  if (Object.hasOwn(patch, 'mc') && patch.mc !== existing.mc && (!Object.hasOwn(patch, 'loaderVersion') || patch.loaderVersion === existing.loaderVersion)) {
+  // a loader build is made for one Minecraft version and one loader; the next launch picks one
+  // for the new pair
+  const newPair = (Object.hasOwn(patch, 'mc') && patch.mc !== existing.mc) || (Object.hasOwn(patch, 'loader') && patch.loader !== existing.loader)
+  if (newPair && (!Object.hasOwn(patch, 'loaderVersion') || patch.loaderVersion === existing.loaderVersion)) {
     patch = { ...patch, loaderVersion: null }
   }
   const merged = { ...existing, ...patch }
@@ -1162,6 +1164,11 @@ function javaHint(row) {
   return requiredMajor(row.id)
 }
 
+function availability(mc, lists) {
+  const loaders = lists ? loadersFor(mc, lists) : Object.fromEntries(LOADERS.filter((l) => l !== 'vanilla').map((l) => [l, null]))
+  return { fabric: loaders.fabric, loaders }
+}
+
 // The version picker's rows, newest first: every id Mojang lists. The per-version facts that
 // need the JSON (its exact Java, a platform refusal) are given for versions on disk; the rest
 // say so (javaNeedsExact false), and describeVersion answers for one. fabric is whether Fabric
@@ -1175,9 +1182,9 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
   let manifest = null
   let offline = null
   // the two lists side by side: each fetch may take its full timeout on a slow network
-  const [mojang, fabricList] = await Promise.all([
+  const [mojang, lists] = await Promise.all([
     fetchManifest({ cacheDir: CLIENT_CACHE_DIR, force: refresh, ...(fetchImpl ? { fetchImpl } : {}) }).then((m) => ({ m }), (err) => ({ err })),
-    fabric || refresh ? loaderFor('fabric').gameVersions({ force: refresh }).catch(() => null) : null,
+    fabric || refresh ? loaderLists({ force: refresh }) : null,
     refreshHarnessIndex({ force: refresh }),
   ])
   if (mojang.err) offline = `the Minecraft version list could not be read (${mojang.err?.message ?? mojang.err}), so only downloaded versions are listed`
@@ -1205,7 +1212,9 @@ export async function listVersions({ os = currentOs(), fetchImpl, fabric = false
       javaNeeds: disk ? javaRequirement(disk.json).major : javaHint(v),
       javaNeedsExact: Boolean(disk),
       harness: Boolean(harnessFor(v.id)),
-      fabric: fabricList ? loaderFor('fabric').available(v.id, fabricList) : null,
+      // which loaders build for it (null: not asked, or that loader's list could not be read);
+      // fabric is the same answer for Fabric, as the routes gave it before the loader list
+      ...availability(v.id, lists),
       refusal: disk ? platformRefusal(disk.json, os, hostCaps) : null,
       note: notes.length ? notes.join('; ') : null,
     }
@@ -1225,9 +1234,7 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
   const needsCaps = !nativeArches(json, os).has(os.arch)
   const resolved = resolveVersion(json, { os, hostCaps: needsCaps ? await hostCapabilities(os) : null })
   const refused = resolvedRefusal(resolved)
-  let fabric = null
-  const [fabricList] = await Promise.all([loaderFor('fabric').gameVersions().catch(() => null), refreshHarnessIndex()])
-  try { if (fabricList) fabric = loaderFor('fabric').available(mc, fabricList) } catch { /* unknown */ }
+  const [lists] = await Promise.all([loaderLists(), refreshHarnessIndex()])
   return {
     id: mc,
     type: json.type ?? 'release',
@@ -1238,7 +1245,7 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
     java: resolved.java,
     arch: resolved.arch,
     emulated: resolved.emulated,
-    fabric,
+    ...availability(mc, lists),
     harness: Boolean(harnessFor(mc)),
     refusal: refused?.message ?? null,
     code: refused?.code ?? null,

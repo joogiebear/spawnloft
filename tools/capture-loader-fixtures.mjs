@@ -9,9 +9,9 @@
 // byte), the jar's entry list (names and sizes, not the files), and the jar's sha1 beside the one
 // the maven publishes. For each loader it keeps the version lists as published. Quilt profiles
 // keep, per library, the .sha1 file the maven publishes beside it (Quilt's rows carry none).
-// The per-version loader lists (Quilt's and Fabric's /versions/loader/<mc>) are cut to their
-// newest LIST_KEEP rows, since each row carries a whole launcher profile; everything else is as
-// published. manifest.json says what came from where. Nothing here is run: the jars are read as
+// The per-version loader lists (Quilt's and Fabric's /versions/loader/<mc>) keep every row in
+// the order served, with only each row's loader part (the rest of a row is a whole launcher
+// profile); everything else is as published. manifest.json says what came from where. Nothing here is run: the jars are read as
 // zip files and removed.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -48,7 +48,6 @@ const FORGE = [
 const NEOFORGE = ['20.4.253', '21.1.266', '26.3.0.103']
 const QUILT = [['1.20.1', '0.30.2'], ['26.3', '0.30.2']]
 const FABRIC_LOADER_LISTS = ['1.21.11', '26.3']
-const LIST_KEEP = 25
 
 const manifest = { capturedAt: new Date().toISOString(), files: [] }
 const sha1 = (buf) => crypto.createHash('sha1').update(buf).digest('hex')
@@ -92,11 +91,12 @@ async function sidecar(url) {
   return m ? m[0].toLowerCase() : null
 }
 
-// A per-version loader list, cut to its newest rows (see the top)
+// A per-version loader list: every row in the order served, with only its loader part (see the top)
 async function saveList(rel, url) {
   const list = JSON.parse((await get(url)).toString('utf8'))
   if (!Array.isArray(list) || list.length === 0) throw new Error(`${url}: not a list, or an empty one`)
-  save(rel, Buffer.from(JSON.stringify(list.slice(0, LIST_KEEP), null, 2) + '\n'), url)
+  if (!list.every((row) => typeof row?.loader?.version === 'string')) throw new Error(`${url}: a row without a loader version`)
+  save(rel, Buffer.from(JSON.stringify(list.map((row) => ({ loader: row.loader })), null, 2) + '\n'), url)
 }
 
 // legacy: the installer format with no version.json (Forge 1.12.2 builds before 2851 and older)

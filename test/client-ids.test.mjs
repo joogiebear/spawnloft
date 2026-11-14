@@ -18,6 +18,7 @@ const { META_URL, loaderVersions, ensureFabricProfile, fabricVersionId, fabricAv
 const F_DIR = path.dirname(fileURLToPath(import.meta.url))
 const eras = F.loadErasManifest()
 const fabricList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'fabric-game-versions.json'), 'utf8'))
+const quiltList = JSON.parse(fs.readFileSync(path.join(F_DIR, 'fixtures', 'client', 'loaders', 'quilt', 'game-versions.json'), 'utf8'))
 
 // the cached lists, as fetched a moment ago
 function seed(file, body, age = 0) {
@@ -108,6 +109,7 @@ test('a profile on a spaced id saves, and its folders are ordinary ones', () => 
 test('the picker lists every id Mojang does, with its kind, newest first, and Fabric when asked', async () => {
   seed('version_manifest_v2.json', eras)
   seed('fabric-game-versions.json', fabricList)
+  seed('quilt-game-versions.json', quiltList)
   const { versions } = await client.listVersions({ os: { name: 'linux', arch: 'x64', version: '6' }, fabric: true })
   assert.equal(versions.length, eras.versions.length)
   const times = versions.map((v) => Date.parse(v.releaseTime))
@@ -116,6 +118,9 @@ test('the picker lists every id Mojang does, with its kind, newest first, and Fa
   assert.equal(row('1.14.2 Pre-Release 4').kind, 'pre-release')
   assert.equal(row('1.14.2 Pre-Release 4').fabric, true)
   assert.equal(row('1.12.2').fabric, false)
+  // every loader's answer, Quilt's from its real list
+  assert.deepEqual(row('1.20.4').loaders, { fabric: true, quilt: true })
+  assert.deepEqual(row('1.12.2').loaders, { fabric: false, quilt: false })
   assert.equal(row('b1.7.3').kind, 'beta')
   assert.equal(row('b1.7.3').javaNeeds, 8)
   assert.equal(row('b1.7.3').javaNeedsExact, false)
@@ -129,10 +134,11 @@ test('the picker lists every id Mojang does, with its kind, newest first, and Fa
 test('describeVersion answers what a launch would decide, from the version\'s own file', async () => {
   seed('version_manifest_v2.json', eras)
   seed('fabric-game-versions.json', fabricList)
+  seed('quilt-game-versions.json', quiltList)
   const d = await client.describeVersion('1.20.4', { os: { name: 'linux', arch: 'x64', version: '6' }, fetchImpl: noNetwork })
   assert.deepEqual({ ...d, java: undefined, problems: undefined }, {
     id: '1.20.4', type: 'release', kind: 'release', releaseTime: d.releaseTime, javaNeeds: 17, javaNeedsExact: true, java: undefined,
-    arch: 'x64', emulated: false, fabric: true, harness: false, refusal: null, code: null, problems: undefined,
+    arch: 'x64', emulated: false, fabric: true, loaders: { fabric: true, quilt: true }, harness: false, refusal: null, code: null, problems: undefined,
   })
   const arm = await client.describeVersion('1.20.4', { os: { name: 'linux', arch: 'arm64', version: '6' }, fetchImpl: noNetwork })
   assert.equal(arm.code, 'no-natives-for-this-machine')

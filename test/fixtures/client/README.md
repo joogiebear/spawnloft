@@ -56,8 +56,8 @@ Captured by the `loader-fixtures` Actions job (`tools/capture-loader-fixtures.mj
 loaders' hosts cannot be reached from where the launcher code is written. The job uploads them as
 its `loader-fixtures` artifact (no workflow writes to the repository), and they are committed from
 there. Not edited, except that the per-version loader lists (`quilt/loader-<mc>.json`,
-`fabric/loader-<mc>.json`) are cut to their newest 25 rows, as the script does: re-run the job to
-change them. `loaders/manifest.json` lists every file with its source URL and
+`fabric/loader-<mc>.json`) keep only each row's `loader` part, in the order served (Quilt's is
+not newest first), as the script does: re-run the job to change them. `loaders/manifest.json` lists every file with its source URL and
 sha1, and when it was captured.
 
 - `forge/<forge version>/`: per pinned Forge installer, `install_profile.json` and (from the modern

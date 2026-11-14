@@ -36,3 +36,12 @@ jobs:
         with:
           name: loader-fixtures
           path: test/fixtures/client/loaders/
+      # The lists that change most, as one base64 tar.gz between two marker lines, for a session that
+      # can read this job's log but not download its artifact
+      - name: Print the loader lists
+        working-directory: test/fixtures/client/loaders
+        run: |
+          echo "----- loader-lists.tgz.b64 begin -----"
+          tar czf - manifest.json quilt/loader-*.json fabric/loader-*.json | base64 -w 0 | fold -w 4000
+          echo
+          echo "----- loader-lists.tgz.b64 end -----"
