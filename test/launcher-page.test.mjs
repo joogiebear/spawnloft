@@ -351,8 +351,8 @@ test('the setup sheet\'s memory and facts', () => {
   assert.equal(defaultMemory('vanilla'), '2G')
   assert.equal(defaultMemory('fabric'), '4G')
   // today's picker rows carry only the harness; the all-versions plan adds the rest
-  assert.deepEqual(versionFacts({ id: '1.21.1', harness: false }, null), ['harness not published'])
-  assert.deepEqual(versionFacts({ id: '26.3', harness: false, fabric: true, javaNeeds: 25 }, { harness: true, emulated: true }), ['Java 25', 'Fabric available', 'harness published', 'runs under emulation'])
+  assert.deepEqual(versionFacts({ id: '1.21.1', harness: false }, null), ['no helper mod yet'])
+  assert.deepEqual(versionFacts({ id: '26.3', harness: false, fabric: true, javaNeeds: 25 }, { harness: true, emulated: true }), ['Java 25', 'Fabric available', 'helper mod available', 'runs under emulation'])
   assert.deepEqual(versionFacts(null, { fabric: false }), ['no Fabric'])
   assert.deepEqual(versionFacts(null, null), [])
   // a Java read from the id is said to be a guess until the version's file says

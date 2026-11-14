@@ -2872,7 +2872,7 @@
             <h1 id="srvName">—</h1>
             <span class="srv-id" id="srvId" hidden title="The name the folder and the commands use"></span>
             <span class="spill" id="srvState"></span>
-            <span class="badge" id="srvOffline" hidden title="Anyone can join as any name. Players get name-derived UUIDs, and every log carries an OFFLINE/INSECURE banner.">Offline mode</span>
+            <span class="badge" id="srvOffline" hidden title="Accounts are not checked: anyone can join under any name. Not safe for a public server. Change it under Settings.">Anyone can join</span>
           </div>
           <div class="srv-meta" id="srvMeta"></div>
         </div>
@@ -3058,15 +3058,13 @@
             <label>
               <input type="radio" name="onlineMode" value="online" checked>
               <b>Require a Minecraft account</b>
-              <span>Matches a real server. Players get their real UUIDs, so plugin behaviour and
-                bug reports match production.</span>
+              <span>Only people who own Minecraft can join, each under their own name. Recommended.</span>
             </label>
             <label>
               <input type="radio" name="onlineMode" value="offline">
               <b>Anyone, as any name</b>
-              <span>For testing with several accounts, or with no internet. Players get
-                name-derived UUIDs, and every log carries an OFFLINE/INSECURE banner that plugin
-                authors often refuse bug reports over.</span>
+              <span>Nobody's account is checked, so anyone can join under any name. For testing by
+                yourself, or with no internet. Not safe for a public server.</span>
             </label>
           </div>
         </div>
@@ -3125,7 +3123,7 @@
         <div class="field">
           <label for="aDir">Server folder</label>
           <div class="row">
-            <input id="aDir" class="mono" spellcheck="false" placeholder="C:\Minecraft\survival" autocomplete="off">
+            <input id="aDir" class="mono" spellcheck="false" placeholder="The folder the server is in" autocomplete="off">
             <button type="button" id="bBrowse" hidden>Browse…</button>
           </div>
           <div class="hint" id="aDirHint">Paste the full path of the folder holding the server jar and server.properties.</div>
@@ -3210,7 +3208,7 @@
           </div>
           <div class="field" style="flex:3" id="dToolsWrap">
             <label for="dTools">Client tools folder <span class="hint">(optional)</span></label>
-            <input id="dTools" class="mono" placeholder="C:\xampp\mysql\bin" autocomplete="off">
+            <input id="dTools" class="mono" placeholder="The bin folder of MySQL or MariaDB" autocomplete="off">
             <div class="hint">Where the MySQL client tools live. Found on its own in the usual places.</div>
           </div>
         </div>
@@ -3270,7 +3268,7 @@
       <div class="sheet-body wide">
         <fieldset class="theme-picker">
           <legend>Appearance</legend>
-          <p class="hint">Choose your colors. Your selection is saved on this PC and applies immediately.</p>
+          <p class="hint">Choose your colors. Your selection is saved on this computer and applies immediately.</p>
           <div class="theme-options">
             <label class="theme-option">
               <input type="radio" name="appTheme" value="classic">
@@ -3298,8 +3296,8 @@
         <div>
           <h2>Where SpawnLoft keeps things</h2>
           <p class="hint" style="margin:0 0 12px">
-            Servers that already exist keep their own folders — the registry stores absolute paths,
-            so changing this only affects servers created from now on.
+            Servers that already exist stay in the folders they are in, so changing this only
+            affects servers created from now on.
           </p>
           <dl class="kv" id="setPaths"></dl>
         </div>
@@ -3355,7 +3353,7 @@
         </div>
         <div id="setClient">
           <h2>Game client</h2>
-          <p class="hint" style="margin:0 0 12px">Profiles for the real Minecraft client, launched pointed at one of your servers. Create profiles with <code>spawnloft client new</code>.</p>
+          <p class="hint" style="margin:0 0 12px">Setups for the real Minecraft game, each started pointed at one of your servers. They are made and changed on the Play page.</p>
           <dl class="kv" id="clientProfiles"></dl>
         </div>
         <div id="setMcp">
@@ -4118,16 +4116,16 @@ const STATE_TEXT = {
   reachable: 'Reachable',
   unreachable: 'Unreachable',
   stopping: 'Stopping…',
-  orphaned: 'Orphaned',
-  stale: 'Stale state',
+  orphaned: 'Out of reach',
+  stale: 'Not shut down cleanly',
   unknown: 'Unavailable',
 };
 
 // The states nobody can be expected to know the meaning of. Saying it here beats a support
 // question, and each one names its way out.
 const STATE_NOTE = {
-  orphaned: ['Orphaned', 'The Java process is still running but the supervisor that owned it is gone, so SpawnLoft can no longer talk to it. Stop it with "spawnloft kill" in a terminal, then start it again here.'],
-  stale: ['Stale state', 'A leftover state file from a session that did not shut down cleanly. Starting the server clears it.'],
+  orphaned: ['Still running, but out of reach.', 'The part of SpawnLoft that looked after this server has gone, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.'],
+  stale: ['Not shut down cleanly.', 'SpawnLoft closed, or the computer went off, while this server was running. It is not running now, and starting it clears this.'],
   unknown: ['Unavailable', 'SpawnLoft could not read this server’s state. Its folder may have been moved or deleted.'],
   unreachable: ['Unreachable', 'This database runs elsewhere and is not answering at its address. Start it there, or check the host, port and password under Settings.'],
 };
@@ -4388,6 +4386,38 @@ function renderStatePill(row) {
 
 const FILE_MANAGER = panelPlatform === 'darwin' ? 'Finder' : panelPlatform === 'win32' ? 'Explorer' : 'your file manager';
 
+/**
+ * An example path as it looks on the computer the panel runs on. Every placeholder was a
+ * Windows one (C:\Downloads\..., java.exe), on a Mac and on Linux too.
+ */
+function examplePath(platform, what) {
+  const win = platform === 'win32';
+  const home = win ? 'C:\\Users\\you' : platform === 'darwin' ? '/Users/you' : '/home/you';
+  const join = (...parts) => parts.join(win ? '\\' : '/');
+  if (what === 'map') return join(home, 'Downloads', 'amazing-map.zip');
+  if (what === 'server') return win ? 'C:\\Minecraft\\survival' : join(home, 'minecraft', 'survival');
+  if (what === 'backups') return win ? 'D:\\spawnloft-backups' : platform === 'darwin' ? '/Volumes/Backup/spawnloft-backups' : '/mnt/backup/spawnloft-backups';
+  if (what === 'java') return win ? 'C:\\Program Files\\Java\\jdk-21\\bin\\java.exe' : platform === 'darwin' ? '/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home/bin/java' : '/usr/lib/jvm/java-21/bin/java';
+  return home;
+}
+const JAVA_FILE = panelPlatform === 'win32' ? 'java.exe' : 'java';
+
+/**
+ * One line of the Java picker. "java" alone is the one the computer runs by default, which the
+ * list called "on PATH".
+ */
+function javaOptionWords(found, needs) {
+  const where = found.path === 'java' ? 'this computer\u2019s default' : found.path;
+  return 'Java ' + found.major + '  ·  ' + where + (needs && found.major < needs ? '  ·  too old for this server' : '');
+}
+
+/** What to say under the picker when the Java chosen cannot run this server, or '' when it can. */
+function javaTooOldWords(list, chosen, needs) {
+  const pick = (list || []).find((f) => f.path === chosen);
+  if (!needs || !pick || !(pick.major < needs)) return '';
+  return 'Java ' + pick.major + ' is too old: this server needs Java ' + needs + ' or newer, and will not start on it.';
+}
+
 /** Software and version, the address to connect to, and the Java it runs on. */
 function renderMeta(row) {
   const meta = $('#srvMeta');
@@ -4585,7 +4615,7 @@ function renderVitals(row) {
   }
 
   const players = vitalCell('players', 'Players',
-    latest == null ? 'Waiting for the server to answer over RCON' : '');
+    latest == null ? 'Waiting for the server to answer' : '');
   if (latest && latest.players != null) {
     bigNumber(players.dd, String(latest.players), latest.maxPlayers != null ? '/ ' + latest.maxPlayers : '');
     players.wrap.append(bar(latest.maxPlayers ? latest.players / latest.maxPlayers : 0));
@@ -4606,7 +4636,7 @@ function renderVitals(row) {
 
   const ceiling = memoryCeilingMb(row.memory);
   const memory = vitalCell('memory', 'Memory',
-    'The whole java process. It can sit above the ' + (row.memory || 'heap') + ' heap limit; that is normal.');
+    'Everything the server uses, Java itself included. It can sit a little above the ' + (row.memory ? row.memory + ' ' : '') + 'limit you set; that is normal.');
   if (latest && Number.isFinite(latest.rss)) {
     // Gigabytes once there is a gigabyte to count; "0.0 GB" for a server that is still warming up
     // says it uses nothing, which is not true.
@@ -4760,7 +4790,8 @@ function renderServer(row) {
       tone: row.status === 'stale' ? 'warn' : 'fault',
       title: note[0],
       text: note[1],
-      actions: row.status === 'stale' ? [{ label: 'Start', run: () => $('#bStart').click() }] : [],
+      actions: row.status === 'stale' ? [{ label: 'Start', run: () => $('#bStart').click() }]
+        : row.status === 'orphaned' ? [{ label: 'Force stop', run: () => forceStop(row.name, row.label || row.name) }] : [],
       dismiss: () => dismissed.add(noteKey),
     }));
   }
@@ -4930,6 +4961,27 @@ function paintDbReach(row) {
   });
   notice.setAttribute('role', 'status');
   box.append(notice);
+}
+
+/**
+ * The way out for a server that is running with nothing looking after it. It was a sentence
+ * telling the person to run "spawnloft kill" in a terminal.
+ */
+async function forceStop(name, label) {
+  const ok = await ask({
+    title: 'Force stop ' + label + '?',
+    text: 'It is ended at once, without saving. Whatever happened in the world since its last save is lost.',
+    confirmLabel: 'Force stop',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await post('/instances/' + encodeURIComponent(name) + '/kill');
+    toast('Stopped ' + label + '.', 'good');
+  } catch (e) {
+    toast(e.message, 'bad');
+  }
+  await refresh();
 }
 
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
@@ -7478,14 +7530,13 @@ async function paintPerformance(name, opts) {
         + (wide ? ' - try ' + wide.label + '.' : '.');
     } else {
       none = data.running
-        ? 'Measuring. The first reading needs two samples ' + data.everySeconds + ' seconds apart, '
-          + 'because processor use is a rate rather than a number you can read off once.'
+        ? 'Measuring. The first reading takes about ' + (data.everySeconds * 2) + ' seconds.'
         : 'Nothing recorded. This is measured while the server runs, and history is cleared when it '
           + 'starts so two runs are never drawn as one line.';
     }
     // The pane's own shape, empty: both gauges with their grids, the reason written once across
     // the processor chart, and the memory chart saying only what it will measure against.
-    const ceilingNote = data.memory ? data.memory + ' max heap' : '';
+    const ceilingNote = data.memory ? data.memory + ' allowed' : '';
     body.append(gauge({
       title: 'Processor', now: data.running ? '…' : '—',
       aside: data.cores ? 'share of all ' + data.cores + ' cores' : '',
@@ -7523,7 +7574,7 @@ async function paintPerformance(name, opts) {
   body.append(gauge({
     title: 'Memory',
     now: data.running ? last.rss + ' MB' : 'stopped',
-    aside: 'peak ' + peakRss + ' MB' + (ceiling ? '  ·  ' + data.memory + ' max heap' : ''),
+    aside: 'peak ' + peakRss + ' MB' + (ceiling ? '  ·  ' + data.memory + ' allowed' : ''),
     samples,
     pick: (s) => s.rss,
     max: rssMax,
@@ -7555,8 +7606,8 @@ async function paintPerformance(name, opts) {
   if (ceiling && peakRss > ceiling) {
     const note = document.createElement('div');
     note.className = 'hint';
-    note.textContent = 'Above the heap limit is normal: this is the whole java process, and '
-      + data.memory + ' is the ceiling on its heap alone.';
+    note.textContent = 'Memory can sit a little above the limit you set. That is normal: ' + data.memory
+      + ' is what the game itself may use, and Java needs some more on top of it.';
     body.append(note);
   }
 
@@ -7572,7 +7623,7 @@ async function paintPerformance(name, opts) {
   const up = humanUptime(data.uptimeMs);
   add('Uptime', up || (data.running ? 'just started' : 'not running'));
   if (data.startedAt) add('Started', stamp(new Date(data.startedAt).toISOString()));
-  add('Samples', samples.length + ' every ' + data.everySeconds + 's');
+  add('Readings', samples.length + ', one every ' + data.everySeconds + ' seconds');
   body.append(facts);
 }
 
@@ -8696,7 +8747,7 @@ async function renderWorlds(opts) {
   src.className = 'mono';
   src.spellcheck = false;
   src.autocomplete = 'off';
-  src.placeholder = 'C:\\Downloads\\amazing-map.zip — a zip, tar.gz, or a folder';
+  src.placeholder = examplePath(panelPlatform, 'map') + ' — a zip, tar.gz, or a folder';
   src.style.flex = '1 1 260px';
   const browse = document.createElement('button');
   browse.type = 'button';
@@ -11644,7 +11695,7 @@ function renderBackupHistory(row, data, signature) {
         text: 'Every new backup, for every server, is copied there as it is taken - ideally on '
           + 'a different drive, so one disk failure cannot take the servers and their backups '
           + 'together. When old backups are cleared, their second copies go too.',
-        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: 'D:\\spawnloft-backups', required: true },
+        input: { label: 'Full path to a folder', value: data.mirror || '', placeholder: examplePath(panelPlatform, 'backups'), required: true },
         confirmLabel: 'Use this folder',
         submit: ({ text }) => post('/settings', { backupsMirrorDir: text }),
       });
@@ -12246,7 +12297,7 @@ async function buildServerSettings(row, body) {
   const jvCustom = el('input', 'mono');
   jvCustom.autocomplete = 'off';
   jvCustom.spellcheck = false;
-  jvCustom.placeholder = 'C:\\Program Files\\Java\\jdk-17\\bin\\java.exe';
+  jvCustom.placeholder = examplePath(panelPlatform, 'java');
   jvCustom.setAttribute('aria-label', 'Path to java');
   jvCustom.hidden = true;
   jvWrap.append(jvSelect, jvCustom);
@@ -12257,7 +12308,7 @@ async function buildServerSettings(row, body) {
   const jvRow = addRow(jv, {
     id: jvSelect.id,
     label: 'Runs on',
-    help: 'Looking for installed Javas…',
+    help: 'Looking for Java on this computer…',
     control: jvWrap,
     entry: {
       kind: 'own', key: 'java',
@@ -12282,23 +12333,38 @@ async function buildServerSettings(row, body) {
       jvSelect.append(o);
     };
     const needs = row.javaNeeds;
-    for (const f of found.found) {
-      const where = f.path === 'java' ? 'on PATH' : f.path;
-      const tooOld = needs && f.major < needs;
-      addOpt(f.path, 'Java ' + f.major + '  ·  ' + where + (tooOld ? '  ·  too old for this server' : ''));
-    }
-    if (!found.found.some((f) => f.path === 'java')) addOpt('java', 'Whatever "java" resolves to on PATH');
-    addOpt('__custom', 'A path of my own…');
+    for (const f of found.found) addOpt(f.path, javaOptionWords(f, needs));
+    if (!found.found.some((f) => f.path === 'java')) addOpt('java', 'This computer\u2019s default Java');
+    addOpt('__custom', 'Choose another Java…');
     selectJava(mine.java);
     const needLine = needs ? 'This server needs Java ' + needs + ' or newer. ' : '';
     jvHint.textContent = found.found.length
-      ? needLine + 'Found ' + found.found.length + (found.found.length === 1 ? ' Java' : ' Javas') + ' on this machine; '
-        + 'for one installed somewhere else, pick the last option and paste the path to java.exe.'
-      : needLine + 'No Java was found on PATH or in the usual install folders. Paste the path to java.exe, or get one from ' + found.download;
+      ? needLine + 'Found ' + found.found.length + (found.found.length === 1 ? ' copy' : ' copies') + ' of Java on this computer. '
+        + 'For one installed somewhere else, pick the last option and paste the path to ' + JAVA_FILE + '.'
+      : needLine + 'No Java was found on this computer. Install one, or paste the path to ' + JAVA_FILE + '. ';
+    if (found.download && !found.found.length) {
+      const get = el('button', 'ghost');
+      get.type = 'button';
+      get.textContent = 'Get Java';
+      get.onclick = () => openOutside(found.download);
+      jvHint.append(get);
+    }
+    // A Java marked too old could be chosen and saved with nothing said
+    const jvOld = el('div', 'hint');
+    jvOld.style.color = 'var(--warn-ink)';
+    jvOld.setAttribute('aria-live', 'polite');
+    jvRow.left.append(jvOld);
+    const sayOld = () => {
+      jvOld.textContent = javaTooOldWords(found.found, chosenJava(), needs);
+      jvOld.hidden = !jvOld.textContent;
+    };
+    jvSelect.addEventListener('change', sayOld);
+    jvCustom.addEventListener('input', sayOld);
+    sayOld();
     javaReady = true;
     update();
   }).catch((e) => {
-    jvHint.textContent = 'Could not look for Javas: ' + e.message;
+    jvHint.textContent = 'Could not look for Java: ' + e.message;
     jvSelect.textContent = '';
     const o = el('option');
     o.value = '__custom';
@@ -12936,7 +13002,7 @@ async function editServer(row) {
         saving = false;
         if (mine !== askSeq || settled) return;
         if (renamed) { state.current = null; await refresh(); select(name); }
-        errBox.textContent = (renamed ? 'Renamed to ' + name + ', but the rest was not saved. ' : '') + e.message;
+        errBox.textContent = (renamed ? 'The folder name is now ' + name + ', but the rest was not saved. ' : '') + e.message;
         errBox.hidden = false;
         ok.disabled = false;
         $('#dlgCancel').disabled = false;
@@ -12951,7 +13017,8 @@ async function editServer(row) {
 
   if (result.renamed) {
     if (state.current !== result.name) { state.current = null; await refresh(); select(result.name); }
-    toast('Renamed to ' + result.name + '.', 'good');
+    const named = rowOf(result.name);
+    toast('Saved' + (named && named.label && named.label !== result.name ? ' ' + named.label : '') + '. Its folder name is now ' + result.name + '.', 'good');
     return;
   }
   await refresh();
@@ -13032,9 +13099,9 @@ async function manageDatabase(row) {
       : 'Choose what to do with this database.',
     confirmLabel: 'Continue',
     choices: live
-      ? [{ value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in Explorer.' }]
+      ? [{ value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in ' + FILE_MANAGER + '.' }]
       : [
-          { value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in Explorer.' },
+          { value: 'folder', label: 'Open its folder', hint: 'Shows the data folder in ' + FILE_MANAGER + '.' },
           { value: 'delete', label: 'Delete this database', hint: 'Removes it from SpawnLoft, and optionally its data.' },
         ],
   });
@@ -13472,7 +13539,7 @@ async function renderDatabaseBackups(opts) {
   take.onclick = async () => {
     dbBackupBusy = true;
     take.disabled = true;
-    take.textContent = 'Dumping…';
+    take.textContent = 'Backing up…';
     try {
       const out = await post(base, { label: tag.value.trim() || 'manual' });
       toast('Backed up ' + label + ' to ' + out.taken.name + ' (' + out.taken.sizeHuman + ').', 'good');
@@ -13595,7 +13662,7 @@ async function renderDatabaseSettings(row) {
   body.dataset.for = row.name;
   body.textContent = '';
   paneHead(body, 'sliders', 'Database settings',
-    'Where it listens, how to reach it as root, and which servers have a database on it.');
+    'Its address, the admin login, and which servers have a database on it.');
 
   const glyph = row.engineKind === 'redis' ? 'cache' : 'database';
   const groupHead = (mark, title, text) => {
@@ -13626,10 +13693,10 @@ async function renderDatabaseSettings(row) {
   // ---- how to reach it: every value a plugin config asks for, each copyable ----------------
   const conn = el('div', 'section set-group db-conn');
   conn.append(groupHead(glyph, 'Connection', row.external
-    ? 'Registered with its address and admin credentials; it is run and stopped where it lives. Servers are attached to it from their own Settings tab.'
+    ? 'SpawnLoft knows its address and admin login; it is started and stopped where it runs. Servers are attached to it from their own Settings tab.'
     : row.engineKind === 'redis'
-      ? 'Loopback only: nothing outside this machine can reach it. One password and one key space, shared by every server attached; plugins prefix their keys.'
-      : 'Loopback only: nothing outside this machine can reach it. Servers get their own user and database; root is for you.'));
+      ? 'Only this computer can connect to it. Every attached server shares the one password and the one store, so each plugin puts its own prefix on what it keeps.'
+      : 'Only this computer can connect to it. Each server gets its own login and its own database; the admin login below is for you.'));
   const dl = el('dl', 'db-facts');
   fact(dl, 'Engine', (row.engineLabel || row.engine) + ' ' + (row.version || '') + (row.external ? ' (runs elsewhere)' : ''));
   fact(dl, 'Host', addrButton(row.host || '127.0.0.1', 'host'));
@@ -14164,7 +14231,7 @@ $('#formNew').onsubmit = async (e) => {
     paintSlug($('#nName'));
     await refresh();
     select(inst.name);
-    toast('Created ' + inst.name + ' on port ' + inst.port + '.', 'good');
+    toast('Created ' + (inst.label || inst.name) + ' on port ' + inst.port + '.', 'good');
   } catch (err) {
     forceJava = false;
     jobs.close();
@@ -14338,7 +14405,7 @@ $('#formPack').onsubmit = async (e) => {
     $('#bPackCreate').disabled = false;
     await refresh();
     select(inst.name);
-    toast('Created ' + inst.name + ' from ' + packView.chosen.title + '.', 'good');
+    toast('Created ' + (inst.label || inst.name) + ' from ' + packView.chosen.title + '.', 'good');
   } catch (err) {
     jobs.close();
     lockAddTabs(false);
@@ -14450,7 +14517,7 @@ function renderSettings() {
     ['Backups', l.backupsDir],
     ['Templates', l.templatesDir],
     ['Settings file', l.settingsFile],
-  ] : [['Locations', 'Could not read them from the core.']];
+  ] : [['Locations', 'Could not read them. Try again in a moment.']];
   for (const r of rows) {
     const dt = document.createElement('dt');
     dt.textContent = r[0];
@@ -14480,7 +14547,7 @@ function renderSettings() {
   } else {
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = 'To move these, run: spawnloft config set-root <path>';
+    hint.textContent = 'These are moved from the SpawnLoft app, or in a terminal with: spawnloft config set-root <folder>';
     actions.append(hint);
   }
 
@@ -14586,9 +14653,13 @@ function renderClientProfiles() {
   dl.innerHTML = '';
   if (!state.clientProfiles.length) {
     const dt = el('dt');
-    dt.textContent = 'No profiles';
+    dt.textContent = 'No setups yet';
     const dd = el('dd');
-    dd.textContent = 'spawnloft client new <name> --mc 1.21.11';
+    const go = el('button', 'ghost');
+    go.type = 'button';
+    go.textContent = 'Make one on the Play page';
+    go.onclick = () => showPlay();
+    dd.append(go);
     dl.append(dt, dd);
     return;
   }
@@ -15177,7 +15248,7 @@ async function updJson(path, method, body) {
 function updOutcomeText(r) {
   if (r.result === 'update') return '';
   if (r.result === 'blocked') return 'A newer release exists but cannot be installed here: ' + (r.reason || 'it is not allowed') + '.';
-  if (r.result === 'unreachable') return 'The update feed could not be read (' + (r.reason || 'no answer') + '). Check your connection and try again.';
+  if (r.result === 'unreachable') return 'SpawnLoft could not check for updates (' + (r.reason || 'no answer') + '). Check your connection and try again.';
   return 'SpawnLoft ' + r.installed + ' is the newest ' + r.channel + ' release.';
 }
 
@@ -15314,7 +15385,7 @@ async function renderCoreUpdates(reportText) {
     e.target.disabled = true;
     try {
       await updJson('/channel', 'POST', { beta: e.target.checked });
-      await renderCoreUpdates('The next check will use the ' + (e.target.checked ? 'beta' : 'release') + ' channel.');
+      await renderCoreUpdates('The next check will look for ' + (e.target.checked ? 'beta releases too.' : 'finished releases only.'));
     } catch (err) { toast(err.message, 'bad'); e.target.checked = !e.target.checked; }
     e.target.disabled = false;
   };
@@ -15372,8 +15443,9 @@ function upgradeNoticeNodes(data) {
         dismiss: dismissRec }));
     }
     for (const e of orphans) {
-      out.push(noticeBox({ tone: 'fault', title: e.name + ' has no supervisor.',
-        text: 'Its Java process has been running without one since before the update, so SpawnLoft cannot talk to it. Stop it with "spawnloft kill ' + e.name + '" in a terminal, then start it here.',
+      out.push(noticeBox({ tone: 'fault', title: e.name + ' is still running, but out of reach.',
+        text: 'It has been running since before the update with nothing looking after it, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.',
+        actions: [{ label: 'Force stop', run: async () => { await forceStop(e.name, e.name); pollUpgradeNotices(); } }],
         dismiss: dismissRec }));
     }
   }

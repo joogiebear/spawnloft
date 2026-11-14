@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parsePaperJar, parseServerJar, newerVersionsOf, compareMcVersions } from '../src/upgrade.mjs'
+import { parsePaperJar, parseServerJar, newerVersionsOf, compareMcVersions, jarChangeWords } from '../src/upgrade.mjs'
 import { compareBuilds } from '../src/asp.mjs'
 
 test('a Paper jar name yields its version and build', () => {
@@ -57,4 +57,12 @@ test('an ASP build is newer by date, and a build the API no longer lists counts 
   assert.equal(compareBuilds(builds, '26.3', 'fd11812e').newer, true)
   assert.equal(compareBuilds(builds, '26.3', '12345678').newer, true)
   assert.equal(compareBuilds(builds, '26.9', 'b77d5e97'), null)
+})
+
+test('a changed server file is said the way the software names itself', () => {
+  assert.equal(jarChangeWords('paper-1.21.4-100.jar', 'paper-1.21.4-130.jar'), 'Paper 1.21.4, build 100 to 130')
+  assert.equal(jarChangeWords('paper-1.21.4-100.jar', 'paper-1.21.5-12.jar'), 'Paper 1.21.4 (build 100) to 1.21.5 (build 12)')
+  // names that do not follow the pattern, or two kinds of software, are given as they are
+  assert.equal(jarChangeWords('server.jar', 'paper-1.21.4-130.jar'), 'server.jar to paper-1.21.4-130.jar')
+  assert.equal(jarChangeWords('paper-1.21.4-100.jar', 'purpur-1.21.4-2300.jar'), 'paper-1.21.4-100.jar to purpur-1.21.4-2300.jar')
 })

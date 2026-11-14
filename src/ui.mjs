@@ -322,9 +322,6 @@ function jobUpdate(id, patch) {
   while (jobs.size > JOB_LIMIT) jobs.delete(jobs.keys().next().value)
 }
 
-// server.properties keys the panel offers. Allowlist: the ports and RCON password are owned by the
-// registry and rewritten by syncProps on every launch, so editing them here would silently revert.
-// `type` is what the page renders; `note` shows next to the control.
 // A changed setting for the Activity list, under the name the Settings page gives it: "Difficulty:
 // hard", not the file's "difficulty = hard".
 const INSTANCE_SETTING_LABELS = {
@@ -337,6 +334,9 @@ export function settingWords(key, value) {
   return `${label}: ${said}`
 }
 
+// server.properties keys the panel offers. Allowlist: the ports and RCON password are owned by the
+// registry and rewritten by syncProps on every launch, so editing them here would silently revert.
+// `type` is what the page renders; `note` shows next to the control.
 const EDITABLE_PROPS = [
   {
     key: 'online-mode',
@@ -344,9 +344,9 @@ const EDITABLE_PROPS = [
     label: 'Require a Minecraft account',
     type: 'bool',
     fallback: 'true',
-    note: 'Off lets anyone join as any name, which is what multi-account testing needs - but it '
-      + 'gives players name-derived UUIDs instead of real ones, and puts an OFFLINE/INSECURE '
-      + 'banner in every log. Plugin authors often refuse a bug report carrying it.',
+    note: 'Off checks nobody\'s account, so anyone can join under any name. Good for testing by '
+      + 'yourself; not safe for a public server. The game also counts everyone as a new player '
+      + 'after a switch, so inventories and permissions do not carry over.',
   },
   { key: 'motd', group: 'world', label: 'Message of the day', type: 'text', fallback: 'A Minecraft Server' },
   { key: 'difficulty', group: 'gameplay', label: 'Difficulty', type: 'enum', fallback: 'easy', options: ['peaceful', 'easy', 'normal', 'hard'] },
@@ -1592,7 +1592,7 @@ async function route(req, res) {
       best: best?.path ?? null,
       onPath: onPath.found ? { major: onPath.major, version: onPath.version } : null,
       found: all.map(({ path: p, source, major, version, reason }) => ({ path: p, source, major, version, reason })),
-      download: java.DOWNLOAD_URL,
+      download: java.downloadUrlFor(),
     })
   }
 
@@ -2074,6 +2074,16 @@ async function route(req, res) {
   }
   if (seg[3] === 'stop') {
     await supervisor.stop(name)
+    return json(res, 200, safeInstance(supervisor.statusOf(name)))
+  }
+  // The way out for a server whose daemon is gone: nothing can ask it to stop, so its process is
+  // ended. Only then: a server that can be asked is stopped with `stop`, which saves first.
+  if (seg[3] === 'kill') {
+    const status = supervisor.statusOf(name).status
+    if (status !== 'orphaned') {
+      return json(res, 409, { error: `"${name}" is not out of reach, so it does not need a force stop. Stop it the usual way.` })
+    }
+    await supervisor.kill(name)
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'restart') {

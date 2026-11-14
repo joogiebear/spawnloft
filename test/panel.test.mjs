@@ -707,3 +707,80 @@ test('the first-run Java row says what was found', () => {
   assert.match(setup, /id="javaAgain"/)
   assert.match(setup, /window\.addEventListener\('focus'/)
 })
+
+// a const object written over several lines, which constSource (one line) cannot lift
+function tableSource(name) {
+  const at = html.indexOf(`const ${name} = {`)
+  assert.ok(at !== -1, `could not find "const ${name}" in ui.html`)
+  return html.slice(at, html.indexOf('\n};', at) + 3)
+}
+
+test('an archive name in a sentence is said as when the backup was taken', () => {
+  const backupNamesToWords = new Function(`const stamp = (d) => d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + d.getMinutes();
+    ${fnSource('backupNamesToWords')}; return backupNamesToWords`)()
+  assert.equal(backupNamesToWords('survival_2026-11-03_041500.tar.gz'), 'the backup from 2026/11/3 4:15')
+  assert.equal(backupNamesToWords('kept survival-20261103-041500_2.tar.gz and more'), 'kept the backup from 2026/11/3 4:15 and more')
+  // nothing that is not an archive's name is touched
+  assert.equal(backupNamesToWords('3 removed, the newest 7 kept'), '3 removed, the newest 7 kept')
+  assert.equal(backupNamesToWords(undefined), 'undefined')
+})
+
+test('an activity entry is a sentence: the verb, then what it was done to', () => {
+  const activityWords = new Function(`${tableSource('ACTIVITY_TEXT')}\n${tableSource('ACTIVITY_BARE')}
+    const backupNamesToWords = (s) => s;
+    ${fnSource('activityWords')}; return activityWords`)()
+  // the colon stays when something follows it, and goes when nothing does
+  assert.deepEqual(activityWords({ action: 'settings', detail: 'Difficulty: hard' }), { verb: 'Changed settings:', detail: 'Difficulty: hard' })
+  assert.equal(activityWords({ action: 'backup-prune' }).verb, 'Cleared old backups')
+  // a start that failed does not say "Started" under a Failed pill
+  assert.deepEqual(activityWords({ action: 'start', ok: false, detail: 'port 25565 is in use' }), { verb: 'Could not start:', detail: 'port 25565 is in use' })
+  assert.deepEqual(activityWords({ action: 'start', ok: false }), { verb: 'Could not start', detail: '' })
+  assert.deepEqual(activityWords({ action: 'start' }), { verb: 'Started', detail: '' })
+  // a verb with nothing recorded after it is a whole sentence
+  assert.equal(activityWords({ action: 'restore' }).verb, 'Restored a backup')
+  assert.deepEqual(activityWords({ action: 'crash', detail: 'crashed 3 times, not restarted' }), { verb: 'Crashed 3 times, not restarted', detail: '' })
+  // an action the page has no words for still shows
+  assert.deepEqual(activityWords({ action: 'new-thing', detail: 'x' }), { verb: 'new-thing', detail: 'x' })
+})
+
+test('examples of a path look like the computer the panel runs on', () => {
+  const { examplePath } = lifted(['examplePath'])
+  assert.equal(examplePath('win32', 'map'), 'C:\\Users\\you\\Downloads\\amazing-map.zip')
+  assert.equal(examplePath('darwin', 'map'), '/Users/you/Downloads/amazing-map.zip')
+  assert.equal(examplePath('linux', 'map'), '/home/you/Downloads/amazing-map.zip')
+  assert.match(examplePath('win32', 'java'), /java\.exe$/)
+  assert.match(examplePath('darwin', 'java'), /\/bin\/java$/)
+  assert.match(examplePath('linux', 'java'), /^\/usr\/.*\/bin\/java$/)
+  assert.equal(examplePath('win32', 'backups'), 'D:\\spawnloft-backups')
+  assert.doesNotMatch(examplePath('linux', 'backups') + examplePath('darwin', 'backups'), /\\|[A-Z]:/)
+  // no Windows example is left written into the page
+  assert.doesNotMatch(html, /placeholder(?:="| = ')[A-Z]:\\/)
+  assert.doesNotMatch(html, /in Explorer\./)
+})
+
+test('the Java picker says which Java is the default, and when one is too old', () => {
+  const { javaOptionWords, javaTooOldWords } = lifted(['javaOptionWords', 'javaTooOldWords'])
+  assert.equal(javaOptionWords({ path: 'java', major: 21 }, 21), 'Java 21  ·  this computer’s default')
+  assert.equal(javaOptionWords({ path: '/opt/jdk-17/bin/java', major: 17 }, 21), 'Java 17  ·  /opt/jdk-17/bin/java  ·  too old for this server')
+  assert.equal(javaOptionWords({ path: '/opt/jdk-17/bin/java', major: 17 }, null), 'Java 17  ·  /opt/jdk-17/bin/java')
+  const list = [{ path: 'java', major: 21 }, { path: '/opt/jdk-17/bin/java', major: 17 }]
+  assert.equal(javaTooOldWords(list, 'java', 21), '')
+  assert.match(javaTooOldWords(list, '/opt/jdk-17/bin/java', 21), /^Java 17 is too old: this server needs Java 21 or newer/)
+  // a path typed by hand is not one SpawnLoft has measured, and a server with no known need has no "too old"
+  assert.equal(javaTooOldWords(list, '/somewhere/else/java', 21), '')
+  assert.equal(javaTooOldWords(list, '/opt/jdk-17/bin/java', null), '')
+  assert.equal(javaTooOldWords(undefined, 'java', 21), '')
+})
+
+test('the words a person does not need are gone from the page', () => {
+  // what a person reads, not what the code says in its comments
+  const said = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '')
+  for (const word of ['Orphaned', 'Stale state', 'has no supervisor', 'over RCON', 'max heap', 'heap limit', 'Loopback only', 'root is for you',
+    'Dumping', 'the registry stores', 'update feed', 'name-derived', 'on PATH', ' Javas', 'spawnloft kill', 'spawnloft client new']) {
+    assert.ok(!said.includes(word), `"${word}" is still said on the page`)
+  }
+  // the server out of reach has a button where it had a terminal command
+  assert.match(html, /label: 'Force stop', run: \(\) => forceStop\(row\.name, row\.label \|\| row\.name\)/)
+  assert.match(fnSource('forceStop'), /post\('\/instances\/' \+ encodeURIComponent\(name\) \+ '\/kill'\)/)
+  assert.match(fnSource('forceStop'), /danger: true/)
+})
