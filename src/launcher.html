@@ -1556,7 +1556,8 @@
   // The one control that clears a blocked Play, as a link in the reason.
   function fixButton(fix, p, first, other = null) {
     const cap = (text) => (first ? sentence(text) : text)
-    const link = (text, onclick) => h('button', { class: 'linkbtn', onclick }, cap(text))
+    // an id each, so a re-render (a poll) keeps the focus on the link it was on
+    const link = (text, onclick) => h('button', { class: 'linkbtn', id: `fix-${fix}`, onclick }, cap(text))
     if (fix === 'sign-in') return link('sign in with Microsoft', () => openMenu('account'))
     if (fix === 'sign-in-again') return link('sign in again', startLogin)
     if (fix === 'pick-account') return link('pick another account', () => openSheet(p, null, 'fAccount'))
@@ -1802,10 +1803,10 @@
       h('span', { class: 'label', id: 'joinLabel', text: 'Join' }),
       h('div', { class: 'menuhost', 'data-menu': 'join' },
         h('button', {
-          class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', disabled: inert,
+          class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint ? 'joinHint' : null, disabled: inert,
           onclick: toggleMenu('join'),
           onkeydown: (e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); openMenu('join') } },
-        }, dot, h('span', { class: 'now', id: 'joinNow', text: now }), hint && h('span', { class: 'hint', text: hint }), h('span', { class: 'chev', 'aria-hidden': 'true' }, ico('chev'))),
+        }, dot, h('span', { class: 'now', id: 'joinNow', text: now }), hint && h('span', { class: 'hint', id: 'joinHint', text: hint }), h('span', { class: 'chev', 'aria-hidden': 'true' }, ico('chev'))),
         open && menuPad(joinMenu(p, plan))),
       custom && h('div', { class: 'addr' },
         h('input', {
@@ -2835,7 +2836,11 @@
       // a stopped server) or cannot go ahead: then the page shows why, and the button is theirs.
       const plan = launchPlan(p)
       if (play && known && !S.job && !S.menu && !plan.blocked && !plan.startsServer && plan.picked?.name === server) startLaunch(p)
-      else render()
+      else {
+        render()
+        // what was pressed (a link in the reason, a server's card) may be gone with the old setup
+        if (!document.activeElement || document.activeElement === document.body) ($('play') ?? $('stop'))?.focus({ preventScroll: true })
+      }
     } else {
       openSheet(null, { mc, server })
     }

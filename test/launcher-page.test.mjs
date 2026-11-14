@@ -568,7 +568,9 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   assert.doesNotMatch(html, /'aria-haspopup': '(menu|listbox|true)'/)
   for (const id of ['menuAccount']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
   // Join is a button that opens a dialog of choices; nothing is typed into it
-  assert.match(html, /class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow'/)
+  assert.match(html, /class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint \? 'joinHint' : null/)
+  // the links in a blocked Play's reason keep the focus through a re-render
+  assert.match(fnSource('fixButton'), /class: 'linkbtn', id: `fix-\$\{fix\}`/)
   assert.doesNotMatch(html, /role: 'combobox'/)
   assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)

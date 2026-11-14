@@ -204,8 +204,8 @@ and the files keep "profile".
   follow a rename or a new port, and go when the server goes or moves to another version. One
   you rename or delete in the game is yours from then on and is not put back. The switch
   **Show my SpawnLoft servers in the game** in the setup sheet (`serverList` on the command
-  line) turns it off and takes SpawnLoft's entries out again. A `servers.dat` that cannot be
-  read is left alone and the launch says so. Games older than 1.7 are left alone.
+  line) turns it off; the next launch takes SpawnLoft's entries out again. A `servers.dat` that cannot be
+  read whole is left alone and the launch says so. Games older than 1.7 are left alone.
 - **The account chip** (top right) opens the account menu: who plays (click one to make it the
   default), **Add Microsoft account** (see [Signing in from the launcher](#signing-in-from-the-launcher)),
   an offline name for servers with `online-mode=false`, and sign out. A setup plays as its own

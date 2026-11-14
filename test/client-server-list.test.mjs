@@ -94,6 +94,7 @@ test('one place, however it is spelled', () => {
   assert.notEqual(addressKey('127.0.0.1:25566'), addressKey('127.0.0.1'))
   assert.equal(addressKey('[::1]:25570'), addressKey('localhost:25570'))
   assert.equal(addressKey('Play.Example.net.'), addressKey('play.example.net:25565'))
+  assert.equal(addressKey('LOCALHOST.'), addressKey('127.0.0.1'))
 })
 
 const compound = (fields) => readNbt(Buffer.concat([named(10, ''), entry(fields).subarray(0, -1), b(0)])).root
@@ -155,6 +156,107 @@ test('an address the player already lists is not added twice', () => {
   assert.equal(out.added, 1)
   assert.equal(out.next.survival.state, 'theirs')
   assert.deepEqual(plain(items).map((e) => e.name), ['home', 'typed once', 'Creative'])
+})
+
+test('a server that moves after its entry was edited in the game is listed again at the new address', () => {
+  const survival = { key: 'survival', name: 'Survival', ip: '127.0.0.1:25565' }
+  const items = []
+  let out = reconcile(items, {}, [survival])
+  items[0].entries[0].tag = { type: 8, raw: mutf8('my name') }
+  // the edit and the move are seen in the same launch
+  out = reconcile(items, out.next, [{ ...survival, ip: '127.0.0.1:25570' }])
+  assert.equal(out.next.survival.state, 'theirs')
+  assert.equal(out.next.survival.ip, '127.0.0.1:25565')
+  out = reconcile(items, out.next, [{ ...survival, ip: '127.0.0.1:25570' }])
+  assert.deepEqual(plain(items), [{ name: 'my name', ip: '127.0.0.1:25565' }, { name: 'Survival', ip: '127.0.0.1:25570' }])
+})
+
+test('two SpawnLoft servers on one address are both listed, and each goes by itself', () => {
+  const a = { key: 'a', name: 'A', ip: '127.0.0.1:25565' }
+  const b = { key: 'b', name: 'B', ip: '127.0.0.1:25565' }
+  const items = []
+  let out = reconcile(items, {}, [a, b])
+  assert.deepEqual(plain(items).map((e) => e.name), ['A', 'B'])
+  assert.deepEqual([out.next.a.state, out.next.b.state], ['ours', 'ours'])
+  out = reconcile(items, out.next, [b])
+  assert.deepEqual(plain(items).map((e) => e.name), ['B'])
+  // the same name too: two entries, two owners, and one goes when its server does
+  const twin = [{ key: 'x', name: 'Same', ip: '127.0.0.1:25566' }, { key: 'y', name: 'Same', ip: '127.0.0.1:25566' }]
+  const list = []
+  out = reconcile(list, {}, twin)
+  assert.equal(list.length, 2)
+  out = reconcile(list, out.next, twin)
+  assert.equal(out.changed, false)
+  out = reconcile(list, out.next, [twin[0]])
+  assert.equal(list.length, 1)
+  assert.equal(out.removed, 1)
+})
+
+test('a server named like something every object has is listed like any other', () => {
+  const items = []
+  const wanted = ['constructor', 'toString', 'valueOf', 'hasOwnProperty'].map((key, i) => ({ key, name: key, ip: `127.0.0.1:${25600 + i}` }))
+  let out = reconcile(items, {}, wanted)
+  assert.equal(out.added, 4)
+  out = reconcile(items, out.next, wanted)
+  assert.equal(out.changed, false)
+  out = reconcile(items, out.next, [])
+  assert.equal(out.removed, 4)
+  assert.deepEqual(items, [])
+})
+
+test('a stop between the two writes never leaves an entry SpawnLoft has forgotten is its own', () => {
+  const survival = { key: 'survival', name: 'Survival', ip: '127.0.0.1:25565' }
+  const creative = { key: 'creative', name: 'Creative', ip: '127.0.0.1:25566' }
+  // an add: the memory was written, the file was not
+  let items = []
+  let out = reconcile(items, {}, [survival])
+  assert.equal(out.before.survival.pending, true)
+  let again = reconcile([], out.before, [survival])
+  assert.equal(again.added, 1, 'an add that never reached the file is added, not taken for a delete')
+  // an add: both were written, the second memory write was not
+  again = reconcile(items, out.before, [survival])
+  assert.equal(again.changed, false)
+  assert.deepEqual(again.next.survival, { ip: '127.0.0.1:25565', name: 'Survival', state: 'ours' })
+  // a rename: memory written, file not; the entry is found by what it said before
+  const moved = { ...survival, name: 'Survival SMP', ip: '127.0.0.1:25570' }
+  const stale = [compound({ name: 'Survival', ip: '127.0.0.1:25565', icon: 'png' })]
+  out = reconcile([compound({ name: 'Survival', ip: '127.0.0.1:25565', icon: 'png' })], out.next, [moved])
+  assert.deepEqual(out.before.survival.prev, { ip: '127.0.0.1:25565', name: 'Survival' })
+  again = reconcile(stale, out.before, [moved])
+  assert.equal(again.updated, 1)
+  assert.deepEqual(plain(stale), [{ name: 'Survival SMP', ip: '127.0.0.1:25570', icon: 'png' }])
+  // a removal: memory written, file not; it is still SpawnLoft's to remove
+  items = []
+  out = reconcile(items, {}, [survival, creative])
+  const kept = plain(items).map((e) => compound(e))
+  out = reconcile(items, out.next, [creative])
+  assert.equal(out.before.survival.state, 'ours')
+  again = reconcile(kept, out.before, [creative])
+  assert.equal(again.removed, 1)
+  assert.deepEqual(plain(kept).map((e) => e.name), ['Creative'])
+  // and what is remembered in the end carries none of the marks
+  assert.deepEqual(Object.keys(again.next.creative).sort(), ['ip', 'name', 'state'])
+})
+
+test('a damaged memory of what was written is no memory, and nothing is removed for it', () => {
+  const dir = fs.mkdtempSync(path.join(scratch, 'state-'))
+  const file = path.join(dir, 'servers.dat')
+  const stateFile = path.join(dir, 'server-list.json')
+  const wanted = [{ key: 'survival', name: 'Survival', ip: '127.0.0.1:25565' }]
+  syncServerList({ file, stateFile, wanted })
+  for (const junk of ['{ not json', '[]', '"text"', '{"entries": [1, 2]}', '{"entries": {"survival": 7, "x": null}}']) {
+    fs.writeFileSync(stateFile, junk)
+    const out = syncServerList({ file, stateFile, wanted })
+    assert.equal(out.skipped, null, junk)
+    assert.equal(out.changed, false, junk)
+    assert.deepEqual(listOf(file), [{ name: 'Survival', ip: '127.0.0.1:25565' }], junk)
+  }
+})
+
+test('a file of a great many tags is refused before it can use the memory up', () => {
+  const many = 150000
+  const big = Buffer.concat([named(10, ''), named(9, 'junk'), b(1), i32(many), Buffer.alloc(many), b(0)])
+  assert.throws(() => readNbt(big), /more tags than a server list holds/)
 })
 
 test('the file: made when missing, left alone when unreadable, not written when nothing changed', () => {
@@ -273,7 +375,7 @@ test('a list that cannot be read is a warning, and the game still starts', async
   await stop('list')
   assert.ok(res.pid)
   assert.equal(warnings.length, 1)
-  assert.match(warnings[0], /Multiplayer list was left as it is: servers\.dat could not be read/)
+  assert.match(warnings[0], /Multiplayer list was not brought up to date: servers\.dat could not be read/)
   assert.deepEqual(fs.readFileSync(file), broken)
 })
 

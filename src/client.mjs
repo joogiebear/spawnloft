@@ -670,7 +670,7 @@ async function launchLocked(name, { playerName = null, account: accountSelector 
   // the game reads its Multiplayer list as it starts, so this is the last moment to bring it in step
   const listed = fillServerList(name, profile)
   if (listed.skipped) {
-    const w = `the game's Multiplayer list was left as it is: ${listed.skipped}`
+    const w = `the game's Multiplayer list was not brought up to date: ${listed.skipped}`
     warnings.push(w)
     onWarning(w)
   }
@@ -703,8 +703,9 @@ export function serversFor(profile) {
 // Brings the profile's servers.dat in step with those servers (client-server-list.mjs). With
 // serverList off, what SpawnLoft wrote before is taken out again and the file is then left alone.
 // Never stops a launch: a list that cannot be read or written is reported and left.
-export function fillServerList(name, profile = getProfile(name)) {
+export function fillServerList(name, given = null) {
   try {
+    const profile = given ?? getProfile(name)
     const parent = readJson(versionJson(profile.mc), null)
     if (!versionKeepsServerList(parent)) return { changed: false, skipped: null }
     return syncServerList({ file: path.join(profileDir(name), 'servers.dat'), stateFile: clientServerList(name), wanted: profile.serverList === false ? [] : serversFor(profile) })
