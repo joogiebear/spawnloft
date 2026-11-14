@@ -905,3 +905,35 @@ test('a chart says in words what its line shows', () => {
   assert.equal(chartWords('Memory', 'no readings yet', '', 60), 'Memory, last minute: no readings yet')
   assert.equal(chartWords('TPS', '19.9', '', 7), 'TPS: 19.9')
 })
+
+test('the whitelist says what its state means, and a player can be added by name', () => {
+  const { whitelistWords, addPlayerQuestion, addedWords, emptyWhitelistQuestion } = lifted(['whitelistWords', 'addPlayerQuestion', 'playerChangeWords', 'addedWords', 'emptyWhitelistQuestion'])
+  assert.equal(whitelistWords(false, 0), 'Off. Anyone can join.')
+  assert.equal(whitelistWords(false, 3), 'Off. Anyone can join; the 3 on the list are not checked.')
+  // operators get in without being listed, so no line says "only the list"
+  assert.equal(whitelistWords(true, 1), 'On. Only the one player on the list, and operators, can join.')
+  assert.equal(whitelistWords(true, 4), 'On. Only the 4 players on the list, and operators, can join.')
+  assert.match(whitelistWords(true, 0), /only operators can join/)
+  // what happens to people connected depends on the server, and a stopped one has nobody connected
+  assert.equal(emptyWhitelistQuestion({ running: false }).text, 'Only operators will be able to join until someone is added.')
+  assert.match(emptyWhitelistQuestion({ running: true, whitelistEnforced: false }).text, /stay until they leave/)
+  assert.match(emptyWhitelistQuestion({ running: true, whitelistEnforced: true }).text, /are removed from the server/)
+
+  const stopped = addPlayerQuestion({ running: false, onlineMode: true, whitelistOn: false })
+  assert.match(stopped.text, /looked up with Mojang/)
+  assert.deepEqual(stopped.choices.map((c) => c.value), ['whitelist', 'op', 'ban'])
+  assert.match(stopped.choices[0].hint, /once the whitelist is turned on/)
+  assert.equal(stopped.input.required, true)
+  assert.match(addPlayerQuestion({ running: true, whitelistOn: true }).text, /server finds them/)
+  assert.equal(addPlayerQuestion({ running: true, whitelistOn: true }).choices[0].hint, 'They can join.')
+  assert.match(addPlayerQuestion({ running: false, onlineMode: false }).text, /exactly the one they will join with/)
+
+  assert.deepEqual(addedWords({ as: 'whitelist', name: 'Alex' }), { text: 'Alex is on the whitelist.', tone: 'good' })
+  assert.deepEqual(addedWords({ as: 'ban', name: 'Griefer', took: true }), { text: 'Griefer is banned.', tone: 'good' })
+  // a running server that did not do it is not a success
+  const refused = addedWords({ as: 'op', name: 'Ghost', took: false, reply: 'That player does not exist' })
+  assert.equal(refused.tone, '')
+  assert.match(refused.text, /That player does not exist/)
+  // Settings no longer sends anyone to the console for this
+  assert.ok(!html.includes('whitelist add <name>'))
+})
