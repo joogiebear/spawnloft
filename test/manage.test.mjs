@@ -147,3 +147,23 @@ test('the panel answers a refusal with 400, an unknown server with 404, and neve
     server.close()
   }
 })
+
+test('opening a folder with no file manager on the machine is a refusal, not an unhandled error', async () => {
+  const inst = makeInstance('reveal-none', { port: 40090, rconPort: 40091 })
+  const { spawn } = await import('node:child_process')
+  // a real spawn of a program that does not exist: Node reports it with an 'error' event
+  const missing = (cmd, args, opts) => spawn(path.join(scratch, 'no-such-opener'), args, opts)
+  await assert.rejects(
+    manage.reveal('reveal-none', null, null, { run: missing, platform: 'linux' }),
+    (err) => err instanceof UserError && /no file manager/.test(err.message) && err.message.includes(inst.dir)
+  )
+  // a spawn that throws outright is the same refusal
+  await assert.rejects(
+    manage.reveal('reveal-none', null, null, { run: () => { throw new Error('EPERM') }, platform: 'linux' }),
+    (err) => err instanceof UserError && /EPERM/.test(err.message)
+  )
+  // and one that starts resolves with the folder it opened, sub-folders by allowlist only
+  const started = (cmd, args, opts) => spawn(process.execPath, ['-e', ''], opts)
+  assert.equal(await manage.reveal('reveal-none', 'logs', null, { run: started }), path.join(inst.dir, 'logs'))
+  assert.equal(await manage.reveal('reveal-none', '../..', null, { run: started }), inst.dir)
+})

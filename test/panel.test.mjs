@@ -237,3 +237,75 @@ test('Play picks the profile for the server\'s version, preferring the one point
   assert.equal(playProfileFor({ name: 'x', mcVersion: null }, profiles).name, 'a')
   assert.equal(playProfileFor({ name: 'x', mcVersion: '1.21.11' }, []), null)
 })
+
+test('deleting several things in Files names them, and asks for the server name when the server itself would go', () => {
+  const { deleteConfirm } = lifted(['deleteConfirm'])
+  const entries = [
+    { path: 'world', type: 'dir' }, { path: 'plugins', type: 'dir' }, { path: 'server.jar', type: 'file' },
+    { path: 'server.properties', type: 'file' }, { path: 'eula.txt', type: 'file' }, { path: 'notes.txt', type: 'file' },
+    { path: 'a.log', type: 'file' }, { path: 'b.log', type: 'file' },
+  ]
+  const one = deleteConfirm('survival', ['plugins/Old.jar'], entries)
+  assert.deepEqual(one, { what: 'Old.jar', text: 'A copy is kept first, so Backups can put it back.', typeToConfirm: null })
+
+  const logs = deleteConfirm('survival', ['a.log', 'b.log'], entries)
+  assert.equal(logs.typeToConfirm, null, 'two loose files are not the server')
+  assert.match(logs.text, /^This deletes a\.log, b\.log\. A copy is kept first/)
+
+  const all = deleteConfirm('survival', entries.map((e) => e.path), entries)
+  assert.equal(all.what, '8 items')
+  assert.equal(all.typeToConfirm, 'survival')
+  assert.match(all.text, /^This deletes world, plugins, server\.jar, server\.properties, eula\.txt, notes\.txt and 2 more\. The server cannot run without some of these\./)
+
+  // inside a subfolder nothing is "the server": the copy in Backups is enough
+  assert.equal(deleteConfirm('survival', ['plugins/A', 'plugins/B.jar'], [{ path: 'plugins/A', type: 'dir' }]).typeToConfirm, null)
+  assert.equal(deleteConfirm('survival', ['server.properties', 'notes.txt'], entries).typeToConfirm, 'survival')
+})
+
+test('copying a secret never spells it out in a label, a tooltip or a toast', () => {
+  const { copyWords } = lifted(['copyWords'])
+  const secret = copyWords('hunter2', 'password', true)
+  assert.ok(!JSON.stringify(secret).includes('hunter2'))
+  assert.deepEqual(secret, { title: 'Copy the password', label: 'Copy the password', said: 'the password' })
+  assert.deepEqual(copyWords('127.0.0.1:25565', 'address', false),
+    { title: 'Copy 127.0.0.1:25565', label: 'Copy address 127.0.0.1:25565', said: '127.0.0.1:25565' })
+  // the admin password and the URL that carries it are the two rows marked secret
+  assert.match(html, /\['Password', c\.password, 'password', true\], \['URL', c\.url, 'URL', true\]/)
+})
+
+test('forgetting an external database says nothing was deleted', () => {
+  const { forgetWords } = lifted(['forgetWords'])
+  const words = forgetWords('Shared MySQL', ['survival'])
+  assert.equal(words.title, 'Forget Shared MySQL?')
+  assert.match(words.text, /keeps running where it is/)
+  assert.match(words.text, /Attached: survival\./)
+  assert.ok(!/delet/i.test(words.text + words.done))
+})
+
+test('an upload stays in the folder it started in, and unsaved editor text is noticed', () => {
+  const { uploadUrl, unsavedFiles } = lifted(['uploadUrl', 'unsavedFiles'])
+  assert.equal(uploadUrl('/api/x/files/upload', 'plugins/My Plugin', 'a b.yml', false), '/api/x/files/upload?dir=plugins%2FMy%20Plugin&name=a%20b.yml')
+  assert.equal(uploadUrl('/u', '', 'a', true), '/u?dir=&name=a&overwrite=1')
+  // view.dir is read once, before the first file goes: later reads would follow the person to another folder
+  const body = fnSource('uploadFiles').replace(/^\s*\/\/.*$/gm, '')
+  assert.equal(body.split('view.dir').length - 1, 1)
+
+  const views = new Map([
+    ['clean', { editing: { text: 'a', original: 'a' } }],
+    ['dirty', { editing: { text: 'b', original: 'a' } }],
+    ['closed', { editing: null }],
+  ])
+  assert.deepEqual(unsavedFiles(views), ['dirty'])
+  assert.match(html, /addEventListener\('beforeunload'/)
+  assert.match(html, /window\.addEventListener\('drop'/)
+})
+
+test('a restore locks its list: every button off, and the row says it is restoring', () => {
+  const { lockRestoring } = lifted(['lockRestoring'])
+  assert.ok(lockRestoring)
+  const src = fnSource('lockRestoring')
+  assert.match(src, /b\.disabled = true/)
+  assert.match(src, /data-restoring/)
+  // both lists call it after drawing, so a redraw during a restore comes up locked
+  assert.equal(html.split('lockRestoring(').length - 1 >= 5, true)
+})

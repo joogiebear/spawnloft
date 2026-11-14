@@ -624,6 +624,7 @@ async function handleBackups(req, res, name, seg) {
   const body = await readBody(req)
 
   if (!action) {
+    backup.refuseWhileRestoring(name, 'taking a new one')
     // snapshotting a running server is allowed; createSnapshot skips files the server holds locked
     const running = supervisor.isRunning(name)
     const out = await backup.createSnapshot(inst, {
@@ -639,6 +640,8 @@ async function handleBackups(req, res, name, seg) {
       mirrored: out.mirrored,
       mirrorError: out.mirrorError,
       saveOnWarning: out.saveOnWarning,
+      // a backup that missed a database, or was copied while the server wrote, is not just "Saved"
+      problems: backup.snapshotProblems(out.manifest?.warnings),
     })
   }
 
@@ -1987,6 +1990,7 @@ async function route(req, res) {
 
   // supervisor.start waits for ready and reports whether it got there
   const started = async () => {
+    backup.refuseWhileRestoring(name, 'starting it')
     const out = await supervisor.start(name)
     const status = safeInstance(supervisor.statusOf(name))
     if (out.failed) return json(res, 500, { error: `"${name}" started but stopped again: ${out.reason}`, status })
@@ -2026,6 +2030,7 @@ async function route(req, res) {
     return json(res, 200, safeInstance(supervisor.statusOf(name)))
   }
   if (seg[3] === 'restart') {
+    backup.refuseWhileRestoring(name, 'restarting it')
     await supervisor.stop(name).catch(() => {})
     return started()
   }
@@ -2047,7 +2052,7 @@ async function route(req, res) {
   }
   if (seg[3] === 'reveal') {
     const body = await readBody(req)
-    return json(res, 200, { dir: manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
+    return json(res, 200, { dir: await manage.reveal(name, body.sub ? String(body.sub) : null, body.folder ? String(body.folder) : null) })
   }
   if (seg[3] === 'settings') {
     const body = await readBody(req)

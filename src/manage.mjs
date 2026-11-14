@@ -197,7 +197,11 @@ export async function destroy(name, { purge = false, snapshot = true } = {}) {
   return { name, purged: purge, snapshot: snapshotFile, tasksRemoved }
 }
 
-export function reveal(name, sub = null, folder = null) {
+// Opens a folder in the system's file manager. It resolves once the opener has started and
+// rejects when it cannot be started. The 'error' listener is the point: a missing program (a
+// Linux machine with no xdg-open, which is any server reached over SSH) is reported by an
+// 'error' event, not by spawn() throwing, and with nothing listening that event ends the panel.
+export function reveal(name, sub = null, folder = null, { run = spawn, platform = process.platform } = {}) {
   const inst = getInstance(name)
   // `sub` arrives over HTTP, so it is matched against an allowlist, never used as a path.
   // `folder` is confined to the server folder by files.resolvePath.
@@ -209,14 +213,23 @@ export function reveal(name, sub = null, folder = null) {
     target = r.full
   }
   const [cmd, args] =
-    process.platform === 'win32' ? ['explorer.exe', [target]]
-    : process.platform === 'darwin' ? ['open', [target]]
+    platform === 'win32' ? ['explorer.exe', [target]]
+    : platform === 'darwin' ? ['open', [target]]
     : ['xdg-open', [target]]
-  // explorer.exe exits non-zero even on success, so the exit code is ignored
-  try {
-    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref()
-  } catch (err) {
-    throw new UserError(`could not open ${target}: ${err.message}`)
-  }
-  return target
+  const refused = (err) => new UserError(
+    err && err.code === 'ENOENT'
+      ? `This computer has no file manager to open folders with. The folder is ${target}`
+      : `Could not open the folder (${err && err.message ? err.message : 'unknown reason'}). It is ${target}`
+  )
+  return new Promise((resolve, reject) => {
+    let child
+    try {
+      // explorer.exe exits non-zero even on success, so the exit code is ignored
+      child = run(cmd, args, { detached: true, stdio: 'ignore' })
+    } catch (err) {
+      return reject(refused(err))
+    }
+    child.once('error', (err) => reject(refused(err)))
+    child.once('spawn', () => { child.unref(); resolve(target) })
+  })
 }

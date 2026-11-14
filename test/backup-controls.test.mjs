@@ -86,9 +86,18 @@ test('a clean restore ends exactly as the snapshot was, and keeps what it cleare
   fs.writeFileSync(path.join(inst.dir, 'plugins/A.jar'), 'changed')
 
   const over = backup.resolveSnapshot(inst.name, path.basename(snap.file))
-  await backup.restoreSnapshot(inst, over)
+  const plain = await backup.restoreSnapshot(inst, over)
   assert.ok(fs.existsSync(path.join(inst.dir, 'plugins/New.jar')), 'an ordinary restore only adds and overwrites')
   assert.equal(fs.readFileSync(path.join(inst.dir, 'plugins/A.jar'), 'utf8'), 'a')
+  // an ordinary restore overwrites too, so it keeps a copy of how things were as well
+  const kept = backup.listSnapshots(inst.name).find((s) => s.name === plain.safety)
+  assert.equal(kept.label, 'pre-restore')
+  const undo = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-undo-'))
+  execFileSync(tarBinary(), ['-xzf', kept.path, '-C', undo])
+  assert.equal(fs.readFileSync(path.join(undo, 'plugins/A.jar'), 'utf8'), 'changed', 'the overwritten file is in the copy')
+  fs.rmSync(undo, { recursive: true, force: true })
+  // a caller that is itself an undo asks for no copy
+  assert.equal((await backup.restoreSnapshot(inst, over, { safety: false })).safety, null)
 
   const out = await backup.restoreSnapshot(inst, over, { clean: true })
   assert.ok(!fs.existsSync(path.join(inst.dir, 'plugins/New.jar')))
@@ -97,4 +106,44 @@ test('a clean restore ends exactly as the snapshot was, and keeps what it cleare
   const safety = backup.listSnapshots(inst.name).find((s) => s.name === out.safety)
   assert.equal(safety.label, 'pre-restore')
   assert.ok(listing(safety.path).includes('plugins/New.jar'), 'what was cleared is kept')
+})
+
+test('while a restore runs, a second restore, a delete and a new backup of that server are refused', async () => {
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'standard' })
+  const ref = backup.resolveSnapshot(inst.name, path.basename(snap.file))
+  const first = backup.restoreSnapshot(inst, ref)
+  assert.equal(backup.isRestoring(inst.name), true)
+  await assert.rejects(backup.restoreSnapshot(inst, ref), /being put back.*restoring another/)
+  assert.throws(() => backup.removeSnapshot(inst.name, ref.name), /being put back.*deleting a backup/)
+  assert.throws(() => backup.refuseWhileRestoring(inst.name, 'starting it'), /starting it/)
+  await first
+  assert.equal(backup.isRestoring(inst.name), false)
+  // a restore that fails releases the server too
+  await assert.rejects(backup.restoreSnapshot({ ...inst, dir: path.join(scratch, 'gone') }, ref), /missing/)
+  assert.equal(backup.isRestoring(inst.name), false)
+  await backup.restoreSnapshot(inst, ref)
+})
+
+test('a snapshot that may be torn or is missing a database says so in the listing, in plain words', async () => {
+  assert.deepEqual(backup.snapshotProblems([
+    'could not flush the world before the snapshot (RCON timed out); the copy may be torn',
+    'database survival on main-db not included: the database is not running',
+    'database cache on fast not included: Redis (Garnet) keeps its own checkpoints; it is not dumped',
+    'world/session.lock not included: another program has it locked, usually the running server',
+    'tar: something harmless',
+  ]), [
+    'Taken while the server was running and it could not be asked to save first, so the world in it may be incomplete.',
+    'Does not include the database survival (main-db): the database is not running.',
+  ])
+  assert.deepEqual(backup.snapshotProblems(undefined), [])
+
+  const inst = server()
+  const snap = await backup.createSnapshot(inst, { scope: 'config' })
+  const manifest = snap.file.replace(/\.tar\.gz$/, '.json')
+  const body = JSON.parse(fs.readFileSync(manifest, 'utf8'))
+  assert.deepEqual(backup.listSnapshots(inst.name)[0].problems, [])
+  body.warnings = ['database survival on main-db not included: the database is not running']
+  fs.writeFileSync(manifest, JSON.stringify(body))
+  assert.deepEqual(backup.listSnapshots(inst.name)[0].problems, ['Does not include the database survival (main-db): the database is not running.'])
 })

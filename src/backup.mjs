@@ -368,6 +368,26 @@ async function createSnapshotLocked(inst, { scope, label, running, taskId, flush
   }
 }
 
+// What is wrong with a snapshot that someone restoring it needs to know, in plain words, read from
+// the warnings its manifest recorded. Only the two that change what the backup holds: a world
+// copied while the server was still writing, and a database that is not in it. A file the running
+// server held locked is routine on Windows and is not one of these.
+export function snapshotProblems(warnings) {
+  const out = []
+  for (const w of Array.isArray(warnings) ? warnings : []) {
+    const text = String(w)
+    if (/^could not flush the world before the snapshot/.test(text)) {
+      out.push('Taken while the server was running and it could not be asked to save first, so the world in it may be incomplete.')
+      continue
+    }
+    const db = /^database (.+?) on (.+?) not included: ([\s\S]*)$/.exec(text)
+    // an engine that is never dumped (it keeps its own checkpoints) is not something that went wrong
+    if (db && /keeps its own checkpoints/.test(db[3])) continue
+    if (db) out.push(`Does not include the database ${db[1]} (${db[2]}): ${db[3].trim().replace(/\.$/, '')}.`)
+  }
+  return out
+}
+
 export function listSnapshots(name) {
   // a listing makes nothing: the panel answers it on a GET (test/panel-get-writes.test.mjs)
   const dir = path.join(BACKUPS_DIR, name)
@@ -393,6 +413,7 @@ export function listSnapshots(name) {
         note: manifest.note ?? null,
         excluded: manifest.excluded ?? [],
         databases: manifest.databases ?? [],
+        problems: snapshotProblems(manifest.warnings),
       }
     })
     .sort((a, b) => b.mtime - a.mtime)
@@ -436,7 +457,28 @@ export function checkRestorable(snapshot) {
   return verifyArchive(snapshot.path, snapshot.members ?? [], (snapshot.databases ?? []).map((d) => d.file))
 }
 
-export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = false } = {}) {
+// Restores in progress in this process, by server name. A second restore, a delete or a start on
+// top of one is how a world ends up as neither the backup nor what it replaced, so those refuse
+// until it has finished.
+const restoresRunning = new Set()
+export function isRestoring(name) {
+  return restoresRunning.has(name)
+}
+export function refuseWhileRestoring(name, verb) {
+  if (restoresRunning.has(name)) fail(`A backup is being put back into "${name}" right now. Wait for it to finish before ${verb}.`)
+}
+
+export async function restoreSnapshot(inst, snapshot, options = {}) {
+  refuseWhileRestoring(inst.name, 'restoring another')
+  restoresRunning.add(inst.name)
+  try {
+    return await restoreSnapshotLocked(inst, snapshot, options)
+  } finally {
+    restoresRunning.delete(inst.name)
+  }
+}
+
+async function restoreSnapshotLocked(inst, snapshot, { quiet = false, clean = false, safety: keepCopy = true } = {}) {
   if (!fs.existsSync(inst.dir)) fail(`instance directory is missing: ${inst.dir}`)
   if (clean && !(snapshot.members ?? []).some((m) => m !== 'databases')) {
     fail(`${snapshot.name} does not record what it holds, so there is nothing it can safely clear first`)
@@ -456,18 +498,20 @@ export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = f
       `\n  Choose an older snapshot; "spawnloft verify ${inst.name} --all" checks every one.`)
   }
 
-  // A clean restore clears what the snapshot holds first, since an ordinary restore only adds and
-  // overwrites. What gets cleared is snapshotted whole (including leave-out paths) so the clean
-  // restore can itself be undone.
+  // What the snapshot is about to overwrite is snapshotted first (whole, including leave-out
+  // paths), so a restore of the wrong backup can itself be undone. A clean restore then clears
+  // those members, since an ordinary restore only adds and overwrites. A caller that is itself
+  // undoing something (putting deleted files back) passes safety: false; a clean restore always
+  // keeps its copy, because it deletes.
   let safety = null
-  if (clean) {
-    const present = snapshot.members
-      .filter((m) => m !== 'databases')
+  if (clean || keepCopy) {
+    const present = (snapshot.members ?? [])
+      .filter((m) => m !== 'databases' && safeRelativePath(m) !== null)
       .filter((m) => fs.existsSync(path.join(inst.dir, ...m.split(/[\\/]/))))
     if (present.length) {
       const res = await createSnapshot(inst, { scope: 'files', label: 'pre-restore', members: present, flush: false })
       safety = path.basename(res.file)
-      for (const m of present) await fs.promises.rm(path.join(inst.dir, ...m.split(/[\\/]/)), { recursive: true, force: true })
+      if (clean) for (const m of present) await fs.promises.rm(path.join(inst.dir, ...m.split(/[\\/]/)), { recursive: true, force: true })
     }
   }
 
@@ -496,7 +540,7 @@ export async function restoreSnapshot(inst, snapshot, { quiet = false, clean = f
       /* ignore: not worth failing a restore that already happened */
     }
   }
-  if (!quiet) activity.record(inst.name, 'restore', { detail: snapshot.name + (safety ? `, cleared first; how it was is kept as ${safety}` : ''), snapshot: safety })
+  if (!quiet) activity.record(inst.name, 'restore', { detail: snapshot.name + (safety ? `${clean ? ', cleared first' : ''}; how it was is kept as ${safety}` : ''), snapshot: safety })
   return { restored: snapshot.name, into: inst.dir, members: snapshot.members, databases, safety }
 }
 
@@ -629,6 +673,7 @@ export async function verifySnapshot(name, ref) {
 
 // removes the archive and its manifest together
 export function removeSnapshot(name, ref) {
+  refuseWhileRestoring(name, 'deleting a backup')
   const snap = resolveSnapshot(name, ref)
   if (manifestOf(snap).locked) fail(`${snap.name} is locked. Unlock it first if it really should go.`)
   fs.rmSync(snap.path, { force: true })

@@ -212,7 +212,10 @@ export function removeDatabase(name, { purge = false } = {}) {
   const why = activeBlock(name, 'deleting it')
   if (why) fail(why)
   const attached = Object.keys(inst.attachments ?? {})
-  if (purge && inst.dir && !inst.external) {
+  // An external database is only forgotten: nothing of it is on this machine to delete, and the
+  // answer must not claim otherwise.
+  const purged = Boolean(purge && inst.dir && !inst.external)
+  if (purged) {
     try {
       fs.rmSync(inst.dir, { recursive: true, force: true })
     } catch (err) {
@@ -221,7 +224,7 @@ export function removeDatabase(name, { purge = false } = {}) {
   }
   removeInstance(name)
   clearState(name)
-  return { name, purged: purge, detached: attached }
+  return { name, purged, detached: attached }
 }
 
 // Idempotent: attaching again re-asserts the same credentials, so manually configured plugins keep working.
@@ -426,7 +429,8 @@ export function databaseBackupStatus(name) {
 // One .sql file: each database is dumped separately and joined in order (each part names its own
 // database, so the file imports in one go). Written as .pending and renamed into place, so a
 // listing never offers half a dump.
-export async function backupDatabase(name, { label = 'manual', quiet = false } = {}) {
+export async function backupDatabase(name, { label = 'manual', quiet = false, duringRestore = false } = {}) {
+  if (!duringRestore) refuseWhileRestoringDatabase(name, 'taking a new one')
   const db = getDatabase(name)
   const engine = engineOf(db)
   if (!engine.canDump) fail(`${ENGINES[db.engine].label} keeps its own checkpoints on disk; there is nothing here to dump`)
@@ -464,18 +468,35 @@ export async function backupDatabase(name, { label = 'manual', quiet = false } =
 }
 
 // Takes a "pre-restore" backup first, so restoring the wrong backup can itself be undone.
+// Restores in progress in this process, by database name: a second restore, a delete or a new
+// dump on top of one refuses until it has finished.
+const dbRestoresRunning = new Set()
+export function isRestoringDatabase(name) {
+  return dbRestoresRunning.has(name)
+}
+function refuseWhileRestoringDatabase(name, verb) {
+  if (dbRestoresRunning.has(name)) fail(`A backup is being put back into "${name}" right now. Wait for it to finish before ${verb}.`)
+}
+
 export async function restoreDatabaseBackup(name, file) {
   const db = getDatabase(name)
   const full = dumpPath(name, file)
   if (!isUp(db)) fail(`"${name}" is not running. A backup is put back into the running database - start it first.`)
-  const safety = attachedDatabases(db).length ? await backupDatabase(name, { label: 'pre-restore', quiet: true }) : null
-  await engineOf(db).importSql(db, full)
-  activity.record(name, 'restore', { detail: path.basename(full) + (safety ? `; how it was is kept as ${safety.name}` : '') })
-  return { restored: path.basename(full), safety: safety?.name ?? null }
+  refuseWhileRestoringDatabase(name, 'restoring another')
+  dbRestoresRunning.add(name)
+  try {
+    const safety = attachedDatabases(db).length ? await backupDatabase(name, { label: 'pre-restore', quiet: true, duringRestore: true }) : null
+    await engineOf(db).importSql(db, full)
+    activity.record(name, 'restore', { detail: path.basename(full) + (safety ? `; how it was is kept as ${safety.name}` : '') })
+    return { restored: path.basename(full), safety: safety?.name ?? null }
+  } finally {
+    dbRestoresRunning.delete(name)
+  }
 }
 
 export async function deleteDatabaseBackup(name, file) {
   getDatabase(name)
+  refuseWhileRestoringDatabase(name, 'deleting a backup')
   const full = dumpPath(name, file)
   await fs.promises.rm(full, { force: true })
   await fs.promises.rm(`${full.slice(0, -4)}.json`, { force: true })

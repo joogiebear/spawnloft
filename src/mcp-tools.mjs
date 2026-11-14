@@ -585,6 +585,7 @@ const destructiveTools = [
       const imported = res.databases?.imported ?? []
       const skipped = res.databases?.skipped ?? []
       const text = [`Restored ${snap.name} into ${n}. Start it to use the restored files.`,
+        ...(res.safety ? [`How it was before is kept as ${res.safety}; restore that to undo this.`] : []),
         ...imported.map((d) => `Imported database ${d.database} into ${d.service}.`),
         ...skipped.map((d) => `NOT imported: database ${d.database}: ${d.reason}. The dump is left in the server folder to import by hand.`)].join('\n')
       return { data: { name: n, confirmed: true, snapshot: snap.name, restored: res.restored,

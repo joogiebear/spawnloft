@@ -450,7 +450,7 @@ export async function undoSnapshot(inst, snapshotName, { running = false } = {})
     fail(`${snap.name} is a backup of the server, not a copy of one change. Restore it from Backups, with the server stopped.`)
   }
   for (const m of members) assertFree(inst, m, running, 'put back')
-  await backup.restoreSnapshot(inst, snap, { quiet: true })
+  await backup.restoreSnapshot(inst, snap, { quiet: true, safety: false })
   activity.record(inst.name, 'undo', { detail: members.join(', '), snapshot: snap.name })
   return { restored: snap.name, members }
 }
