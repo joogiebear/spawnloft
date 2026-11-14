@@ -11,7 +11,7 @@ import { checkCancelled } from './cancel.mjs'
 import { parseMemoryGb, getInstance, isDatabase, listInstances } from './registry.mjs'
 import { mcVersionOf } from './plugins.mjs'
 import { syncServerList, versionKeepsServerList } from './client-server-list.mjs'
-import { pickClientJava, requiredMajor } from './java.mjs'
+import { pickClientJava, requiredMajor, probe } from './java.mjs'
 import { mojangJava } from './client-java.mjs'
 import { ensureVersion, materialiseAssets, assetTreeDir } from './client-install.mjs'
 import { plainClientLog } from './client-log.mjs'
@@ -1252,6 +1252,29 @@ export async function describeVersion(id, { os = currentOs(), fetchImpl } = {}) 
 export function profileFolder(name) {
   getProfile(name)
   return profileDir(name)
+}
+
+// Is this path a Java, and which: { path, found, major, version, arch, message }. `message`
+// says why not, for a person. The path is the whole path to java or javaw (or the bare word
+// java, the one on PATH): a relative one would mean something else to each process that reads it.
+export async function checkJava(given) {
+  if (typeof given !== 'string' || !given.trim() || given.length > 1024) fail('send the Java\'s "path"')
+  const p = given.trim()
+  const no = (message) => ({ path: p, found: false, major: null, version: null, arch: null, message })
+  if (p !== 'java' && !path.isAbsolute(p)) return no('Give the whole path to java, starting from the drive or from /.')
+  if (p !== 'java') {
+    let stat = null
+    try { stat = fs.statSync(p) } catch { /* said below */ }
+    if (!stat) return no('There is no file at that path.')
+    if (stat.isDirectory()) return no(`That is a folder. Pick the ${process.platform === 'win32' ? 'javaw.exe or java.exe' : 'java'} file inside its bin folder.`)
+  }
+  // a file Windows will not start at all (a text file, a picture) makes the start itself throw
+  let state
+  try { state = await probe(p) } catch { state = { found: false } }
+  // a program that ends well without saying a version is not a Java either
+  const said = state.major != null || /version "/.test(state.version ?? '')
+  if (!state.found || !said) return no(p === 'java' && !state.found ? 'No program called java was found on this computer.' : 'That file is not a Java: it did not answer the way Java does.')
+  return { path: p, found: true, major: state.major ?? null, version: state.version ?? null, arch: state.arch ?? null, message: null }
 }
 
 // Which folder "open folder" means: the profile's own, or the one the game keeps its logs or

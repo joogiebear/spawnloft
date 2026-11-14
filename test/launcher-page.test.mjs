@@ -692,14 +692,18 @@ test('on a fresh install Play makes a vanilla setup for the latest release and k
 
 test('menus are disclosures over groups of plain buttons, each in a pad with a bottom margin', () => {
   // no ARIA menu or listbox: the panels hold headings, notes and an input, which those roles forbid
-  assert.doesNotMatch(html, /role: '(menu|menuitem|menuitemradio|listbox|option)'/)
-  assert.doesNotMatch(html, /'aria-haspopup': '(menu|listbox|true)'/)
+  // (the setup sheet's version list is the one real listbox: options and nothing else)
+  const menus = ['accountMenu', 'askMenu', 'joinMenu', 'accountChip', 'joinField'].map(fnSource).join('\n')
+  assert.doesNotMatch(menus, /role: '(menu|menuitem|menuitemradio|listbox|option)'/)
+  assert.doesNotMatch(menus, /'aria-haspopup': '(menu|listbox|true)'/)
+  assert.equal(html.match(/role: 'listbox'/g).length, 1)
+  assert.match(fnSource('versionPicker'), /id: 'fMcOptions', role: 'listbox', 'aria-label': 'Versions' \},\s+rows\.map/)
   for (const id of ['menuAccount']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
   // Join is a button that opens a dialog of choices; nothing is typed into it
   assert.match(html, /class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', 'aria-describedby': hint \? 'joinHint' : null/)
   // the links in a blocked Play's reason keep the focus through a re-render
   assert.match(fnSource('fixButton'), /class: 'linkbtn', id: `fix-\$\{fix\}`/)
-  assert.doesNotMatch(html, /role: 'combobox'/)
+  assert.doesNotMatch(menus, /role: 'combobox'/)
   assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)
   // every opener names what it opens, and every menu renders inside the pad
@@ -920,4 +924,174 @@ test('exits are shown one at a time, and only its own setup\'s Play or a dismiss
   assert.equal(S.crash.pending, false)
   // Play on another setup leaves this notice alone
   assert.match(fnSource('startLaunch'), /if \(S\.crash\?\.profile === p\.name\) dropCrash\(\)/)
+})
+
+test('the version list: the tab\'s rows, or every version that has what was typed', () => {
+  const { pickerRows, versionBadges, nextPickable } = lifted(['KIND_LABELS', 'kindLabel', 'versionRows', 'pickerRows', 'versionBadges', 'nextPickable'].filter((n) => n !== 'KIND_LABELS'), `const VERSION_CAP = 80\n${constSource('KIND_LABELS')}`)
+  const v = (id, type = 'release', more = {}) => ({ id, type, ...more })
+  const all = [v('26.4-snapshot-5', 'snapshot'), v('26.3'), v('1.21.11', 'release', { downloaded: true }), v('1.21.1'), v('24w21a', 'snapshot'), v('1.2.1'), v('b1.7.3', 'old_beta', { kind: 'beta' })]
+  const ids = (out) => out.rows.map((r) => r.id)
+  assert.deepEqual(ids(pickerRows(all, 'release', '')), ['26.3', '1.21.11', '1.21.1', '1.2.1'])
+  assert.deepEqual(ids(pickerRows(all, 'snapshot', '  ')), ['26.4-snapshot-5', '26.3', '1.21.11', '1.21.1', '24w21a', '1.2.1'])
+  assert.equal(pickerRows(all, 'all', '').rows.length, all.length)
+  // typing searches everything, whatever the tab; ids that start with it come first
+  assert.deepEqual(ids(pickerRows(all, 'release', '24W')), ['24w21a'])
+  assert.deepEqual(ids(pickerRows(all, 'release', '1.2')), ['1.21.11', '1.21.1', '1.2.1'])
+  assert.deepEqual(ids(pickerRows(all, 'release', '1.7')), ['b1.7.3'])
+  assert.deepEqual(ids(pickerRows(all, 'release', '21')), ['1.21.11', '1.21.1', '24w21a'])
+  assert.deepEqual(pickerRows(all, 'release', 'zzz'), { rows: [], more: 0 })
+  // a long list is cut, and says by how many
+  const many = Array.from({ length: 200 }, (_, i) => v(`24w${i}a`, 'snapshot'))
+  assert.equal(pickerRows(many, 'all', '').rows.length, 80)
+  assert.equal(pickerRows(many, 'all', '').more, 120)
+  assert.equal(pickerRows(many, 'all', '', 500).more, 0)
+
+  assert.deepEqual(versionBadges(all[1], '26.3'), [{ text: 'Latest', tone: 'live' }])
+  assert.deepEqual(versionBadges(all[2], '26.3'), [{ text: 'Downloaded', tone: 'accent' }])
+  assert.deepEqual(versionBadges(all[0], '26.3'), [{ text: 'Snapshot', tone: '' }])
+  assert.deepEqual(versionBadges(all[6], '26.3'), [{ text: 'Beta', tone: '' }])
+  assert.deepEqual(versionBadges(v('1.0'), null), [])
+
+  // the arrow keys skip rows that cannot be picked, and wrap
+  const rows = [v('a', 'release', { refusal: 'no' }), v('b'), v('c', 'release', { refusal: 'no' }), v('d')]
+  const blocked = (r) => Boolean(r.refusal)
+  assert.equal(nextPickable(rows, -1, 1, blocked), 1)
+  assert.equal(nextPickable(rows, 1, 1, blocked), 3)
+  assert.equal(nextPickable(rows, 3, 1, blocked), 1)
+  assert.equal(nextPickable(rows, -1, -1, blocked), 3)
+  assert.equal(nextPickable(rows, 1, -1, blocked), 3)
+  assert.equal(nextPickable(rows, 0, 1, () => true), -1)
+  assert.equal(nextPickable([], -1, 1, blocked), -1)
+
+  const picker = fnSource('versionPicker')
+  // a version this computer cannot run is listed with the reason and cannot be picked
+  assert.match(picker, /const pick = \(r\) => \{\s+if \(blocked\(r\)\) return/)
+  assert.match(picker, /'aria-disabled': blocked\(r\) \? 'true' : null/)
+  // Escape closes the list before it closes the sheet
+  assert.match(html, /else if \(S\.sheet\?\.vOpen\) \{.+\}\s+else if \(S\.sheet\) closeSheet\(\)/)
+})
+
+test('memory is checked against the computer', () => {
+  const { memoryAdvice } = lifted(['memoryText', 'memoryGb', 'memoryFromGb', 'gbText', 'memoryAdvice'])
+  const GB = 1024 ** 3
+  const eight = { totalMemory: 8 * GB, freeMemory: 3.2 * GB }
+  let a = memoryAdvice('2G', eight)
+  assert.equal(a.total, 8)
+  assert.equal(a.warn, null)
+  assert.equal(a.line, 'This computer has 3.2 GB free of 8 GB.')
+  assert.equal(a.tooMuch('8G'), false)
+  assert.equal(memoryAdvice('6G', eight).warn, null)
+  assert.match(memoryAdvice('8G', eight).warn, /^That is most of this computer's 8 GB\..*4 GB is a safer choice\.$/)
+  // a machine with less than a choice: the choice is off, and a setup saved with it is warned about
+  const four = { totalMemory: 4 * GB, freeMemory: 0 }
+  a = memoryAdvice('8G', four)
+  assert.equal(a.tooMuch('8G'), true)
+  assert.equal(a.tooMuch('4G'), false)
+  assert.match(a.warn, /^This computer has 4 GB of memory, less than the 8 GB this setup is given\./)
+  assert.equal(a.line, 'This computer has 4 GB.')
+  // a computer sold with 8 GB says a little less: 8 GB can still be picked, with the warning
+  const sold8 = { totalMemory: 7.7 * GB, freeMemory: 0 }
+  assert.equal(memoryAdvice('8G', sold8).tooMuch('8G'), false)
+  assert.match(memoryAdvice('8G', sold8).warn, /^That is most of this computer's 7\.7 GB\..*4 GB is a safer choice\.$/)
+  // small computers: the right sentence, and never the choice already made as the safer one
+  assert.match(memoryAdvice('2G', { totalMemory: GB }).warn, /^This computer has 1 GB of memory, less than the 2 GB/)
+  assert.match(memoryAdvice('2G', { totalMemory: 2 * GB }).warn, /1 GB is a safer choice\.$/)
+  assert.match(memoryAdvice('1G', { totalMemory: GB }).warn, /may slow down\.$/)
+  a = memoryAdvice('8G', undefined)
+  assert.deepEqual([a.total, a.warn, a.tooMuch('8G'), a.line], [null, null, false, 'Most setups need 2 to 4 GB.'])
+  assert.match(fnSource('sheetView'), /MEMORY_CHOICES\.map\(\(c\) => \[c, memoryText\(c\), advice\.tooMuch\(c\)\]\)/)
+})
+
+test('Java is a list, and a path is checked before it is saved', () => {
+  const { javaChoices, javaFit } = lifted(['javaChoices', 'javaFit'], `const JAVA_OTHER = ':other'`)
+  const found = [{ path: 'java', major: 21, arch: 'x64' }, { path: '/opt/jdk-17/bin/java', major: 17, arch: null }]
+  assert.deepEqual(javaChoices(found, null).map((c) => c.value), ['', 'mojang', 'java', '/opt/jdk-17/bin/java', ':other'])
+  assert.equal(javaChoices(found, null)[2].text, 'Java 21 (x64) \u00b7 the one programs find first')
+  assert.equal(javaChoices(found, null)[3].text, 'Java 17 \u00b7 /opt/jdk-17/bin/java')
+  // a saved path that is none of the found ones keeps its own row
+  assert.deepEqual(javaChoices(found, 'C:\\java\\bin\\javaw.exe').map((c) => c.value), ['', 'mojang', 'java', '/opt/jdk-17/bin/java', 'C:\\java\\bin\\javaw.exe', ':other'])
+  assert.deepEqual(javaChoices(null, 'mojang').map((c) => c.value), ['', 'mojang', ':other'])
+
+  assert.equal(javaFit(21, { min: 21, max: 21 }, '1.21.11'), null)
+  assert.equal(javaFit(17, { min: 21, max: 21 }, '1.21.11'), '1.21.11 needs Java 21, and this is Java 17. Play will refuse it.')
+  assert.equal(javaFit(8, { min: 17, max: null }, '1.20.4'), '1.20.4 needs Java 17 or newer, and this is Java 8. Play will refuse it.')
+  assert.equal(javaFit(8, { min: 17, guess: true }, '1.20.4'), '1.20.4 probably needs Java 17 or newer, and this is Java 8.')
+  assert.equal(javaFit(25, { min: 8, max: 8 }, '1.12.2'), '1.12.2 wants Java 8, and this is Java 25, which is newer. The game may not start.')
+  assert.equal(javaFit(null, { min: 21 }, 'x'), null)
+  assert.equal(javaFit(21, null, 'x'), null)
+
+  // Save asks the panel about a path that is not one of the found Javas, and stops on a no
+  const save = fnSource('saveSheet')
+  assert.match(save, /const check = await checkJava\(f\)\s+if \(check && check\.found === false\) \{\s+f\.adv = true\s+throw new Error\(`The Java was not saved: \$\{check\.message\}`\)/)
+  // Browse is the desktop app's file picker, asked for programs
+  assert.match(fnSource('browseJava'), /desktop\.pickFile\('Choose the java program', 'program'\)/)
+  assert.match(fnSource('javaField'), /desktop\?\.pickFile && h\('button', \{ type: 'button', class: 'sm', id: 'fJavaBrowse'/)
+  // an answer that arrives while a button is pressed does not rebuild the page under the click
+  assert.match(fnSource('renderSoon'), /if \(pressed\) renderWaits = true\s+else render\(\)/)
+})
+
+test('the sheet after review: Save asks about the Java again, typing with an IME is left whole, Enter takes an exact version', () => {
+  assert.match(fnSource('saveSheet'), /f\.javaCheck = null\s+const check = await checkJava\(f\)/)
+  const picker = fnSource('versionPicker')
+  assert.match(picker, /if \(!e\.isComposing\) render\(\) \}, oncompositionend:/)
+  assert.match(picker, /rows\.find\(\(x\) => x\.id\.toLowerCase\(\) === typed\.toLowerCase\(\)\)/)
+  assert.match(picker, /onpointerdown: \(e\) => e\.preventDefault\(\)/)
+  assert.match(fnSource('offlineField'), /if \(!e\.isComposing\) render\(\) \}, oncompositionend:/)
+  assert.match(html, /for \(const ev of \['pointerup', 'pointercancel', 'contextmenu'\]\)/)
+  assert.match(fnSource('pollOnce'), /renderSoon\(\)/)
+})
+
+test('the sheet says things in plain words', () => {
+  const sheet = fnSource('sheetView')
+  assert.doesNotMatch(html, /through MCP/)
+  assert.doesNotMatch(sheet, /'Loader'/)
+  assert.match(sheet, /segmented\('Mods', \[\['vanilla', 'None'\], \['fabric', 'Fabric', fabricNo\]\]/)
+  assert.match(sheet, /None is plain Minecraft, also called Vanilla/)
+  assert.doesNotMatch(html, /or mojang for Mojang/)
+})
+
+test('accounts: signing out asks first, the offline name has a label and is checked as it is typed', () => {
+  const { offlineNameProblem, offlineNameOk, setupPlaysAs } = lifted(['offlineNameProblem', 'offlineNameOk', 'setupPlaysAs'])
+  assert.equal(offlineNameProblem(''), null)
+  assert.equal(offlineNameProblem('ab'), 'At least 3 characters.')
+  assert.equal(offlineNameProblem('a b'), 'Only letters, digits and underscore.')
+  assert.equal(offlineNameProblem('x'.repeat(17)), 'At most 16 characters.')
+  assert.equal(offlineNameProblem('Steve_01'), null)
+  assert.equal(offlineNameOk('Steve_01'), true)
+  assert.equal(offlineNameOk(''), false)
+  assert.equal(offlineNameOk('ab'), false)
+
+  // the chip names the default account; a setup with its own player says so
+  const sam = { uuid: 'u1', name: 'Sam', type: 'microsoft' }
+  assert.equal(setupPlaysAs({ account: 'u2', accountUuid: 'u2', accountName: 'Alex', accountType: 'microsoft' }, sam), 'Alex')
+  assert.equal(setupPlaysAs({ account: 'u1', accountUuid: 'u1', accountName: 'Sam', accountType: 'microsoft' }, sam), null)
+  assert.equal(setupPlaysAs({ account: null }, sam), null)
+  assert.equal(setupPlaysAs(null, sam), null)
+  // an offline name that is also who is signed in is not "another player"
+  const tester = { uuid: 'o1', name: 'Tester', type: 'offline' }
+  assert.equal(setupPlaysAs({ account: 'offline:Tester', accountUuid: null, accountName: 'Tester', accountType: 'offline' }, tester), null)
+  assert.equal(setupPlaysAs({ account: 'offline:Tester', accountUuid: null, accountName: 'Tester', accountType: 'offline' }, sam), 'Tester')
+  // an account signed out since: its key is not a name to show
+  assert.equal(setupPlaysAs({ account: 'f3d28cb0', accountUuid: null, accountName: 'f3d28cb0', accountType: null }, sam), null)
+  // the question does not outlive the menu it was asked in
+  for (const fn of ['setDefault', 'openSheet']) assert.match(fnSource(fn), /S\.acctAsk = null/, fn)
+  assert.match(html, /S\.menu = which\s+S\.acctAsk = null/)
+  assert.match(fnSource('removeAccount'), /await refresh\(\)[\s\S]*\$\('chip'\)\?\.focus/)
+  assert.match(fnSource('accountChip'), /own && h\('small', \{ class: 'own', id: 'chipOwn', text: `This setup plays as \$\{own\}` \}\)/)
+
+  const menu = fnSource('accountMenu')
+  // neither the x nor the bottom row removes anything: both open the question
+  assert.doesNotMatch(menu, /removeAccount/)
+  assert.match(menu, /onclick: \(\) => ask\(a\) \}, ico\('x'\)\)/)
+  assert.match(menu, /id: 'acctOut', onclick: \(\) => ask\(def\)/)
+  assert.match(menu, /\$\('acctKeep'\)\?\.focus/)
+  const ask = fnSource('accountAsk')
+  assert.match(ask, /id: 'acctGo', 'aria-describedby': 'acctWhy', onclick: \(\) => removeAccount\(a\)/)
+  assert.match(ask, /Signing in again goes through Microsoft\\'s page\./)
+  // both offline fields are the same labelled one
+  const field = fnSource('offlineField')
+  assert.match(field, /h\('label', \{ class: 'flabel', for: id, text: 'Offline name' \}\)/)
+  assert.match(field, /disabled: !ok, onclick: go/)
+  assert.match(menu, /offlineField\('offName', 'Add'/)
+  assert.match(fnSource('askMenu'), /offlineField\('askName', 'Play'/)
 })

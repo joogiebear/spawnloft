@@ -22,8 +22,8 @@
     shell: 'tauri',
     // resolves to an absolute path, or null if cancelled
     pickFolder: (title) => call('pick_folder', { title: text(title) }),
-    // files only (world archives); null if cancelled
-    pickFile: (title) => call('pick_file', { title: text(title) }),
+    // files only; null if cancelled. kind 'program' lists programs where the default lists world archives
+    pickFile: (title, kind) => call('pick_file', { title: text(title), kind: text(kind) }),
     // { setting, zoom }: setting is 'auto' or the chosen factor, zoom the factor on screen now
     getZoom: () => call('get_zoom'),
     setZoom: (value) => call('set_zoom', { value: value === 'auto' ? 'auto' : Number(value) }),

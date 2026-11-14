@@ -208,22 +208,32 @@ and the files keep "profile".
   read whole is left alone and the launch says so. Games older than 1.7 are left alone.
 - **The account chip** (top right) opens the account menu: who plays (click one to make it the
   default), **Add Microsoft account** (see [Signing in from the launcher](#signing-in-from-the-launcher)),
-  an offline name for servers with `online-mode=false`, and sign out. A setup plays as its own
-  account, else the default account (see [Default account and precedence](#default-account-and-precedence)).
+  an offline name for servers with `online-mode=false` (checked as it is typed: 3 to 16 letters,
+  digits or underscores), and sign out, which asks first and says how many setups are set to
+  play as that account. A setup plays as its own
+  account, else the default account (see [Default account and precedence](#default-account-and-precedence));
+  when the setup in view has its own, the chip says "This setup plays as NAME".
   When a setup has neither, Play first asks **Who's playing?**: sign in with Microsoft, or type an
   offline name and play.
 
 On a fresh install with no setup, Play makes one for the latest release (Vanilla, 2 GB), asks
 who is playing, and plays. Nothing downloads before that is answered.
 
-The setup sheet (New setup, or the gear) has the version (releases, or with snapshots, or
-everything, from Mojang's version list, cached for an hour so it works offline once fetched;
-**Refresh** reads it again, for a version out within the hour), Vanilla or
-Fabric, memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory that says how much is
-free), an optional name (else it is named by its version), who it plays as, the server it usually
-joins, **Let SpawnLoft see the game** (the harness mod), and under Advanced the Java path, the
-Fabric loader version and, once the setup exists, the switch that lets an assistant use its
-Microsoft account. Changing the version, loader, Java, memory or harness is refused while the game
+The setup sheet (New setup, or the gear) has the version: a list you can type in to narrow
+(typing searches every version, whatever the tab), with tabs for releases, releases and
+snapshots, or everything, marks for the latest release, snapshots and what is already
+downloaded, and a version this computer cannot run listed with the reason and not pickable. The
+list is Mojang's, cached for an hour so it works offline once fetched; **Refresh** reads it
+again, for a version out within the hour. Then **Mods** (None, which is plain "Vanilla"
+Minecraft, or Fabric), memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory; a
+choice above the machine's memory cannot be picked, one above three quarters of it is warned
+about, and the line under it says how much is free), an optional name (else it is named by its
+version), who it plays as, the server it usually joins, **Let SpawnLoft see the game** (the
+harness mod), and under Advanced the Java (Automatic, Mojang's own, each Java found on this
+computer, or **Another Java…** for a path, with **Browse…** in the desktop app; a path is
+started once before it is saved, so a wrong one is refused there and not at the next Play, and
+a Java too old for the version is said under the list), the Fabric version and, once the setup
+exists, the switch that lets an assistant use its Microsoft account. Changing the version, loader, Java, memory or harness is refused while the game
 is running. Changing the version of a setup that has mods in its folder warns that they may not
 load. **Remove setup** keeps its folder unless you tick the box.
 

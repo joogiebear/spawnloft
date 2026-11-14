@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('spawnloftDesktop', {
   pickFolder: (title) => ipcRenderer.invoke('spawnloft:pickFolder', { title }),
 
   // files only (world archives); null if cancelled
-  pickFile: (title) => ipcRenderer.invoke('spawnloft:pickFile', { title }),
+  pickFile: (title, kind) => ipcRenderer.invoke('spawnloft:pickFile', { title, kind }),
 
   getSetup: () => ipcRenderer.invoke('spawnloft:getSetup'),
 
