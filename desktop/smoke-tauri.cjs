@@ -363,6 +363,12 @@ async function main() {
   } finally {
     if (sid) await wd('DELETE', '').catch(() => {})
     driver.kill()
+    // The driver's output pipes are inherited by what it started (WebKitWebDriver, the window, the
+    // cores). When one of those outlives the driver by a moment the pipes stay open, and this
+    // script sat there after PASS with nothing left to do until the job's time ran out.
+    driver.stdout.destroy()
+    driver.stderr.destroy()
+    driver.unref()
     fs.writeFileSync(path.join(outDir, 'smoke-tauri.log'), log.join('\n') + '\n')
     // every run folder: the chosen root's, and the default one the first core used before setup
     for (const p of fs.readdirSync(scratch, { recursive: true }).map((r) => path.join(scratch, r))) {
