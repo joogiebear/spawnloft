@@ -1588,7 +1588,7 @@ async function runTask(id) {
       record('ok', `${res.file} (${humanBytes(res.size)})${pruned}${res.saveOnWarning ? `; WARNING: ${res.saveOnWarning}` : ''}`)
     } else if (action.type === 'verify') {
       const snaps = backup.listSnapshots(instance)
-      if (!snaps.length) return record('skipped', 'no snapshots to verify yet')
+      if (!snaps.length) return record('skipped', 'no backups to check yet')
       const failed = []
       for (const s of snaps) {
         const r = await backup.verifySnapshot(instance, s.name)
@@ -1596,11 +1596,11 @@ async function runTask(id) {
       }
       if (failed.length) {
         process.exitCode = 1
-        const detail = `${failed.length} of ${snaps.length} snapshots failed: ${failed.join('; ')}`
+        const detail = `${failed.length} of ${snaps.length} backups failed the check: ${failed.join('; ')}`
         await alert(detail)
         return record('FAILED', detail)
       }
-      record('ok', `all ${snaps.length} snapshots read back whole`)
+      record('ok', `all ${snaps.length} backups read back whole`)
     } else if (action.type === 'command') {
       if (!running) return record('skipped', 'the server was not running, so nothing was sent')
       await sup.sendConsole(instance, action.line)

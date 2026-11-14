@@ -43,6 +43,22 @@ test('a server that can be stopped the usual way is not force stopped', async ()
   assert.equal((await panelFetch(at)).status, 405)
 })
 
+test('a running server is not force stopped either: it can be asked to stop, and saves first', async () => {
+  // a real process stands in for the daemon and for java, and has to outlive the request
+  const live = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+  try {
+    writeJson(stateFile(name), { name, running: true, daemonPid: live.pid, javaPid: live.pid })
+    assert.equal(readState(name).status, 'running')
+    const res = await panelFetch(at, { method: 'POST' })
+    assert.equal(res.status, 409)
+    await sleep(300)
+    assert.ok(pidAlive(live.pid), 'the running server was killed')
+  } finally {
+    live.kill('SIGKILL')
+    fs.rmSync(stateFile(name), { force: true })
+  }
+})
+
 test('a server out of reach is ended, and reads as stopped after', async () => {
   const orphan = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
   const dead = spawnSync(process.execPath, ['-e', '0']).pid

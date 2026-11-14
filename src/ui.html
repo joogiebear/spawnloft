@@ -3143,7 +3143,7 @@
         </div>
         <div class="row">
           <button type="submit" class="primary" id="bAdopt">Add server</button>
-          <span class="hint">Nothing is moved. Its port and RCON password are read from its own server.properties.</span>
+          <span class="hint">Nothing is moved. Its port and the rest of its settings are read from its own server.properties.</span>
         </div>
       </form>
 
@@ -4125,7 +4125,7 @@ const STATE_TEXT = {
 // question, and each one names its way out.
 const STATE_NOTE = {
   orphaned: ['Still running, but out of reach.', 'The part of SpawnLoft that looked after this server has gone, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.'],
-  stale: ['Not shut down cleanly.', 'SpawnLoft closed, or the computer went off, while this server was running. It is not running now, and starting it clears this.'],
+  stale: ['Not shut down cleanly.', 'This server stopped without shutting down cleanly, as when the computer goes off while it runs. It is not running now, and starting it clears this.'],
   unknown: ['Unavailable', 'SpawnLoft could not read this server’s state. Its folder may have been moved or deleted.'],
   unreachable: ['Unreachable', 'This database runs elsewhere and is not answering at its address. Start it there, or check the host, port and password under Settings.'],
 };
@@ -4636,7 +4636,7 @@ function renderVitals(row) {
 
   const ceiling = memoryCeilingMb(row.memory);
   const memory = vitalCell('memory', 'Memory',
-    'Everything the server uses, Java itself included. It can sit a little above the ' + (row.memory ? row.memory + ' ' : '') + 'limit you set; that is normal.');
+    'Everything the server uses, Java itself included. It can sit above the ' + (row.memory ? row.memory + ' ' : '') + 'limit you set; that is normal.');
   if (latest && Number.isFinite(latest.rss)) {
     // Gigabytes once there is a gigabyte to count; "0.0 GB" for a server that is still warming up
     // says it uses nothing, which is not true.
@@ -4974,15 +4974,22 @@ async function forceStop(name, label) {
     confirmLabel: 'Force stop',
     danger: true,
   });
-  if (!ok) return;
+  if (!ok) return false;
+  let done = false;
   try {
     await post('/instances/' + encodeURIComponent(name) + '/kill');
+    forceStopped.add(name);
+    done = true;
     toast('Stopped ' + label + '.', 'good');
   } catch (e) {
     toast(e.message, 'bad');
   }
   await refresh();
+  return done;
 }
+// The update's record still lists a server as out of reach after it has been force stopped here;
+// its notice would stay, offering a stop that is refused.
+const forceStopped = new Set();
 
 function noticeBox({ tone, title, text, actions = [], dismiss }) {
   const box = document.createElement('div');
@@ -7530,7 +7537,7 @@ async function paintPerformance(name, opts) {
         + (wide ? ' - try ' + wide.label + '.' : '.');
     } else {
       none = data.running
-        ? 'Measuring. The first reading takes about ' + (data.everySeconds * 2) + ' seconds.'
+        ? 'Measuring. The first reading takes about ' + data.everySeconds + ' seconds.'
         : 'Nothing recorded. This is measured while the server runs, and history is cleared when it '
           + 'starts so two runs are never drawn as one line.';
     }
@@ -7606,7 +7613,7 @@ async function paintPerformance(name, opts) {
   if (ceiling && peakRss > ceiling) {
     const note = document.createElement('div');
     note.className = 'hint';
-    note.textContent = 'Memory can sit a little above the limit you set. That is normal: ' + data.memory
+    note.textContent = 'Memory can sit above the limit you set. That is normal: ' + data.memory
       + ' is what the game itself may use, and Java needs some more on top of it.';
     body.append(note);
   }
@@ -10769,7 +10776,7 @@ const ACTIVITY_TEXT = {
   'player-op': 'Made an operator:', 'player-deop': 'Took operator from', 'player-ban': 'Banned', 'player-unban': 'Unbanned', 'player-forget': 'Forgot the player',
   'schedule-add': 'Scheduled', 'schedule-change': 'Changed the schedule', 'schedule-enable': 'Turned on the schedule', 'schedule-disable': 'Paused the schedule', 'schedule-remove': 'Removed the schedule',
   'schedule-run': 'Ran the schedule now:',
-  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset:', delete: 'Deleted this server:',
+  create: 'Created this server', adopt: 'Added this server from', rename: 'Renamed', rebuild: 'Reset:', delete: 'Removed this server:',
 };
 
 /**
@@ -10785,6 +10792,10 @@ function activityWords(e) {
   if (!e.detail && ACTIVITY_BARE[e.action]) return { verb: ACTIVITY_BARE[e.action], detail: '' };
   const verb = ACTIVITY_TEXT[e.action] || e.action;
   if (!e.detail) return { verb: verb.replace(/:$/, ''), detail: '' };
+  // a file that happens to be named like an archive is still a file
+  if (/^file-/.test(e.action)) return { verb, detail: e.detail };
+  const gone = e.action === 'backup-note' && / \(note removed\)$/.test(e.detail);
+  if (gone) return { verb: 'Took the note off', detail: backupNamesToWords(e.detail.replace(/ \(note removed\)$/, '')) };
   return { verb, detail: backupNamesToWords(e.detail) };
 }
 // Changes whose copy holds exactly what they changed. The server makes the same list; this one only
@@ -11035,9 +11046,13 @@ function backupWords(snap, capital) {
 
 /** An archive's file name inside a sentence written by the core, said as when it was taken. */
 function backupNamesToWords(text) {
-  return String(text).replace(/\S*?(\d{4})-?(\d{2})-?(\d{2})[-_](\d{2})(\d{2})(\d{2})(?:_\d+)?\.tar\.gz/g, (all, y, mo, d, h, mi, sec) => {
+  // [label_]scope_YYYY-MM-DD_HHMMSS[_n].tar.gz, standing by itself: a name with a folder in front
+  // of it is somebody's file, and a bracket or a quote around it is kept
+  return String(text).replace(/(?<![\w.\/\\-])(?:[\w.-]*_)?(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})(?:_\d+)?\.tar\.gz/g, (all, y, mo, d, h, mi, sec) => {
     const at = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(sec));
-    return Number.isNaN(at.getTime()) ? all : 'the backup from ' + stamp(at);
+    // 99:99:99 rolls over to a real date, which is not when anything was taken
+    const real = at.getMonth() === Number(mo) - 1 && at.getDate() === Number(d) && at.getHours() === Number(h) && at.getMinutes() === Number(mi) && at.getSeconds() === Number(sec);
+    return real ? 'the backup from ' + stamp(at) : all;
   });
 }
 
@@ -11876,7 +11891,7 @@ function renderBackupHistory(row, data, signature) {
         const ok = await ask({
           title: 'Restore into ' + row.name + '?',
           text: 'This puts back ' + covers + ' from ' + backupWords(snap)
-            + ', as they were on ' + new Date(snap.mtime).toLocaleString() + '. Anything changed since then is overwritten.' + left + dbs + flawed
+            + '. Anything changed since then is overwritten.' + left + dbs + flawed
             + words.note,
           choices: [
             { value: 'over', label: 'Put it back over what is there', hint: 'Anything added since - a new plugin, chunks explored since - stays. ' + words.copy },
@@ -12368,7 +12383,7 @@ async function buildServerSettings(row, body) {
     jvSelect.textContent = '';
     const o = el('option');
     o.value = '__custom';
-    o.textContent = 'A path of my own…';
+    o.textContent = 'Choose another Java…';
     jvSelect.append(o);
     jvCustom.hidden = false;
     jvCustom.value = mine.java;
@@ -15417,7 +15432,7 @@ function upgradeNoticeNodes(data) {
     const waiting = restarted.filter((e) => !e.start);
     const failed = restarted.filter((e) => e.start === 'failed' || e.start === 'skipped');
     const back1x = restarted.filter((e) => e.start === 'restored-1x');
-    const orphans = servers.filter((e) => e.stop === 'orphaned');
+    const orphans = servers.filter((e) => e.stop === 'orphaned' && !forceStopped.has(e.name));
     if (waiting.length) {
       out.push(noticeBox({ tone: 'warn', title: 'Updating.',
         text: 'Starting ' + joinNames(waiting.map((e) => e.name)) + ' again after the update.' }));
@@ -15445,7 +15460,11 @@ function upgradeNoticeNodes(data) {
     for (const e of orphans) {
       out.push(noticeBox({ tone: 'fault', title: e.name + ' is still running, but out of reach.',
         text: 'It has been running since before the update with nothing looking after it, so it cannot be stopped the usual way or sent commands. Force stop it, then start it again.',
-        actions: [{ label: 'Force stop', run: async () => { await forceStop(e.name, e.name); pollUpgradeNotices(); } }],
+        actions: [{ label: 'Force stop', run: async () => {
+          if (!(await forceStop(e.name, e.name))) return;
+          upgradeBanner.last = null;
+          pollUpgradeNotices();
+        } }],
         dismiss: dismissRec }));
     }
   }

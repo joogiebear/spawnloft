@@ -718,8 +718,15 @@ function tableSource(name) {
 test('an archive name in a sentence is said as when the backup was taken', () => {
   const backupNamesToWords = new Function(`const stamp = (d) => d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + d.getMinutes();
     ${fnSource('backupNamesToWords')}; return backupNamesToWords`)()
-  assert.equal(backupNamesToWords('survival_2026-11-03_041500.tar.gz'), 'the backup from 2026/11/3 4:15')
-  assert.equal(backupNamesToWords('kept survival-20261103-041500_2.tar.gz and more'), 'kept the backup from 2026/11/3 4:15 and more')
+  assert.equal(backupNamesToWords('standard_2026-11-03_041500.tar.gz'), 'the backup from 2026/11/3 4:15')
+  // the names the core really writes: a label, a scope, and a number when two fall in one second
+  assert.equal(backupNamesToWords('kept scheduled_standard_2026-11-03_041500_2.tar.gz and more'), 'kept the backup from 2026/11/3 4:15 and more')
+  assert.equal(backupNamesToWords('before-1.21_full_2026-11-03_041500.tar.gz: before the upgrade'), 'the backup from 2026/11/3 4:15: before the upgrade')
+  // what stands around a name is kept
+  assert.equal(backupNamesToWords('(standard_2026-11-03_041500.tar.gz)'), '(the backup from 2026/11/3 4:15)')
+  // somebody's own file in a folder is not a backup, and neither is a time that does not exist
+  assert.equal(backupNamesToWords('plugins/old/world_2024-01-01_120000.tar.gz (3 MB)'), 'plugins/old/world_2024-01-01_120000.tar.gz (3 MB)')
+  assert.equal(backupNamesToWords('standard_2026-13-03_999999.tar.gz'), 'standard_2026-13-03_999999.tar.gz')
   // nothing that is not an archive's name is touched
   assert.equal(backupNamesToWords('3 removed, the newest 7 kept'), '3 removed, the newest 7 kept')
   assert.equal(backupNamesToWords(undefined), 'undefined')
@@ -727,8 +734,15 @@ test('an archive name in a sentence is said as when the backup was taken', () =>
 
 test('an activity entry is a sentence: the verb, then what it was done to', () => {
   const activityWords = new Function(`${tableSource('ACTIVITY_TEXT')}\n${tableSource('ACTIVITY_BARE')}
-    const backupNamesToWords = (s) => s;
+    const backupNamesToWords = (s) => s.replace(/[^ ]+[.]tar[.]gz/, 'the backup from then');
     ${fnSource('activityWords')}; return activityWords`)()
+  // a backup in the detail is said as when it was taken; a file that only looks like one is not
+  assert.deepEqual(activityWords({ action: 'backup-lock', detail: 'standard_2026-11-03_041500.tar.gz' }), { verb: 'Locked', detail: 'the backup from then' })
+  assert.deepEqual(activityWords({ action: 'file-upload', detail: 'world_2024-01-01_120000.tar.gz (3 MB)' }), { verb: 'Uploaded', detail: 'world_2024-01-01_120000.tar.gz (3 MB)' })
+  // a note taken off is not "Put a note on ... (note removed)"
+  assert.deepEqual(activityWords({ action: 'backup-note', detail: 'standard_2026-11-03_041500.tar.gz (note removed)' }), { verb: 'Took the note off', detail: 'the backup from then' })
+  assert.deepEqual(activityWords({ action: 'backup-note', detail: 'standard_2026-11-03_041500.tar.gz: before 1.21' }), { verb: 'Put a note on', detail: 'the backup from then: before 1.21' })
+  assert.deepEqual(activityWords({ action: 'delete', detail: 'files kept' }), { verb: 'Removed this server:', detail: 'files kept' })
   // the colon stays when something follows it, and goes when nothing does
   assert.deepEqual(activityWords({ action: 'settings', detail: 'Difficulty: hard' }), { verb: 'Changed settings:', detail: 'Difficulty: hard' })
   assert.equal(activityWords({ action: 'backup-prune' }).verb, 'Cleared old backups')
@@ -776,11 +790,15 @@ test('the words a person does not need are gone from the page', () => {
   // what a person reads, not what the code says in its comments
   const said = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/<!--[\s\S]*?-->/g, '')
   for (const word of ['Orphaned', 'Stale state', 'has no supervisor', 'over RCON', 'max heap', 'heap limit', 'Loopback only', 'root is for you',
-    'Dumping', 'the registry stores', 'update feed', 'name-derived', 'on PATH', ' Javas', 'spawnloft kill', 'spawnloft client new']) {
+    'Dumping', 'the registry stores', 'update feed', 'name-derived', 'on PATH', ' Javas', 'spawnloft kill', 'spawnloft client new', 'A path of my own', 'RCON password', 'Mirroring', 'a mirror',
+    'old snapshot', 'Add a mirror']) {
     assert.ok(!said.includes(word), `"${word}" is still said on the page`)
   }
   // the server out of reach has a button where it had a terminal command
   assert.match(html, /label: 'Force stop', run: \(\) => forceStop\(row\.name, row\.label \|\| row\.name\)/)
   assert.match(fnSource('forceStop'), /post\('\/instances\/' \+ encodeURIComponent\(name\) \+ '\/kill'\)/)
   assert.match(fnSource('forceStop'), /danger: true/)
+  // the update's notice for it goes once it has been stopped, where it stayed and offered a stop that is refused
+  assert.match(fnSource('forceStop'), /forceStopped\.add\(name\)/)
+  assert.match(html, /e\.stop === 'orphaned' && !forceStopped\.has\(e\.name\)/)
 })

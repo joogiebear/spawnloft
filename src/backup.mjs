@@ -32,7 +32,7 @@ function mirrorCopy(name, file) {
     if (fs.existsSync(manifest)) fs.copyFileSync(manifest, dest.replace(/\.tar\.gz$/, '.json'))
     return { mirrored: dest, mirrorError: null }
   } catch (err) {
-    return { mirrored: null, mirrorError: `the snapshot is safe, but mirroring it failed: ${err.message}` }
+    return { mirrored: null, mirrorError: `the backup is safe, but its second copy could not be made: ${err.message}` }
   }
 }
 
