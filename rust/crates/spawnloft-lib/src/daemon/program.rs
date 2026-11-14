@@ -92,7 +92,11 @@ pub fn minecraft(inst: &Instance, node: Option<&Path>) -> Result<Program, String
         .ok_or_else(|| format!("instance \"{}\" has no usable jar name", inst.name))?;
     // -Dterminal.jline=false before the person's flags, as in registry.mjs serverJvmArgs: no TTY, so
     // without it TerminalConsoleAppender prints "Advanced terminal features are not available".
-    let mut args = vec![format!("-Xms{memory}"), format!("-Xmx{memory}"), "-Dterminal.jline=false".to_string()];
+    let mut args = vec![
+        format!("-Xms{memory}"),
+        format!("-Xmx{memory}"),
+        "-Dterminal.jline=false".to_string(),
+    ];
     args.extend(flags);
     args.extend(["-jar".to_string(), jar_name, "--nogui".to_string()]);
     let java = inst.java();
@@ -223,7 +227,15 @@ mod tests {
         .unwrap();
         assert_eq!(
             own.args,
-            ["-Xms2G", "-Xmx2G", "-Dterminal.jline=false", "-Dx=1", "-jar", "paper.jar", "--nogui"]
+            [
+                "-Xms2G",
+                "-Xmx2G",
+                "-Dterminal.jline=false",
+                "-Dx=1",
+                "-jar",
+                "paper.jar",
+                "--nogui"
+            ]
         );
     }
 
