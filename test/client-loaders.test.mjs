@@ -20,7 +20,7 @@ const client = await import('../src/client.mjs')
 const linux = { name: 'linux', arch: 'x64', version: '6.1.0' }
 
 test('the loader list: vanilla first, Fabric and Quilt behind the shared shape, and the same list client.mjs checks a setup against', () => {
-  assert.deepEqual(LOADERS, ['vanilla', 'fabric', 'quilt', 'neoforge'])
+  assert.deepEqual(LOADERS, ['vanilla', 'fabric', 'quilt', 'forge', 'neoforge'])
   assert.equal(client.LOADERS, LOADERS)
   assert.equal(loaderFor('vanilla'), null)
   const fabric = loaderFor('fabric')
@@ -32,8 +32,9 @@ test('the loader list: vanilla first, Fabric and Quilt behind the shared shape, 
   assert.equal(fabric.pick([{ version: '0.19.5', stable: true }, { version: '0.19.4', stable: true }], '0.19.4').version, '0.19.4')
   assert.equal(fabric.available('1.21.11', [{ version: '1.21.11', stable: true }]), true)
   assert.equal(fabric.available('1.8.9', [{ version: '1.21.11', stable: true }]), false)
-  assert.throws(() => loaderFor('forge'), /unknown loader/)
-  assert.throws(() => client.createProfile('bad-loader', { mc: '1.21.11', loader: 'forge' }), /unknown loader "forge" - use vanilla or fabric or quilt/)
+  assert.equal(typeof loaderFor('forge').narrowJava, 'function')
+  assert.throws(() => loaderFor('liteloader'), /unknown loader/)
+  assert.throws(() => client.createProfile('bad-loader', { mc: '1.21.11', loader: 'liteloader' }), /unknown loader "liteloader" - use vanilla or fabric or quilt or forge or neoforge/)
 })
 
 // A Forge 1.12.2 profile as the legacy installer writes it: its own full minecraftArguments line

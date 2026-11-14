@@ -815,7 +815,7 @@
     // the version file comes first: the Java is read from it
     if (stage === 'manifest' || stage === 'version') return 0
     if (stage === 'java') return 1
-    if (['client', 'libraries', 'assets', 'natives', 'fabric', 'quilt', 'neoforge', 'harness'].includes(stage)) return 2
+    if (['client', 'libraries', 'assets', 'natives', 'fabric', 'quilt', 'forge', 'neoforge', 'harness'].includes(stage)) return 2
     if (stage === 'server') return 3
     if (stage === 'spawn' || stage === 'running') return 4
     return -1
@@ -1211,7 +1211,9 @@
   // greyed out until SpawnLoft can set them up.
   const LOADER_NAMES = { vanilla: 'Vanilla', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
   const MOD_LOADERS = ['fabric', 'quilt', 'forge', 'neoforge']
-  const COMING = ['forge']
+  const COMING = []
+  // the loaders set up by an installer, whose builds the sheet lists in Advanced
+  const INSTALLER_LOADERS = ['forge', 'neoforge']
 
   function loaderName(loader) {
     return Object.hasOwn(LOADER_NAMES, loader) ? LOADER_NAMES[loader] : 'Vanilla'
@@ -1368,14 +1370,22 @@
   function loaderBlock(loader, mc, info) {
     if (!modded(loader)) return null
     if (COMING.includes(loader)) return `${loaderName(loader)} is coming in a later SpawnLoft.`
+    if (loader === 'forge' && legacyForgeMc(mc)) return 'Forge for 1.12.2 and older is coming in a later SpawnLoft.'
     const has = info?.loaders && typeof info.loaders === 'object' ? info.loaders[loader] : loader === 'fabric' ? info?.fabric : undefined
     return has === false ? `${loaderName(loader)} has no build for ${mc}.` : null
+  }
+
+  // Minecraft 1.12.2 and older, where Forge's installer is the older kind
+  function legacyForgeMc(mc) {
+    const m = /^1\.(\d+)(?:\.\d+)?$/.exec(String(mc ?? ''))
+    return Boolean(m) && Number(m[1]) < 13
   }
 
   // The line under the Mods choice: why the pick cannot be used, else what it does.
   function loaderHint(loader) {
     if (!modded(loader)) return 'None is plain Minecraft, also called Vanilla. Pick a mod loader to play with mods.'
-    return `${loaderName(loader)} loads mods. Put them in the mods folder inside the setup\u2019s folder.`
+    const first = INSTALLER_LOADERS.includes(loader) ? ` The first Play sets ${loaderName(loader)} up, which takes a minute or two.` : ''
+    return `${loaderName(loader)} loads mods. Put them in the mods folder inside the setup\u2019s folder.${first}`
   }
 
   // Said in the sheet when an existing setup's loader is changed: its mods were made for the old one.
@@ -1579,6 +1589,8 @@
 
   const S = {
     summary: null,
+    // a mod loader's builds per loader@version, for Advanced's build list
+    builds: {},
     down: false,
     downWhy: null,
     pick: stored('local', PICK_KEY),
@@ -2737,6 +2749,11 @@
     const close = () => { f.vOpen = false; f.vFind = ''; f.vAt = -1; render(); $('fMc')?.focus({ preventScroll: true }) }
     const pick = (r) => {
       if (blocked(r)) return
+      // a build is made for one version; going back to the setup's own keeps its pinned build
+      if (r.id !== f.mc) {
+        const own = S.sheet === f && f.editing ? profileNamed(f.editing) : null
+        f.loaderVersion = own && own.mc === r.id && own.loader === f.loader ? (own.loaderVersion ?? '') : ''
+      }
       f.mc = r.id
       fixLoader(f)
       loadDetails(f.mc)
@@ -2783,6 +2800,57 @@
   }
 
   // The Javas on this computer, for the sheet's Java list; asked for when Advanced is opened.
+  // A loader's builds for a version, for the build list in Advanced, kept by loader and version.
+  const buildsKey = (loader, mc) => `${loader}@${mc}`
+  async function loadBuilds(loader, mc) {
+    const key = buildsKey(loader, mc)
+    const had = S.builds[key]
+    // a list is read again after ten minutes, a failed read after one
+    if (had && (had.loading || Date.now() - had.at < (had.error ? 60e3 : 600e3))) return
+    S.builds[key] = { ...(had?.builds ? had : {}), loading: true, at: Date.now() }
+    try {
+      S.builds[key] = { ...(await api(`client/loaders/${encodeURIComponent(loader)}/${encodeURIComponent(mc)}/builds`)), at: Date.now() }
+    } catch (err) {
+      S.builds[key] = { ...(had?.builds ? had : {}), error: err.message, at: Date.now() }
+    }
+    render()
+  }
+
+  // The loader's version in Advanced: a list of its builds for an installer's loader once they
+  // are read, else a field to type one in.
+  function loaderVersionField(f) {
+    const name = loaderName(f.loader)
+    const example = { quilt: '0.30.2', neoforge: '21.1.266', forge: '47.4.28' }[f.loader] ?? '0.17.3'
+    const typed = () => h('label', { class: 'field' }, h('span', { text: `${name} version` }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: (e) => { f.loaderVersion = e.target.value } }),
+      h('small', { class: 'hint', text: `The build of ${name} itself, like ${example}. Left empty, the first Play takes the newest stable one.` }))
+    if (!INSTALLER_LOADERS.includes(f.loader) || !f.mc || loaderBlock(f.loader, f.mc, versionInfo(f.mc))) return typed()
+    // read when Advanced is open; until the list is in, the field to type one in
+    if (f.adv) loadBuilds(f.loader, f.mc)
+    const got = S.builds[buildsKey(f.loader, f.mc)]
+    if (!got?.builds?.length) {
+      if (!got?.error) return typed()
+      return h('div', {}, typed(), h('small', { class: 'hint warn', text: `${name}\u2019s builds could not be read: ${got.error}` }))
+    }
+    const builds = got.builds
+    const by = got.picked && builds.find((b) => b.version === got.picked)
+    const auto = by ? `${by.recommended ? 'Recommended' : 'Newest'}: ${by.version}` : 'Newest stable'
+    const options = [['', auto], ...builds.map((b) => [b.version, b.recommended ? `${b.version} (recommended)` : b.stable ? b.version : `${b.version} (beta)`])]
+    const unknown = Boolean(f.loaderVersion) && !builds.some((b) => b.version === f.loaderVersion)
+    if (unknown) options.splice(1, 0, [f.loaderVersion, `${f.loaderVersion} (not published)`])
+    // a pinned build with a newer default out says so; the setup keeps its build (design Q3)
+    const pinned = f.loaderVersion && builds.findIndex((b) => b.version === f.loaderVersion)
+    const newer = Boolean(got.picked) && got.picked !== f.loaderVersion && pinned > 0 && builds.findIndex((b) => b.version === got.picked) < pinned
+    const hint = unknown
+      ? `${name} ${f.loaderVersion} is not published for ${f.mc}. Pick one from the list.`
+      : newer
+      ? `${name} ${got.picked} is out. This setup stays on ${f.loaderVersion} until you pick another.`
+      : f.loaderVersion ? `This setup stays on ${name} ${f.loaderVersion}.` : `Left on ${auto.split(':')[0].toLowerCase()}, the first Play takes that build and keeps it.`
+    return h('label', { class: 'field' }, h('span', { text: `${name} version` }),
+      h('select', { id: 'fLoaderVersion', value: f.loaderVersion, onchange: (e) => { f.loaderVersion = e.target.value; render() } },
+        options.map(([v, text]) => h('option', { value: v, selected: v === (f.loaderVersion ?? '') || null, text }))),
+      h('small', { class: newer || unknown ? 'hint warn' : 'hint', text: hint }))
+  }
+
   async function loadJavas({ fresh = false } = {}) {
     if (S.javas?.loading) return
     S.javas = { loading: true, javas: S.javas?.javas ?? null }
@@ -2847,8 +2915,10 @@
 
   // What the version in the sheet needs of a Java: its own file's bounds when the panel has
   // read it, else the guess from its id.
-  function javaNeeds(mc) {
+  function javaNeeds(mc, loader = null) {
     const d = S.details[mc]?.java
+    // Forge on a version Mojang ships with Java 8 runs on Java 8 only, as the launch decides
+    if (d?.min && loader === 'forge' && d.component === 'jre-legacy') return { min: 8, max: 8 }
     if (d?.min) return { min: d.min, max: d.max ?? null }
     const row = versionInfo(mc)
     return row.javaNeeds ? { min: row.javaNeeds, max: null, guess: row.javaNeedsExact === false } : null
@@ -2861,7 +2931,7 @@
     const picked = found.find((j) => j.path === f.java) ?? null
     const check = f.javaCheck && f.javaCheck.path === fieldText(f.java) ? f.javaCheck : null
     const major = picked?.major ?? (check?.found ? check.major : null)
-    const fit = javaFit(major, javaNeeds(f.mc), f.mc)
+    const fit = javaFit(major, javaNeeds(f.mc, f.loader), f.mc)
     const onpick = (e) => {
       const val = e.target.value
       // "Another Java" starts from the path the setup had, so that it is not lost by looking
@@ -3014,8 +3084,7 @@
           ? h('div', { class: 'grid2' }, ro('Java', f.java === 'mojang' ? "Mojang's own Java" : f.java || 'Automatic', runningHint), modded(f.loader) && ro(`${loaderName(f.loader)} version`, f.loaderVersion || 'Newest stable'))
           : h('div', { class: 'grid2' },
             javaField(f),
-            modded(f.loader) && h('label', { class: 'field' }, h('span', { text: `${loaderName(f.loader)} version` }), h('input', { id: 'fLoaderVersion', value: f.loaderVersion, placeholder: 'Newest stable', oninput: set('loaderVersion') }),
-              h('small', { class: 'hint', text: `The build of ${loaderName(f.loader)} itself, like ${{ quilt: '0.30.2', neoforge: '21.1.266' }[f.loader] ?? '0.17.3'}. Left empty, the first Play takes the newest stable one.` }))),
+            modded(f.loader) && loaderVersionField(f)),
         f.editing
           ? h('div', { class: 'switchrow' }, h('div', { class: 'txt' }, h('b', { id: 'fAssistLabel', text: 'Allow an assistant to use my account' }),
             h('small', { text: msAccount ? `An AI assistant you connected to SpawnLoft may start this setup and play signed in as ${msAccount.name}.` : 'An AI assistant you connected to SpawnLoft may start this setup signed in as its Microsoft account. It plays as an offline player while the setup has none.' })),

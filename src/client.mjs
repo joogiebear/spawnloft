@@ -432,6 +432,22 @@ export async function checkProfileVersion({ mc, loader = 'vanilla' }, { fetchImp
   return known.mc
 }
 
+// A loader's builds for one version, for the setup sheet's build list: newest first, with the one
+// a first Play would take (Forge's recommended build, else the newest stable one).
+export async function loaderBuilds(loader, mc, { force = false } = {}) {
+  if (!LOADERS.includes(loader) || loader === 'vanilla') fail(`"${loader}" is not a mod loader`)
+  if (typeof mc !== 'string' || !isSafeVersionId(mc)) fail('the Minecraft version is not valid')
+  const mod = loaderFor(loader)
+  const builds = await mod.builds(mc, { force })
+  const picked = builds.length ? mod.pick(builds).version : null
+  return {
+    loader,
+    mc,
+    picked,
+    builds: builds.slice(0, 300).map((b) => ({ version: b.version, stable: b.stable !== false, recommended: Boolean(b.recommended) })),
+  }
+}
+
 export async function prepareVersion(name, { onStage = () => {} } = {}) {
   const profile = getProfile(name)
   if (!fs.existsSync(versionJson(profile.mc))) {
@@ -458,12 +474,27 @@ export async function prepareVersion(name, { onStage = () => {} } = {}) {
 
 // The Java a version runs on: the profile's own, one found on this machine, or Mojang's runtime
 // for the version's component, for the arch the game runs as (plan step V2).
-async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () => {}, fetchImpl = null, listFetchImpl = null, foundJavas = null } = {}) {
+export async function javaFor(profile, resolved, { onStage = () => {}, onProgress = () => {}, fetchImpl = null, listFetchImpl = null, foundJavas = null } = {}) {
   const runtime = () => {
     onStage({ stage: 'java', message: `Getting Mojang's Java ${resolved.java.major}` })
     return mojangJava({ component: resolved.java.component, major: resolved.java.major, osName: resolved.os.name, arch: resolved.arch, onProgress, ...(fetchImpl ? { fetchImpl } : {}), ...(listFetchImpl ? { listFetchImpl } : {}) })
   }
-  return pickClientJava({ explicit: profile.java, requirement: resolved.java, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
+  // a loader may narrow the version's Java (Forge on a Java 8 version runs on 8 only)
+  const mod = loaderFor(profile.loader)
+  const requirement = mod?.narrowJava ? mod.narrowJava(resolved.java) : resolved.java
+  // Mojang's Java first where the loader asks it, before any installed one; when it cannot be had
+  // (offline, none for this machine), the usual choice
+  if (requirement.mojangFirst && !profile.java) {
+    try {
+      const r = await runtime()
+      return { path: r.path, warning: null, source: 'mojang-runtime', requirement }
+    } catch (err) {
+      if (!['no-runtime-for-this-machine', 'runtime-offline', 'download-failed'].includes(err?.code)) throw err
+    }
+  }
+  const picked = await pickClientJava({ explicit: profile.java, requirement, arch: resolved.arch, what: 'Minecraft ' + profile.mc, runtime, ...(foundJavas ? { found: foundJavas } : {}) })
+  const warning = mod && picked.warning ? `${picked.warning} Mods often fail on a newer Java.` : picked.warning
+  return { ...picked, warning, requirement }
 }
 
 // What a loader sets up once the game's Java is picked: an installer's build steps, which read the
@@ -852,7 +883,7 @@ function versionsInUse(except) {
 function launchFacts(resolved, picked, profile, installed, assetsDir) {
   return {
     id: resolved.id,
-    java: { major: resolved.java.major, component: resolved.java.component, min: resolved.java.min, max: resolved.java.max, chosenPath: picked.path, source: picked.source, warning: picked.warning },
+    java: { major: resolved.java.major, component: resolved.java.component, min: (picked.requirement ?? resolved.java).min, max: (picked.requirement ?? resolved.java).max, chosenPath: picked.path, source: picked.source, warning: picked.warning },
     arch: resolved.arch,
     emulated: resolved.emulated,
     nativesDir: resolved.natives.dir,

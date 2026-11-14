@@ -12,6 +12,7 @@ on:
     paths:
       - src/client-forge-install.mjs
       - src/client-neoforge.mjs
+      - src/client-forge.mjs
       - src/client-loaders.mjs
       - src/client-install.mjs
       - src/client-meta.mjs
@@ -36,6 +37,9 @@ jobs:
         include:
           - { loader: neoforge, mc: '26.3', build: '26.3.0.103' }
           - { loader: neoforge, mc: '1.21.1', build: '21.1.266', and: '21.1.265' }
+          - { loader: forge, mc: '26.3', build: '66.1.8' }
+          - { loader: forge, mc: '1.20.1', build: '47.4.28', and: '47.4.29' }
+          - { loader: forge, mc: '1.16.5', build: '36.2.34' }
     name: ${{ matrix.loader }} ${{ matrix.build }}
     steps:
       - uses: actions/checkout@v4

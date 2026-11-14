@@ -97,7 +97,21 @@ or a crash leaves the finished steps in place, and the next Play carries on from
 profiles on the same build share its files, and the second one waits for the first rather than
 building them again. A NeoForge profile gets nothing in its `mods/` folder.
 
-Forge is listed in the launcher and greyed out until a later SpawnLoft. The harness has its own, shorter list (see [The harness](#the-harness)).
+Forge builds for 1.13 and newer here, and is set up the same way, from Forge's own maven: its
+version file goes under `versions/<mc>-forge-<build>/` (1.20.1-forge-47.4.28), and the card
+shows "Setting up Forge 47.4.28". The build a first Play takes is the one Forge marks
+recommended for the version, else its newest. Forge for 1.12.2 and older uses an older kind of
+installer and comes in a later SpawnLoft; until then it is greyed out for those versions with
+that reason. Forge on a version Mojang ships with Java 8 (1.13 to 1.16.5) runs on Java 8 only,
+since Forge of that era fails on anything newer. Mojang's own Java 8 is taken first, before an
+installed one, as Forge builds of that era from before early 2022 fail on Java 8 updates from
+8u321 on; when it cannot be had, an installed Java 8, and failing that a newer one with a warning
+that mods often fail on a newer Java.
+
+A Forge or NeoForge build is pinned once picked: a later Play keeps it, and the setup sheet's
+**Advanced** lists the loader's builds for the version, newest first with the recommended one
+marked, and says when a newer default build is out. The list is read from
+`GET /api/client/loaders/<loader>/<mc>/builds`. The harness has its own, shorter list (see [The harness](#the-harness)).
 
 When Mojang changes the format of a version file in a way this SpawnLoft does not understand (a
 new launcher format, a platform rule or a launcher setting it has not seen), the launch is
@@ -155,7 +169,7 @@ builds for it: Mojang's Java there stops at 17, so 1.20.4 and older.
 
 ```
 spawnloft client list
-spawnloft client new <name> --mc <version> [--loader vanilla|fabric|quilt|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
+spawnloft client new <name> --mc <version> [--loader vanilla|fabric|quilt|forge|neoforge] [--memory 2G] [--java <path>] [--server <server>] [--harness] [--account <name>]
 spawnloft client set <name> key=value ...
 spawnloft client remove <name> [--purge]
 ```
@@ -164,9 +178,9 @@ A profile is a few keys, all changeable with `set`:
 
 | Key | Meaning |
 | --- | --- |
-| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
+| `mc` | The Minecraft version, as Mojang's version list names it: `1.21.11`, `26.4-snapshot-6`, `1.14.2 Pre-Release 4`, `b1.7.3`. A profile is saved only for a version in that list (or one already downloaded), and with a mod loader only for a version that loader builds for (Fabric and Quilt: 1.14 and newer; Forge: 1.13 and newer; NeoForge: 1.20.2 and newer); a mistyped id is refused with the nearest ones. |
 | `loader` | `vanilla`, `fabric`, `quilt` or `neoforge`. A mod loader is needed for mods; the harness needs Fabric. Changing it clears `loaderVersion`, and the mods already in the profile's folder were made for the old loader. |
-| `loaderVersion` | The loader's own build (Fabric's, Quilt's or NeoForge's). Left empty, the newest stable one is picked at the first launch and recorded; a beta only where there is nothing else. |
+| `loaderVersion` | The loader's own build (Fabric's, Quilt's, Forge's or NeoForge's). Left empty, the newest stable one (Forge's recommended one) is picked at the first launch and recorded; a beta only where there is nothing else. |
 | `memory` | The game's heap, a whole number of M or G (`2G` by default). |
 | `java` | A specific Java to use, `mojang` for Mojang's own runtime for the version, or empty to let SpawnLoft pick (an installed Java that fits, else Mojang's runtime, downloaded once into `client/runtime/`). |
 | `server` | The SpawnLoft server the game joins on launch, or empty for the title screen. |
@@ -245,7 +259,7 @@ snapshots, or everything, marks for the latest release, snapshots and what is al
 downloaded, and a version this computer cannot run listed with the reason and not pickable. The
 list is Mojang's, cached for an hour so it works offline once fetched; **Refresh** reads it
 again, for a version out within the hour. Then **Mods** (None, which is plain "Vanilla"
-Minecraft, Fabric, Quilt or NeoForge; Forge is shown and greyed out until a later SpawnLoft;
+Minecraft, Fabric, Quilt, Forge or NeoForge; Forge is greyed out on 1.12.2 and older until a later SpawnLoft;
 a loader with no build for the picked version is greyed out with the reason; a list on a narrow
 window), memory (2, 4 or 8 GB, or Custom: a slider up to the machine's memory; a
 choice above the machine's memory cannot be picked, one above three quarters of it is warned
