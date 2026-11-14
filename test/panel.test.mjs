@@ -1011,6 +1011,8 @@ test('installing a plugin asks about a wrong version and about what it needs, an
   assert.equal(some.title, 'Shop needs 2 other mods')
   assert.match(some.text, /Citizens is not on Hangar or Modrinth: get it from https:\/\/ci\.citizensnpcs\.co/)
   assert.deepEqual(some.fetch.map((d) => d.id), ['v', 'p'])
+  assert.match(some.text, /without Vault, ProtocolLib and Citizens\./)
+  assert.equal(some.choices[0].hint, 'Vault and ProtocolLib.')
   // only things it cannot fetch: no choice to make but whether to go on
   const none = dependencyQuestion('Shop', { requires: [{ title: 'Citizens', installed: false, external: 'https://x' }] }, 'plugin')
   assert.equal(none.choices, undefined)

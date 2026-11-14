@@ -8424,7 +8424,7 @@ function mismatchQuestion(title, plan, gameVersion) {
 function dependencyQuestion(title, plan, word) {
   const missing = ((plan && plan.requires) || []).filter((d) => !d.installed);
   if (!missing.length) return null;
-  const list = (items) => items.map((d) => d.title).join(', ');
+  const list = (items) => { const t = items.map((d) => d.title); return t.length > 1 ? t.slice(0, -1).join(', ') + ' and ' + t[t.length - 1] : t.join(''); };
   const can = missing.filter((d) => !d.external);
   const cannot = missing.filter((d) => d.external);
   const elsewhere = cannot.length
