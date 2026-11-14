@@ -436,15 +436,13 @@
   /* the Join field: a picked server, a typed address, or the title screen */
   .join { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-1) var(--s-3); align-items: center; padding-top: var(--s-5); border-top: 1px solid var(--line-soft); }
   .join > .hint { grid-column: 2; }
-  .joinbox { display: flex; align-items: center; gap: var(--s-2); min-height: 44px; padding: 0 var(--s-1) 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); }
-  .joinbox:focus-within { border-color: var(--lapis-edge); background: var(--field-focus); }
-  .joinbox.bad { border-color: var(--fault); }
-  .joinbox input { width: auto; border: 0; background: transparent; min-height: 42px; padding: 0; flex: 1; min-width: 4ch; font-size: var(--t-4); }
-  .joinbox input:focus { background: transparent; }
-  .joinbox input:focus-visible { outline: none; }
-  .joinbox input.picked { flex: 0 1 auto; field-sizing: content; font-weight: 650; }
+  .joinbox { display: flex; align-items: center; gap: var(--s-2); width: 100%; min-height: 44px; padding: 0 var(--s-1) 0 var(--s-3); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--recess); box-shadow: none; justify-content: flex-start; text-align: left; font-weight: 400; color: var(--ink); }
+  .joinbox:where(:hover:not(:disabled)), .joinbox[aria-expanded="true"] { border-color: var(--lapis-edge); background: var(--field-focus); }
+  .joinbox .now { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-4); font-weight: 650; }
+  .join > .addr { grid-column: 2; display: grid; gap: var(--s-1); }
+  .join > .addr input { width: 100%; min-height: 40px; }
   .joinbox .hint { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .joinbox .chev { margin-left: auto; color: var(--ink-3); }
+  .joinbox .chev { display: inline-flex; margin-left: auto; padding: 0 var(--s-2); color: var(--ink-3); }
 
   /* menus: under their button; a bottom sheet on a narrow window. The pad is where the menu used
      to be positioned; its bottom padding is in flow, so the stage scrolls a little past the menu
@@ -558,7 +556,7 @@
     .servers .find { width: 100%; }
     .prog { padding: var(--s-4); }
     .join { grid-template-columns: minmax(0, 1fr); }
-    .join > .hint { grid-column: 1; }
+    .join > .hint, .join > .addr { grid-column: 1; }
     .menupad { display: contents; }
     .menu, .menu.srv, .menu.ask { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; width: auto; max-height: 75vh; border-radius: var(--r-lg) var(--r-lg) 0 0; padding: var(--s-3) var(--s-3) var(--s-5); }
     .grid2 { grid-template-columns: minmax(0, 1fr); }
@@ -802,8 +800,8 @@
     return { name: null, type: 'offline' }
   }
 
-  // The servers the Join menu offers a profile: every SpawnLoft server, with a note on the ones
-  // that run another version. An online-mode server is listed but blocked for an offline player.
+  // Every SpawnLoft server as a setup sees it: `otherVersion` on the ones that run another version
+  // (Join lists only the rest), `blocked` on an online-mode server for an offline player.
   function serverChoices(profile, servers, accountType) {
     return servers.map((s) => ({
       name: s.name,
@@ -850,7 +848,7 @@
     return /\bUpdate SpawnLoft\.?$/.test(String(ev?.message ?? ''))
   }
 
-  // Why Play is greyed for a setup, or null. `c` is { profile, acct, picked, machineRefusal,
+  // Why Play is greyed for a setup, or null. `c` is { profile, acct, picked, anyway, machineRefusal,
   // busy, otherJob, refusal }. The reason is sentence parts, like playSentence's; `fix` names
   // the controls that help, in order.
   function blockReason(c) {
@@ -862,6 +860,11 @@
     if (c.acct.missing) return { reason: ['This setup plays as ', { b: c.acct.name }, ', who is no longer signed in.'], fix: ['pick-account', 'sign-in'] }
     if (c.acct.expired) return { reason: [own ? 'This setup plays as ' : 'You play as ', { b: c.acct.name }, ', whose saved sign-in no longer works.'], fix: ['sign-in-again', own ? 'pick-account' : 'switch-account'] }
     if (c.picked?.blocked) return { reason: [{ b: c.picked.name }, ' needs a Microsoft account, and this setup plays as ', { b: c.acct.name ?? 'an offline player' }, '.'], fix: ['sign-in', 'title-screen'] }
+    // the server would turn the game away after the whole download; `anyway` is the player saying
+    // this server takes other versions, which SpawnLoft cannot see
+    if (c.picked?.otherVersion && c.anyway !== c.picked.name) {
+      return { reason: [{ b: c.picked.label || c.picked.name }, ' runs Minecraft ', { b: c.picked.otherVersion }, ', and this setup is ', { b: c.profile.mc }, '.'], fix: ['other-setup', 'title-screen', 'anyway'], other: { mc: c.picked.otherVersion, server: c.picked.name } }
+    }
     return null
   }
 
@@ -1288,7 +1291,11 @@
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return out
     for (const [name, t] of Object.entries(saved)) {
       if (!t || typeof t !== 'object' || name === '__proto__') continue
-      out[name] = { server: typeof t.server === 'string' && t.server ? t.server : null, address: typeof t.address === 'string' ? t.address.slice(0, 260) : '' }
+      const server = typeof t.server === 'string' && t.server ? t.server : null
+      const address = typeof t.address === 'string' ? t.address.slice(0, 260) : ''
+      // custom: "Another address" is the choice, typed yet or not; anyway: the server whose
+      // other version the player said to go ahead with
+      out[name] = { server, address, custom: !server && (t.custom === true || Boolean(address.trim())), anyway: server && t.anyway === server ? server : null }
     }
     return out
   }
@@ -1296,8 +1303,8 @@
   function saveTargets() {
     const out = {}
     for (const [name, t] of Object.entries(S.targets)) {
-      if (t.server) out[name] = { server: t.server }
-      else if (t.address.trim()) out[name] = { address: t.address.trim() }
+      if (t.server) out[name] = t.anyway === t.server ? { server: t.server, anyway: t.server } : { server: t.server }
+      else if (t.custom || t.address.trim()) out[name] = { address: t.address.trim(), custom: true }
       else out[name] = {}
     }
     stored('local', JOIN_KEY, JSON.stringify(out))
@@ -1316,12 +1323,12 @@
 
   // A profile seen for the first time joins the server it names, if any.
   function targetFor(p) {
-    if (!S.targets[p.name]) S.targets[p.name] = { server: p.server ?? null, address: '' }
+    if (!S.targets[p.name]) S.targets[p.name] = { server: p.server ?? null, address: '', custom: false, anyway: null }
     return S.targets[p.name]
   }
 
-  function setTarget(p, { server = null, address = '' }) {
-    S.targets[p.name] = { server, address }
+  function setTarget(p, { server = null, address = '', custom = false, anyway = null }) {
+    S.targets[p.name] = { server, address, custom: !server && (custom || Boolean(address.trim())), anyway: server && anyway === server ? server : null }
     saveTargets()
   }
 
@@ -1513,7 +1520,7 @@
     else if (state.kind === 'running') kids.push(runningCard(p))
     else {
       kids.push(playButton(p, plan))
-      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why', role: 'status' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [i ? ' or ' : ' ', fixButton(f, p, i === 0)]), state.fix.length ? '.' : null)))
+      if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why', role: 'status' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
       else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
     }
     kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
@@ -1539,16 +1546,26 @@
         played && !p.running && h('span', { class: 'pill', text: played })))
   }
 
+  // What goes between the links in a blocked Play's reason: "A or B", "A, B, or C".
+  function fixJoin(i, count) {
+    if (i === 0) return ' '
+    if (count === 2) return ' or '
+    return i === count - 1 ? ', or ' : ', '
+  }
+
   // The one control that clears a blocked Play, as a link in the reason.
-  function fixButton(fix, p, first) {
+  function fixButton(fix, p, first, other = null) {
     const cap = (text) => (first ? sentence(text) : text)
     const link = (text, onclick) => h('button', { class: 'linkbtn', onclick }, cap(text))
     if (fix === 'sign-in') return link('sign in with Microsoft', () => openMenu('account'))
     if (fix === 'sign-in-again') return link('sign in again', startLogin)
     if (fix === 'pick-account') return link('pick another account', () => openSheet(p, null, 'fAccount'))
     if (fix === 'switch-account') return link('pick another account', () => openMenu('account'))
-    if (fix === 'title-screen') return link('play on the title screen', () => { setTarget(p, {}); render() })
+    if (fix === 'title-screen') return link('play on the title screen', () => { setTarget(p, {}); render(); $('play')?.focus({ preventScroll: true }) })
     if (fix === 'edit') return link('pick another version', () => openSheet(p, null, 'fMc'))
+    // a setup of the server's version: one that exists is picked, else the New sheet opens for it
+    if (fix === 'other-setup' && other) return link(`use a ${other.mc} setup`, () => takePrefill({ mc: other.mc, server: other.server }))
+    if (fix === 'anyway' && other) return link('play anyway if the server takes other versions', () => { setTarget(p, { server: other.server, anyway: other.server }); render(); $('play')?.focus({ preventScroll: true }) })
     return null
   }
 
@@ -1642,23 +1659,28 @@
     const picked = t.server ? choices.find((c) => c.name === t.server) ?? null : null
     // a server that is gone falls back to the title screen
     if (t.server && !picked) t.server = null
-    const address = picked ? '' : t.address.trim()
-    const addrProblem = address ? addressProblem(address) : null
+    // "Another address" is a choice of its own: until an address is typed, Play has nowhere to go
+    const custom = !picked && (t.custom || Boolean(t.address.trim()))
+    const address = custom ? t.address.trim() : ''
+    const addrProblem = custom ? addressProblem(address) : null
     const job = S.job?.profile === p.name ? S.job : null
     const refused = S.refusals[p.name]
     if (refused && refused.mc !== p.mc) delete S.refusals[p.name]
     const state = playState({
-      down: S.down, loaded: true, profile: p, job, acct, picked,
+      down: S.down, loaded: true, profile: p, job, acct, picked, anyway: t.anyway,
       machineRefusal: S.summary.machineRefusal,
       busy: Boolean(S.notice?.busy && S.notice.profile === p.name),
       otherJob: Boolean(S.job && !job),
       refusal: S.refusals[p.name]?.message ?? null,
       crashed: S.crash?.profile === p.name && !S.crash.pending,
     })
-    const startsServer = Boolean(picked?.stopped)
+    // a server Play will not go to is not started for it
+    const startsServer = Boolean(picked?.stopped) && !(picked.otherVersion && t.anyway !== picked.name)
     const who = acct.missing ? `${acct.name} (no longer signed in)` : acct.name
-    const sentenceParts = playSentence({ mc: p.mc, fabric: p.loader === 'fabric', who, server: picked?.name, address: addrProblem ? null : address, startsServer })
-    return { state, acct, t, choices, picked, address, addrProblem, startsServer, blocked: state.kind !== 'ready' && state.kind !== 'closed-early', sentence: sentenceParts }
+    const sentenceParts = custom && addrProblem
+      ? [address ? 'Fix the server address under Join, or pick another place to join.' : 'Type a server address under Join, or pick another place to join.']
+      : playSentence({ mc: p.mc, fabric: p.loader === 'fabric', who, server: picked?.name, address, startsServer })
+    return { state, acct, t, choices, picked, custom, address, addrProblem, startsServer, blocked: state.kind !== 'ready' && state.kind !== 'closed-early', sentence: sentenceParts }
   }
 
   function playButton(p, plan) {
@@ -1767,49 +1789,64 @@
     if (S.menu !== 'ask') (document.activeElement?.id ? null : $('cancelLaunch') ?? $('play'))?.focus({ preventScroll: true })
   }
 
+  // Join is one choice out of a short list: a SpawnLoft server on the setup's version, another
+  // address (typed in a box of its own under the field), or the title screen. The field is a
+  // button that says which, so nothing typed can turn a picked server into an address.
   function joinField(p, plan, inert) {
-    const { t, picked, address, addrProblem, acct } = plan
+    const { t, picked, custom, address, addrProblem, acct } = plan
     const open = S.menu === 'join' && !inert
     const dot = picked && h('span', { class: `dot ${picked.status === 'running' ? 'live' : picked.stopped ? 'idle' : 'warn'}` })
+    const now = picked ? picked.label || picked.name : custom ? 'Another address' : 'Title screen'
+    const hint = picked ? `${statusText(picked.status)}${picked.mc ? ` \u00b7 ${picked.mc}` : ''}` : custom ? null : 'no server'
     return h('div', { class: 'join' },
-      h('label', { class: 'label', for: 'join', text: 'Join' }),
+      h('span', { class: 'label', id: 'joinLabel', text: 'Join' }),
       h('div', { class: 'menuhost', 'data-menu': 'join' },
-        h('div', { class: address && addrProblem ? 'joinbox bad' : 'joinbox' }, dot,
-          h('input', {
-            id: 'join', role: 'combobox', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', autocomplete: 'off', spellcheck: 'false',
-            class: picked ? 'picked' : null, size: picked ? String(Math.max(4, picked.name.length + 1)) : null, disabled: inert,
-            placeholder: 'Pick a server or type an address', value: picked ? picked.name : t.address,
-            onclick: () => { if (!open) openMenu('join', { focus: false }) },
-            oninput: (e) => { setTarget(p, { address: e.target.value }); S.menu = null; render() },
-            onkeydown: (e) => {
-              if (e.key === 'Enter' && !plan.blocked) { e.preventDefault(); startLaunch(p) }
-              if (e.key === 'ArrowDown') { e.preventDefault(); openMenu('join') }
-            },
-          }),
-          picked && h('span', { class: 'hint', text: `${statusText(picked.status)}${picked.mc ? ` · ${picked.mc}` : ''}` }),
-          h('button', { class: 'sm quiet icon chev', tabindex: '-1', 'aria-label': 'Your servers', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', disabled: inert, onclick: toggleMenu('join') }, ico('chev'))),
+        h('button', {
+          class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String(open), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow', disabled: inert,
+          onclick: toggleMenu('join'),
+          onkeydown: (e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); openMenu('join') } },
+        }, dot, h('span', { class: 'now', id: 'joinNow', text: now }), hint && h('span', { class: 'hint', text: hint }), h('span', { class: 'chev', 'aria-hidden': 'true' }, ico('chev'))),
         open && menuPad(joinMenu(p, plan))),
-      address && h('small', { class: addrProblem ? 'hint bad' : 'hint', text: addrProblem ?? `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` }))
+      custom && h('div', { class: 'addr' },
+        h('input', {
+          id: 'joinAddress', 'aria-label': 'Server address', 'aria-describedby': 'joinAddressHint', autocomplete: 'off', spellcheck: 'false', disabled: inert,
+          class: address && addrProblem ? 'bad' : null, placeholder: 'play.example.net or 192.168.1.20:25566', value: t.address, maxlength: '260',
+          oninput: (e) => { setTarget(p, { address: e.target.value, custom: true }); S.menu = null; render() },
+          onkeydown: (e) => { if (e.key === 'Enter' && !plan.blocked) { e.preventDefault(); startLaunch(p) } },
+        }),
+        h('small', { id: 'joinAddressHint', class: address && addrProblem ? 'hint bad' : 'hint', text: address && addrProblem ? addrProblem : `Host, or host:port. Online servers need a Microsoft account${acct.type === 'microsoft' ? `; you are signed in as ${acct.name}` : ''}.` })))
+  }
+
+  // The servers Join offers a setup: the ones on its version (and the one picked now, whatever
+  // it runs), those that are up first. The first run's draft has no version to narrow by yet.
+  function joinChoices(choices, mc, current) {
+    const fits = choices.filter((c) => mc === 'latest' || !c.otherVersion || c.name === current)
+    return [...fits.filter((c) => c.status === 'running'), ...fits.filter((c) => c.status !== 'running')]
   }
 
   function joinMenu(p, plan) {
-    const { t, choices } = plan
-    const title = !t.server && !t.address.trim()
+    const { t, choices, custom } = plan
+    const title = !t.server && !custom
+    const list = joinChoices(choices, p.mc, t.server)
+    const rest = choices.length - list.length
     const pickServer = (c) => () => { setTarget(p, { server: c.name }); closeMenu({ refocus: true }) }
     return h('div', { class: 'menu srv', id: 'menuJoin', role: 'dialog', 'aria-label': 'Where to join', onkeydown: menuKeys },
-      choices.length ? h('div', { class: 'mhead', text: 'Your servers' }) : h('p', { class: 'note', text: 'No SpawnLoft servers yet.' }),
-      choices.map((c) => {
+      list.length
+        ? h('div', { class: 'mhead', text: p.mc === 'latest' ? 'Your servers' : `Your servers on ${p.mc}` })
+        : h('p', { class: 'note', text: choices.length ? `None of your servers run Minecraft ${p.mc}.` : 'No SpawnLoft servers yet.' }),
+      list.map((c) => {
         let meta = c.status === 'running' ? 'joins right away' : c.stopped ? 'starts it first, up to 2 min' : statusText(c.status)
         let warn = false
-        if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion) { meta = 'runs a different version'; warn = true }
+        if (c.blocked) { meta = c.blocked; warn = true } else if (c.otherVersion && p.mc !== 'latest') { meta = 'runs another version'; warn = true }
         return h('button', { class: c.name === t.server ? 'row cur' : 'row', 'aria-current': c.name === t.server ? 'true' : null, disabled: Boolean(c.blocked) && c.name !== t.server, onclick: pickServer(c) },
           h('span', { class: `dot ${c.status === 'running' ? 'live' : c.stopped ? 'idle' : 'warn'}` }),
-          h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` · ${c.mc}` : ''}` })),
+          h('span', { class: 'sub' }, h('b', { title: c.label && c.label !== c.name ? `Folder name: ${c.name}` : null, text: c.label || c.name }), h('small', { text: `${statusText(c.status)}${c.mc ? ` \u00b7 ${c.mc}` : ''}` })),
           h('span', { class: warn ? 'meta warn' : 'meta', text: meta }))
       }),
+      rest > 0 && h('p', { class: 'note', text: `${rest} more on other versions. They are under Your servers, with Show all.` }),
       h('hr'),
-      h('button', { class: title ? 'row act cur' : 'row act', 'aria-current': title ? 'true' : null, onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen only'),
-      h('p', { class: 'note', text: 'Or type an address above: play.example.net or 192.168.1.20:25566. Online servers need a Microsoft account.' }))
+      h('button', { class: custom ? 'row act cur' : 'row act', id: 'joinOther', 'aria-current': custom ? 'true' : null, onclick: () => { setTarget(p, { address: t.address, custom: true }); closeMenu(); $('joinAddress')?.focus() } }, 'Another address\u2026'),
+      h('button', { class: title ? 'row act cur' : 'row act', id: 'joinTitle', 'aria-current': title ? 'true' : null, onclick: () => { setTarget(p, {}); closeMenu({ refocus: true }) } }, 'Title screen'))
   }
 
   function launchingCard(p, job) {
@@ -1912,7 +1949,7 @@
     if (plan.blocked) return render()
     if (plan.addrProblem) {
       render()
-      return $('join')?.focus()
+      return ($('joinAddress') ?? $('join'))?.focus()
     }
     if (!p.account && !defaultAccount()) {
       S.acctNotice = null
@@ -2042,8 +2079,8 @@
     S.menu = null
     S.sheetFrom = document.activeElement?.id || null
     S.sheet = p
-      ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, error: null, saving: false, removing: false }
-      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, error: null, saving: false, removing: false }
+      ? { editing: p.name, name: p.name, mc: p.mc, loader: p.loader, loaderVersion: p.loaderVersion ?? '', memory: p.memory, java: p.java ?? '', server: p.server ?? '', account: p.accountUuid ?? p.account ?? '', harness: p.harness, assistantAccount: p.assistantAccount, serverList: p.serverList !== false, error: null, saving: false, removing: false }
+      : { editing: null, name: '', mc: prefill?.mc ?? '', loader: 'vanilla', loaderVersion: '', memory: defaultMemory('vanilla'), memoryTouched: false, java: '', server: prefill?.server && servers.some((s) => s.name === prefill.server) ? prefill.server : '', account: '', harness: false, assistantAccount: false, serverList: true, error: null, saving: false, removing: false }
     if (!p && prefill?.server && !S.sheet.server) S.sheet.server = prefill.server
     S.sheet.custom = !MEMORY_CHOICES.includes(String(S.sheet.memory).toUpperCase())
     if (!S.versions || S.versions.error) loadVersions()
@@ -2262,6 +2299,10 @@
       h('div', { class: 'txt' }, h('b', { id: 'fHarnessLabel', text: 'Let SpawnLoft see the game' }), h('small', { style: block ? 'color:var(--warn-ink)' : null, text: block ?? 'Adds SpawnLoft\u2019s helper mod to the game, which diagnostics and the assistant tools need. Off until you need it.' })),
       h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(f.harness), 'aria-labelledby': 'fHarnessLabel', disabled: Boolean(block), onclick: toggle('harness') }))
 
+    const serverList = h('div', { class: 'switchrow' },
+      h('div', { class: 'txt' }, h('b', { id: 'fServerListLabel', text: 'Show my SpawnLoft servers in the game' }), h('small', { text: 'Each time the game starts, the servers on this version are put in its Multiplayer list. Servers you added there yourself are never changed.' })),
+      h('button', { type: 'button', class: 'switch', id: 'fServerList', role: 'switch', 'aria-checked': String(f.serverList), 'aria-labelledby': 'fServerListLabel', onclick: toggle('serverList') }))
+
     if (f.adv === undefined) f.adv = Boolean(f.java || f.loaderVersion || f.assistantAccount)
     const msAccount = (() => {
       const a = f.account ? accountsNow().find((x) => x.uuid === f.account) : def
@@ -2293,6 +2334,7 @@
         running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
         grid,
+        serverList,
         harness,
         advanced,
         f.removing && p && h('div', { class: 'confirm', role: 'alert' },
@@ -2318,7 +2360,7 @@
 
   // The sheet's fields as the panel's profile routes take them. A Fabric build only goes with Fabric.
   function profileFields(f) {
-    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account) }
+    return { mc: f.mc, loader: f.loader, loaderVersion: f.loader === 'fabric' ? fieldText(f.loaderVersion) : null, memory: f.memory, java: fieldText(f.java), harness: f.harness, server: fieldText(f.server), account: fieldText(f.account), serverList: f.serverList }
   }
 
   // What a New sheet POSTs: a name unless one was typed, and the fields.

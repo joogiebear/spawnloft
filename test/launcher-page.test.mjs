@@ -97,7 +97,7 @@ test('Play names the account a launch uses, the profile\'s own before the defaul
   assert.deepEqual(playAccount({ account: null }, accounts, 'no-such-uuid'), { name: null, type: 'offline' })
 })
 
-test('the Join menu lists every server, notes another version and blocks online servers for offline players', () => {
+test('every server is marked for a setup: another version, and online servers blocked for offline players', () => {
   const { serverChoices } = lifted(['STOPPED', 'serverChoices'])
   const servers = [
     { name: 'survival', label: null, mc: '1.21.11', status: 'running', onlineMode: false },
@@ -117,6 +117,77 @@ test('the Join menu lists every server, notes another version and blocks online 
   assert.equal(signedIn.find((c) => c.name === 'public-smp').blocked, null)
   // an account that is missing is not a Microsoft account either
   assert.equal(serverChoices({ mc: '1.21.11', server: null }, servers, null).find((c) => c.name === 'public-smp').blocked, 'needs a Microsoft account')
+})
+
+test('Join offers the servers on the setup\'s version, running ones first, and the one picked now', () => {
+  const { serverChoices, joinChoices } = lifted(['STOPPED', 'serverChoices', 'joinChoices'])
+  const servers = [
+    { name: 'creative', label: null, mc: '1.21.11', status: 'stopped', onlineMode: false },
+    { name: 'old', label: null, mc: '1.20.4', status: 'running', onlineMode: false },
+    { name: 'survival', label: null, mc: '1.21.11', status: 'running', onlineMode: false },
+    { name: 'unknown', label: null, mc: null, status: 'stopped', onlineMode: false },
+  ]
+  const choices = serverChoices({ mc: '1.21.11' }, servers, 'offline')
+  const names = (list) => list.map((c) => c.name)
+  // a server whose version is not known stays: it may well be the right one
+  assert.deepEqual(names(joinChoices(choices, '1.21.11', null)), ['survival', 'creative', 'unknown'])
+  // the server picked now is listed whatever it runs, so the menu shows what Join says
+  assert.deepEqual(names(joinChoices(choices, '1.21.11', 'old')), ['old', 'survival', 'creative', 'unknown'])
+  // the first run has no version yet
+  assert.deepEqual(names(joinChoices(serverChoices({ mc: 'latest' }, servers, 'offline'), 'latest', null)), ['old', 'survival', 'creative', 'unknown'])
+  // the menu ends in the two choices that are not servers, and says where the rest are
+  assert.match(fnSource('joinMenu'), /id: 'joinOther'[^\n]*'Another address\\u2026'\)/)
+  assert.match(fnSource('joinMenu'), /id: 'joinTitle'[^\n]*'Title screen'\)/)
+  assert.match(fnSource('joinMenu'), /rest > 0 && h\('p', \{ class: 'note'/)
+})
+
+test('a server on another version stops Play until the player says where to go', () => {
+  const { playState, playAccount, fixJoin } = lifted(['STRICT_CODES', 'sentence', 'blockReason', 'playState', 'playAccount', 'fixJoin'])
+  const ms = { name: 'Joogiebear', uuid: 'u1', type: 'microsoft', refreshFailedAt: null }
+  const setup = { name: '1-21-11', mc: '1.21.11', loader: 'vanilla', account: null, running: false }
+  const old = { name: 'old', label: 'Old world', otherVersion: '1.20.4', blocked: null }
+  const ctx = (over = {}) => ({ down: false, loaded: true, profile: setup, job: null, acct: playAccount(setup, [ms], 'u1'), picked: null, anyway: null, machineRefusal: null, busy: false, otherJob: false, refusal: null, crashed: false, ...over })
+  const text = (parts) => parts.map((x) => (typeof x === 'string' ? x : x.b)).join('')
+  const state = playState(ctx({ picked: old }))
+  assert.equal(state.kind, 'blocked')
+  assert.equal(text(state.reason), 'Old world runs Minecraft 1.20.4, and this setup is 1.21.11.')
+  assert.deepEqual(state.fix, ['other-setup', 'title-screen', 'anyway'])
+  assert.deepEqual(state.other, { mc: '1.20.4', server: 'old' })
+  // "play anyway" is for that server only
+  assert.equal(playState(ctx({ picked: old, anyway: 'old' })).kind, 'ready')
+  assert.equal(playState(ctx({ picked: old, anyway: 'another' })).kind, 'blocked')
+  assert.equal(playState(ctx({ picked: { name: 'survival', otherVersion: null, blocked: null } })).kind, 'ready')
+  // the account comes first: that is what has to be fixed whichever server it is
+  assert.deepEqual(playState(ctx({ picked: { ...old, blocked: 'needs a Microsoft account' }, acct: { name: null, type: 'offline' } })).fix, ['sign-in', 'title-screen'])
+  // "A or B", "A, B, or C"
+  assert.deepEqual([0, 1].map((i) => fixJoin(i, 2)), [' ', ' or '])
+  assert.deepEqual([0, 1, 2].map((i) => fixJoin(i, 3)), [' ', ', ', ', or '])
+  // the links do what they say
+  assert.match(fnSource('fixButton'), /fix === 'other-setup' && other\) return link\(`use a \$\{other\.mc\} setup`, \(\) => takePrefill\(\{ mc: other\.mc, server: other\.server \}\)\)/)
+  assert.match(fnSource('fixButton'), /setTarget\(p, \{ server: other\.server, anyway: other\.server \}\)/)
+  // a server Play will not go to is not started, and the button does not say it would be
+  assert.match(fnSource('launchPlan'), /const startsServer = Boolean\(picked\?\.stopped\) && !\(picked\.otherVersion && t\.anyway !== picked\.name\)/)
+})
+
+test('"Another address" is a choice of its own, with its own box', () => {
+  const plan = fnSource('launchPlan')
+  assert.match(plan, /const custom = !picked && \(t\.custom \|\| Boolean\(t\.address\.trim\(\)\)\)/)
+  // nothing typed yet is a problem too: Play has nowhere to go, and says so instead of "title screen"
+  assert.match(plan, /const addrProblem = custom \? addressProblem\(address\) : null/)
+  assert.match(plan, /custom && addrProblem\s+\? \[address \? 'Fix the server address under Join/)
+  assert.match(fnSource('startLaunch'), /if \(plan\.addrProblem\) \{\s+render\(\)\s+return \(\$\('joinAddress'\) \?\? \$\('join'\)\)\?\.focus\(\)/)
+  const field = fnSource('joinField')
+  assert.match(field, /custom && h\('div', \{ class: 'addr' \}/)
+  assert.match(field, /id: 'joinAddress', 'aria-label': 'Server address'/)
+  assert.match(field, /oninput: \(e\) => \{ setTarget\(p, \{ address: e\.target\.value, custom: true \}\)/)
+  // the field itself takes no typing, so a picked server cannot turn into an address
+  assert.doesNotMatch(field, /placeholder: 'Pick a server or type an address'/)
+})
+
+test('the setup sheet has the switch for the game\'s own server list, on unless turned off', () => {
+  assert.match(html, /id: 'fServerList', role: 'switch', 'aria-checked': String\(f\.serverList\), 'aria-labelledby': 'fServerListLabel'/)
+  assert.match(fnSource('openSheet'), /serverList: p\.serverList !== false/)
+  assert.match(fnSource('profileFields'), /serverList: f\.serverList/)
 })
 
 test('the version picker shows releases, then snapshots too, then everything', () => {
@@ -431,14 +502,21 @@ test('what Join remembered in localStorage is cleaned before the page trusts it'
   assert.deepEqual(cleanTargets('survival'), {})
   assert.deepEqual(cleanTargets([{ server: 'survival' }]), {})
   assert.deepEqual(cleanTargets({ a: { server: 'survival' }, b: { address: 'play.example.net' }, c: {} }), {
-    a: { server: 'survival', address: '' },
-    b: { server: null, address: 'play.example.net' },
-    c: { server: null, address: '' },
+    a: { server: 'survival', address: '', custom: false, anyway: null },
+    b: { server: null, address: 'play.example.net', custom: true, anyway: null },
+    c: { server: null, address: '', custom: false, anyway: null },
+  })
+  // "Another address" with nothing typed yet is still the choice; "anyway" goes with its server
+  assert.deepEqual(cleanTargets({ a: { address: '', custom: true }, b: { server: 'old', anyway: 'old' }, c: { server: 'old', anyway: 'other' }, d: { server: 'x', custom: true } }), {
+    a: { server: null, address: '', custom: true, anyway: null },
+    b: { server: 'old', address: '', custom: false, anyway: 'old' },
+    c: { server: 'old', address: '', custom: false, anyway: null },
+    d: { server: 'x', address: '', custom: false, anyway: null },
   })
   // junk values fall back, and an address is cut to the length the panel accepts
   assert.deepEqual(cleanTargets({ a: { server: 7, address: ['x'] }, b: null, c: 'x', d: { address: 'a'.repeat(300) } }), {
-    a: { server: null, address: '' },
-    d: { server: null, address: 'a'.repeat(260) },
+    a: { server: null, address: '', custom: false, anyway: null },
+    d: { server: null, address: 'a'.repeat(260), custom: true, anyway: null },
   })
   // a key that would set the prototype is not a setup
   const odd = cleanTargets(JSON.parse('{"__proto__": {"server": "x", "address": ""}, "a": {}}'))
@@ -449,19 +527,19 @@ test('what Join remembered in localStorage is cleaned before the page trusts it'
 
 test('the New sheet POSTs the fields the panel\'s route takes, named by the version unless a name was typed', () => {
   const { newProfileBody, editedProfile } = lifted(['nameBase', 'autoName', 'fieldText', 'profileFields', 'newProfileBody', 'editedProfile'])
-  const f = { name: '  ', mc: '1.21.11', loader: 'vanilla', loaderVersion: '0.17.3', memory: '2G', java: ' ', harness: false, server: '', account: null, assistantAccount: true }
+  const f = { name: '  ', mc: '1.21.11', loader: 'vanilla', loaderVersion: '0.17.3', memory: '2G', java: ' ', harness: false, server: '', account: null, assistantAccount: true, serverList: true }
   assert.deepEqual(newProfileBody(f, ['1-21-11']), {
-    name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla', loaderVersion: null, memory: '2G', java: null, harness: false, server: null, account: null,
+    name: '1-21-11-2', mc: '1.21.11', loader: 'vanilla', loaderVersion: null, memory: '2G', java: null, harness: false, server: null, account: null, serverList: true,
   })
   // a typed name wins; a Fabric build only goes with Fabric; typed fields are trimmed
   const modded = { ...f, name: ' modded ', loader: 'fabric', loaderVersion: ' 0.17.3 ', java: ' /opt/jdk21 ', server: 'survival', account: 'u1' }
   assert.deepEqual(newProfileBody(modded, []), {
-    name: 'modded', mc: '1.21.11', loader: 'fabric', loaderVersion: '0.17.3', memory: '2G', java: '/opt/jdk21', harness: false, server: 'survival', account: 'u1',
+    name: 'modded', mc: '1.21.11', loader: 'fabric', loaderVersion: '0.17.3', memory: '2G', java: '/opt/jdk21', harness: false, server: 'survival', account: 'u1', serverList: true,
   })
   // the POST route does not take assistantAccount; the Edit form does
   assert.ok(!('assistantAccount' in newProfileBody(f, [])))
   assert.deepEqual(editedProfile(modded), {
-    mc: '1.21.11', loader: 'fabric', loaderVersion: '0.17.3', memory: '2G', java: '/opt/jdk21', harness: false, server: 'survival', account: 'u1', assistantAccount: true,
+    mc: '1.21.11', loader: 'fabric', loaderVersion: '0.17.3', memory: '2G', java: '/opt/jdk21', harness: false, server: 'survival', account: 'u1', serverList: true, assistantAccount: true,
   })
   assert.equal(editedProfile(f).loaderVersion, null)
   // and saveSheet sends exactly those
@@ -489,8 +567,9 @@ test('menus are disclosures over groups of plain buttons, each in a pad with a b
   assert.doesNotMatch(html, /role: '(menu|menuitem|menuitemradio|listbox|option)'/)
   assert.doesNotMatch(html, /'aria-haspopup': '(menu|listbox|true)'/)
   for (const id of ['menuAccount']) assert.match(html, new RegExp(`id: '${id}', role: 'group', 'aria-label'`), id)
-  // Join is a combobox whose popup is a dialog, so the field that is focused carries the state
-  assert.match(html, /id: 'join', role: 'combobox', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin'/)
+  // Join is a button that opens a dialog of choices; nothing is typed into it
+  assert.match(html, /class: 'joinbox', id: 'join', 'aria-haspopup': 'dialog', 'aria-expanded': String\(open\), 'aria-controls': 'menuJoin', 'aria-labelledby': 'joinLabel joinNow'/)
+  assert.doesNotMatch(html, /role: 'combobox'/)
   assert.match(html, /id: 'menuJoin', role: 'dialog'/)
   assert.match(html, /id: 'menuAsk', role: 'dialog'/)
   // every opener names what it opens, and every menu renders inside the pad
