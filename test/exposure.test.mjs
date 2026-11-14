@@ -79,21 +79,47 @@ test('a home network address is a private one, and nothing else', () => {
   for (const yes of ['10.0.0.5', '172.16.0.1', '172.31.255.254', '192.168.1.24']) assert.equal(isPrivateIPv4(yes), true, yes)
   for (const no of ['127.0.0.1', '172.32.0.1', '169.254.3.3', '100.72.1.9', '8.8.8.8', '192.168.1', 'fe80::1', '']) assert.equal(isPrivateIPv4(no), false, no)
   assert.deepEqual(lanAddresses(HOME), ['192.168.1.24', '10.8.0.3'])
+  assert.deepEqual(lanAddresses({ wifi: HOME.wifi, tun0: HOME.vpn }), ['192.168.1.24'])
 })
 
 test('join info is read off this computer: its addresses, and where the server listens', () => {
   const inst = { port: 25565, dir: '/nowhere' }
-  assert.deepEqual(joinInfo(inst, { interfaces: HOME, bound: '' }), { port: 25565, here: 'localhost', loopbackOnly: false, lan: ['192.168.1.24', '10.8.0.3'], public: [] })
+  const open = { port: 25565, here: 'localhost', loopbackOnly: false, bindFixed: false, lan: ['192.168.1.24', '10.8.0.3'], public: [] }
+  assert.deepEqual(joinInfo(inst, { interfaces: HOME, bound: '' }), open)
+  // "every interface" has three spellings, and guides tell people to write the second
+  for (const all of ['0.0.0.0', '::', '[::]', ' ']) assert.deepEqual(joinInfo(inst, { interfaces: HOME, bound: all }), open, all)
   // a machine with a public address of its own has it listed; a home computer never does
   const vps = { eth0: [{ address: '203.0.114.7', family: 'IPv4', internal: false }] }
   assert.deepEqual(joinInfo(inst, { interfaces: vps, bound: '' }).public, ['203.0.114.7'])
-  // listening on this computer only: nobody else gets an address
-  const closed = joinInfo(inst, { interfaces: HOME, bound: '127.0.0.1' })
-  assert.equal(closed.loopbackOnly, true)
-  assert.deepEqual([closed.lan, closed.public, closed.here], [[], [], 'localhost'])
-  // bound to one address: that one alone, and not localhost
+  // listening on this computer only, however that is written: nobody else gets an address
+  for (const loop of ['127.0.0.1', '127.0.1.1', 'localhost', '::1', '[::1]']) {
+    const closed = joinInfo(inst, { interfaces: HOME, bound: loop })
+    assert.equal(closed.loopbackOnly, true, loop)
+    assert.deepEqual([closed.lan, closed.public, closed.here], [[], [], 'localhost'], loop)
+  }
+  // told to listen on one address: that one alone, and not localhost
   const one = joinInfo(inst, { interfaces: HOME, bound: '192.168.1.24' })
-  assert.deepEqual([one.here, one.lan], ['192.168.1.24', ['192.168.1.24']])
+  assert.deepEqual([one.here, one.only, one.onlyKind, one.lan], ['192.168.1.24', '192.168.1.24', 'lan', ['192.168.1.24']])
+  assert.equal(joinInfo(inst, { interfaces: vps, bound: '203.0.114.7' }).onlyKind, 'public')
+  // an address this computer no longer holds is said to be that, not passed off as a network
+  const gone = joinInfo(inst, { interfaces: HOME, bound: '192.168.1.99' })
+  assert.deepEqual([gone.onlyKind, gone.lan, gone.public], ['unknown', [], []])
+  // the registry's own bind is written into the file at every start, so it wins over the file
+  assert.equal(joinInfo({ ...inst, bind: '127.0.0.1' }, { interfaces: HOME }).loopbackOnly, true)
+  assert.equal(joinInfo({ ...inst, bind: '127.0.0.1' }, { interfaces: HOME }).bindFixed, true)
   // a port that is not known is null, never a guess
   assert.equal(joinInfo({ dir: '/nowhere' }, { interfaces: HOME, bound: '' }).port, null)
+})
+
+test('adapters made by containers, virtual machines and VPNs are not the home network', () => {
+  const busy = {
+    'vEthernet (WSL)': [{ address: '172.20.80.1', family: 'IPv4', internal: false }],
+    docker0: [{ address: '172.17.0.1', family: 'IPv4', internal: false }],
+    'VirtualBox Host-Only Network': [{ address: '192.168.56.1', family: 'IPv4', internal: false }],
+    tun0: [{ address: '10.8.0.3', family: 'IPv4', internal: false }],
+    'Wi-Fi': [{ address: '192.168.1.24', family: 'IPv4', internal: false }],
+  }
+  assert.deepEqual(lanAddresses(busy), ['192.168.1.24'])
+  // when one of those is all there is, it is still an address
+  assert.deepEqual(lanAddresses({ docker0: busy.docker0 }), ['172.17.0.1'])
 })

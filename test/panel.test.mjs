@@ -952,16 +952,29 @@ test('how friends join: an address for each place someone can be, and none that 
   const alone = joinWays({ port: 25565, here: 'localhost', loopbackOnly: false, lan: [], public: [] })
   assert.deepEqual(alone[1].addresses, [])
   assert.match(alone[1].note, /no home network address right now/)
-  // two networks: both, and which to try
-  assert.match(joinWays({ port: 1, here: 'localhost', lan: ['10.0.0.2', '192.168.1.24'], public: [] })[1].note, /first is usually the one/)
-  // a machine with its own public address
+  // two networks: both, and no promise about which
+  assert.match(joinWays({ port: 1, here: 'localhost', lan: ['10.0.0.2', '192.168.1.24'], public: [] })[1].note, /if one does not work, try the next/)
+  // the commonest reason a neighbour cannot connect is said
+  assert.match(home[1].note, /firewall may be blocking Java/)
+  // a machine with only a public address is not told to join a Wi-Fi
   const vps = joinWays({ port: 25565, here: 'localhost', lan: [], public: ['203.0.114.7'] })
-  assert.deepEqual(vps[2].addresses, ['203.0.114.7:25565'])
-  assert.match(vps[2].note, /firewall/)
+  assert.deepEqual(vps.map((w) => w.who), ['On this computer', 'Over the internet'])
+  assert.deepEqual(vps[1].addresses, ['203.0.114.7:25565'])
+  assert.match(vps[1].note, /firewall/)
   // listening on this computer only
   const closed = joinWays({ port: 25565, here: 'localhost', loopbackOnly: true, lan: [], public: [] })
   assert.deepEqual(closed.map((w) => w.who), ['On this computer', 'Anyone else'])
-  assert.match(closed[1].note, /nobody else can reach it/)
+  assert.match(closed[1].note, /nobody else can reach it\. Clearing server-ip/)
+  // set by SpawnLoft itself: editing the file would be undone at the next start, so it is not suggested
+  assert.ok(!joinWays({ port: 25565, loopbackOnly: true, bindFixed: true })[1].note.includes('Clearing'))
+  // one address only: that address, no localhost, and what kind it is
+  const one = joinWays({ port: 25565, here: '192.168.1.24', only: '192.168.1.24', onlyKind: 'lan', lan: ['192.168.1.24'], public: [] })
+  assert.deepEqual(one.map((w) => w.addresses), [['192.168.1.24:25565']])
+  assert.match(one[0].note, /same Wi-Fi or router/)
+  assert.match(joinWays({ port: 25565, only: '192.168.1.99', onlyKind: 'unknown' })[0].note, /not one of this computer’s addresses right now/)
+  assert.deepEqual(joinWays({ port: 25565, only: '2001:db8::5', onlyKind: 'here' })[0].addresses, ['[2001:db8::5]:25565'])
+  // the internet row owns up to the case forwarding cannot fix
+  assert.match(home[2].note, /share one public address/)
   // a port that is not known gives no address anywhere: "localhost:?" could be copied before
   const unknown = joinWays({ port: null, here: 'localhost', lan: ['192.168.1.24'], public: [] })
   assert.deepEqual(unknown.flatMap((w) => w.addresses), [])
@@ -969,4 +982,6 @@ test('how friends join: an address for each place someone can be, and none that 
   assert.match(joinLead({ port: 25565 }, 'stopped'), /not running/)
   assert.match(joinLead({ port: 25565 }, 'running'), /Add Server/)
   assert.ok(!html.includes("'localhost:' + (row.port || '?')"))
+  // the shared dialog is emptied of the list by everything that opens it
+  assert.equal(html.split('clearDlgDetail();').length - 1, 3)
 })

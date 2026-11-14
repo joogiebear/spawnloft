@@ -3781,6 +3781,13 @@ function askBlocked(opts, typed) {
   return Boolean(opts.input && opts.input.required) && !String(typed).trim();
 }
 
+/** The one dialog is shared; what the last asking laid out under its text is not the next one's. */
+function clearDlgDetail() {
+  const detail = document.getElementById('dlgDetail');
+  detail.replaceChildren();
+  detail.hidden = true;
+}
+
 function ask(opts) {
   const dlg = $('#dlg');
   $('#dlgTitle').textContent = opts.title;
@@ -3869,6 +3876,9 @@ function ask(opts) {
       typeBox.oninput = null;
       typeBox.onkeydown = null;
       if (dlg.open) dlg.close();
+      // Emptied here and not on 'close': that event arrives late, after the next dialog has
+      // opened, and would take the next one's detail with it.
+      clearDlgDetail();
       resolve(result);
     };
     /*
@@ -5354,36 +5364,52 @@ const dbAddress = (row) => (row.host || '127.0.0.1') + ':' + (row.port || '?');
  */
 function joinWays(info) {
   const port = info.port;
-  const at = (hosts) => (port ? hosts.map((h) => h + ':' + port) : []);
+  // an IPv6 address needs its brackets, or its last group reads as the port
+  const at = (hosts) => (port ? hosts.map((h) => (h.includes(':') ? '[' + h + ']' : h) + ':' + port) : []);
+  const portWords = port ? 'port ' + port : 'the server\u2019s port';
+  const firewall = ' If it will not connect, this computer\u2019s firewall may be blocking Java.';
+  const unlock = info.bindFixed ? '' : ' Clearing server-ip in server.properties makes it listen everywhere.';
+  if (info.loopbackOnly) {
+    return [
+      { who: 'On this computer', addresses: at(['localhost']), note: 'For playing on the computer the server runs on.' },
+      { who: 'Anyone else', addresses: [], note: 'This server is set to listen on this computer only, so nobody else can reach it.' + unlock },
+    ];
+  }
+  if (info.only) {
+    // one address and no other: "localhost" does not answer either
+    const note = {
+      lan: 'For this computer and anyone on the same Wi-Fi or router.' + firewall,
+      public: 'A public address, so friends anywhere can use it, as long as this computer\u2019s firewall lets ' + portWords + ' (TCP) through.',
+      here: 'One of this computer\u2019s own addresses. Who can reach it depends on the network it belongs to.',
+      unknown: 'This is not one of this computer\u2019s addresses right now, so the server may not start, or may not be reachable.',
+    }[info.onlyKind] || '';
+    return [{ who: 'This server listens on one address only', addresses: at([info.only]), note: note + unlock }];
+  }
   const ways = [{
     who: 'On this computer',
     addresses: at([info.here || 'localhost']),
     note: 'For playing on the computer the server runs on.',
   }];
   const lan = info.lan || [];
-  if (info.loopbackOnly) {
-    ways.push({
-      who: 'Anyone else',
-      addresses: [],
-      note: 'This server is set to listen on this computer only (server-ip in server.properties), so nobody else can reach it. Clearing that line opens it to your network.',
-    });
-    return ways;
-  }
-  ways.push({
-    who: 'On your home network',
-    addresses: at(lan),
-    note: lan.length
-      ? 'For anyone on the same Wi-Fi or router as this computer.' + (lan.length > 1 ? ' This computer has more than one network address; the first is usually the one.' : '')
-      : 'This computer has no home network address right now. Connect it to your Wi-Fi or router and look again.',
-  });
   const open = info.public || [];
+  // a machine with only a public address is not on anyone's Wi-Fi: no row telling it to join one
+  if (lan.length || !open.length) {
+    ways.push({
+      who: 'On your home network',
+      addresses: at(lan),
+      note: lan.length
+        ? 'For anyone on the same Wi-Fi or router as this computer.' + (lan.length > 1 ? ' This computer has more than one network address: if one does not work, try the next.' : '') + firewall
+        : 'This computer has no home network address right now. Connect it to your Wi-Fi or router and look again.',
+    });
+  }
   ways.push({
     who: 'Over the internet',
     addresses: at(open),
     note: open.length
-      ? 'This computer has a public address of its own, so friends anywhere can use it, as long as its firewall lets ' + (port ? 'port ' + port : 'the server\u2019s port') + ' (TCP) through.'
+      ? 'This computer has a public address of its own, so friends anywhere can use it, as long as its firewall lets ' + portWords + ' (TCP) through.'
       : 'Friends elsewhere type your public address' + (port ? ', then :' + port : ' and the port') + '. Your router also has to pass ' + (port ? 'port ' + port : 'that port')
-        + ' (TCP) on to this computer, which routers call port forwarding. SpawnLoft does not look up your public address or change your router.',
+        + ' (TCP) on to this computer, which routers call port forwarding. Some internet providers share one public address between customers, and forwarding cannot work there.'
+        + ' SpawnLoft does not look up your public address or change your router.',
   });
   return ways;
 }
@@ -13211,6 +13237,7 @@ function editPlan(row, typed) {
 
 async function editServer(row) {
   const dlg = $('#dlg');
+  clearDlgDetail();
   $('#dlgTitle').textContent = 'Edit ' + row.name;
   $('#dlgText').hidden = false;
   $('#dlgText').textContent = 'Changes apply the next time this server starts.';
@@ -13538,6 +13565,7 @@ async function showCredentials(dbName, serverName) {
     return;
   }
   const dlg = $('#dlg');
+  clearDlgDetail();
   $('#dlgTitle').textContent = serverName + ' on ' + dbName;
   $('#dlgText').hidden = false;
   $('#dlgText').textContent = c.kind === 'redis'
