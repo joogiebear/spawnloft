@@ -11,7 +11,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-version-drift-'))
 process.env.MCCTL_DATA_ROOT = scratch
 after(() => fs.rmSync(scratch, { recursive: true, force: true }))
 
-const { checkDrift, checkLoaders, checkHarnessList, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
+const { checkDrift, checkLoaders, passes, checkHarnessList, report, BASELINE_FILE } = await import('../tools/check-version-drift.mjs')
 const { HARNESS_INDEX_URL, HARNESS_INDEX_SIG_URL, SIGNATURE_DOMAIN, harnessJarUrl } = await import('../src/client-harness-index.mjs')
 const { MANIFEST_URL } = await import('../src/client-meta.mjs')
 const { RUNTIME_INDEX_URL } = await import('../src/client-java.mjs')
@@ -141,6 +141,17 @@ test('an installer SpawnLoft does not know, a host off the list or a new launch 
   const result = await checkDrift({ get: world(fixture('versions', '26.4-snapshot-6.json')), baseline, loaders: (r) => checkLoaders(r, { loaders: ['forge'], loader: (id) => only[id], readVersion: () => structuredClone(future) }) })
   assert.ok(result.failures.length > 0)
   assert.ok(result.failures.every((f) => f.startsWith('26.3 + Forge 67.0.1: ') && /\$\{loader_thing\}/.test(f)), result.failures.join('\n'))
+})
+
+test('an outage is a note, a moved address is drift', () => {
+  assert.equal(passes(new Error('could not reach Quilt: ENOTFOUND meta.quiltmc.org')), true, 'Quilt fails with no code')
+  assert.equal(passes(coded('could not reach x', 'download-failed')), true)
+  assert.equal(passes(coded('Forge has no build', 'loader-not-available')), true)
+  assert.equal(passes(coded('the Forge installer answered 404', 'download-failed')), false)
+  assert.equal(passes(new Error('Quilt loaders answered 410')), false)
+  assert.equal(passes(coded('the installer answered 503', 'download-failed')), true)
+  assert.equal(passes(coded('names a download at', 'loader-host-refused')), false)
+  assert.equal(passes(coded('spec 2', 'loader-installer-unknown')), false)
 })
 
 // ---- the signed harness list ---------------------------------------------------------------

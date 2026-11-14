@@ -1328,6 +1328,9 @@ test('the crash notice names the common Forge and NeoForge causes', () => {
   assert.match(say('forge', 'nothing here'), /^Forge usually closes like this/)
   assert.equal(say('fabric', 'Found duplicate mods:'), null)
   assert.equal(say('vanilla', 'x'), null)
+  // a game out of memory, or a log not read: the general line, which names memory and Java
+  assert.equal(say('neoforge', 'java.lang.OutOfMemoryError: Java heap space'), null)
+  assert.equal(loaderCrashCause('forge', [], '1.20.1'), null)
   // the line takes the place of the general one
   assert.match(fnSource('crashNotice'), /loaderCrashCause\(p\.loader, all, p\.mc\)\) \|\| 'Usually a mod, not enough memory, or the wrong Java\.'/)
 })

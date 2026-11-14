@@ -74,9 +74,14 @@ function placeable(classifier) {
 // The loaders set up here, past Fabric (whose profile is read above as it always was)
 export const DRIFT_LOADERS = ['quilt', 'forge', 'neoforge']
 
-// What a loader that cannot be reached or has no build yet says: a note. Anything else (an
-// installer spec, a host, a file the installer does not list) is drift.
-const PASSING = ['loader-unreachable', 'loader-not-available', 'download-failed']
+// A loader that cannot be reached or has no build yet: a note. An address that answers 4xx (a
+// moved installer, a list that is gone) and anything else (an installer spec, a host, a file the
+// installer does not list) is drift. Quilt's reads fail with no code when it is unreachable.
+export function passes(err) {
+  if (err?.code === 'loader-not-available') return true
+  if (/answered 4\d\d\b/.test(String(err?.message ?? ''))) return false
+  return err?.code == null || ['loader-unreachable', 'download-failed'].includes(err.code)
+}
 
 // Each loader for one release: { versions: [{ label, json, modded }], failures, notes }. The
 // version file each writes is merged with the release, so the resolver below sees what a launch
@@ -96,7 +101,7 @@ export async function checkLoaders(release, {
     try {
       builds = await mod.builds(mc)
     } catch (err) {
-      ;(PASSING.includes(err.code) ? notes : failures).push(`${mod.name}'s builds for ${mc} could not be read: ${err.message}`)
+      ;(passes(err) ? notes : failures).push(`${mod.name}'s builds for ${mc} could not be read: ${err.message}`)
       continue
     }
     if (!builds.length) { notes.push(`${mod.name} has no build for ${mc} yet`); continue }
@@ -106,7 +111,7 @@ export async function checkLoaders(release, {
         const vid = await mod.ensureInstalled(mc, build, {})
         versions.push({ label: `${mc} + ${mod.name} ${build}`, json: mergeInherited(readVersion(vid), release), modded: true })
       } catch (err) {
-        ;(PASSING.includes(err.code) ? notes : failures).push(`${mod.name} ${build} for ${mc}: ${err.message}`)
+        ;(passes(err) ? notes : failures).push(`${mod.name} ${build} for ${mc}: ${err.message}`)
       }
     }
   }
@@ -277,7 +282,10 @@ async function main(argv) {
   const reportFile = at === -1 ? null : argv[at + 1]
   const updating = argv.includes('--update-baseline')
   const baseline = updating ? null : JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'))
-  const result = await checkDrift({ baseline })
+  // the loaders write version files and libraries: only into a data folder named for the run
+  const own = process.env.SPAWNLOFT_DATA_ROOT || process.env.MCCTL_DATA_ROOT
+  const skipLoaders = async () => ({ versions: [], failures: [], notes: ['Quilt, Forge and NeoForge were not set up: set MCCTL_DATA_ROOT to a folder of their own to check them'] })
+  const result = await checkDrift({ baseline, ...(own ? {} : { loaders: skipLoaders }) })
   const harness = await checkHarnessList()
   result.failures.push(...harness.failures)
   result.notes.push(...harness.notes)

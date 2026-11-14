@@ -37,7 +37,11 @@ export const CLIENT_SHAPES = [
     id: 'mod-dependency-forge',
     test: /Mod ID: '([\w.-]+)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/,
     title: 'A mod is missing a dependency, or has the wrong version of it',
-    advice: (m) => `The mod "${m[2]}" needs "${m[1]}" ${m[3]}. Put the right build of it into the profile's mods/ folder.`,
+    advice: (m, ctx) => (m[1] === 'minecraft'
+      ? `The mod "${m[2]}" is made for Minecraft ${m[3]}, not ${ctx.mc ?? 'this version'}. Get its build for this version.`
+      : m[1] === 'forge' || m[1] === 'neoforge'
+        ? `The mod "${m[2]}" needs another ${m[1] === 'forge' ? 'Forge' : 'NeoForge'} build (${m[3]}). Set it with "spawnloft client set ${ctx.profile ?? '<profile>'} loaderVersion=<build>".`
+        : `The mod "${m[2]}" needs "${m[1]}" ${m[3]}. Put the right build of it into the profile's mods/ folder.`),
   },
   {
     // Forge for 1.12.2 and older, started on Java 9 or newer

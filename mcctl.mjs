@@ -2177,7 +2177,9 @@ async function cmdClient(positional, flags) {
     const list = await client.listVersions({ fabric: true })
     const show = flags.all === true ? 'all' : flags.snapshots === true ? 'snapshot' : 'release'
     if (quiet) {
-      process.stdout.write(jsonLine('client', { offline: list.offline, versions: list.versions.map((v) => ({ id: v.id, type: v.type, downloaded: v.downloaded, loaders: v.loaders })) }))
+      const kinds = show === 'all' ? null : show === 'snapshot' ? ['release', 'snapshot'] : ['release']
+      const rows = list.versions.filter((v) => !kinds || kinds.includes(v.type)).slice(0, count)
+      process.stdout.write(jsonLine('client', { offline: list.offline, versions: rows.map((v) => ({ id: v.id, type: v.type, downloaded: v.downloaded, loaders: v.loaders })) }))
       return
     }
     if (list.offline) process.stderr.write(`Note: ${list.offline}.\n`)

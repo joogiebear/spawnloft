@@ -1966,7 +1966,7 @@
       if (state.kind === 'blocked') kids.push(h('p', { class: 'why', id: 'why' }, ico('alert'), h('span', {}, parts(state.reason), state.fix.map((f, i) => [fixJoin(i, state.fix.length), fixButton(f, p, i === 0, state.other)]), state.fix.length ? '.' : null)))
       else kids.push(h('p', { class: 'does', id: 'does' }, parts(plan.sentence)))
       const lw = state.kind !== 'blocked' && loaderWarning(plan.picked, p)
-      if (lw) kids.push(h('p', { class: 'why', id: 'loaderWarn' }, ico('alert'), h('span', {}, parts(lw), ' ', fixButton('loader-setup', p, true, { mc: p.mc, server: plan.picked.name }), '.')))
+      if (lw) kids.push(h('p', { class: 'why', id: 'loaderWarn' }, ico('alert'), h('span', {}, parts(lw), ' ', fixButton('loader-setup', p, true, { mc: plan.picked.mc ?? p.mc, server: plan.picked.name }), '.')))
     }
     kids.push(joinField(p, plan, state.kind === 'launching' || state.kind === 'running'))
     return h('div', { class: 'playgrid' },
@@ -2389,8 +2389,6 @@
     ]
   }
 
-  // A game that ended without a Stop from here and was not simply closed. The panel's record of
-  // the exit, when it has one, says how it ended; the log's last lines say why, as far as anything does.
   // What a Forge or NeoForge log says went wrong, as one sentence for the crash notice, or null.
   // The loader's own error screen names the mod; these are the shapes behind it. Forge before
   // 1.13 says the same things in other words, so each test takes both.
@@ -2399,14 +2397,15 @@
     { test: /AppClassLoader cannot be cast to (?:class )?java\.net\.URLClassLoader/, say: (m, name) => `This ${name} needs Java 8, and the game ran on a newer Java. Set Java to Automatic under Edit setup.` },
     { test: /Mod ID: '(?:minecraft)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/, say: (m, name, mc) => `The mod ${m[1]} is made for another Minecraft version (it wants ${m[2]}, and this setup is ${mc}). Get the build of it for ${mc}.` },
     { test: /Mod ID: '(?:forge|neoforge)', Requested by: '([\w.-]+)', Expected range: '([^']*)'/, say: (m, name) => `The mod ${m[1]} needs another ${name} build (${m[2]}). Pick one under Advanced in Edit setup.` },
-    { test: /fabric\.mod\.json|quilt\.mod\.json|is an? (?:Fabric|Quilt) mod/i, say: (m, name) => `A mod in the mods folder is made for Fabric or Quilt. A ${name} setup loads ${name} mods only.` },
     { test: /Found duplicate mods|DuplicateModsFoundException|Duplicate mods? found/i, say: () => 'The mods folder has two copies of one mod. Remove the older file.' },
     { test: /Mod ID: '([\w.-]+)', Requested by: '([\w.-]+)'/, say: (m) => `The mod ${m[2]} needs ${m[1]}, which is missing or the wrong version. Put the right build of ${m[1]} in the mods folder.` },
     { test: /Missing or unsupported mandatory dependencies|MissingModsException|requires (?:mod )?[\w.-]+.*(?:missing|not installed)/i, say: () => 'A mod needs another mod that is missing or the wrong version. The game\u2019s error screen named it, and the log below does too.' },
+    { test: /fabric\.mod\.json|quilt\.mod\.json|is an? (?:Fabric|Quilt) mod/i, say: (m, name) => `A mod in the mods folder is made for Fabric or Quilt. A ${name} setup loads ${name} mods only.` },
     { test: /MixinApplyError|InvalidMixinException|MixinTransformerError|Mixin apply (?:failed|for mod)/, say: () => 'A mod failed to patch the game, usually because two mods clash or one is made for another version.' },
   ]
   function loaderCrashCause(loader, lines, mc) {
-    if (!INSTALLER_LOADERS.includes(loader)) return null
+    // no log read yet, or a game out of memory: the general line says it better
+    if (!INSTALLER_LOADERS.includes(loader) || !lines.length || lines.some((l) => /OutOfMemoryError/.test(l))) return null
     const name = loaderName(loader)
     for (const cause of LOADER_CAUSES) {
       for (const line of lines) {
@@ -2417,6 +2416,8 @@
     return `${name} usually closes like this when a mod is missing, made for another Minecraft version, or made for another loader.`
   }
 
+  // A game that ended without a Stop from here and was not simply closed. The panel's record of
+  // the exit, when it has one, says how it ended; the log's last lines say why, as far as anything does.
   function crashNotice(crash) {
     const rec = crash.exit
     const p = profileNamed(crash.profile)
