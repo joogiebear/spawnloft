@@ -87,8 +87,10 @@ one connection open instead of reconnecting.
 **LV5. Selecting everything in a server's folder and pressing Delete asks only "Delete 14 items?"** | weak confirm | medium | S
 
 Select all on the top folder, then Delete: the dialog is "Delete 14 items? A copy is kept first, so
-Backups can put them back." with a plain Delete button. That removes the world, the server jar and
-server.properties. Elsewhere the mild choice "Remove from SpawnLoft, keep the files" needs the server's
+Backups can put them back." with one red Delete button, no names and nothing to type. That removes the world, the server jar and
+server.properties. A copy does go to Backups first, a selection over 1 GB gets a second, typed confirm
+(`src/ui.html:9781-9788`), and files in use are protected while the server runs, so this is about a
+stopped server with a small world. Elsewhere the mild choice "Remove from SpawnLoft, keep the files" needs the server's
 id typed. [files-select-all, files-bulk-delete]
 
 Fix: when the selection includes the active world or the server jar, name them and ask for a typed
@@ -207,10 +209,10 @@ set-db-detach]
 **LV21. Internal words on the Play screen** | wording | medium | S
 
 Seen in the 27 launcher states: "pid 48211" and a full folder path on the running card; "harness not
-published"; "Let SpawnLoft see the game"; `uses a launcher rule ("has_quick_plays_support_v2") that this
-SpawnLoft does not know`; `Set Java to "mojang" in this setup`; "online-mode=false"; "The profile name
+published"; "Let SpawnLoft see the game"; "online-mode=false"; "The profile name
 the command line uses". The Join list leads with folder ids: "creative (Creative Build)". Adds examples
-to LA3 and LA4. [launcher sheets]
+to LA3 and LA4. (Two further messages in the screenshots, about a "launcher rule" and setting Java to
+"mojang", were made-up text in the stand-in data; the real ones are in `src/client-version.mjs:119-127`.) [launcher sheets]
 
 **LV22. The setup sheet is taller than the window** | scaling | medium | S
 
@@ -241,9 +243,13 @@ behind it; and after contact is lost, about 15 seconds in which every button sti
 
 ## Findings from parts 1 to 4 that were confirmed on screen
 
+Forty-nine ids, twelve of them high. This is what happened to be reachable in the test worlds, not a
+check of every high finding: about thirty high findings in parts 1 to 4 could not be tried here (most
+need Windows, the desktop window, a real game client or a failure that is hard to stage).
+
 | Id | What was seen |
 |---|---|
-| X1 | With Plugins open on a stopped server, pressing Start left "Applies the next time the server starts." With Worlds open it was worse than the code suggested: "Set active" and "Delete" stayed enabled on a running server. |
+| X1 | With Plugins open on a stopped server, pressing Start left "Applies the next time the server starts." With Worlds open, "Set active" and "Delete" stayed enabled on a running server. |
 | PLY3 | With Players open on a running server, pressing Stop left "Changes go through the running server's console…", also after closing and reopening the tool. |
 | SET1 | Changing only "Restart it automatically" on a running server showed "1 unsaved change · Take effect when … next starts." with "Save and restart". |
 | SET5, F2 | "0 unsaved changes" with a blue Save after any section change, on every server. |

@@ -122,8 +122,8 @@ Evidence: `launcher.html:1381`, `:1388`, `:1586-1602`. No cancel call exists in 
 
 Fix: add a Cancel button to the card, which needs a server route. Keep the setup button visible and read-only.
 
-**LA2. The page can sit on the loading skeleton for ever** | missing state | high | S
-`pollOnce` only handles a network failure. If `/api/client/launcher` answers with an error status (a 500, say), `S.summary` stays null and `S.down` stays false, so `playView` keeps drawing the skeleton with no message and no retry.
+**LA2. The page can sit on the loading skeleton with no message** | missing state | high | S
+`pollOnce` only handles a network failure. If `/api/client/launcher` answers with an error status (a 500, say), `S.summary` stays null and `S.down` stays false, so `playView` keeps drawing the skeleton with no message and no retry button for as long as the error lasts. Polling goes on (`:2331`), so one good answer clears it.
 
 Evidence: `launcher.html:2337-2344`, `:1368-1370`, `:1098-1101`.
 
@@ -371,14 +371,14 @@ It is shown during "Starting NAME" and "Starting the game" too (`:1601`).
 
 ### WZ-B. Findings
 
-**WZ1. The Java result is mislabelled in two of its states** | clarity | high | S
+**WZ1. The Java result is mislabelled in three of its states** | clarity | high | S
 Anything other than a clean "ok" falls into one branch that:
 - titles the row "Java needs updating" whenever Java was found, and
 - appends "servers will not start until it is sorted" (`setup.html:637-646`).
 That is wrong for:
 - Java found but its version unreadable, which the server reports as fine: "Found X." (`java.mjs:87`).
 - Java that runs older versions: "will run older Minecraft versions" (`java.mjs:107-108`).
-- Java that is present but could not be run, which is not an update problem (`java.mjs:70-75`).
+- Java that is present but could not be run, which is titled "Java is not installed" (`java.mjs:64-68`, `setup.html:643`).
 
 Fix: branch on `reason`. For example, "Java 17 found. Fine for older versions; current Paper needs 25." with no "will not start" line.
 

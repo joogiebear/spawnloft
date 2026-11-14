@@ -11,7 +11,7 @@ Findings read: **id. title** | kind | severity | size (S is small, a few hours a
 ### Findings
 
 **X1. Plugins, Worlds and Files do not notice the server starting or stopping** | missing state | high | M
-Each pane bakes `data.running` in when it is drawn and returns early if already drawn for this server (`:7655`, `:8214`, `:9344`). Only `select()` of another server clears the cache (`:6342-6348`), and `#filesBody` is not in that list. Nothing re-renders them on a state change (`renderServer` does not, `:4568`). So after pressing Stop in the header, Worlds still shows "Set active" and "Delete" greyed with "Stop the server first" (`:8357-8365`), Plugins still says "The server is running, so everything here takes effect the next time it starts." (`:7701`), and Files keeps its "In use" pills. Reopening the tool does not refresh it either. Backups is the only one of the four that polls (`:10424`).
+Each pane bakes `data.running` in when it is drawn and returns early if already drawn for this server (`:7655`, `:8214`, `:9344`). Only `select()` of another server clears the cache (`:6342-6348`), and `#filesBody` is not in that list. Nothing re-renders them on a state change (`renderServer` does not, `:4568`). So after pressing Stop in the header, Worlds still shows "Set active" and "Delete" greyed with "Stop the server first" (`:8357-8365`), Plugins still says "The server is running, so everything here takes effect the next time it starts." (`:7701`), and Files keeps its "In use" pills. The other direction is the dangerous one and was seen running: after Start, Worlds still offers "Set active" and "Delete" as if the server were stopped. Reopening the tool does not refresh it either. Backups is the only one of the four that polls (`:10424`).
 
 Fix: when `row.status` changes for the current server, re-render the open pane (or at least clear `dataset.for`).
 
@@ -98,7 +98,7 @@ Fix: a row class of their own, or scope the tier rule to `#playersBody`.
 ### Findings
 
 **PL1. Nothing is done about dependencies** | gap | high | L
-`plugins.mjs` never reads `depend` from plugin.yml or Modrinth's dependency list (no match for "depend" in `src/plugins.mjs`). A Fabric mod that needs Fabric API, or a plugin that needs Vault or ProtocolLib, installs with "Installed … " and then fails at the next start. Every mainstream panel with a Modrinth installer offers the required ones.
+`plugins.mjs` never reads `depend` from plugin.yml or Modrinth's dependency list (`platformDependencies` in `src/plugins.mjs:480`, `:539` is used only to match the game version). A Fabric mod that needs Fabric API, or a plugin that needs Vault or ProtocolLib, installs with "Installed … " and then fails at the next start. Every mainstream panel with a Modrinth installer offers the required ones.
 
 Fix: after picking a version, list its required dependencies not already installed and offer "Install these too".
 
@@ -579,7 +579,7 @@ Fix: group or filter; default to whole backups with "Show small copies (31)".
 Fix: count only Standard, Full and Worlds for the strip and for Overview.
 
 **BK7. The default restore choice is the one that cannot be undone** | flow | high | S
-The first radio is preselected (`:3684`) and it is "Put it back over what is there … Not undoable" (`:11001`). Only "Clear first" keeps a copy (`src/backup.mjs:463-471`). The database page takes a safety copy on every restore (`src/services.mjs:471`).
+The first radio is preselected (`:3684`) and it is "Put it back over what is there … Not undoable" (`:11001`). Only "Clear first" keeps a copy (`src/backup.mjs:463-471`). The database page takes a safety copy before a restore whenever a server is attached (`src/services.mjs:471`).
 
 Fix: always take the safety copy before any restore (it is a short snapshot of the same members), and say "A copy of how things are now is kept first."
 
@@ -607,7 +607,7 @@ Options are selected only on an exact match (`:10699`). A schedule made elsewher
 Fix: add the current schedule as its own option ("Daily at 04:30 (current)"), and offer a time picker rather than two fixed times.
 
 **BK13. A bad "keeping" number means "keep everything", with no message** | error state | medium | S
-Empty, 0 or a non-number becomes `keep: null` on the server (`src/ui.mjs:689-690`), which means never delete. `max="365"` is not enforced. The toast still says "Automatic backups scheduled." (`:10746`).
+Empty, 0 or a non-number becomes `keep: null` on the server (`src/ui.mjs:689-690`), which means never delete. Above 365 is silently cut to 365 on the server (`src/schedule.mjs:121`), and with nothing saved the page still shows "keeping 7" (`:10635`, `:10710`). The toast still says "Automatic backups scheduled." (`:10746`).
 
 Fix: validate in the page; say what the number covers ("Keeps the newest 7 automatic backups. Backups you make by hand are never removed.").
 
@@ -700,7 +700,7 @@ Fix: let the name wrap under the date at that width, or collapse the row buttons
 - No "restore as a new server".
 
 ### Keep
-- The status strip answers "is this server backed up?" first, with an icon and words, and the stale warning is amber with text.
+- The place and form of the status strip, which answers "is this server backed up?" first (its answer needs BK6 and LV2 fixed), with an icon and words, and the stale warning is amber with text.
 - History refreshes in the background without disturbing the form or focus (`:10466-10473`).
 - Locking is honoured by both Delete and the schedule; a locked row stays at full strength.
 - The restore dialog names what comes back, from when, what was left out, and that databases are included; it uses type-to-confirm.
@@ -763,7 +763,7 @@ The dialog only advises "Stop the servers that use it first if they are writing 
 Dumps are by hand only. A database is covered automatically only as part of a server's Standard backup, and only if it is running at that moment (BK2).
 
 ### Keep
-- Every restore takes a safety copy first and says it can be undone from the same list.
+- A restore takes a safety copy first and says it can be undone from the same list. (Only when a server is attached, `src/services.mjs:471`; the dialog promises it always.)
 - A poll does not redraw under a dump or restore, or while a label is being typed (`:12445`, `:12461-12463`).
 - The empty state suggests when to take one.
 - The disabled reasons ("Start the database first…") are on the page, not only in a tooltip.
