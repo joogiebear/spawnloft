@@ -244,6 +244,13 @@ export async function createSnapshot(inst, { scope = 'standard', label = null, r
   const slug = label ? `${label.replace(/[^a-z0-9_-]/gi, '-')}_` : ''
   const base = `${slug}${scope}_${stamp()}`
   const dir = backupDir(inst.name)
+  // Said now, not after half an hour: a folder that cannot be written to looks, to the lock
+  // below, exactly like a lock somebody else is holding, and it would wait out its whole timeout.
+  try {
+    fs.accessSync(dir, fs.constants.W_OK)
+  } catch {
+    fail(`The backups folder cannot be written to, so no backup can be made. It is ${dir}`)
+  }
 
   // Serialize snapshots per instance: if two overlapped, whichever finished first would turn
   // saving back on while the other's tar was still reading. The second one queues rather than
