@@ -193,6 +193,8 @@ export function createProfile(name, { mc: typedMc, loader = 'vanilla', loaderVer
   if (!fs.existsSync(optionsFile)) {
     fs.writeFileSync(optionsFile, 'lang:en_us\n')
   }
+  // what a removed profile of this name left about its games is not this one's history
+  for (const file of [clientLastExit(name), clientPlayed(name)]) fs.rmSync(file, { force: true })
   const profile = { mc, loader, loaderVersion, java, memory, harness, server, account: accountKeyFor(account), assistantAccount, createdAt: new Date().toISOString() }
   reg.profiles[name] = profile
   saveProfiles(reg)
@@ -274,6 +276,8 @@ export function renameProfile(name, newName) {
   if (!release) fail(`profile "${name}" is being launched (pid ${holderText(name)}); wait for it`, 'launching')
   let released = false
   try {
+    // again under the lock: a launch elsewhere may have started the game and let go since
+    if (status(name).running) fail(`profile "${name}" is running; stop it before renaming it`, 'already-running')
     const reg = loadProfiles()
     assertNameFree(reg, newName, { except: name })
     // a folder left by a profile removed without its files is not this one's to take over
@@ -300,14 +304,41 @@ export function renameProfile(name, newName) {
     // the run folder holds the lock this call has: let go, then move what is left of it
     release()
     released = true
-    try {
-      if (!caseOnly) fs.rmSync(clientRunDir(newName), PURGE)
-      if (fs.existsSync(clientRunDir(name))) fs.renameSync(clientRunDir(name), clientRunDir(newName))
-    } catch { /* the log and the play record stay under the old name; the profile itself has moved */ }
+    moveRunDir(name, newName, { caseOnly })
   } finally {
     if (!released) release()
   }
   return getProfile(newName)
+}
+
+// The log, how the last game ended and the time played follow a renamed profile. Windows may
+// hold the folder for a moment (a virus scanner, the indexer), so the move is tried a few times;
+// if it still cannot be made, the records are dropped rather than left for a later profile of
+// the old name to inherit.
+function moveRunDir(name, newName, { caseOnly = false } = {}) {
+  const from = clientRunDir(name)
+  if (!fs.existsSync(from)) return
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      if (!caseOnly) fs.rmSync(clientRunDir(newName), PURGE)
+      fs.renameSync(from, clientRunDir(newName))
+      return
+    } catch { /* tried again */ }
+  }
+  for (const file of [clientLastExit(name), clientPlayed(name)]) {
+    try { fs.rmSync(file, { force: true }) } catch { /* left behind; createProfile clears them */ }
+  }
+}
+
+// "survival-copy", "survival-copy-2": a name no profile has and no folder is left under, cut to
+// fit the 32 characters a name may have.
+function copyNameFor(name, reg) {
+  const used = new Set(Object.keys(reg.profiles).map((n) => n.toLowerCase()))
+  for (let i = 1; ; i++) {
+    const tail = i === 1 ? '-copy' : `-copy-${i}`
+    const made = name.slice(0, 32 - tail.length) + tail
+    if (!used.has(made.toLowerCase()) && !fs.existsSync(profileDir(made))) return made
+  }
 }
 
 // What a copy of a profile takes with it from the game folder: how the game is set up, not what
@@ -316,8 +347,15 @@ const DUPLICATE_TAKES = ['options.txt', 'optionsof.txt', 'servers.dat', 'mods', 
 
 // A second profile with the first one's settings, mods and options. assistantAccount starts off,
 // as for every new profile.
-export function duplicateProfile(name, newName) {
+export function duplicateProfile(name, wanted = null) {
   const from = getProfile(name)
+  const newName = wanted ?? copyNameFor(name, loadProfiles())
+  validateProfileName(newName)
+  // A folder a removed profile left holds its worlds and mods: a copy made into it would carry
+  // them, and a copy that failed would delete them.
+  if (fs.existsSync(profileDir(newName))) {
+    fail(`a folder named "${newName}" is already in the profiles folder (left by a removed profile); pick another name or delete ${profileDir(newName)}`, 'name-taken')
+  }
   const made = createProfile(newName, { mc: from.mc, loader: from.loader, loaderVersion: from.loaderVersion, java: from.java, memory: from.memory, harness: from.harness, server: from.server, account: from.account })
   try {
     for (const item of DUPLICATE_TAKES) {

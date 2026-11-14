@@ -6437,18 +6437,25 @@ function focusPlay() {
   } catch { /* not loaded, or not ours */ }
   frame.focus();
 }
-// Every Play in the panel is the Play page's Play: a server card or the More menu leaves a note
-// for the page ({ mc, server, profile, play }) and opens it, and the page picks the setup, points
+// Every Play in the panel is the Play page's Play: a server card or the More menu hands the
+// page a note ({ mc, server, profile, play }) and opens it, and the page picks the setup, points
 // it at the server and starts the launch with its own progress, Cancel and errors. With no
-// setup that fits, the page opens its New setup form filled in for the server. A loaded frame
-// hears the note through the storage event; a fresh one reads the key as it loads.
+// setup that fits, the page opens its New setup form filled in for the server. The note goes to
+// this panel's own frame and nowhere else, as a message: at once when the page is loaded, and
+// when it says it is ready otherwise. It is never stored, so it cannot start a game another day.
+let playReady = false;
+let playNote = null;
+function sendPlayNote() {
+  if (!playNote || !playReady) return;
+  const note = playNote;
+  playNote = null;
+  try { $('#playFrame').contentWindow.postMessage({ type: 'spawnloft-play-note', note }, location.origin) } catch { /* the frame is gone: nothing to tell */ }
+}
 function openLauncherFor(row, profile = null) {
-  const note = { mc: row.mcVersion || null, server: row.name };
-  if (profile) { note.profile = profile.name; note.play = !profile.running; }
-  // the time makes two presses in a row two notes: a storage event needs a changed value
-  note.at = Date.now();
-  try { localStorage.setItem('spawnloft.launcher.newProfile', JSON.stringify(note)) } catch {}
+  playNote = { mc: row.mcVersion || null, server: row.name };
+  if (profile) { playNote.profile = profile.name; playNote.play = !profile.running; }
   showPlay();
+  sendPlayNote();
 }
 function playClient(row) {
   openLauncherFor(row, playProfileFor(row));
@@ -6459,6 +6466,7 @@ let playState = { launching: null, running: [] };
 window.addEventListener('message', (e) => {
   if (e.origin !== location.origin || e.source !== $('#playFrame').contentWindow) return;
   const d = e.data;
+  if (d && d.type === 'spawnloft-play-ready') { playReady = true; sendPlayNote(); return; }
   if (!d || d.type !== 'spawnloft-play-state') return;
   playState = { launching: typeof d.launching === 'string' ? d.launching : null, running: Array.isArray(d.running) ? d.running.filter((n) => typeof n === 'string') : [] };
   showPlayState();

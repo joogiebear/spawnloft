@@ -157,9 +157,18 @@ test('inside the Play page the launcher is a page, not a window: a title for the
   assert.match(main, /on\('will-frame-navigate'/)
 })
 
-test('an open launcher takes a card\'s prefill from the storage event', () => {
+test('a card\'s note reaches the one launcher in the panel\'s frame, as a message, and is never stored', () => {
   const html = fs.readFileSync(path.join(root, 'src', 'launcher.html'), 'utf8')
-  assert.match(html, /window\.addEventListener\('storage', \(e\) => \{\s*if \(e\.key !== NEW_PROFILE_KEY/)
+  // only from the window that holds this page, and only of this origin
+  assert.match(html, /window\.addEventListener\('message', \(e\) => \{\s*if \(window\.parent === window \|\| e\.source !== window\.parent \|\| e\.origin !== location\.origin\) return/)
+  assert.match(html, /type: 'spawnloft-play-ready'/)
+  // a note in shared storage reached every launcher open in the browser, and stayed for another day
+  assert.doesNotMatch(html, /spawnloft\.launcher\.newProfile|addEventListener\('storage'/)
+  const panel = fs.readFileSync(path.join(root, 'src', 'ui.html'), 'utf8')
+  assert.doesNotMatch(panel, /spawnloft\.launcher\.newProfile/)
+  assert.match(panel, /\$\('#playFrame'\)\.contentWindow\.postMessage\(\{ type: 'spawnloft-play-note', note \}, location\.origin\)/)
+  // and the panel takes the page's word only from its own frame
+  assert.match(panel, /if \(e\.origin !== location\.origin \|\| e\.source !== \$\('#playFrame'\)\.contentWindow\) return;/)
 })
 
 test('the desktop window rules pass their own tests', () => {

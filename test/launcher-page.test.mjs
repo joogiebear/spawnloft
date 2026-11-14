@@ -268,7 +268,7 @@ test('the one screen keeps the old screens\' links and the card\'s pre-fill', ()
   // #profiles and #accounts were screens; they now open the setups and the account menu
   assert.match(html, /hash === 'profiles' \? 'version' : hash === 'accounts' \? 'account'/)
   // the storage keys the page and the panel's server cards share are unchanged
-  for (const key of ['spawnloft.launcher.newProfile', 'spawnloft.launcher.job', 'spawnloft.launcher.profile']) assert.ok(html.includes(`'${key}'`), key)
+  for (const key of ['spawnloft.launcher.job', 'spawnloft.launcher.profile']) assert.ok(html.includes(`'${key}'`), key)
   // no sidebar, no screens
   assert.doesNotMatch(html, /class="rail"|data-go=/)
 })
@@ -568,15 +568,6 @@ test('a launch can be cancelled, and the page says what that left', () => {
   assert.match(fnSource('finishJob'), /ev\?\.stage === 'cancelled' \|\| ev\?\.code === 'cancelled'\) \{\s+S\.notice = \{ profile: job\.profile, \.\.\.cancelledNotice\(job\)/)
 })
 
-test('a copy of a setup gets a free name that fits', () => {
-  const { copyName } = lifted(['copyName'])
-  assert.equal(copyName('survival', ['survival']), 'survival-copy')
-  assert.equal(copyName('survival', ['survival', 'Survival-Copy']), 'survival-copy-2')
-  const long = 'a'.repeat(32)
-  assert.equal(copyName(long, [long]), 'a'.repeat(27) + '-copy')
-  assert.equal(copyName(long, [long]).length, 32)
-})
-
 test('when a setup was last played, and for how long, in words', () => {
   const { dayWords, playedWords, playedLine } = lifted(['dayWords', 'playedWords', 'playedLine'])
   const now = new Date(2026, 10, 14, 15, 0).getTime()
@@ -591,7 +582,8 @@ test('when a setup was last played, and for how long, in words', () => {
   assert.equal(playedWords(180 * 60000), '3 h')
   assert.equal(playedWords(41.5 * 3600000), '41 h')
   assert.equal(playedLine({ running: true, played: null }), 'Running now')
-  assert.equal(playedLine({ running: false, played: { lastPlayedAt: null, totalMs: 0 } }), 'Never played')
-  assert.equal(playedLine({ running: false }), 'Never played')
+  // no record is not "never played": setups older than the record have none
+  assert.equal(playedLine({ running: false, played: { lastPlayedAt: null, totalMs: 0 } }), '')
+  assert.equal(playedLine({ running: false }), '')
   assert.match(playedLine({ running: false, played: { lastPlayedAt: new Date().toISOString(), totalMs: 200 * 60000 } }), /^Played today · 3 h 20 min in all$/)
 })

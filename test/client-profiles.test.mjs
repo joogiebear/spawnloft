@@ -195,6 +195,34 @@ test('duplicateProfile copies the settings, mods and options, and leaves the wor
   assert.equal(fs.existsSync(path.join(to, 'saves')), false)
   assert.deepEqual(played('src-copy'), { lastPlayedAt: null, totalMs: 0, launches: 0 })
   assert.throws(() => duplicateProfile('src', 'SRC-copy'), (err) => err.code === 'name-taken')
+  // with no name asked for it picks one: the next that is free
+  assert.equal(duplicateProfile('src').name, 'src-copy-2')
+  removeProfile('src-copy-2', { purge: true })
   removeProfile('src', { purge: true })
   removeProfile('src-copy', { purge: true })
+})
+
+test('a copy never lands in the folder a removed profile left, and a failed copy deletes nothing of it', () => {
+  createProfile('base', { mc: '1.21.4' })
+  createProfile('base-copy', { mc: '1.21.4' })
+  fs.mkdirSync(path.join(profileDir('base-copy'), 'saves', 'OldWorld'), { recursive: true })
+  removeProfile('base-copy')   // the folder, worlds included, is kept
+  assert.throws(() => duplicateProfile('base', 'base-copy'), (err) => err.code === 'name-taken')
+  assert.ok(fs.existsSync(path.join(profileDir('base-copy'), 'saves', 'OldWorld')), 'the old worlds are untouched')
+  // the name it picks by itself steps over the folder
+  const made = duplicateProfile('base')
+  assert.equal(made.name, 'base-copy-2')
+  assert.equal(fs.existsSync(path.join(profileDir('base-copy-2'), 'saves')), false)
+  assert.ok(fs.existsSync(path.join(profileDir('base-copy'), 'saves', 'OldWorld')))
+  removeProfile('base', { purge: true })
+  removeProfile('base-copy-2', { purge: true })
+  fs.rmSync(profileDir('base-copy'), { recursive: true })
+})
+
+test('a new profile does not inherit the play record a removed one of its name left', () => {
+  fs.mkdirSync(clientRunDir('again'), { recursive: true })
+  fs.writeFileSync(clientPlayed('again'), JSON.stringify({ lastPlayedAt: '2026-01-01T00:00:00.000Z', totalMs: 99, launches: 3 }))
+  createProfile('again', { mc: '1.21.4' })
+  assert.deepEqual(played('again'), { lastPlayedAt: null, totalMs: 0, launches: 0 })
+  removeProfile('again', { purge: true })
 })

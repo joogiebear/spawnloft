@@ -1105,8 +1105,10 @@ async function handleClient(req, res, seg, url) {
   // a new name for the setup, or a second setup with this one's settings, mods and options
   if ((verb === 'rename' || verb === 'duplicate') && req.method === 'POST') {
     const body = (await readBody(req)) ?? {}
-    if (typeof body.name !== 'string' || !body.name) fail('send the new name as "name"')
-    const made = verb === 'rename' ? client.renameProfile(profileName, body.name) : client.duplicateProfile(profileName, body.name)
+    const named = typeof body.name === 'string' && body.name ? body.name : null
+    if (verb === 'rename' && !named) fail('send the new name as "name"')
+    // a copy with no name asked for gets one: "<name>-copy", or the next free one
+    const made = verb === 'rename' ? client.renameProfile(profileName, named) : client.duplicateProfile(profileName, named)
     return json(res, 200, clientProfileRow(made))
   }
   return json(res, 405, { error: 'method not allowed' })

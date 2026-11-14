@@ -238,15 +238,16 @@ export async function spawnClient(command, { name, state }) {
 const stopAsked = new Set()
 const stopMark = (name) => path.join(clientRunDir(name), 'stop-asked.json')
 
-// The last recorded exit of a profile's game, or null: { pid, code, signal, startedAt, endedAt, stopped }.
 // When a profile was last played, how many times, and for how long in all. The time is added
 // when the game exits, by the process that started it: a game started by a CLI command that has
 // since ended counts as a launch and adds no time.
 export function readPlayed(name) {
   let rec = null
   try { rec = readJson(clientPlayed(name), null) } catch { /* unreadable: starts again */ }
+  // no record yet (a profile older than the record): the last game known to have ended says when
+  const known = typeof rec?.lastPlayedAt === 'string' ? rec.lastPlayedAt : readLastExit(name)?.startedAt
   return {
-    lastPlayedAt: typeof rec?.lastPlayedAt === 'string' ? rec.lastPlayedAt : null,
+    lastPlayedAt: typeof known === 'string' ? known : null,
     totalMs: Number.isFinite(rec?.totalMs) && rec.totalMs > 0 ? rec.totalMs : 0,
     launches: Number.isInteger(rec?.launches) && rec.launches > 0 ? rec.launches : 0,
   }
@@ -256,6 +257,7 @@ function notePlayed(name, change) {
   try { writeJson(clientPlayed(name), change(readPlayed(name))) } catch { /* a record, not a requirement */ }
 }
 
+// The last recorded exit of a profile's game, or null: { pid, code, signal, startedAt, endedAt, stopped }.
 export function readLastExit(name) {
   try {
     const rec = readJson(clientLastExit(name), null)

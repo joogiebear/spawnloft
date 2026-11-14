@@ -685,7 +685,6 @@
   // the memory segments; anything else is Custom, a slider in half-gigabyte steps
   const MEMORY_CHOICES = ['2G', '4G', '8G']
   const STOPPED = new Set(['stopped', 'stale'])
-  const NEW_PROFILE_KEY = 'spawnloft.launcher.newProfile'
   const JOB_KEY = 'spawnloft.launcher.job'
   const PICK_KEY = 'spawnloft.launcher.profile'
   // per profile, where Join pointed last: { server } or { address }; nothing is the title screen
@@ -936,16 +935,6 @@
     for (let i = 2; ; i++) if (!used.has(`${base}-${i}`.toLowerCase())) return `${base}-${i}`
   }
 
-  // A name for a copy of a setup: "survival-copy", "survival-copy-2", cut to fit the 32 allowed.
-  function copyName(name, taken) {
-    const used = new Set(taken.map((n) => n.toLowerCase()))
-    for (let i = 1; ; i++) {
-      const tail = i === 1 ? '-copy' : `-copy-${i}`
-      const made = String(name).slice(0, 32 - tail.length) + tail
-      if (!used.has(made.toLowerCase())) return made
-    }
-  }
-
   // The name a person gave a setup, or null when it is the one autoName made for it.
   function givenName(p) {
     const base = nameBase(p.mc, p.loader).toLowerCase()
@@ -1094,7 +1083,8 @@
   function playedLine(p) {
     const rec = p.played
     if (p.running) return 'Running now'
-    if (!rec?.lastPlayedAt) return 'Never played'
+    // no record is not "never": setups older than the record were played without one
+    if (!rec?.lastPlayedAt) return ''
     const total = playedWords(rec.totalMs ?? 0)
     return `Played ${dayWords(rec.lastPlayedAt)}${total ? ` · ${total} in all` : ''}`
   }
@@ -1343,6 +1333,9 @@
   // The panel's sidebar shows a launch under way or a game running from any of its pages: this
   // page says so whenever it changes. Nobody listens in a window of its own.
   let toldPanel = ''
+  // a server card's note that came before the panel's first answer, and whether that has come
+  let waitingNote = null
+  let loadedOnce = false
   function tellPanel() {
     if (window.parent === window) return
     const state = { type: 'spawnloft-play-state', launching: S.job && !S.job.done ? S.job.profile : null, running: (S.summary?.profiles ?? []).filter((q) => q.running).map((q) => q.name) }
@@ -1614,7 +1607,7 @@
   }
 
   function setupSub(q) {
-    return [givenName(q), q.played?.lastPlayedAt ? `played ${dayWords(q.played.lastPlayedAt)}` : 'never played', q.server ? `usually joins ${q.server}` : null].filter(Boolean).join(' · ')
+    return [givenName(q), q.played?.lastPlayedAt ? `played ${dayWords(q.played.lastPlayedAt)}` : null, q.server ? `usually joins ${q.server}` : null].filter(Boolean).join(' · ')
   }
 
   function versionMenu(p) {
@@ -2024,6 +2017,10 @@
     const toggle = (key) => () => { f[key] = !f[key]; render() }
     const ro = (label, value, hint) => h('label', { class: 'field' }, h('span', { text: label }), h('input', { readonly: true, value }), hint && h('small', { class: 'hint', text: hint }))
     const runningHint = 'Stop the game to change it.'
+    // an error about the setup's own name, not one that only has the word in it
+    const NAME_ERROR = /profile name|already exists|folder named|needs a name/i
+    // Duplicate copies the setup as it is saved, so not while the sheet holds changes
+    const edited = Boolean(p && (fieldText(f.name) !== p.name || Object.keys(profilePatch(p, editedProfile(f))).length))
     const busyHere = Boolean(p && S.job?.profile === p.name)
 
     let versionField
@@ -2095,7 +2092,7 @@
         ? (running || busyHere
           ? ro('Name', f.name, running ? runningHint : 'It is being launched.')
           : h('label', { class: 'field' }, h('span', { text: 'Name' }),
-            h('input', { id: 'fName', value: f.name, maxlength: '32', class: f.error && /name/i.test(f.error) ? 'bad' : null, oninput: set('name') }),
+            h('input', { id: 'fName', value: f.name, maxlength: '32', class: f.error && NAME_ERROR.test(f.error) ? 'bad' : null, oninput: set('name', true) }),
             h('small', { class: 'hint', text: 'Renaming moves its folder too. Letters, digits, dash and underscore.' })))
         : h('label', { class: 'field' }, h('span', { text: 'Name (optional)' }),
           h('input', { id: 'fName', value: f.name, placeholder: autoPlaceholder, maxlength: '32', class: f.error && /name/.test(f.error) ? 'bad' : null, oninput: set('name') }),
@@ -2141,7 +2138,7 @@
       h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle', onkeydown: trapTab },
         h('div', {},
           h('h2', { id: 'sheetTitle' }, p ? [setupTitle(p), given && h('span', { text: ` (${given})` })] : 'New setup'),
-          h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : `${playedLine(p)} · ${memoryText(p.memory)} · ${p.server ? `usually joins ${p.server}` : 'opens on the title screen'}`) : 'Nothing is downloaded until you press Play.' })),
+          h('p', { class: 'sub', text: p ? (running ? `Running since ${clockTime(p.startedAt)}` : [playedLine(p), memoryText(p.memory), p.server ? `usually joins ${p.server}` : 'opens on the title screen'].filter(Boolean).join(' · ')) : 'Nothing is downloaded until you press Play.' })),
         f.error && notice({ tone: 'fault', title: sentence(f.error) }),
         running && notice({ tone: 'warn', title: 'This setup is running', text: 'The version, loader, Java, memory and the helper mod can\'t change while the game is open. Stop it first to change them.' }),
         machine && !running && notice({ tone: 'fault', title: 'Minecraft can\'t be launched on this computer', text: sentence(machine) }),
@@ -2159,7 +2156,7 @@
           p
             ? [desktop?.openProfileFolder && h('button', { class: 'sm quiet', onclick: () => openFolder(p) }, ico('folder'), 'Open folder'),
               h('button', { class: 'sm quiet', style: 'color:var(--fault-ink)', disabled: running || busyHere, title: running ? 'Stop the game to remove it.' : null, onclick: () => { f.removing = true; render(); const keep = $('keepSetup'); keep?.scrollIntoView({ block: 'nearest' }); keep?.focus() } }, 'Remove setup…'),
-              h('button', { class: 'sm quiet', disabled: f.saving, title: 'A second setup with the same settings, mods and options. Worlds are not copied.', onclick: () => duplicateProfile(p) }, 'Duplicate'),
+              h('button', { class: 'sm quiet', disabled: f.saving || edited, title: edited ? 'Save or cancel your changes first: the copy is made from the saved setup.' : 'A second setup with the same settings, mods and options. Worlds are not copied.', onclick: () => duplicateProfile(p) }, 'Duplicate'),
               h('span', { class: 'grow' })]
             : h('span', { class: 'hint', text: 'Kept in its own folder under SpawnLoft\'s data folder.' }),
           h('button', { onclick: closeSheet }, 'Cancel'),
@@ -2188,7 +2185,10 @@
   function movedName(from, to) {
     if (S.pick === from) pickProfile(to)
     if (S.targets[from]) { S.targets[to] = S.targets[from]; delete S.targets[from]; saveTargets() }
-    delete S.refusals[from]
+    if (S.refusals[from]) { S.refusals[to] = S.refusals[from]; delete S.refusals[from] }
+    // the row itself, so the sheet and the card read as the same setup until the next poll
+    const row = S.summary?.profiles?.find((q) => q.name === from)
+    if (row) row.name = to
     if (S.crash?.profile === from) S.crash = null
   }
 
@@ -2198,7 +2198,8 @@
     f.error = null
     render()
     try {
-      const made = await api(`client/profiles/${enc(p.name)}/duplicate`, { method: 'POST', body: { name: copyName(p.name, profilesNow().map((q) => q.name)) } })
+      // the panel picks the name: it can see the folders a removed setup left behind
+      const made = await api(`client/profiles/${enc(p.name)}/duplicate`, { method: 'POST', body: {} })
       pickProfile(made.name)
       S.flash = { tone: 'live', title: `Made ${made.name}, a copy of ${p.name}`, text: 'It has the same settings, mods and options. Worlds were not copied.' }
       S.sheet = null
@@ -2207,7 +2208,8 @@
       f.error = err.message
       f.saving = false
     }
-    refresh()
+    await refresh()
+    if (!S.sheet) $('play')?.focus({ preventScroll: true })
   }
 
   async function saveSheet() {
@@ -2225,15 +2227,22 @@
       } else {
         // a new name first: everything after it speaks to the setup by that name
         const wanted = fieldText(f.name)
-        if (wanted && wanted !== f.editing) {
+        if (!wanted) throw new Error('A setup needs a name')
+        const before = profileNamed(f.editing)
+        const patch = profilePatch(before ?? {}, editedProfile(f))
+        if (wanted !== f.editing) {
           const renamed = await api(`client/profiles/${enc(f.editing)}/rename`, { method: 'POST', body: { name: wanted } })
           movedName(f.editing, renamed?.name ?? wanted)
           f.editing = f.name = renamed?.name ?? wanted
-          await refresh()
         }
-        const before = profileNamed(f.editing)
-        const patch = profilePatch(before ?? {}, editedProfile(f))
-        const out = Object.keys(patch).length ? await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch }) : { warnings: [] }
+        let out = { warnings: [] }
+        try {
+          if (Object.keys(patch).length) out = await api(`client/profiles/${enc(f.editing)}`, { method: 'PATCH', body: patch })
+        } catch (err) {
+          // the name did change: say so, or the error reads as if nothing was saved
+          if (f.editing !== p0 && !(err instanceof PanelDown)) err.message = `Renamed to ${f.editing}, but the other changes were not saved: ${err.message}`
+          throw err
+        }
         const label = setupTitle(out.profile ?? before ?? f)
         if (patch.mc !== undefined) delete S.refusals[f.editing]
         S.flash = out.warnings?.length
@@ -2607,19 +2616,23 @@
   }
 
   function takePrefill(prefill) {
-    if (!prefill || typeof prefill !== 'object' || S.sheet) return
+    if (!prefill || typeof prefill !== 'object') return
+    // a sheet already open keeps what was typed into it, and says why nothing started
+    if (S.sheet) {
+      S.sheet.error = 'Save or cancel this setup first, then press Play on the server again'
+      return render()
+    }
     const { mc, server, profile: p, play } = prefillPick(prefill, profilesNow())
     if (p) {
       // a running or launching setup is shown as it is; its Join changes from the next launch
       pickProfile(p.name)
       const known = server && serversNow().some((s) => s.name === server)
       if (known) setTarget(p, { server })
-      S.menu = null
       // A server card's Play is this page's Play, pressed for the person: the launch starts here,
       // with its progress and Cancel. Not when Play here would do more than they asked for (start
       // a stopped server) or cannot go ahead: then the page shows why, and the button is theirs.
       const plan = launchPlan(p)
-      if (play && known && !S.job && !plan.blocked && !plan.startsServer && plan.picked?.name === server) startLaunch(p)
+      if (play && known && !S.job && !S.menu && !plan.blocked && !plan.startsServer && plan.picked?.name === server) startLaunch(p)
       else render()
     } else {
       openSheet(null, { mc, server })
@@ -2636,24 +2649,27 @@
         followJob(S.job, null)
       }
     } catch { stored('session', JOB_KEY, null) }
-    let prefill = null
-    try { prefill = JSON.parse(stored('local', NEW_PROFILE_KEY) ?? 'null') } catch { /* ignored */ }
-    stored('local', NEW_PROFILE_KEY, null)
     render()
     poll().then(() => {
-      if (prefill) takePrefill(prefill)
+      loadedOnce = true
+      if (waitingNote) takePrefill(waitingNote)
       else if (menu && !S.down) openMenu(menu)
+      waitingNote = null
     })
   }
 
-  // The same, for a launcher already loaded (the panel's Play page, or a window of its own the
-  // panel brings forward rather than reloading): the storage event is how the card's choice arrives. A sheet already
-  // open keeps what was typed into it.
-  window.addEventListener('storage', (e) => {
-    if (e.key !== NEW_PROFILE_KEY || !e.newValue) return
-    let prefill = null
-    try { prefill = JSON.parse(e.newValue) } catch { /* ignored */ }
-    stored('local', NEW_PROFILE_KEY, null)
-    takePrefill(prefill)
+  // A server card's Play arrives as a message from the panel that holds this page in its frame,
+  // and from nothing else: one press reaches one page (a note in shared storage reached every
+  // launcher open in the browser, and each started the game), and nothing is left behind to be
+  // acted on another day. A note that comes before the first answer from the panel waits for it,
+  // and is read against what the panel says now, not three seconds ago.
+  window.addEventListener('message', (e) => {
+    if (window.parent === window || e.source !== window.parent || e.origin !== location.origin) return
+    if (e.data?.type !== 'spawnloft-play-note' || !e.data.note || typeof e.data.note !== 'object') return
+    const note = e.data.note
+    if (!loadedOnce) { waitingNote = note; return }
+    poll().then(() => takePrefill(note))
   })
+  // the panel sends a note it made while this page was loading once it hears this
+  if (window.parent !== window) try { window.parent.postMessage({ type: 'spawnloft-play-ready' }, location.origin) } catch { /* not the panel */ }
 </script>
