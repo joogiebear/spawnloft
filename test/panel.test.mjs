@@ -521,6 +521,23 @@ test('a stop or a restart asks first when it takes something from somebody, and 
   assert.equal(taskDisconnects({ action: { type: 'backup' } }), null)
   assert.equal(taskDisconnects({ action: { type: 'steps', steps: [{ do: 'backup' }] } }), null)
 
+  assert.equal(taskDisconnects({ action: { type: 'command', line: '/stop' } }), 'stop')
+  assert.equal(taskDisconnects({ action: { type: 'command', line: 'say stop the lag' } }), null)
+  assert.equal(taskDisconnects({ action: { type: 'steps', steps: [{ do: 'command', line: 'restart' }] } }), 'restart')
+
+  // each way in asks before it acts: the question's "no" returns ahead of the request
+  const between = (from, to) => { const i = html.indexOf(from); assert.ok(i > 0, from); const j = html.indexOf(to, i); assert.ok(j > i, to); return html.slice(i, j) }
+  const asks = /if \(question && !\(await ask\(/
+  assert.match(between("const act = (what, { sure = false } = {}) => async () => {", 'state.busy = true;'), asks)
+  assert.match(between('async function cardAct(name, what) {', 'overview.acting[name] = verb.what;'), asks)
+  assert.match(between('saveRestart.onclick = async () => {', 'doSave({ restart: true });'), asks)
+  assert.match(between('runNow.onclick = async () => {', 'busy(true);'), asks)
+  assert.match(between('opBtn.onclick = async () => {', "on: true }"), /if \(!\(await ask\(operatorQuestion\(label\)\)\)\) return;/)
+  const { stillUp } = lifted(['stillUp'])
+  assert.equal(stillUp({ status: 'running' }), true)
+  assert.equal(stillUp({ status: 'stopped' }), false)
+  assert.equal(stillUp(null), false)
+
   // a caller that asked already does not ask twice, and every other way to stop goes through the question
   assert.equal((html.match(/act\('(?:stop|restart)', \{ sure: true \}\)/g) || []).length, 3)
   assert.equal((html.match(/act\('(?:stop|restart)'\)\(\)/g) || []).length, 0)

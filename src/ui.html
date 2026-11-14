@@ -5783,6 +5783,7 @@ async function cardAct(name, what) {
   const question = stopQuestion(verb.what, row, state.rows);
   if (question && !(await ask(question))) return;
   if (overview.acting[name]) return;
+  if (question && !stillUp(rowOf(name))) return toast((row.label || name) + ' is no longer running.');
   overview.acting[name] = verb.what;
   renderHomeCards();
   const note = toast(ACTION_ING[verb.what] + ' ' + name + '…');
@@ -6837,13 +6838,26 @@ function stopQuestion(what, row, rows) {
   };
 }
 
+/** Whether the thing a stop was confirmed for is still there to stop. */
+function stillUp(row) {
+  return Boolean(row) && (row.status === 'running' || row.status === 'reachable');
+}
+
 /** Whether running this scheduled task now stops or restarts the server. */
 function taskDisconnects(task) {
   const a = (task && task.action) || {};
+  // The console's own "stop" and "restart" do the same thing as the steps named for them.
+  const typed = (line) => {
+    const word = String(line || '').trim().replace(/^\//, '').split(/\s+/)[0].toLowerCase();
+    return word === 'stop' || word === 'restart' ? word : null;
+  };
   if (a.type === 'restart' || a.type === 'stop') return a.type;
+  if (a.type === 'command') return typed(a.line);
   if (a.type === 'steps') {
-    const step = (a.steps || []).find((st) => st.do === 'restart' || st.do === 'stop');
-    if (step) return step.do;
+    for (const st of a.steps || []) {
+      if (st.do === 'restart' || st.do === 'stop') return st.do;
+      if (st.do === 'command' && typed(st.line)) return typed(st.line);
+    }
   }
   return null;
 }
@@ -6857,6 +6871,9 @@ const act = (what, { sure = false } = {}) => async () => {
     const question = stopQuestion(what, rowOf(name), state.rows);
     if (question && !(await ask(question))) return;
     if (state.current !== name || state.busy) return;
+    // The answer was to what the question said. A server that stopped while it was being read is
+    // not stopped again, and not started by a restart nobody would now ask for.
+    if (question && !stillUp(rowOf(name))) return toast((rowOf(name)?.label || name) + ' is no longer running.');
   }
   state.busy = true;
   // What is under way, so the state pill can say "Starting…" through the wait rather than
