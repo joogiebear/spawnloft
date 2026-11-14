@@ -1151,6 +1151,27 @@ test('Files: a row says what can be done with it, and a rename or a move builds 
   assert.deepEqual(ids({ type: 'link', path: 'out', name: 'out' }), [])
 })
 
+test('Files: the keys on a row, and what a file that cannot be shown is called', () => {
+  const { rowKey, notShownWords } = lifted(['fileSize', 'rowKey', 'notShownWords'])
+  const key = (k, mods = {}) => rowKey({ key: k, altKey: false, ctrlKey: false, shiftKey: false, metaKey: false, ...mods })
+  assert.equal(key('F2'), 'rename')
+  assert.equal(key('Delete'), 'delete')
+  // a Mac's keyboard has no Delete of that kind: Cmd+Backspace, as in Finder
+  assert.equal(key('Backspace', { metaKey: true }), 'delete')
+  assert.equal(key('Backspace'), null, 'Backspace alone is not a way to delete a file')
+  assert.equal(key('Delete', { ctrlKey: true }), null)
+  assert.equal(key('F2', { shiftKey: true }), null)
+  assert.equal(key('a'), null)
+  // a packed log that is cut short is not called a jar
+  assert.match(notShownWords('binary', 10, true), /could not be unpacked/)
+  assert.match(notShownWords('large', 10, true), /unpacks to more than can be read/)
+  assert.match(notShownWords('binary', 10, false), /not text/)
+  assert.match(notShownWords('large', 5 * 1024 * 1024, false), /too big to open here/)
+  // typing in the file counts the matches again and leaves the view where the typing is
+  assert.match(html, /findSoon\(\(\) => stood, false\)/)
+  assert.match(html, /if \(move\) reveal\(\); else sync\(\);/)
+})
+
 test('Files: Find marks every match whatever its case, and a big file says how much of it is shown', () => {
   const { findAll, markMatches, findWords, tailWords, notShownWords } = lifted(['fileSize', 'escHtml', 'findAll', 'markMatches', 'findWords', 'tailWords', 'notShownWords'])
   const text = 'motd=A <b>Server</b>\nserver-port=25565\nSERVER-ip=\n'
@@ -1175,7 +1196,7 @@ test('Files: Find marks every match whatever its case, and a big file says how m
   assert.equal(tailWords({ whole: false, shown: 256 * KB, of: 12 * KB * KB, packed: false }), 'The last 256 KB of 12 MB. Read only: download it for the whole file.')
   assert.equal(tailWords({ whole: false, shown: 256 * KB, of: 40 * KB * KB, packed: true }), 'The last 256 KB of 40 MB once unpacked. Read only: download it for the whole file.')
   assert.equal(tailWords({ whole: true, shown: 900, of: 900, packed: true }), 'Unpacked to read it here. Read only.')
-  assert.match(notShownWords('large', 5 * KB * KB, false), /^It is 5\.0 MB, too big for the editor, and is not text/)
+  assert.match(notShownWords('large', 5 * KB * KB, false), /^It is 5\.0 MB, too big to open here/)
   assert.match(notShownWords('large', 1, true), /^It unpacks to more than can be read here/)
   assert.match(notShownWords('binary', 1, false), /^It is not text/)
   // a picture is shown from its own route, and a read-only file cannot be saved

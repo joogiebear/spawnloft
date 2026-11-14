@@ -161,9 +161,11 @@ function fromWholeLine(buf) {
 }
 
 // The last `bytes` of what a .gz unpacks to, without holding the whole of it.
-function gunzipTail(full, bytes) {
+function gunzipTail(full, bytes, max = MAX_UNPACKED_BYTES) {
   return new Promise((resolve, reject) => {
-    let kept = Buffer.alloc(0)
+    // the last chunks, enough of them to hold the tail: joined once at the end, not on every chunk
+    let kept = []
+    let have = 0
     let total = 0
     const src = fs.createReadStream(full)
     const gz = zlib.createGunzip()
@@ -172,20 +174,24 @@ function gunzipTail(full, bytes) {
     gz.on('error', stop)
     gz.on('data', (chunk) => {
       total += chunk.length
-      if (total > MAX_UNPACKED_BYTES) {
+      if (total > max) {
         const err = new Error('too large unpacked')
         err.code = 'too-large'
         return stop(err)
       }
-      kept = chunk.length >= bytes ? chunk.subarray(chunk.length - bytes) : Buffer.concat([kept, chunk])
-      if (kept.length > bytes) kept = kept.subarray(kept.length - bytes)
+      kept.push(chunk)
+      have += chunk.length
+      while (kept.length > 1 && have - kept[0].length >= bytes) have -= kept.shift().length
     })
-    gz.on('end', () => resolve({ buf: Buffer.from(kept), total }))
+    gz.on('end', () => {
+      const all = Buffer.concat(kept, have)
+      resolve({ buf: Buffer.from(all.subarray(Math.max(0, all.length - bytes))), total })
+    })
     src.pipe(gz)
   })
 }
 
-export async function readTail(inst, relative, { bytes = TAIL_BYTES } = {}) {
+export async function readTail(inst, relative, { bytes = TAIL_BYTES, maxUnpacked = MAX_UNPACKED_BYTES } = {}) {
   const { base: root, full, rel } = resolvePath(inst, relative)
   assertLinkStaysInside(root, full, rel)
   const s = await fs.promises.stat(full)
@@ -196,7 +202,7 @@ export async function readTail(inst, relative, { bytes = TAIL_BYTES } = {}) {
   const packed = /\.gz$/i.test(rel) && !/\.tar\.gz$/i.test(rel)
   if (packed) {
     try {
-      ({ buf, total } = await gunzipTail(full, bytes))
+      ({ buf, total } = await gunzipTail(full, bytes, maxUnpacked))
     } catch (err) {
       // not a gzip after all, cut short, or too big once unpacked: it is a download either way
       return { ...base, text: null, reason: err.code === 'too-large' ? 'large' : 'binary' }
@@ -391,19 +397,31 @@ export async function uploadFile(inst, parent, name, stream, { overwrite = false
   return { path: rel, size, snapshot }
 }
 
+// A new name that differs from the old one only in capitals, in a folder that does not hold the
+// new spelling as an entry of its own: on a disk that ignores case, the "existing" file found
+// under the new name is the one being renamed. `names` is what the folder lists.
+export function sameButForCase(fromRel, toRel, names) {
+  if (fromRel === toRel || fromRel.toLowerCase() !== toRel.toLowerCase()) return false
+  return !names.includes(toRel.split('/').pop())
+}
+
 // Rename or move; `to` is the new path from the server folder. No snapshot: the old name is the undo.
 export function movePath(inst, from, to, { running = false } = {}) {
   const src = resolvePath(inst, from)
   const dstRaw = typeof to === 'string' ? to.trim().replace(/\\/g, '/') : ''
   checkName(dstRaw.split('/').filter(Boolean).pop() ?? '')
   const dst = resolvePath(inst, dstRaw, { mustExist: false })
-  if (dst.stat) fail(`${dst.rel} already exists`)
   if (dst.rel === src.rel) fail('that is its name already')
+  // Windows and macOS find config.yml when asked for Config.yml: that is the file itself, being
+  // given other capitals, not something in its way
+  if (dst.stat && !sameButForCase(src.rel, dst.rel, fs.readdirSync(path.dirname(dst.full)))) fail(`${dst.rel} already exists`)
   if (dst.rel.toLowerCase().startsWith(src.rel.toLowerCase() + '/')) fail('a folder cannot be moved inside itself')
   assertFree(inst, src.rel, running, 'move', { removing: true })
   assertFree(inst, dst.rel, running, 'move into')
   const parent = path.dirname(dst.full)
-  if (!fs.existsSync(parent) || !fs.statSync(parent).isDirectory()) fail(`${toSlash(path.relative(src.base, parent))} is not a folder`)
+  const parentRel = toSlash(path.relative(src.base, parent))
+  if (!fs.existsSync(parent)) fail(`there is no folder ${parentRel}`)
+  if (!fs.statSync(parent).isDirectory()) fail(`${parentRel} is not a folder`)
   fs.renameSync(src.full, dst.full)
   activity.record(inst.name, 'file-move', { detail: `${src.rel} to ${dst.rel}` })
   return { from: src.rel, path: dst.rel }

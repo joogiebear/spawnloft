@@ -476,7 +476,11 @@ async function handleFiles(req, res, name, seg, url) {
         'content-security-policy': "default-src 'none'; sandbox",
         'cache-control': 'no-store',
       })
-      fs.createReadStream(out.file).pipe(res)
+      // no more than was promised, if the file grows meanwhile; and a file that went away between
+      // the look and the read ends this answer, not the panel
+      const stream = fs.createReadStream(out.file, { end: out.size - 1 })
+      stream.on('error', () => res.destroy())
+      stream.pipe(res)
       return
     }
     if (verb === 'search') return json(res, 200, { ...await files.searchNames(inst, q('path'), q('q'), { running }), running })
@@ -491,6 +495,7 @@ async function handleFiles(req, res, name, seg, url) {
       })
       const stream = fs.createReadStream(out.file)
       stream.on('close', out.done)
+      stream.on('error', () => res.destroy())
       stream.pipe(res)
       return
     }
