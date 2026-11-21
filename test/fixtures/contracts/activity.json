@@ -108,7 +108,7 @@
     "src/ui.mjs:1581": ["schedule-run"],
     "src/ui.mjs:2461": ["settings"],
     "src/upgrade.mjs:171": ["upgrade"],
-    "mcctl.mjs:317": ["command"]
+    "mcctl.mjs:319": ["command"]
   },
   "dynamicSites": {
     "src/ui.mjs:1463": { "argument": "action", "source": "const action = { whitelist: 'player-whitelist', op: 'player-op', ban: 'player-ban' }[out.as]" }

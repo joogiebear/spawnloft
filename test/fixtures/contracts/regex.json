@@ -12,7 +12,7 @@
   "runtime": {
     "policy": "These take a pattern at run time in JavaScript's dialect. In Rust they run on the regex crate; a pattern that uses syntax it lacks (lookaround, backreferences, other JavaScript-only forms) is refused with a clear message, a declared difference. The Mojang patterns are checked against every manifest in the captured fixtures.",
     "sites": [
-      { "file": "mcctl.mjs", "line": 293, "code": "new RegExp(flags.grep, 'i')", "what": "spawnloft logs --grep, case-insensitive" },
+      { "file": "mcctl.mjs", "line": 295, "code": "new RegExp(flags.grep, 'i')", "what": "spawnloft logs --grep, case-insensitive" },
       { "file": "src/mcp-tools.mjs", "line": 116, "code": "new RegExp(grep, 'i')", "what": "the MCP get_logs tool's grep, case-insensitive" },
       { "file": "src/bots.mjs", "line": 180, "code": "new RegExp(m[1], m[2])", "what": "a bot scenario's /pattern/flags (expectMessage, waitWindow, present, absent); checked here, matched by src/bot-host.cjs, which stays JavaScript (bot-host.cjs:48)" },
       { "file": "src/client-meta.mjs", "line": 80, "code": "new RegExp(rule.os.version)", "what": "a Mojang library or argument rule's os.version, matched against the OS version; a pattern that does not compile makes the rule not match" }
