@@ -38,7 +38,17 @@ fn plural<'a>(n: usize, one: &'a str, many: &'a str) -> &'a str {
 fn same(a: &str, b: &str) -> bool {
     let (a, b) = (jspath::normalize(a), jspath::normalize(b));
     if cfg!(windows) {
-        a.to_lowercase() == b.to_lowercase()
+        // a junction Node made reads back with a trailing `\` (libuv adds one), one made here
+        // without: both name the same folder
+        let bare = |p: &str| {
+            let t = p.trim_end_matches(['\\', '/']);
+            if t.is_empty() || t.ends_with(':') {
+                p.to_lowercase()
+            } else {
+                t.to_lowercase()
+            }
+        };
+        bare(&a) == bare(&b)
     } else {
         a == b
     }
@@ -259,10 +269,10 @@ pub struct TaskRef {
 
 /// The environment around a move (running servers, tasks, locks), so tests can replace it.
 pub trait Env {
-    fn running(&self) -> Vec<String>;
+    fn running(&self) -> Result<Vec<String>, Failure>;
     fn enabled_tasks(&self) -> Result<Vec<TaskRef>, Failure>;
     fn set_enabled(&self, id: &str, on: bool) -> Result<(), Failure>;
-    fn held_locks(&self) -> Vec<String>;
+    fn held_locks(&self) -> Result<Vec<String>, Failure>;
     fn private_copies(&self) -> Vec<PrivateCopy>;
     /// milliseconds since the epoch
     fn now(&self) -> f64;
@@ -276,25 +286,27 @@ pub struct RealEnv<'a> {
 }
 
 impl RealEnv<'_> {
-    fn servers(&self) -> Vec<crate::registry::Instance> {
-        crate::registry::list_all(Path::new(&self.layout.registry_file))
-            .unwrap_or_default()
+    /// An unreadable registry is a failure, as in Node: "no servers" would let the folder move
+    /// under a live one.
+    fn servers(&self) -> Result<Vec<crate::registry::Instance>, Failure> {
+        Ok(crate::registry::list_all(Path::new(&self.layout.registry_file))?
             .into_iter()
             .filter(|i| !crate::js::truthy(i.get("external")))
-            .collect()
+            .collect())
     }
 }
 
 impl Env for RealEnv<'_> {
-    fn running(&self) -> Vec<String> {
-        self.servers()
-            .into_iter()
-            .filter(|i| {
-                crate::control::read_state(Path::new(&self.layout.state_file(&i.name)))
-                    .is_ok_and(|(s, _)| crate::control::is_active_status(s))
-            })
-            .map(|i| i.name)
-            .collect()
+    fn running(&self) -> Result<Vec<String>, Failure> {
+        let mut busy = Vec::new();
+        for i in self.servers()? {
+            // an unreadable state file fails, as in Node, rather than reading as stopped
+            let (status, _) = crate::control::read_state(Path::new(&self.layout.state_file(&i.name)))?;
+            if crate::control::is_active_status(status) {
+                busy.push(i.name);
+            }
+        }
+        Ok(busy)
     }
     fn enabled_tasks(&self) -> Result<Vec<TaskRef>, Failure> {
         Ok(self
@@ -310,7 +322,7 @@ impl Env for RealEnv<'_> {
     fn set_enabled(&self, id: &str, on: bool) -> Result<(), Failure> {
         self.sched.set_enabled(id, on).map(|_| ())
     }
-    fn held_locks(&self) -> Vec<String> {
+    fn held_locks(&self) -> Result<Vec<String>, Failure> {
         // a starting server reads as stopped until its daemon publishes state, and a backup of a
         // stopped server never shows as running; only their locks reveal them
         let mut held = Vec::new();
@@ -318,7 +330,7 @@ impl Env for RealEnv<'_> {
         if held_at(format!("{}.lock", self.layout.registry_file)) {
             held.push("the server registry (being changed)".to_string());
         }
-        for i in self.servers() {
+        for i in self.servers()? {
             if held_at(jspath::join(&[&self.layout.run_dir_of(&i.name), "start.lock"])) {
                 held.push(format!("{} (being started)", i.name));
             }
@@ -330,7 +342,7 @@ impl Env for RealEnv<'_> {
                 held.push(format!("{} (being backed up)", i.name));
             }
         }
-        held
+        Ok(held)
     }
     fn private_copies(&self) -> Vec<PrivateCopy> {
         crate::private_copy::find(&crate::private_copy::Where::here(self.layout))
@@ -544,7 +556,7 @@ pub fn plan_move(
     }
 
     // nothing may be running: a database or world can't be copied or renamed while being written
-    let busy = env.running();
+    let busy = env.running()?;
     if !busy.is_empty() {
         problems.push(format!(
             "{} {} running; stop {} first (`spawnloft stop <name>`)",
@@ -554,7 +566,7 @@ pub fn plan_move(
         ));
     }
     // a start or backup in progress doesn't show as running, but holds a lock
-    let locked = env.held_locks();
+    let locked = env.held_locks()?;
     if !locked.is_empty() {
         problems.push(format!(
             "{} {} in use right now; wait for {} to finish and try again",
@@ -1020,11 +1032,16 @@ pub fn rollback_move(root: &str, env: &dyn Env) -> Result<Vec<String>, Failure> 
 /// `finishMove(root)`: deletes the parked original; the point of no return, hence its own command.
 pub fn finish_move(root: &str) -> Result<(Option<String>, u64), Failure> {
     let file = journal_path(root);
-    let Some(Value::Object(journal)) = read_journal(&file)? else {
-        return Err(Failure::user(format!(
-            "no move is recorded for {}",
-            jspath::resolve(root)
-        )));
+    // Node's `if (!journal)`: any other value is a journal without fields
+    let journal = match read_journal(&file)? {
+        Some(Value::Object(j)) => j,
+        Some(v) if crate::js::truthy(Some(&v)) => serde_json::Map::new(),
+        _ => {
+            return Err(Failure::user(format!(
+                "no move is recorded for {}",
+                jspath::resolve(root)
+            )));
+        }
     };
     let step = text_of(&journal, "step");
     if step.as_deref() != Some("done") {
@@ -1036,6 +1053,18 @@ pub fn finish_move(root: &str) -> Result<(Option<String>, u64), Failure> {
     let parked = text_of(&journal, "parked");
     let mut removed = 0;
     if let Some(p) = parked.as_ref().filter(|p| exists(p)) {
+        // the journal names what gets deleted, so only a parked original beside the data folder
+        // is: never the folder the data now lives in, or anything else a damaged journal names.
+        // Node has no such check.
+        let from = jspath::resolve(root);
+        let beside = same(&jspath::dirname(p), &jspath::dirname(&from))
+            && jspath::basename(p).starts_with(&format!("{}.moved-", jspath::basename(&from)));
+        let live = text_of(&journal, "to").is_some_and(|to| same(&to, p)) || same(p, &from);
+        if !beside || live {
+            return Err(Failure::user(format!(
+                "{p} is not a parked copy of {from}, so it was not removed"
+            )));
+        }
         if describe_link(p).is_link {
             return Err(Failure::user(format!(
                 "{p} is a link, not the parked copy, so it was not removed"
@@ -1101,8 +1130,8 @@ mod tests {
     }
 
     impl Env for Fake {
-        fn running(&self) -> Vec<String> {
-            Vec::new()
+        fn running(&self) -> Result<Vec<String>, Failure> {
+            Ok(Vec::new())
         }
         fn enabled_tasks(&self) -> Result<Vec<TaskRef>, Failure> {
             Ok(vec![TaskRef {
@@ -1113,8 +1142,8 @@ mod tests {
             self.calls.borrow_mut().push((id.to_string(), on));
             Ok(())
         }
-        fn held_locks(&self) -> Vec<String> {
-            Vec::new()
+        fn held_locks(&self) -> Result<Vec<String>, Failure> {
+            Ok(Vec::new())
         }
         fn private_copies(&self) -> Vec<PrivateCopy> {
             Vec::new()

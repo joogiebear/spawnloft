@@ -708,7 +708,11 @@ pub fn free_bytes(p: &std::path::Path) -> Option<u64> {
     free_bytes_c(&c)
 }
 
-#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+// the layout below is the one these three share; others differ
+#[cfg(all(
+    target_os = "linux",
+    any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")
+))]
 fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
     // `struct statfs` on 64-bit Linux, glibc and musl alike
     #[repr(C)]
@@ -740,7 +744,8 @@ fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
     Some(s.f_bavail.saturating_mul(u64::try_from(s.f_bsize).ok()?))
 }
 
-#[cfg(target_os = "macos")]
+// the 64-bit-inode layout, which plain `statfs` binds on Apple Silicon only
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
     // `struct statfs` with 64-bit inodes, the only layout on Apple silicon
     #[repr(C)]
@@ -777,7 +782,13 @@ fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
     Some(s.f_bavail.saturating_mul(u64::from(s.f_bsize)))
 }
 
-#[cfg(not(any(all(target_os = "linux", target_pointer_width = "64"), target_os = "macos")))]
+#[cfg(not(any(
+    all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")
+    ),
+    all(target_os = "macos", target_arch = "aarch64")
+)))]
 fn free_bytes_c(_c: &std::ffi::CStr) -> Option<u64> {
     None
 }

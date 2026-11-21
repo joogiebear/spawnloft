@@ -1579,6 +1579,11 @@ pub fn make_junction(target: &std::path::Path, at: &std::path::Path) -> std::io:
     if let Some(rest) = text.strip_prefix(r"\\?\") {
         text = rest.to_string();
     }
+    // libuv's fs__create_junction ends both names with a separator, so the link reads back as
+    // Node's own junctions do
+    if !text.ends_with('\\') {
+        text.push('\\');
+    }
     let sub: Vec<u16> = format!(r"\??\{text}").encode_utf16().collect();
     let print: Vec<u16> = text.encode_utf16().collect();
     let bytes = |v: &[u16]| {
@@ -1586,7 +1591,10 @@ pub fn make_junction(target: &std::path::Path, at: &std::path::Path) -> std::io:
     };
     let (sub_len, print_len) = (bytes(&sub)?, bytes(&print)?);
     // header: tag, data length, reserved; then the four offsets and lengths, then both names
-    let data_len = 8 + sub_len + 2 + print_len + 2;
+    let data_len = [8, sub_len, 2, print_len, 2]
+        .into_iter()
+        .try_fold(0u16, u16::checked_add)
+        .ok_or_else(|| std::io::Error::other("the path is too long for a junction"))?;
     let mut buf: Vec<u8> = Vec::with_capacity(8 + usize::from(data_len));
     buf.extend_from_slice(&IO_REPARSE_TAG_MOUNT_POINT.to_le_bytes());
     buf.extend_from_slice(&data_len.to_le_bytes());

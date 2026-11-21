@@ -154,8 +154,16 @@ fn dispatch(
     }
     // not for `data`: it is what puts things right after a move was interrupted, when the data
     // folder is not there, and making its folders again - empty - is the very thing in its way
-    if command != "data" {
-        layout.ensure_dirs()?;
+    if command != "data"
+        && let Err(e) = layout.ensure_dirs()
+    {
+        // the installer's `repair --quiet` shows nothing: its failure goes to handover.log
+        if command == "repair" && parsed.get("quiet").is_some_and(Flag::truthy) {
+            maintenance::quiet_log(e.message());
+            ctx.out.set_code(1);
+            return Ok(());
+        }
+        return Err(e);
     }
     match command {
         "help" => {
