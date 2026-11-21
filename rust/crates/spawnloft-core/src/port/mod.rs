@@ -25,6 +25,7 @@ mod list;
 mod logs;
 mod metrics;
 mod output;
+mod pack;
 mod plugins;
 mod status;
 mod why;
@@ -188,6 +189,7 @@ fn dispatch(
         "paper" => fetch::paper(&mut ctx),
         "upgrade" => fetch::upgrade(&mut ctx),
         "plugins" => plugins::plugins(&mut ctx),
+        "pack" => pack::pack(&mut ctx),
         "client" => client::client(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."

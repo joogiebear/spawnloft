@@ -38,6 +38,8 @@ pub mod log_timeline;
 pub mod manage;
 pub mod mariadb;
 pub mod metrics;
+pub mod modrinth;
+pub mod mrpack;
 pub mod mysql;
 pub mod nodecore;
 pub mod notify;
