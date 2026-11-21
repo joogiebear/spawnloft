@@ -1,0 +1,1375 @@
+{
+ "about": "C4 part 2, fetching server software: new with --paper, --folia, --purpur, --vanilla, --asp, --fabric, --spigot, --craftbukkit and --neoforge against faked hosts (every checksum kind, size floors, missing versions and builds), Java picked and refused before any download, BuildTools and the NeoForge installer played by a stand-in java (a failed install removes the server again), upgrade --check and upgrade across builds and versions (with the snapshot), and paper's listing flags.",
+ "platforms": [
+  "linux",
+  "darwin"
+ ],
+ "hosts": {
+  "https://fill.papermc.io": {
+   "routes": {
+    "GET /v3/projects/paper": {
+     "json": {
+      "project": {
+       "id": "paper"
+      },
+      "versions": {
+       "1.21": [
+        "1.21.5",
+        "1.21.4",
+        "1.21.4-rc1"
+       ],
+       "1.20": [
+        "1.20.6"
+       ]
+      }
+     }
+    },
+    "GET /v3/projects/paper/versions/1.21.4/builds": {
+     "json": [
+      {
+       "id": 16,
+       "time": "2026-11-03T10:00:00Z",
+       "channel": "EXPERIMENTAL",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.4-16.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar}"
+         },
+         "size": 3000
+        }
+       }
+      },
+      {
+       "id": 15,
+       "time": "2026-11-02T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.4-15.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar}"
+         },
+         "size": 2048
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/paper/versions/1.21.5/builds": {
+     "json": [
+      {
+       "id": 3,
+       "time": "2026-11-10T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.5-3.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/3/paper-1.21.5-3.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/3/paper-1.21.5-3.jar}"
+         },
+         "size": 2500
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/folia": {
+     "json": {
+      "project": {
+       "id": "folia"
+      },
+      "versions": {
+       "1.21": [
+        "1.21.4"
+       ]
+      }
+     }
+    },
+    "GET /v3/projects/folia/versions/1.21.4/builds": {
+     "json": [
+      {
+       "id": 7,
+       "time": "2026-11-01T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "folia-1.21.4-7.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/7/folia-1.21.4-7.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/7/folia-1.21.4-7.jar}"
+         },
+         "size": 2200
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/paper/versions/1.20.6/builds": {
+     "json": [
+      {
+       "id": 5,
+       "time": "2026-09-01T10:00:00Z",
+       "channel": null,
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.20.6-5.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/y/../a b.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/a%20b.jar}"
+         },
+         "size": 1000
+        }
+       }
+      }
+     ]
+    }
+   }
+  },
+  "https://fill-data.papermc.io": {
+   "routes": {
+    "GET /v1/objects/a%20b.jar": {
+     "bytes": {
+      "size": 1000,
+      "seed": "spaced"
+     }
+    },
+    "GET /v1/objects/16/paper-1.21.4-16.jar": {
+     "bytes": {
+      "size": 3000,
+      "seed": "paper-16"
+     }
+    },
+    "GET /v1/objects/15/paper-1.21.4-15.jar": {
+     "bytes": {
+      "size": 2048,
+      "seed": "paper-15"
+     }
+    },
+    "GET /v1/objects/3/paper-1.21.5-3.jar": {
+     "bytes": {
+      "size": 2500,
+      "seed": "paper-3"
+     }
+    },
+    "GET /v1/objects/7/folia-1.21.4-7.jar": {
+     "bytes": {
+      "size": 2200,
+      "seed": "folia-7"
+     }
+    }
+   }
+  },
+  "https://api.purpurmc.org": {
+   "routes": {
+    "GET /v2/purpur": {
+     "json": {
+      "project": "purpur",
+      "versions": [
+       "1.21.3",
+       "1.21.4"
+      ]
+     }
+    },
+    "GET /v2/purpur/1.21.4": {
+     "json": {
+      "builds": {
+       "latest": "2400",
+       "all": [
+        "2399",
+        "2400"
+       ]
+      }
+     }
+    },
+    "GET /v2/purpur/1.21.4/2400": {
+     "json": {
+      "build": "2400",
+      "md5": "${md5:https://api.purpurmc.org/v2/purpur/1.21.4/2400/download}"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2400/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-2400"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2399": {
+     "json": {
+      "build": "2399",
+      "md5": "00000000000000000000000000000000"
+     }
+    },
+    "GET /v2/purpur/1.21.3": {
+     "text": "﻿{\"builds\":{\"latest\":\"7\",\"all\":[\"7\"]}}"
+    },
+    "GET /v2/purpur/1.21.3/7": {
+     "text": "﻿{\"md5\":\"${md5:https://api.purpurmc.org/v2/purpur/1.21.3/7/download}\"}"
+    },
+    "GET /v2/purpur/1.21.3/7/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-7"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2399/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-2399"
+     }
+    }
+   }
+  },
+  "https://piston-meta.mojang.com": {
+   "routes": {
+    "GET /mc/game/version_manifest_v2.json": {
+     "json": {
+      "latest": {
+       "release": "1.21.4"
+      },
+      "versions": [
+       {
+        "id": "25w14a",
+        "type": "snapshot",
+        "url": "https://piston-meta.mojang.com/v1/packages/s/25w14a.json"
+       },
+       {
+        "id": "1.21.4",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/r/1.21.4.json"
+       },
+       {
+        "id": "1.0",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/r/1.0.json"
+       }
+      ]
+     }
+    },
+    "GET /v1/packages/r/1.21.4.json": {
+     "json": {
+      "javaVersion": {
+       "majorVersion": 21
+      },
+      "downloads": {
+       "server": {
+        "url": "https://piston-data.mojang.com/v1/objects/aaa/server.jar",
+        "sha1": "${sha1:https://piston-data.mojang.com/v1/objects/aaa/server.jar}",
+        "size": 1126400
+       }
+      }
+     }
+    },
+    "GET /v1/packages/r/1.0.json": {
+     "json": {
+      "javaVersion": {
+       "majorVersion": 8
+      },
+      "downloads": {}
+     }
+    },
+    "GET /v1/packages/s/25w14a.json": {
+     "json": {
+      "downloads": {
+       "server": {
+        "url": "https://piston-data.mojang.com/v1/objects/bbb/server.jar",
+        "sha1": "0000"
+       }
+      }
+     }
+    }
+   }
+  },
+  "https://piston-data.mojang.com": {
+   "routes": {
+    "GET /v1/objects/aaa/server.jar": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "vanilla"
+     }
+    },
+    "GET /v1/objects/bbb/server.jar": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "snap"
+     }
+    }
+   }
+  },
+  "https://api.infernalsuite.com": {
+   "routes": {
+    "GET /v1/projects/asp": {
+     "json": [
+      {
+       "id": "a1111111c0ffee0000000000",
+       "date": 1730000000000,
+       "mcVersion": [
+        "1.21.4",
+        "1.21.5-pre1"
+       ],
+       "files": [
+        {
+         "id": "f0",
+         "fileName": "asp-server.jar",
+         "sha256Hash": "x"
+        }
+       ]
+      },
+      {
+       "id": "b77d5e97c0ffee0000000000",
+       "date": 1731000000000,
+       "mcVersion": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "id": "f9",
+         "fileName": "api.jar"
+        },
+        {
+         "id": "f1",
+         "fileName": "asp-server.jar",
+         "sha256Hash": "${sha256:https://api.infernalsuite.com/v1/projects/asp/b77d5e97c0ffee0000000000/download/f1}"
+        }
+       ]
+      },
+      {
+       "id": "c2222222",
+       "date": 1729000000000,
+       "mcVersion": [
+        "1.21.3"
+       ],
+       "files": [
+        {
+         "id": "f2",
+         "fileName": "plugin.jar"
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v1/projects/asp/b77d5e97c0ffee0000000000/download/f1": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "asp"
+     }
+    }
+   }
+  },
+  "https://meta.fabricmc.net": {
+   "routes": {
+    "GET /v2/versions/game": {
+     "json": [
+      {
+       "version": "25w14a",
+       "stable": false
+      },
+      {
+       "version": "1.21.4",
+       "stable": true
+      },
+      {
+       "version": "1.99",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader": {
+     "json": [
+      {
+       "version": "0.17.0-beta",
+       "stable": false
+      },
+      {
+       "version": "0.16.10",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/installer": {
+     "json": [
+      {
+       "version": "1.0.1",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader/1.21.4/0.16.10/1.0.1/server/jar": {
+     "bytes": {
+      "size": 204800,
+      "seed": "fabric"
+     }
+    },
+    "GET /v2/versions/loader/1.99/0.16.10/1.0.1/server/jar": {
+     "status": 400,
+     "json": {
+      "error": "no"
+     }
+    },
+    "GET /v2/versions/loader/1.98/0.16.10/1.0.1/server/jar": {
+     "bytes": {
+      "size": 1000,
+      "seed": "tiny"
+     }
+    }
+   }
+  },
+  "https://maven.neoforged.net": {
+   "routes": {
+    "GET /api/maven/versions/releases/net/neoforged/neoforge": {
+     "json": {
+      "isSnapshot": false,
+      "versions": [
+       "26.1.0.5",
+       "26.1.0.6",
+       "26.1.0.7-beta",
+       "26.2.0.1-beta",
+       "26.3.0.9",
+       "26.4.0.1"
+      ]
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.1.0.6"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar}  neoforge-26.1.0.6-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.2.0.1-beta"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar}  neoforge-26.2.0.1-beta-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.3.0.9"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar}  neoforge-26.3.0.9-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.4.0.1"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar.sha256": {
+     "text": "deadbeef  neoforge-26.4.0.1-installer.jar\n"
+    }
+   }
+  },
+  "https://hub.spigotmc.org": {
+   "routes": {
+    "GET /versions/": {
+     "text": "<a href=\"1.21.3.json\">1.21.3.json</a> <a href=\"1.21.4.json\">1.21.4.json</a> <a href=\"4647.json\">4647.json</a> <a href=\"latest.json\">latest.json</a>"
+    },
+    "GET /jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar": {
+     "bytes": {
+      "size": 204800,
+      "seed": "buildtools"
+     }
+    }
+   }
+  }
+ },
+ "normalize": [
+  {
+   "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{20}\\b",
+   "replace": "<password>"
+  },
+  {
+   "pattern": "\"size\"(\\s*):(\\s*)\\d+(,\\s*\"serverWasRunning)",
+   "replace": "\"size\"$1:$2<n>$3"
+  }
+ ],
+ "steps": [
+  {
+   "write": "bin/java",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" 2025-10-21' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n",
+   "mode": "755"
+  },
+  {
+   "write": "bin/javac",
+   "text": "#!/bin/sh\necho 'javac 25.0.1'\n",
+   "mode": "755"
+  },
+  {
+   "write": "old/java",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 17, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"17.0.1\" 2025-10-21' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n",
+   "mode": "755"
+  },
+  {
+   "write": "jre/java",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" 2025-10-21' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n",
+   "mode": "755"
+  },
+  {
+   "run": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--fabric",
+    "1.21.4"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "pick one of --paper, --fabric"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "x",
+    "--purpur",
+    "1.21.4",
+    "--neoforge",
+    "26.1"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "pick one of --purpur, --neoforge"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "ERR_INVALID_ARG_TYPE"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/nope/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "could not be run"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "x",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/old/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "needs Java 21, and"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "p1",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java",
+    "--accept-eula"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Downloaded paper-1.21.4-15.jar (build 15)"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "p2",
+    "--paper",
+    "1.21.4",
+    "--build",
+    "16",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "build 16"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "p3",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java",
+    "--port",
+    "26100"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Using stored paper-1.21.4-15.jar."
+   }
+  },
+  {
+   "run": [
+    "new",
+    "p4",
+    "--paper",
+    "1.21.4",
+    "--build",
+    "99",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no build 99"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "p5",
+    "--paper",
+    "1.21.4",
+    "--java",
+    "{run}/old/java",
+    "--force"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "f1",
+    "--folia",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "folia-1.21.4-7.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "pu",
+    "--purpur",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "purpur-1.21.4-2400.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "pu2",
+    "--purpur",
+    "1.21.4",
+    "--build",
+    "2399",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "checksum"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "pu3",
+    "--purpur",
+    "1.21.4",
+    "--build",
+    "1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "has no build 1"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "v1",
+    "--vanilla",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "vanilla-1.21.4.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "v2",
+    "--vanilla",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "Mojang lists no"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "v3",
+    "--vanilla",
+    "1.0",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "publishes no server jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a1",
+    "--asp",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "asp-1.21.4-b77d5e97.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a2",
+    "--asp",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no build for Minecraft 1.21.3"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "fa",
+    "--fabric",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "fa2",
+    "--fabric",
+    "1.99",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no server launcher"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "fa3",
+    "--fabric",
+    "1.98",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "not a server jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "fa4",
+    "--fabric",
+    "../x",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "fa5",
+    "--fabric",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "s1",
+    "--spigot",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "BuildTools"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "s2",
+    "--spigot",
+    "1.21.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "already built"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "s3",
+    "--craftbukkit",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "BuildTools exited 3"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "s4",
+    "--craftbukkit",
+    "1.21.3",
+    "--java",
+    "{run}/jre/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "needs a JDK"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "s5",
+    "--craftbukkit",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "craftbukkit-1.21.3.jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n1",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "NeoForge 26.1.0.6 (minecraft 26.1)"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n2",
+    "--neoforge",
+    "26.2",
+    "--java",
+    "{run}/bin/java",
+    "--port",
+    "26200",
+    "--offline",
+    "--memory",
+    "3G"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "26.2.0.1-beta"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n3",
+    "--neoforge",
+    "9.9",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no build for Minecraft 9.9"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n4",
+    "--neoforge",
+    "26.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "exited 1"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n5",
+    "--neoforge",
+    "26.4",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "did not match the checksum"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n1",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "n6",
+    "--neoforge",
+    "26.1",
+    "--java",
+    "{run}/old/java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "needs Java 25"
+   }
+  },
+  {
+   "run": [
+    "upgrade"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p1",
+    "--check"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "newest stable build"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p2",
+    "--check"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Minecraft 1.21.5 is out"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p1",
+    "--build",
+    "16"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "paper-1.21.4-15.jar -> paper-1.21.4-16.jar (EXPERIMENTAL)"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "-> paper-1.21.4-15.jar"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p3"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "already runs"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "p1",
+    "--version",
+    "1.21.5"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "Re-run with --yes"
+   }
+  },
+  {
+   "write": "data/instances/p1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/p1/server.properties",
+   "text": "server-port=25565\nrcon.port=25575\nrcon.password=SameOnBothSidesAAAA\n"
+  },
+  {
+   "run": [
+    "upgrade",
+    "p1",
+    "--version",
+    "1.21.5",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Snapshot:"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "f1",
+    "--check"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "pu",
+    "--check"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Purpur 1.21.4 build 2400"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "a1",
+    "--check"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "a1",
+    "--build",
+    "x"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "cannot be chosen by id"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "v1",
+    "--check"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "is not a jar SpawnLoft can update"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "v1"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "name a version"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "v1",
+    "--version",
+    "1.21.4"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "vanilla-1.21.4.jar -> paper-1.21.4-15.jar"
+   }
+  },
+  {
+   "run": [
+    "upgrade",
+    "fa",
+    "--check"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "versions",
+    "--limit",
+    "1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "older"
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "versions",
+    "--limit",
+    "-1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "versions",
+    "--limit",
+    "x"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds",
+    "1.21.4",
+    "--limit",
+    "1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds",
+    ".."
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds",
+    "1.20.6"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "fetch",
+    "1.20.6"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "checksum verified"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "pb",
+    "--purpur",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "purpur-1.21.3-7.jar"
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "16"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Already stored"
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "fetch",
+    "1.21.4",
+    "16",
+    "--force"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "checksum verified"
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "jars"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

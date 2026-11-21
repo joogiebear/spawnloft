@@ -40,7 +40,7 @@ fn coded(message: impl Into<String>, code: &str) -> Failure {
 
 /// The agent every fetch here uses, with `limits` applied: no proxy (as Node's `fetch`), statuses
 /// handed back rather than turned into errors, Node's redirect limit.
-fn agent(
+pub(crate) fn agent(
     limits: impl FnOnce(
         ureq::config::ConfigBuilder<ureq::typestate::AgentScope>,
     ) -> ureq::config::ConfigBuilder<ureq::typestate::AgentScope>,
@@ -54,19 +54,32 @@ fn agent(
 }
 
 /// Where a fetch is sent: the URL itself, or in a test-hooks build the parity rig's fake host.
-fn target(url: &str) -> Result<String, String> {
-    crate::test_origins::rewrite(url)
+pub(crate) fn target(url: &str) -> Result<String, String> {
+    crate::test_origins::rewrite(&normalized(url))
+}
+
+/// The URL as `fetch` sends it: parsed and serialised by the WHATWG rules (dot segments
+/// resolved, spaces and non-ASCII percent-encoded). Text that does not parse is left as it is,
+/// for the caller's own refusal.
+pub(crate) fn normalized(url: &str) -> String {
+    url::Url::parse(url).map_or_else(|_| url.to_string(), |u| u.to_string())
+}
+
+/// `res.json()`'s text: a UTF-8 byte order mark before the JSON is dropped.
+pub(crate) fn json_text(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// Why a request got no answer, in Node's `err.cause?.message || err.message` place.
-fn cause(e: &ureq::Error) -> String {
+pub(crate) fn cause(e: &ureq::Error) -> String {
     match e {
         ureq::Error::Io(io) => io.to_string(),
         other => other.to_string(),
     }
 }
 
-fn is_timeout(e: &ureq::Error) -> bool {
+pub(crate) fn is_timeout(e: &ureq::Error) -> bool {
     match e {
         ureq::Error::Timeout(_) => true,
         ureq::Error::Io(io) => io.kind() == io::ErrorKind::TimedOut,
@@ -256,7 +269,7 @@ pub fn fetch_json(url: &str, label: &str) -> Result<serde_json::Value, Failure> 
             }
         });
     }
-    crate::jsjson::parse(&String::from_utf8_lossy(&text)).map_err(Failure::syntax)
+    crate::jsjson::parse(&json_text(&text)).map_err(Failure::syntax)
 }
 
 /// `partPath(dest)`: where a download is written until it is whole. One name per attempt: two
@@ -297,33 +310,56 @@ pub fn drop_part(tmp: &Path) {
 pub enum Hash {
     Sha256,
     Sha512,
+    Sha1,
+    Md5,
 }
 
-enum Hasher {
+/// A digest computed as the bytes arrive.
+pub enum Hasher {
     Sha256(sha2::Sha256),
     Sha512(sha2::Sha512),
+    Sha1(sha1::Sha1),
+    Md5(md5::Md5),
+}
+
+impl std::fmt::Debug for Hasher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Hasher::Sha256(_) => "sha256",
+            Hasher::Sha512(_) => "sha512",
+            Hasher::Sha1(_) => "sha1",
+            Hasher::Md5(_) => "md5",
+        };
+        write!(f, "Hasher({name})")
+    }
 }
 
 impl Hasher {
-    fn new(h: Hash) -> Hasher {
+    pub fn new(h: Hash) -> Hasher {
         use sha2::Digest;
         match h {
             Hash::Sha256 => Hasher::Sha256(sha2::Sha256::new()),
             Hash::Sha512 => Hasher::Sha512(sha2::Sha512::new()),
+            Hash::Sha1 => Hasher::Sha1(sha1::Sha1::new()),
+            Hash::Md5 => Hasher::Md5(md5::Md5::new()),
         }
     }
-    fn update(&mut self, data: &[u8]) {
+    pub fn update(&mut self, data: &[u8]) {
         use sha2::Digest;
         match self {
             Hasher::Sha256(h) => h.update(data),
             Hasher::Sha512(h) => h.update(data),
+            Hasher::Sha1(h) => h.update(data),
+            Hasher::Md5(h) => h.update(data),
         }
     }
-    fn hex(self) -> String {
+    pub fn hex(self) -> String {
         use sha2::Digest;
         let bytes: Vec<u8> = match self {
             Hasher::Sha256(h) => h.finalize().to_vec(),
             Hasher::Sha512(h) => h.finalize().to_vec(),
+            Hasher::Sha1(h) => h.finalize().to_vec(),
+            Hasher::Md5(h) => h.finalize().to_vec(),
         };
         bytes.iter().map(|b| format!("{b:02x}")).collect()
     }

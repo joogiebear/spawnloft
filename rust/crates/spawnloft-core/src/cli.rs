@@ -219,22 +219,18 @@ pub const PORTED: &[Row] = &[
         names: &["worlds"],
         when: When::Always,
     },
-    // C4: making servers. `new` with a software flag fetches or builds its jar (C4 part 2);
-    // `new --modpack` is C5's
+    // C4: making servers and fetching their software. `new --modpack` is C5's
     Row {
         names: &["new"],
-        when: When::NoneTruthy(&[
-            "modpack",
-            "paper",
-            "folia",
-            "purpur",
-            "asp",
-            "vanilla",
-            "spigot",
-            "craftbukkit",
-            "fabric",
-            "neoforge",
-        ]),
+        when: When::NoneTruthy(&["modpack"]),
+    },
+    Row {
+        names: &["paper"],
+        when: When::Always,
+    },
+    Row {
+        names: &["upgrade"],
+        when: When::Always,
     },
     Row {
         names: &["clone"],
@@ -706,7 +702,7 @@ mod tests {
     }
 
     #[test]
-    fn new_is_answered_here_unless_it_fetches_a_jar_or_a_modpack() {
+    fn new_is_answered_here_unless_it_installs_a_modpack() {
         for line in [
             &["new", "a", "--jar", "x.jar"][..],
             &["new", "a", "--template", "t"],
@@ -714,6 +710,14 @@ mod tests {
             &["new", "a", "--modpack="],
             &["new", "a", "--no-paper", "--jar", "x.jar"],
             &["new", "a", "--", "--paper", "1.21"],
+            &["new", "a", "--paper", "1.21.4"],
+            &["new", "a", "--paper"],
+            &["new", "a", "--neoforge=21.1"],
+            &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
+            &["new", "a", "--spigot", "1.21"],
+            &["new", "a", "--no-modpack", "--paper", "1.21"],
+            &["paper", "fetch", "1.21.4"],
+            &["upgrade", "a", "--check"],
             &["clone", "a", "b"],
             &["adopt", "a", "/x"],
             &["templates"],
@@ -730,11 +734,7 @@ mod tests {
         for line in [
             &["new", "a", "--modpack", "pack.mrpack"][..],
             &["new", "a", "--modpack=x"],
-            &["new", "a", "--paper", "1.21.4"],
-            &["new", "a", "--paper"],
-            &["new", "a", "--neoforge=21.1"],
-            &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
-            &["new", "a", "--spigot", "1.21"],
+            &["new", "a", "--paper", "1.21", "--modpack", "x"],
         ] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
