@@ -1,0 +1,193 @@
+// The parity rig itself (tools/parity/, rust/PLAN-CORE-PORT.md section 6): its evening-out, its
+// comparison, its fake hosts and its rules, with no core binary needed. The end-to-end part runs
+// the rig's own self-tests (scenarios seeded with a difference it must find) and the basics
+// scenario, and needs SPAWNLOFT_CORE_BIN; rust-internal.yml's parity job runs the whole rig.
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { normalizeText, machineNeutral } from '../tools/parity/lib/normalize.mjs'
+import { textDiff, compareSides, runScenario, sideEnv, findCore } from '../tools/parity/lib/rig.mjs'
+import { snapshot, zipListing, globToRegExp } from '../tools/parity/lib/tree.mjs'
+import { startHosts } from '../tools/parity/lib/fake-host.mjs'
+import { DECLARED, applyDeclared, declaredTable } from '../tools/parity/declared-differences.mjs'
+import { loadScenarios } from '../tools/parity/run.mjs'
+import { buildZip } from './fixtures/zip-writer.mjs'
+
+const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const parity = path.join(repo, 'tools', 'parity')
+
+function tmp(label) {
+  return fs.mkdtempSync(path.join(os.tmpdir(), `sl-rig-${label}-`))
+}
+
+test('volatile values are evened out, and nothing else', () => {
+  const t = normalizeText('at 2026-11-21T03:17:44.123Z and 2026-11-21 03:17:44, made 2026-11-21, '
+    + 'file standard_2026-11-21_033246.tar.gz, {"pid":123,"javaPid": 456,"token":"abc","startedAtMs":12,"at":1763695064000} pid 77, took 15 ms')
+  assert.equal(t, 'at <time> and <time>, made <date>, file standard_<stamp>.tar.gz, '
+    + '{"pid":<pid>,"javaPid": <pid>,"token":"<token>","startedAtMs":<ms>,"at":<epoch-ms>} pid <pid>, took <ms>')
+  // ports, sizes, versions and names are left alone: they must match exactly
+  const kept = 'port 25565 size 2048 version 1.21.4 alpha Beta_2'
+  assert.equal(normalizeText(kept), kept)
+  assert.equal(normalizeText('x=1 y', [{ pattern: 'x=\\d', replace: 'x=?' }]), 'x=? y')
+})
+
+test('golden files name this machine\'s paths, with / after them on every platform', () => {
+  const run = 'C:\\T\\run'
+  assert.equal(machineNeutral('C:\\T\\run\\data\\x.json {"d":"C:\\\\T\\\\run\\\\data"}', { run }), '<run>/data/x.json {"d":"<run>/data"}')
+  assert.equal(machineNeutral('/tmp/r/run/data and /repo/src', { run: '/tmp/r/run', repo: '/repo' }), '<run>/data and <repo>/src')
+})
+
+test('a text diff shows where the sides part', () => {
+  const d = textDiff('a\nb\nc\nd', 'a\nb\nX\nd')
+  assert.match(d, /- node: c/)
+  assert.match(d, /\+ rust: X/)
+  assert.match(d, /^ {2}a$/m)
+  assert.equal(textDiff('same', 'same').includes('-'), false)
+})
+
+test('globs for ignored paths', () => {
+  assert.ok(globToRegExp('data/run/**').test('data/run/alpha/console.log'))
+  assert.ok(globToRegExp('**/*.part').test('data/jars/x.jar.part'))
+  assert.equal(globToRegExp('data/*.log').test('data/run/x.log'), false)
+})
+
+test('a zip is compared by its entries, in order, with their flags', () => {
+  const listing = zipListing(buildZip([['b.txt', 'two'], ['a/ä.txt', 'one']]))
+  const lines = listing.split('\n')
+  assert.equal(lines.length, 2)
+  assert.match(lines[0], /^b\.txt method=0 flags=0x0 size=3/)
+  assert.equal(zipListing(Buffer.from('not a zip')), null)
+})
+
+test('the data tree records kinds, modes, text and archives, and skips what a scenario ignores', () => {
+  const root = tmp('tree')
+  fs.mkdirSync(path.join(root, 'data', 'run'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'data', 'a.json'), '{"pid":5}\n')
+  fs.writeFileSync(path.join(root, 'data', 'b.zip'), buildZip([['x', 'y']]))
+  fs.writeFileSync(path.join(root, 'data', 'c.bin'), Buffer.from([0, 1, 2]))
+  fs.writeFileSync(path.join(root, 'data', 'run', 'skip.log'), 'x')
+  const tree = snapshot(root, { ignore: ['data/run/**'], normalize: (t) => normalizeText(t) })
+  assert.deepEqual([...tree.keys()], ['data', 'data/a.json', 'data/b.zip', 'data/c.bin', 'data/run'])
+  assert.equal(tree.get('data/a.json').text, '{"pid":<pid>}\n')
+  assert.match(tree.get('data/b.zip').zip, /^x method=0/)
+  assert.equal(tree.get('data/c.bin').size, 3)
+  if (process.platform !== 'win32') assert.match(tree.get('data/a.json').mode, /^[0-7]{3}$/)
+  fs.rmSync(root, { recursive: true, force: true })
+})
+
+const side = (over = {}) => ({ steps: [{ label: 'step 1 (list)', code: 0, signal: null, stdout: 'a\n', stderr: '' }], requests: [], tree: new Map([['data', { kind: 'dir' }]]), ...over })
+
+test('the comparison reports output, exit code, requests and tree differences', () => {
+  assert.deepEqual(compareSides(side(), side()), [])
+  const b = side({
+    steps: [{ label: 'step 1 (list)', code: 1, signal: null, stdout: 'b\n', stderr: '' }],
+    requests: [{ url: '/x' }],
+    tree: new Map([['data', { kind: 'dir' }], ['data/new', { kind: 'file', text: 'x' }]]),
+  })
+  const whats = compareSides(side(), b).map(d => d.what)
+  assert.deepEqual(whats, ['step 1 (list): exit code', 'step 1 (list): stdout', 'requests to the fake hosts', 'data tree: data/new'])
+  assert.deepEqual(compareSides(side(), side({ steps: [] })).map(d => d.detail), ['ran on one side only'])
+})
+
+test('each side runs in the scratch folder, with the switch on the Node side only', () => {
+  const ctx = { run: '/s/run', data: '/s/run/data', home: '/s/run/home', repo: '/repo' }
+  process.env.SPAWNLOFT_DATA_ROOT_LEAK_CHECK = 'x'
+  const node = sideEnv(ctx, 'node', { origins: null })
+  const rust = sideEnv(ctx, 'rust', { origins: '{"https://a.b":"http://127.0.0.1:1"}', extra: { FOO: 'bar', HOME: null } })
+  delete process.env.SPAWNLOFT_DATA_ROOT_LEAK_CHECK
+  assert.equal(node.SPAWNLOFT_CORE_IMPL, 'node')
+  assert.equal('SPAWNLOFT_CORE_IMPL' in rust, false)
+  assert.equal(node.SPAWNLOFT_DATA_ROOT_LEAK_CHECK, undefined, 'the machine\'s own SPAWNLOFT_ variables never reach a side')
+  assert.equal(node.SPAWNLOFT_DATA_ROOT, '/s/run/data')
+  assert.equal(node.MCCTL_DATA_ROOT, '/s/run/data')
+  assert.equal(node.NODE_ENV, 'test')
+  // with no host faked, every outside host is still refused
+  assert.equal(node.SPAWNLOFT_TEST_ORIGINS, '{}')
+  assert.equal(rust.FOO, 'bar')
+  assert.equal('HOME' in rust, false)
+})
+
+test('the fake host answers routes, fills in checksums, and points redirects at its fakes', async () => {
+  const hosts = await startHosts({
+    'https://meta.example': { routes: {
+      'GET /v': { json: { url: 'https://files.example/f.jar', sha1: '${sha1:https://files.example/f.jar}', size: '${size:https://files.example/f.jar}' } },
+      'GET /v?x=1': { text: 'with query' },
+      'GET /moved': { redirect: 'https://files.example/f.jar' },
+      'GET /fail': { status: 500, text: 'no' },
+    } },
+    'https://files.example': { routes: { 'GET /f.jar': { bytes: { size: 100, seed: 's' } } } },
+  })
+  try {
+    const map = JSON.parse(hosts.env)
+    const meta = await (await fetch(`${map['https://meta.example']}/v`, { headers: { 'user-agent': 'rig-test' } })).json()
+    assert.equal(meta.size, '100')
+    const jar = Buffer.from(await (await fetch(`${map['https://files.example']}/f.jar`)).arrayBuffer())
+    assert.equal(jar.length, 100)
+    const { createHash } = await import('node:crypto')
+    assert.equal(meta.sha1, createHash('sha1').update(jar).digest('hex'))
+    assert.equal(await (await fetch(`${map['https://meta.example']}/v?x=1`)).text(), 'with query')
+    const moved = await fetch(`${map['https://meta.example']}/moved`, { redirect: 'manual' })
+    assert.equal(moved.headers.get('location'), `${map['https://files.example']}/f.jar`)
+    assert.equal((await fetch(`${map['https://meta.example']}/fail`)).status, 500)
+    assert.equal((await fetch(`${map['https://meta.example']}/nope`)).status, 404)
+    const log = hosts.take()
+    assert.equal(log.length, 6)
+    assert.equal(log[0].userAgent, 'rig-test')
+    assert.equal(log.at(-1).unmatched, true)
+    assert.deepEqual(hosts.take(), [])
+  } finally {
+    await hosts.close()
+  }
+})
+
+test('a step for one side only is refused outside a self-test', async () => {
+  await assert.rejects(runScenario({ name: 'x', steps: [{ side: 'rust', mkdir: 'data/x' }, { run: ['list'] }] }, { core: 'none', repo, scratch: tmp('refuse') }),
+    /allowed only in a self-test/)
+  await assert.rejects(runScenario({ name: 'x', steps: [{ mkdir: 'data/x' }] }, { core: 'none', repo, scratch: tmp('refuse') }), /no step runs a command/)
+})
+
+test('the declared differences are the plan\'s six rows, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 6)
+  for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
+  // doctor's node line and root go; everything else stays
+  const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'
+  assert.equal(applyDeclared(doctor, 'doctor'), '{"notes":["java: 21","data root: /d"]}')
+  assert.equal(applyDeclared(doctor, 'list'), doctor, 'a row applies only to its commands')
+  assert.equal(applyDeclared('{"runtime":"/usr/bin/node"}', 'repair'), '{"runtime":"<runtime>"}')
+  assert.match(declaredTable(), /^\| Where \| Node \| Rust \|/)
+})
+
+test('every scenario file loads and keeps to the rules', () => {
+  const all = loadScenarios([path.join(parity, 'scenarios'), path.join(parity, 'selftest')])
+  assert.ok(all.length >= 10)
+  for (const s of all) {
+    assert.ok(Array.isArray(s.steps) && s.steps.some(x => x.run), `${s.name} runs something`)
+    assert.ok(s.about, `${s.name} says what it is for`)
+    if (s.expect === 'differ') assert.ok(s.expectDifferences?.length, `${s.name} names the differences it seeds`)
+    else assert.equal(s.steps.some(x => x.side), false, `${s.name} runs the same steps on both sides`)
+  }
+  assert.ok(all.filter(s => s.expect === 'differ').length >= 4, 'self-tests for output, exit code, tree and requests')
+})
+
+test('the --json scenario runs every command name mcctl.mjs answers', () => {
+  const src = fs.readFileSync(path.join(repo, 'mcctl.mjs'), 'utf8')
+  const table = src.slice(src.indexOf('const COMMANDS = {'))
+  const names = [...table.slice(0, table.indexOf('}')).matchAll(/^\s+([a-z]+):/gm)].map(m => m[1])
+  assert.ok(names.length >= 59, `found ${names.length} names`)
+  const scenario = JSON.parse(fs.readFileSync(path.join(parity, 'scenarios', 'cli-json.json'), 'utf8'))
+  const ran = new Set(scenario.steps.filter(s => s.run && s.run.length === 2 && s.run[1] === '--json').map(s => s.run[0]))
+  for (const n of [...names, '--help', '-h']) assert.ok(ran.has(n), `cli-json.json does not run "${n} --json"`)
+})
+
+const core = findCore(repo)
+test('end to end: the self-tests find their seeded differences and the basics agree', { skip: !process.env.SPAWNLOFT_CORE_BIN && 'set SPAWNLOFT_CORE_BIN to a spawnloft-core built with --features test-hooks' }, async () => {
+  const scenarios = loadScenarios([path.join(parity, 'selftest'), path.join(parity, 'scenarios', 'basics.json')])
+  for (const s of scenarios) {
+    if (s.platforms && !s.platforms.includes(process.platform)) continue
+    const r = await runScenario(s, { core, repo, scratch: tmp(s.name), baseDir: path.dirname(s.file) })
+    assert.ok(r.ok, `${s.name}: ${JSON.stringify({ problems: r.problems, diffs: r.diffs.map(d => d.what) })}`)
+  }
+})

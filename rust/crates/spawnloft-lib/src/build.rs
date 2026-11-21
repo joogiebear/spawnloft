@@ -47,8 +47,15 @@ impl BuildInfo {
     pub fn json(&self) -> String {
         use crate::json::string;
         let commit = self.commit.map(string).unwrap_or_else(|| "null".to_string());
+        // a test-hooks build says so, and the release gate refuses one (desktop/release-gate.mjs);
+        // a release build's line is unchanged
+        let hooks = if cfg!(feature = "test-hooks") {
+            ",\"testHooks\":true"
+        } else {
+            ""
+        };
         format!(
-            "{{\"name\":{},\"version\":{},\"commit\":{commit},\"target\":{}}}",
+            "{{\"name\":{},\"version\":{},\"commit\":{commit},\"target\":{}{hooks}}}",
             string(NAME),
             string(self.version),
             string(self.target),
@@ -89,9 +96,16 @@ mod tests {
 
     #[test]
     fn json_is_one_object() {
+        let hooks = if cfg!(feature = "test-hooks") {
+            r#","testHooks":true"#
+        } else {
+            ""
+        };
         assert_eq!(
             LOCAL.json(),
-            r#"{"name":"spawnloft-core","version":"2.0.0-internal.0","commit":null,"target":"x86_64-unknown-linux-gnu"}"#
+            format!(
+                r#"{{"name":"spawnloft-core","version":"2.0.0-internal.0","commit":null,"target":"x86_64-unknown-linux-gnu"{hooks}}}"#
+            )
         );
         assert!(
             CI.json()

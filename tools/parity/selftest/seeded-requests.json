@@ -1,0 +1,60 @@
+{
+  "about": "Self-test: the Rust side already has the jar, so it asks the fake host for less. Same exit code; the rig must report the request lists (and the output).",
+  "expect": "differ",
+  "expectDifferences": [
+    "requests to the fake hosts",
+    "(paper fetch 1.21.4): stdout"
+  ],
+  "hosts": {
+    "https://fill.papermc.io": {
+      "routes": {
+        "GET /v3/projects/paper/versions/1.21.4/builds": {
+          "json": [
+            {
+              "id": 15,
+              "time": "2026-11-02T10:00:00Z",
+              "channel": "STABLE",
+              "downloads": {
+                "server:default": {
+                  "name": "paper-1.21.4-15.jar",
+                  "url": "https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar",
+                  "checksums": {
+                    "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar}"
+                  },
+                  "size": 64
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "https://fill-data.papermc.io": {
+      "routes": {
+        "GET /v1/objects/15/paper-1.21.4-15.jar": {
+          "bytes": {
+            "size": 64,
+            "seed": "j"
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "side": "rust",
+      "write": "data/jars/paper-1.21.4-15.jar",
+      "text": "already here"
+    },
+    {
+      "run": [
+        "paper",
+        "fetch",
+        "1.21.4"
+      ],
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

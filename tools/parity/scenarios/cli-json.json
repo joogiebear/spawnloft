@@ -1,0 +1,567 @@
+{
+  "about": "Every one of the CLI's 61 command names with --json (rust/PLAN-CORE-PORT.md section 11, C0: the --json fixtures for all 48 commands), over a registry with one stopped server: the envelope each answers with, the INVALID_USAGE error for those that take no --json, and the data of those that do. test/cli-json-coverage.test.mjs fails when mcctl.mjs gains a command this scenario does not run. The golden file test/fixtures/contracts/cli/cli-json.json holds the Node answers; steps whose answer depends on the machine (doctor, repair, metrics, diag, backup sizes) are compared between the sides but kept out of it.",
+  "golden": "test/fixtures/contracts/cli/cli-json.json",
+  "goldenAbout": "What the Node core prints for every command name with --json (tools/parity/scenarios/cli-json.json). Each ported command must print the same envelope. Regenerate with node tools/parity/run.mjs tools/parity/scenarios/cli-json.json --update-golden; a change here changes the CLI's --json contract (schemaVersion 1).",
+  "normalize": [
+    {
+      "pattern": "(\"serverInfo\":\\{[^}]*\"version\":)\"[^\"]*\"",
+      "replace": "$1\"<version>\""
+    },
+    {
+      "pattern": "\"sizeBytes\":\\d+",
+      "replace": "\"sizeBytes\":<archive-size>"
+    },
+    {
+      "pattern": "standard, \\d+ B",
+      "replace": "standard, <archive-size>"
+    }
+  ],
+  "steps": [
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "paper-1.21.4-15.jar",
+            "java": "java",
+            "memory": "2G",
+            "loader": "paper",
+            "mcVersion": "1.21.4",
+            "port": 25565,
+            "rcon": {
+              "port": 25575,
+              "password": "rcon-secret-alpha"
+            },
+            "createdAt": "2026-11-01T10:00:00.000Z"
+          }
+        }
+      }
+    },
+    {
+      "write": "data/instances/alpha/server.properties",
+      "text": "server-port=25565\nmotd=Alpha\n"
+    },
+    {
+      "write": "data/instances/alpha/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/alpha/world/level.dat",
+      "base64": "H4sIAAAAAAAAA2NgYGBgBAAAhUgFAAAAAA=="
+    },
+    {
+      "run": [
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "list",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "ls",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "status",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "start",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "stop",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "restart",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "kill",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "logs",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "log",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "cmd",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "rcon",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "send",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "console",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "attach",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "players",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "new",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "clone",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "adopt",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "rm",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "remove",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "set",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "props",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "backup",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "snapshot",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "snapshots",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "backups",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "restore",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "prune",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "verify",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "templates",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "template",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "jars",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "paper",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "config",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "data",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "rename",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "rebuild",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "reveal",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "open",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "plugins",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "upgrade",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "pack",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "worlds",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "why",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "diagnostics",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "diag",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "metrics",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "launchers",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "ui",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "panel",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "task",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "doctor",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "repair",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "db",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "mcp",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "bot",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "client",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "uninstall",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "help",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "--help",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "-h",
+        "--json"
+      ]
+    },
+    {
+      "run": [
+        "status",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "plugins",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "snapshots",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "backups",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "why",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "diagnostics",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "metrics",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false
+    },
+    {
+      "run": [
+        "data",
+        "status",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "client",
+        "list",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "doctor",
+        "--json"
+      ],
+      "golden": false
+    },
+    {
+      "run": [
+        "repair",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false
+    },
+    {
+      "run": [
+        "diag",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false
+    },
+    {
+      "run": [
+        "backup",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false
+    },
+    {
+      "run": [
+        "snapshots",
+        "alpha",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "golden": false
+    }
+  ]
+}

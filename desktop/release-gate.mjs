@@ -620,8 +620,11 @@ export function installedVersions(root) {
   else {
     try {
       const text = execFileSync(out.corePath, ['--version', '--json'], { encoding: 'utf8', windowsHide: true, timeout: 30000 })
-      out.core = JSON.parse(text).version
+      const info = JSON.parse(text)
+      out.core = info.version
       if (typeof out.core !== 'string') { problems.push(`${out.corePath}: --version --json has no version`); out.core = undefined }
+      // the parity rig's build (rust/PLAN-CORE-PORT.md 5.5): honours SPAWNLOFT_TEST_ORIGINS and the other test hooks
+      if (info.testHooks) problems.push(`${out.corePath}: is a test-hooks build, which no package may ship`)
     } catch (e) {
       problems.push(`${out.corePath}: --version --json failed (${e.message.split('\n')[0]})`)
     }

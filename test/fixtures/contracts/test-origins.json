@@ -1,0 +1,132 @@
+{
+  "about": "SPAWNLOFT_TEST_ORIGINS (rust/PLAN-CORE-PORT.md 6.2): the test-only map from a download origin to a local fake. Held by test/test-origins.test.mjs (src/test-origins.mjs) and by the test_origins tests under cargo test (spawnloft-lib, test-hooks). A map is a JSON object of canonical origins (lower-case scheme and host, no default port, nothing after the authority) to origins on this machine (127.0.0.1, localhost, [::1]); anything else makes the whole variable unusable and every request through it fails. A mapped origin keeps the text after its authority exactly; an unmapped loopback URL passes unchanged; any other URL is refused, never sent.",
+  "env": "SPAWNLOFT_TEST_ORIGINS",
+  "honouredWhen": {
+    "node": "NODE_ENV=test",
+    "rust": "a build with the test-hooks feature"
+  },
+  "maps": {
+    "paper": {
+      "https://fill.papermc.io": "http://127.0.0.1:41234",
+      "https://fill-data.papermc.io": "http://127.0.0.1:41235"
+    },
+    "empty": {}
+  },
+  "badMaps": [
+    "not json",
+    "[]",
+    "\"x\"",
+    "{\"https://fill.papermc.io/\":\"http://127.0.0.1:1\"}",
+    "{\"https://Fill.papermc.io\":\"http://127.0.0.1:1\"}",
+    "{\"https://fill.papermc.io:443\":\"http://127.0.0.1:1\"}",
+    "{\"https://fill.papermc.io\":\"http://127.0.0.1:1/v3\"}",
+    "{\"https://fill.papermc.io\":\"http://example.com\"}",
+    "{\"ftp://fill.papermc.io\":\"http://127.0.0.1:1\"}",
+    "{\"https://fill.papermc.io\":\"ftp://127.0.0.1:1\"}",
+    "{\"https://fill.papermc.io\":5}"
+  ],
+  "cases": [
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io/v3/projects/paper",
+      "expect": "http://127.0.0.1:41234/v3/projects/paper"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io/v3/projects/paper/versions/1.21.4/builds?channel=STABLE#top",
+      "expect": "http://127.0.0.1:41234/v3/projects/paper/versions/1.21.4/builds?channel=STABLE#top"
+    },
+    {
+      "map": "paper",
+      "url": "https://FILL.PaperMC.io/v3/x",
+      "expect": "http://127.0.0.1:41234/v3/x"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io:443/v3/x",
+      "expect": "http://127.0.0.1:41234/v3/x"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io",
+      "expect": "http://127.0.0.1:41234/"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io?q=1",
+      "expect": "http://127.0.0.1:41234/?q=1"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io#frag",
+      "expect": "http://127.0.0.1:41234/#frag"
+    },
+    {
+      "map": "paper",
+      "url": "https://fill-data.papermc.io/v1/objects/abc/paper-1.21.4-15.jar",
+      "expect": "http://127.0.0.1:41235/v1/objects/abc/paper-1.21.4-15.jar"
+    },
+    {
+      "map": "paper",
+      "url": "http://fill.papermc.io/v3/x",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "paper",
+      "url": "https://fill.papermc.io:8443/v3/x",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "paper",
+      "url": "https://api.modrinth.com/v2/project/x",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "paper",
+      "url": "https://user:pw@fill.papermc.io/v3/x",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "paper",
+      "url": "http://127.0.0.1:8080/api/client/launcher",
+      "expect": "http://127.0.0.1:8080/api/client/launcher"
+    },
+    {
+      "map": "paper",
+      "url": "http://localhost:1/x",
+      "expect": "http://localhost:1/x"
+    },
+    {
+      "map": "paper",
+      "url": "http://[::1]:2/x",
+      "expect": "http://[::1]:2/x"
+    },
+    {
+      "map": "paper",
+      "url": "not a url",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "empty",
+      "url": "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+      "expect": {
+        "refused": true
+      }
+    },
+    {
+      "map": "empty",
+      "url": "http://127.0.0.1:5/ok",
+      "expect": "http://127.0.0.1:5/ok"
+    }
+  ]
+}

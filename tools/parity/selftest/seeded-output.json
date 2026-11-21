@@ -1,0 +1,68 @@
+{
+  "about": "Self-test: the Rust side's registry has a second server, so list prints differently. The rig must report the difference (expect: differ).",
+  "expect": "differ",
+  "expectDifferences": [
+    "(list --json): stdout"
+  ],
+  "steps": [
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "server.jar",
+            "java": "java",
+            "memory": "2G",
+            "port": 25565,
+            "rcon": {
+              "port": 25575,
+              "password": "pw"
+            }
+          }
+        }
+      }
+    },
+    {
+      "side": "rust",
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "server.jar",
+            "java": "java",
+            "memory": "2G",
+            "port": 25565,
+            "rcon": {
+              "port": 25575,
+              "password": "pw"
+            }
+          },
+          "beta": {
+            "dir": "{data}/instances/beta",
+            "jar": "server.jar",
+            "java": "java",
+            "memory": "2G",
+            "port": 25566,
+            "rcon": {
+              "port": 25576,
+              "password": "pw"
+            }
+          }
+        }
+      }
+    },
+    {
+      "run": [
+        "list",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

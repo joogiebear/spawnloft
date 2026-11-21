@@ -25,6 +25,7 @@ pub mod registry;
 pub mod resp;
 pub mod runtime;
 pub mod sha256;
+pub mod test_origins;
 pub mod tick;
 pub mod time;
 pub mod update;

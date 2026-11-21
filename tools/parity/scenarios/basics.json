@@ -1,0 +1,24 @@
+{
+  "about": "The CLI with nothing set up: usage, help, an unknown command, the empty lists, and usage errors with and without --json.",
+  "steps": [
+    { "run": [], "expect": { "code": 0 } },
+    { "run": ["help"], "expect": { "code": 0, "stdoutIncludes": "spawnloft list" } },
+    { "run": ["--help"] },
+    { "run": ["frobnicate"], "expect": { "code": 2 } },
+    { "run": ["frobnicate", "--json"], "expect": { "code": 2 } },
+    { "run": ["help", "--json"] },
+    { "run": ["list"], "expect": { "code": 0 } },
+    { "run": ["ls"] },
+    { "run": ["list", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"instances\":[]" } },
+    { "run": ["list", "--json=yes"] },
+    { "run": ["list", "--bogus", "--json"] },
+    { "run": ["status"] },
+    { "run": ["status", "--json"] },
+    { "run": ["status", "nosuch"] },
+    { "run": ["status", "nosuch", "--json"] },
+    { "run": ["start", "--json"] },
+    { "run": ["logs", "nosuch"] },
+    { "run": ["metrics", "--csv", "--json"] },
+    { "run": ["list", "--csv"] }
+  ]
+}

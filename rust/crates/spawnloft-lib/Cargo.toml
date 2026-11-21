@@ -15,6 +15,10 @@ workspace = true
 # Test and CI builds only: honour SPAWNLOFT_UPDATE_SOURCE (a loopback http feed) in the updater.
 # Never enabled for a release build, so a release binary has no feed override at all.
 internal-feed = []
+# Test and CI builds only: the hooks the parity rig and the black-box tests rely on
+# (rust/PLAN-CORE-PORT.md section 5.5), starting with SPAWNLOFT_TEST_ORIGINS (test_origins.rs).
+# Never enabled for a release build.
+test-hooks = []
 
 [dependencies]
 regex = "1.13.1"
