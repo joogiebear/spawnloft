@@ -1,0 +1,1107 @@
+{
+ "about": "C2's db command: list, versions, add (Garnet from the stand-in engine store, MySQL against a faked download with the wrong bytes), attach, detach with and without --drop, creds, connect and address for an external database, root, create for a server (one that starts, one that fails) and remove, with their usage errors.",
+ "normalize": [
+  {
+   "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{24}\\b",
+   "replace": "<password>"
+  },
+  {
+   "pattern": "\\b\\d+s\\b *",
+   "replace": "<secs> "
+  }
+ ],
+ "ignore": [
+  "data/run/**",
+  "data/activity.jsonl",
+  "data/services/*/data/fake-shutdowns.log",
+  "data/services/*/data/checkpoint.txt"
+ ],
+ "hosts": {
+  "https://cdn.mysql.com": {
+   "routes": {
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-linux-glibc2.28-x86_64-minimal.tar.xz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-winx64.zip": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-macos15-arm64.tar.gz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    },
+    "GET /Downloads/MySQL-8.4/mysql-8.4.11-macos15-x86_64.tar.gz": {
+     "bytes": {
+      "size": 1000,
+      "seed": 7
+     }
+    }
+   }
+  }
+ },
+ "steps": [
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadbd.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-admin.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-dump.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-install-db.mjs"
+  },
+  {
+   "write": "data/engines/garnet-0.0.0-fake/GarnetServer.mjs",
+   "copy": "../../../test/fixtures/fake-garnet/GarnetServer.mjs"
+  },
+  {
+   "mkdir": "data/instances/srv1"
+  },
+  {
+   "mkdir": "data/instances/srv2"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47900,
+      "label": "Survival"
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47905
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "db"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No databases."
+   }
+  },
+  {
+   "run": [
+    "db",
+    "list"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No databases."
+   }
+  },
+  {
+   "run": [
+    "db",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "db",
+    "versions"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "8.4.11"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "versions",
+    "--engine",
+    "garnet"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "2.1.7"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "versions",
+    "--engine",
+    "mariadb"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "versions",
+    "--engine"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "data/services/db1/my.ini",
+   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=47811\nbind-address=127.0.0.1\n"
+  },
+  {
+   "mkdir": "data/services/db1/data/mysql"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47900,
+      "label": "Survival"
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47905
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/db1",
+      "port": 47811,
+      "root": {
+       "user": "root",
+       "password": "pw-test"
+      },
+      "attachments": {}
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "k",
+    "--engine",
+    "mariadb"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "bad name",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "srv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "abc"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47900"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "9.9.9",
+    "--port",
+    "47822"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "bad!",
+    "--port",
+    "47822"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47821",
+    "--label",
+    "  Key   value  "
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Created database"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "kv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake",
+    "--port",
+    "47823"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "m1",
+    "--version",
+    "8.4.11",
+    "--port",
+    "47830"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "add",
+    "m2",
+    "--port",
+    "47831"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "list"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "kv1"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "srv1",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "kv1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "jdbc:mysql://127.0.0.1:47811/srv1"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "is attached"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "creds",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "password:"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "credentials",
+    "db1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "creds",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "kv1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "key prefix:"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "kv1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "redis://"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "creds",
+    "kv1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Redis has no per-server"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "db1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "kept"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "db1",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "db1",
+    "srv1",
+    "--drop"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "dropped"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "kv1",
+    "srv1",
+    "--drop"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "database null dropped"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "garnet",
+    "--port",
+    "1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "garnet",
+    "--port",
+    "47821",
+    "--password",
+    "wrong"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mariadb",
+    "--port",
+    "47811"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mysql",
+    "--port",
+    "abc"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e1",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811",
+    "--tools",
+    "{run}/nowhere"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "srv1",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e2",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811",
+    "--password",
+    "pw-test",
+    "--label",
+    "Ext DB"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "answering"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e3",
+    "--engine",
+    "mysql",
+    "--port",
+    "47811"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "attach",
+    "e2",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "jdbc:"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "db1",
+    "--host",
+    "x"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e2",
+    "--host",
+    "a b"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "0"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "nothing answers"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e2",
+    "--port",
+    "47811",
+    "--user",
+    "admin"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "answering"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "root",
+    "db1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "pw-test"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "root",
+    "e2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "admin"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "root",
+    "srv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "root"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "create"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "create",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "mariadb"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "attached to \"srv2\""
+   },
+   "timeoutMs": 120000
+  },
+  {
+   "run": [
+    "db",
+    "create",
+    "srv2",
+    "--engine",
+    "garnet",
+    "--version",
+    "9.9.9"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "create",
+    "srv1",
+    "--engine",
+    "garnet",
+    "--version",
+    "0.0.0-fake"
+   ],
+   "expect": {
+    "code": 1
+   },
+   "env": {
+    "FAKE_GARNET_FAIL": "start"
+   },
+   "timeoutMs": 120000
+  },
+  {
+   "run": [
+    "db",
+    "list"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "srv2-db"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "remove"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "remove",
+    "kv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "remove",
+    "srv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "kv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "db",
+    "remove",
+    "kv1",
+    "--purge"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "and its files"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "rm",
+    "e2",
+    "--purge"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Servers that were attached: srv2"
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "srv2-db"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "db1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "db",
+    "remove",
+    "srv2-db"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "(files kept)"
+   }
+  },
+  {
+   "run": [
+    "db"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "db1"
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

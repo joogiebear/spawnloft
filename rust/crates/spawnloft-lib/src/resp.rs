@@ -76,14 +76,20 @@ pub fn send(
         .ok()
         .and_then(|mut a| a.next())
         .ok_or_else(|| format!("could not reach {host}:{port}: no address"))?;
-    let mut stream = TcpStream::connect_timeout(&addr, timeout)
-        .map_err(|e| format!("could not reach {host}:{port}: {e}"))?;
+    // Node's socket errors: `connect ECONNREFUSED 127.0.0.1:6379`, `read ECONNRESET`
+    let node = |e: &std::io::Error, call: &str| {
+        let code = crate::jspath::error_code(e).0;
+        if call == "connect" {
+            format!("could not reach {host}:{port}: connect {code} {addr}")
+        } else {
+            format!("could not reach {host}:{port}: {call} {code}")
+        }
+    };
+    let mut stream = TcpStream::connect_timeout(&addr, timeout).map_err(|e| node(&e, "connect"))?;
     let mut buf: Vec<u8> = Vec::new();
     let mut last = String::new();
     for (i, cmd) in queue.iter().enumerate() {
-        stream
-            .write_all(&encode(cmd))
-            .map_err(|e| format!("could not reach {host}:{port}: {e}"))?;
+        stream.write_all(&encode(cmd)).map_err(|e| node(&e, "write"))?;
         loop {
             if let Some((reply, used)) = parse(&buf) {
                 buf.drain(..used);
@@ -124,7 +130,7 @@ pub fn send(
                     ));
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(format!("could not reach {host}:{port}: {e}")),
+                Err(e) => return Err(node(&e, "read")),
             }
         }
     }

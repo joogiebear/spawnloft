@@ -126,6 +126,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c2-rust-daemon` | the same lifecycle with `SPAWNLOFT_DAEMON=rust`, so both supervisors start `spawnloft-core daemon` |
 | `c2-databases-node`, `c2-databases-rust` | databases under each daemon: the MariaDB and Garnet stand-ins in the engine store (copied in by `write` with `copy`), a missing engine, an external database, start, stop, restart and kill |
 | `c2-failed-start` | a start that fails, for a server and a database under each daemon (the activity log left out: two processes write it in either order) |
+| `c2-db` | the `db` command: list, versions, add (Garnet from the stand-in store, MySQL against a faked download whose bytes are wrong), attach and detach with and without `--drop`, creds, connect and address for an external database, root, create for a server (one that starts, one that fails) and remove, with the usage errors; random passwords evened out |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
