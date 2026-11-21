@@ -12,6 +12,10 @@
   {
    "pattern": "unreadable-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z",
    "replace": "unreadable-<time>"
+  },
+  {
+   "pattern": "(pre-restore_files_<stamp>)_\\d+",
+   "replace": "$1"
   }
  ],
  "steps": [
@@ -420,7 +424,7 @@
     "snapshot",
     "srv1",
     "--label",
-    "é😀 x",
+    "\u00e9\ud83d\ude00 x",
     "--no-flush"
    ],
    "expect": {

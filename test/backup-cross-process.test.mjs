@@ -79,14 +79,15 @@ function core(side, ctx, ...args) {
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
 
-/** Every file under `dir`, by relative path with forward slashes, to its bytes as hex. */
+/** Every file under `dir`, by relative path with forward slashes, to its bytes as hex. Names in
+ * NFC: on macOS the system tar puts a name back decomposed (NFD), whichever core called it. */
 function tree(dir) {
   const out = {}
   const walk = (rel) => {
     for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
       const r = rel ? `${rel}/${e.name}` : e.name
       if (e.isDirectory()) walk(r)
-      else out[r] = fs.readFileSync(path.join(dir, r)).toString('hex')
+      else out[r.normalize('NFC')] = fs.readFileSync(path.join(dir, r)).toString('hex')
     }
   }
   walk('')
