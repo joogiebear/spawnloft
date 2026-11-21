@@ -12,6 +12,8 @@
  *   anything else is echoed, which proves a line reached the server
  *
  * FAKE_JAVA_FAIL=start makes it die during startup the way a taken port does.
+ * FAKE_JAVA_RCON=1 makes it answer RCON (test/fixtures/fake-rcon.mjs) on the rcon.port and
+ * rcon.password of the server.properties in its folder, as a server with enable-rcon=true does.
  */
 import fs from 'node:fs'
 import readline from 'node:readline'
@@ -23,6 +25,13 @@ say(`Starting minecraft server (fake) with ${process.argv.slice(2).join(' ')}`)
 if (process.env.FAKE_JAVA_FAIL === 'start') {
   say('Failed to start the minecraft server')
   process.exit(1)
+}
+
+if (process.env.FAKE_JAVA_RCON === '1') {
+  const { startFakeRcon } = await import('./fake-rcon.mjs')
+  const props = Object.fromEntries(fs.readFileSync('server.properties', 'utf8').split(/\r?\n/)
+    .filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1)]))
+  await startFakeRcon({ port: Number(props['rcon.port']), password: props['rcon.password'] })
 }
 
 setTimeout(() => say('Done (0.042s)! For help, type "help"'), 150)

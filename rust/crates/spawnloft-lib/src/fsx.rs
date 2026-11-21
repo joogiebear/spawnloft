@@ -159,6 +159,20 @@ pub fn rename_failure(e: &std::io::Error, from: &Path, to: &Path) -> crate::fail
     }
 }
 
+/// `fs.readdirSync(dir)`'s names in its order: libuv's scandir sorts them byte by byte on Unix
+/// (`alphasort` over the raw names); Windows gives them as the file system lists them, which is
+/// what `read_dir` gives too.
+pub fn readdir_names(dir: &Path) -> std::io::Result<Vec<String>> {
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        names.push(entry?.file_name().to_string_lossy().into_owned());
+    }
+    if cfg!(unix) {
+        names.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+    }
+    Ok(names)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

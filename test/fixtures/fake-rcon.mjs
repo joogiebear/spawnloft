@@ -15,6 +15,7 @@
 //              the first byte, so they always do and a client that writes two at once is hung up on.
 //   replies    replies by command, over the defaults. A reply over 4096 bytes goes out in several
 //              packets, as Minecraft sends it.
+//   port       where to listen; any free port when 0 (the default).
 import net from 'node:net'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -43,7 +44,7 @@ const WAKE_MS = 3
 // Size of the single read it does.
 const READ_BYTES = 1460
 
-export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, stopAfter = null, strict = false, replies = {} } = {}) {
+export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, stopAfter = null, strict = false, replies = {}, port = 0 } = {}) {
   const live = new Set()
   const commands = []
   const dropped = {}
@@ -141,7 +142,7 @@ export async function startFakeRcon({ password = 'pw', delays = {}, drop = {}, s
     return new Promise((resolve) => server.close(resolve))
   }
 
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve))
   return {
     port: server.address().port,
     // Every command that reached the server, in arrival order: { conn, cmd }.

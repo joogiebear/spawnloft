@@ -139,6 +139,47 @@ pub const PORTED: &[Row] = &[
         names: &["metrics"],
         when: When::Always,
     },
+    // C2: the server lifecycle
+    Row {
+        names: &["start"],
+        when: When::Always,
+    },
+    Row {
+        names: &["stop"],
+        when: When::Always,
+    },
+    Row {
+        names: &["restart"],
+        when: When::Always,
+    },
+    Row {
+        names: &["kill"],
+        when: When::Always,
+    },
+    Row {
+        names: &["cmd", "rcon"],
+        when: When::Always,
+    },
+    Row {
+        names: &["send"],
+        when: When::Always,
+    },
+    Row {
+        names: &["console", "attach"],
+        when: When::Always,
+    },
+    Row {
+        names: &["players"],
+        when: When::Always,
+    },
+    Row {
+        names: &["set"],
+        when: When::Always,
+    },
+    Row {
+        names: &["props"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -557,10 +598,10 @@ mod tests {
     #[test]
     fn what_is_forwarded_to_the_node_core() {
         for line in [
-            &["start", "survival"][..],
+            &["db", "list"][..],
             &["mcp"],
             &["task", "run", "abc"],
-            &["console", "survival"],
+            &["backup", "survival"],
             &["ui"],
             &["ui", "--port", "8080"],
             &["repair"],
@@ -588,6 +629,8 @@ mod tests {
             &["ui", "--upstream", "http://127.0.0.1:1/"],
             &["repair", "--quiet"],
             &["user-path", "add"],
+            &["start", "survival"],
+            &["console", "survival"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),

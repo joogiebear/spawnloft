@@ -154,6 +154,25 @@ export const DECLARED = [
       .replace(/^ {2}code: '[A-Z_]+'\n\}\n\nNode\.js v[^\n]*\n/m, ''),
   },
   {
+    // C2: the forwarding binary hands its pipes to the Node core, whose detached daemon keeps a
+    // copy; spawnloft-core clears the inherit flag on its standard handles before a detached start
+    id: 'windows-daemon-holds-pipes',
+    where: 'Windows: `start` and `restart` read through a pipe (the rig, a script capturing the output)',
+    node: 'the pipe stays open after the command exits, until the server stops (the rig waits 10 s and notes it)',
+    rust: 'the pipe closes when the command exits',
+    commands: ['start', 'restart'],
+    apply: dropLines(/^rig: the command exited but its output stayed open/),
+  },
+  {
+    // C2: readline goes on emitting the lines of a chunk it already read after close()
+    id: 'console-after-detach',
+    where: '`console` (`attach`) given `/detach` or `/exit` with more lines behind it in the same read (piped input)',
+    node: 'the lines after it in that read are still sent to the server',
+    rust: 'nothing after `/detach` or `/exit` is sent',
+    apply: null,
+    held: 'scenarios feed `console` input that ends at `/detach` or `/exit`, or none',
+  },
+  {
     // plan section 3.4 and test/fixtures/contracts/C0-CHECKS.md section 2
     id: 'data-root-code-folder',
     where: 'a checkout whose code folder holds `instances.json` and no settings choose a data root',

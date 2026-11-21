@@ -122,6 +122,10 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c1-settings` | the data root and the other folders chosen by `settings.json` (XDG and Windows locations), a damaged settings file and its warning |
 | `c1-running` | the same commands against a running server (the fake JVM), text and `--json` |
 | `c1-review` | what the C1 review found: half an emoji or a record's own `name` in the registry, pids as `process.kill` coerces them, crash reports with equal times, `/i` patterns beyond ASCII and Annex B escapes, a large console with a count that is not whole, a sample past the year 9999 |
+| `c2-lifecycle` | C2's lifecycle over the JVM stand-in answering RCON (`FAKE_JAVA_RCON=1`): `start`, `stop`, `restart`, `kill`, `cmd`/`rcon`, `players`, `send`, `console` fed from a pipe, `set` with every key and `props`, their refusals and usage errors |
+| `c2-rust-daemon` | the same lifecycle with `SPAWNLOFT_DAEMON=rust`, so both supervisors start `spawnloft-core daemon` |
+| `c2-databases-node`, `c2-databases-rust` | databases under each daemon: the MariaDB and Garnet stand-ins in the engine store (copied in by `write` with `copy`), a missing engine, an external database, start, stop, restart and kill |
+| `c2-failed-start` | a start that fails, for a server and a database under each daemon (the activity log left out: two processes write it in either order) |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
@@ -147,6 +151,8 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | a JSON file holding a number beyond the double range (`1e400`) | read as Infinity | refused as a file that does not parse | no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); scenarios do not hand-write one |
 | a state file whose `daemonStartTime` (written by 2.0's daemon) differs from the live process under that pid | the field is ignored; the pid and the image name decide | the creation time decides where the system reports one | the Node daemon never writes the field; scenarios write it only as the running daemon's own |
 | a settings value of the wrong type (`"dataRoot": 5`) | an uncaught crash: source excerpt, the error line, the stack, `{ code: ... }` and `Node.js v<version>` | the error line alone, exit 1 | evened out (`settings-type-crash`) |
+| Windows: `start` and `restart` read through a pipe (the rig, a script capturing the output) | the pipe stays open after the command exits, until the server stops (the rig waits 10 s and notes it) | the pipe closes when the command exits | evened out (`windows-daemon-holds-pipes`) |
+| `console` (`attach`) given `/detach` or `/exit` with more lines behind it in the same read (piped input) | the lines after it in that read are still sent to the server | nothing after `/detach` or `/exit` is sent | scenarios feed `console` input that ends at `/detach` or `/exit`, or none |
 | a checkout whose code folder holds `instances.json` and no settings choose a data root | the code folder is the data root (and is listed among other registries) | the per-user data folder; the code folder is never a data root | no installed build can be in that state (C0-CHECKS.md section 2); the rig's code folder is the checkout, which has no instances.json |
 
 ## The download-host override

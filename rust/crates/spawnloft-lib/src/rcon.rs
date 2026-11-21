@@ -77,8 +77,12 @@ impl Rcon {
                     ),
                     refused: true,
                 }
+            } else if e.kind() == std::io::ErrorKind::TimedOut {
+                // the socket's own timeout, as net's `timeout` event reports it
+                err("RCON connection failed: connection timed out")
             } else {
-                err(format!("RCON connection failed: {e}"))
+                let (code, _) = crate::jspath::error_code(&e);
+                err(format!("RCON connection failed: connect {code} {host}:{port}"))
             }
         })?;
         let _ = stream.set_nodelay(true);
@@ -95,7 +99,9 @@ impl Rcon {
         loop {
             let packet = rcon
                 .read_packet(deadline)?
-                .ok_or_else(|| err("RCON authentication timed out"))?;
+                // the connect phase's `timeout` listener is still armed in rcon.mjs, and the idle
+                // timeout (armed again by the auth write) fires just before the auth timer
+                .ok_or_else(|| err("RCON connection failed: connection timed out"))?;
             if packet.id == -1 {
                 return Err(err("RCON authentication failed - wrong rcon.password"));
             }
@@ -108,7 +114,7 @@ impl Rcon {
     fn write(&mut self, bytes: &[u8]) -> Result<(), RconError> {
         self.stream
             .write_all(bytes)
-            .map_err(|e| err(format!("RCON error: {e}")))
+            .map_err(|e| err(format!("RCON error: write {}", crate::jspath::error_code(&e).0)))
     }
 
     // One packet, or None when the deadline passed first.
@@ -158,7 +164,12 @@ impl Rcon {
                     return Ok(None);
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(err(format!("RCON error: {e}"))),
+                Err(e) => {
+                    return Err(err(format!(
+                        "RCON error: read {}",
+                        crate::jspath::error_code(&e).0
+                    )));
+                }
             }
         }
     }
@@ -178,7 +189,9 @@ impl Rcon {
                 return if got_any {
                     Ok(String::from_utf8_lossy(&chunks).into_owned())
                 } else {
-                    Err(err(format!("RCON command timed out: {command}")))
+                    // net's idle timeout, armed again by the command's write, fires just before
+                    // the command's own timer, so a command with no reply fails as the socket
+                    Err(err("RCON error: RCON timed out"))
                 };
             };
             if packet.id == sentinel {
@@ -212,9 +225,114 @@ pub fn strip_colors(text: &str) -> String {
     out
 }
 
+/// `RCON_TIMEOUT_MS`: how long a command may take to answer; the environment override is for
+/// tests.
+pub fn timeout_ms() -> f64 {
+    let n = crate::paths::env_var("RCON_TIMEOUT_MS")
+        .map(|v| crate::js::number(Some(&serde_json::Value::String(v))))
+        .unwrap_or(f64::NAN);
+    if n > 0.0 { n } else { 8000.0 }
+}
+
+/// A failed `rconExec`; `unsent` when nothing could have been written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecError {
+    pub message: String,
+    pub unsent: bool,
+}
+
+/// `rconExec` options.
+#[derive(Debug, Clone, Copy)]
+pub struct ExecOptions {
+    pub attempts: u32,
+    pub timeout_ms: f64,
+    pub retry_timeouts: bool,
+    pub retry_sent: bool,
+}
+
+impl Default for ExecOptions {
+    fn default() -> Self {
+        ExecOptions {
+            attempts: 3,
+            timeout_ms: timeout_ms(),
+            retry_timeouts: true,
+            retry_sent: true,
+        }
+    }
+}
+
+fn transient(message: &str, timeouts: bool) -> bool {
+    let m = message.to_ascii_lowercase();
+    ["connection closed", "econnreset", "epipe", "econnaborted"]
+        .iter()
+        .any(|w| m.contains(w))
+        || (timeouts && m.contains("timed out"))
+}
+
+/// `rconExec(inst, commands, opts)`: connect, run the commands, disconnect. Transient socket
+/// failures are retried on a fresh connection, after `120 * attempt` ms.
+pub fn exec(
+    inst: &crate::registry::Instance,
+    commands: &[&str],
+    opts: ExecOptions,
+) -> Result<Vec<String>, ExecError> {
+    let Some(port) = inst.rcon_port() else {
+        return Err(ExecError {
+            message: format!("instance \"{}\" has no RCON port configured", inst.name),
+            unsent: true,
+        });
+    };
+    let password = inst.rcon_password().unwrap_or_default();
+    let timeout = crate::util::timer(opts.timeout_ms);
+    let mut connected = false;
+    let mut attempt = 1;
+    loop {
+        let result = Rcon::connect(port, &password, timeout).and_then(|mut rcon| {
+            connected = true;
+            let mut out = Vec::new();
+            for c in commands {
+                out.push(rcon.send(c)?);
+            }
+            Ok(out)
+        });
+        match result {
+            Ok(out) => return Ok(out),
+            Err(e) => {
+                if attempt >= opts.attempts
+                    || (connected && !opts.retry_sent)
+                    || !transient(&e.message, opts.retry_timeouts)
+                {
+                    return Err(ExecError {
+                        message: e.message,
+                        unsent: !connected,
+                    });
+                }
+                crate::util::sleep(f64::from(120 * attempt));
+                attempt += 1;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exec_retries_only_what_rcon_mjs_retries() {
+        assert!(transient("RCON error: RCON connection closed", false));
+        assert!(transient("RCON error: read ECONNRESET", false));
+        assert!(!transient("RCON error: RCON timed out", false));
+        assert!(transient("RCON error: RCON timed out", true));
+        assert!(!transient(
+            "RCON authentication failed - wrong rcon.password",
+            true
+        ));
+        let inst = crate::registry::spread("x", &serde_json::json!({}));
+        let e = exec(&inst, &["list"], ExecOptions::default()).unwrap_err();
+        assert_eq!(e.message, "instance \"x\" has no RCON port configured");
+        assert!(e.unsent);
+    }
     use std::net::TcpListener;
 
     fn packet_from(stream: &mut TcpStream) -> (i32, i32, String) {

@@ -343,6 +343,40 @@ fn taskkill(pid: u32) {
     let _ = cmd.spawn();
 }
 
+/// `taskkill /PID <pid> /T /F`, started and not waited for, as supervisor.mjs `killTree` does.
+pub fn kill_tree_pid(pid: u32) {
+    taskkill(pid);
+}
+
+/// Node's `spawn(..., { detached: true, windowsHide: true })`: libuv's `DETACHED_PROCESS` and
+/// `CREATE_NEW_PROCESS_GROUP`, so the child has no console and Ctrl+C in the caller's never
+/// reaches it.
+///
+/// `CreateProcess` here always inherits every inheritable handle, and this process's own standard
+/// handles usually are (a pipe the caller reads to its end, say): a daemon holding them would keep
+/// that reader waiting until the server stops. libuv clears the flag at startup
+/// (`uv_disable_stdio_inheritance`); this clears it before a detached start. A child that is
+/// meant to share them still gets them: `Stdio::inherit` passes a duplicate.
+pub fn detach(cmd: &mut Command) {
+    use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE, SetHandleInformation};
+    use windows_sys::Win32::System::Console::{
+        GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+    };
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    for which in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+        // SAFETY: GetStdHandle takes a constant; SetHandleInformation only changes the flag of a
+        // handle this process owns, and fails harmlessly on a null or invalid one.
+        unsafe {
+            let h = GetStdHandle(which);
+            if !h.is_null() && h != INVALID_HANDLE_VALUE {
+                SetHandleInformation(h, HANDLE_FLAG_INHERIT, 0);
+            }
+        }
+    }
+    cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+}
+
 /// TerminateProcess, which is what Node's `child.kill('SIGTERM')` does on Windows.
 pub fn terminate(child: &mut Child) {
     let _ = child.kill();

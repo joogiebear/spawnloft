@@ -4,9 +4,12 @@
 //! envelope and exit codes (0, 1 for a failed operation, 2 for a usage error).
 //!
 //! C1 (rust/PLAN-CORE-PORT.md section 4) moved the read-only group: `help`, `list`, `status`,
-//! `logs`, `why` and `metrics`, with their aliases.
+//! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
+//! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`.
 
 pub mod args;
+mod configure;
+mod lifecycle;
 mod list;
 mod logs;
 mod metrics;
@@ -138,6 +141,16 @@ fn dispatch(
         "logs" | "log" => logs::logs(&mut ctx),
         "why" | "diagnostics" => why::why(&mut ctx),
         "metrics" => metrics::metrics(&mut ctx),
+        "start" => lifecycle::start(&mut ctx),
+        "stop" => lifecycle::stop(&mut ctx),
+        "restart" => lifecycle::restart(&mut ctx),
+        "kill" => lifecycle::kill(&mut ctx),
+        "cmd" | "rcon" => lifecycle::cmd(&mut ctx),
+        "send" => lifecycle::send(&mut ctx),
+        "console" | "attach" => lifecycle::console(&mut ctx),
+        "players" => lifecycle::players(&mut ctx),
+        "set" => configure::set(&mut ctx),
+        "props" => configure::props(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

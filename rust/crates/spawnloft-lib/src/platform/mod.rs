@@ -69,3 +69,25 @@ pub fn cpu_count() -> usize {
     }
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
 }
+
+/// `process.platform`: the names the Node core records (engine markers, archive tables).
+pub fn node_platform() -> &'static str {
+    if cfg!(windows) {
+        "win32"
+    } else if cfg!(target_os = "macos") {
+        "darwin"
+    } else {
+        "linux"
+    }
+}
+
+/// `process.arch`.
+pub fn node_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        "x86" => "ia32",
+        "arm" => "arm",
+        other => other,
+    }
+}
