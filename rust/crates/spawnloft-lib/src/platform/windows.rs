@@ -1431,6 +1431,20 @@ pub fn network_interfaces() -> Vec<(String, Vec<super::InterfaceAddress>)> {
     out
 }
 
+/// Whether two names are one file (the volume and the file index), as libuv's copyfile checks
+/// before copying: copying a file onto itself would empty it.
+pub fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
+    use windows_sys::Win32::Storage::FileSystem::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle};
+    let id = |p: &std::path::Path| -> Option<(u32, u32, u32)> {
+        let f = std::fs::File::open(p).ok()?;
+        // SAFETY: a plain-data struct the call fills, for a handle that stays open meanwhile
+        let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+        let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle() as _, &mut info) };
+        (ok != 0).then_some((info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow))
+    };
+    matches!((id(a), id(b)), (Some(x), Some(y)) if x == y)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
