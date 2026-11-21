@@ -653,10 +653,15 @@ fn make_tmp() -> Result<String, Failure> {
             .map(|x| ALPHA[*x as usize % ALPHA.len()] as char)
             .collect();
         let dir = jspath::join(&[&base, &format!("spawnloft-mrpack-{tag}")]);
-        let mut builder = std::fs::DirBuilder::new();
         // `fs.mkdtempSync` makes the folder 0700: what is staged in it is checked, then copied
         #[cfg(unix)]
-        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        let builder = {
+            let mut b = std::fs::DirBuilder::new();
+            std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
+            b
+        };
+        #[cfg(not(unix))]
+        let builder = std::fs::DirBuilder::new();
         match builder.create(&dir) {
             Ok(()) => return Ok(dir),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
