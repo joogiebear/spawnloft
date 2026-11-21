@@ -1,0 +1,48 @@
+{
+  "about": "<data root>/instances.json as the registry writes it (src/registry.mjs, util.mjs writeJson): the exact text after each call, from an empty data root. Reads are instances.json. test/contracts-files.test.mjs makes the same calls in a scratch data root and compares the text byte for byte.",
+  "rules": {
+    "text": "JSON.stringify(data, null, 2) and one \\n; LF only, on every platform. No BOM.",
+    "keyOrder": "insertion order, never sorted: version then instances; servers in the order they were first put; a record keeps its own key order. updateInstance merges one level ({ ...old, ...patch }), so a patched key stays where it was and a new one goes at the end; null is written as null, not dropped. removeInstance then putInstance puts the server last.",
+    "write": "written to instances.json.tmp then renamed over instances.json (renameOver: up to 5 retries on EPERM/EBUSY/EACCES with 50 ms doubling waits), under instances.json.lock (locks.json). Neither file is left behind.",
+    "mode": "0600 on POSIX: the temp file is created with that mode and chmod-ed, so a wider older file is tightened. On Windows an explicit owner-only ACL (private-files.mjs) instead; mode is null there.",
+    "numbers": "integers as plain digits (ports); no other number type is written."
+  },
+  "placeholders": {
+    "<data>": "the data root"
+  },
+  "server": "every put uses { dir: <data>/instances/<name>, jar, java, memory, loader, port, rcon: { port, password }, createdAt } in that key order",
+  "steps": [
+    {
+      "call": "putInstance('survival', server)",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"survival\": {\n      \"dir\": \"<data>/instances/survival\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\"\n    }\n  }\n}\n",
+      "mode": "0600"
+    },
+    {
+      "call": "putInstance('lobby', server)",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"survival\": {\n      \"dir\": \"<data>/instances/survival\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\"\n    },\n    \"lobby\": {\n      \"dir\": \"<data>/instances/lobby\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\"\n    }\n  }\n}\n",
+      "mode": "0600"
+    },
+    {
+      "call": "updateInstance('survival', { label: 'Survival', port: 25570, webhook: null })",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"survival\": {\n      \"dir\": \"<data>/instances/survival\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25570,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\",\n      \"label\": \"Survival\",\n      \"webhook\": null\n    },\n    \"lobby\": {\n      \"dir\": \"<data>/instances/lobby\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\"\n    }\n  }\n}\n",
+      "mode": "0600"
+    },
+    {
+      "call": "updateInstance('lobby', { autoRestart: true })",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"survival\": {\n      \"dir\": \"<data>/instances/survival\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25570,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\",\n      \"label\": \"Survival\",\n      \"webhook\": null\n    },\n    \"lobby\": {\n      \"dir\": \"<data>/instances/lobby\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\",\n      \"autoRestart\": true\n    }\n  }\n}\n",
+      "mode": "0600"
+    },
+    {
+      "call": "removeInstance('survival')",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"lobby\": {\n      \"dir\": \"<data>/instances/lobby\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\",\n      \"autoRestart\": true\n    }\n  }\n}\n",
+      "mode": "0600"
+    },
+    {
+      "call": "putInstance('survival', server)",
+      "text": "{\n  \"version\": 1,\n  \"instances\": {\n    \"lobby\": {\n      \"dir\": \"<data>/instances/lobby\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25566,\n      \"rcon\": {\n        \"port\": 25576,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\",\n      \"autoRestart\": true\n    },\n    \"survival\": {\n      \"dir\": \"<data>/instances/survival\",\n      \"jar\": \"paper-1.21.4-232.jar\",\n      \"java\": \"java\",\n      \"memory\": \"4G\",\n      \"loader\": \"paper\",\n      \"port\": 25565,\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2\"\n      },\n      \"createdAt\": \"2026-11-21T03:00:00.000Z\"\n    }\n  }\n}\n",
+      "mode": "0600"
+    }
+  ],
+  "lockLeft": false,
+  "tmpLeft": false
+}

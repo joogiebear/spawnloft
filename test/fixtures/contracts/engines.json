@@ -1,0 +1,45 @@
+{
+  "about": "The database engine store, <data>/engines: one folder per engine version, and spawnloft-engine.json inside it saying what was installed. hasEngine compares the marker with this process, so Rust must write Node's platform and arch names (win32, darwin, linux; x64, arm64), never Rust's (windows, macos; x86_64, aarch64). test/contracts-files.test.mjs lays out a Garnet engine in a scratch data root with each marker and asks garnet.mjs hasEngine.",
+  "folders": {
+    "asserted": "live (engineDir)",
+    "garnet": "<data>/engines/garnet-2.1.7",
+    "mariadb": "<data>/engines/mariadb-11.4.5",
+    "mysqlOnLinuxX64": "<data>/engines/mysql-8.4.11-linux-x64",
+    "note": "mysql-<version>-<platform>-<arch> with Node names; garnet-<version> and mariadb-<version> have none"
+  },
+  "markers": {
+    "asserted": "source (written after a verified download)",
+    "text": "JSON.stringify(value): one line, no spaces, no trailing newline",
+    "garnet": {
+      "keyOrder": [
+        "version",
+        "platform",
+        "arch",
+        "sha256"
+      ],
+      "source": "fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, platform: process.platform, arch: process.arch, sha256: archive.sha256 }))",
+      "read": "platform, arch and sha256 must all equal this process's and the pinned archive's, and the .NET runtime folder must exist"
+    },
+    "mysql": {
+      "keyOrder": [
+        "version",
+        "arch",
+        "sha256"
+      ],
+      "source": "fs.writeFileSync(path.join(unpacked, 'spawnloft-engine.json'), JSON.stringify({ version, arch: process.arch, sha256: archive.sha256 }))",
+      "read": "only sha256 is compared, with the archive for this platform and arch"
+    },
+    "mariadb": {
+      "note": "no marker: an engine is there when its server binary is"
+    }
+  },
+  "hasEngine": {
+    "asserted": "live where Garnet has a pinned archive for this machine",
+    "garnet": {
+      "node": true,
+      "rustNames": false,
+      "rustArchOnly": false,
+      "extraField": true
+    }
+  }
+}

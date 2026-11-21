@@ -1,0 +1,105 @@
+{
+  "about": "Zips as src/zip.mjs createZip writes them: world exports where the tar cannot write zip (GNU tar, so Linux), the file browser's zip action and the diagnostics bundle. test/contracts-files.test.mjs zips the tree below and reads the central directory back byte by byte.",
+  "asserted": "live",
+  "tree": [
+    "world/level.dat",
+    "world/region/r.0.0.mca",
+    "world/B.txt",
+    "world/_x.txt",
+    "world/a.txt (empty)",
+    "world/Zed/z.txt",
+    "world/DIM-1/ (empty folder)",
+    "icon.png"
+  ],
+  "members": [
+    "world",
+    "icon.png"
+  ],
+  "rules": {
+    "order": "members in the order given; inside each, depth first, a folder before its contents, names in plain code-unit order (Array.prototype.sort, not localeCompare: B < Zed < _x < a), folders and files mixed. Links, sockets and devices are skipped.",
+    "names": "relative paths with /, folders ending in /, UTF-8, general purpose flag 0x0800 (UTF-8 names) on every entry, no data descriptors (each local header is patched after its data).",
+    "method": "0 (stored) for folders and empty files, 8 (deflate, zlib raw) for everything else",
+    "versions": "made by 0x032d (Unix, 4.5); needed 20, or 45 with zip64 fields, which are written only when a size or offset passes 32 bits (or a file is within 64 KiB of 4 GiB)",
+    "attributes": "external attributes: (st_mode & 0xffff) << 16, | 0x10 for a folder. Node gives Windows files S_IFREG and folders S_IFDIR too.",
+    "time": "DOS date and time from the file's mtime in LOCAL time, years clamped to 1980..2107",
+    "end": "no archive comment"
+  },
+  "common": [
+    {
+      "madeBy": 813,
+      "needed": 20,
+      "flags": 2048,
+      "local": "20/2048"
+    }
+  ],
+  "entries": [
+    [
+      "world/",
+      0,
+      true,
+      "dir"
+    ],
+    [
+      "world/B.txt",
+      8,
+      false,
+      "file"
+    ],
+    [
+      "world/DIM-1/",
+      0,
+      true,
+      "dir"
+    ],
+    [
+      "world/Zed/",
+      0,
+      true,
+      "dir"
+    ],
+    [
+      "world/Zed/z.txt",
+      8,
+      false,
+      "file"
+    ],
+    [
+      "world/_x.txt",
+      8,
+      false,
+      "file"
+    ],
+    [
+      "world/a.txt",
+      0,
+      false,
+      "file"
+    ],
+    [
+      "world/level.dat",
+      8,
+      false,
+      "file"
+    ],
+    [
+      "world/region/",
+      0,
+      true,
+      "dir"
+    ],
+    [
+      "world/region/r.0.0.mca",
+      8,
+      false,
+      "file"
+    ],
+    [
+      "icon.png",
+      8,
+      false,
+      "file"
+    ]
+  ],
+  "total": 11,
+  "exclude": "world exports pass exclude ['session.lock'] (EXCLUDE_ARGS without --exclude): a basename skipped anywhere"
+}

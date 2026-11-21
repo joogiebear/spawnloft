@@ -1,0 +1,100 @@
+{
+  "about": "The game launcher's files under <data>/client: profiles, accounts, the version store and the profile's servers.dat. Nobody should have to sign in again or download a version again after an update. test/contracts-files.test.mjs makes two profiles, an offline account and a server list in a scratch data root and compares the text and bytes.",
+  "layout": {
+    "asserted": "live (client-paths.mjs)",
+    "paths": {
+      "profilesFile": "client/profiles.json",
+      "accountsFile": "client/accounts.json",
+      "profileDir": "client/profiles/vanilla-1",
+      "versionJson": "client/versions/1.21.4/1.21.4.json",
+      "versionJar": "client/versions/1.21.4/1.21.4.jar",
+      "libraries": "client/libraries",
+      "assets": "client/assets",
+      "logConfig": "client/assets/log_configs/client-1.12.xml",
+      "natives": "client/natives/1.21.4",
+      "runtime": "client/runtime",
+      "cache": "client/cache",
+      "runState": "client/run/vanilla-1/state.json",
+      "lastExit": "client/run/vanilla-1/last-exit.json",
+      "played": "client/run/vanilla-1/played.json",
+      "serverListState": "client/run/vanilla-1/server-list.json",
+      "clientLog": "client/run/vanilla-1/client.log",
+      "launchLock": "client/run/vanilla-1/launch.lock"
+    },
+    "note": "relative to the data root, / separators. Mojang's own layout under versions/, libraries/ and assets/ (objects/ and indexes/), so a store is shared by every profile."
+  },
+  "profiles": {
+    "asserted": "live",
+    "text": "util.mjs writeJson; { version: 1, profiles: { <name>: profile }, defaultAccount?: <uuid> }, profiles in creation order. A new profile's keys: mc, loader, loaderVersion, java, memory, harness, server, account, assistantAccount, serverList (only when false), createdAt. A new profile folder gets options.txt with lang:en_us.",
+    "observed": {
+      "text": "{\n  \"version\": 1,\n  \"profiles\": {\n    \"vanilla-1\": {\n      \"mc\": \"1.21.4\",\n      \"loader\": \"vanilla\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"2G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"createdAt\": \"<at>\"\n    },\n    \"fabric-1\": {\n      \"mc\": \"1.21.4\",\n      \"loader\": \"fabric\",\n      \"loaderVersion\": null,\n      \"java\": null,\n      \"memory\": \"4G\",\n      \"harness\": false,\n      \"server\": null,\n      \"account\": null,\n      \"assistantAccount\": false,\n      \"serverList\": false,\n      \"createdAt\": \"<at>\"\n    }\n  }\n}\n",
+      "options": "lang:en_us\n"
+    }
+  },
+  "accounts": {
+    "asserted": "live",
+    "text": "util.mjs writeJson with strict owner-only protection: 0600 on POSIX, an owner-only ACL on Windows, and not written at all when that fails. { version: 1, accounts: [...] }. An offline entry is { type, name, uuid } with the uuid of an offline-mode server (md5 of OfflinePlayer:<name>, version 3); a Microsoft entry also holds its tokens and expiresAt.",
+    "observed": {
+      "text": "{\n  \"version\": 1,\n  \"accounts\": [\n    {\n      \"type\": \"offline\",\n      \"name\": \"Steve\",\n      \"uuid\": \"5627dd98-e6be-3c21-b8a8-e92344183641\"\n    }\n  ]\n}\n",
+      "mode": "0600"
+    }
+  },
+  "serversDat": {
+    "asserted": "live",
+    "about": "The profile's servers.dat (client-server-list.mjs): uncompressed NBT, an unnamed compound holding the list \"servers\" of compounds; SpawnLoft adds { name, ip } entries in that key order and remembers which are its own in <data>/client/run/<profile>/server-list.json, written before and after the list. The list is written to servers.dat.spawnloft.tmp, fsync-ed and renamed. Strings are Java modified UTF-8. Entries the player made are never touched.",
+    "wanted": [
+      {
+        "key": "survival",
+        "name": "Survival (SpawnLoft)",
+        "ip": "127.0.0.1:25565"
+      },
+      {
+        "key": "lobby",
+        "name": "lobby",
+        "ip": "localhost:25566"
+      }
+    ],
+    "first": {
+      "result": {
+        "changed": true,
+        "added": 2,
+        "updated": 0,
+        "removed": 0,
+        "skipped": null
+      },
+      "hex": "0a0000090007736572766572730a000000020800046e616d650014537572766976616c2028537061776e4c6f6674290800026970000f3132372e302e302e313a3235353635000800046e616d6500056c6f6262790800026970000f6c6f63616c686f73743a32353536360000",
+      "state": "{\n  \"version\": 1,\n  \"entries\": {\n    \"survival\": {\n      \"ip\": \"127.0.0.1:25565\",\n      \"name\": \"Survival (SpawnLoft)\",\n      \"state\": \"ours\"\n    },\n    \"lobby\": {\n      \"ip\": \"localhost:25566\",\n      \"name\": \"lobby\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+    },
+    "afterRemovingLobby": {
+      "result": {
+        "changed": true,
+        "added": 0,
+        "updated": 0,
+        "removed": 1,
+        "skipped": null
+      },
+      "hex": "0a0000090007736572766572730a000000010800046e616d650014537572766976616c2028537061776e4c6f6674290800026970000f3132372e302e302e313a32353536350000",
+      "state": "{\n  \"version\": 1,\n  \"entries\": {\n    \"survival\": {\n      \"ip\": \"127.0.0.1:25565\",\n      \"name\": \"Survival (SpawnLoft)\",\n      \"state\": \"ours\"\n    }\n  }\n}\n"
+    }
+  },
+  "storeFiles": {
+    "asserted": "source",
+    "files": [
+      {
+        "file": "client/cache/verified.json",
+        "writer": "client-install.mjs saveLedger",
+        "text": "JSON.stringify({ format: 1, files }), one line, no newline; a cache"
+      },
+      {
+        "file": "client/runtime/index.json",
+        "writer": "client-java.mjs writeRuntimeIndex",
+        "text": "JSON.stringify(index, null, 2), no newline, under runtime/index.lock"
+      },
+      {
+        "file": "client/natives/<id>/.complete and the assets tree .complete",
+        "writer": "client-install.mjs",
+        "text": "a stamp with no newline (the index sha1 for assets)"
+      }
+    ]
+  }
+}

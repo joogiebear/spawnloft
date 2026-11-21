@@ -1,0 +1,282 @@
+{
+  "about": "What a scheduled task and a server folder run, as text: the task shims, the server launchers, the launchd plists, the systemd units and the schtasks command lines (Windows writes no Task Scheduler XML: the task is made with schtasks /Create and holds only the shim path). The text comes from SPAWNLOFT_ENTRY, the core's own path, so Rust can reproduce it and RUNTIME_FORMAT stays 2. test/contracts-files.test.mjs generates every text from the Node functions with the inputs below; \"asserted\" says how: live (the Node writer ran), source (the template was checked in the source and its formula run, because the writer only runs on another platform).",
+  "placeholders": {
+    "<entry>": "the spawnloft-core path: a 2.0 install, SPAWNLOFT_ENTRY set",
+    "<node>": "the running executable: a checkout or 1.x build, SPAWNLOFT_ENTRY unset",
+    "<mcctl>": "<code>/mcctl.mjs",
+    "<data>": "the data root",
+    "<home>": "$HOME of the process that wrote the shim",
+    "<config>": "$XDG_CONFIG_HOME of that process",
+    "<ns>": "the first 16 hex digits of sha256(<data>), so two data folders on one machine do not share task names"
+  },
+  "task": {
+    "id": "survival-backup",
+    "schedules": {
+      "minutes": {
+        "kind": "minutes",
+        "every": 30
+      },
+      "hourly": {
+        "kind": "hourly",
+        "every": 2
+      },
+      "daily": {
+        "kind": "daily",
+        "at": "03:00"
+      },
+      "weekly": {
+        "kind": "weekly",
+        "day": "SUN",
+        "at": "23:30"
+      },
+      "onlogon": {
+        "kind": "onlogon"
+      }
+    },
+    "enabledExceptHourly": "the plist for hourly is written with enabled false, to show Disabled"
+  },
+  "shims": {
+    "posix": {
+      "asserted": "live",
+      "about": "<data>/tasks/<id>.sh, mode 0700, run by launchd and systemd as /bin/sh <file> (schedule-mac.mjs writeShim; Linux uses the same). Exports SPAWNLOFT_DATA_ROOT, then the runner's own environment (ELECTRON_RUN_AS_NODE=1 when not an entry binary: written for a 1.x desktop build, harmless under node), then HOME, APPDATA, XDG_CONFIG_HOME and XDG_DATA_HOME, each only if set in the writer's environment, in that order. Every value and argument is single-quoted, a quote inside written as '\\''. LF.",
+      "entry": {
+        "file": "<data>/tasks/survival-backup.sh",
+        "text": "#!/bin/sh\nexport SPAWNLOFT_DATA_ROOT='<data>'\nexport HOME='<home>'\nexport XDG_CONFIG_HOME='<config>'\nexec '<entry>' task run 'survival-backup'\n",
+        "mode": "0700"
+      },
+      "checkout": {
+        "file": "<data>/tasks/survival-backup.sh",
+        "text": "#!/bin/sh\nexport SPAWNLOFT_DATA_ROOT='<data>'\nexport ELECTRON_RUN_AS_NODE='1'\nexport HOME='<home>'\nexport XDG_CONFIG_HOME='<config>'\nexec '<node>' '<mcctl>' task run 'survival-backup'\n",
+        "mode": "0700"
+      }
+    },
+    "windows": {
+      "asserted": "live on Windows (rewriteShims), source elsewhere",
+      "about": "<data>\\tasks\\<id>.cmd (schedule.mjs writeShim): @echo off, entry.mjs windowsRun lines, exit /b %errorlevel%, joined and ended with CRLF. windowsRun: set KEY=VALUE for each runner variable, then the runner quoted (a checkout whose executable is node or node.exe writes bare node, a PATH lookup), each argument quoted, then the command; every % in a path or value doubled.",
+      "source": [
+        "const lines = ['@echo off', ...windowsRun(cliCommand(), `task run ${id}`), 'exit /b %errorlevel%']",
+        "fs.writeFileSync(shim, lines.join('\\r\\n') + '\\r\\n')"
+      ],
+      "entry": "@echo off\r\n\"<entry>\" task run survival-backup\r\nexit /b %errorlevel%\r\n",
+      "checkout": "@echo off\r\nnode \"<mcctl>\" task run survival-backup\r\nexit /b %errorlevel%\r\n"
+    }
+  },
+  "launchers": {
+    "asserted": "live (writeLaunchers, with process.platform set to each platform for the call)",
+    "about": "start, console and stop in the server folder (create.mjs writeLaunchers): .sh on Linux, .bat on Windows and on macOS too (any platform but Linux). The .sh files are mode 0755 and single-quoted like the shims. The .bat files are a template literal in create.mjs: their lines end the way src/create.mjs is checked out (LF in an LF checkout, CRLF in a CRLF one), except windowsRun's set lines, which always end CRLF. The texts below are from an LF checkout; the test converts them when the source has CRLF.",
+    "server": "survival",
+    "files": {
+      "linux-entry": {
+        "start.sh": {
+          "text": "#!/bin/sh\n'<entry>' start 'survival' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<entry>' console 'survival'\n",
+          "mode": "0755"
+        },
+        "console.sh": {
+          "text": "#!/bin/sh\nexec '<entry>' console 'survival'\n",
+          "mode": "0755"
+        },
+        "stop.sh": {
+          "text": "#!/bin/sh\nexec '<entry>' stop 'survival'\n",
+          "mode": "0755"
+        }
+      },
+      "linux-checkout": {
+        "start.sh": {
+          "text": "#!/bin/sh\n'<node>' '<mcctl>' start 'survival' || { echo; echo 'Failed to start.'; exit 1; }\nexec '<node>' '<mcctl>' console 'survival'\n",
+          "mode": "0755"
+        },
+        "console.sh": {
+          "text": "#!/bin/sh\nexec '<node>' '<mcctl>' console 'survival'\n",
+          "mode": "0755"
+        },
+        "stop.sh": {
+          "text": "#!/bin/sh\nexec '<node>' '<mcctl>' stop 'survival'\n",
+          "mode": "0755"
+        }
+      },
+      "win32-entry": {
+        "start.bat": {
+          "text": "@echo off\ntitle survival - SpawnLoft\n\"<entry>\" start survival\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\n\"<entry>\" console survival\n",
+          "mode": null
+        },
+        "console.bat": {
+          "text": "@echo off\ntitle survival console - SpawnLoft\n\"<entry>\" console survival\npause\n",
+          "mode": null
+        },
+        "stop.bat": {
+          "text": "@echo off\ntitle survival - SpawnLoft\n\"<entry>\" stop survival\npause\n",
+          "mode": null
+        }
+      },
+      "win32-checkout": {
+        "start.bat": {
+          "text": "@echo off\ntitle survival - SpawnLoft\nnode \"<mcctl>\" start survival\nif errorlevel 1 (echo.& echo Failed to start. & pause & exit /b 1)\nnode \"<mcctl>\" console survival\n",
+          "mode": null
+        },
+        "console.bat": {
+          "text": "@echo off\ntitle survival console - SpawnLoft\nnode \"<mcctl>\" console survival\npause\n",
+          "mode": null
+        },
+        "stop.bat": {
+          "text": "@echo off\ntitle survival - SpawnLoft\nnode \"<mcctl>\" stop survival\npause\n",
+          "mode": null
+        }
+      }
+    }
+  },
+  "launchd": {
+    "asserted": "live (plist is pure)",
+    "about": "~/Library/LaunchAgents/<label>.plist, mode 0600 (schedule-mac.mjs plist): one line of plist XML after the two header lines, keys in this order, & < > \" ' escaped in strings, ending with a newline. Weekday is 0 for Sunday. Loaded with launchctl bootstrap gui/<uid>; enabled or disabled with launchctl enable/disable gui/<uid>/<label>.",
+    "names": {
+      "launchdLabel": "io.github.joogiebear.mcctl.<ns>.survival-backup",
+      "launchdFile": "~/Library/LaunchAgents/io.github.joogiebear.mcctl.<ns>.survival-backup.plist",
+      "systemdLabel": "spawnloft-<ns>-survival-backup"
+    },
+    "plists": {
+      "minutes": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.joogiebear.mcctl.<ns>.survival-backup</string><key>ProgramArguments</key><array><string>/bin/sh</string><string><data>/tasks/survival-backup.sh</string></array><key>WorkingDirectory</key><string><data></string><key>Disabled</key><false/><key>AbandonProcessGroup</key><true/><key>AssociatedBundleIdentifiers</key><array><string>io.github.joogiebear.mcctl</string></array><key>StartInterval</key><integer>1800</integer><key>StandardOutPath</key><string><data>/tasks/survival-backup.stdout.log</string><key>StandardErrorPath</key><string><data>/tasks/survival-backup.stderr.log</string></dict></plist>\n",
+      "hourly": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.joogiebear.mcctl.<ns>.survival-backup</string><key>ProgramArguments</key><array><string>/bin/sh</string><string><data>/tasks/survival-backup.sh</string></array><key>WorkingDirectory</key><string><data></string><key>Disabled</key><true/><key>AbandonProcessGroup</key><true/><key>AssociatedBundleIdentifiers</key><array><string>io.github.joogiebear.mcctl</string></array><key>StartInterval</key><integer>7200</integer><key>StandardOutPath</key><string><data>/tasks/survival-backup.stdout.log</string><key>StandardErrorPath</key><string><data>/tasks/survival-backup.stderr.log</string></dict></plist>\n",
+      "daily": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.joogiebear.mcctl.<ns>.survival-backup</string><key>ProgramArguments</key><array><string>/bin/sh</string><string><data>/tasks/survival-backup.sh</string></array><key>WorkingDirectory</key><string><data></string><key>Disabled</key><false/><key>AbandonProcessGroup</key><true/><key>AssociatedBundleIdentifiers</key><array><string>io.github.joogiebear.mcctl</string></array><key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict><key>StandardOutPath</key><string><data>/tasks/survival-backup.stdout.log</string><key>StandardErrorPath</key><string><data>/tasks/survival-backup.stderr.log</string></dict></plist>\n",
+      "weekly": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.joogiebear.mcctl.<ns>.survival-backup</string><key>ProgramArguments</key><array><string>/bin/sh</string><string><data>/tasks/survival-backup.sh</string></array><key>WorkingDirectory</key><string><data></string><key>Disabled</key><false/><key>AbandonProcessGroup</key><true/><key>AssociatedBundleIdentifiers</key><array><string>io.github.joogiebear.mcctl</string></array><key>StartCalendarInterval</key><dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>30</integer><key>Weekday</key><integer>0</integer></dict><key>StandardOutPath</key><string><data>/tasks/survival-backup.stdout.log</string><key>StandardErrorPath</key><string><data>/tasks/survival-backup.stderr.log</string></dict></plist>\n",
+      "onlogon": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.joogiebear.mcctl.<ns>.survival-backup</string><key>ProgramArguments</key><array><string>/bin/sh</string><string><data>/tasks/survival-backup.sh</string></array><key>WorkingDirectory</key><string><data></string><key>Disabled</key><false/><key>AbandonProcessGroup</key><true/><key>AssociatedBundleIdentifiers</key><array><string>io.github.joogiebear.mcctl</string></array><key>RunAtLoad</key><true/><key>StandardOutPath</key><string><data>/tasks/survival-backup.stdout.log</string><key>StandardErrorPath</key><string><data>/tasks/survival-backup.stderr.log</string></dict></plist>\n"
+    }
+  },
+  "systemd": {
+    "asserted": "live (serviceUnit and timerUnit are pure); the systemctl calls are live on Linux with a stand-in systemctl",
+    "about": "<config>/systemd/user/<label>.service and .timer, mode 0600 (schedule-linux.mjs). In units % is doubled everywhere; ExecStart's argument is double-quoted with \\ and \" escaped and $ doubled. onlogon has no timer: the service is WantedBy=default.target and enabled without --now.",
+    "units": {
+      "minutes": {
+        "service": "[Unit]\nDescription=SpawnLoft task survival-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<data>/tasks/survival-backup.sh\"\nWorkingDirectory=<data>\nKillMode=process\nStandardOutput=append:<data>/tasks/survival-backup.stdout.log\nStandardError=append:<data>/tasks/survival-backup.stderr.log\n",
+        "timer": "[Unit]\nDescription=SpawnLoft schedule survival-backup\n\n[Timer]\nOnActiveSec=1800s\nOnUnitActiveSec=1800s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+      },
+      "hourly": {
+        "service": "[Unit]\nDescription=SpawnLoft task survival-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<data>/tasks/survival-backup.sh\"\nWorkingDirectory=<data>\nKillMode=process\nStandardOutput=append:<data>/tasks/survival-backup.stdout.log\nStandardError=append:<data>/tasks/survival-backup.stderr.log\n",
+        "timer": "[Unit]\nDescription=SpawnLoft schedule survival-backup\n\n[Timer]\nOnActiveSec=7200s\nOnUnitActiveSec=7200s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+      },
+      "daily": {
+        "service": "[Unit]\nDescription=SpawnLoft task survival-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<data>/tasks/survival-backup.sh\"\nWorkingDirectory=<data>\nKillMode=process\nStandardOutput=append:<data>/tasks/survival-backup.stdout.log\nStandardError=append:<data>/tasks/survival-backup.stderr.log\n",
+        "timer": "[Unit]\nDescription=SpawnLoft schedule survival-backup\n\n[Timer]\nOnCalendar=*-*-* 03:00:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+      },
+      "weekly": {
+        "service": "[Unit]\nDescription=SpawnLoft task survival-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<data>/tasks/survival-backup.sh\"\nWorkingDirectory=<data>\nKillMode=process\nStandardOutput=append:<data>/tasks/survival-backup.stdout.log\nStandardError=append:<data>/tasks/survival-backup.stderr.log\n",
+        "timer": "[Unit]\nDescription=SpawnLoft schedule survival-backup\n\n[Timer]\nOnCalendar=Sun *-*-* 23:30:00\nPersistent=true\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n"
+      },
+      "onlogon": {
+        "service": "[Unit]\nDescription=SpawnLoft task survival-backup\n\n[Service]\nType=oneshot\nExecStart=/bin/sh \"<data>/tasks/survival-backup.sh\"\nWorkingDirectory=<data>\nKillMode=process\nStandardOutput=append:<data>/tasks/survival-backup.stdout.log\nStandardError=append:<data>/tasks/survival-backup.stderr.log\n\n[Install]\nWantedBy=default.target\n",
+        "timer": null
+      }
+    },
+    "calls": {
+      "about": "systemctl --user, in this order, for a create of an enabled task and of a disabled one (update runs the same list as create). <label> is spawnloft-<ns>-<id>. The answers of is-active, is-enabled and disable are read but their exit codes are not checked.",
+      "createEnabled": [
+        "is-active <label>.service",
+        "is-enabled <label>.timer",
+        "is-enabled <label>.service",
+        "disable --now <label>.timer",
+        "disable <label>.service",
+        "daemon-reload",
+        "enable --now <label>.timer"
+      ],
+      "createDisabled": [
+        "is-active <label>.service",
+        "is-enabled <label>.timer",
+        "is-enabled <label>.service",
+        "disable --now <label>.timer",
+        "disable <label>.service",
+        "daemon-reload"
+      ]
+    }
+  },
+  "schtasks": {
+    "asserted": "source (triggerArgs is evaluated from src/schedule.mjs; schtasks only runs on Windows)",
+    "about": "The Windows task is made and changed by running schtasks with these arguments (schedule.mjs). The task path is \\mcctl\\<id>; /TR holds the shim path in its own double quotes so a path with spaces survives; /F overwrites by name, which keeps the run history.",
+    "calls": {
+      "create": {
+        "args": [
+          "/Create",
+          "/TN",
+          "mcctl\\<id>",
+          "/TR",
+          "\"<shim>\"",
+          "<trigger...>",
+          "/F"
+        ],
+        "source": "schtasks(['/Create', '/TN', `${TASK_FOLDER}\\\\${id}`, '/TR', `\"${shim}\"`, ...triggerArgs(task.schedule), '/F'])"
+      },
+      "disableAfterCreate": {
+        "args": [
+          "/Change",
+          "/TN",
+          "mcctl\\<id>",
+          "/DISABLE"
+        ],
+        "source": "if (!task.enabled) schtasks(['/Change', '/TN', `${TASK_FOLDER}\\\\${id}`, '/DISABLE'])"
+      },
+      "enableOrDisable": {
+        "args": [
+          "/Change",
+          "/TN",
+          "mcctl\\<id>",
+          "/ENABLE or /DISABLE"
+        ],
+        "source": "schtasks(['/Change', '/TN', `${TASK_FOLDER}\\\\${id}`, enabled ? '/ENABLE' : '/DISABLE'])"
+      },
+      "run": {
+        "args": [
+          "/Run",
+          "/TN",
+          "mcctl\\<id>"
+        ],
+        "source": "else schtasks(['/Run', '/TN', `${TASK_FOLDER}\\\\${id}`])"
+      },
+      "remove": {
+        "args": [
+          "/Delete",
+          "/TN",
+          "mcctl\\<id>",
+          "/F"
+        ],
+        "source": "const res = spawnSync('schtasks', ['/Delete', '/TN', `${TASK_FOLDER}\\\\${id}`, '/F'],"
+      },
+      "query": {
+        "args": [
+          "/Query",
+          "/TN",
+          "mcctl\\<id>"
+        ],
+        "source": "const res = spawnSync('schtasks', ['/Query', '/TN', `${TASK_FOLDER}\\\\${id}`],"
+      }
+    },
+    "triggers": {
+      "minutes": [
+        "/SC",
+        "MINUTE",
+        "/MO",
+        "30"
+      ],
+      "hourly": [
+        "/SC",
+        "HOURLY",
+        "/MO",
+        "2"
+      ],
+      "daily": [
+        "/SC",
+        "DAILY",
+        "/ST",
+        "03:00"
+      ],
+      "weekly": [
+        "/SC",
+        "WEEKLY",
+        "/D",
+        "SUN",
+        "/ST",
+        "23:30"
+      ],
+      "onlogon": [
+        "/SC",
+        "ONLOGON"
+      ]
+    }
+  }
+}

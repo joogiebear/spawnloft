@@ -1,0 +1,60 @@
+{
+  "about": "<data root>/run/runtime.json, the record of what the task shims and server launchers run (src/relocate.mjs repairAfterMove, called by the panel at every start, ui.mjs serve, and by `spawnloft repair` with force). If format, exe or root differ from this process's, or there is no readable record, every shim and launcher is rewritten and the record is written again. test/contracts-files.test.mjs runs each case.",
+  "shape": {
+    "object": {
+      "format": {
+        "const": 2
+      },
+      "exe": "string",
+      "root": "string"
+    },
+    "extra": true
+  },
+  "rules": {
+    "signature": "format is RUNTIME_FORMAT (2: 2.0 files run spawnloft-core); exe is SPAWNLOFT_ENTRY when it names an existing file (a 2.0 install), else the running executable; root is the Node code folder (paths.mjs ROOT, the folder holding src/ and mcctl.mjs: <resources>/core in a package), resolved, with no trailing separator.",
+    "compare": "only those three fields, with ===. Other fields are left for whoever wrote them.",
+    "text": "JSON.stringify({ ...recorded, ...signature }, null, 2) and \\n: a recorded key keeps its place, so format, exe and root stay where an older record had them and are added at the end otherwise. A record that matches is not rewritten at all.",
+    "rust": "While both sides live, Rust writes root as the string Node computes (<resources>/core), or each would rewrite every shim after the other ran (PLAN-CORE-PORT.md 3.4). From C10 Rust ignores root when comparing."
+  },
+  "placeholders": {
+    "<entry>": "the spawnloft-core path (SPAWNLOFT_ENTRY)",
+    "<code>": "the Node code folder"
+  },
+  "signature": {
+    "format": 2,
+    "exe": "<entry>",
+    "root": "<code>"
+  },
+  "cases": [
+    {
+      "what": "no record yet",
+      "before": null,
+      "moved": true,
+      "after": "{\n  \"format\": 2,\n  \"exe\": \"<entry>\",\n  \"root\": \"<code>\"\n}\n"
+    },
+    {
+      "what": "the same three fields: left alone, byte for byte",
+      "before": "{\"format\":2,\"exe\":\"<entry>\",\"root\":\"<code>\"}",
+      "moved": false,
+      "after": "{\"format\":2,\"exe\":\"<entry>\",\"root\":\"<code>\"}"
+    },
+    {
+      "what": "an older format, with a field of its own",
+      "before": "{\"format\":1,\"exe\":\"<entry>\",\"root\":\"<code>\",\"by\":\"1.5.0\"}",
+      "moved": true,
+      "after": "{\n  \"format\": 2,\n  \"exe\": \"<entry>\",\n  \"root\": \"<code>\",\n  \"by\": \"1.5.0\"\n}\n"
+    },
+    {
+      "what": "a record with other keys first",
+      "before": "{\"mine\":true,\"root\":\"/old\"}",
+      "moved": true,
+      "after": "{\n  \"mine\": true,\n  \"root\": \"<code>\",\n  \"format\": 2,\n  \"exe\": \"<entry>\"\n}\n"
+    },
+    {
+      "what": "an unreadable record counts as moved",
+      "before": "not json",
+      "moved": true,
+      "after": "{\n  \"format\": 2,\n  \"exe\": \"<entry>\",\n  \"root\": \"<code>\"\n}\n"
+    }
+  ]
+}

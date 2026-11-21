@@ -1,0 +1,91 @@
+{
+  "about": "What a scheduled task leaves behind: one line per run in <data>/run/<server>/tasks.log (mcctl.mjs runTask, record), read back by the panel (schedule.mjs recentRuns), and schedules.json as create and update write it (the definitions and every field are schedules.json). test/contracts-files.test.mjs runs `spawnloft task run` for a command task of a stopped server and compares the line, runs the reader on the lines below, and on Linux creates tasks through schedule.mjs with a stand-in systemctl.",
+  "tasksLog": {
+    "file": "<data>/run/<server>/tasks.log, appended; the folder is made if missing. A failed append is ignored (the exit code still reaches the scheduler).",
+    "line": "<ISO time>\\t<task id>\\t<status>\\t<action type>\\t<detail>\\n, the same line printed on stdout. status is ok, skipped or FAILED. Tabs, CR and LF runs in the detail become one space.",
+    "lineRegex": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z\\t[A-Za-z0-9_-]+\\t(ok|skipped|FAILED)\\t[a-z]+\\t[^\\t\\r\\n]*$",
+    "exitCodes": "ok and skipped exit 0; FAILED sets exit code 1 (what Task Scheduler, launchd and systemd record).",
+    "run": {
+      "asserted": "live",
+      "task": "survival-command",
+      "status": 0,
+      "line": "<at>\tsurvival-command\tskipped\tcommand\tthe server was not running, so nothing was sent\n",
+      "stdout": "<at>\tsurvival-command\tskipped\tcommand\tthe server was not running, so nothing was sent\n"
+    },
+    "reader": {
+      "asserted": "live",
+      "rules": "lines split on \\r?\\n; a line with fewer than three tab-separated parts is skipped; a second part of ok or FAILED is the older line without an id; a status other than ok or skipped reads as FAILED; the detail is everything after the fourth tab, tabs kept; a line whose time does not parse is skipped; newest first, at most 40 (limit).",
+      "file": "2026-11-20T03:00:00.000Z\tsurvival-backup\tok\tbackup\tstandard_2026-11-20_030000.tar.gz (1.2 MB)\n2026-11-20T04:00:00.000Z\tok\tbackup\tan older line, without the id\n2026-11-20T05:00:00.000Z\tsurvival-command\tFAILED\tcommand\tdetail\twith a tab\n2026-11-20T06:00:00.000Z\tsurvival-command\tweird\tcommand\tan unknown status reads as FAILED\nnot a time\tsurvival-command\tok\tcommand\tskipped: no time\ntoo\tshort\n\n2026-11-20T07:00:00.000Z\tsurvival-restart\tskipped\trestart\tit was already stopped\r\n",
+      "rows": [
+        {
+          "at": "2026-11-20T07:00:00.000Z",
+          "id": "survival-restart",
+          "status": "skipped",
+          "action": "restart",
+          "detail": "it was already stopped"
+        },
+        {
+          "at": "2026-11-20T06:00:00.000Z",
+          "id": "survival-command",
+          "status": "FAILED",
+          "action": "command",
+          "detail": "an unknown status reads as FAILED"
+        },
+        {
+          "at": "2026-11-20T05:00:00.000Z",
+          "id": "survival-command",
+          "status": "FAILED",
+          "action": "command",
+          "detail": "detail\twith a tab"
+        },
+        {
+          "at": "2026-11-20T04:00:00.000Z",
+          "id": null,
+          "status": "ok",
+          "action": "backup",
+          "detail": "an older line, without the id"
+        },
+        {
+          "at": "2026-11-20T03:00:00.000Z",
+          "id": "survival-backup",
+          "status": "ok",
+          "action": "backup",
+          "detail": "standard_2026-11-20_030000.tar.gz (1.2 MB)"
+        }
+      ]
+    }
+  },
+  "schedulesWrites": {
+    "asserted": "live on Linux (a stand-in systemctl); the text rule is the same on every platform",
+    "text": "JSON.stringify(data, null, 2) and \\n (util.mjs writeJson, temp file and rename, under schedules.lock). Ids in creation order; a task's keys always instance, name, action, schedule, enabled, owner, createdAt. An empty name is stored as the action's label. On launchd and systemd the definition is saved before the scheduler call and rolled back if it fails; on Windows after schtasks accepts it.",
+    "ids": [
+      "survival-backup",
+      "survival-command"
+    ],
+    "createEnabled": [
+      "is-active <label>.service",
+      "is-enabled <label>.timer",
+      "is-enabled <label>.service",
+      "disable --now <label>.timer",
+      "disable <label>.service",
+      "daemon-reload",
+      "enable --now <label>.timer"
+    ],
+    "createDisabled": [
+      "is-active <label>.service",
+      "is-enabled <label>.timer",
+      "is-enabled <label>.service",
+      "disable --now <label>.timer",
+      "disable <label>.service",
+      "daemon-reload"
+    ],
+    "afterCreate": "{\n  \"version\": 1,\n  \"tasks\": {\n    \"survival-backup\": {\n      \"instance\": \"survival\",\n      \"name\": \"Nightly backup\",\n      \"action\": {\n        \"type\": \"backup\",\n        \"keep\": 7\n      },\n      \"schedule\": {\n        \"kind\": \"daily\",\n        \"at\": \"03:00\"\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<at>\"\n    },\n    \"survival-command\": {\n      \"instance\": \"survival\",\n      \"name\": \"Run a server command\",\n      \"action\": {\n        \"type\": \"command\",\n        \"line\": \"say hi\"\n      },\n      \"schedule\": {\n        \"kind\": \"minutes\",\n        \"every\": 15\n      },\n      \"enabled\": false,\n      \"owner\": null,\n      \"createdAt\": \"<at>\"\n    }\n  }\n}\n",
+    "afterEnable": "{\n  \"version\": 1,\n  \"tasks\": {\n    \"survival-backup\": {\n      \"instance\": \"survival\",\n      \"name\": \"Nightly backup\",\n      \"action\": {\n        \"type\": \"backup\",\n        \"keep\": 7\n      },\n      \"schedule\": {\n        \"kind\": \"daily\",\n        \"at\": \"03:00\"\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<at>\"\n    },\n    \"survival-command\": {\n      \"instance\": \"survival\",\n      \"name\": \"Run a server command\",\n      \"action\": {\n        \"type\": \"command\",\n        \"line\": \"say hi\"\n      },\n      \"schedule\": {\n        \"kind\": \"minutes\",\n        \"every\": 15\n      },\n      \"enabled\": true,\n      \"owner\": null,\n      \"createdAt\": \"<at>\"\n    }\n  }\n}\n",
+    "units": [
+      "spawnloft-<ns>-survival-backup.service",
+      "spawnloft-<ns>-survival-backup.timer",
+      "spawnloft-<ns>-survival-command.service",
+      "spawnloft-<ns>-survival-command.timer"
+    ]
+  }
+}

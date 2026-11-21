@@ -4,6 +4,7 @@
 
 pub mod activity;
 pub mod build;
+pub mod collate;
 pub mod crashguard;
 pub mod daemon;
 pub mod diagnose;
