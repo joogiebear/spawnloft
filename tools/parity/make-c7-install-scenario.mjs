@@ -178,8 +178,6 @@ const versions = {
     id: 'lib-bad-sum', type: 'snapshot', assetIndex: assetIndex('empty', []),
     libraries: [{ name: 'com.example:bent:1.0', downloads: { artifact: artifact('com/example/bent/1.0/bent-1.0.jar', filler(80, 12), { sum: '0'.repeat(40) }) } }],
   },
-<<<<<<< HEAD
-=======
   // eight workers start together: the first library refused, the next seven are still fetched
   'many-made': {
     id: 'many-made', type: 'snapshot', assetIndex: assetIndex('empty', []),
@@ -192,7 +190,6 @@ const versions = {
     id: 'hostile-natives', type: 'snapshot', assetIndex: assetIndex('empty', []),
     libraries: ['linux', 'osx', 'windows'].map((os) => lib(`org.evil:natives:1.0:natives-${os === 'osx' ? 'macos-arm64' : os}`, zip([['ok.so', 'fine'], ['../../escaped.so', 'bad']]), { rules: [{ action: 'allow', os: { name: os } }] })),
   },
->>>>>>> origin/v2
   'loader-made': {
     id: 'loader-made', type: 'snapshot', assetIndex: assetIndex('empty', []),
     libraries: [{ name: 'com.example:made:1.0', downloads: { artifact: { path: 'com/example/made/1.0/made-1.0.jar', url: '', sha1: sha1('made'), size: 4 } } }],
@@ -209,19 +206,11 @@ for (const [id, v] of Object.entries(versions)) {
 hosts[META].routes['GET /mc/game/version_manifest_v2.json'] = { json: { latest: { release: '1.20.1', snapshot: 'escape' }, versions: manifestRows } }
 
 const profile = (mc, loader = 'vanilla') => ({ mc, loader, loaderVersion: null, memory: '2G', java: null, server: null, harness: false, account: null })
-<<<<<<< HEAD
-const profiles = { m: profile('1.20.1'), old: profile('1.6.4'), res: profile('1.5.2'), lwjgl2: profile('1.12.2'), odd: profile('odd-layout'), esc: profile('escape'), gone: profile('lib-missing'), bent: profile('lib-bad-sum'), made: profile('loader-made'), unlisted: profile('9.9.9'), fab: profile('1.20.1', 'fabric') }
-
-const run = (args, code, more = {}) => ({ run: ['client', ...args], ...(code === null ? {} : { expect: { code } }), ...more })
-const scenario = {
-  about: 'C7 part 3b: client install over faked Mojang hosts (made by make-c7-install-scenario.mjs). A modern version with its jar, log config, asset index, duplicate libraries and assets, and natives for every OS and arch (extracted without META-INF), installed again from the checked-files list, a damaged library fetched again, natives extracted again after their stamp goes, --verify; the virtual and resources asset layouts; an LWJGL 2 version with old-style natives and excludes (Linux arm64 and the arm64 Mac refuse it); an unknown layout, an index path that leaves its folder, a missing library, a checksum mismatch, a library only a loader makes, a version not in the list, an unknown profile, usage errors, and a Fabric profile, which the Node core still sets up.',
-=======
 const profiles = { m: profile('1.20.1'), old: profile('1.6.4'), res: profile('1.5.2'), lwjgl2: profile('1.12.2'), odd: profile('odd-layout'), esc: profile('escape'), gone: profile('lib-missing'), bent: profile('lib-bad-sum'), made: profile('loader-made'), many: profile('many-made'), hostile: profile('hostile-natives'), unlisted: profile('9.9.9'), fab: profile('1.20.1', 'fabric') }
 
 const run = (args, code, more = {}) => ({ run: ['client', ...args], ...(code === null ? {} : { expect: { code } }), ...more })
 const scenario = {
   about: 'C7 part 3b: client install over faked Mojang hosts (made by make-c7-install-scenario.mjs). A modern version with its jar, log config, asset index, duplicate libraries and assets, and natives for every OS and arch (extracted without META-INF), installed again from the checked-files list, a damaged library fetched again, natives extracted again after their stamp goes, --verify; the virtual and resources asset layouts; an LWJGL 2 version with old-style natives and excludes (Linux arm64 and the arm64 Mac refuse it); an unknown layout, an index path that leaves its folder, a missing library, a checksum mismatch, a library only a loader makes (alone, and first of twelve, when the other seven workers still fetch theirs), a natives jar with an entry that leaves its folder, a version not in the list, an unknown profile, usage errors, and a Fabric profile, which the Node core still sets up.',
->>>>>>> origin/v2
   platforms: ['linux-x64', 'darwin', 'win32'],
   hosts,
   normalize: [
@@ -250,11 +239,8 @@ const scenario = {
     run(['install', 'gone'], 1),
     run(['install', 'bent', '--json'], 1),
     run(['install', 'made'], 1),
-<<<<<<< HEAD
-=======
     run(['install', 'many', '--json'], 1),
     run(['install', 'hostile', '--json'], 1),
->>>>>>> origin/v2
     run(['install', 'unlisted'], 1),
     run(['install', 'nosuch'], 1),
     run(['install', 'fab'], 1),
