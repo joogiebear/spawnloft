@@ -622,7 +622,8 @@ Victor's machines.
 
 Each has a recommendation; "go with your recommendations" closes all of them.
 
-- **Q1. When is the first public 2.0 beta?** Recommendation: after C10, as the all-Rust build.
+- **Q1. When is the first public 2.0 beta? Decided (Victor, decision card, 2026-11-21 02:56
+  UTC): "Yes, beta after the port".** The first public beta is the all-Rust build, after C10.
   No public user then ever has a bundled Node, there is one upgrade path to test instead of
   two, and a Node security release never forces a SpawnLoft release. The cost is that the
   finished installer, updater and window wait for the port before real users try them. The
