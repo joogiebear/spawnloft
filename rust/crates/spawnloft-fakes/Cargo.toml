@@ -28,3 +28,15 @@ path = "src/bin/lock-probe.rs"
 [[bin]]
 name = "registry-probe"
 path = "src/bin/registry-probe.rs"
+
+# Test-only: reads and writes zips through spawnloft-lib's zip module, for
+# test/zip-cross-process.test.mjs.
+[[bin]]
+name = "zip-probe"
+path = "src/bin/zip-probe.rs"
+
+# Test-only: the C1 network checks (name resolution and TLS in the static musl build, proxy
+# variables ignored), in the musl-network job of rust-internal.yml.
+[[bin]]
+name = "net-probe"
+path = "src/bin/net-probe.rs"

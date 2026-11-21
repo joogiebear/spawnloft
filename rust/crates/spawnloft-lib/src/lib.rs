@@ -4,12 +4,14 @@
 
 pub mod activity;
 pub mod build;
+pub mod cancel;
 pub mod collate;
 pub mod control;
 pub mod crashguard;
 pub mod daemon;
 pub mod data_format;
 pub mod diagnose;
+pub mod download;
 pub mod entry;
 pub mod exposure;
 pub mod failure;
@@ -41,12 +43,14 @@ pub mod runtime;
 pub mod settings;
 pub mod sha256;
 pub mod supervisor;
+pub mod tar;
 pub mod test_origins;
 pub mod text;
 pub mod tick;
 pub mod time;
 pub mod update;
 pub mod user_path;
+pub mod zip;
 
 /// The JSON library the daemon reads and writes with, for the binary crates.
 pub use regex;

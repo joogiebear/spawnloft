@@ -331,13 +331,22 @@ export async function extractZip(file, dest) {
       let crc = 0
       let written = 0
       const check = new Transform({ transform(chunk, _, done) { crc = crc32(chunk, crc); written += chunk.length; done(null, chunk) } })
+      let inflated = true
       if (entry.packed === 0) fs.writeFileSync(target, '')
       else {
-        const source = fs.createReadStream(null, { fd, autoClose: false, start: dataAt, end: dataAt + entry.packed - 1 })
+        // A stream of its own on the file, not on `fd`: a failed pipeline closes the descriptor
+        // under it, and the close below then threw EBADF in place of the real error.
+        const source = fs.createReadStream(file, { start: dataAt, end: dataAt + entry.packed - 1 })
         const stages = entry.method === 8 ? [source, zlib.createInflateRaw(), check] : [source, check]
-        await pipeline(...stages, fs.createWriteStream(target))
+        try {
+          await pipeline(...stages, fs.createWriteStream(target))
+        } catch (err) {
+          // compressed data that does not inflate is damage, as a wrong checksum is
+          if (!String(err?.code ?? '').startsWith('Z_')) throw err
+          inflated = false
+        }
       }
-      if (crc !== entry.crc || written !== entry.size) {
+      if (!inflated || crc !== entry.crc || written !== entry.size) {
         fs.rmSync(target, { force: true })
         fail(`"${entry.name}" did not match its checksum; the archive is damaged and nothing more was extracted`)
       }

@@ -55,17 +55,26 @@ function* zipEntries(fd, size) {
   }
 }
 
-function readEntryData(fd, entry) {
+function readEntryData(fd, entry, size) {
   if (entry.compressed === 0xffffffff || entry.localOffset === 0xffffffff) return null
   // the local header's extra field can differ in length from the central one, so read it
   const local = Buffer.alloc(30)
   fs.readSync(fd, local, 0, 30, entry.localOffset)
   if (local.readUInt32LE(0) !== LOCAL_SIG) return null
   const dataAt = entry.localOffset + 30 + local.readUInt16LE(26) + local.readUInt16LE(28)
-  const data = Buffer.alloc(entry.compressed)
-  fs.readSync(fd, data, 0, entry.compressed, dataAt)
+  // Only what the file holds, and never more out than the entry says it holds: a jar dropped in
+  // a mods folder could otherwise claim 4 GiB of zeros past its end, which inflate to far more.
+  const data = Buffer.alloc(Math.max(0, Math.min(entry.compressed, size - dataAt)))
+  fs.readSync(fd, data, 0, data.length, dataAt)
   if (entry.method === 0) return data
-  if (entry.method === 8) return zlib.inflateRawSync(data)
+  if (entry.method === 8) {
+    try {
+      return zlib.inflateRawSync(data, { maxOutputLength: Math.max(entry.size, 1) })
+    } catch (err) {
+      if (err.code === 'ERR_BUFFER_TOO_LARGE') return null
+      throw err
+    }
+  }
   return null
 }
 
@@ -75,7 +84,7 @@ export function readZipEntry(file, wanted) {
   try {
     const size = fs.fstatSync(fd).size
     for (const entry of zipEntries(fd, size)) {
-      if (entry.name === wanted) return readEntryData(fd, entry)
+      if (entry.name === wanted) return readEntryData(fd, entry, size)
     }
     return null
   } finally {
@@ -109,7 +118,7 @@ export function extractZip(file, dest, { mapPath = (n) => n } = {}) {
       if (target !== root && !target.startsWith(root + path.sep)) {
         fail(`the archive tried to write outside its folder ("${entry.name}"); nothing more was extracted`)
       }
-      const data = readEntryData(fd, entry)
+      const data = readEntryData(fd, entry, size)
       if (data == null) fail(`could not read "${entry.name}" out of ${path.basename(file)}`)
       fs.mkdirSync(path.dirname(target), { recursive: true })
       fs.writeFileSync(target, data)

@@ -6,7 +6,7 @@
     { "file": "src/diag-bundle.mjs", "line": 285, "uses": ["lookbehind", "lookahead"], "pattern": "new RegExp(`(?<![A-Za-z0-9_])(?:${list.map((s) => s.replace(/[.*+?^${}()|[\\]\\\\-]/g, '\\\\$&')).join('|')})(?![A-Za-z0-9_])`, 'gi')", "what": "account names and uuids redacted from a diagnostics bundle, as whole words" },
     { "file": "src/mclogs.mjs", "line": 36, "uses": ["lookahead"], "pattern": "/([A-Za-z]:[\\\\/]+Users[\\\\/]+)([^\\\\/\\r\\n\"'<>|:*?]+?)(?=[\\\\/])/g", "what": "the Windows user name in a path, before a log goes to mclo.gs" },
     { "file": "src/mcp-tools.mjs", "line": 664, "uses": ["lookahead"], "pattern": "/\\/(?:\\d{1,3}(?:\\.\\d{1,3}){3}|\\[[0-9a-fA-F:.%a-zA-Z0-9]+\\]|[0-9a-fA-F]{0,4}(?::[0-9a-fA-F]{0,4}){2,7})(?=:\\d{1,5}\\b)/g", "what": "IP_RE: player addresses in console lines, hidden from the assistant" },
-    { "file": "src/plugins.mjs", "line": 640, "uses": ["lookahead"], "pattern": "/^(?!\\.+$)[A-Za-z0-9_.-]{1,64}$/", "what": "PROJECT_ID: a Modrinth or Hangar project id that is not only dots" },
+    { "file": "src/plugins.mjs", "line": 649, "uses": ["lookahead"], "pattern": "/^(?!\\.+$)[A-Za-z0-9_.-]{1,64}$/", "what": "PROJECT_ID: a Modrinth or Hangar project id that is not only dots" },
     { "file": "src/ui.mjs", "line": 457, "uses": ["lookahead"], "pattern": "/\\\\u(?![0-9a-fA-F]{4})/", "what": "a server.properties value with \\u not followed by four hex digits" }
   ],
   "runtime": {

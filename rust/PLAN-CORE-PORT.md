@@ -284,6 +284,33 @@ across the port, each added under the `SUPPLY-CHAIN.md` rule in the phase that n
 (zip and gzip), an Ed25519 verifier for the signed harness index (`ed25519-dalek`, or the
 Ed25519 inside `minisign-verify` if it can be reached).
 
+C1 records, checked 2026-11-21:
+- *Proxy variables.* `ureq` 3 reads `ALL_PROXY`, `HTTPS_PROXY` and `HTTP_PROXY` (either case) and
+  `NO_PROXY` by default (`Proxy::try_from_env` in its default config). Node's `fetch` reads none
+  of them unless `NODE_USE_ENV_PROXY` is set (checked on the pinned 24.22.3 and on 22: with
+  `HTTPS_PROXY` pointing at a listener, `fetch` went straight to the host), and SpawnLoft never
+  sets it. So `download.rs` builds every agent with the proxy off, and the two behave the same:
+  `download::tests::proxy_variables_are_ignored_as_node_ignores_them` and the `musl-network` CI
+  job, which runs both sides with every variable pointing at a port that refuses. The updater's
+  agent (`update/fetch.rs`) still reads them; it has no Node twin. Honouring a proxy is a feature
+  for both sides together, not a parity question.
+- *musl.* The `musl-network` CI job builds a probe on `spawnloft-lib`'s download agent static for
+  `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` and fetches from Mojang's and
+  GitHub's hosts on the runner and in Debian slim and Alpine containers with their CA stores
+  removed: names resolve through musl's own resolver and TLS verifies against the bundled
+  `webpki-roots`.
+- *The zip readers.* The cross-read test (`test/zip-cross-process.test.mjs`) found one Node bug,
+  fixed on both sides in the same PR: a failure while writing an extracted entry (a folder in the
+  way, a full disk, compressed data that does not inflate) was reported as `EBADF: bad file
+  descriptor, close`, because the failed pipeline closed the archive's descriptor under the
+  `finally`. Damaged compressed data is now the checksum sentence on both. The Fable review
+  found a second, fixed on both sides too: the jar reader read an entry's declared compressed
+  size even past the end of the file (zero-filled) and inflated it without bound, so a jar of a
+  few hundred bytes in a mods folder could take gigabytes. It now reads only what the file holds
+  and inflates no more than the entry's declared size (`null` past it, as for any unreadable
+  entry). On Windows the Rust extraction hands the system `\\?\` paths, as Node's
+  `toNamespacedPath` does, so names ending in a dot or space and device names stay literal.
+
 **C2.** `console` is interactive: raw input and console modes on Windows, signals on Unix. The
 database engines keep the layout of the engine store exactly, since a running database's files
 are the user's data. `handover resume` starts servers in-process; `nodecore.rs`'s `Starter`
@@ -484,6 +511,9 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | A settings value of the wrong type (added in C1) | uncaught crash with excerpt, stack and version | the error line alone |
 | Windows: why a secrets file is not owner-only, or could not be made so (added in C1; shown by `doctor` from C6b) | icacls's output: its account names and error text | the security API's: account names looked up from each SID, errors as the system words them |
 | Windows: the local time zone of the log timeline (added in C1; shown by the diagnostics bundle from C6b) | `TZ` when set, else the system's | the system's |
+| The bytes of a zip the core writes (added in C1; world exports from C3) | zlib's deflate | miniz_oxide's: the same entries, names, times, modes and contents, so the archive is not byte-identical |
+| A jar entry whose compressed data is damaged part way (added in C1) | zlib's words for that damage (`invalid distance too far back`) | `invalid compressed data`; data cut short is `unexpected end of file` on both |
+| The cause named when a download gets no answer at all (added in C1) | undici's (`getaddrinfo ENOTFOUND x`, `connect ECONNREFUSED`) | ureq's; the sentence around it is Node's |
 
 ### 6.2 Faking the network for a spawned process
 

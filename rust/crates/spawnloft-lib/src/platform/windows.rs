@@ -426,6 +426,24 @@ impl ProcessProbe {
     }
 }
 
+/// `TerminateProcess` on the process `pid` names (cancel.rs, when taskkill could not end it).
+/// Whether it was ended.
+pub fn terminate_pid(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    // SAFETY: plain call; the result is checked and owned.
+    let Some(handle) =
+        owned(unsafe { OpenProcess(windows_sys::Win32::System::Threading::PROCESS_TERMINATE, 0, pid) })
+    else {
+        return false;
+    };
+    // SAFETY: a valid process handle that this function owns.
+    unsafe {
+        windows_sys::Win32::System::Threading::TerminateProcess(handle.as_raw_handle() as HANDLE, 1) != 0
+    }
+}
+
 fn open_query(pid: u32) -> Option<OwnedHandle> {
     if pid == 0 {
         return None;

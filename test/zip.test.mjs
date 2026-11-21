@@ -89,14 +89,14 @@ test('names are read in the encoding they were written in', () => {
 })
 
 /** One stored entry under any name at all - which is how a hostile archive is made. */
-function craft(name, body = Buffer.from('owned')) {
+function craft(name, body = Buffer.from('owned'), { method = 0, size = body.length } = {}) {
   const label = Buffer.from(name)
   const local = Buffer.alloc(30)
-  local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4)
+  local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(method, 8)
   local.writeUInt32LE(zlib.crc32 ? zlib.crc32(body) : 0, 14)
-  local.writeUInt32LE(body.length, 18); local.writeUInt32LE(body.length, 22); local.writeUInt16LE(label.length, 26)
+  local.writeUInt32LE(body.length, 18); local.writeUInt32LE(size, 22); local.writeUInt16LE(label.length, 26)
   const central = Buffer.alloc(46)
-  central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6)
+  central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(method, 10)
   local.copy(central, 16, 14, 26)
   central.writeUInt16LE(label.length, 28)
   const end = Buffer.alloc(22)
@@ -133,6 +133,18 @@ test('damage is found on the file that is damaged, and what is not a zip is said
   const cut = path.join(scratch, 'cut.zip')
   fs.writeFileSync(cut, fs.readFileSync(file).subarray(0, 5000))
   await assert.rejects(extractZip(cut, out), /not a zip|cut short|damaged/)
+
+  // Compressed data that does not inflate is damage too, said as such, and the half is removed.
+  const half = zlib.deflateRawSync(crypto.randomBytes(20000)).subarray(0, 3000)
+  const deflated = path.join(scratch, 'half.zip')
+  fs.writeFileSync(deflated, craft('world/half.dat', half, { method: 8, size: 20000 }))
+  await assert.rejects(extractZip(deflated, out), /"world\/half.dat" did not match its checksum/)
+  assert.ok(!fs.existsSync(path.join(out, 'world', 'half.dat')))
+  // An entry that cannot be written says why (it used to say EBADF, the archive's own descriptor
+  // having been closed under it).
+  const dot = path.join(scratch, 'dot.zip')
+  fs.writeFileSync(dot, craft('.'))
+  await assert.rejects(extractZip(dot, out), (err) => err.code === 'EISDIR' && /, open '/.test(err.message))
 
   const tarball = path.join(scratch, 'really.tar.gz')
   fs.writeFileSync(tarball, zlib.gzipSync(Buffer.alloc(2048)))
