@@ -1044,9 +1044,9 @@ async function cmdRebuild(positional, flags) {
   out(res.keptPlugins ? 'Plugins kept.' : 'Plugins wiped.')
 }
 
-function cmdReveal(positional) {
+async function cmdReveal(positional) {
   const name = requireName(positional, 'reveal')
-  out(`Opening ${manage.reveal(name)}`)
+  out(`Opening ${await manage.reveal(name)}`)
 }
 
 /**
