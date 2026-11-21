@@ -38,6 +38,79 @@ pub fn guess_loader(jar: &str, has_neoforge_libs: bool) -> String {
     "paper".into()
 }
 
+/// One row of `SOFTWARE`: what a plugins page needs of it. `content` is where it loads add-ons
+/// from (`plugins`, `mods` or `none`), `modrinth` the search loader facet (widest-compatible
+/// first), `hangar` whether PaperMC's platform is a useful second source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Software {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub content: &'static str,
+    pub modrinth: &'static [&'static str],
+    pub hangar: bool,
+}
+
+const fn sw(
+    id: &'static str,
+    label: &'static str,
+    content: &'static str,
+    modrinth: &'static [&'static str],
+    hangar: bool,
+) -> Software {
+    Software {
+        id,
+        label,
+        content,
+        modrinth,
+        hangar,
+    }
+}
+
+/// `SOFTWARE`, in its order.
+pub const SOFTWARE: [Software; 9] = [
+    sw(
+        "paper",
+        "Paper",
+        "plugins",
+        &["paper", "spigot", "bukkit", "folia"],
+        true,
+    ),
+    sw(
+        "purpur",
+        "Purpur",
+        "plugins",
+        &["purpur", "paper", "spigot", "bukkit", "folia"],
+        true,
+    ),
+    sw("folia", "Folia", "plugins", &["folia"], false),
+    sw(
+        "asp",
+        "Advanced Slime Paper",
+        "plugins",
+        &["paper", "spigot", "bukkit", "folia"],
+        true,
+    ),
+    sw("spigot", "Spigot", "plugins", &["spigot", "bukkit"], false),
+    sw("craftbukkit", "CraftBukkit", "plugins", &["bukkit"], false),
+    sw("vanilla", "Vanilla", "none", &[], false),
+    sw("fabric", "Fabric", "mods", &["fabric"], false),
+    sw("neoforge", "NeoForge", "mods", &["neoforge"], false),
+];
+
+/// `softwareOf(loaderOf(inst))` from the recorded `loader`: absent or unknown is Paper (and so is
+/// a value that is not text, which `Map.get` never matches).
+pub fn software_of(loader: Option<&serde_json::Value>) -> Software {
+    let id = match loader {
+        Some(serde_json::Value::String(s)) => s.as_str(),
+        _ => "paper",
+    };
+    SOFTWARE
+        .iter()
+        .find(|s| s.id == id)
+        .copied()
+        .unwrap_or(SOFTWARE[0])
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

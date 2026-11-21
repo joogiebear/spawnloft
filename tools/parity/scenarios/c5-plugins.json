@@ -1,0 +1,565 @@
+{
+ "about": "C5's plugins command: the list (text and --json) over plugin.yml, paper-plugin.yml, fabric.mod.json and NeoForge mods.toml manifests, stored and deflated entries, jars that are not zips, a folder named like a jar, records SpawnLoft keeps (and odd ones: a number, a store whose managed is an array, a store that is not JSON), names that are not text (a list, a number: the sort and the lookup throw), enable and disable by name and by file, no-ops, and every refusal and usage error.",
+ "steps": [
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv": {
+      "dir": "{data}/instances/srv",
+      "jar": "paper-1.21.4-100.jar",
+      "port": 25565,
+      "memory": "2G",
+      "loader": "paper"
+     },
+     "modded": {
+      "dir": "{data}/instances/modded",
+      "jar": "fabric-server-mc.1.21.4-loader.0.16.9-launcher.1.0.1.jar",
+      "port": 25566,
+      "memory": "2G",
+      "loader": "fabric"
+     },
+     "odd": {
+      "dir": "{data}/instances/odd",
+      "jar": "paper-1.21.4-100.jar",
+      "port": 25567,
+      "memory": "2G"
+     },
+     "odd2": {
+      "dir": "{data}/instances/odd2",
+      "jar": "server.jar",
+      "port": 25568,
+      "memory": "2G",
+      "loader": "neoforge"
+     },
+     "broken": {
+      "dir": "{data}/instances/broken",
+      "jar": "paper-1.21.4-100.jar",
+      "port": 25569,
+      "memory": "2G"
+     },
+     "arr": {
+      "dir": "{data}/instances/arr",
+      "jar": "purpur-1.21.4-1.jar",
+      "port": 25570,
+      "memory": "2G",
+      "loader": "purpur"
+     },
+     "van": {
+      "dir": "{data}/instances/van",
+      "jar": "vanilla-1.21.4.jar",
+      "port": 25571,
+      "memory": "2G",
+      "loader": "vanilla"
+     },
+     "bare": {
+      "dir": "{data}/instances/bare",
+      "jar": "paper-1.21.4-100.jar",
+      "port": 25572,
+      "memory": "2G",
+      "loader": [
+       "fabric"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "write": "data/instances/srv/plugins/Alpha.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVx631ogFgAAABYAAAAUAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZNYW5pZmVzdC1WZXJzaW9uOiAxLjAKUEsDBBQAAAAAAAAAIVzHcrrWoQAAAKEAAAAKAAAAcGx1Z2luLnltbG5hbWU6IEFscGhhCnZlcnNpb246ICcxLjIuMycKYXBpLXZlcnNpb246ICIxLjIxIgphdXRob3JzOiBbQW5uLCAiQm8iXQpkZXNjcmlwdGlvbjogRG9lcyBhbHBoYSB0aGluZ3MKd2Vic2l0ZTogaHR0cHM6Ly9hbHBoYS5leGFtcGxlCmNvbW1hbmRzOgogIGE6CiAgICB1c2FnZTogL2EKUEsBAhQDFAAAAAAAAAAhXHrfWiAWAAAAFgAAABQAAAAAAAAAAAAAAIABAAAAAE1FVEEtSU5GL01BTklGRVNULk1GUEsBAhQDFAAAAAAAAAAhXMdyutahAAAAoQAAAAoAAAAAAAAAAAAAAIABSAAAAHBsdWdpbi55bWxQSwUGAAAAAAIAAgB6AAAAEQEAAAAA"
+  },
+  {
+   "write": "data/instances/srv/plugins/beta.jar.disabled",
+   "base64": "UEsDBBQAAAAIAAAAIVwMEZgdJwAAACUAAAAKAAAAcGx1Z2luLnltbMtLzE21UkhKLUnkKkstKs7Mz7NSMNIz4EosLcnIL7JSCM7PyecCAFBLAQIUAxQAAAAIAAAAIVwMEZgdJwAAACUAAAAKAAAAAAAAAAAAAACAAQAAAABwbHVnaW4ueW1sUEsFBgAAAAABAAEAOAAAAE8AAAAAAA=="
+  },
+  {
+   "write": "data/instances/srv/plugins/Gamma-1.0.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVzZrv9gOAAAADgAAAAQAAAAcGFwZXItcGx1Z2luLnltbG5hbWU6IEdhbW1hCnZlcnNpb246IDEuMApkZXNjcmlwdGlvbjogPgogIGZvbGRlZAogIHRleHQKUEsBAhQDFAAAAAAAAAAhXNmu/2A4AAAAOAAAABAAAAAAAAAAAAAAAIABAAAAAHBhcGVyLXBsdWdpbi55bWxQSwUGAAAAAAEAAQA+AAAAZgAAAAAA"
+  },
+  {
+   "write": "data/instances/srv/plugins/Mystery.jar",
+   "text": "not a zip, just bytes pretending"
+  },
+  {
+   "write": "data/instances/srv/plugins/Empty.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVwAAAAAAAAAAAAAAAAKAAAAcGx1Z2luLnltbFBLAQIUAxQAAAAAAAAAIVwAAAAAAAAAAAAAAAAKAAAAAAAAAAAAAACAAQAAAABwbHVnaW4ueW1sUEsFBgAAAAABAAEAOAAAACgAAAAAAA=="
+  },
+  {
+   "write": "data/instances/srv/plugins/notes.txt",
+   "text": "not a plugin"
+  },
+  {
+   "write": "data/instances/srv/plugins/Zed.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVxm7xGrFwAAABcAAAAKAAAAcGx1Z2luLnltbG5hbWU6IHplZAp2ZXJzaW9uOiAwLjEKUEsBAhQDFAAAAAAAAAAhXGbvEasXAAAAFwAAAAoAAAAAAAAAAAAAAIABAAAAAHBsdWdpbi55bWxQSwUGAAAAAAEAAQA4AAAAPwAAAAAA"
+  },
+  {
+   "write": "data/instances/srv/plugins/Tracked.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVwVicu4GQAAABkAAAAKAAAAcGx1Z2luLnltbG5hbWU6IFRyYWNrZWQKdmVyc2lvbjogNQpQSwECFAMUAAAAAAAAACFcFYnLuBkAAAAZAAAACgAAAAAAAAAAAAAAgAEAAAAAcGx1Z2luLnltbFBLBQYAAAAAAQABADgAAABBAAAAAAA="
+  },
+  {
+   "write": "data/instances/srv/plugins/Hangared.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVyi8LVoDwAAAA8AAAAKAAAAcGx1Z2luLnltbG5hbWU6IEhhbmdhcmVkClBLAQIUAxQAAAAAAAAAIVyi8LVoDwAAAA8AAAAKAAAAAAAAAAAAAACAAQAAAABwbHVnaW4ueW1sUEsFBgAAAAABAAEAOAAAADcAAAAAAA=="
+  },
+  {
+   "write": "data/instances/srv/plugins/Odd.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVwHPM6DEAAAABAAAAAKAAAAcGx1Z2luLnltbG5hbWU6IE9kZFJlY29yZApQSwECFAMUAAAAAAAAACFcBzzOgxAAAAAQAAAACgAAAAAAAAAAAAAAgAEAAAAAcGx1Z2luLnltbFBLBQYAAAAAAQABADgAAAA4AAAAAAA="
+  },
+  {
+   "write": "data/instances/srv/plugins/.mcctl-plugins.json",
+   "json": {
+    "version": 1,
+    "managed": {
+     "Tracked.jar": {
+      "source": "modrinth",
+      "project": "abc123",
+      "version": "5.0",
+      "installedAt": "2026-11-01T10:00:00.000Z",
+      "gameVersions": [
+       "1.21.3",
+       "1.21.4"
+      ]
+     },
+     "Hangared.jar": {
+      "source": "hangar",
+      "project": "Hangared",
+      "version": "3.1"
+     },
+     "Odd.jar": 5,
+     "beta.jar.disabled": {
+      "source": "modrinth",
+      "project": "b1",
+      "version": "2.0"
+     }
+    }
+   }
+  },
+  {
+   "mkdir": "data/instances/srv/plugins/Folder.jar"
+  },
+  {
+   "write": "data/instances/srv/server.properties",
+   "text": "server-port=25565\n"
+  },
+  {
+   "write": "data/instances/modded/mods/cloth.jar",
+   "base64": "UEsDBBQAAAAIAAAAIVzyGNaGjAAAAM4AAAAPAAAAZmFicmljLm1vZC5qc29uTc5LCsMgEAbgq8is26RZuMnWA/QApQvRaRSMik5DQbx7VUrocr5/XgWshpWBcoHMVQX/shtcGHi5Y3fRnYnh7Fh4zw5M2Qbf44VPt04as0o20o/FuUe+yYSUGz4gG9TSW3QtKOeFOxlMUP+pV/zZpts/JBU1K2DCjlFuo8EQxbzO8/h6wo/co0Oo9QtQSwECFAMUAAAACAAAACFc8hjWhowAAADOAAAADwAAAAAAAAAAAAAAgAEAAAAAZmFicmljLm1vZC5qc29uUEsFBgAAAAABAAEAPQAAALkAAAAAAA=="
+  },
+  {
+   "write": "data/instances/modded/mods/neo.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVwKF4ERHgAAAB4AAAAUAAAATUVUQS1JTkYvTUFOSUZFU1QuTUZJbXBsZW1lbnRhdGlvbi1WZXJzaW9uOiA5LjkuMQpQSwMEFAAAAAAAAAAhXH4cnLR9AAAAfQAAABsAAABNRVRBLUlORi9uZW9mb3JnZS5tb2RzLnRvbWxtb2RMb2FkZXI9ImphdmFmbWwiCltbbW9kc11dCm1vZElkPSJuZW8iICMgaWQKdmVyc2lvbj0iJHtmaWxlLmphclZlcnNpb259IgpkZXNjcmlwdGlvbj0nJycKTXVsdGkKIGxpbmUnJycKYXV0aG9ycz0iTmVvIFRlYW0iClBLAQIUAxQAAAAAAAAAIVwKF4ERHgAAAB4AAAAUAAAAAAAAAAAAAACAAQAAAABNRVRBLUlORi9NQU5JRkVTVC5NRlBLAQIUAxQAAAAAAAAAIVx+HJy0fQAAAH0AAAAbAAAAAAAAAAAAAACAAVAAAABNRVRBLUlORi9uZW9mb3JnZS5tb2RzLnRvbWxQSwUGAAAAAAIAAgCLAAAABgEAAAAA"
+  },
+  {
+   "write": "data/instances/modded/mods/legacy.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVzL4nQFPwAAAD8AAAASAAAATUVUQS1JTkYvbW9kcy50b21sW1ttb2RzXV0KbW9kSWQ9J2xlZ2FjeScKZGlzcGxheU5hbWU9IkxlZ2FjeSBNb2QiCnZlcnNpb249IjEuMCIKUEsBAhQDFAAAAAAAAAAhXMvidAU/AAAAPwAAABIAAAAAAAAAAAAAAIABAAAAAE1FVEEtSU5GL21vZHMudG9tbFBLBQYAAAAAAQABAEAAAABvAAAAAAA="
+  },
+  {
+   "write": "data/instances/modded/mods/nul.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVxP/MslBAAAAAQAAAAPAAAAZmFicmljLm1vZC5qc29ubnVsbFBLAQIUAxQAAAAAAAAAIVxP/MslBAAAAAQAAAAPAAAAAAAAAAAAAACAAQAAAABmYWJyaWMubW9kLmpzb25QSwUGAAAAAAEAAQA9AAAAMQAAAAAA"
+  },
+  {
+   "write": "data/instances/modded/mods/badjson.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVzPxrXCBQAAAAUAAAAPAAAAZmFicmljLm1vZC5qc29ue25vcGVQSwECFAMUAAAAAAAAACFcz8a1wgUAAAAFAAAADwAAAAAAAAAAAAAAgAEAAAAAZmFicmljLm1vZC5qc29uUEsFBgAAAAABAAEAPQAAADIAAAAAAA=="
+  },
+  {
+   "write": "data/instances/modded/mods/plugin-in-mods.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVx00/LSDAAAAAwAAAAKAAAAcGx1Z2luLnltbG5hbWU6IFN0cmF5ClBLAQIUAxQAAAAAAAAAIVx00/LSDAAAAAwAAAAKAAAAAAAAAAAAAACAAQAAAABwbHVnaW4ueW1sUEsFBgAAAAABAAEAOAAAADQAAAAAAA=="
+  },
+  {
+   "write": "data/instances/odd/plugins/List.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVxIEFaQEQAAABEAAAAKAAAAcGx1Z2luLnltbG5hbWU6CnZlcnNpb246IDEKUEsBAhQDFAAAAAAAAAAhXEgQVpARAAAAEQAAAAoAAAAAAAAAAAAAAIABAAAAAHBsdWdpbi55bWxQSwUGAAAAAAEAAQA4AAAAOQAAAAAA"
+  },
+  {
+   "write": "data/instances/odd2/mods/0.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVxVfYfsEAAAABAAAAAPAAAAZmFicmljLm1vZC5qc29ueyJuYW1lIjogIlplcm8ifVBLAQIUAxQAAAAAAAAAIVxVfYfsEAAAABAAAAAPAAAAAAAAAAAAAACAAQAAAABmYWJyaWMubW9kLmpzb25QSwUGAAAAAAEAAQA9AAAAPQAAAAAA"
+  },
+  {
+   "write": "data/instances/odd2/mods/1.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVwfE8tXCwAAAAsAAAAPAAAAZmFicmljLm1vZC5qc29ueyJuYW1lIjogNX1QSwECFAMUAAAAAAAAACFcHxPLVwsAAAALAAAADwAAAAAAAAAAAAAAgAEAAAAAZmFicmljLm1vZC5qc29uUEsFBgAAAAABAAEAPQAAADgAAAAAAA=="
+  },
+  {
+   "write": "data/instances/broken/plugins/A.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVx3B1bGCAAAAAgAAAAKAAAAcGx1Z2luLnltbG5hbWU6IEEKUEsBAhQDFAAAAAAAAAAhXHcHVsYIAAAACAAAAAoAAAAAAAAAAAAAAIABAAAAAHBsdWdpbi55bWxQSwUGAAAAAAEAAQA4AAAAMAAAAAAA"
+  },
+  {
+   "write": "data/instances/broken/plugins/.mcctl-plugins.json",
+   "text": "{not json"
+  },
+  {
+   "write": "data/instances/arr/plugins/A.jar",
+   "base64": "UEsDBBQAAAAAAAAAIVx3B1bGCAAAAAgAAAAKAAAAcGx1Z2luLnltbG5hbWU6IEEKUEsBAhQDFAAAAAAAAAAhXHcHVsYIAAAACAAAAAoAAAAAAAAAAAAAAIABAAAAAHBsdWdpbi55bWxQSwUGAAAAAAEAAQA4AAAAMAAAAAAA"
+  },
+  {
+   "write": "data/instances/arr/plugins/.mcctl-plugins.json",
+   "text": "{\"managed\": [1], \"x\": 2}"
+  },
+  {
+   "mkdir": "data/instances/van"
+  },
+  {
+   "mkdir": "data/instances/bare"
+  },
+  {
+   "run": [
+    "plugins",
+    "srv"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "--json",
+    "--yes"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "extra",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "plugins"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "nope",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "frob"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "enable"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    ""
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "enable",
+    "ghost"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    "alpha"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    "ALPHA"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "enable",
+    "beta.jar.disabled"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    "Tracked.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    "Odd.jar",
+    "--whatever"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "disable",
+    "Folder"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "modded"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "modded",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "modded",
+    "enable",
+    "legacy mod"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "odd"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "odd",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "odd",
+    "enable",
+    "zzz"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "odd2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "odd2",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "broken"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "broken",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "arr",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "arr",
+    "disable",
+    "A"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "van"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "bare",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "bare"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    "--json=1"
+   ],
+   "expect": {
+    "code": 2
+   }
+  }
+ ]
+}
