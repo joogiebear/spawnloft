@@ -188,7 +188,7 @@ pub fn run_to_file(
 }
 
 /// A command for `cmd` with `args`, the overrides `env` on top of this process's environment
-/// (a `None` value removes a variable), in `cwd` when given.
+/// with the Node-only variables removed unless set here, in `cwd` when given.
 pub fn command(cmd: &str, args: &[String], env: &[(String, String)], cwd: Option<&Path>) -> Command {
     let mut c = Command::new(cmd);
     c.args(args);

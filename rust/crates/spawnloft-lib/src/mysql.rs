@@ -368,7 +368,12 @@ fn execute(cmd: &str, args: &[String], env: &Env, timeout_ms: u64) -> Result<Str
             "MySQL needs the Microsoft Visual C++ x64 runtime. Install it from https://aka.ms/vs/17/release/vc_redist.x64.exe, then retry.",
         ));
     }
-    let code = done.code.map_or_else(|| "null".to_string(), |c| c.to_string());
+    // Node reports a Windows exit status unsigned (an NTSTATUS such as 3221225477)
+    let code = match done.code {
+        None => "null".to_string(),
+        Some(c) if cfg!(windows) => (c as u32).to_string(),
+        Some(c) => c.to_string(),
+    };
     Err(Failure::user(format!(
         "MySQL tool exited {code}: {}",
         js::trim(&String::from_utf8_lossy(&done.stderr))

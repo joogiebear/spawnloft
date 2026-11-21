@@ -123,7 +123,11 @@ pub fn fetch_pinned(
         hash: Some(hash),
         expected: Some(expected.to_string()),
         on_progress: Some(&mut report),
+        // Node's fetch reads the body once (fetchRetry retries only opening it) and gives up after
+        // 10 minutes of silence here; the archive is named by its file, not the staging path
         stall: std::time::Duration::from_secs(600),
+        attempts: 1,
+        label: file.file_name().map(|n| n.to_string_lossy().into_owned()),
         ..download::Options::default()
     };
     match download::download_file(url, file, options) {

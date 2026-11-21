@@ -271,6 +271,10 @@ mod system {
                 c.env(k, v);
             }
             let out = crate::procx::output_within(c, Duration::from_secs(15)).ok()?;
+            // a timed-out ldd is no answer, as spawnSync's error is
+            if out.timed_out {
+                return None;
+            }
             for name in parse_ldd(&String::from_utf8_lossy(&out.stdout)) {
                 if !missing.contains(&name) {
                     missing.push(name);

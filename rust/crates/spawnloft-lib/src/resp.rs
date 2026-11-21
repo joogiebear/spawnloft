@@ -71,21 +71,53 @@ pub fn send(
         queue.push(vec!["AUTH".into(), pw.to_string()]);
     }
     queue.extend(commands.iter().cloned());
-    let addr: SocketAddr = (host, port)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut a| a.next())
-        .ok_or_else(|| format!("could not reach {host}:{port}: no address"))?;
-    // Node's socket errors: `connect ECONNREFUSED 127.0.0.1:6379`, `read ECONNRESET`
-    let node = |e: &std::io::Error, call: &str| {
-        let code = crate::jspath::error_code(e).0;
-        if call == "connect" {
-            format!("could not reach {host}:{port}: connect {code} {addr}")
-        } else {
-            format!("could not reach {host}:{port}: {call} {code}")
-        }
+    // Node's socket errors: `getaddrinfo ENOTFOUND h`, `connect ECONNREFUSED 127.0.0.1:6379`,
+    // `read ECONNRESET`; the address as Node prints it (no brackets around IPv6)
+    let shown = |a: &SocketAddr| format!("{}:{}", a.ip(), a.port());
+    let timed_out = || format!("no reply from {host}:{port} within {}ms", timeout.as_millis());
+    let addrs: Vec<SocketAddr> = match (host, port).to_socket_addrs() {
+        Ok(a) => a.collect(),
+        Err(_) => Vec::new(),
     };
-    let mut stream = TcpStream::connect_timeout(&addr, timeout).map_err(|e| node(&e, "connect"))?;
+    if addrs.is_empty() {
+        return Err(format!(
+            "could not reach {host}:{port}: getaddrinfo ENOTFOUND {host}"
+        ));
+    }
+    // every address in turn, as Node's autoSelectFamily does, within the one deadline
+    let mut stream = None;
+    let mut refused: Option<String> = None;
+    for addr in &addrs {
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(timed_out());
+        }
+        match TcpStream::connect_timeout(addr, left) {
+            Ok(s) => {
+                stream = Some(s);
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => return Err(timed_out()),
+            Err(e) => {
+                refused.get_or_insert_with(|| {
+                    format!(
+                        "could not reach {host}:{port}: connect {} {}",
+                        crate::jspath::error_code(&e).0,
+                        shown(addr)
+                    )
+                });
+            }
+        }
+    }
+    let Some(mut stream) = stream else {
+        return Err(refused.unwrap_or_else(timed_out));
+    };
+    let node = |e: &std::io::Error, call: &str| {
+        format!(
+            "could not reach {host}:{port}: {call} {}",
+            crate::jspath::error_code(e).0
+        )
+    };
     let mut buf: Vec<u8> = Vec::new();
     let mut last = String::new();
     for (i, cmd) in queue.iter().enumerate() {

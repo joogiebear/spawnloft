@@ -343,7 +343,7 @@ pub fn create_database(
         Ok(())
     });
     if let Err(f) = set_up {
-        let _ = std::fs::remove_dir_all(&dir);
+        remove_tree(Path::new(&dir)).map_err(|e| Failure::io(&e, "rm", Some(Path::new(&dir))))?;
         return Err(f);
     }
     registry::put_instance(registry_file(layout), name, Value::Object(fields))?;
@@ -370,12 +370,14 @@ pub fn port_for_server(layout: &Layout, server: &Instance) -> Result<u16, Failur
     util::find_free_port(want, &taken)
 }
 
-fn forget(layout: &Layout, by: &Actor, name: &str, dir: &str, kill: bool) {
+/// The cleanup after a failed start or attach: a folder that cannot be deleted fails it, with
+/// the record kept, as `fs.rmSync` throwing does.
+fn forget(layout: &Layout, by: &Actor, name: &str, dir: &str, kill: bool) -> Result<(), Failure> {
     if kill {
         let _ = supervisor::kill(layout, by, name);
     }
-    let _ = std::fs::remove_dir_all(dir);
-    let _ = registry::remove_instance(registry_file(layout), name);
+    remove_tree(Path::new(dir)).map_err(|e| Failure::io(&e, "rm", Some(Path::new(dir))))?;
+    registry::remove_instance(registry_file(layout), name)
 }
 
 /// `createForServer(serverName, { engine, version, onProgress })`: creates, starts and attaches a
@@ -429,12 +431,12 @@ pub fn create_for_server(
     let out = match supervisor::start(layout, by, &name, supervisor::StartOptions::default()) {
         Ok(o) => o,
         Err(f) => {
-            forget(layout, by, &name, &dir, false);
+            forget(layout, by, &name, &dir, false)?;
             return Err(f);
         }
     };
     if out.failed || out.timed_out {
-        forget(layout, by, &name, &dir, true);
+        forget(layout, by, &name, &dir, true)?;
         return Err(Failure::user(if out.failed {
             format!(
                 "the database started but stopped again: {}",
@@ -450,7 +452,7 @@ pub fn create_for_server(
         Err(f) => {
             // the server may have been renamed or deleted during the download, or provisioning
             // failed: cleaned up as a failed start is
-            forget(layout, by, &name, &dir, true);
+            forget(layout, by, &name, &dir, true)?;
             return Err(f);
         }
     };

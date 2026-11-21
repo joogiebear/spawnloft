@@ -185,6 +185,9 @@
    "mkdir": "data/services/db1/data/mysql"
   },
   {
+   "mkdir": "data/services/kvx/data"
+  },
+  {
    "write": "data/instances.json",
    "json": {
     "version": 1,
@@ -211,6 +214,17 @@
       "root": {
        "user": "root",
        "password": "pw-test"
+      },
+      "attachments": {}
+     },
+     "kvx": {
+      "kind": "database",
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/kvx",
+      "port": 47824,
+      "root": {
+       "password": "pw-kv"
       },
       "attachments": {}
      }
@@ -742,6 +756,75 @@
   },
   {
    "run": [
+    "start",
+    "kvx",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e4",
+    "--engine",
+    "garnet",
+    "--port",
+    "47824",
+    "--password",
+    "pw-kv"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "answering"
+   }
+  },
+  {
+   "run": [
+    "db",
+    "connect",
+    "e5",
+    "--engine",
+    "garnet",
+    "--host",
+    "no-such-host.invalid",
+    "--port",
+    "47824"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "address",
+    "e4",
+    "--host",
+    "no-such-host.invalid"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "nothing answers"
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "kvx"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
     "db",
     "connect",
     "e2",
@@ -1065,6 +1148,17 @@
   },
   {
    "run": [
+    "db",
+    "attach",
+    "db1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
     "stop",
     "db1"
    ],
@@ -1072,6 +1166,30 @@
     "code": 0
    },
    "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "db1",
+    "srv2",
+    "--drop"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "db",
+    "detach",
+    "db1",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "kept"
+   }
   },
   {
    "run": [
