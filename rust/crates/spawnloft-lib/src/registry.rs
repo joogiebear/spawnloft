@@ -675,13 +675,17 @@ pub fn loader_of(inst: &Instance) -> String {
     }
 }
 
-static MEMORY_RE: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"^([0-9]+(?:\.[0-9]+)?)\s*([GgMm])$").expect("memory pattern"));
+static MEMORY_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        // JavaScript's `\s`, which is not Rust's: it has U+FEFF and lacks U+0085
+        r"^([0-9]+(?:\.[0-9]+)?)[\t\n\x0B\x0C\r \u{A0}\u{1680}\u{2000}-\u{200A}\u{2028}\u{2029}\u{202F}\u{205F}\u{3000}\u{FEFF}]*([GgMm])$",
+    ).expect("memory pattern")
+});
 
 /// `parseMemoryGb`: `4G` is 4, `6144M` is 6.
 pub fn parse_memory_gb(memory: &str) -> Result<f64, String> {
     let caps = MEMORY_RE
-        .captures(memory.trim())
+        .captures(js::trim(memory))
         .ok_or_else(|| format!("invalid memory value \"{memory}\" - use e.g. 4G or 6144M"))?;
     let n: f64 = caps[1]
         .parse()
