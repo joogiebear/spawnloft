@@ -67,7 +67,8 @@ pub struct Row {
 /// This binary's own commands, which the Node core has no twin for (or, for `ui`, only the
 /// window's forms, which keep their own exit codes). They are answered here whatever
 /// `SPAWNLOFT_CORE_IMPL` says. `repair` and `uninstall`, the installer's and uninstaller's
-/// commands, moved to [`PORTED`] in C6.
+/// commands, moved to [`PORTED`] in C6; their installer forms stay native
+/// through [`INSTALLER_FORMS`].
 pub const CORE_OWN: &[Row] = &[
     Row {
         names: &["--version", "-V", "version"],
@@ -344,6 +345,20 @@ pub fn is_ported(args: &[String]) -> bool {
     }
 }
 
+/// The installer's and uninstaller's forms of ported commands: answered here even when
+/// `SPAWNLOFT_CORE_IMPL=node`, since Node's `repair` has no `--quiet`, the installer ignores the
+/// exit code, and with no usable Node nothing at all would be done.
+pub const INSTALLER_FORMS: &[Row] = &[
+    Row {
+        names: &["repair"],
+        when: When::AnyFlag(&["--quiet"]),
+    },
+    Row {
+        names: &["uninstall"],
+        when: When::AnyFlag(&["--yes"]),
+    },
+];
+
 /// [`forwards`] with the switch and the ported table given, for tests.
 pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Row]) -> bool {
     let Some((command, rest)) = args.split_first() else {
@@ -353,7 +368,9 @@ pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Ro
     let Some(command) = command.to_str() else {
         return true;
     };
-    if CORE_OWN.iter().any(|r| row_matches(r, command, rest)) {
+    if CORE_OWN.iter().any(|r| row_matches(r, command, rest))
+        || INSTALLER_FORMS.iter().any(|r| row_matches(r, command, rest))
+    {
         return false;
     }
     force_node || !ported.iter().any(|r| row_matches(r, command, rest))
@@ -678,6 +695,11 @@ mod tests {
         for line in [&["--version"][..], &["daemon", "s"], &["update", "check"]] {
             assert!(!forwards_with(&os(line), true, &ported), "{line:?}");
         }
+        // the installer's forms of ported commands stay here under the switch; the rest goes
+        for line in [&["repair", "--quiet"][..], &["uninstall", "--yes", "--data"]] {
+            assert!(!forwards_with(&os(line), true, PORTED), "{line:?}");
+        }
+        assert!(forwards_with(&os(&["repair", "--json"]), true, PORTED));
     }
 
     #[test]

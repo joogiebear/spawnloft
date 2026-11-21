@@ -133,7 +133,13 @@ pub fn sweep_files(dir: &str, folder: &str, known: bool, caseless: bool) -> Vec<
             let owner = m
                 .as_ref()
                 .and_then(|m| m.get(if snap.is_some() { "instance" } else { "database" }));
-            let owned = js::truthy(owner) && same(&js::string(owner), folder);
+            // Node's `owner === folder` off Windows: only a string owner names the folder there;
+            // caseless, any truthy owner is turned into text first, as `String(owner)` does
+            let owned = match owner {
+                Some(Value::String(o)) => !o.is_empty() && same(o, folder),
+                o if caseless => js::truthy(o) && same(&js::string(o), folder),
+                _ => false,
+            };
             if owned || (known && STAMPED.is_match(&f)) {
                 files.push(full);
                 if m.is_some() {
@@ -329,8 +335,9 @@ pub fn run(
 
     // servers first: a daemon that outlives the program is a Java process nobody can stop
     for inst in registry::list_all(registry_file)? {
+        // a state file that cannot be read may belong to a live server: stopped all the same
         let active = control::read_state(Path::new(&layout.state_file(&inst.name)))
-            .is_ok_and(|(s, _)| control::is_active_status(s));
+            .map_or(true, |(s, _)| control::is_active_status(s));
         if !active {
             continue;
         }
