@@ -174,7 +174,11 @@ impl Ledger {
     /// `openLedger({ verify })`: `verify` starts from nothing, so every file is hashed again.
     pub fn open(paths: &Paths, verify: bool) -> Ledger {
         Ledger {
-            files: if verify { Map::new() } else { read_ledger_file(paths) },
+            files: if verify {
+                Map::new()
+            } else {
+                read_ledger_file(paths)
+            },
             ..Ledger::default()
         }
     }
@@ -222,7 +226,11 @@ impl Ledger {
 
 fn ledger_key(paths: &Paths, file: &str) -> String {
     let rel = jspath::relative(&paths.root, file);
-    if cfg!(windows) { rel.replace('\\', "/") } else { rel }
+    if cfg!(windows) {
+        rel.replace('\\', "/")
+    } else {
+        rel
+    }
 }
 
 /// `noteChecked(ledger, file, sha1)`: the file was just downloaded against this hash.
@@ -231,7 +239,11 @@ fn note_checked(paths: &Paths, ledger: &Mutex<Ledger>, file: &str, sha1: &Value)
         return;
     }
     let Ok(meta) = std::fs::metadata(file) else { return };
-    let line = json!([meta.len(), jsjson::num(mtime_ms(&meta)), js::string(Some(sha1)).to_lowercase()]);
+    let line = json!([
+        meta.len(),
+        jsjson::num(mtime_ms(&meta)),
+        js::string(Some(sha1)).to_lowercase()
+    ]);
     lock(ledger).put(ledger_key(paths, file), line);
 }
 
@@ -478,7 +490,8 @@ fn extract_natives_jar(file: &str, dest: &str, exclude: &Value) -> Result<usize,
     let base = jspath::basename(file);
     let mut written = 0;
     for entry in zip_entries(&mut f, size).map_err(|e| Failure::io(&e, "read", None))? {
-        if entry.name.ends_with('/') || entry.name.starts_with("META-INF/") || excluded(&entry.name, exclude)? {
+        if entry.name.ends_with('/') || entry.name.starts_with("META-INF/") || excluded(&entry.name, exclude)?
+        {
             continue;
         }
         let target = jspath::resolve(&jspath::join(&[&root, &entry.name]));
@@ -494,7 +507,10 @@ fn extract_natives_jar(file: &str, dest: &str, exclude: &Value) -> Result<usize,
             )));
         }
         let Some(data) = read_entry_data(&mut f, &entry, size)? else {
-            return Err(Failure::user(format!("could not read \"{}\" out of {base}", entry.name)));
+            return Err(Failure::user(format!(
+                "could not read \"{}\" out of {base}",
+                entry.name
+            )));
         };
         mkdir_parent(&target)?;
         let t = Path::new(&target);
@@ -528,7 +544,11 @@ pub fn extract_natives(
             continue;
         }
         let exclude = row.native.clone().unwrap_or(Value::Array(Vec::new()));
-        files += extract_natives_jar(&jspath::join(&[&paths.libraries_dir(), &row.path]), &dir, &exclude)?;
+        files += extract_natives_jar(
+            &jspath::join(&[&paths.libraries_dir(), &row.path]),
+            &dir,
+            &exclude,
+        )?;
     }
     write_text(&jspath::join(&[&root, ".complete"]), stamp)?;
     Ok(files)
@@ -553,7 +573,11 @@ pub struct Plan {
 pub fn plan_install(version: &Value, os: &Os) -> Result<Plan, Failure> {
     let rows = library::libraries(version, os)?;
     let mut seen = HashSet::new();
-    let libraries: Vec<Row> = rows.iter().filter(|r| seen.insert(r.path.clone())).cloned().collect();
+    let libraries: Vec<Row> = rows
+        .iter()
+        .filter(|r| seen.insert(r.path.clone()))
+        .cloned()
+        .collect();
     // the remaining fields are read in planInstall's order, so the first failure is Node's
     let _ = library::logging_config(version)?;
     let natives: Vec<Row> = rows.iter().filter(|r| r.native.is_some()).cloned().collect();
@@ -572,7 +596,11 @@ pub fn plan_install(version: &Value, os: &Os) -> Result<Plan, Failure> {
 fn index_entries(index: &Value) -> Vec<(String, Value)> {
     match prop(Some(index), "objects") {
         Some(Value::Object(m)) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-        Some(Value::Array(a)) => a.iter().enumerate().map(|(i, v)| (i.to_string(), v.clone())).collect(),
+        Some(Value::Array(a)) => a
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i.to_string(), v.clone()))
+            .collect(),
         Some(Value::String(s)) => s
             .encode_utf16()
             .enumerate()
@@ -600,8 +628,14 @@ pub fn asset_tree_rows(index: &Value) -> Result<Vec<(String, String)>, Failure> 
             )));
         }
         let hash = js::string(prop(Some(&entry), "hash"));
-        if !(hash.len() == 40 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))) {
-            return Err(Failure::user(format!("the asset index names \"{rel}\" with a malformed hash")));
+        if !(hash.len() == 40
+            && hash
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+        {
+            return Err(Failure::user(format!(
+                "the asset index names \"{rel}\" with a malformed hash"
+            )));
         }
         rows.push((rel, format!("objects/{}/{hash}", &hash[..2])));
     }
@@ -672,12 +706,22 @@ impl Tally<'_> {
             .is_none_or(|t| now.duration_since(*t).as_millis() >= 250);
         if due {
             self.last_emit.insert(phase, now);
-            (self.on_progress)(&Progress { phase, done, total, bytes });
+            (self.on_progress)(&Progress {
+                phase,
+                done,
+                total,
+                bytes,
+            });
         }
     }
     fn emit_end(&mut self, phase: &'static str, done: usize, total: usize, bytes: f64) {
         self.last_emit.insert(phase, Instant::now());
-        (self.on_progress)(&Progress { phase, done, total, bytes });
+        (self.on_progress)(&Progress {
+            phase,
+            done,
+            total,
+            bytes,
+        });
     }
 }
 
@@ -702,7 +746,9 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
         }
         Err(e) => return Err(Failure::read(&e, Path::new(&json_file))),
     };
-    let parent_id = prop(Some(&raw), "inheritsFrom").filter(|v| js::truthy(Some(v))).map(|v| js::string(Some(v)));
+    let parent_id = prop(Some(&raw), "inheritsFrom")
+        .filter(|v| js::truthy(Some(v)))
+        .map(|v| js::string(Some(v)));
     let version = match &parent_id {
         Some(parent) => {
             ensure_with(paths, parent, o, ledger)?;
@@ -728,15 +774,22 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
     let mut index_bytes = 0.0;
     if needs_fetch(paths, &index_dest, &ai_sha1, &ai_size, ledger) {
         mkdir_parent(&index_dest)?;
-        (o.fetch)(&ai_url, Path::new(&index_dest), expected_of(&ai_sha1).as_deref(), &format!("asset index {ai_id}"))
-            .map_err(|e| download_failed(e, format!("could not download asset index {ai_id} from {ai_url}")))?;
+        (o.fetch)(
+            &ai_url,
+            Path::new(&index_dest),
+            expected_of(&ai_sha1).as_deref(),
+            &format!("asset index {ai_id}"),
+        )
+        .map_err(|e| download_failed(e, format!("could not download asset index {ai_id} from {ai_url}")))?;
         note_checked(paths, ledger, &index_dest, &ai_sha1);
         index_bytes = size_or_zero(&ai_size);
     }
     let index_json = read_json_file(&index_dest)?;
     let Some(layout) = library::asset_layout(&index_json) else {
         return Err(coded(
-            format!("Minecraft {id}'s asset index ({ai_id}) is laid out in a way SpawnLoft does not know. Update SpawnLoft."),
+            format!(
+                "Minecraft {id}'s asset index ({ai_id}) is laid out in a way SpawnLoft does not know. Update SpawnLoft."
+            ),
             "unknown-asset-layout",
         ));
     };
@@ -767,8 +820,18 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
             let own = prop(Some(&raw), "downloads").and_then(|d| prop(Some(d), "client"));
             if js::truthy(own) {
                 let url = js::string(prop(Some(dl), "url"));
-                (o.fetch)(&url, Path::new(&jar_path), expected_of(&sha1).as_deref(), &format!("the client jar for {id}"))
-                    .map_err(|e| download_failed(e, format!("could not download the client jar for {id} from {url}")))?;
+                (o.fetch)(
+                    &url,
+                    Path::new(&jar_path),
+                    expected_of(&sha1).as_deref(),
+                    &format!("the client jar for {id}"),
+                )
+                .map_err(|e| {
+                    download_failed(
+                        e,
+                        format!("could not download the client jar for {id} from {url}"),
+                    )
+                })?;
                 note_checked(paths, ledger, &jar_path, &sha1);
                 let mut t = lock(&tally);
                 t.downloaded += 1;
@@ -810,7 +873,12 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
             t.downloaded += 1;
             t.total_bytes += cfg.size.unwrap_or(0.0);
         }
-        lock(&tally).emit_end("log config", 1, 1, if needs { cfg.size.unwrap_or(0.0) } else { 0.0 });
+        lock(&tally).emit_end(
+            "log config",
+            1,
+            1,
+            if needs { cfg.size.unwrap_or(0.0) } else { 0.0 },
+        );
     }
 
     if index_bytes != 0.0 {
@@ -838,9 +906,18 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
         if needs {
             mkdir_parent(&dest)?;
             let url = js::string(row.url.as_ref());
-            let expected = if nullish(Some(&row.sha1)) { None } else { expected_of(&row.sha1) };
-            (o.fetch)(&url, Path::new(&dest), expected.as_deref(), &format!("library {}", row.name))
-                .map_err(|e| download_failed(e, format!("could not download library {} from {url}", row.name)))?;
+            let expected = if nullish(Some(&row.sha1)) {
+                None
+            } else {
+                expected_of(&row.sha1)
+            };
+            (o.fetch)(
+                &url,
+                Path::new(&dest),
+                expected.as_deref(),
+                &format!("library {}", row.name),
+            )
+            .map_err(|e| download_failed(e, format!("could not download library {} from {url}", row.name)))?;
             note_checked(paths, ledger, &dest, &row.sha1);
         }
         let mut t = lock(&tally);
@@ -875,8 +952,18 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
         let needs = needs_fetch(paths, &dest, &hash, &row.size, ledger);
         if needs {
             mkdir_parent(&dest)?;
-            (o.fetch)(&row.url, Path::new(&dest), Some(&row.hash), &format!("asset {}", row.hash))
-                .map_err(|e| download_failed(e, format!("could not download asset {} from {}", row.hash, row.url)))?;
+            (o.fetch)(
+                &row.url,
+                Path::new(&dest),
+                Some(&row.hash),
+                &format!("asset {}", row.hash),
+            )
+            .map_err(|e| {
+                download_failed(
+                    e,
+                    format!("could not download asset {} from {}", row.hash, row.url),
+                )
+            })?;
             note_checked(paths, ledger, &dest, &hash);
         }
         let mut t = lock(&tally);
@@ -899,7 +986,11 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
 
     let natives_dir = paths.natives_dir(id);
     let complete = jspath::join(&[&natives_dir, ".complete"]);
-    let read_stamp = || std::fs::read(&complete).ok().map(|b| String::from_utf8_lossy(&b).into_owned());
+    let read_stamp = || {
+        std::fs::read(&complete)
+            .ok()
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+    };
     let stamped = read_stamp().as_deref() == Some(plan.natives_stamp.as_str());
     let keep = o.keep_natives.iter().any(|k| k == id) && Path::new(&complete).exists();
     let native_downloaded = lock(&tally).native_downloaded;
@@ -912,8 +1003,7 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
             .map_err(|e| super::profiles::lock_failure(&e))?;
         let res = (|| {
             let done = read_stamp().as_deref() == Some(plan.natives_stamp.as_str())
-                && (!native_downloaded
-                    || std::fs::metadata(&complete).is_ok_and(|m| mtime_ms(&m) >= began));
+                && (!native_downloaded || std::fs::metadata(&complete).is_ok_and(|m| mtime_ms(&m) >= began));
             if !done {
                 extract_natives(
                     paths,
@@ -958,14 +1048,23 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
 
 /// `fetchVersionJson(id, { manifest })`: the version JSON Mojang's list names, kept while its
 /// sha1 still matches.
-pub fn fetch_version_json(paths: &Paths, id: &str, manifest: &Value, fetch: Fetch<'_>) -> Result<(), Failure> {
+pub fn fetch_version_json(
+    paths: &Paths,
+    id: &str,
+    manifest: &Value,
+    fetch: Fetch<'_>,
+) -> Result<(), Failure> {
     let rows = match prop(Some(manifest), "versions") {
         Some(Value::Array(rows)) => rows.clone(),
         Some(Value::Null) => {
-            return Err(Failure::type_error("Cannot read properties of null (reading 'find')"));
+            return Err(Failure::type_error(
+                "Cannot read properties of null (reading 'find')",
+            ));
         }
         None => {
-            return Err(Failure::type_error("Cannot read properties of undefined (reading 'find')"));
+            return Err(Failure::type_error(
+                "Cannot read properties of undefined (reading 'find')",
+            ));
         }
         Some(_) => return Err(Failure::type_error("manifest.versions.find is not a function")),
     };
@@ -987,7 +1086,12 @@ pub fn fetch_version_json(paths: &Paths, id: &str, manifest: &Value, fetch: Fetc
     }
     crate::fsx::mkdir_all(Path::new(&paths.version_dir(id)))?;
     let url = js::string(prop(Some(entry), "url"));
-    fetch(&url, Path::new(&dest), expected_of(&sha1).as_deref(), &format!("the version JSON for {id}"))?;
+    fetch(
+        &url,
+        Path::new(&dest),
+        expected_of(&sha1).as_deref(),
+        &format!("the version JSON for {id}"),
+    )?;
     read_json_file(&dest).map(|_| ())
 }
 
@@ -1006,7 +1110,9 @@ pub fn prepare_vanilla(
         on_stage(&format!("Downloading the version file for Minecraft {mc}"));
         let manifest = known.manifest.unwrap_or(Value::Null);
         if manifest.is_null() {
-            return Err(Failure::type_error("Cannot read properties of null (reading 'versions')"));
+            return Err(Failure::type_error(
+                "Cannot read properties of null (reading 'versions')",
+            ));
         }
         fetch_version_json(paths, mc, &manifest, fetch)?;
     }
@@ -1031,7 +1137,11 @@ mod tests {
         let f = d.join("a");
         std::fs::write(&f, "x").unwrap();
         let m = std::fs::metadata(&f).unwrap();
-        let d2 = m.modified().unwrap().duration_since(std::time::UNIX_EPOCH).unwrap();
+        let d2 = m
+            .modified()
+            .unwrap()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
         assert_eq!(
             mtime_ms(&m),
             d2.as_secs() as f64 * 1000.0 + f64::from(d2.subsec_nanos()) / 1e6
@@ -1105,10 +1215,16 @@ mod tests {
 
     #[test]
     fn asset_tree_rows_refuse_escapes_and_the_stamp() {
-        let rows = asset_tree_rows(&json!({ "objects": { "a/b.png": { "hash": "ab".repeat(20) } } })).unwrap();
-        assert_eq!(rows, vec![("a/b.png".to_string(), format!("objects/ab/{}", "ab".repeat(20)))]);
+        let rows =
+            asset_tree_rows(&json!({ "objects": { "a/b.png": { "hash": "ab".repeat(20) } } })).unwrap();
+        assert_eq!(
+            rows,
+            vec![("a/b.png".to_string(), format!("objects/ab/{}", "ab".repeat(20)))]
+        );
         assert!(asset_tree_rows(&json!({ "objects": { "../x": { "hash": "ab".repeat(20) } } })).is_err());
-        assert!(asset_tree_rows(&json!({ "objects": { ".COMPLETE/x": { "hash": "ab".repeat(20) } } })).is_err());
+        assert!(
+            asset_tree_rows(&json!({ "objects": { ".COMPLETE/x": { "hash": "ab".repeat(20) } } })).is_err()
+        );
         assert!(asset_tree_rows(&json!({ "objects": { "x": { "hash": "AB".repeat(20) } } })).is_err());
     }
 }
