@@ -5,7 +5,8 @@
     { "pattern": "\"(?:uptimeMs)\":\\d+", "replace": "\"uptimeMs\":<ms>" },
     { "pattern": "Started \"run1\" in [^\\n]*", "replace": "Started \"run1\" <took>" },
     { "pattern": "\\(build [^)]*\\)", "replace": "(build)" },
-    { "pattern": "\"runId\":\"run1:\\d+\"", "replace": "\"runId\":\"run1:<epoch-ms>\"" }
+    { "pattern": "\"runId\":\"run1:\\d+\"", "replace": "\"runId\":\"run1:<epoch-ms>\"" },
+    { "pattern": "\"at\":\\d+,\"cpuPercent\":[\\d.]+,\"rssMiB\":[\\d.]+", "replace": "\"at\":<s>,\"cpuPercent\":<n>,\"rssMiB\":<n>" }
   ],
   "ignore": ["data/run/run1/**", "data/instances/run1/logs/**"],
   "steps": [

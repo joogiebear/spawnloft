@@ -175,8 +175,23 @@ impl Layout {
             &self.engines_dir,
             &self.services_dir,
         ] {
-            std::fs::create_dir_all(d)
-                .map_err(|e| crate::failure::Failure::io(&e, "mkdir", Some(Path::new(d))))?;
+            std::fs::create_dir_all(d).map_err(|e| {
+                // Node's recursive mkdir says ENOTDIR when a folder on the way is a file; Windows
+                // reports that as "already exists"
+                let blocked = Path::new(d)
+                    .ancestors()
+                    .skip(1)
+                    .any(|a| a.metadata().is_ok_and(|m| !m.is_dir()));
+                if blocked {
+                    crate::failure::Failure::Internal {
+                        head: "Error".into(),
+                        message: format!("ENOTDIR: not a directory, mkdir '{d}'"),
+                        code: Some("ENOTDIR".into()),
+                    }
+                } else {
+                    crate::failure::Failure::io(&e, "mkdir", Some(Path::new(d)))
+                }
+            })?;
         }
         Ok(())
     }
