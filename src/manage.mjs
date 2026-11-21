@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 import { BACKUPS_DIR, INSTANCES_DIR, runDir } from './paths.mjs'
-import { getInstance, hasInstance, putInstance, removeInstance } from './registry.mjs'
+import { getInstance, hasInstance, listAll, putInstance, removeInstance } from './registry.mjs'
 import * as backup from './backup.mjs'
 import { activeBlock } from './control.mjs'
 import * as schedule from './schedule.mjs'
@@ -23,6 +23,19 @@ function assertStopped(name, verb) {
   if (why) throw new UserError(why)
 }
 
+// On a disk that ignores case (Windows, macOS by default) "backups/gamma" exists as soon as
+// "backups/Gamma" does, because it is the same folder. A rename that only changes capitals must
+// not read that as someone else's folder in the way.
+export function sameEntry(a, b) {
+  try {
+    const x = fs.statSync(a, { bigint: true })
+    const y = fs.statSync(b, { bigint: true })
+    return x.ino === y.ino && x.dev === y.dev && x.ino !== 0n
+  } catch {
+    return false
+  }
+}
+
 // The directory moves only when it sits where SpawnLoft put it; an adopted instance keeps its path.
 export function rename(oldName, newName) {
   // validate with the registry's own rule up front: putInstance rejecting the name after the
@@ -37,6 +50,10 @@ export function rename(oldName, newName) {
   }
   const inst = getInstance(oldName)
   if (hasInstance(newName)) throw new UserError(`"${newName}" already exists`)
+  // Windows and macOS see "gamma" and "Gamma" as one folder and one task name, so another server
+  // that differs only in capitals would have its folders and tasks overwritten
+  const clash = listAll().find((i) => i.name !== oldName && i.name.toLowerCase() === newName.toLowerCase())
+  if (clash) throw new UserError(`"${clash.name}" already exists, and "${newName}" differs from it only in capitals`)
   assertStopped(oldName, 'renaming it')
 
   const { name: _drop, ...cfg } = inst
@@ -49,7 +66,7 @@ export function rename(oldName, newName) {
   if (fs.existsSync(oldBackups)) {
     // checked first: renameSync onto an existing directory fails like a locked file, and "close
     // anything using that folder" would be the wrong advice
-    if (fs.existsSync(newBackups)) {
+    if (fs.existsSync(newBackups) && !sameEntry(oldBackups, newBackups)) {
       throw new UserError(
         `${newBackups} already holds snapshots - from an earlier server called "${newName}".` + NL +
           `  "${oldName}" has not been renamed. Move or delete that folder first, or pick another name.`,
@@ -99,7 +116,8 @@ export function rename(oldName, newName) {
 
   // the mirror is keyed by name too; otherwise retention would never find the old copies
   const mirror = backup.mirrorRoot()
-  if (mirror && fs.existsSync(path.join(mirror, oldName)) && !fs.existsSync(path.join(mirror, newName))) {
+  if (mirror && fs.existsSync(path.join(mirror, oldName)) &&
+    (!fs.existsSync(path.join(mirror, newName)) || sameEntry(path.join(mirror, oldName), path.join(mirror, newName)))) {
     try {
       fs.renameSync(path.join(mirror, oldName), path.join(mirror, newName))
     } catch {
