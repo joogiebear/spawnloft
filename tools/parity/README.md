@@ -26,7 +26,8 @@ node tools/parity/run.mjs --declared               # the declared-differences ta
 and `rust/`) for a look. `--out <dir>` writes `report.json` with everything each side printed
 and its whole data tree. `--sides node` runs one side. The core must be a `test-hooks` build:
 without it the Rust side ignores `SPAWNLOFT_TEST_ORIGINS`. `rust-internal.yml`'s `parity` job
-runs all of it on Linux x64 and arm64, Windows and macOS on every pull request.
+runs all of it on Linux x64 and arm64, Windows and macOS on every pull request. `run.mjs` asks
+the core for `--version --json` first and refuses one that is not a `test-hooks` build.
 
 ## What each side gets
 
@@ -38,7 +39,8 @@ so absolute paths in shims and records compare exactly. The machine's own `SPAWN
 `TZ=UTC`, `LANG=LC_ALL=en_US.UTF-8` and the bundled-runtime stand-ins `SPAWNLOFT_NODE` and
 `SPAWNLOFT_CORE_DIR`. `SPAWNLOFT_TEST_ORIGINS` is always set: it holds the scenario's fake
 hosts, and with none it is `{}`. That refuses every host that is not on this machine, so no
-scenario ever downloads anything real.
+scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL` or
+`SPAWNLOFT_TEST_ORIGINS` itself, in its own `env` or a step's: the rig refuses it.
 
 Not isolated: the system's scheduler (`schtasks`, `launchctl`, `systemctl --user`) and the
 Windows user PATH. Scenarios do not create tasks until C6 brings a way to point the scheduler at
@@ -71,12 +73,17 @@ a scratch folder.
   failed the same way, for example when a host was not faked.
 - `hosts`: see `lib/fake-host.mjs`. A route answers with `json`, `text`, `base64`,
   `bytes: {size, seed}` or `file`. It can also set `status`, `headers`, `redirect` and
-  `delayMs`. `${sha256:<url>}` (also sha1, sha512, md5 and size) fills in another route's
-  checksum. Every request is logged and the two sides' logs are compared: method, path and query,
-  user agent, accept.
+  `delayMs`. A `redirect` must point at a faked origin (or a path on this one): one to anywhere
+  else is answered with a 500 and logged, since the client would follow it to the network.
+  `${sha256:<url>}` (also sha1, sha512, md5 and size) fills in another route's checksum. Every
+  request is logged and the two sides' logs are compared, sorted, so two cores that ask in a
+  different order but for the same things agree: method, path and query, user agent, accept, the
+  body's size and its sha256.
 - `normalize` adds patterns this scenario knows are volatile, on top of the built-in ones
-  (`lib/normalize.mjs`: times, dates, file-name stamps, pids, lock tokens, epoch milliseconds,
-  durations). Nothing else is evened out between the sides except the declared differences.
+  (`lib/normalize.mjs`: times, dates, file-name stamps, pids, lock tokens, epoch milliseconds
+  under a key that names a time, and measured durations by name: `uptimeMs`, `totalMs`,
+  `durationMs` and a few more. A configured duration such as `timeoutMs`, a count, a size and
+  MCP's `protocolVersion` are compared exactly). Nothing else is evened out between the sides except the declared differences.
 - `golden`: the Node side's steps, with this machine's paths replaced by `<run>` and `<repo>`,
   must equal the file. A step with `"golden": false` is compared between the sides but kept out
   of the golden file. Use it for answers that depend on the machine. `goldenPlatforms` limits the
@@ -84,12 +91,19 @@ a scratch folder.
 - `platforms`: run the scenario only there.
 - `acl`: on Windows, also compare each entry's `icacls` listing. POSIX modes are always compared.
 
+The data tree records each file's mode and, by kind: a zip's entries in order with their method,
+flags, sizes, CRC and attributes; a tar's (or `.tar.gz`'s) members with name, type, mode, size
+and sha256, from the rig's own reader; text, evened out; anything else by size and sha256. A
+file name with a stamp is evened out like text, and two names that come out the same are kept
+apart as `name` and `name#2`.
+
 ## Self-tests
 
 `selftest/` holds scenarios with `"expect": "differ"`. Each one seeds a difference with steps
 marked `"side": "rust"`, and names the difference in `expectDifferences`. The rig passes such a
 scenario only when it reports that exact difference. They cover stdout, the exit code and stderr,
-an extra and a changed file in the tree, a file mode, and the fake-host request list. A
+an extra and a changed file in the tree, a file mode, a tar member's bytes, and the fake-host
+request list. A
 `side`-only step anywhere else is refused, so a real scenario can never run different steps on
 the two sides. `test/parity-rig.test.mjs` tests the rig's parts with no binary, and runs the
 self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
@@ -102,6 +116,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `registry-read` | C1's read-only commands over two stopped servers, text and `--json`, with the failure paths |
 | `downloads-paper` | faked downloads: Paper's fill API and data host, the jar store, checksum mismatch, HTTP 503, the cache, `jars` |
 | `mcp` | the MCP server over stdio. Golden: `test/fixtures/contracts/cli/mcp-tools.json` (the tool list C9 must equal) |
+| `network-refused` | a host with no fake is refused on both sides, with the same message, and nothing is sent |
 | `cli-json` | all 61 command names with `--json`, then the forms that answer with data. Golden: `test/fixtures/contracts/cli/cli-json.json` |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
@@ -117,6 +132,7 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | `doctor`, the diagnostics bundle, the panel's diagnostics | a `node: <version>` line and the code `root` | the core's version; no `root` | evened out (`doctor-node-line`) |
 | `repair` text and `--json` | `runtime: <node path>` | the core's own path | evened out (`repair-runtime`) |
 | free-text sort order outside ASCII | ICU collation | the port's comparison function (spawnloft-lib collate.rs) | scenarios sort ASCII names only; test/fixtures/contracts/ordering.json pins the ASCII order on both sides |
+| sort order on a machine whose locale tailors ASCII letters (da, nb, lt, et, ...) | that locale's order | the root order (what an en-US machine shows) | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 |
 | number grouping (`toLocaleString`, mcctl.mjs) | the system locale | fixed en-US grouping | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 (Windows runners are en-US) |
 | a run-time pattern using lookaround or a backreference (`logs --grep`, MCP `get_logs`, bot scenarios) | accepted | refused with a clear message | scenarios give such a pattern only in a step that expects the refusal, and test/fixtures/contracts/regex.json lists the sites |
 | the error text for an invalid run-time pattern | V8's (`Invalid regular expression: /(/: Unterminated group`) | the `regex` crate's | evened out (`invalid-pattern-text`) |
@@ -126,8 +142,12 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 `SPAWNLOFT_TEST_ORIGINS` is a JSON map from an origin to a loopback origin. Node honours it only
 with `NODE_ENV=test` (`src/test-origins.mjs`, which wraps `fetch` before any module runs). This
 is the one named exception to the Node freeze. Rust honours it only in a build with the
-`test-hooks` feature (`spawnloft-lib/src/test_origins.rs`, `test_origins::rewrite`, which every
-Rust download calls from C1 on). Such a build adds `"testHooks":true` to `--version --json`,
-and `desktop/release-gate.mjs` refuses a package that contains one. Both sides are held to
+`test-hooks` feature (`spawnloft-lib/src/test_origins.rs`, `test_origins::rewrite`). Every Rust
+client that reaches the network calls it: the updater's fetch and the webhook post today, every
+download from C1 on. Node follows redirects one hop at a time, so a redirect cannot lead past
+the map. Such a build adds `"testHooks":"spawnloft-test-hooks:on"` to `--version --json`;
+`desktop/release-gate.mjs` refuses a core that reports it, and `desktop/build-trust.mjs` refuses
+a binary that contains the marker. Not covered: the Node daemon's own webhook post
+(`src/daemon.mjs`), since the Node daemon is not the default and is frozen. Both sides are held to
 `test/fixtures/contracts/test-origins.json`. To change the rules, change
 `make-test-origins-fixture.mjs` and regenerate the fixture from the Node module.

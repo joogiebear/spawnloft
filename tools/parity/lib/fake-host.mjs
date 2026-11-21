@@ -8,7 +8,8 @@
 //   { "https://fill.papermc.io": { "routes": { "GET /v3/projects/paper": { "json": {...} } } } }
 // A route answers with one of `json`, `text`, `base64`, `bytes: {size, seed}` (deterministic
 // filler, for a jar or an archive whose content does not matter) or `file` (relative to the
-// scenario), plus optional `status`, `headers`, `redirect` (a path, or a URL on a faked origin)
+// scenario), plus optional `status`, `headers`, `redirect` (a path, or a URL on a faked origin;
+// any other target is refused with a 500, since the client would follow it to the network)
 // and `delayMs`. A route key may carry a query (`GET /x?y=1`); it is tried before the bare path.
 // Strings in `json`, `text` and `headers` may name another route's body as `${sha1:<url>}`,
 // `${sha256:<url>}`, `${sha512:<url>}`, `${md5:<url>}` or `${size:<url>}`, so a metadata answer can
@@ -72,9 +73,11 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
       : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, expandDeep(x)]))
         : v
   // a redirect to a faked origin must point at its fake: fetch follows it without asking us
+  // and one to anywhere else is a mistake in the scenario that would reach the network
   const toFake = (location, origin) => {
     for (const [from, to] of Object.entries(map)) if (location.startsWith(from)) return to + location.slice(from.length)
-    return location.startsWith('/') ? map[origin] + location : location
+    if (location.startsWith('/')) return map[origin] + location
+    throw new Error(`fake host: ${origin} redirects to ${location}, which is not a faked origin`)
   }
   origins.forEach((origin, i) => {
     const routes = hosts[origin].routes ?? {}
@@ -84,8 +87,11 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
       req.on('end', () => {
         const pathname = req.url.split('?')[0]
         const route = routes[`${req.method} ${req.url}`] ?? routes[`${req.method} ${pathname}`]
+        const sent = Buffer.concat(chunks)
         log.push({ origin, method: req.method, url: req.url, userAgent: req.headers['user-agent'] ?? null,
-          accept: req.headers.accept ?? null, bodyBytes: Buffer.concat(chunks).length, ...(route ? {} : { unmatched: true }) })
+          accept: req.headers.accept ?? null, bodyBytes: sent.length,
+          ...(sent.length ? { bodySha256: crypto.createHash('sha256').update(sent).digest('hex') } : {}),
+          ...(route ? {} : { unmatched: true }) })
         const send = () => {
           if (!route) {
             res.writeHead(404, { 'content-type': 'application/json' })
@@ -107,8 +113,17 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
           res.writeHead(route.status ?? (route.redirect ? 302 : 200), headers)
           res.end(req.method === 'HEAD' ? undefined : body)
         }
-        if (route?.delayMs) setTimeout(send, route.delayMs)
-        else send()
+        const answer = () => {
+          try {
+            send()
+          } catch (err) {
+            log.push({ origin, method: req.method, url: req.url, error: err.message })
+            res.writeHead(500, { 'content-type': 'text/plain' })
+            res.end(err.message)
+          }
+        }
+        if (route?.delayMs) setTimeout(answer, route.delayMs)
+        else answer()
       })
     })
   })

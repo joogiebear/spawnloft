@@ -10,11 +10,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalizeText, machineNeutral } from '../tools/parity/lib/normalize.mjs'
 import { textDiff, compareSides, runScenario, sideEnv, findCore } from '../tools/parity/lib/rig.mjs'
-import { snapshot, zipListing, globToRegExp } from '../tools/parity/lib/tree.mjs'
+import { snapshot, zipListing, tarListing, globToRegExp } from '../tools/parity/lib/tree.mjs'
 import { startHosts } from '../tools/parity/lib/fake-host.mjs'
 import { DECLARED, applyDeclared, declaredTable } from '../tools/parity/declared-differences.mjs'
 import { loadScenarios } from '../tools/parity/run.mjs'
 import { buildZip } from './fixtures/zip-writer.mjs'
+import zlib from 'node:zlib'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const parity = path.join(repo, 'tools', 'parity')
@@ -25,11 +26,13 @@ function tmp(label) {
 
 test('volatile values are evened out, and nothing else', () => {
   const t = normalizeText('at 2026-11-21T03:17:44.123Z and 2026-11-21 03:17:44, made 2026-11-21, '
-    + 'file standard_2026-11-21_033246.tar.gz, {"pid":123,"javaPid": 456,"token":"abc","startedAtMs":12,"at":1763695064000} pid 77, took 15 ms')
+    + 'file standard_2026-11-21_033246.tar.gz, {"pid":123,"javaPid": 456,"token":"abc","uptimeMs":12,"at":1763695064000,"startedAt":1763695064001} pid 77')
   assert.equal(t, 'at <time> and <time>, made <date>, file standard_<stamp>.tar.gz, '
-    + '{"pid":<pid>,"javaPid": <pid>,"token":"<token>","startedAtMs":<ms>,"at":<epoch-ms>} pid <pid>, took <ms>')
-  // ports, sizes, versions and names are left alone: they must match exactly
-  const kept = 'port 25565 size 2048 version 1.21.4 alpha Beta_2'
+    + '{"pid":<pid>,"javaPid": <pid>,"token":"<token>","uptimeMs":<ms>,"at":<epoch-ms>,"startedAt":<epoch-ms>} pid <pid>')
+  // ports, sizes, versions, names, configured durations, counts and protocol versions are left
+  // alone: they must match exactly
+  const kept = 'port 25565 size 2048 version 1.21.4 alpha Beta_2 took 15 ms {"timeoutMs":5000,"delayMs":250,'
+    + '"count":1763695064000,"sizeBytes":1763695064000,"protocolVersion":"2025-06-18"}'
   assert.equal(normalizeText(kept), kept)
   assert.equal(normalizeText('x=1 y', [{ pattern: 'x=\\d', replace: 'x=?' }]), 'x=? y')
 })
@@ -75,6 +78,54 @@ test('the data tree records kinds, modes, text and archives, and skips what a sc
   assert.match(tree.get('data/b.zip').zip, /^x method=0/)
   assert.equal(tree.get('data/c.bin').size, 3)
   if (process.platform !== 'win32') assert.match(tree.get('data/a.json').mode, /^[0-7]{3}$/)
+  fs.rmSync(root, { recursive: true, force: true })
+})
+
+// a minimal ustar archive: [name, body, type?, mode?]
+function buildTar(entries) {
+  const blocks = []
+  for (const [name, body = '', type = '0', mode = 0o644] of entries) {
+    const data = Buffer.from(body)
+    const h = Buffer.alloc(512)
+    h.write(name, 0, 100, 'utf8')
+    h.write(mode.toString(8).padStart(7, '0') + '\0', 100)
+    h.write('0000000\0', 108)
+    h.write('0000000\0', 116)
+    h.write(data.length.toString(8).padStart(11, '0') + '\0', 124)
+    h.write('00000000000\0', 136)
+    h.write(type, 156)
+    h.write('ustar\u000000', 257)
+    h.fill(' ', 148, 156)
+    let sum = 0
+    for (const b of h) sum += b
+    h.write(sum.toString(8).padStart(6, '0') + '\0 ', 148)
+    blocks.push(h, data, Buffer.alloc((512 - (data.length % 512)) % 512))
+  }
+  blocks.push(Buffer.alloc(1024))
+  return Buffer.concat(blocks)
+}
+
+test('a tar is compared by its members\' names, types, modes and bytes, gzipped or not', () => {
+  const long = 'd/' + 'n'.repeat(120) + '.txt'
+  const tar = buildTar([['a/', '', '5', 0o755], ['a/x.txt', 'one'], ['././@LongLink', long + '\0', 'L'], ['ignored', 'two']])
+  const lines = tarListing(tar).split('\n')
+  assert.equal(lines[0], 'a/ type=5 mode=755 size=0')
+  assert.match(lines[1], /^a\/x\.txt type=0 mode=644 size=3 sha256=[0-9a-f]{64}$/)
+  assert.ok(lines[2].startsWith(`${long} type=0 `), 'a GNU long name replaces the short one')
+  assert.equal(tarListing(zlib.gzipSync(tar)), tarListing(tar))
+  // the same names with other bytes are a different archive
+  assert.notEqual(tarListing(buildTar([['a/', '', '5', 0o755], ['a/x.txt', 'One']])), tarListing(buildTar([['a/', '', '5', 0o755], ['a/x.txt', 'one']])))
+  assert.equal(tarListing(Buffer.from([0x1f, 0x8b, 1, 2])), null)
+})
+
+test('two files whose stamped names even out to one are both kept', () => {
+  const root = tmp('collide')
+  fs.mkdirSync(path.join(root, 'b'))
+  fs.writeFileSync(path.join(root, 'b', 'standard_2026-11-21_033246.txt'), 'one')
+  fs.writeFileSync(path.join(root, 'b', 'standard_2026-11-21_033247.txt'), 'two')
+  const tree = snapshot(root, { normalizePath: (p) => normalizeText(p) })
+  assert.deepEqual([...tree.keys()], ['b', 'b/standard_<stamp>.txt', 'b/standard_<stamp>.txt#2'])
+  assert.deepEqual([tree.get('b/standard_<stamp>.txt').text, tree.get('b/standard_<stamp>.txt#2').text], ['one', 'two'])
   fs.rmSync(root, { recursive: true, force: true })
 })
 
@@ -138,6 +189,17 @@ test('the fake host answers routes, fills in checksums, and points redirects at 
     assert.equal(log[0].userAgent, 'rig-test')
     assert.equal(log.at(-1).unmatched, true)
     assert.deepEqual(hosts.take(), [])
+    // a redirect off the faked origins would reach the network, so the host answers 500 instead
+    const off = await startHosts({ 'https://a.example': { routes: { 'GET /r': { redirect: 'https://elsewhere.example/x' } } } })
+    try {
+      const r = await fetch(`${JSON.parse(off.env)['https://a.example']}/r`, { redirect: 'manual' })
+      assert.equal(r.status, 500)
+      assert.match(await r.text(), /not a faked origin/)
+      assert.ok(off.take().some(e => /not a faked origin/.test(e.error ?? '')))
+    } finally {
+      await off.close()
+    }
+    assert.deepEqual(hosts.take(), [])
   } finally {
     await hosts.close()
   }
@@ -147,10 +209,14 @@ test('a step for one side only is refused outside a self-test', async () => {
   await assert.rejects(runScenario({ name: 'x', steps: [{ side: 'rust', mkdir: 'data/x' }, { run: ['list'] }] }, { core: 'none', repo, scratch: tmp('refuse') }),
     /allowed only in a self-test/)
   await assert.rejects(runScenario({ name: 'x', steps: [{ mkdir: 'data/x' }] }, { core: 'none', repo, scratch: tmp('refuse') }), /no step runs a command/)
+  // the switch and the origin map are the rig's to set, never a scenario's
+  for (const env of [{ env: { SPAWNLOFT_CORE_IMPL: 'rust' } }, { steps: [{ run: ['list'], env: { SPAWNLOFT_TEST_ORIGINS: '{}' } }] }]) {
+    await assert.rejects(runScenario({ name: 'x', steps: [{ run: ['list'] }], ...env }, { core: 'none', repo, scratch: tmp('refuse') }), /a scenario may not set/)
+  }
 })
 
-test('the declared differences are the plan\'s six rows, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 6)
+test('the declared differences are the plan\'s six rows and the locale row, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 7)
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'

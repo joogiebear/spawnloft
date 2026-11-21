@@ -68,3 +68,37 @@ test('a spawned CLI downloads from the fake host, and is refused a host with no 
     fs.rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('a redirect is followed one hop at a time, and one to a host with no fake is refused', async () => {
+  // in a child, since install() replaces this process's fetch
+  const script = `
+    await import(${JSON.stringify(new URL('../src/test-origins.mjs', import.meta.url).href)})
+    const http = await import('node:http')
+    const seen = []
+    const server = http.createServer((req, res) => {
+      seen.push(req.url)
+      if (req.url === '/hop') { res.writeHead(302, { location: '/ok' }); return res.end() }
+      if (req.url === '/away') { res.writeHead(302, { location: 'https://example.invalid/x' }); return res.end() }
+      res.end('ok')
+    })
+    await new Promise(r => server.listen(0, '127.0.0.1', r))
+    const base = 'http://127.0.0.1:' + server.address().port
+    const hop = await (await fetch(base + '/hop')).text()
+    let away
+    try { await fetch(base + '/away'); away = 'sent' } catch (err) { away = err.message }
+    server.close()
+    console.log(JSON.stringify({ hop, away, seen }))
+  `
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script],
+    { env: { ...process.env, NODE_ENV: 'test', [ORIGINS_ENV]: '{}' }, windowsHide: true })
+  let stdout = ''
+  let stderr = ''
+  child.stdout.on('data', c => { stdout += c })
+  child.stderr.on('data', c => { stderr += c })
+  const code = await new Promise(r => child.on('close', r))
+  assert.equal(code, 0, stderr)
+  const out = JSON.parse(stdout)
+  assert.equal(out.hop, 'ok')
+  assert.match(out.away, /has no fake for https:\/\/example\.invalid; the request was not sent/)
+  assert.deepEqual(out.seen, ['/hop', '/ok', '/away'])
+})

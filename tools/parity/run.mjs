@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { parseArgs } from '../../src/args.mjs'
 import { runScenario, findCore, SIDES } from './lib/rig.mjs'
 import { declaredTable } from './declared-differences.mjs'
@@ -48,6 +49,11 @@ async function main() {
   for (const k of Object.keys(flags)) if (!known.includes(k)) usage(`unknown option --${k}`)
   const core = flags.core ? path.resolve(flags.core) : findCore(repo)
   if (!core || !fs.existsSync(core)) usage('no spawnloft-core found: build it (cd rust && cargo build -p spawnloft-core --features test-hooks) or pass --core')
+  // a core without the test hooks ignores SPAWNLOFT_TEST_ORIGINS, so its side could reach the network
+  const version = spawnSync(core, ['--version', '--json'], { encoding: 'utf8', windowsHide: true })
+  let hooks = null
+  try { hooks = JSON.parse(version.stdout).testHooks } catch {}
+  if (!hooks) usage(`${core} is not a test-hooks build (--version --json has no testHooks): cd rust && cargo build -p spawnloft-core --features test-hooks`)
   const sides = flags.sides ? String(flags.sides).split(',') : SIDES
   if (!sides.every(s => SIDES.includes(s)) || !sides.length) usage(`--sides takes ${SIDES.join(',')}`)
   const targets = positional.length ? positional : [path.join(here, 'scenarios'), path.join(here, 'selftest')]

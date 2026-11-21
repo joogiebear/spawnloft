@@ -135,8 +135,11 @@ pub fn rewrite_with(map: &Result<Origins, String>, url: &str) -> Result<String, 
     ))
 }
 
-/// What every download calls before it connects: in a `test-hooks` build with the variable set,
-/// the URL under the map; otherwise `url` itself.
+/// What every request to an outside host calls before it connects (the updater's fetches, the
+/// webhook post, and from C1 every download). A client that follows redirects itself follows
+/// them without asking again; the rig's fake host refuses to redirect anywhere but its fakes.
+/// In a `test-hooks` build with the variable set it returns the URL under the map; otherwise
+/// `url` itself.
 pub fn rewrite(url: &str) -> Result<String, String> {
     #[cfg(feature = "test-hooks")]
     if let Some(text) = std::env::var_os(ORIGINS_ENV).filter(|v| !v.is_empty()) {

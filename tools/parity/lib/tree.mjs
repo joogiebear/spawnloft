@@ -1,11 +1,12 @@
 // A side's data tree as the rig compares it: every file and folder under the scratch folder
 // (the data root and the scratch home both), with its kind, its mode on POSIX, and its content
-// as text (evened out), as a zip listing, as a tar listing (from the system tar, which both
-// cores call, rust/PLAN-CORE-PORT.md rule 9), or as a size and sha256.
+// as text (evened out), as a zip listing, as a tar member listing with each member's hash, or as
+// a size and sha256.
 
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import zlib from 'node:zlib'
 import { spawnSync } from 'node:child_process'
 
 const TEXT_LIMIT = 1024 * 1024
@@ -62,10 +63,43 @@ export function zipListing(buf) {
   return out.join('\n')
 }
 
-function tarListing(file) {
-  // by its bare name from its own folder: GNU tar (Git for Windows' bash) reads `D:\...` as a remote host
-  const r = spawnSync('tar', ['-tf', path.basename(file)], { cwd: path.dirname(file), encoding: 'utf8', windowsHide: true })
-  return r.status === 0 ? r.stdout.replace(/\r\n/g, '\n') : null
+// A tar's members as name, type, mode, size and sha256, from our own reader (gunzip first for
+// .gz): the names alone would call two backups with different bytes the same. Mtimes, owners
+// and the gzip header are left out, since they change from one run to the next.
+export function tarListing(buf) {
+  let data = buf
+  if (buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
+    try { data = zlib.gunzipSync(buf) } catch { return null }
+  }
+  const out = []
+  let longName = null
+  let paxPath = null
+  const field = (h, at, len) => h.subarray(at, at + len).toString('utf8').replace(/\0.*$/s, '')
+  const octal = (h, at, len) => parseInt(field(h, at, len).trim() || '0', 8)
+  for (let p = 0; p + 512 <= data.length;) {
+    const h = data.subarray(p, p + 512)
+    if (h.every(b => b === 0)) break
+    const size = octal(h, 124, 12)
+    const type = String.fromCharCode(h[156] || 48)
+    const body = data.subarray(p + 512, p + 512 + size)
+    p += 512 + Math.ceil(size / 512) * 512
+    if (type === 'L') { longName = body.toString('utf8').replace(/\0.*$/s, ''); continue }
+    if (type === 'x') {
+      const m = /(?:^|\n)\d+ path=([^\n]*)\n/.exec(body.toString('utf8'))
+      if (m) paxPath = m[1]
+      continue
+    }
+    if (type === 'g') continue
+    const prefix = field(h, 345, 155)
+    const name = paxPath ?? longName ?? (prefix ? `${prefix}/${field(h, 0, 100)}` : field(h, 0, 100))
+    longName = null
+    paxPath = null
+    const mode = (octal(h, 100, 8) & 0o777).toString(8).padStart(3, '0')
+    const hash = type === '0' || type === '\0' ? ` sha256=${crypto.createHash('sha256').update(body).digest('hex')}` : ''
+    const link = type === '1' || type === '2' ? ` link=${field(h, 157, 100)}` : ''
+    out.push(`${name} type=${type} mode=${mode} size=${size}${hash}${link}`)
+  }
+  return out.join('\n')
 }
 
 function icacls(abs) {
@@ -81,7 +115,7 @@ function describeFile(abs, rel, normalize) {
     if (listing !== null) return { zip: listing }
   }
   if (/\.(tar|tar\.gz|tgz)$/.test(lower)) {
-    const listing = tarListing(abs)
+    const listing = tarListing(buf)
     if (listing !== null) return { tar: listing }
   }
   if (buf.length <= TEXT_LIMIT && isText(buf)) return { text: normalize(buf.toString('utf8'), rel) }
@@ -107,7 +141,10 @@ export function snapshot(root, { ignore = [], normalize = (t) => t, normalizePat
       const mode = process.platform === 'win32'
         ? (acl ? { acl: icacls(abs) } : {})
         : { mode: (st.mode & 0o777).toString(8).padStart(3, '0') }
-      const key = normalizePath(rel)
+      // two names that even out alike (two backups a second apart) stay two entries, so a side
+      // that leaves an extra one is caught
+      let key = normalizePath(rel)
+      for (let n = 2; out.has(key); n++) key = `${normalizePath(rel)}#${n}`
       if (st.isSymbolicLink()) out.set(key, { kind: 'link', target: fs.readlinkSync(abs), ...mode })
       else if (st.isDirectory()) { out.set(key, { kind: 'dir', ...mode }); walk(abs) }
       else out.set(key, { kind: 'file', ...mode, ...describeFile(abs, rel, normalize) })

@@ -39,6 +39,17 @@ export const DECLARED = [
     held: 'scenarios sort ASCII names only; test/fixtures/contracts/ordering.json pins the ASCII order on both sides',
   },
   {
+    // found by the C0 review: not in the plan's table. Node's localeCompare() with no locale uses
+    // the machine's, and Danish, Norwegian, Lithuanian, Estonian and others reorder ASCII letters
+    // (Danish puts "aa" after "z"); collate.rs is the root order every en-US machine sees
+    id: 'collation-machine-locale',
+    where: 'sort order on a machine whose locale tailors ASCII letters (da, nb, lt, et, ...)',
+    node: 'that locale\'s order',
+    rust: 'the root order (what an en-US machine shows)',
+    apply: null,
+    held: 'the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8',
+  },
+  {
     id: 'number-grouping',
     where: 'number grouping (`toLocaleString`, mcctl.mjs)',
     node: 'the system locale',

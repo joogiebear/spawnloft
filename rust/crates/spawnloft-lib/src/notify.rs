@@ -22,6 +22,8 @@ pub fn format_discord(instance: &str, message: &str) -> String {
 
 /// Posts the body; `Ok(status)` for any answer, `Err` when nothing answered.
 pub fn post(url: &str, body: &str) -> Result<u16, String> {
+    // a test-hooks build sends this to the parity rig's fake host, or refuses it
+    let url = &crate::test_origins::rewrite(url)?;
     if let Some(rest) = url.strip_prefix("http://") {
         return post_plain(rest, body);
     }

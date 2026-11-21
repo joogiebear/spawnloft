@@ -166,7 +166,10 @@ async function runSide(scenario, side, o) {
     const even = (t) => applyDeclared(normalizeText(t.replace(/\r\n/g, '\n'), extra), command)
     steps.push({ index: i, label, args: raw.run, golden: raw.golden !== false, code: res.code, signal: res.signal, stdout: even(res.stdout), stderr: even(res.stderr), raw: { stdout: res.stdout, stderr: res.stderr } })
   }
+  // as a sorted list: parallel downloads (a modpack, a client's libraries) arrive in any order,
+  // and what matters is that both sides asked for the same things
   const requests = o.takeRequests().map(r => ({ ...r, url: normalizeText(r.url, extra) }))
+    .sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : JSON.stringify(a) > JSON.stringify(b) ? 1 : 0)
   const tree = snapshot(run, {
     ignore: scenario.ignore ?? [],
     acl: Boolean(scenario.acl),
@@ -277,6 +280,11 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   if (!['same', 'differ'].includes(expect)) throw new Error(`${scenario.name}: expect is "same" or "differ"`)
   if (expect !== 'differ' && scenario.steps.some(s => s.side)) throw new Error(`${scenario.name}: a step for one side only is allowed only in a self-test (expect: "differ")`)
   if (!scenario.steps.some(s => s.run)) throw new Error(`${scenario.name}: no step runs a command`)
+  // the switch and the host map are the rig's to set: a scenario that set them could make both
+  // sides the same core, or let one side reach the network
+  for (const env of [scenario.env, ...scenario.steps.map(s => s.env)]) {
+    for (const k of Object.keys(env ?? {})) if ([IMPL_ENV, 'SPAWNLOFT_TEST_ORIGINS'].includes(k)) throw new Error(`${scenario.name}: a scenario may not set ${k}`)
+  }
   fs.mkdirSync(scratch, { recursive: true })
   const hosts = await startHosts(scenario.hosts ?? {}, { baseDir })
   const results = {}

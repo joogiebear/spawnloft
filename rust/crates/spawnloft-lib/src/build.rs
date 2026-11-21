@@ -1,5 +1,11 @@
 //! Which build this is: version, commit and target, as `spawnloft-core --version` prints them.
 
+/// In a `test-hooks` build only (the parity rig's): the string the release gate's binary scan
+/// refuses (desktop/build-trust.mjs), as it refuses `spawnloft-feed:internal`. It reaches the
+/// binary through `--version --json`, so it is never optimised away; a release build has no copy.
+#[cfg(feature = "test-hooks")]
+pub const TEST_HOOKS_MARKER: &str = "spawnloft-test-hooks:on";
+
 /// The product name every binary reports.
 pub const NAME: &str = "spawnloft-core";
 
@@ -49,11 +55,10 @@ impl BuildInfo {
         let commit = self.commit.map(string).unwrap_or_else(|| "null".to_string());
         // a test-hooks build says so, and the release gate refuses one (desktop/release-gate.mjs);
         // a release build's line is unchanged
-        let hooks = if cfg!(feature = "test-hooks") {
-            ",\"testHooks\":true"
-        } else {
-            ""
-        };
+        #[cfg(feature = "test-hooks")]
+        let hooks = format!(",\"testHooks\":{}", string(TEST_HOOKS_MARKER));
+        #[cfg(not(feature = "test-hooks"))]
+        let hooks = "";
         format!(
             "{{\"name\":{},\"version\":{},\"commit\":{commit},\"target\":{}{hooks}}}",
             string(NAME),
@@ -97,7 +102,7 @@ mod tests {
     #[test]
     fn json_is_one_object() {
         let hooks = if cfg!(feature = "test-hooks") {
-            r#","testHooks":true"#
+            r#","testHooks":"spawnloft-test-hooks:on""#
         } else {
             ""
         };
