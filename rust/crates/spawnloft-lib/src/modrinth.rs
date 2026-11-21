@@ -93,8 +93,21 @@ fn is_timeout(e: &ureq::Error) -> bool {
     }
 }
 
+/// A stand-in network for this crate's tests: set, every [`send`] on this thread asks it.
+#[cfg(test)]
+pub(crate) type FakeNet = Box<dyn FnMut(&Request<'_>) -> Result<Reply, Lost>>;
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FAKE: std::cell::RefCell<Option<FakeNet>> = const { std::cell::RefCell::new(None) };
+}
+
 /// The network.
 pub fn send(req: &Request<'_>) -> Result<Reply, Lost> {
+    #[cfg(test)]
+    if let Some(answer) = FAKE.with(|f| f.borrow_mut().as_mut().map(|f| f(req))) {
+        return answer;
+    }
     let target = crate::download::target(req.url).map_err(Lost::Refused)?;
     let cfg = ureq::Agent::config_builder()
         .proxy(None)
@@ -205,7 +218,7 @@ pub fn prop<'a>(base: Option<&'a Value>, key: &str) -> Result<Option<&'a Value>,
 
 /// `list.includes(x)` for a string `x`: an array's strict equality, a string's substring search,
 /// anything else not a function.
-fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> {
+pub fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> {
     match list {
         Some(Value::Array(items)) => Ok(items.iter().any(|v| v.as_str() == Some(x))),
         Some(Value::String(s)) => Ok(s.contains(x)),
@@ -215,7 +228,7 @@ fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> 
 }
 
 /// The items of `list` for an array method `method`.
-fn items<'a>(list: Option<&'a Value>, method: &str, expr: &str) -> Result<&'a [Value], Failure> {
+pub fn items<'a>(list: Option<&'a Value>, method: &str, expr: &str) -> Result<&'a [Value], Failure> {
     match list {
         Some(Value::Array(items)) => Ok(items),
         None | Some(Value::Null) => Err(no_props(list, method)),

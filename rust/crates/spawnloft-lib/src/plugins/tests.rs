@@ -59,7 +59,7 @@ pub(crate) fn build_zip(entries: &[(&str, &[u8])], deflate: bool) -> Vec<u8> {
     out
 }
 
-fn scratch(tag: &str) -> std::path::PathBuf {
+pub(crate) fn scratch(tag: &str) -> std::path::PathBuf {
     use std::sync::atomic::{AtomicU32, Ordering};
     static N: AtomicU32 = AtomicU32::new(0);
     let d = std::env::temp_dir().join(format!(
@@ -72,7 +72,7 @@ fn scratch(tag: &str) -> std::path::PathBuf {
     d
 }
 
-fn write_jar(dir: &Path, name: &str, yml: &str) {
+pub(crate) fn write_jar(dir: &Path, name: &str, yml: &str) {
     let zip = build_zip(
         &[
             ("META-INF/MANIFEST.MF", b"Manifest-Version: 1.0\n"),
@@ -83,7 +83,7 @@ fn write_jar(dir: &Path, name: &str, yml: &str) {
     std::fs::write(dir.join(name), zip).unwrap();
 }
 
-fn inst_at(dir: &Path, extra: Value) -> Instance {
+pub(crate) fn inst_at(dir: &Path, extra: Value) -> Instance {
     let mut fields = Map::new();
     fields.insert("dir".into(), json!(dir.to_string_lossy()));
     fields.insert("jar".into(), json!("paper-26.2-121.jar"));
