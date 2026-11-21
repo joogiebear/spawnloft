@@ -86,37 +86,49 @@ pub fn stray_jars(dir: &str, current: &str) -> Vec<(String, u64)> {
     out
 }
 
+/// Whether two names are one file: libuv's copyfile returns early then, on every system.
+#[cfg(unix)]
+fn same_file(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    matches!(
+        (std::fs::metadata(a), std::fs::metadata(b)),
+        (Ok(x), Ok(y)) if x.is_file() && x.dev() == y.dev() && x.ino() == y.ino()
+    )
+}
+
+#[cfg(windows)]
+use crate::platform::same_file;
+
 /// `fs.copyFileSync(src, dest)`, with Node's error: `ENOENT: ..., copyfile 'a' -> 'b'`.
 pub fn copyfile(src: &Path, dest: &Path) -> Result<(), Failure> {
-    // libuv returns early when both name the same file (the same path, a hard link, a link into
-    // the store); `std::fs::copy` would truncate the destination first and empty it. Windows'
-    // CopyFileW is what both sides call there.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if let (Ok(a), Ok(b)) = (std::fs::metadata(src), std::fs::metadata(dest))
-            && a.is_file()
-            && a.dev() == b.dev()
-            && a.ino() == b.ino()
-        {
-            return Ok(());
-        }
+    // `std::fs::copy` would truncate the destination first and empty it (the same path, a hard
+    // link, a link into the store)
+    if same_file(src, dest) {
+        return Ok(());
     }
     std::fs::copy(src, dest).map(|_| ()).map_err(|e| {
         // the standard library refuses a folder before asking the system; libuv opens it and
-        // the system answers EISDIR
-        let (code, text) = if cfg!(unix) && e.kind() == std::io::ErrorKind::InvalidInput && src.is_dir() {
+        // the system answers EISDIR (Linux) or ENOTSUP (macOS, from fcopyfile)
+        let folder = e.kind() == std::io::ErrorKind::InvalidInput && src.is_dir();
+        let (code, text) = if folder && cfg!(target_os = "macos") {
+            ("ENOTSUP", "operation not supported on socket")
+        } else if folder && cfg!(unix) {
             ("EISDIR", "illegal operation on a directory")
         } else {
             jspath::error_code(&e)
         };
+        // Node's message names the paths as Windows spells them
+        let shown = |p: &Path| {
+            let t = p.to_string_lossy();
+            if cfg!(windows) {
+                t.replace('/', "\\")
+            } else {
+                t.into_owned()
+            }
+        };
         Failure::Internal {
             head: "Error".into(),
-            message: format!(
-                "{code}: {text}, copyfile '{}' -> '{}'",
-                src.display(),
-                dest.display()
-            ),
+            message: format!("{code}: {text}, copyfile '{}' -> '{}'", shown(src), shown(dest)),
             code: Some(code.to_string()),
         }
     })
