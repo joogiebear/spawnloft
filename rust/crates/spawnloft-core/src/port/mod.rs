@@ -176,8 +176,11 @@ fn dispatch(
         "launchers" => create::launchers(&mut ctx),
         "reveal" | "open" => create::reveal(&mut ctx),
         "rebuild" => create::rebuild(&mut ctx),
+<<<<<<< HEAD
         "paper" => fetch::paper(&mut ctx),
         "upgrade" => fetch::upgrade(&mut ctx),
+=======
+>>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

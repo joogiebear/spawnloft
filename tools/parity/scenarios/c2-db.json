@@ -6,7 +6,7 @@
    "replace": "<password>"
   },
   {
-   "pattern": "\\b\\d+s\\b *",
+   "pattern": "\\b(?:\\d+[dhm] +)*\\d+s\\b *",
    "replace": "<secs> "
   }
  ],
