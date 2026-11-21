@@ -66,7 +66,7 @@ async function main() {
   const results = []
   let failed = 0
   for (const s of scenarios) {
-    if (s.platforms && !s.platforms.includes(process.platform)) {
+    if (s.platforms && !s.platforms.includes(process.platform) && !s.platforms.includes(`${process.platform}-${process.arch}`)) {
       process.stdout.write(`skip ${s.name} (only on ${s.platforms.join(', ')})\n`)
       continue
     }

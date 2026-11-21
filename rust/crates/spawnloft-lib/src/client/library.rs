@@ -15,7 +15,7 @@ pub const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
 const LIBRARIES_URL: &str = "https://libraries.minecraft.net/";
 
 /// `String(x).slice(0, n)` in UTF-16 units.
-fn cut(s: &str, n: usize) -> String {
+pub(crate) fn cut(s: &str, n: usize) -> String {
     let mut used = 0;
     let mut out = String::new();
     for c in s.chars() {

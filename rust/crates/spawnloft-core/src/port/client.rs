@@ -5,7 +5,7 @@
 use serde_json::{Value, json};
 
 use spawnloft_lib::client::paths::Paths;
-use spawnloft_lib::client::{accounts, auth, http, log, meta, profiles, prop, state, versions};
+use spawnloft_lib::client::{accounts, auth, http, install, log, meta, profiles, prop, state, versions};
 use spawnloft_lib::failure::Failure;
 use spawnloft_lib::js;
 
@@ -323,6 +323,75 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                         if is_default { "  (default)" } else { "" }
                     ));
                 }
+            }
+            Ok(())
+        }
+        Some("install") => {
+            check_flags(ctx.args, &["json", "verify"])?;
+            let [name] = rest.as_slice() else {
+                return Err(usage());
+            };
+            let profile = profiles::get(&paths, name)?;
+            // a mod loader's profile is set up by the Node core until the loaders move (part 4)
+            if !matches!(profile.get("loader"), None | Some(Value::Null))
+                && profile.text("loader") != Some("vanilla")
+            {
+                let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+                ctx.out.set_code(spawnloft_lib::runtime::forward(&raw));
+                return Ok(());
+            }
+            let verify = ctx.args.get("verify") == Some(&Flag::Bool(true));
+            let mc = js::string(profile.get("mc"));
+            let out = std::sync::Mutex::new(&mut *ctx.out);
+            let say = |text: &str| out.lock().unwrap_or_else(|p| p.into_inner()).err(text);
+            let id = install::prepare_vanilla(
+                &paths,
+                &mc,
+                &mut |message| {
+                    if !quiet {
+                        say(&format!("{message}\n"));
+                    }
+                },
+                &meta::default_fetch,
+                &install::default_fetch,
+            )?;
+            // only a phase that fetched something is worth a line
+            let on_progress = |p: &install::Progress| {
+                if !quiet && p.bytes > 0.0 {
+                    say(&format!(
+                        "{} {}/{} ({})\n",
+                        p.phase,
+                        p.done,
+                        p.total,
+                        spawnloft_lib::text::human_bytes(Some(p.bytes))
+                    ));
+                }
+            };
+            let result = install::ensure_version(
+                &paths,
+                &id,
+                &install::Ensure {
+                    os: spawnloft_lib::client::rules::current_os(),
+                    on_progress: &on_progress,
+                    fetch: &install::default_fetch,
+                    keep_natives: &[],
+                    verify,
+                },
+            )?;
+            if quiet {
+                let mut data = serde_json::Map::new();
+                data.insert("name".into(), json!(name));
+                if let Value::Object(m) = &result {
+                    data.extend(m.clone());
+                }
+                emit(ctx, Value::Object(data));
+            } else {
+                ctx.out.line(&format!(
+                    "Installed {}: {} files ({} bytes)",
+                    js::string(prop(Some(&result), "id")),
+                    js::string(prop(Some(&result), "downloaded")),
+                    js::string(prop(Some(&result), "bytes"))
+                ));
             }
             Ok(())
         }

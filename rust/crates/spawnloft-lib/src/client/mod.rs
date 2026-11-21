@@ -9,6 +9,7 @@ pub mod auth;
 pub mod harness;
 pub mod harness_index;
 pub mod http;
+pub mod install;
 pub mod library;
 pub mod loaders;
 pub mod log;
