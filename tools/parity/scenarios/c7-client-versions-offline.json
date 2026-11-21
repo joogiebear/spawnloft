@@ -1,0 +1,34 @@
+{
+  "about": "C7 part 2 with no list reachable (no host faked, so both sides are refused): client versions lists the downloaded versions with a note and ? for every loader, new takes a version on disk (a loader whose list cannot be read decides nothing) and refuses one that is not, and a cached manifest older than its hour is used when the network fails.",
+  "normalize": [
+    { "pattern": "^1[5-9]\\d{11}$", "replace": "<epoch-ms>" }
+  ],
+  "steps": [
+    { "run": ["client", "versions"], "expect": { "code": 0 } },
+    { "run": ["client", "versions", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/versions/1.21.11/1.21.11.json", "json": { "id": "1.21.11", "type": "release", "releaseTime": "2026-10-01T10:00:00+00:00" } },
+    { "write": "data/client/versions/b1.7.3/b1.7.3.json", "json": { "id": "b1.7.3", "type": "old_beta", "releaseTime": "2011-07-07T22:00:00+00:00", "downloads": { "client": { "size": 3 } } } },
+    { "write": "data/client/versions/b1.7.3/b1.7.3.jar", "text": "abc" },
+    { "write": "data/client/versions/Odd/Odd.json", "json": { "id": "odd" } },
+    { "run": ["client", "versions", "--all"], "expect": { "code": 0, "stderrIncludes": "only downloaded versions are listed" } },
+    { "run": ["client", "versions", "--all", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "a", "--mc", "1.21.11", "--loader", "fabric"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "b", "--mc", "b1.7.3"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "c", "--mc", "1.20.1"], "expect": { "code": 1, "stderrIncludes": "not available offline" } },
+    { "run": ["client", "new", "c", "--mc", "Odd"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "c", "--mc", "1.21.11", "--loader", "forge"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "mc=1.20.1"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "a", "mc=1.21.11"], "expect": { "code": 0 } },
+
+    { "write": "data/client/cache/version_manifest_v2.json", "json": { "versions": [{ "id": "1.19.4", "type": "release", "releaseTime": "2023-03-14T10:00:00+00:00" }] } },
+    { "write": "data/client/cache/version_manifest_v2.json.fetched-at", "text": "1000" },
+    { "run": ["client", "versions"], "expect": { "code": 0, "stdoutIncludes": "1.19.4" } },
+    { "run": ["client", "new", "d", "--mc", "1.19.4", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/cache/version_manifest_v2.json", "text": "{ broken" },
+    { "run": ["client", "versions", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/cache/version_manifest_v2.json", "json": { "versions": 5 } },
+    { "run": ["client", "versions"], "expect": { "code": 1 } },
+    { "write": "data/client/cache/version_manifest_v2.json", "json": { "versions": [null] } },
+    { "run": ["client", "new", "e", "--mc", "1.18"], "expect": { "code": 1 } }
+  ]
+}

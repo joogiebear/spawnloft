@@ -1,0 +1,29 @@
+{
+  "about": "C7 part 2: client versions with the signed harness list's refresh switched on (SPAWNLOFT_HARNESS_INDEX_FETCH unset) and GitHub faked. A list whose signature is not one, one no trusted key signed, one too large, an unreachable one, the hour's wait after a failure, a cached copy that no longer verifies (dropped, with its reason in the status file) and a status file that holds null. A list that verifies needs the real key, so the Rust unit tests cover acceptance.",
+  "normalize": [
+    { "pattern": "^1[5-9]\\d{11}$", "replace": "<epoch-ms>" },
+    { "pattern": "\"lastCheck\": 1[5-9]\\d{11}", "replace": "\"lastCheck\": <epoch-ms>" }
+  ],
+  "hosts": {
+    "https://piston-meta.mojang.com": { "routes": { "GET /mc/game/version_manifest_v2.json": { "json": { "versions": [{ "id": "1.21.11", "type": "release", "releaseTime": "2026-10-01T10:00:00+00:00" }] } } } },
+    "https://github.com": { "routes": {
+      "GET /joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json": { "json": { "format": 1, "serial": 9, "rows": [] } },
+      "GET /joogiebear/spawnloft-harness-mod/releases/download/index/harness-index.json.sig": { "text": "not a signature\n" }
+    } }
+  },
+  "steps": [
+    { "run": ["client", "versions", "--json"], "env": { "SPAWNLOFT_HARNESS_INDEX_FETCH": null }, "expect": { "code": 0 } },
+    { "run": ["client", "versions", "--json"], "env": { "SPAWNLOFT_HARNESS_INDEX_FETCH": null }, "expect": { "code": 0 } },
+    { "write": "data/client/cache/harness-index.status.json", "json": { "lastCheck": 1000, "outcome": "harness-index-signature" } },
+    { "write": "data/client/cache/harness-index.json", "json": { "format": 1, "serial": 3, "rows": [] } },
+    { "write": "data/client/cache/harness-index.json.sig", "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n" },
+    { "run": ["client", "versions"], "env": { "SPAWNLOFT_HARNESS_INDEX_FETCH": null }, "expect": { "code": 0 } },
+    { "write": "data/client/cache/harness-index.json", "json": { "format": 1, "serial": 3, "rows": [] } },
+    { "write": "data/client/cache/harness-index.json.sig", "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\n" },
+    { "run": ["client", "versions", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/cache/harness-index.status.json", "text": "null" },
+    { "run": ["client", "versions"], "env": { "SPAWNLOFT_HARNESS_INDEX_FETCH": null }, "expect": { "code": 1 } },
+    { "write": "data/client/cache/harness-index.status.json", "text": "{ broken" },
+    { "run": ["client", "versions"], "env": { "SPAWNLOFT_HARNESS_INDEX_FETCH": null }, "expect": { "code": 0 } }
+  ]
+}

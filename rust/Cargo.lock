@@ -3687,6 +3687,7 @@ dependencies = [
  "minisign",
  "minisign-verify",
  "regex",
+ "ring",
  "semver",
  "serde_json",
  "sha1",

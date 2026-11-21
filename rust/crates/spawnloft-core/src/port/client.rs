@@ -5,7 +5,7 @@
 use serde_json::{Value, json};
 
 use spawnloft_lib::client::paths::Paths;
-use spawnloft_lib::client::{accounts, log, profiles, prop, state};
+use spawnloft_lib::client::{accounts, log, meta, profiles, prop, state, versions};
 use spawnloft_lib::failure::Failure;
 use spawnloft_lib::js;
 
@@ -18,6 +18,44 @@ pub const USAGE: &str = "Usage: spawnloft client list | client versions [--snaps
 fn usage() -> Failure {
     Failure::usage(USAGE)
 }
+
+/// A flag's value as the Node core holds it.
+fn flag_value(f: Option<&Flag>) -> Option<Value> {
+    f.map(|f| match f {
+        Flag::Text(s) => json!(s),
+        Flag::Bool(b) => json!(b),
+    })
+}
+
+/// `-n`: absent is `default`; otherwise a positive whole number written as text.
+fn count_flag(n: Option<&Flag>, default: f64) -> Result<f64, Failure> {
+    let count = n.map_or(default, Flag::number);
+    if !matches!(n, None | Some(Flag::Text(_))) || count.fract() != 0.0 || !count.is_finite() || count < 1.0 {
+        return Err(Failure::usage("-n must be a positive whole number"));
+    }
+    Ok(count)
+}
+
+/// `arg.match(/^([a-zA-Z]+)=(.*)$/)`: a key of letters, `=`, and a value on one line.
+fn set_arg(arg: &str) -> Option<(String, String)> {
+    let (key, value) = arg.split_once('=')?;
+    let ok_key = !key.is_empty() && key.bytes().all(|b| b.is_ascii_alphabetic());
+    let one_line = !value.contains(['\n', '\r', '\u{2028}', '\u{2029}']);
+    (ok_key && one_line).then(|| (key.to_string(), value.to_string()))
+}
+
+const SET_KEYS: &[&str] = &[
+    "mc",
+    "loader",
+    "loaderVersion",
+    "memory",
+    "java",
+    "server",
+    "harness",
+    "account",
+    "assistantAccount",
+    "serverList",
+];
 
 pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let paths = Paths::new(ctx.layout);
@@ -216,6 +254,179 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                         if is_default { "  (default)" } else { "" }
                     ));
                 }
+            }
+            Ok(())
+        }
+        Some("versions") => {
+            check_flags(ctx.args, &["snapshots", "all", "n", "json"])?;
+            if !rest.is_empty() {
+                return Err(usage());
+            }
+            let count = count_flag(ctx.args.get("n"), 30.0)?;
+            let list = versions::list_versions(&paths, false, &meta::default_fetch)?;
+            let show = if ctx.args.get("all") == Some(&Flag::Bool(true)) {
+                "all"
+            } else if ctx.args.get("snapshots") == Some(&Flag::Bool(true)) {
+                "snapshot"
+            } else {
+                "release"
+            };
+            let limit = if count > usize::MAX as f64 {
+                usize::MAX
+            } else {
+                count as usize
+            };
+            if quiet {
+                let rows: Vec<Value> = versions::shown(&list.versions, show, limit)
+                    .into_iter()
+                    .map(|v| {
+                        spawnloft_lib::client::object(vec![
+                            ("id", Some(json!(v.id))),
+                            ("type", v.kind_raw.clone()),
+                            ("downloaded", Some(json!(v.downloaded))),
+                            ("loaders", Some(Value::Object(v.loaders))),
+                        ])
+                    })
+                    .collect();
+                emit(ctx, json!({ "offline": list.offline, "versions": rows }));
+                return Ok(());
+            }
+            if let Some(offline) = &list.offline {
+                ctx.out.err(&format!("Note: {offline}.\n"));
+            }
+            ctx.out.line(&spawnloft_lib::text::table(&versions::table_rows(
+                &list.versions,
+                show,
+                limit,
+            )));
+            ctx.out.line("? means that loader's list could not be read. Make a profile: spawnloft client new <name> --mc <version> --loader <loader>");
+            Ok(())
+        }
+        Some("new") => {
+            check_flags(
+                ctx.args,
+                &[
+                    "mc", "loader", "memory", "java", "server", "harness", "account", "json",
+                ],
+            )?;
+            let [name] = rest.as_slice() else {
+                return Err(usage());
+            };
+            let mc = flag_value(ctx.args.get("mc"));
+            if !js::truthy(mc.as_ref()) {
+                return Err(usage());
+            }
+            let loader = flag_value(ctx.args.get("loader")).unwrap_or(json!("vanilla"));
+            // the version Mojang lists (and its loader builds for) before anything is saved
+            let mc = versions::check_profile_version(
+                &paths,
+                &mc.unwrap_or(Value::Null),
+                Some(&loader),
+                &meta::default_fetch,
+            )?;
+            let or_null = |k: &str| flag_value(ctx.args.get(k)).unwrap_or(Value::Null);
+            let profile = profiles::create(
+                &paths,
+                name,
+                profiles::NewProfile {
+                    mc: json!(mc),
+                    loader,
+                    loader_version: Value::Null,
+                    java: or_null("java"),
+                    memory: flag_value(ctx.args.get("memory")).unwrap_or(json!(profiles::DEFAULT_MEMORY)),
+                    harness: json!(ctx.args.get("harness") == Some(&Flag::Bool(true))),
+                    server: or_null("server"),
+                    account: or_null("account"),
+                    server_list: true,
+                },
+            )?;
+            if quiet {
+                emit(ctx, json!({ "profile": profile.to_json() }));
+            } else {
+                ctx.out.line(&format!(
+                    "Created profile \"{name}\" (Minecraft {}, {}). Launch it: spawnloft client launch {name}",
+                    js::string(profile.get("mc")),
+                    js::string(profile.get("loader"))
+                ));
+            }
+            Ok(())
+        }
+        Some("set") => {
+            check_flags(ctx.args, &["json"])?;
+            if rest.len() < 2 {
+                return Err(usage());
+            }
+            let name = &rest[0];
+            let mut patch = serde_json::Map::new();
+            for arg in &rest[1..] {
+                let Some((key, raw)) = set_arg(arg) else {
+                    return Err(usage());
+                };
+                if !SET_KEYS.contains(&key.as_str()) {
+                    return Err(Failure::user(format!(
+                        "unknown profile field \"{key}\"; one of {}",
+                        SET_KEYS.join(", ")
+                    )));
+                }
+                let value = if matches!(key.as_str(), "harness" | "assistantAccount" | "serverList") {
+                    match raw.as_str() {
+                        "true" => json!(true),
+                        "false" => json!(false),
+                        _ => return Err(usage()),
+                    }
+                } else if matches!(key.as_str(), "loaderVersion" | "java" | "server" | "account")
+                    && raw.is_empty()
+                {
+                    Value::Null
+                } else {
+                    json!(raw)
+                };
+                patch.insert(key, value);
+            }
+            if patch.contains_key("mc") || patch.contains_key("loader") {
+                let before = profiles::get(&paths, name)?;
+                let mc = patch.get("mc").cloned().or_else(|| before.get("mc").cloned());
+                let loader = match patch.get("loader") {
+                    Some(l) => Some(l.clone()),
+                    None => before.get("loader").cloned(),
+                };
+                let trimmed = match &mc {
+                    Some(Value::String(s)) => js::trim(s).to_string(),
+                    None | Some(Value::Null) => {
+                        return Err(Failure::type_error(format!(
+                            "Cannot read properties of {} (reading 'trim')",
+                            if mc.is_none() { "undefined" } else { "null" }
+                        )));
+                    }
+                    Some(_) => return Err(Failure::type_error("mc.trim is not a function")),
+                };
+                let mc_changed = before.get("mc") != Some(&json!(trimmed));
+                if mc_changed || !spawnloft_lib::client::strict_eq(loader.as_ref(), before.get("loader")) {
+                    let loader = loader.filter(|l| !l.is_null());
+                    versions::check_profile_version(
+                        &paths,
+                        mc.as_ref().unwrap_or(&Value::Null),
+                        loader.as_ref(),
+                        &meta::default_fetch,
+                    )?;
+                }
+            }
+            let entries: Vec<(String, Value)> = patch.clone().into_iter().collect();
+            let profile = profiles::update(&paths, name, entries)?;
+            if quiet {
+                emit(ctx, json!({ "profile": profile.to_json() }));
+            } else {
+                let said: Vec<String> = patch
+                    .iter()
+                    .map(|(k, v)| {
+                        if v.is_null() {
+                            format!("{k} cleared")
+                        } else {
+                            format!("{k}={}", js::string(Some(v)))
+                        }
+                    })
+                    .collect();
+                ctx.out.line(&format!("Updated \"{name}\": {}", said.join(" ")));
             }
             Ok(())
         }
