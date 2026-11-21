@@ -79,11 +79,29 @@ fn exists(p: &str) -> bool {
 
 /// `fs.rmSync(file, { force: true })`: a missing file is fine, anything else is thrown.
 fn rm_force(file: &str) -> Result<(), Failure> {
+    if std::fs::symlink_metadata(file).is_ok_and(|m| m.is_dir()) {
+        return Err(Failure::Internal {
+            head: "SystemError [ERR_FS_EISDIR]".into(),
+            message: format!("Path is a directory: rm returned EISDIR (is a directory) {file}"),
+            code: Some("ERR_FS_EISDIR".into()),
+        });
+    }
     match std::fs::remove_file(file) {
         Ok(()) => Ok(()),
         Err(e) if jspath::is_enoent(&e) => Ok(()),
         Err(e) => Err(Failure::io(&e, "rm", Some(Path::new(file)))),
     }
+}
+
+#[cfg(windows)]
+fn dir_link(meta: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    meta.file_type().is_symlink() && meta.file_attributes() & 0x10 != 0
+}
+
+#[cfg(not(windows))]
+fn dir_link(_: &std::fs::Metadata) -> bool {
+    false
 }
 
 /// `fs.rmSync(dir, { recursive: true, force: true })`.
@@ -95,6 +113,9 @@ fn rm_tree(p: &Path) -> Result<(), Failure> {
     };
     let r = if meta.is_dir() {
         std::fs::remove_dir_all(p)
+    } else if dir_link(&meta) {
+        // a directory symlink or junction on Windows: unlinked as libuv does, never followed
+        std::fs::remove_dir(p)
     } else {
         std::fs::remove_file(p)
     };
@@ -628,7 +649,7 @@ fn create_snapshot_locked(
     let mut dumps = services::Dumps::default();
     let mut dump_dir: Option<PathBuf> = None;
     if opts.scope == "standard" || opts.scope == "full" {
-        let tmp = crate::engines::mkdtemp(&std::env::temp_dir().join("spawnloft-dump-").to_string_lossy())?;
+        let tmp = crate::engines::mkdtemp(&jspath::join(&[&util::os_tmpdir(), "spawnloft-dump-"]))?;
         match services::dump_attachments(layout, &inst.name, &tmp) {
             Ok(d) => dumps = d,
             Err(e) => {
@@ -797,8 +818,17 @@ fn create_snapshot_locked(
         let manifest = Value::Object(m);
         let _ = fsx::write_json_node(Path::new(&r.manifest_file), &manifest, None, false)?;
         // history only sees the final name once tar is done and the manifest exists
-        std::fs::rename(&r.pending, &r.file)
-            .map_err(|e| fsx::rename_failure(&e, Path::new(&r.pending), Path::new(&r.file)))?;
+        // a plain renameSync in Node, so its own error, not renameOver's
+        std::fs::rename(&r.pending, &r.file).map_err(|e| Failure::Internal {
+            head: "Error".into(),
+            message: format!(
+                "{}, rename '{}' -> '{}'",
+                jspath::node_error(&e, "rename", None),
+                r.pending,
+                r.file
+            ),
+            code: Some(jspath::error_code(&e).0.to_string()),
+        })?;
         let file = r.file.clone();
         reservation = None;
         let (mirrored, mirror_error) = mirror_copy(&inst.name, &file)?;
@@ -885,8 +915,10 @@ pub fn snapshot_problems(warnings: Option<&Value>) -> Vec<String> {
     let Some(Value::Array(list)) = warnings else {
         return Vec::new();
     };
-    let db_re =
-        regex::Regex::new(r"^database (.+?) on (.+?) not included: ((?s:.*))$").expect("a fixed pattern");
+    let db_re = regex::Regex::new(
+        r"^database ([^\n\r\u{2028}\u{2029}]+?) on ([^\n\r\u{2028}\u{2029}]+?) not included: ((?s:.*))$",
+    )
+    .expect("a fixed pattern");
     let mut out = Vec::new();
     for w in list {
         let t = js::string(Some(w));
@@ -1030,7 +1062,8 @@ fn mtime_ms(meta: &std::fs::Metadata) -> f64 {
             .or_else(|e| Ok::<f64, ()>(-(e.duration().as_secs_f64() * 1000.0)))
             .ok()
     });
-    t.unwrap_or(0.0).trunc()
+    // a Date of mtimeMs: Node rounds to the nearest millisecond
+    (t.unwrap_or(0.0) + 0.5).floor()
 }
 
 /// `listSnapshots(name)`: newest first. A listing makes nothing (the panel answers it on a GET).
