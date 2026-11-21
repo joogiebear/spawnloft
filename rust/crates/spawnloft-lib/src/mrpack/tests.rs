@@ -993,3 +993,33 @@ fn local_addresses_are_known_as_javascript_matched_them() {
         assert!(!is_local_host(h), "{h}");
     }
 }
+
+#[test]
+fn a_protected_file_is_guarded_however_the_pack_spells_it() {
+    let old = strs(&[
+        "./ops.json",
+        "overrides/../x",
+        "world//level.dat",
+        "OPS.JSON",
+        "World/region/r.mca",
+        "./config/a.toml",
+    ]);
+    let protect = vec!["world".to_string(), "ops.json".to_string()];
+    assert!(plan_removals(&old, &strs(&["config/a.toml"]), &protect).is_empty());
+    assert_eq!(
+        plan_removals(&strs(&["./mods/x.jar", "mods/x.jar"]), &[], &[]),
+        ["mods/x.jar"]
+    );
+}
+
+#[test]
+fn a_record_that_is_null_zero_false_or_empty_is_no_record() {
+    let dir = std::env::temp_dir().join(format!("sl-mrpack-falsy-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let inst = crate::registry::spread("r", &json!({ "dir": dir.to_string_lossy() }));
+    for text in ["null", "0", "false", "\"\"", "{}"] {
+        std::fs::write(dir.join(PACK_FILE), text).unwrap();
+        assert_eq!(pack_of(&inst).is_some(), text == "{}", "{text}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

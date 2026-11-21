@@ -128,6 +128,14 @@ pub fn forget_managed(inst: &Instance, file: &str) -> Result<(), Failure> {
     let mut store = read_managed(inst)?;
     let removed = match store.get_mut("managed") {
         Some(Value::Object(m)) => m.shift_remove(file).is_some(),
+        // `delete arr[i]` leaves a hole, which the store is written with as null
+        Some(Value::Array(a)) => match file.parse::<usize>() {
+            Ok(i) if crate::jsjson::is_index_key(file) && i < a.len() => {
+                a[i] = Value::Null;
+                true
+            }
+            _ => false,
+        },
         _ => false,
     };
     if removed {

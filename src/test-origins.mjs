@@ -85,7 +85,8 @@ export function install(env = process.env) {
       const method = (opts.method ?? 'GET').toUpperCase()
       if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === 'POST')) opts = { ...opts, method: 'GET', body: undefined, duplex: undefined }
     }
-    throw new Error('too many redirects')
+    // undici's own failure: `fetch failed`, caused by this
+    throw new TypeError('fetch failed', { cause: new Error('redirect count exceeded') })
   }
   return true
 }

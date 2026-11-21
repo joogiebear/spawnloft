@@ -413,11 +413,17 @@ export function packOf(inst) {
 // What an update may delete: files the old pack owned that the new one doesn't, and nothing else.
 // `protect` entries (worlds, root server files, spawnloft records) survive even a bad record; a path
 // matches exactly or as a directory prefix.
+// Paths are compared as the file they name, so `./ops.json` or `world//level.dat` in a pack's
+// overrides cannot slip past the guard, and a guard ignores case (Windows and macOS do).
 export function planRemovals(oldFiles = [], newFiles = [], { protect = [] } = {}) {
-  const keep = new Set(newFiles.map((p) => String(p).replace(/\\/g, '/')))
-  const guarded = (p) => protect.some((g) => p === g || p.startsWith(`${g}/`))
-  return [...new Set(oldFiles.map((p) => String(p).replace(/\\/g, '/')))]
-    .filter((p) => !keep.has(p) && !guarded(p) && !p.split('/').includes('..') && !p.startsWith('/'))
+  const keep = new Set(newFiles.map((p) => safeRelativePath(String(p))).filter((p) => p !== null))
+  const guards = protect.map((g) => String(g).toLowerCase())
+  const guarded = (p) => {
+    const low = p.toLowerCase()
+    return guards.some((g) => low === g || low.startsWith(`${g}/`))
+  }
+  return [...new Set(oldFiles.map((p) => safeRelativePath(String(p))).filter((p) => p !== null))]
+    .filter((p) => !keep.has(p) && !guarded(p))
 }
 
 function protectedPaths(inst) {
