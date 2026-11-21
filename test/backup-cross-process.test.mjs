@@ -6,8 +6,10 @@
  * 1.5.0 build reads and writes, since `dataFormat` never changes in the port.
  *
  * On macOS it is also the check the installer design owed C3: a restore adds no quarantine
- * attribute to what it extracts, not even from an archive that carries one itself (an archive
- * downloaded through a browser, then restored).
+ * attribute to what it extracts. From an archive that carries one itself (one downloaded through
+ * a browser, then restored) the system tar copies the archive's own attribute onto what it
+ * extracts, for both cores alike (rule 9 keeps the system tar): the check there is that nothing
+ * but the archive's own value appears.
  *
  * The Rust side is the spawnloft-core binary named by SPAWNLOFT_CORE_BIN (the parity job's), and
  * the Node side the same binary with SPAWNLOFT_CORE_IMPL=node, which forwards to mcctl.mjs:
@@ -125,11 +127,6 @@ for (const [maker, restorer] of [['rust', 'node'], ['node', 'rust']]) {
     fs.writeFileSync(path.join(ctx.dir, 'world', 'level.dat'), 'changed')
     fs.rmSync(path.join(ctx.dir, 'plugins', 'Essentials'), { recursive: true })
     fs.writeFileSync(path.join(ctx.dir, 'world', 'new.txt'), 'made after')
-    if (process.platform === 'darwin') {
-      // as a browser marks a download
-      const q = spawnSync('xattr', ['-w', 'com.apple.quarantine', '0081;00000000;Safari;', res.path], { encoding: 'utf8' })
-      assert.equal(q.status, 0, q.stderr)
-    }
     const restored = core(restorer, ctx, 'restore', 'srv', path.basename(res.path), '--yes')
     assert.equal(restored.code, 0, restored.err + restored.out)
     assert.match(restored.out, /^Restored standard_/)
@@ -143,5 +140,18 @@ for (const [maker, restorer] of [['rust', 'node'], ['node', 'rust']]) {
     // the copy the restore kept of what it replaced is one the maker reads back too
     const again = core(maker, ctx, 'verify', 'srv', 'pre-restore')
     assert.equal(again.code, 0, again.err + again.out)
+
+    if (process.platform === 'darwin') {
+      // as a browser marks a download; the system tar carries the archive's value over
+      const mark = '0081;00000000;Safari;'
+      const q = spawnSync('xattr', ['-w', 'com.apple.quarantine', mark, res.path], { encoding: 'utf8' })
+      assert.equal(q.status, 0, q.stderr)
+      const second = core(restorer, ctx, 'restore', 'srv', path.basename(res.path), '--yes')
+      assert.equal(second.code, 0, second.err + second.out)
+      const lines = quarantined(ctx.dir)
+      assert.deepEqual(lines.filter((l) => !l.endsWith(`com.apple.quarantine: ${mark}`)), [])
+      const q2 = spawnSync('xattr', ['-d', 'com.apple.quarantine', res.path], { encoding: 'utf8' })
+      assert.equal(q2.status, 0, q2.stderr)
+    }
   })
 }
