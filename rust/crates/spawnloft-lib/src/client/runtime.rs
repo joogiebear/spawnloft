@@ -62,7 +62,11 @@ pub fn runtime_dir(paths: &Paths, component: &str, platform: &str) -> String {
 }
 
 fn manifest_file(paths: &Paths, component: &str, platform: &str) -> String {
-    jspath::join(&[&paths.runtime_dir(), component, &format!("{platform}.manifest.json")])
+    jspath::join(&[
+        &paths.runtime_dir(),
+        component,
+        &format!("{platform}.manifest.json"),
+    ])
 }
 
 fn index_file(paths: &Paths) -> String {
@@ -75,13 +79,16 @@ fn plain(s: &str) -> bool {
     !b.is_empty()
         && b.len() <= 64
         && (b[0].is_ascii_lowercase() || b[0].is_ascii_digit())
-        && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
+        && b.iter()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
 }
 
 /// `/^[0-9a-f]{40}$/.test(String(v))`.
 fn sha1_like(v: Option<&Value>) -> bool {
     let s = js::string(v);
-    s.len() == 40 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    s.len() == 40
+        && s.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn https_like(v: Option<&Value>) -> bool {
@@ -89,7 +96,11 @@ fn https_like(v: Option<&Value>) -> bool {
 }
 
 /// `fetchRuntimeIndex({ force })`: kept a day in the cache folder.
-pub fn fetch_runtime_index(paths: &Paths, force: bool, fetch: super::meta::FetchJson<'_>) -> Result<Value, Failure> {
+pub fn fetch_runtime_index(
+    paths: &Paths,
+    force: bool,
+    fetch: super::meta::FetchJson<'_>,
+) -> Result<Value, Failure> {
     let mut o = super::meta::Cached::new("Mojang's Java runtime list", force);
     o.max_age_ms = 24.0 * 3_600_000.0;
     o.fetch = fetch;
@@ -139,7 +150,11 @@ pub fn runtime_entry(all: &Value, component: &str, platform: &str) -> Result<Opt
             v => v.cloned().unwrap_or(Value::Null),
         },
         url: js::string(prop(m, "url")),
-        version: if nullish(name) { String::new() } else { js::string(name) },
+        version: if nullish(name) {
+            String::new()
+        } else {
+            js::string(name)
+        },
     }))
 }
 
@@ -191,10 +206,16 @@ fn posix_dirname(p: &str) -> &str {
 pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
     let entries: Vec<(String, Value)> = match prop(Some(manifest), "files") {
         Some(Value::Object(m)) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-        Some(Value::Array(a)) => {
-            a.iter().enumerate().map(|(i, v)| (i.to_string(), v.clone())).collect()
+        Some(Value::Array(a)) => a
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i.to_string(), v.clone()))
+            .collect(),
+        _ => {
+            return Err(user(format!(
+                "the Java runtime manifest for {platform} lists no files"
+            )));
         }
-        _ => return Err(user(format!("the Java runtime manifest for {platform} lists no files"))),
     };
     let windows = platform.starts_with("windows");
     let (mut dirs, mut downloads, mut links) = (Vec::new(), Vec::new(), Vec::new());
@@ -212,7 +233,9 @@ pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
             let raw = prop(prop(Some(entry), "downloads"), "raw");
             if !js::truthy(raw) {
                 return Err(coded(
-                    format!("the Java runtime manifest offers \"{rel}\" only compressed, which SpawnLoft cannot unpack. Update SpawnLoft."),
+                    format!(
+                        "the Java runtime manifest offers \"{rel}\" only compressed, which SpawnLoft cannot unpack. Update SpawnLoft."
+                    ),
                     "runtime-format",
                 ));
             }
@@ -234,7 +257,9 @@ pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
         } else if kind == Some(&json!("link")) {
             if windows {
                 return Err(coded(
-                    format!("the Java runtime manifest for {platform} has a link (\"{rel}\"), which SpawnLoft does not make on Windows. Update SpawnLoft."),
+                    format!(
+                        "the Java runtime manifest for {platform} has a link (\"{rel}\"), which SpawnLoft does not make on Windows. Update SpawnLoft."
+                    ),
                     "runtime-format",
                 ));
             }
@@ -255,7 +280,9 @@ pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
             links.push((rel, target));
         } else {
             return Err(coded(
-                format!("the Java runtime manifest has an entry of a kind SpawnLoft does not know (\"{rel}\"). Update SpawnLoft."),
+                format!(
+                    "the Java runtime manifest has an entry of a kind SpawnLoft does not know (\"{rel}\"). Update SpawnLoft."
+                ),
                 "runtime-format",
             ));
         }
@@ -285,11 +312,16 @@ pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
     // shortest first, ties in manifest order (a stable sort by UTF-16 length)
     candidates.sort_by_key(|d| d.rel.encode_utf16().count());
     let Some(java) = candidates.first() else {
-        return Err(user(format!("the Java runtime manifest for {platform} has no {exe}")));
+        return Err(user(format!(
+            "the Java runtime manifest for {platform} has no {exe}"
+        )));
     };
     if !windows && !java.executable {
         return Err(coded(
-            format!("the Java runtime manifest for {platform} does not mark {} executable", java.rel),
+            format!(
+                "the Java runtime manifest for {platform} does not mark {} executable",
+                java.rel
+            ),
             "runtime-format",
         ));
     }
@@ -306,7 +338,9 @@ pub fn runtime_plan(manifest: &Value, platform: &str) -> Result<Plan, Failure> {
 fn read_index(paths: &Paths) -> Result<Map<String, Value>, Failure> {
     let index = read_json(&index_file(paths))?;
     match index {
-        Some(Value::Object(m)) if matches!(m.get("runtimes"), Some(Value::Object(_) | Value::Array(_))) => Ok(m),
+        Some(Value::Object(m)) if matches!(m.get("runtimes"), Some(Value::Object(_) | Value::Array(_))) => {
+            Ok(m)
+        }
         _ => {
             let mut m = Map::new();
             m.insert("runtimes".into(), json!({}));
@@ -318,7 +352,11 @@ fn read_index(paths: &Paths) -> Result<Map<String, Value>, Failure> {
 fn runtimes(index: &mut Map<String, Value>) -> &mut Map<String, Value> {
     // an array as runtimes takes keys as an object would; it is written back as an object
     if let Some(Value::Array(a)) = index.get("runtimes") {
-        let m: Map<String, Value> = a.iter().enumerate().map(|(i, v)| (i.to_string(), v.clone())).collect();
+        let m: Map<String, Value> = a
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i.to_string(), v.clone()))
+            .collect();
         index.insert("runtimes".into(), Value::Object(m));
     }
     match index.get_mut("runtimes") {
@@ -455,10 +493,14 @@ fn ensure_locked(
     let m_file = manifest_file(paths, component, platform);
     let where_ = platform_text(platform);
     let Some(want) = entry.map(|e| json!(e.sha1)).or_else(|| {
-        recorded.as_ref().map(|r| prop(Some(r), "manifestSha1").cloned().unwrap_or(Value::Null))
+        recorded
+            .as_ref()
+            .map(|r| prop(Some(r), "manifestSha1").cloned().unwrap_or(Value::Null))
     }) else {
         return Err(coded(
-            format!("Mojang's Java runtime list could not be read, and {component} for {where_} is not downloaded yet"),
+            format!(
+                "Mojang's Java runtime list could not be read, and {component} for {where_} is not downloaded yet"
+            ),
             "runtime-offline",
         ));
     };
@@ -468,17 +510,27 @@ fn ensure_locked(
     if text.is_none() {
         let Some(e) = entry else {
             return Err(coded(
-                format!("the Java runtime {component} for {where_} is damaged, and Mojang's runtime list could not be read to repair it"),
+                format!(
+                    "the Java runtime {component} for {where_} is damaged, and Mojang's runtime list could not be read to repair it"
+                ),
                 "runtime-offline",
             ));
         };
-        fetch(&e.url, Path::new(&m_file), Some(&e.sha1), &format!("the {component} manifest"))?;
+        fetch(
+            &e.url,
+            Path::new(&m_file),
+            Some(&e.sha1),
+            &format!("the {component} manifest"),
+        )?;
         text = Some(std::fs::read(&m_file).map_err(|err| Failure::read(&err, Path::new(&m_file)))?);
     }
-    let manifest = jsjson::parse(&String::from_utf8_lossy(&text.unwrap_or_default())).map_err(Failure::syntax)?;
+    let manifest =
+        jsjson::parse(&String::from_utf8_lossy(&text.unwrap_or_default())).map_err(Failure::syntax)?;
     let plan = runtime_plan(&manifest, platform)?;
 
-    let recorded_sha1 = recorded.as_ref().and_then(|r| prop(Some(r), "manifestSha1").cloned());
+    let recorded_sha1 = recorded
+        .as_ref()
+        .and_then(|r| prop(Some(r), "manifestSha1").cloned());
     // a new manifest replaces the record before any file changes
     if recorded.is_some() && recorded_sha1.as_ref() != Some(&want) {
         update_index(paths, |r| {
@@ -502,9 +554,9 @@ fn ensure_locked(
                 d.rel
             )));
         }
-        let fits = std::fs::symlink_metadata(&dest).is_ok_and(|m| {
-            m.is_file() && d.size.is_none_or(|s| m.len() as f64 == s)
-        }) && (!thorough || sha1_of(&dest).as_deref() == Some(d.sha1.as_str()));
+        let fits = std::fs::symlink_metadata(&dest)
+            .is_ok_and(|m| m.is_file() && d.size.is_none_or(|s| m.len() as f64 == s))
+            && (!thorough || sha1_of(&dest).as_deref() == Some(d.sha1.as_str()));
         if !fits {
             todo.push(d.clone());
         }
@@ -513,7 +565,12 @@ fn ensure_locked(
     let total = todo.len();
     let progress = Mutex::new((0usize, 0f64));
     if total > 0 {
-        on_progress(&Progress { phase: "java", done: 0, total, bytes: 0.0 });
+        on_progress(&Progress {
+            phase: "java",
+            done: 0,
+            total,
+            bytes: 0.0,
+        });
     }
     let next = AtomicUsize::new(0);
     let failed = AtomicBool::new(false);
@@ -525,12 +582,19 @@ fn ensure_locked(
             s.spawn(|| {
                 cancel::with_cancel(job, || {
                     while !failed.load(Ordering::SeqCst) {
-                        let Some(d) = todo.get(next.fetch_add(1, Ordering::SeqCst)) else { break };
+                        let Some(d) = todo.get(next.fetch_add(1, Ordering::SeqCst)) else {
+                            break;
+                        };
                         let dest = jspath::join(&[dir, &d.rel]);
                         let one = (|| {
                             crate::fsx::mkdir_all(Path::new(&jspath::dirname(&dest)))?;
                             rm_file(&dest)?;
-                            fetch(&d.url, Path::new(&dest), Some(&d.sha1), &format!("{component} {}", d.rel))?;
+                            fetch(
+                                &d.url,
+                                Path::new(&dest),
+                                Some(&d.sha1),
+                                &format!("{component} {}", d.rel),
+                            )?;
                             if let Some(size) = d.size
                                 && std::fs::metadata(&dest).map_or(true, |m| m.len() as f64 != size)
                             {
@@ -547,7 +611,12 @@ fn ensure_locked(
                         let mut p = progress.lock().unwrap_or_else(|p| p.into_inner());
                         p.0 += 1;
                         p.1 += d.size.unwrap_or(0.0);
-                        on_progress(&Progress { phase: "java", done: p.0, total, bytes: p.1 });
+                        on_progress(&Progress {
+                            phase: "java",
+                            done: p.0,
+                            total,
+                            bytes: p.1,
+                        });
                     }
                 });
             });
@@ -697,18 +766,40 @@ mod tests {
         let p = runtime_plan(&m, "mac-os").unwrap();
         assert_eq!(p.java, "x/bin/java");
         assert_eq!(p.count, 4);
-        let bad = manifest(vec![file("bin/java", true), ("l".into(), json!({ "type": "link", "target": "../../etc" }))]);
-        assert!(runtime_plan(&bad, "linux").unwrap_err().message().contains("outside its folder"));
+        let bad = manifest(vec![
+            file("bin/java", true),
+            ("l".into(), json!({ "type": "link", "target": "../../etc" })),
+        ]);
+        assert!(
+            runtime_plan(&bad, "linux")
+                .unwrap_err()
+                .message()
+                .contains("outside its folder")
+        );
         let under = manifest(vec![
             file("bin/java", true),
             ("l".into(), json!({ "type": "link", "target": "bin" })),
             file("l/x", false),
         ]);
-        assert!(runtime_plan(&under, "linux").unwrap_err().message().contains("under the link"));
-        let win = manifest(vec![file("bin/java.exe", false), ("l".into(), json!({ "type": "link", "target": "bin" }))]);
-        assert_eq!(runtime_plan(&win, "windows-x64").unwrap_err().json_code(), "runtime-format");
+        assert!(
+            runtime_plan(&under, "linux")
+                .unwrap_err()
+                .message()
+                .contains("under the link")
+        );
+        let win = manifest(vec![
+            file("bin/java.exe", false),
+            ("l".into(), json!({ "type": "link", "target": "bin" })),
+        ]);
+        assert_eq!(
+            runtime_plan(&win, "windows-x64").unwrap_err().json_code(),
+            "runtime-format"
+        );
         let not_exe = manifest(vec![file("bin/java", false)]);
-        assert_eq!(runtime_plan(&not_exe, "linux").unwrap_err().json_code(), "runtime-format");
+        assert_eq!(
+            runtime_plan(&not_exe, "linux").unwrap_err().json_code(),
+            "runtime-format"
+        );
         assert!(runtime_plan(&json!({}), "linux").is_err());
         assert!(runtime_plan(&manifest(vec![file("../java", true)]), "linux").is_err());
     }
@@ -718,7 +809,9 @@ mod tests {
         assert_eq!(platform_key("linux", "arm64"), None);
         assert_eq!(platform_key("osx", "arm64"), Some("mac-os-arm64"));
         let all = json!({ "linux": { "java-runtime-gamma": [{ "manifest": { "sha1": "b".repeat(40), "url": "https://m/x.json", "size": 9 }, "version": { "name": "17.0.8" } }], "jre-legacy": [] } });
-        let e = runtime_entry(&all, "java-runtime-gamma", "linux").unwrap().unwrap();
+        let e = runtime_entry(&all, "java-runtime-gamma", "linux")
+            .unwrap()
+            .unwrap();
         assert_eq!((e.version.as_str(), e.size.clone()), ("17.0.8", json!(9)));
         assert_eq!(runtime_entry(&all, "jre-legacy", "linux").unwrap(), None);
         assert_eq!(runtime_entry(&all, "nope", "mac-os").unwrap(), None);
