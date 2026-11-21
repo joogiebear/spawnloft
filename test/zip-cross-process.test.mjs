@@ -79,8 +79,9 @@ async function same(command, zip, ...more) {
   const answer = {}
   for (const [side, dest] of [['node', node], ['rust', rust]]) {
     answer[side] = await run(side, command, zip, ...(command.endsWith('extract') ? [dest, ...more] : more))
-    // an error that names the destination names each side's own
-    answer[side].out = answer[side].out.split(dest).join('<dest>')
+    // an error that names the destination names each side's own, and a quoted one (the NUL
+    // TypeError's inspect quote) has its backslashes doubled on Windows
+    for (const named of [dest.replaceAll('\\', '\\\\'), dest]) answer[side].out = answer[side].out.split(named).join('<dest>')
   }
   const label = `${command} ${path.basename(zip)} ${more.join(' ')}`
   assert.equal(answer.rust.out, answer.node.out, `${label}: the answers differ`)
