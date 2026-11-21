@@ -260,6 +260,11 @@ pub const PORTED: &[Row] = &[
         names: &["rebuild"],
         when: When::Always,
     },
+    // C5: plugins and modpacks
+    Row {
+        names: &["plugins"],
+        when: When::Always,
+    },
     // C7: the client launcher, a group of subcommands at a time
     Row {
         names: &["client"],
@@ -699,7 +704,7 @@ mod tests {
             assert!(is_ported(&strings), "{line:?}");
         }
         assert!(!is_ported(&["--version".to_string()]));
-        assert!(!is_ported(&["plugins".to_string()]));
+        assert!(!is_ported(&["pack".to_string()]));
     }
 
     #[test]
@@ -789,7 +794,7 @@ mod tests {
         for line in [
             &["mcp"][..],
             &["task", "run", "abc"],
-            &["plugins", "survival"],
+            &["pack", "survival"],
             &["ui"],
             &["ui", "--port", "8080"],
             &["repair"],

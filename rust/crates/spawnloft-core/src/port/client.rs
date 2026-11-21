@@ -57,6 +57,25 @@ const SET_KEYS: &[&str] = &[
     "serverList",
 ];
 
+fn uses_loader(profile: &profiles::Profile) -> bool {
+    !matches!(profile.get("loader"), None | Some(Value::Null)) && profile.text("loader") != Some("vanilla")
+}
+
+/// Whether this `client` line is one the Node core still answers although its subcommand is
+/// ported: `install` of a mod loader's profile, set up by the Node core until the loaders move
+/// (part 4). Decided before the Rust side prints anything, so a settings warning is not printed
+/// twice. Anything that fails here is left to the Rust side, which reports it as Node would.
+pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::settings::Layout) -> bool {
+    let pos = &args.positional;
+    if pos.first().map(String::as_str) != Some("install") || pos.len() != 2 {
+        return false;
+    }
+    if check_flags(args, &["json", "verify"]).is_err() {
+        return false;
+    }
+    profiles::get(&Paths::new(layout), &pos[1]).is_ok_and(|p| uses_loader(&p))
+}
+
 pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let paths = Paths::new(ctx.layout);
     let pos = ctx.args.positional.clone();
@@ -332,13 +351,14 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 return Err(usage());
             };
             let profile = profiles::get(&paths, name)?;
-            // a mod loader's profile is set up by the Node core until the loaders move (part 4)
-            if !matches!(profile.get("loader"), None | Some(Value::Null))
-                && profile.text("loader") != Some("vanilla")
-            {
-                let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-                ctx.out.set_code(spawnloft_lib::runtime::forward(&raw));
-                return Ok(());
+            // a mod loader's profile goes to the Node core before anything is printed
+            // (`hands_to_node`); this only guards against installing one here
+            if uses_loader(&profile) {
+                return Err(Failure::Internal {
+                    head: "Error".into(),
+                    message: format!("profile \"{name}\" uses a mod loader, which the Node core sets up"),
+                    code: None,
+                });
             }
             let verify = ctx.args.get("verify") == Some(&Flag::Bool(true));
             let mc = js::string(profile.get("mc"));

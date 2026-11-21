@@ -8,7 +8,8 @@
 //! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`, and the
 //! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
 //! `verify`, with their aliases, `config` and `worlds`. C4 moves making servers: `new` (but
-//! `--modpack`, C5), `clone`, `adopt`, `templates`, `jars`, `launchers`, `reveal` and `rebuild`. C7 moves the client
+//! `--modpack`, C5), `clone`, `adopt`, `templates`, `jars`, `launchers`, `reveal` and `rebuild`. C5
+//! moves plugins and modpacks: `plugins`, then `pack` and `new --modpack`. C7 moves the client
 //! launcher, one group of `client` subcommands at a time.
 
 pub mod args;
@@ -24,6 +25,7 @@ mod list;
 mod logs;
 mod metrics;
 mod output;
+mod plugins;
 mod status;
 mod why;
 mod worlds;
@@ -68,6 +70,13 @@ pub fn run(argv: &[String], out: &mut Out) -> u8 {
     // paths.mjs resolves the layout when it is first imported, before any command runs, and
     // warns then about an unusable settings file
     let (loaded, warning) = settings::load();
+    let command = argv.first().map(String::as_str);
+    let parsed = args::parse(argv.get(1..).unwrap_or(&[]));
+    if command == Some("client") && Layout::resolve(&loaded).is_ok_and(|l| client::hands_to_node(&parsed, &l))
+    {
+        let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        return spawnloft_lib::runtime::forward(&raw);
+    }
     if let Some(w) = warning {
         out.err(&w);
     }
@@ -79,8 +88,6 @@ pub fn run(argv: &[String], out: &mut Out) -> u8 {
             return 1;
         }
     };
-    let command = argv.first().map(String::as_str);
-    let parsed = args::parse(argv.get(1..).unwrap_or(&[]));
     let cli_command = match command {
         Some(c) => query_alias(c)
             .unwrap_or(if c == "snapshot" { "backup" } else { c })
@@ -180,6 +187,7 @@ fn dispatch(
         "rebuild" => create::rebuild(&mut ctx),
         "paper" => fetch::paper(&mut ctx),
         "upgrade" => fetch::upgrade(&mut ctx),
+        "plugins" => plugins::plugins(&mut ctx),
         "client" => client::client(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."

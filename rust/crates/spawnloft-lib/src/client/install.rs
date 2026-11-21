@@ -105,7 +105,22 @@ fn rm_force(p: &Path) -> Result<(), Failure> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(e) => Err(e),
         Ok(m) if m.is_dir() => std::fs::remove_dir_all(p),
-        Ok(_) => std::fs::remove_file(p),
+        Ok(_) => return remove_entry(p),
+    };
+    match res {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(Failure::io(&e, "rm", Some(p))),
+        _ => Ok(()),
+    }
+}
+
+/// Removes one entry that is not a folder: a file, or a link (on Windows a link to a folder, a
+/// junction included, goes as a folder does).
+fn remove_entry(p: &Path) -> Result<(), Failure> {
+    let res = match std::fs::remove_file(p) {
+        Err(e) if cfg!(windows) && std::fs::metadata(p).is_ok_and(|m| m.is_dir()) => {
+            std::fs::remove_dir(p).map_err(|_| e)
+        }
+        other => other,
     };
     match res {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(Failure::io(&e, "rm", Some(p))),
@@ -131,7 +146,18 @@ fn write_text(file: &str, text: &str) -> Result<(), Failure> {
 
 /// `linkOrCopy(from, to)`.
 fn link_or_copy(from: &str, to: &str) -> Result<(), Failure> {
-    rm_force(Path::new(to))?;
+    // `fs.rmSync(to, { force: true })`: not recursive, so a folder in the way is refused
+    match std::fs::symlink_metadata(to) {
+        Ok(m) if m.is_dir() => {
+            return Err(Failure::Internal {
+                head: "SystemError [ERR_FS_EISDIR]".into(),
+                message: format!("Path is a directory: rm returned EISDIR (is a directory) {to}"),
+                code: Some("ERR_FS_EISDIR".into()),
+            });
+        }
+        Ok(_) => remove_entry(Path::new(to))?,
+        Err(_) => {}
+    }
     if std::fs::hard_link(from, to).is_err() {
         std::fs::copy(from, to).map_err(|e| Failure::io(&e, "copyfile", Some(Path::new(from))))?;
     }
@@ -330,7 +356,11 @@ fn in_batches<T: Sync>(
             let job = job.clone();
             s.spawn(|| {
                 cancel::with_cancel(job, || {
-                    while !failed.load(Ordering::SeqCst) {
+                    // every worker takes its first item before any can fail, as Node's start
+                    // them all before the first await settles
+                    let mut first_turn = true;
+                    while first_turn || !failed.load(Ordering::SeqCst) {
+                        first_turn = false;
                         let i = next.fetch_add(1, Ordering::SeqCst);
                         let Some(item) = items.get(i) else { break };
                         if let Err(e) = worker(item) {
@@ -443,26 +473,65 @@ fn read_entry_data(f: &mut std::fs::File, e: &ZipEntry, size: u64) -> Result<Opt
     match e.method {
         0 => Ok(Some(data)),
         8 => {
+            // `inflateRawSync(data, { maxOutputLength: max })`: grown as it fills, so a size the
+            // entry only claims is never allocated up front
             let max = (e.size as usize).max(1);
             let mut z = flate2::Decompress::new(false);
-            let mut out = vec![0u8; max];
-            match z.decompress(&data, &mut out, flate2::FlushDecompress::Finish) {
-                Ok(flate2::Status::StreamEnd) => {
-                    out.truncate(z.total_out() as usize);
-                    Ok(Some(out))
+            let mut out: Vec<u8> = Vec::with_capacity(max.min(1 << 16));
+            loop {
+                let before = (z.total_in(), z.total_out());
+                let input = &data[z.total_in() as usize..];
+                let status = z.decompress_vec(input, &mut out, flate2::FlushDecompress::None);
+                match status {
+                    Ok(flate2::Status::StreamEnd) => return Ok(Some(out)),
+                    Err(err) => {
+                        return Err(Failure::Internal {
+                            head: "Error".into(),
+                            message: err.to_string(),
+                            code: Some("Z_DATA_ERROR".into()),
+                        });
+                    }
+                    Ok(_) => {}
                 }
-                // the output filled before the stream ended: ERR_BUFFER_TOO_LARGE
-                Ok(_) if z.total_out() as usize >= max => Ok(None),
-                Ok(_) => Err(Failure::Internal {
-                    head: "Error".into(),
-                    message: "unexpected end of file".into(),
-                    code: Some("Z_BUF_ERROR".into()),
-                }),
-                Err(err) => Err(Failure::Internal {
-                    head: "Error".into(),
-                    message: err.to_string(),
-                    code: Some("Z_DATA_ERROR".into()),
-                }),
+                if out.len() > max {
+                    return Ok(None);
+                }
+                if out.len() == max {
+                    // full: more to come is too large, nothing more is a stream cut short
+                    let mut probe = [0u8; 1];
+                    let more = z.decompress(
+                        &data[z.total_in() as usize..],
+                        &mut probe,
+                        flate2::FlushDecompress::None,
+                    );
+                    if z.total_out() as usize > max {
+                        return Ok(None);
+                    }
+                    return match more {
+                        Ok(flate2::Status::StreamEnd) => Ok(Some(out)),
+                        Ok(_) if z.total_out() as usize > max => Ok(None),
+                        Err(err) => Err(Failure::Internal {
+                            head: "Error".into(),
+                            message: err.to_string(),
+                            code: Some("Z_DATA_ERROR".into()),
+                        }),
+                        Ok(_) => Err(Failure::Internal {
+                            head: "Error".into(),
+                            message: "unexpected end of file".into(),
+                            code: Some("Z_BUF_ERROR".into()),
+                        }),
+                    };
+                }
+                if out.len() == out.capacity() {
+                    out.reserve_exact((max - out.len()).min(out.capacity().max(1 << 16)));
+                } else if (z.total_in(), z.total_out()) == before {
+                    // nothing moved with room to spare: the input ran out
+                    return Err(Failure::Internal {
+                        head: "Error".into(),
+                        message: "unexpected end of file".into(),
+                        code: Some("Z_BUF_ERROR".into()),
+                    });
+                }
             }
         }
         _ => Ok(None),
@@ -477,6 +546,55 @@ fn excluded(name: &str, exclude: &Value) -> Result<bool, Failure> {
         Value::String(s) => Ok(s.chars().any(|c| name.starts_with(c))),
         _ => Err(Failure::type_error("exclude is not iterable")),
     }
+}
+
+/// `util.inspect(text)` for a path: quoted, with the escapes a path can need.
+fn inspect_string(text: &str) -> String {
+    let quote = if text.contains('\'') && !text.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let mut out = String::from(quote);
+    for c in text.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            c if c == quote => {
+                out.push('\\');
+                out.push(c);
+            }
+            c if (c as u32) < 0x20 || c as u32 == 0x7f => out.push_str(&format!("\\x{:02X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push(quote);
+    out
+}
+
+/// `path.resolve(root, name)`: an absolute name stands alone, and on Windows a name with a
+/// drive (`D:x`) resolves on that drive, inside the root only when it is the root's own drive.
+fn resolve_entry(root: &str, name: &str) -> String {
+    if jspath::is_absolute(name) {
+        return jspath::resolve(name);
+    }
+    let b = name.as_bytes();
+    if cfg!(windows) && b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
+        let same = root
+            .as_bytes()
+            .first()
+            .is_some_and(|r| r.eq_ignore_ascii_case(&b[0]))
+            && root.as_bytes().get(1) == Some(&b':');
+        // another drive's folder is never under the root
+        return if same {
+            jspath::resolve(&jspath::join(&[root, &name[2..]]))
+        } else {
+            jspath::resolve(name)
+        };
+    }
+    jspath::resolve(&jspath::join(&[root, name]))
 }
 
 /// `extractZip(file, dest, { mapPath })` of plugins.mjs, with the natives' mapPath: META-INF and
@@ -494,12 +612,7 @@ fn extract_natives_jar(file: &str, dest: &str, exclude: &Value) -> Result<usize,
         {
             continue;
         }
-        let target = jspath::resolve(&jspath::join(&[&root, &entry.name]));
-        let target = if jspath::is_absolute(&entry.name) {
-            jspath::resolve(&entry.name)
-        } else {
-            target
-        };
+        let target = resolve_entry(&root, &entry.name);
         if target != root && !target.starts_with(&format!("{root}{sep}")) {
             return Err(Failure::user(format!(
                 "the archive tried to write outside its folder (\"{}\"); nothing more was extracted",
@@ -512,6 +625,16 @@ fn extract_natives_jar(file: &str, dest: &str, exclude: &Value) -> Result<usize,
                 entry.name
             )));
         };
+        if target.contains('\0') {
+            return Err(Failure::Internal {
+                head: "TypeError [ERR_INVALID_ARG_VALUE]".into(),
+                message: format!(
+                    "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received {}",
+                    inspect_string(&target)
+                ),
+                code: Some("ERR_INVALID_ARG_VALUE".into()),
+            });
+        }
         mkdir_parent(&target)?;
         let t = Path::new(&target);
         std::fs::write(t, &data).map_err(|e| Failure::io(&e, "open", Some(t)))?;
@@ -991,7 +1114,12 @@ fn ensure_with(paths: &Paths, id: &str, o: &Ensure<'_>, ledger: &Mutex<Ledger>) 
             .ok()
             .map(|b| String::from_utf8_lossy(&b).into_owned())
     };
-    let stamped = read_stamp().as_deref() == Some(plan.natives_stamp.as_str());
+    // `existsSync && readFileSync`: a stamp that is there but cannot be read fails the install
+    let stamped = match std::fs::read(&complete) {
+        Ok(b) => String::from_utf8_lossy(&b) == plan.natives_stamp.as_str(),
+        Err(e) if crate::jspath::is_enoent(&e) => false,
+        Err(e) => return Err(Failure::read(&e, Path::new(&complete))),
+    };
     let keep = o.keep_natives.iter().any(|k| k == id) && Path::new(&complete).exists();
     let native_downloaded = lock(&tally).native_downloaded;
     if !plan.natives.is_empty() && !keep && (native_downloaded || !stamped) {
