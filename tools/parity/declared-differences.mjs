@@ -186,10 +186,10 @@ export const DECLARED = [
     // C2: the forwarding binary hands its pipes to the Node core, whose detached daemon keeps a
     // copy; spawnloft-core clears the inherit flag on its standard handles before a detached start
     id: 'windows-daemon-holds-pipes',
-    where: 'Windows: `start`, `restart`, `db create` for a server (which starts it) and `task run` of a start or restart task, read through a pipe (the rig, a script capturing the output)',
-    node: 'the pipe stays open after the command exits, until the server stops (the rig waits 10 s and notes it)',
+    where: 'Windows: `start`, `restart`, `db create` for a server (which starts it), `task run` of a start or restart task and `client launch` (the game), read through a pipe (the rig, a script capturing the output)',
+    node: 'the pipe stays open after the command exits, until the server or the game stops (the rig waits 10 s and notes it)',
     rust: 'the pipe closes when the command exits',
-    commands: ['start', 'restart', 'db', 'task'],
+    commands: ['start', 'restart', 'db', 'task', 'client'],
     apply: dropLines(/^rig: the command exited but its output stayed open/),
   },
   {
