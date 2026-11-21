@@ -237,11 +237,17 @@ impl Run {
             "searchNames" => {
                 let f = files::search_names(inst, s(a, 0), s(a, 1), flag(a, 2, "running"))?;
                 let mut results = entries(&f.results);
-                // Node lists a folder in the file system's own order, which is byte order only on Unix
+                // Node lists a folder in the file system's own order, which is byte order only on
+                // Unix: elsewhere, the order a breadth-first walk of byte-ordered folders gives
                 if !cfg!(unix)
                     && let Value::Array(l) = &mut results
                 {
-                    l.sort_by(|x, y| x["path"].as_str().cmp(&y["path"].as_str()));
+                    let key = |v: &Value| {
+                        let p = v["path"].as_str().unwrap_or("").to_string();
+                        let parts: Vec<String> = p.split('/').map(String::from).collect();
+                        (parts.len(), parts)
+                    };
+                    l.sort_by_key(key);
                 }
                 json!({ "path": f.path, "query": f.query, "results": results, "truncated": f.truncated })
             }
@@ -265,7 +271,10 @@ impl Run {
                     &self.dir.to_string_lossy(),
                     &s(a, 0).unwrap().split('/').collect::<Vec<_>>(),
                 );
-                let v = json!({ "name": d.name, "sized": d.size > 0, "temp": d.file != own });
+                // the same file however it is spelled (/private/var on macOS, short names on Windows)
+                let real = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+                let temp = real(&d.file) != real(&own);
+                let v = json!({ "name": d.name, "sized": d.size > 0, "temp": temp });
                 d.done();
                 v
             }
