@@ -16,12 +16,9 @@ use crate::{collate, control, fsx, jspath, props, text, util};
 /// Dimension folders a Bukkit-family server keeps beside a world.
 const DIM_SUFFIXES: [&str; 2] = ["_nether", "_the_end"];
 
-/// `MAX_COPY_BYTES` of files.mjs: a delete bigger than this asks before it copies (gzipping a
-/// whole world can take minutes and as much disk again).
-pub const MAX_COPY_BYTES: u64 = 1024 * 1024 * 1024;
-
-/// `MAX_WORLD_COPY_BYTES`: the size up to which a world is copied before it is deleted.
-pub const MAX_WORLD_COPY_BYTES: u64 = MAX_COPY_BYTES;
+/// `MAX_WORLD_COPY_BYTES`: the size up to which a world is copied before it is deleted, the
+/// size Files copies before a delete.
+pub const MAX_WORLD_COPY_BYTES: u64 = crate::files::MAX_COPY_BYTES;
 
 fn is_world_dir(dir: &Path) -> bool {
     std::fs::metadata(dir.join("level.dat")).is_ok_and(|m| m.is_file())

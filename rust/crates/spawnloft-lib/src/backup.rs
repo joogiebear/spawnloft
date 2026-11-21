@@ -105,7 +105,7 @@ fn dir_link(_: &std::fs::Metadata) -> bool {
 }
 
 /// `fs.rmSync(dir, { recursive: true, force: true })`.
-fn rm_tree(p: &Path) -> Result<(), Failure> {
+pub(crate) fn rm_tree(p: &Path) -> Result<(), Failure> {
     let meta = match std::fs::symlink_metadata(p) {
         Ok(m) => m,
         Err(e) if jspath::is_enoent(&e) => return Ok(()),
@@ -1055,7 +1055,7 @@ fn read_manifest(file: &str) -> Result<Value, Failure> {
     }
 }
 
-fn mtime_ms(meta: &std::fs::Metadata) -> f64 {
+pub(crate) fn mtime_ms(meta: &std::fs::Metadata) -> f64 {
     let t = meta.modified().ok().and_then(|m| {
         m.duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs_f64() * 1000.0)
