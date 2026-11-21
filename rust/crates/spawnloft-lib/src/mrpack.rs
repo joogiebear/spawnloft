@@ -653,7 +653,11 @@ fn make_tmp() -> Result<String, Failure> {
             .map(|x| ALPHA[*x as usize % ALPHA.len()] as char)
             .collect();
         let dir = jspath::join(&[&base, &format!("spawnloft-mrpack-{tag}")]);
-        match std::fs::create_dir(&dir) {
+        let mut builder = std::fs::DirBuilder::new();
+        // `fs.mkdtempSync` makes the folder 0700: what is staged in it is checked, then copied
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        match builder.create(&dir) {
             Ok(()) => return Ok(dir),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(Failure::io(&e, "mkdtemp", Some(Path::new(&dir)))),
@@ -757,7 +761,11 @@ fn install_loader(
     Ok("server.jar".into())
 }
 
-fn copy_staged(dir: &str, staged: &[Staged]) -> Result<(), Failure> {
+fn copy_staged(
+    dir: &str,
+    staged: &[Staged],
+    after_each: &mut dyn FnMut(&Staged) -> Result<(), Failure>,
+) -> Result<(), Failure> {
     for f in staged {
         let parts: Vec<&str> = f.file.path.split('/').collect();
         let mut all = vec![dir];
@@ -772,6 +780,7 @@ fn copy_staged(dir: &str, staged: &[Staged]) -> Result<(), Failure> {
                 code: Some(code.into()),
             }
         })?;
+        after_each(f)?;
     }
     Ok(())
 }
@@ -806,7 +815,7 @@ pub struct PackOptions {
 pub struct Created {
     pub name: String,
     pub pack: Value,
-    pub pack_version: Value,
+    pub pack_version: Option<Value>,
     pub mc: Value,
     pub loader: Loader,
     pub files: usize,
@@ -814,10 +823,20 @@ pub struct Created {
     pub port: f64,
 }
 
-fn version_number(version: &Value) -> Value {
-    field(Some(version), "version_number")
-        .cloned()
-        .unwrap_or(Value::Null)
+/// `version.version_number`: `None` is undefined, which JSON leaves out and text prints as
+/// `undefined`.
+fn version_number(version: &Value) -> Option<Value> {
+    field(Some(version), "version_number").cloned()
+}
+
+/// An object of `pairs` as `JSON.stringify` writes it: an undefined value leaves its key out.
+fn object(pairs: Vec<(&str, Option<Value>)>) -> Value {
+    Value::Object(
+        pairs
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k.to_string(), v)))
+            .collect(),
+    )
 }
 
 /// `createFromModpack(name, projectId, opts)`.
@@ -881,39 +900,41 @@ pub fn create_from_modpack(
             patch.insert("mcVersion".into(), index.mc.clone());
         }
         registry::update_instance(registry_file, name, &patch)?;
-        copy_staged(&dir, &staged)?;
-        for f in &staged {
-            // pack-owned mods show in the Mods tab but are never offered updates of their own
+        copy_staged(&dir, &staged, &mut |f| {
+            // pack-owned mods show in the Mods tab but are never offered updates of their own;
+            // recorded as each is copied, so a pack that ships the record file itself overwrites
+            // what came before it, as in Node
             if is_top_mod(&f.file.path) {
                 plugins::record_managed(
                     &inst,
                     jspath::basename(&f.file.path).as_str(),
-                    json!({
-                        "source": "modpack",
-                        "project": project_id,
-                        "version": version_number(&version),
-                        "installedAt": crate::time::iso_now(),
-                    }),
+                    object(vec![
+                        ("source", Some(json!("modpack"))),
+                        ("project", Some(json!(project_id))),
+                        ("version", version_number(&version)),
+                        ("installedAt", Some(json!(crate::time::iso_now()))),
+                    ]),
                 )?;
             }
-        }
+            Ok(())
+        })?;
         on_progress("Applying the pack\u{2019}s configuration");
         let overrides = lay_overrides(&mrpack, &dir)?;
         let mut files: Vec<Value> = index.files.iter().map(|f| json!(f.path)).collect();
         files.extend(overrides.into_iter().map(Value::String));
         crate::client::write_json(
             &jspath::join(&[&dir, PACK_FILE]),
-            &json!({
-                "project": project_id,
-                "versionId": index.version_id,
-                "versionNumber": version_number(&version),
-                "name": index.name,
-                "mc": index.mc,
-                "loader": index.loader.to_json(),
-                "installedAt": crate::time::iso_now(),
-                "files": files,
-                "skippedClientOnly": index.skipped,
-            }),
+            &object(vec![
+                ("project", Some(json!(project_id))),
+                ("versionId", Some(index.version_id.clone())),
+                ("versionNumber", version_number(&version)),
+                ("name", Some(index.name.clone())),
+                ("mc", Some(index.mc.clone())),
+                ("loader", Some(index.loader.to_json())),
+                ("installedAt", Some(json!(crate::time::iso_now()))),
+                ("files", Some(json!(files))),
+                ("skippedClientOnly", Some(json!(index.skipped))),
+            ]),
         )
     })();
     if let Err(e) = laid {
@@ -945,7 +966,10 @@ pub fn create_from_modpack(
 pub fn pack_of(inst: &Instance) -> Option<Value> {
     let dir = inst.dir()?;
     let bytes = std::fs::read(jspath::join(&[dir, PACK_FILE])).ok()?;
-    crate::jsjson::parse(&String::from_utf8_lossy(&bytes)).ok()
+    // callers test `if (!pack)`: a record of null, 0, false or "" is no record
+    crate::jsjson::parse(&String::from_utf8_lossy(&bytes))
+        .ok()
+        .filter(|v| js::truthy(Some(v)))
 }
 
 /// `loaderOfRecord(pack)`: `loader`, or the older `fabricLoader`.
@@ -964,18 +988,25 @@ fn loader_of_record(pack: &Value) -> Option<(Value, Value)> {
 
 /// `planRemovals(oldFiles, newFiles, { protect })`: what an update may delete, the files the old
 /// pack owned that the new one does not, never a protected path (exactly or as a folder above
-/// it) and never a path that climbs or is absolute.
+/// it, in any case) and never a path that climbs or is absolute. Paths are compared as the file
+/// they name (`safeRelativePath`), so `./ops.json` in a pack's overrides is ops.json.
 pub fn plan_removals(old: &[Value], new: &[Value], protect: &[String]) -> Vec<String> {
-    let norm = |p: &Value| js::string(Some(p)).replace('\\', "/");
-    let keep: std::collections::HashSet<String> = new.iter().map(norm).collect();
-    let guarded = |p: &str| protect.iter().any(|g| p == g || p.starts_with(&format!("{g}/")));
+    let norm = |p: &Value| crate::util::safe_relative_path(&js::string(Some(p)));
+    let keep: std::collections::HashSet<String> = new.iter().filter_map(norm).collect();
+    let guards: Vec<String> = protect.iter().map(|g| g.to_lowercase()).collect();
+    let guarded = |p: &str| {
+        let low = p.to_lowercase();
+        guards
+            .iter()
+            .any(|g| low == *g || low.starts_with(&format!("{g}/")))
+    };
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
-    for p in old.iter().map(norm) {
+    for p in old.iter().filter_map(norm) {
         if !seen.insert(p.clone()) {
             continue;
         }
-        if !keep.contains(&p) && !guarded(&p) && !p.split('/').any(|s| s == "..") && !p.starts_with('/') {
+        if !keep.contains(&p) && !guarded(&p) {
             out.push(p);
         }
     }
@@ -1018,7 +1049,7 @@ fn not_from_a_pack(name: &str) -> Failure {
 /// What `checkPackUpdate` answers that the command line prints.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Check {
-    pub latest: Value,
+    pub latest: Option<Value>,
     pub update_available: bool,
 }
 
@@ -1031,7 +1062,7 @@ pub fn check_pack_update(inst: &Instance) -> Result<Check, Failure> {
     let latest = version_number(&version);
     let current = field(Some(&pack), "versionNumber");
     Ok(Check {
-        update_available: !js::strict_equals(Some(&latest), current),
+        update_available: !js::strict_equals(latest.as_ref(), current),
         latest,
     })
 }
@@ -1039,10 +1070,10 @@ pub fn check_pack_update(inst: &Instance) -> Result<Check, Failure> {
 /// What `updatePack` answers.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Updated {
-    AlreadyLatest(Value),
+    AlreadyLatest(Option<Value>),
     Done {
-        from: Value,
-        to: Value,
+        from: Option<Value>,
+        to: Option<Value>,
         mc: Value,
         mc_changed: bool,
         files: usize,
@@ -1074,12 +1105,12 @@ pub fn update_pack(
         return Err(not_from_a_pack(name));
     };
     on_progress("Finding the pack on Modrinth");
-    let project = field(Some(&pack), "project").cloned().unwrap_or(Value::Null);
-    let (version, pack_file) = resolve_pack_version(&js::string(Some(&project)))?;
+    let project = field(Some(&pack), "project").cloned();
+    let (version, pack_file) = resolve_pack_version(&js::string(project.as_ref()))?;
     let old_number = field(Some(&pack), "versionNumber").cloned();
     let new_number = version_number(&version);
-    if js::strict_equals(Some(&new_number), old_number.as_ref()) {
-        return Ok(Updated::AlreadyLatest(old_number.unwrap_or(Value::Null)));
+    if js::strict_equals(new_number.as_ref(), old_number.as_ref()) {
+        return Ok(Updated::AlreadyLatest(old_number));
     }
 
     let Archive { tmp, mrpack, index } = fetch_pack_archive(&pack_file, on_progress)?;
@@ -1103,7 +1134,7 @@ pub fn update_pack(
 
         on_progress("Applying the new pack");
         let dir = crate::create::path_arg(inst.get("dir"), "path")?.to_string();
-        copy_staged(&dir, &staged)?;
+        copy_staged(&dir, &staged, &mut |_| Ok(()))?;
         let overrides = lay_overrides(&mrpack, &dir)?;
         let mut new_owned: Vec<Value> = index.files.iter().map(|f| json!(f.path)).collect();
         new_owned.extend(overrides.into_iter().map(Value::String));
@@ -1134,7 +1165,9 @@ pub fn update_pack(
                 }
                 Ok(_) => std::fs::remove_file(&target)
                     .map_err(|e| Failure::io(&e, "rm", Some(Path::new(&target))))?,
-                Err(_) => {}
+                // `force` forgives a file that is not there, and nothing else
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(Failure::io(&e, "lstat", Some(Path::new(&target)))),
             }
         }
 
@@ -1186,31 +1219,31 @@ pub fn update_pack(
                 plugins::record_managed(
                     &inst,
                     jspath::basename(&f.path).as_str(),
-                    json!({
-                        "source": "modpack",
-                        "project": project,
-                        "version": new_number,
-                        "installedAt": crate::time::iso_now(),
-                    }),
+                    object(vec![
+                        ("source", Some(json!("modpack"))),
+                        ("project", project.clone()),
+                        ("version", new_number.clone()),
+                        ("installedAt", Some(json!(crate::time::iso_now()))),
+                    ]),
                 )?;
             }
         }
         crate::client::write_json(
             &jspath::join(&[&dir, PACK_FILE]),
-            &json!({
-                "project": project,
-                "versionId": index.version_id,
-                "versionNumber": new_number,
-                "name": index.name,
-                "mc": index.mc,
-                "loader": index.loader.to_json(),
-                "installedAt": crate::time::iso_now(),
-                "files": new_owned,
-                "skippedClientOnly": index.skipped,
-            }),
+            &object(vec![
+                ("project", project.clone()),
+                ("versionId", Some(index.version_id.clone())),
+                ("versionNumber", new_number.clone()),
+                ("name", Some(index.name.clone())),
+                ("mc", Some(index.mc.clone())),
+                ("loader", Some(index.loader.to_json())),
+                ("installedAt", Some(json!(crate::time::iso_now()))),
+                ("files", Some(json!(new_owned))),
+                ("skippedClientOnly", Some(json!(index.skipped))),
+            ]),
         )?;
         Ok(Updated::Done {
-            from: old_number.clone().unwrap_or(Value::Null),
+            from: old_number.clone(),
             to: new_number.clone(),
             mc: index.mc.clone(),
             mc_changed: !js::strict_equals(Some(&index.mc), field(Some(&pack), "mc")),

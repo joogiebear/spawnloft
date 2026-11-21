@@ -131,6 +131,25 @@ export const DECLARED = [
     held: 'no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); a mod\'s own fabric.mod.json could, and its row then falls back to mods.toml or the file name (no published mod writes one); scenarios do not hand-write one',
   },
   {
+    // found by the C5 modpack review: zlib names what is wrong with a stream; miniz does not
+    id: 'inflate-error-text',
+    where: 'a zip entry (a jar, a modpack override) whose deflate data is corrupt',
+    node: "zlib's message (`invalid code lengths set`, `invalid distance too far back`, ...)",
+    rust: '`invalid compressed data` or `unexpected end of file`',
+    apply: null,
+    held: 'the exit code and the cleanup are the same; scenarios ship no corrupt deflate stream',
+  },
+  {
+    // found by the C5 modpack review: undici asks for and undoes gzip, deflate and br; ureq is
+    // built without them
+    id: 'content-encoding',
+    where: 'a download or an API answer sent with `Content-Encoding` (gzip, deflate, br)',
+    node: 'asks for it (`accept-encoding`) and decodes it',
+    rust: 'asks for none and reads the bytes as sent, so a compressed answer fails its size or checksum, or does not parse',
+    apply: null,
+    held: 'a server compresses only when asked, and Rust never asks; the fake hosts never compress',
+  },
+  {
     // found by the C5 review: js_sort (spawnloft-lib plugins.rs) is V8's TimSort below 64 items
     // only; beyond, it makes a superset of V8's comparisons
     id: 'sort-comparisons-over-64',

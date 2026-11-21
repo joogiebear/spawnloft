@@ -95,6 +95,10 @@ fn is_timeout(e: &ureq::Error) -> bool {
 
 /// The network.
 pub fn send(req: &Request<'_>) -> Result<Reply, Lost> {
+    // `fetch` refuses text that is not a URL before anything is sent
+    if url::Url::parse(req.url).is_err() {
+        return Err(Lost::Failed("Invalid URL".into()));
+    }
     let target = crate::download::target(req.url).map_err(Lost::Refused)?;
     let cfg = ureq::Agent::config_builder()
         .proxy(None)
@@ -120,14 +124,18 @@ pub fn send(req: &Request<'_>) -> Result<Reply, Lost> {
             .send(body.as_bytes())
             .map_err(lost)?,
     };
+    // header bytes are read as latin1, as undici reads them
     let header = |k: &str| {
         res.headers()
             .get(k)
-            .and_then(|v| v.to_str().ok())
-            .map(str::to_string)
+            .map(|v| v.as_bytes().iter().map(|b| char::from(*b)).collect::<String>())
     };
     let location = header("location");
     let content_length = header("content-length");
+    // a followed request still pointing somewhere after the 20th hop: undici gives up
+    if !req.manual_redirects && (300..400).contains(&res.status().as_u16()) && location.is_some() {
+        return Err(Lost::Failed("redirect count exceeded".into()));
+    }
     Ok(Reply {
         status: res.status().as_u16(),
         location,

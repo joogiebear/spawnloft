@@ -49,7 +49,7 @@ pub fn new_modpack(ctx: &mut Ctx<'_>, name: &str) -> Result<(), Failure> {
         "Created \"{}\" from {} {}",
         res.name,
         t(Some(&res.pack)),
-        t(Some(&res.pack_version))
+        t(res.pack_version.as_ref())
     ));
     let files = format!(
         "{}{}",
@@ -106,7 +106,7 @@ pub fn pack(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         ctx.out.line(&if info.update_available {
             format!(
                 "Release {} is out. Apply with: spawnloft pack {name} update --yes",
-                t(Some(&info.latest))
+                t(info.latest.as_ref())
             )
         } else {
             "That is the newest release.".to_string()
@@ -126,7 +126,7 @@ pub fn pack(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         match res {
             Updated::AlreadyLatest(v) => {
                 ctx.out
-                    .line(&format!("Already on the newest release ({}).", t(Some(&v))));
+                    .line(&format!("Already on the newest release ({}).", t(v.as_ref())));
             }
             Updated::Done {
                 from,
@@ -138,8 +138,11 @@ pub fn pack(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 snapshot,
             } => {
                 ctx.out.line("");
-                ctx.out
-                    .line(&format!("Updated to {} (from {}).", t(Some(&to)), t(Some(&from))));
+                ctx.out.line(&format!(
+                    "Updated to {} (from {}).",
+                    t(to.as_ref()),
+                    t(from.as_ref())
+                ));
                 ctx.out.line(&format!("  Snapshot: {snapshot}"));
                 ctx.out.line(&format!(
                     "  {files} pack files laid in, {removed} old pack file(s) retired."

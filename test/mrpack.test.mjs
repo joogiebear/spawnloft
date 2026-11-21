@@ -249,3 +249,10 @@ test('a zip entry that tries to climb out of the destination stops the extractio
   assert.throws(() => extractZip(file, dest), /outside its folder/)
   assert.ok(!fs.existsSync(path.join(dir, 'escape.txt')), 'nothing was written outside dest')
 })
+
+test('a protected file is guarded however the pack spells it', () => {
+  const old = ['./ops.json', 'overrides/../x', 'world//level.dat', 'OPS.JSON', 'World/region/r.mca', './config/a.toml']
+  const removals = planRemovals(old, ['config/a.toml'], { protect: ['world', 'ops.json'] })
+  assert.deepEqual(removals, [], 'dot segments, doubled slashes and case all name the guarded file')
+  assert.deepEqual(planRemovals(['./mods/x.jar', 'mods/x.jar'], []), ['mods/x.jar'], 'one file, one removal')
+})
