@@ -117,35 +117,43 @@ pub fn save(
     }
     let tmp = PathBuf::from(format!("{shown}.{}.tmp", std::process::id()));
     let mut aside: Option<PathBuf> = None;
-    let attempt = (|| -> Result<(), String> {
+    // a UserError (renameOver's "is holding it") passes through; anything else is wrapped
+    let attempt = (|| -> Result<(), Result<String, Failure>> {
         if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
-            crate::fsx::mkdir_all(dir).map_err(|f| f.message().to_string())?;
+            crate::fsx::mkdir_all(dir).map_err(|f| Ok(f.message().to_string()))?;
         }
         let mut ordered = Value::Object(merged.clone());
         jsjson::js_order(&mut ordered);
         let text = format!("{}\n", jsjson::stringify_pretty(&ordered));
-        write_synced(&tmp, text.as_bytes()).map_err(|e| jspath::node_error(&e, "open", Some(&tmp)))?;
+        write_synced(&tmp, text.as_bytes()).map_err(|e| Ok(jspath::node_error(&e, "open", Some(&tmp))))?;
         // Windows: the file gets its explicit ACL before it becomes the settings file. Not
         // fatal: the file names folders, not secrets.
         let _ = crate::private_files::protect(&tmp, 0o600);
         if damaged {
             let at = crate::time::iso_now().replace([':', '.'], "-");
             let to = PathBuf::from(format!("{shown}.unreadable-{at}"));
-            copy_new(&file, &to)?;
-            aside = Some(to);
+            // named before the copy, so a half-made copy is removed with the rest
+            aside = Some(to.clone());
+            copy_new(&file, &to).map_err(Ok)?;
         }
-        crate::fsx::rename_over(&tmp, &file)
-            .map_err(|e| crate::fsx::rename_failure(&e, &tmp, &file).message().to_string())
+        crate::fsx::rename_over(&tmp, &file).map_err(|e| Err(crate::fsx::rename_failure(&e, &tmp, &file)))
     })();
-    if let Err(why) = attempt {
+    if let Err(failed) = attempt {
         // undo whatever was half done; the old file is untouched
         let _ = std::fs::remove_file(&tmp);
         if let Some(a) = &aside {
             let _ = std::fs::remove_file(a);
         }
-        return Err(Failure::user(format!(
-            "could not write settings file {shown} ({why}); it was left as it was"
-        )));
+        return Err(match failed {
+            Err(user @ Failure::User { .. }) => user,
+            Err(other) => Failure::user(format!(
+                "could not write settings file {shown} ({}); it was left as it was",
+                other.message()
+            )),
+            Ok(why) => Failure::user(format!(
+                "could not write settings file {shown} ({why}); it was left as it was"
+            )),
+        });
     }
     Ok((merged, aside.map(|a| a.display().to_string())))
 }
@@ -199,8 +207,10 @@ pub fn check_writable(dir: &str) -> Result<(), String> {
     let probe = jspath::join_path(dir, &[".spawnloft-write-test"]);
     crate::fsx::mkdir_all(Path::new(dir)).map_err(|f| f.message().to_string())?;
     std::fs::write(&probe, "ok").map_err(|e| jspath::node_error(&e, "open", Some(&probe)))?;
-    let _ = std::fs::remove_file(&probe);
-    Ok(())
+    match std::fs::remove_file(&probe) {
+        Err(e) if !jspath::is_enoent(&e) => Err(jspath::node_error(&e, "rm", Some(&probe))),
+        _ => Ok(()),
+    }
 }
 
 /// The resolved layout (`resolveRoots`).

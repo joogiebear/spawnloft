@@ -153,6 +153,33 @@ pub fn is_inside(parent: &std::path::Path, child: &std::path::Path) -> bool {
     rel.is_empty() || (rel != ".." && !rel.starts_with(sep) && !crate::jspath::is_absolute(&rel))
 }
 
+/// `os.tmpdir()`: `TMPDIR`, `TMP`, `TEMP`, then `/tmp` on Unix; `TEMP`, `TMP`, then
+/// `%SystemRoot%\temp` on Windows; a trailing separator dropped (not from a root).
+pub fn os_tmpdir() -> String {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    if cfg!(windows) {
+        let mut p = var("TEMP").or_else(|| var("TMP")).unwrap_or_else(|| {
+            format!(
+                "{}\\temp",
+                var("SystemRoot").or_else(|| var("windir")).unwrap_or_default()
+            )
+        });
+        if p.len() > 1 && p.ends_with('\\') && !p.ends_with(":\\") {
+            p.pop();
+        }
+        p
+    } else {
+        let mut p = var("TMPDIR")
+            .or_else(|| var("TMP"))
+            .or_else(|| var("TEMP"))
+            .unwrap_or_else(|| "/tmp".into());
+        if p.len() > 1 && p.ends_with('/') {
+            p.pop();
+        }
+        p
+    }
+}
+
 /// `dirSizeAsync(dir)`: the bytes of every file below `dir`, links not followed; whatever cannot
 /// be read counts as nothing.
 pub fn dir_size(dir: &std::path::Path) -> u64 {
