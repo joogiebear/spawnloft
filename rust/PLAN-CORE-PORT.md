@@ -482,6 +482,8 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | A JSON number beyond the double range (added in C1) | Infinity | refused as unparseable |
 | A state file's `daemonStartTime` (added in C1, design D4) | ignored | decides, where the system reports a creation time |
 | A settings value of the wrong type (added in C1) | uncaught crash with excerpt, stack and version | the error line alone |
+| Windows: why a secrets file is not owner-only, or could not be made so (added in C1; shown by `doctor` from C6b) | icacls's output: its account names and error text | the security API's: account names looked up from each SID, errors as the system words them |
+| Windows: the local time zone of the log timeline (added in C1; shown by the diagnostics bundle from C6b) | `TZ` when set, else the system's | the system's |
 
 ### 6.2 Faking the network for a spawned process
 

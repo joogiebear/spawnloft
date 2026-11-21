@@ -246,14 +246,15 @@ jobs:
             rust/target
           key: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core with the test hooks, and the lock probe
+      - name: Build spawnloft-core with the test hooks, and the lock and registry probes
         working-directory: rust
         run: |
           cargo build --locked -p spawnloft-core --features test-hooks
-          cargo build --locked -p spawnloft-fakes --bin lock-probe
+          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe
           exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
           echo "SPAWNLOFT_LOCK_PROBE=$GITHUB_WORKSPACE/rust/target/debug/lock-probe$exe" >> "$GITHUB_ENV"
+          echo "SPAWNLOFT_REGISTRY_PROBE=$GITHUB_WORKSPACE/rust/target/debug/registry-probe$exe" >> "$GITHUB_ENV"
       - name: The library's tests with the test hooks on
         working-directory: rust
         run: cargo test --locked -p spawnloft-lib --features test-hooks
@@ -261,10 +262,10 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: node tools/parity/run.mjs --core "$SPAWNLOFT_CORE_BIN" --out parity-report
-      - name: The rig's own tests and the cross-process lock tests
+      - name: The rig's own tests and the cross-process lock and registry tests
         env:
           TMPDIR: ${{ runner.temp }}
-        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

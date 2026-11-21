@@ -371,3 +371,136 @@ mod tests {
         assert!(!send(helper, 0), "the forked helper outlived the group kill");
     }
 }
+
+#[repr(C)]
+#[allow(dead_code)]
+struct Tm {
+    tm_sec: i32,
+    tm_min: i32,
+    tm_hour: i32,
+    tm_mday: i32,
+    tm_mon: i32,
+    tm_year: i32,
+    tm_wday: i32,
+    tm_yday: i32,
+    tm_isdst: i32,
+    // glibc, musl and macOS all follow the nine ints with these two
+    tm_gmtoff: std::ffi::c_long,
+    tm_zone: *const std::ffi::c_char,
+}
+
+unsafe extern "C" {
+    fn localtime_r(time: *const i64, out: *mut Tm) -> *mut Tm;
+    fn tzset();
+}
+
+/// How far local time is ahead of UTC at `utc_secs`, in seconds, by the C library's zone rules
+/// (`TZ`, else `/etc/localtime`), the same rules Node's ICU reads. 0 when the time is out of the
+/// library's range.
+pub fn local_offset_secs(utc_secs: i64) -> i64 {
+    static TZSET: std::sync::Once = std::sync::Once::new();
+    // SAFETY: tzset only reads the environment and the zone files.
+    TZSET.call_once(|| unsafe { tzset() });
+    // SAFETY: a zeroed tm is valid output space; the pointers live through the call.
+    let mut tm: Tm = unsafe { std::mem::zeroed() };
+    let got = unsafe { localtime_r(&utc_secs, &mut tm) };
+    // c_long is i64 on every 64-bit target this builds for, i32 elsewhere
+    #[allow(clippy::useless_conversion)]
+    let offset = i64::from(tm.tm_gmtoff);
+    if got.is_null() { 0 } else { offset }
+}
+
+#[repr(C)]
+struct IfAddrs {
+    ifa_next: *mut IfAddrs,
+    ifa_name: *const std::ffi::c_char,
+    ifa_flags: std::ffi::c_uint,
+    ifa_addr: *const u8,
+    ifa_netmask: *const u8,
+    ifa_ifu: *const u8,
+    ifa_data: *const u8,
+}
+
+unsafe extern "C" {
+    fn getifaddrs(out: *mut *mut IfAddrs) -> i32;
+    fn freeifaddrs(list: *mut IfAddrs);
+}
+
+const IFF_UP: u32 = 0x1;
+const IFF_LOOPBACK: u32 = 0x8;
+const IFF_RUNNING: u32 = 0x40;
+const AF_INET: u8 = 2;
+#[cfg(target_os = "linux")]
+const AF_INET6: u8 = 10;
+#[cfg(not(target_os = "linux"))]
+const AF_INET6: u8 = 30;
+
+/// The address family of a sockaddr: a u16 on Linux, the second byte after `sa_len` on the BSDs.
+///
+/// # Safety
+/// `sa` must point at a sockaddr.
+unsafe fn family(sa: *const u8) -> u8 {
+    // SAFETY: the caller promises a sockaddr, which is at least two bytes.
+    unsafe {
+        if cfg!(target_os = "linux") {
+            u16::from_ne_bytes([*sa, *sa.add(1)]) as u8
+        } else {
+            *sa.add(1)
+        }
+    }
+}
+
+/// `os.networkInterfaces()`: each interface that is up and running with its addresses, in the
+/// order the system lists them (libuv's rule), and whether it is the loopback (`internal`).
+pub fn network_interfaces() -> Vec<(String, Vec<super::InterfaceAddress>)> {
+    let mut list: *mut IfAddrs = std::ptr::null_mut();
+    // SAFETY: an out-pointer; the list is freed below.
+    if unsafe { getifaddrs(&mut list) } != 0 {
+        return Vec::new();
+    }
+    let mut out: Vec<(String, Vec<super::InterfaceAddress>)> = Vec::new();
+    let mut cur = list;
+    while !cur.is_null() {
+        // SAFETY: a node of the list getifaddrs made, alive until freeifaddrs.
+        let ent = unsafe { &*cur };
+        cur = ent.ifa_next;
+        let flags = ent.ifa_flags;
+        if flags & IFF_UP == 0 || flags & IFF_RUNNING == 0 || ent.ifa_addr.is_null() || ent.ifa_name.is_null()
+        {
+            continue;
+        }
+        // SAFETY: a non-null sockaddr from the list.
+        let fam = unsafe { family(ent.ifa_addr) };
+        let address = if fam == AF_INET {
+            // sin_addr follows the family and the port
+            // SAFETY: an AF_INET sockaddr holds sockaddr_in, 16 bytes.
+            let b = unsafe { std::slice::from_raw_parts(ent.ifa_addr.add(4), 4) };
+            std::net::IpAddr::from([b[0], b[1], b[2], b[3]])
+        } else if fam == AF_INET6 {
+            // sin6_addr follows the family, the port and the flow info
+            // SAFETY: an AF_INET6 sockaddr holds sockaddr_in6, 28 bytes.
+            let b = unsafe { std::slice::from_raw_parts(ent.ifa_addr.add(8), 16) };
+            let mut a = [0u8; 16];
+            a.copy_from_slice(b);
+            std::net::IpAddr::from(a)
+        } else {
+            continue;
+        };
+        // SAFETY: a NUL-terminated name from the list.
+        let name = unsafe { std::ffi::CStr::from_ptr(ent.ifa_name) }
+            .to_string_lossy()
+            .into_owned();
+        let entry = super::InterfaceAddress {
+            address: address.to_string(),
+            ipv4: address.is_ipv4(),
+            internal: flags & IFF_LOOPBACK != 0,
+        };
+        match out.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, addrs)) => addrs.push(entry),
+            None => out.push((name, vec![entry])),
+        }
+    }
+    // SAFETY: the list from getifaddrs, freed once.
+    unsafe { freeifaddrs(list) };
+    out
+}

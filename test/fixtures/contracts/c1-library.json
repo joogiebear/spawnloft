@@ -1,0 +1,4625 @@
+{
+  "about": "exposure.mjs, cleanJvmFlags, dataFormatWarning, log-timeline.mjs (in America/New_York and in UTC) and the activity reader in Node. Made by tools/parity/make-c1-fixtures.mjs; the matching spawnloft-lib modules must agree.",
+  "exposure": {
+    "addresses": [
+      {
+        "address": "8.8.8.8",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "1.1.1.1",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "10.0.0.1",
+        "public": false,
+        "private": true
+      },
+      {
+        "address": "127.0.0.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "0.0.0.0",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "169.254.1.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "172.16.0.1",
+        "public": false,
+        "private": true
+      },
+      {
+        "address": "172.32.0.1",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "172.15.255.255",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "192.168.1.10",
+        "public": false,
+        "private": true
+      },
+      {
+        "address": "100.64.0.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "100.128.0.1",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "198.18.0.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "198.20.0.1",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "192.0.0.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "192.0.2.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "192.0.3.1",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "198.51.100.7",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "203.0.113.9",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "224.0.0.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "255.255.255.255",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "256.1.1.1",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "1.2.3",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "1.2.3.4.5",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "01.2.3.4",
+        "public": true,
+        "private": false
+      },
+      {
+        "address": "1.2.3.0004",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "a.b.c.d",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": " 1.2.3.4",
+        "public": false,
+        "private": false
+      },
+      {
+        "address": "::1",
+        "public": false,
+        "private": false
+      }
+    ],
+    "interfaces": {
+      "home": {
+        "lo": [
+          {
+            "address": "127.0.0.1",
+            "family": "IPv4",
+            "internal": true
+          },
+          {
+            "address": "::1",
+            "family": "IPv6",
+            "internal": true
+          }
+        ],
+        "eth0": [
+          {
+            "address": "192.168.1.20",
+            "family": "IPv4",
+            "internal": false
+          },
+          {
+            "address": "fe80::1",
+            "family": "IPv6",
+            "internal": false
+          }
+        ],
+        "docker0": [
+          {
+            "address": "172.17.0.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ]
+      },
+      "vm": {
+        "lo": [
+          {
+            "address": "127.0.0.1",
+            "family": "IPv4",
+            "internal": true
+          }
+        ],
+        "vEthernet (WSL)": [
+          {
+            "address": "172.20.0.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ],
+        "virbr0": [
+          {
+            "address": "192.168.122.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ]
+      },
+      "vps": {
+        "lo": [
+          {
+            "address": "127.0.0.1",
+            "family": "IPv4",
+            "internal": true
+          }
+        ],
+        "ens3": [
+          {
+            "address": "203.1.113.5",
+            "family": "IPv4",
+            "internal": false
+          },
+          {
+            "address": "2001:db8::5",
+            "family": "IPv6",
+            "internal": false
+          }
+        ],
+        "wg0": [
+          {
+            "address": "10.8.0.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ]
+      },
+      "odd": {
+        "Tailscale": [
+          {
+            "address": "100.100.1.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ],
+        "Wi-Fi": [
+          {
+            "address": "10.1.2.3",
+            "family": "IPv4",
+            "internal": false
+          },
+          {
+            "address": "10.1.2.4",
+            "family": "IPv4",
+            "internal": false
+          }
+        ],
+        "TAP-x": [
+          {
+            "address": "192.168.50.1",
+            "family": "IPv4",
+            "internal": false
+          }
+        ],
+        "none": []
+      }
+    },
+    "lists": {
+      "home": {
+        "public": [],
+        "lan": [
+          "192.168.1.20"
+        ]
+      },
+      "vm": {
+        "public": [],
+        "lan": [
+          "172.20.0.1",
+          "192.168.122.1"
+        ]
+      },
+      "vps": {
+        "public": [
+          "203.1.113.5"
+        ],
+        "lan": [
+          "10.8.0.1"
+        ]
+      },
+      "odd": {
+        "public": [],
+        "lan": [
+          "10.1.2.3",
+          "10.1.2.4"
+        ]
+      }
+    },
+    "joins": [
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "0.0.0.0",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "::",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "127.0.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "localhost",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "::1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "[::1]",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": " 192.168.1.20 ",
+        "info": {
+          "port": 25565,
+          "here": "192.168.1.20",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "192.168.1.20",
+          "onlyKind": "lan",
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "203.1.113.5",
+        "info": {
+          "port": 25565,
+          "here": "203.1.113.5",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "203.1.113.5",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "10.9.9.9",
+        "info": {
+          "port": 25565,
+          "here": "10.9.9.9",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "10.9.9.9",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "fe80::1",
+        "info": {
+          "port": 25565,
+          "here": "fe80::1",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "fe80::1",
+          "onlyKind": "here",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "127.999.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": "25565"
+        },
+        "bound": "",
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565.5,
+          "bind": "10.8.0.1"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "10.8.0.1",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "10.8.0.1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "bind": "0.0.0.0"
+        },
+        "bound": null,
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 25565,
+          "bind": ""
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "bind": "[::]"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "192.168.1.20"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "home",
+        "inst": {
+          "port": 1,
+          "bind": 127
+        },
+        "bound": null,
+        "info": {
+          "port": 1,
+          "here": "127",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "127",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "0.0.0.0",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "::",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "127.0.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "localhost",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "::1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "[::1]",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": " 192.168.1.20 ",
+        "info": {
+          "port": 25565,
+          "here": "192.168.1.20",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "192.168.1.20",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "203.1.113.5",
+        "info": {
+          "port": 25565,
+          "here": "203.1.113.5",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "203.1.113.5",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "10.9.9.9",
+        "info": {
+          "port": 25565,
+          "here": "10.9.9.9",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "10.9.9.9",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "fe80::1",
+        "info": {
+          "port": 25565,
+          "here": "fe80::1",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "fe80::1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "127.999.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": "25565"
+        },
+        "bound": "",
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565.5,
+          "bind": "10.8.0.1"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "10.8.0.1",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "10.8.0.1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "bind": "0.0.0.0"
+        },
+        "bound": null,
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 25565,
+          "bind": ""
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "bind": "[::]"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "172.20.0.1",
+            "192.168.122.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vm",
+        "inst": {
+          "port": 1,
+          "bind": 127
+        },
+        "bound": null,
+        "info": {
+          "port": 1,
+          "here": "127",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "127",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "0.0.0.0",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "::",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "127.0.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "localhost",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "::1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "[::1]",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": " 192.168.1.20 ",
+        "info": {
+          "port": 25565,
+          "here": "192.168.1.20",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "192.168.1.20",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "203.1.113.5",
+        "info": {
+          "port": 25565,
+          "here": "203.1.113.5",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "203.1.113.5",
+          "onlyKind": "public",
+          "lan": [],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "10.9.9.9",
+        "info": {
+          "port": 25565,
+          "here": "10.9.9.9",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "10.9.9.9",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "fe80::1",
+        "info": {
+          "port": 25565,
+          "here": "fe80::1",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "fe80::1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "127.999.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": "25565"
+        },
+        "bound": "",
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565.5,
+          "bind": "10.8.0.1"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "10.8.0.1",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "10.8.0.1",
+          "onlyKind": "lan",
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "bind": "0.0.0.0"
+        },
+        "bound": null,
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 25565,
+          "bind": ""
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "bind": "[::]"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "10.8.0.1"
+          ],
+          "public": [
+            "203.1.113.5"
+          ]
+        }
+      },
+      {
+        "interfaces": "vps",
+        "inst": {
+          "port": 1,
+          "bind": 127
+        },
+        "bound": null,
+        "info": {
+          "port": 1,
+          "here": "127",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "127",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "0.0.0.0",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "::",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "dir": "/x"
+        },
+        "bound": "127.0.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "localhost",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "::1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "[::1]",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": " 192.168.1.20 ",
+        "info": {
+          "port": 25565,
+          "here": "192.168.1.20",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "192.168.1.20",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "203.1.113.5",
+        "info": {
+          "port": 25565,
+          "here": "203.1.113.5",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "203.1.113.5",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "10.9.9.9",
+        "info": {
+          "port": 25565,
+          "here": "10.9.9.9",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "10.9.9.9",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "fe80::1",
+        "info": {
+          "port": 25565,
+          "here": "fe80::1",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "only": "fe80::1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565
+        },
+        "bound": "127.999.0.1",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": true,
+          "bindFixed": false,
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": "25565"
+        },
+        "bound": "",
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565.5,
+          "bind": "10.8.0.1"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "10.8.0.1",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "10.8.0.1",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "bind": "0.0.0.0"
+        },
+        "bound": null,
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 25565,
+          "bind": ""
+        },
+        "bound": "",
+        "info": {
+          "port": 25565,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": false,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "bind": "[::]"
+        },
+        "bound": null,
+        "info": {
+          "port": null,
+          "here": "localhost",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "lan": [
+            "10.1.2.3",
+            "10.1.2.4"
+          ],
+          "public": []
+        }
+      },
+      {
+        "interfaces": "odd",
+        "inst": {
+          "port": 1,
+          "bind": 127
+        },
+        "bound": null,
+        "info": {
+          "port": 1,
+          "here": "127",
+          "loopbackOnly": false,
+          "bindFixed": true,
+          "only": "127",
+          "onlyKind": "unknown",
+          "lan": [],
+          "public": []
+        }
+      }
+    ],
+    "rcon": [
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": {
+          "id": "rcon-exposed",
+          "title": "The admin console may be open to the internet",
+          "advice": "This machine has a public address (203.1.113.5) and RCON listens on port 25575 on every interface - Minecraft cannot bind it separately from the game. No firewall was found. RCON is unencrypted and guarded only by its password. Block it: sudo ufw allow OpenSSH && sudo ufw allow 25565/tcp && sudo ufw enable (allow SSH first, or enabling the firewall will lock you out)."
+        }
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5",
+            "8.8.8.8"
+          ],
+          "firewall": null,
+          "bound": "0.0.0.0"
+        },
+        "exposure": {
+          "id": "rcon-exposed",
+          "title": "The admin console may be open to the internet",
+          "advice": "This machine has a public address (203.1.113.5) and RCON listens on port 25575 on every interface - Minecraft cannot bind it separately from the game. A firewall may be in place, but one could not be confirmed. RCON is unencrypted and guarded only by its password. Block it: sudo ufw allow OpenSSH && sudo ufw allow 25565/tcp && sudo ufw enable (allow SSH first, or enabling the firewall will lock you out)."
+        }
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": true,
+          "bound": ""
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "win32",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": "127.0.0.1"
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": "localhost"
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 25575
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": "10.0.0.5"
+        },
+        "exposure": {
+          "id": "rcon-exposed",
+          "title": "The admin console may be open to the internet",
+          "advice": "This machine has a public address (203.1.113.5) and RCON listens on port 25575 on every interface - Minecraft cannot bind it separately from the game. No firewall was found. RCON is unencrypted and guarded only by its password. Block it: sudo ufw allow OpenSSH && sudo ufw allow 25565/tcp && sudo ufw enable (allow SSH first, or enabling the firewall will lock you out)."
+        }
+      },
+      {
+        "inst": {
+          "port": 25565,
+          "rcon": {
+            "port": 0
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "port": 25565
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": null
+      },
+      {
+        "inst": {
+          "rcon": {
+            "port": "25575"
+          }
+        },
+        "seen": {
+          "platform": "linux",
+          "addresses": [
+            "203.1.113.5"
+          ],
+          "firewall": false,
+          "bound": ""
+        },
+        "exposure": {
+          "id": "rcon-exposed",
+          "title": "The admin console may be open to the internet",
+          "advice": "This machine has a public address (203.1.113.5) and RCON listens on port 25575 on every interface - Minecraft cannot bind it separately from the game. No firewall was found. RCON is unencrypted and guarded only by its password. Block it: sudo ufw allow OpenSSH && sudo ufw allow undefined/tcp && sudo ufw enable (allow SSH first, or enabling the firewall will lock you out)."
+        }
+      }
+    ],
+    "bound": [
+      {
+        "text": "server-ip=\nserver-port=25565\n",
+        "bound": ""
+      },
+      {
+        "text": "motd=x\n \tserver-ip = 10.0.0.5 \r\nserver-port=1",
+        "bound": "10.0.0.5"
+      },
+      {
+        "text": "#server-ip=1.2.3.4\n",
+        "bound": ""
+      },
+      {
+        "text": "server-ipx=1\nserver-ip=2\n",
+        "bound": "2"
+      },
+      {
+        "text": "server-ip=1.2.3.4\rserver-port=5",
+        "bound": "1.2.3.4"
+      },
+      {
+        "text": "server-ip= next",
+        "bound": ""
+      },
+      {
+        "text": "x=1\n  server-ip   =   \n",
+        "bound": ""
+      },
+      {
+        "text": "server-ip:1.2.3.4\n",
+        "bound": ""
+      },
+      {
+        "text": "",
+        "bound": ""
+      }
+    ],
+    "firewall": [
+      {
+        "files": {
+          "/etc/ufw/ufw.conf": "# x\n ENABLED = YES \n"
+        },
+        "systemctl": "",
+        "active": true
+      },
+      {
+        "files": {
+          "/etc/ufw/ufw.conf": "ENABLED=no\n"
+        },
+        "systemctl": "",
+        "active": false
+      },
+      {
+        "files": {},
+        "systemctl": "active\n",
+        "active": true
+      },
+      {
+        "files": {},
+        "systemctl": "inactive\n",
+        "active": false
+      },
+      {
+        "files": {},
+        "systemctl": null,
+        "active": false
+      },
+      {
+        "files": {
+          "/etc/nftables.conf": "flush ruleset\ntable inet filter {\n"
+        },
+        "systemctl": "",
+        "active": null
+      },
+      {
+        "files": {
+          "/etc/iptables/rules.v4": "*filter\n:INPUT ACCEPT\n"
+        },
+        "systemctl": "",
+        "active": null
+      },
+      {
+        "files": {
+          "/etc/nftables.conf": "tables\n"
+        },
+        "systemctl": "",
+        "active": false
+      },
+      {
+        "files": {
+          "/etc/sysconfig/iptables": "  -A INPUT -j DROP\n"
+        },
+        "systemctl": "",
+        "active": null
+      },
+      {
+        "files": {
+          "/etc/sysconfig/iptables": "-AB\n"
+        },
+        "systemctl": "",
+        "active": false
+      },
+      {
+        "files": {
+          "/etc/ufw/ufw.conf": "ENABLED=yes # comment\n"
+        },
+        "systemctl": "",
+        "active": false
+      },
+      {
+        "files": {
+          "/etc/ufw/ufw.conf": "enabled\t=\tyes"
+        },
+        "systemctl": "",
+        "active": true
+      }
+    ]
+  },
+  "jvm": {
+    "clean": [
+      {
+        "input": null,
+        "value": null
+      },
+      {
+        "input": "",
+        "value": null
+      },
+      {
+        "input": "   ",
+        "value": null
+      },
+      {
+        "input": "-XX:+UseG1GC",
+        "value": [
+          "-XX:+UseG1GC"
+        ]
+      },
+      {
+        "input": "-XX:+UseG1GC  -Dfoo=bar\n-Dx=1",
+        "value": [
+          "-XX:+UseG1GC",
+          "-Dfoo=bar",
+          "-Dx=1"
+        ]
+      },
+      {
+        "input": [
+          "-Da",
+          " -Db ",
+          ""
+        ],
+        "value": [
+          "-Da",
+          "-Db"
+        ]
+      },
+      {
+        "input": [
+          "-Da",
+          5
+        ],
+        "error": "\"5\" is not a Java option - each starts with a dash, like -XX:+UseG1GC"
+      },
+      {
+        "input": "nodash",
+        "error": "\"nodash\" is not a Java option - each starts with a dash, like -XX:+UseG1GC"
+      },
+      {
+        "input": "-Xmx4G",
+        "error": "-Xmx4G: memory is set by the Memory setting, so both stay in step"
+      },
+      {
+        "input": "-xms1g",
+        "error": "-xms1g: memory is set by the Memory setting, so both stay in step"
+      },
+      {
+        "input": "-XmX",
+        "error": "-XmX: memory is set by the Memory setting, so both stay in step"
+      },
+      {
+        "input": "-jar",
+        "error": "-jar: which jar runs is the server's own jar"
+      },
+      {
+        "input": "-JAR",
+        "error": "-JAR: which jar runs is the server's own jar"
+      },
+      {
+        "input": "-cp",
+        "error": "-cp: which jar runs is the server's own jar"
+      },
+      {
+        "input": "--class-path",
+        "error": "--class-path: which jar runs is the server's own jar"
+      },
+      {
+        "input": "--CLASS-PATH",
+        "error": "--CLASS-PATH: which jar runs is the server's own jar"
+      },
+      {
+        "input": "-classpath",
+        "error": "-classpath: which jar runs is the server's own jar"
+      },
+      {
+        "input": "-jarx",
+        "value": [
+          "-jarx"
+        ]
+      },
+      {
+        "input": "-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "error": "\"-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...\" is too long for one argument"
+      },
+      {
+        "input": "-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "value": [
+          "-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      {
+        "input": "-Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da -Da",
+        "error": "that is more than 60 Java arguments"
+      },
+      {
+        "input": [
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da"
+        ],
+        "value": [
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da",
+          "-Da"
+        ]
+      },
+      {
+        "input": "-Da -Db",
+        "value": [
+          "-Da",
+          "-Db"
+        ]
+      },
+      {
+        "input": "-Da -Db",
+        "value": [
+          "-Da",
+          "-Db"
+        ]
+      },
+      {
+        "input": "-Da﻿-Db",
+        "value": [
+          "-Da",
+          "-Db"
+        ]
+      },
+      {
+        "input": 5,
+        "error": "\"5\" is not a Java option - each starts with a dash, like -XX:+UseG1GC"
+      },
+      {
+        "input": true,
+        "error": "\"true\" is not a Java option - each starts with a dash, like -XX:+UseG1GC"
+      },
+      {
+        "input": [
+          "-Dé"
+        ],
+        "value": [
+          "-Dé"
+        ]
+      }
+    ],
+    "args": [
+      "-Xms4G",
+      "-Xmx4G",
+      "-Dterminal.jline=false",
+      "-XX:+UseG1GC",
+      "-jar",
+      "paper.jar",
+      "--nogui"
+    ]
+  },
+  "dataFormat": [
+    {
+      "marker": {
+        "writtenBy": "3.1.0",
+        "format": 1
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by SpawnLoft 3.1.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "3.1.0",
+        "format": 1
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by SpawnLoft 3.1.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "3.1.0",
+        "format": 1
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3.1.0",
+        "format": 1
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3.1.0",
+        "format": 1
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by SpawnLoft 3.1.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "2.4.0",
+        "format": 1
+      },
+      "version": "2.0.0",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "2.4.0",
+        "format": 1
+      },
+      "version": "v2.1",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "2.4.0",
+        "format": 1
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "2.4.0",
+        "format": 1
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "2.4.0",
+        "format": 1
+      },
+      "version": "2.0.0-internal.5",
+      "warning": null
+    },
+    {
+      "marker": {
+        "format": 2
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "format": 2
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "format": 2
+      },
+      "version": "2",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "format": 2
+      },
+      "version": null,
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "format": 2
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "format": 1.5
+      },
+      "version": "2.0.0",
+      "warning": null
+    },
+    {
+      "marker": {
+        "format": 1.5
+      },
+      "version": "v2.1",
+      "warning": null
+    },
+    {
+      "marker": {
+        "format": 1.5
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "format": 1.5
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "format": 1.5
+      },
+      "version": "2.0.0-internal.5",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "v3.0"
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by SpawnLoft v3.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "v3.0"
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by SpawnLoft v3.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "v3.0"
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "v3.0"
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "v3.0"
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by SpawnLoft v3.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "3"
+      },
+      "version": "2.0.0",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3"
+      },
+      "version": "v2.1",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3"
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3"
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "3"
+      },
+      "version": "2.0.0-internal.5",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": 3.5
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": 3.5
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": 3.5
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": 3.5
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": 3.5
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "10.0.0",
+        "format": "2"
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by SpawnLoft 10.0.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "10.0.0",
+        "format": "2"
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by SpawnLoft 10.0.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "10.0.0",
+        "format": "2"
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "10.0.0",
+        "format": "2"
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "10.0.0",
+        "format": "2"
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by SpawnLoft 10.0.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": null,
+        "format": 3
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": null,
+        "format": 3
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": null,
+        "format": 3
+      },
+      "version": "2",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": null,
+        "format": 3
+      },
+      "version": null,
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": null,
+        "format": 3
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by a newer SpawnLoft (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {},
+      "version": "2.0.0",
+      "warning": null
+    },
+    {
+      "marker": {},
+      "version": "v2.1",
+      "warning": null
+    },
+    {
+      "marker": {},
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {},
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {},
+      "version": "2.0.0-internal.5",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "99999999999999999999.0"
+      },
+      "version": "2.0.0",
+      "warning": "this data folder was last used by SpawnLoft 99999999999999999999.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "99999999999999999999.0"
+      },
+      "version": "v2.1",
+      "warning": "this data folder was last used by SpawnLoft 99999999999999999999.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    },
+    {
+      "marker": {
+        "writtenBy": "99999999999999999999.0"
+      },
+      "version": "2",
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "99999999999999999999.0"
+      },
+      "version": null,
+      "warning": null
+    },
+    {
+      "marker": {
+        "writtenBy": "99999999999999999999.0"
+      },
+      "version": "2.0.0-internal.5",
+      "warning": "this data folder was last used by SpawnLoft 99999999999999999999.0 (/d/data-format.json). This version can still run it, but servers, tasks or settings made there may not show up or may behave differently here. SpawnLoft points scheduled tasks and launchers back at this version when it starts; if a task still does not run, run \"spawnloft repair\"."
+    }
+  ],
+  "lines": [
+    {
+      "line": "[12:00:01 INFO]: Done (3.2s)!",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "INFO",
+        "thread": null,
+        "text": "Done (3.2s)!"
+      }
+    },
+    {
+      "line": "[12:00:01 SEVERE]: bad",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "ERROR",
+        "thread": null,
+        "text": "bad"
+      }
+    },
+    {
+      "line": "[12:00:01 warn]: lower",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "WARN",
+        "thread": null,
+        "text": "lower"
+      }
+    },
+    {
+      "line": "[12:00:01] [Server thread/INFO]: fabric",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "INFO",
+        "thread": "Server thread",
+        "text": "fabric"
+      }
+    },
+    {
+      "line": "[12:00:01] [main/WARN] (fabric-loader) mod text",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "WARN",
+        "thread": "main",
+        "text": "mod text"
+      }
+    },
+    {
+      "line": "[2026-08-31T05:42:27.5Z] daemon line",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T05:42:27.5Z",
+        "level": null,
+        "thread": null,
+        "text": "daemon line"
+      }
+    },
+    {
+      "line": "[2026-08-31 05:42:27+0100] daemon colonless",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31 05:42:27+0100",
+        "level": null,
+        "thread": null,
+        "text": "daemon colonless"
+      }
+    },
+    {
+      "line": "[2026-08-31T05:42:27] daemon local",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T05:42:27",
+        "level": null,
+        "thread": null,
+        "text": "daemon local"
+      }
+    },
+    {
+      "line": "[2026-02-30 05:42:27] overflow",
+      "parsed": {
+        "time": null,
+        "iso": "2026-02-30 05:42:27",
+        "level": null,
+        "thread": null,
+        "text": "overflow"
+      }
+    },
+    {
+      "line": "2026-08-31T05:42:27.5Z ServerMain WARN Advanced terminal",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T05:42:27.5Z",
+        "level": "WARN",
+        "thread": "ServerMain",
+        "text": "Advanced terminal"
+      }
+    },
+    {
+      "line": "2026-08-31T05:42:27Z main SEVERE x",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T05:42:27Z",
+        "level": "ERROR",
+        "thread": "main",
+        "text": "x"
+      }
+    },
+    {
+      "line": "2026-08-31T05:42:27Z main NOTICE x",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "2026-08-31T05:42:27Z main NOTICE x"
+      }
+    },
+    {
+      "line": "plain text",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "plain text"
+      }
+    },
+    {
+      "line": "\tat java.lang.Thread.run",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "\tat java.lang.Thread.run"
+      }
+    },
+    {
+      "line": "[12:00:01 INFO]: crlf\r",
+      "parsed": {
+        "time": "12:00:01",
+        "iso": null,
+        "level": "INFO",
+        "thread": null,
+        "text": "crlf"
+      }
+    },
+    {
+      "line": "[12:00:01 INFO]: a b",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "[12:00:01 INFO]: a b"
+      }
+    },
+    {
+      "line": "[１２:00:01 INFO]: wide digits",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "[１２:00:01 INFO]: wide digits"
+      }
+    },
+    {
+      "line": "[12:00:01 ÌNFO]: accent",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "[12:00:01 ÌNFO]: accent"
+      }
+    },
+    {
+      "line": "[12:00:01] [a]b/INFO]: x",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": "[12:00:01] [a]b/INFO]: x"
+      }
+    },
+    {
+      "line": "",
+      "parsed": {
+        "time": null,
+        "iso": null,
+        "level": null,
+        "thread": null,
+        "text": ""
+      }
+    },
+    {
+      "line": "[2026-13-01T00:00:00Z] bad month",
+      "parsed": {
+        "time": null,
+        "iso": "2026-13-01T00:00:00Z",
+        "level": null,
+        "thread": null,
+        "text": "bad month"
+      }
+    },
+    {
+      "line": "[2026-08-31T24:00:00Z] midnight",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T24:00:00Z",
+        "level": null,
+        "thread": null,
+        "text": "midnight"
+      }
+    },
+    {
+      "line": "[0001-01-01 00:00:00Z] legacy year",
+      "parsed": {
+        "time": null,
+        "iso": "0001-01-01 00:00:00Z",
+        "level": null,
+        "thread": null,
+        "text": "legacy year"
+      }
+    },
+    {
+      "line": "[2026-08-31T05:42:27-0230] minus",
+      "parsed": {
+        "time": null,
+        "iso": "2026-08-31T05:42:27-0230",
+        "level": null,
+        "thread": null,
+        "text": "minus"
+      }
+    }
+  ],
+  "timelines": [
+    {
+      "tz": "America/New_York",
+      "dates": [
+        {
+          "text": "2026-08-31T05:42:27.5Z",
+          "ms": 1788154947500
+        },
+        {
+          "text": "2026-08-31 05:42:27.5Z",
+          "ms": 1788154947500
+        },
+        {
+          "text": "2026-08-31t05:42:27Z",
+          "ms": 1788154947000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0100",
+          "ms": 1788151347000
+        },
+        {
+          "text": "2026-08-31T05:42:27+01:00",
+          "ms": 1788151347000
+        },
+        {
+          "text": "2026-08-31 05:42:27",
+          "ms": 1788169347000
+        },
+        {
+          "text": "2026-08-31T05:42:27",
+          "ms": 1788169347000
+        },
+        {
+          "text": "2026-08-31T05:42:27.123456Z",
+          "ms": 1788154947123
+        },
+        {
+          "text": "2026-08-31 05:42:27-0230",
+          "ms": 1788163947000
+        },
+        {
+          "text": "2026-13-31T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-02-30T05:42:27Z",
+          "ms": 1772430147000
+        },
+        {
+          "text": "2026-08-31T24:00:00Z",
+          "ms": 1788220800000
+        },
+        {
+          "text": "2026-08-31T25:00:00Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00",
+          "ms": 1788235200000
+        },
+        {
+          "text": "2026-08-31T05:42:60Z",
+          "ms": null
+        },
+        {
+          "text": "2026-03-08T02:30:00",
+          "ms": 1772955000000
+        },
+        {
+          "text": "2026-11-01T01:30:00",
+          "ms": 1793511000000
+        },
+        {
+          "text": "2026-03-08 02:30:00",
+          "ms": 1772955000000
+        },
+        {
+          "text": "2026-11-01 01:30:00",
+          "ms": 1793511000000
+        },
+        {
+          "text": "2026-08-31T05:42:27.Z",
+          "ms": null
+        },
+        {
+          "text": "0000-01-01T00:00:00Z",
+          "ms": -62167219200000
+        },
+        {
+          "text": "2026-02-00T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-02-32T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T24:00:01Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T24:00:00.001Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00.5",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00.000",
+          "ms": 1788235200000
+        },
+        {
+          "text": "2026-08-31 05:42:27+2400",
+          "ms": 1788068547000
+        },
+        {
+          "text": "2026-08-31 05:42:27+2359",
+          "ms": 1788068607000
+        },
+        {
+          "text": "2026-08-31T05:42:27+24:00",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T05:42:27+2400",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+24:00",
+          "ms": 1788068547000
+        },
+        {
+          "text": "2026-08-31 05:42:27+23:60",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+0099",
+          "ms": 1788149007000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0099",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+0023",
+          "ms": 1788153567000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0023",
+          "ms": 1788153567000
+        },
+        {
+          "text": "2026-08-31 05:42:27+0024",
+          "ms": 1788153507000
+        },
+        {
+          "text": "2026-08-31 05:42:27+9999",
+          "ms": 1787792607000
+        },
+        {
+          "text": "2026-08-31T05:42:27+00:99",
+          "ms": null
+        },
+        {
+          "text": "0001-01-01 00:00:00Z",
+          "ms": 978307200000
+        },
+        {
+          "text": "0049-06-01 00:00:00Z",
+          "ms": 2506118400000
+        },
+        {
+          "text": "0050-06-01 00:00:00Z",
+          "ms": -618105600000
+        },
+        {
+          "text": "0099-06-01 00:00:00",
+          "ms": 928209600000
+        },
+        {
+          "text": "0100-06-01 00:00:00Z",
+          "ms": -58998412800000
+        },
+        {
+          "text": "9999-12-31T23:59:59Z",
+          "ms": 253402300799000
+        },
+        {
+          "text": "+275760-09-13T00:00:00.000Z",
+          "ms": 8640000000000000
+        },
+        {
+          "text": "+275760-09-13T00:00:00.001Z",
+          "ms": null
+        },
+        {
+          "text": "-000001-01-01T00:00:00.000Z",
+          "ms": -62198755200000
+        },
+        {
+          "text": "+010000-01-01T00:00:00.000Z",
+          "ms": 253402300800000
+        },
+        {
+          "text": "-000000-01-01T00:00:00.000Z",
+          "ms": null
+        },
+        {
+          "text": "Invalid Date",
+          "ms": null
+        },
+        {
+          "text": "",
+          "ms": null
+        }
+      ],
+      "logs": [
+        {
+          "lines": [
+            "Starting org.bukkit.craftbukkit.Main",
+            "[23:59:58 INFO]: a",
+            "[23:59:59 INFO]: b",
+            "[00:00:01 INFO]: next day",
+            "\tcontinued",
+            "[01:30:00 INFO]: c"
+          ],
+          "anchor": null,
+          "mtime": 1773036000000,
+          "entries": [
+            {
+              "at": "2026-03-09T03:59:58.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "Starting org.bukkit.craftbukkit.Main",
+              "raw": "Starting org.bukkit.craftbukkit.Main"
+            },
+            {
+              "at": "2026-03-09T03:59:58.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "a",
+              "raw": "[23:59:58 INFO]: a"
+            },
+            {
+              "at": "2026-03-09T03:59:59.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "b",
+              "raw": "[23:59:59 INFO]: b"
+            },
+            {
+              "at": "2026-03-09T04:00:01.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "next day\n\tcontinued",
+              "raw": "[00:00:01 INFO]: next day\n\tcontinued"
+            },
+            {
+              "at": "2026-03-09T05:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "c",
+              "raw": "[01:30:00 INFO]: c"
+            }
+          ],
+          "text": "23:59:58.000 server      Starting org.bukkit.craftbukkit.Main\n23:59:58.000 server    INFO  a\n23:59:59.000 server    INFO  b\n00:00:01.000 server    INFO  next day\n  \tcontinued\n01:30:00.000 server    INFO  c"
+        },
+        {
+          "lines": [
+            "[10:00:00 INFO]: a",
+            "[09:30:00 INFO]: half hour back stays",
+            "[08:00:00 INFO]: two back is a new day"
+          ],
+          "anchor": 1793538000000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-11-01T15:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "a",
+              "raw": "[10:00:00 INFO]: a"
+            },
+            {
+              "at": "2026-11-01T14:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "half hour back stays",
+              "raw": "[09:30:00 INFO]: half hour back stays"
+            },
+            {
+              "at": "2026-11-02T13:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "two back is a new day",
+              "raw": "[08:00:00 INFO]: two back is a new day"
+            }
+          ],
+          "text": "10:00:00.000 server    INFO  a\n09:30:00.000 server    INFO  half hour back stays\n08:00:00.000 server    INFO  two back is a new day"
+        },
+        {
+          "lines": [
+            "[01:59:00 INFO]: before",
+            "[02:30:00 INFO]: skipped hour",
+            "[03:01:00 INFO]: after"
+          ],
+          "anchor": 1772946000000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-03-08T06:59:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "before",
+              "raw": "[01:59:00 INFO]: before"
+            },
+            {
+              "at": "2026-03-08T07:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "skipped hour",
+              "raw": "[02:30:00 INFO]: skipped hour"
+            },
+            {
+              "at": "2026-03-08T07:01:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after",
+              "raw": "[03:01:00 INFO]: after"
+            }
+          ],
+          "text": "01:59:00.000 server    INFO  before\n03:30:00.000 server    INFO  skipped hour\n03:01:00.000 server    INFO  after"
+        },
+        {
+          "lines": [
+            "[01:30:00 INFO]: twice",
+            "[01:45:00 INFO]: twice again"
+          ],
+          "anchor": 1793505600000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-11-01T05:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "twice",
+              "raw": "[01:30:00 INFO]: twice"
+            },
+            {
+              "at": "2026-11-01T05:45:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "twice again",
+              "raw": "[01:45:00 INFO]: twice again"
+            }
+          ],
+          "text": "01:30:00.000 server    INFO  twice\n01:45:00.000 server    INFO  twice again"
+        },
+        {
+          "lines": [
+            "[01:30:00 INFO]: mtime in the repeated hour"
+          ],
+          "anchor": null,
+          "mtime": 1793515200000,
+          "entries": [
+            {
+              "at": "2026-11-01T05:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "mtime in the repeated hour",
+              "raw": "[01:30:00 INFO]: mtime in the repeated hour"
+            }
+          ],
+          "text": "01:30:00.000 server    INFO  mtime in the repeated hour"
+        },
+        {
+          "lines": [
+            "[12:00:00 INFO]: anchor later in the day"
+          ],
+          "anchor": 1781553600000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-06-16T16:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "anchor later in the day",
+              "raw": "[12:00:00 INFO]: anchor later in the day"
+            }
+          ],
+          "text": "12:00:00.000 server    INFO  anchor later in the day"
+        },
+        {
+          "lines": [
+            "[23:00:00 INFO]: after mtime of day"
+          ],
+          "anchor": null,
+          "mtime": 1781524800000,
+          "entries": [
+            {
+              "at": "2026-06-15T03:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after mtime of day",
+              "raw": "[23:00:00 INFO]: after mtime of day"
+            }
+          ],
+          "text": "23:00:00.000 server    INFO  after mtime of day"
+        },
+        {
+          "lines": [
+            "no stamp at all",
+            "still none"
+          ],
+          "anchor": null,
+          "mtime": 1769902200000,
+          "entries": [
+            {
+              "at": "2026-01-31T23:30:00.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "no stamp at all\nstill none",
+              "raw": "no stamp at all\nstill none"
+            }
+          ],
+          "text": "18:30:00.000 server      no stamp at all\n  still none"
+        },
+        {
+          "lines": [
+            "[2026-08-31T05:42:27Z] only daemon",
+            "cont"
+          ],
+          "anchor": null,
+          "mtime": 1767225600000,
+          "entries": [
+            {
+              "at": "2026-08-31T05:42:27.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "only daemon\ncont",
+              "raw": "[2026-08-31T05:42:27Z] only daemon\ncont"
+            }
+          ],
+          "text": "01:42:27.000 server      only daemon\n  cont"
+        },
+        {
+          "lines": [
+            "[12:00:00 INFO]: month end"
+          ],
+          "anchor": null,
+          "mtime": 1772337600000,
+          "entries": [
+            {
+              "at": "2026-02-28T17:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "month end",
+              "raw": "[12:00:00 INFO]: month end"
+            }
+          ],
+          "text": "12:00:00.000 server    INFO  month end"
+        },
+        {
+          "lines": [
+            "[2026-08-31 99:99:99] unreadable",
+            "[12:00:00 INFO]: after"
+          ],
+          "anchor": 1788134400000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-08-31 99:99:99",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "unreadable",
+              "raw": "[2026-08-31 99:99:99] unreadable"
+            },
+            {
+              "at": "2026-08-31T16:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after",
+              "raw": "[12:00:00 INFO]: after"
+            }
+          ],
+          "text": "2026-08-31 99:99:99 server      unreadable\n12:00:00.000 server    INFO  after"
+        }
+      ],
+      "merged": {
+        "entries": [
+          {
+            "at": "2026-03-08T06:59:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "before",
+            "raw": "[01:59:00 INFO]: before"
+          },
+          {
+            "at": "2026-03-08T07:01:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "after",
+            "raw": "[03:01:00 INFO]: after"
+          },
+          {
+            "at": "2026-03-08T07:30:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "skipped hour",
+            "raw": "[02:30:00 INFO]: skipped hour"
+          },
+          {
+            "at": "2026-03-09T03:59:58.000Z",
+            "source": "server",
+            "level": null,
+            "thread": null,
+            "text": "Starting org.bukkit.craftbukkit.Main",
+            "raw": "Starting org.bukkit.craftbukkit.Main"
+          },
+          {
+            "at": "2026-03-09T03:59:58.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "a",
+            "raw": "[23:59:58 INFO]: a"
+          },
+          {
+            "at": "2026-03-09T03:59:59.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "b",
+            "raw": "[23:59:59 INFO]: b"
+          },
+          {
+            "at": "2026-03-09T04:00:01.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "next day\n\tcontinued",
+            "raw": "[00:00:01 INFO]: next day\n\tcontinued"
+          },
+          {
+            "at": "2026-03-09T05:30:00.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "c",
+            "raw": "[01:30:00 INFO]: c"
+          },
+          {
+            "at": "2026-11-01T14:30:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "half hour back stays",
+            "raw": "[09:30:00 INFO]: half hour back stays"
+          },
+          {
+            "at": "2026-11-01T15:00:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "a",
+            "raw": "[10:00:00 INFO]: a"
+          },
+          {
+            "at": "2026-11-02T13:00:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "two back is a new day",
+            "raw": "[08:00:00 INFO]: two back is a new day"
+          }
+        ],
+        "text": "01:59:00.000 client  INFO  before\n03:01:00.000 client  INFO  after\n03:30:00.000 client  INFO  skipped hour\n23:59:58.000 server    Starting org.bukkit.craftbukkit.Main\n23:59:58.000 server  INFO  a\n23:59:59.000 server  INFO  b\n00:00:01.000 server  INFO  next day\n  \tcontinued\n01:30:00.000 server  INFO  c\n09:30:00.000 daemon  INFO  half hour back stays\n10:00:00.000 daemon  INFO  a\n08:00:00.000 daemon  INFO  two back is a new day"
+      }
+    },
+    {
+      "tz": "UTC",
+      "dates": [
+        {
+          "text": "2026-08-31T05:42:27.5Z",
+          "ms": 1788154947500
+        },
+        {
+          "text": "2026-08-31 05:42:27.5Z",
+          "ms": 1788154947500
+        },
+        {
+          "text": "2026-08-31t05:42:27Z",
+          "ms": 1788154947000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0100",
+          "ms": 1788151347000
+        },
+        {
+          "text": "2026-08-31T05:42:27+01:00",
+          "ms": 1788151347000
+        },
+        {
+          "text": "2026-08-31 05:42:27",
+          "ms": 1788154947000
+        },
+        {
+          "text": "2026-08-31T05:42:27",
+          "ms": 1788154947000
+        },
+        {
+          "text": "2026-08-31T05:42:27.123456Z",
+          "ms": 1788154947123
+        },
+        {
+          "text": "2026-08-31 05:42:27-0230",
+          "ms": 1788163947000
+        },
+        {
+          "text": "2026-13-31T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-02-30T05:42:27Z",
+          "ms": 1772430147000
+        },
+        {
+          "text": "2026-08-31T24:00:00Z",
+          "ms": 1788220800000
+        },
+        {
+          "text": "2026-08-31T25:00:00Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00",
+          "ms": 1788220800000
+        },
+        {
+          "text": "2026-08-31T05:42:60Z",
+          "ms": null
+        },
+        {
+          "text": "2026-03-08T02:30:00",
+          "ms": 1772937000000
+        },
+        {
+          "text": "2026-11-01T01:30:00",
+          "ms": 1793496600000
+        },
+        {
+          "text": "2026-03-08 02:30:00",
+          "ms": 1772937000000
+        },
+        {
+          "text": "2026-11-01 01:30:00",
+          "ms": 1793496600000
+        },
+        {
+          "text": "2026-08-31T05:42:27.Z",
+          "ms": null
+        },
+        {
+          "text": "0000-01-01T00:00:00Z",
+          "ms": -62167219200000
+        },
+        {
+          "text": "2026-02-00T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-02-32T05:42:27Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T24:00:01Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T24:00:00.001Z",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00.5",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 24:00:00.000",
+          "ms": 1788220800000
+        },
+        {
+          "text": "2026-08-31 05:42:27+2400",
+          "ms": 1788068547000
+        },
+        {
+          "text": "2026-08-31 05:42:27+2359",
+          "ms": 1788068607000
+        },
+        {
+          "text": "2026-08-31T05:42:27+24:00",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31T05:42:27+2400",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+24:00",
+          "ms": 1788068547000
+        },
+        {
+          "text": "2026-08-31 05:42:27+23:60",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+0099",
+          "ms": 1788149007000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0099",
+          "ms": null
+        },
+        {
+          "text": "2026-08-31 05:42:27+0023",
+          "ms": 1788153567000
+        },
+        {
+          "text": "2026-08-31T05:42:27+0023",
+          "ms": 1788153567000
+        },
+        {
+          "text": "2026-08-31 05:42:27+0024",
+          "ms": 1788153507000
+        },
+        {
+          "text": "2026-08-31 05:42:27+9999",
+          "ms": 1787792607000
+        },
+        {
+          "text": "2026-08-31T05:42:27+00:99",
+          "ms": null
+        },
+        {
+          "text": "0001-01-01 00:00:00Z",
+          "ms": 978307200000
+        },
+        {
+          "text": "0049-06-01 00:00:00Z",
+          "ms": 2506118400000
+        },
+        {
+          "text": "0050-06-01 00:00:00Z",
+          "ms": -618105600000
+        },
+        {
+          "text": "0099-06-01 00:00:00",
+          "ms": 928195200000
+        },
+        {
+          "text": "0100-06-01 00:00:00Z",
+          "ms": -58998412800000
+        },
+        {
+          "text": "9999-12-31T23:59:59Z",
+          "ms": 253402300799000
+        },
+        {
+          "text": "+275760-09-13T00:00:00.000Z",
+          "ms": 8640000000000000
+        },
+        {
+          "text": "+275760-09-13T00:00:00.001Z",
+          "ms": null
+        },
+        {
+          "text": "-000001-01-01T00:00:00.000Z",
+          "ms": -62198755200000
+        },
+        {
+          "text": "+010000-01-01T00:00:00.000Z",
+          "ms": 253402300800000
+        },
+        {
+          "text": "-000000-01-01T00:00:00.000Z",
+          "ms": null
+        },
+        {
+          "text": "Invalid Date",
+          "ms": null
+        },
+        {
+          "text": "",
+          "ms": null
+        }
+      ],
+      "logs": [
+        {
+          "lines": [
+            "Starting org.bukkit.craftbukkit.Main",
+            "[23:59:58 INFO]: a",
+            "[23:59:59 INFO]: b",
+            "[00:00:01 INFO]: next day",
+            "\tcontinued",
+            "[01:30:00 INFO]: c"
+          ],
+          "anchor": null,
+          "mtime": 1773036000000,
+          "entries": [
+            {
+              "at": "2026-03-08T23:59:58.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "Starting org.bukkit.craftbukkit.Main",
+              "raw": "Starting org.bukkit.craftbukkit.Main"
+            },
+            {
+              "at": "2026-03-08T23:59:58.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "a",
+              "raw": "[23:59:58 INFO]: a"
+            },
+            {
+              "at": "2026-03-08T23:59:59.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "b",
+              "raw": "[23:59:59 INFO]: b"
+            },
+            {
+              "at": "2026-03-09T00:00:01.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "next day\n\tcontinued",
+              "raw": "[00:00:01 INFO]: next day\n\tcontinued"
+            },
+            {
+              "at": "2026-03-09T01:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "c",
+              "raw": "[01:30:00 INFO]: c"
+            }
+          ],
+          "text": "23:59:58.000 server      Starting org.bukkit.craftbukkit.Main\n23:59:58.000 server    INFO  a\n23:59:59.000 server    INFO  b\n00:00:01.000 server    INFO  next day\n  \tcontinued\n01:30:00.000 server    INFO  c"
+        },
+        {
+          "lines": [
+            "[10:00:00 INFO]: a",
+            "[09:30:00 INFO]: half hour back stays",
+            "[08:00:00 INFO]: two back is a new day"
+          ],
+          "anchor": 1793538000000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-11-02T10:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "a",
+              "raw": "[10:00:00 INFO]: a"
+            },
+            {
+              "at": "2026-11-02T09:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "half hour back stays",
+              "raw": "[09:30:00 INFO]: half hour back stays"
+            },
+            {
+              "at": "2026-11-03T08:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "two back is a new day",
+              "raw": "[08:00:00 INFO]: two back is a new day"
+            }
+          ],
+          "text": "10:00:00.000 server    INFO  a\n09:30:00.000 server    INFO  half hour back stays\n08:00:00.000 server    INFO  two back is a new day"
+        },
+        {
+          "lines": [
+            "[01:59:00 INFO]: before",
+            "[02:30:00 INFO]: skipped hour",
+            "[03:01:00 INFO]: after"
+          ],
+          "anchor": 1772946000000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-03-09T01:59:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "before",
+              "raw": "[01:59:00 INFO]: before"
+            },
+            {
+              "at": "2026-03-09T02:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "skipped hour",
+              "raw": "[02:30:00 INFO]: skipped hour"
+            },
+            {
+              "at": "2026-03-09T03:01:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after",
+              "raw": "[03:01:00 INFO]: after"
+            }
+          ],
+          "text": "01:59:00.000 server    INFO  before\n02:30:00.000 server    INFO  skipped hour\n03:01:00.000 server    INFO  after"
+        },
+        {
+          "lines": [
+            "[01:30:00 INFO]: twice",
+            "[01:45:00 INFO]: twice again"
+          ],
+          "anchor": 1793505600000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-11-02T01:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "twice",
+              "raw": "[01:30:00 INFO]: twice"
+            },
+            {
+              "at": "2026-11-02T01:45:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "twice again",
+              "raw": "[01:45:00 INFO]: twice again"
+            }
+          ],
+          "text": "01:30:00.000 server    INFO  twice\n01:45:00.000 server    INFO  twice again"
+        },
+        {
+          "lines": [
+            "[01:30:00 INFO]: mtime in the repeated hour"
+          ],
+          "anchor": null,
+          "mtime": 1793515200000,
+          "entries": [
+            {
+              "at": "2026-11-01T01:30:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "mtime in the repeated hour",
+              "raw": "[01:30:00 INFO]: mtime in the repeated hour"
+            }
+          ],
+          "text": "01:30:00.000 server    INFO  mtime in the repeated hour"
+        },
+        {
+          "lines": [
+            "[12:00:00 INFO]: anchor later in the day"
+          ],
+          "anchor": 1781553600000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-06-16T12:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "anchor later in the day",
+              "raw": "[12:00:00 INFO]: anchor later in the day"
+            }
+          ],
+          "text": "12:00:00.000 server    INFO  anchor later in the day"
+        },
+        {
+          "lines": [
+            "[23:00:00 INFO]: after mtime of day"
+          ],
+          "anchor": null,
+          "mtime": 1781524800000,
+          "entries": [
+            {
+              "at": "2026-06-14T23:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after mtime of day",
+              "raw": "[23:00:00 INFO]: after mtime of day"
+            }
+          ],
+          "text": "23:00:00.000 server    INFO  after mtime of day"
+        },
+        {
+          "lines": [
+            "no stamp at all",
+            "still none"
+          ],
+          "anchor": null,
+          "mtime": 1769902200000,
+          "entries": [
+            {
+              "at": "2026-01-31T23:30:00.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "no stamp at all\nstill none",
+              "raw": "no stamp at all\nstill none"
+            }
+          ],
+          "text": "23:30:00.000 server      no stamp at all\n  still none"
+        },
+        {
+          "lines": [
+            "[2026-08-31T05:42:27Z] only daemon",
+            "cont"
+          ],
+          "anchor": null,
+          "mtime": 1767225600000,
+          "entries": [
+            {
+              "at": "2026-08-31T05:42:27.000Z",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "only daemon\ncont",
+              "raw": "[2026-08-31T05:42:27Z] only daemon\ncont"
+            }
+          ],
+          "text": "05:42:27.000 server      only daemon\n  cont"
+        },
+        {
+          "lines": [
+            "[12:00:00 INFO]: month end"
+          ],
+          "anchor": null,
+          "mtime": 1772337600000,
+          "entries": [
+            {
+              "at": "2026-02-28T12:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "month end",
+              "raw": "[12:00:00 INFO]: month end"
+            }
+          ],
+          "text": "12:00:00.000 server    INFO  month end"
+        },
+        {
+          "lines": [
+            "[2026-08-31 99:99:99] unreadable",
+            "[12:00:00 INFO]: after"
+          ],
+          "anchor": 1788134400000,
+          "mtime": null,
+          "entries": [
+            {
+              "at": "2026-08-31 99:99:99",
+              "source": "server",
+              "level": null,
+              "thread": null,
+              "text": "unreadable",
+              "raw": "[2026-08-31 99:99:99] unreadable"
+            },
+            {
+              "at": "2026-08-31T12:00:00.000Z",
+              "source": "server",
+              "level": "INFO",
+              "thread": null,
+              "text": "after",
+              "raw": "[12:00:00 INFO]: after"
+            }
+          ],
+          "text": "2026-08-31 99:99:99 server      unreadable\n12:00:00.000 server    INFO  after"
+        }
+      ],
+      "merged": {
+        "entries": [
+          {
+            "at": "2026-03-08T23:59:58.000Z",
+            "source": "server",
+            "level": null,
+            "thread": null,
+            "text": "Starting org.bukkit.craftbukkit.Main",
+            "raw": "Starting org.bukkit.craftbukkit.Main"
+          },
+          {
+            "at": "2026-03-08T23:59:58.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "a",
+            "raw": "[23:59:58 INFO]: a"
+          },
+          {
+            "at": "2026-03-08T23:59:59.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "b",
+            "raw": "[23:59:59 INFO]: b"
+          },
+          {
+            "at": "2026-03-09T00:00:01.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "next day\n\tcontinued",
+            "raw": "[00:00:01 INFO]: next day\n\tcontinued"
+          },
+          {
+            "at": "2026-03-09T01:30:00.000Z",
+            "source": "server",
+            "level": "INFO",
+            "thread": null,
+            "text": "c",
+            "raw": "[01:30:00 INFO]: c"
+          },
+          {
+            "at": "2026-03-09T01:59:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "before",
+            "raw": "[01:59:00 INFO]: before"
+          },
+          {
+            "at": "2026-03-09T02:30:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "skipped hour",
+            "raw": "[02:30:00 INFO]: skipped hour"
+          },
+          {
+            "at": "2026-03-09T03:01:00.000Z",
+            "source": "client",
+            "level": "INFO",
+            "thread": null,
+            "text": "after",
+            "raw": "[03:01:00 INFO]: after"
+          },
+          {
+            "at": "2026-11-02T09:30:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "half hour back stays",
+            "raw": "[09:30:00 INFO]: half hour back stays"
+          },
+          {
+            "at": "2026-11-02T10:00:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "a",
+            "raw": "[10:00:00 INFO]: a"
+          },
+          {
+            "at": "2026-11-03T08:00:00.000Z",
+            "source": "daemon",
+            "level": "INFO",
+            "thread": null,
+            "text": "two back is a new day",
+            "raw": "[08:00:00 INFO]: two back is a new day"
+          }
+        ],
+        "text": "23:59:58.000 server    Starting org.bukkit.craftbukkit.Main\n23:59:58.000 server  INFO  a\n23:59:59.000 server  INFO  b\n00:00:01.000 server  INFO  next day\n  \tcontinued\n01:30:00.000 server  INFO  c\n01:59:00.000 client  INFO  before\n02:30:00.000 client  INFO  skipped hour\n03:01:00.000 client  INFO  after\n09:30:00.000 daemon  INFO  half hour back stays\n10:00:00.000 daemon  INFO  a\n08:00:00.000 daemon  INFO  two back is a new day"
+      }
+    }
+  ],
+  "activity": {
+    "previous": "{\"at\":\"2026-01-01T00:00:00.000Z\",\"server\":\"smp\",\"action\":\"create\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"2026-01-02T00:00:00.000Z\",\"server\":\"smp\",\"action\":\"backup\",\"by\":{\"kind\":\"schedule\",\"name\":\"nightly\"}}\n{\"at\":\"2026-01-03T00:00:00.000Z\",\"server\":\"old\",\"action\":\"backup\",\"by\":{\"kind\":\"panel\"}}\n",
+    "current": "{\"at\":\"2026-01-04T00:00:00.000Z\",\"server\":\"smp\",\"action\":\"backup-delete\",\"by\":{\"kind\":\"panel\"}}\n{\"at\":\"2026-01-04T01:00:00.000Z\",\"server\":\"smp\",\"action\":\"backup-prune\",\"detail\":\" 3 backups\",\"by\":{\"kind\":\"schedule\"}}\n{\"truncated\":\n\n  \n{\"at\":\"2026-01-05T00:00:00.000Z\",\"server\":\"smp\",\"action\":\"schedule-disable\",\"detail\":\"Automatic backup\",\"by\":{\"kind\":\"assistant\",\"name\":\"Claude\"}}\n{\"at\":\"2026-01-05T01:00:00.000Z\",\"server\":\"smp\",\"action\":\"backup-prune\",\"detail\":\"none\",\"by\":{\"kind\":\"schedule\"}}\n{\"at\":\"2026-01-06T00:00:00.000Z\",\"server\":\"old\",\"action\":\"delete\",\"by\":{\"kind\":\"cli\"},\"ok\":false}\n{\"at\":\"2026-01-06T01:00:00.000Z\",\"server\":\"old\",\"action\":\"delete\",\"by\":{\"kind\":\"cli\"}}\n{\"at\":\"2026-01-07T00:00:00.000Z\",\"server\":\"new\",\"action\":\"start\",\"by\":\"cli\"}\n{\"at\":5,\"server\":\"new\",\"action\":\"stop\"}\n{\"server\":\"new\",\"action\":\"restart\",\"by\":{\"kind\":\"spawnloft\"}}\n{\"at\":\"not a date\",\"server\":\"gone\",\"action\":\"backup\",\"by\":{\"kind\":\"cli\"}}\n[1,2]\n\"text\"\n{\"at\":\"2026-01-08T00:00:00.000Z\",\"server\":\"smp\",\"action\":\"schedule-remove\",\"detail\":\"Automatic backup\",\"by\":{\"kind\":\"panel\"}}",
+    "reads": [
+      {
+        "query": {},
+        "entries": [
+          {
+            "at": "2026-01-08T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-remove",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          "text",
+          [
+            1,
+            2
+          ],
+          {
+            "at": "not a date",
+            "server": "gone",
+            "action": "backup",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "server": "new",
+            "action": "restart",
+            "by": {
+              "kind": "spawnloft"
+            }
+          },
+          {
+            "at": 5,
+            "server": "new",
+            "action": "stop"
+          },
+          {
+            "at": "2026-01-07T00:00:00.000Z",
+            "server": "new",
+            "action": "start",
+            "by": "cli"
+          },
+          {
+            "at": "2026-01-06T01:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T00:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            },
+            "ok": false
+          },
+          {
+            "at": "2026-01-05T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": "none",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-05T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-disable",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "assistant",
+              "name": "Claude"
+            }
+          },
+          {
+            "at": "2026-01-04T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": " 3 backups",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-03T00:00:00.000Z",
+            "server": "old",
+            "action": "backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-02T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup",
+            "by": {
+              "kind": "schedule",
+              "name": "nightly"
+            }
+          },
+          {
+            "at": "2026-01-01T00:00:00.000Z",
+            "server": "smp",
+            "action": "create",
+            "by": {
+              "kind": "cli"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "limit": 3
+        },
+        "entries": [
+          {
+            "at": "2026-01-08T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-remove",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          "text",
+          [
+            1,
+            2
+          ]
+        ],
+        "more": true
+      },
+      {
+        "query": {
+          "limit": 0
+        },
+        "entries": [],
+        "more": true
+      },
+      {
+        "query": {
+          "server": "smp"
+        },
+        "entries": [
+          {
+            "at": "2026-01-08T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-remove",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-05T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": "none",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-05T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-disable",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "assistant",
+              "name": "Claude"
+            }
+          },
+          {
+            "at": "2026-01-04T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": " 3 backups",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-02T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup",
+            "by": {
+              "kind": "schedule",
+              "name": "nightly"
+            }
+          },
+          {
+            "at": "2026-01-01T00:00:00.000Z",
+            "server": "smp",
+            "action": "create",
+            "by": {
+              "kind": "cli"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "server": "new"
+        },
+        "entries": [
+          {
+            "server": "new",
+            "action": "restart",
+            "by": {
+              "kind": "spawnloft"
+            }
+          },
+          {
+            "at": 5,
+            "server": "new",
+            "action": "stop"
+          },
+          {
+            "at": "2026-01-07T00:00:00.000Z",
+            "server": "new",
+            "action": "start",
+            "by": "cli"
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "since": "2026-01-04T00:00:00.000Z"
+        },
+        "entries": [
+          {
+            "at": "2026-01-08T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-remove",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          "text",
+          [
+            1,
+            2
+          ],
+          {
+            "at": "not a date",
+            "server": "gone",
+            "action": "backup",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "server": "new",
+            "action": "restart",
+            "by": {
+              "kind": "spawnloft"
+            }
+          },
+          {
+            "at": 5,
+            "server": "new",
+            "action": "stop"
+          },
+          {
+            "at": "2026-01-07T00:00:00.000Z",
+            "server": "new",
+            "action": "start",
+            "by": "cli"
+          },
+          {
+            "at": "2026-01-06T01:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T00:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            },
+            "ok": false
+          },
+          {
+            "at": "2026-01-05T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": "none",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-05T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-disable",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "assistant",
+              "name": "Claude"
+            }
+          },
+          {
+            "at": "2026-01-04T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": " 3 backups",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "before": "2026-01-05T00:00:00.000Z"
+        },
+        "entries": [
+          {
+            "server": "new",
+            "action": "restart",
+            "by": {
+              "kind": "spawnloft"
+            }
+          },
+          {
+            "at": 5,
+            "server": "new",
+            "action": "stop"
+          },
+          {
+            "at": "2026-01-04T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": " 3 backups",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-03T00:00:00.000Z",
+            "server": "old",
+            "action": "backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-02T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup",
+            "by": {
+              "kind": "schedule",
+              "name": "nightly"
+            }
+          },
+          {
+            "at": "2026-01-01T00:00:00.000Z",
+            "server": "smp",
+            "action": "create",
+            "by": {
+              "kind": "cli"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "by": "you"
+        },
+        "entries": [
+          {
+            "at": "2026-01-08T00:00:00.000Z",
+            "server": "smp",
+            "action": "schedule-remove",
+            "detail": "Automatic backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "not a date",
+            "server": "gone",
+            "action": "backup",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T01:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T00:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            },
+            "ok": false
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-03T00:00:00.000Z",
+            "server": "old",
+            "action": "backup",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-01T00:00:00.000Z",
+            "server": "smp",
+            "action": "create",
+            "by": {
+              "kind": "cli"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "by": "schedule",
+          "limit": 1
+        },
+        "entries": [
+          {
+            "at": "2026-01-05T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": "none",
+            "by": {
+              "kind": "schedule"
+            }
+          }
+        ],
+        "more": true
+      },
+      {
+        "query": {
+          "by": "cli"
+        },
+        "entries": [
+          {
+            "at": "not a date",
+            "server": "gone",
+            "action": "backup",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T01:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            }
+          },
+          {
+            "at": "2026-01-06T00:00:00.000Z",
+            "server": "old",
+            "action": "delete",
+            "by": {
+              "kind": "cli"
+            },
+            "ok": false
+          },
+          {
+            "at": "2026-01-01T00:00:00.000Z",
+            "server": "smp",
+            "action": "create",
+            "by": {
+              "kind": "cli"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "server": "smp",
+          "since": "2026-01-02",
+          "before": "2026-01-05"
+        },
+        "entries": [
+          {
+            "at": "2026-01-04T01:00:00.000Z",
+            "server": "smp",
+            "action": "backup-prune",
+            "detail": " 3 backups",
+            "by": {
+              "kind": "schedule"
+            }
+          },
+          {
+            "at": "2026-01-04T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup-delete",
+            "by": {
+              "kind": "panel"
+            }
+          },
+          {
+            "at": "2026-01-02T00:00:00.000Z",
+            "server": "smp",
+            "action": "backup",
+            "by": {
+              "kind": "schedule",
+              "name": "nightly"
+            }
+          }
+        ],
+        "more": false
+      },
+      {
+        "query": {
+          "by": "spawnloft"
+        },
+        "entries": [
+          {
+            "server": "new",
+            "action": "restart",
+            "by": {
+              "kind": "spawnloft"
+            }
+          }
+        ],
+        "more": false
+      }
+    ],
+    "trails": {
+      "smp": {
+        "lastMadeAt": 1767312000000,
+        "deleted": 5,
+        "lastDeletedAt": 1767574800000,
+        "scheduleOffAt": 1767830400000
+      },
+      "old": {
+        "lastMadeAt": null,
+        "deleted": 0,
+        "lastDeletedAt": null,
+        "scheduleOffAt": null
+      },
+      "new": {
+        "lastMadeAt": null,
+        "deleted": 0,
+        "lastDeletedAt": null,
+        "scheduleOffAt": null
+      },
+      "gone": {
+        "lastMadeAt": null,
+        "deleted": 0,
+        "lastDeletedAt": null,
+        "scheduleOffAt": null
+      },
+      "none": {
+        "lastMadeAt": null,
+        "deleted": 0,
+        "lastDeletedAt": null,
+        "scheduleOffAt": null
+      }
+    }
+  }
+}
