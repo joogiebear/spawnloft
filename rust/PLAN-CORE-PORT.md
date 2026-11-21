@@ -1,0 +1,563 @@
+# SpawnLoft 2.0: finishing the Rust core port
+
+2026-11-21, rev 1 (planning thread "Plan finishing the Rust core port"). Facts are from `v2` at
+c9f1ea1. Companion to `PLAN-2.0-REMAINING.md` ("the remaining-work plan"),
+`INSTALLER-UPDATER-DESIGN.md` ("the design"), `PHASE0-FINDINGS.md` and the original
+`PLAN-RUST-TAURI.md` rev 3.1 ("the original plan", in the project files). Planning only: this
+document changes no code. Nothing is published, and nothing reaches `dev` or a feed until Victor
+says "push to beta".
+
+**What changed.** On 2026-11-10 Victor chose to ship 2.0 as the Tauri shell over a bundled Node
+core and to port the core in 2.1. On 2026-11-21 he reversed the order: "I'm not worried about
+beta. I want to keep building on 2.0, finish doing the port." So the core port (the original
+plan's R2 to R6) moves into 2.0, and 2.0 ships with no Node.js inside it. This document
+supersedes section 3B and the "after the beta (2.1 track)" paragraph of the remaining-work plan.
+Everything else in that plan is done or unchanged.
+
+## 0. Summary
+
+The Node core is about 27,600 lines in 105 modules under `src/`, plus the 2,500-line command
+table in `mcctl.mjs`. About 2,000 of those lines already have a Rust twin (the daemon and what it
+needs, the panel's sign-in rule). The rest is ported in ten phases, C0 to C10, in dependency
+order: a parity rig first, then the foundation, server lifecycle, backups and files, server
+creation, plugins, the scheduler and maintenance commands, the client launcher, the panel API,
+MCP, and last the removal of Node from the package.
+
+Three things make this safer than the original plan's "whole core behind one switch":
+
+1. **The entry point already exists.** Since W1, every shim, launcher, task and MCP config runs
+   `spawnloft-core`, which forwards what it does not own to Node (`cli::forwards`). A command
+   moves to Rust by leaving that forward list. Nothing a user has on disk changes when it does.
+2. **SpawnLoft was always several processes sharing files.** The CLI, the panel, the task runner
+   and the daemons are separate processes today, coordinating through `instances.json`, lock
+   files, `state.json` and the control pipe. A Rust CLI beside a Node panel is the same
+   arrangement as a Node CLI beside a Node panel, provided Rust honours the same file formats and
+   the same locks. Those become written contracts (section 3).
+3. **The Node source stays whole and frozen until the last phase.** No Node module is edited to
+   call Rust, and none is deleted piecemeal. Rust takes over entry points (commands, then panel
+   routes, then MCP); Node keeps answering whatever has not moved. `v2` builds and runs after
+   every merge.
+
+Size: 25 to 36 thread weeks (one Opus thread full time for a week), in three parallel tracks
+after the foundation. The T and W threads ran at about a thread week per calendar day, so this
+is weeks of calendar, not months, with Victor's three hardware gates (section 9) as the floor.
+That calendar figure is an estimate from past pace, not a promise.
+
+## 1. Where `v2` stands (c9f1ea1)
+
+### 1.1 Rust on `v2`: 21,600 lines in four crates
+
+| Area | Where | Lines | State |
+| --- | --- | --- | --- |
+| Per-server daemon (R1): control pipe, crash guard, metrics, tick, RCON, RESP, diagnosis, webhook, activity writer, read-only registry | `spawnloft-lib/src/daemon/`, `metrics.rs`, `tick.rs`, `rcon.rs`, `resp.rs`, `diagnose.rs`, `notify.rs`, `activity.rs`, `crashguard.rs`, `registry.rs`, `platform/` | about 5,800 | Done, default and required in every 2.0 build |
+| Signed updater with rollback and hold | `update/` | about 4,700 | Done |
+| 1.x handover, repair, uninstall, PATH | `handover/`, `spawnloft-core/src/handover_cmd.rs`, `user_path.rs` | about 4,500 | Done, but `resume`, `repair` and `uninstall` still call the Node core (`nodecore.rs`) |
+| Panel endpoint: sign-in rule and reverse proxy to the Node panel | `panel.rs`, `panel_auth.rs` | about 2,100 | Done; answers `/api/update*` and `/api/handover*` itself, proxies the rest |
+| Entry point, forwarding, bundled-Node lookup | `spawnloft-core/src/cli.rs`, `runtime.rs` | about 700 | Done |
+| Tauri shell: window, bridge, zoom, window state, updater glue | `spawnloft-shell/src/` | 2,650 | Done |
+
+The Rust core has no async runtime: std threads, blocking I/O, `ureq` for HTTPS. Its direct
+dependencies are `serde_json`, `regex`, `windows-sys`, `minisign-verify`, `semver`, `sha2`,
+`ureq`, `hmac` and `getrandom` (`SUPPLY-CHAIN.md`).
+
+### 1.2 Node still in the package
+
+| What | Lines | Note |
+| --- | --- | --- |
+| `src/*.mjs`, 105 modules | 27,645 | No npm dependencies; Node built-ins only |
+| `mcctl.mjs`, the command table | 2,499 | 48 commands, 61 names with aliases |
+| `src/bot-host.cjs` and its lockfile | 398 | Mineflayer host; stays Node (section 5.4) |
+| `src/ui.html`, `launcher.html`, `setup.html` | 21,517 | The panel pages; not ported, served as they are |
+| Bundled Node 24 runtime | about 30 MB compressed | `resources/runtime/node-<ver>/` |
+| Tests: `test/*.test.mjs`, 140 files | 27,986 | About 1,650 tests; 124 files import `src/` modules directly |
+
+Already twinned in Rust and still present in Node (2,042 lines): `daemon`, `crashguard`,
+`metrics*`, `tick`, `ready`, `resp`, `rcon`, `diagnose`, `notify`, `panel-auth`.
+
+### 1.3 How a 2.0 build runs today
+
+```
+SpawnLoft (Tauri shell)
+  └─ spawnloft-core ui --port 0 --exit-with-stdin        Rust: sign-in, /api/update*, /api/handover*
+       └─ proxies everything else to: <bundled node> resources/core/spawnloft.mjs ui
+            └─ the whole Node core
+                 └─ spawns spawnloft-core daemon <name>   Rust
+
+spawnloft <command>  ->  spawnloft-core <command>
+  ├─ own: --version, daemon, handover, update, user-path, ui (window form),
+  │       repair --quiet, uninstall --yes                (three of these call Node)
+  └─ every other command: forwarded to the Node core on the bundled Node
+```
+
+## 2. Rules of the port
+
+1. **Parity, not features.** A ported command prints the same text, the same `--json`, the same
+   exit code, and leaves the same files. Improvements wait until the Node twin is gone. The one
+   allowed difference is replacing a shell-out with a native call where the result is the same
+   (`taskkill`, `tasklist`, `icacls`, PowerShell process queries).
+2. **Node is frozen and whole.** No new features in `src/`. A bug fix to a module whose Rust
+   twin exists lands in both in one PR. No Node module is deleted before C10.
+3. **One entry point, one owner per command.** `spawnloft-core` answers a command in Rust or
+   forwards it; never half of each. Ownership is a table in `cli.rs`.
+4. **Same files, same locks.** Rust writes every shared file in the format the Node writer
+   produces (key order, number form, line endings, file mode or ACL) and takes the same lock
+   files with the same record. `dataFormat` does not change during the port, so "Reinstall a
+   previous version" and a manual return to 1.x keep working at every step.
+5. **A command moves only when its parity scenarios are green on Windows, macOS and Linux.**
+6. **No async runtime.** The core stays on std threads and blocking I/O. The panel holds a
+   handful of connections and three event streams; downloads run on a small thread pool. This
+   keeps the crate tree, the binary and the supply-chain review small (open question Q3).
+7. **Arguments are parsed the way `args.mjs` parses them** (43 lines, ported by hand), not with
+   `clap`, because flag handling is part of the contract. This replaces the note in `cli.rs`
+   that `clap` arrives with the command table.
+8. **Security-sensitive phases get a Fable review before merge** (archive extraction, modpack
+   install, uninstall and data moves, account tokens, the panel API, MCP). Others get the
+   standard Opus review pass.
+
+## 3. How Node and Rust coexist
+
+### 3.1 Commands
+
+`cli::forwards` becomes an ownership table: command name to "Rust" or "Node". Each phase flips
+its commands (section 4). One switch exists for CI and support only:
+
+- `SPAWNLOFT_CORE_IMPL=node` makes `spawnloft-core` forward every command Node can still answer,
+  whatever the table says. The parity rig uses it to run the same scenario on both sides.
+  Unset, the table decides. It is never written into a shim and is removed in C10.
+
+`task run`, `mcp` and `ui` are commands like any other: scheduled tasks stop starting Node when
+`task run` flips in C6, MCP when `mcp` flips in C9.
+
+### 3.2 The panel
+
+The proxy stays until C8. Route families do **not** flip one at a time as their modules land,
+because the Node panel keeps state in its own process: the job table and its cancel handles
+(`ui.mjs:313-318`) are shared by every route that starts a download or an install, and the three
+event streams read from them. So between C1 and C8 the window keeps talking to the Node panel,
+which keeps calling Node modules, while the command line runs Rust. Both sides meet at the files
+and the locks, as two Node processes do today. In C8 the 18 route families move in a few groups
+(section 4, C8), each behind an entry in a route table that defaults to the proxy, and the group
+that shares the job table moves together.
+
+### 3.3 MCP
+
+`spawnloft-core mcp` forwards to the Node MCP server until C9. The Node tools call Node modules
+in their own process, which is why the Node source stays whole. In C9 the server and its 39
+tools move at once.
+
+### 3.4 Shared files and locks
+
+The contract fixtures under `test/fixtures/contracts/` cover the daemon's files today. C0 extends
+them to everything two implementations will both write:
+
+| Contract | Written by (Node) | Why it matters |
+| --- | --- | --- |
+| Lock files: `instances.json.lock` and every other `acquireLock` site (record `{pid, token}`, legacy bare pid, stale-holder rule) | `util.mjs` | A Rust writer and a Node writer must exclude each other. C0 lists every lock file in the source and adds a cross-process test in both directions |
+| `instances.json` writes (the fixture exists for reads) | `registry.mjs` and callers | Rust becomes a writer in C1 |
+| `settings.json`, `data-format.json`, `run/runtime.json` | `settings.mjs`, `data-format.mjs`, `relocate.mjs` | Read by 1.x after a rollback |
+| Task shims, server launchers, launchd plists, systemd units, Task Scheduler XML: the exact text per platform | `schedule*.mjs`, `create.mjs` | If Rust writes the same text, `RUNTIME_FORMAT` stays 2 and nothing is rewritten on update |
+| `tasks.log`, `schedules.json` writes | `schedule.mjs`, `task-steps.mjs` | Panel history |
+| Backup manifests, snapshot folder layout, archive entry order and flags | `backup.mjs`, `zip.mjs`, `tar.mjs` | A 1.x build must restore a 2.0 backup and the reverse |
+| Plugin and modpack provenance records | `plugins.mjs`, `mrpack.mjs` | Update checks compare against them |
+| Client files: profiles, accounts (owner-only), version store layout, `launcher_profiles`-style records, the server list (`servers.dat`) | `client*.mjs` | Nobody should have to sign in again or re-download a version |
+| Activity actions beyond `crash` | every module | The panel's Activity page |
+
+Regular expressions are a contract too: the Rust `regex` crate has no lookaround and no
+backreferences. Seven regex lines in `src/` use them; C0 lists them and each phase rewrites its
+own with a test that feeds both the same inputs.
+
+### 3.5 What Node still does for Rust, and when it stops
+
+| Seam today | Ends in |
+| --- | --- |
+| `handover resume` starts servers through `node spawnloft.mjs start` (`nodecore.rs`) | C2 |
+| The daemon takes a database's launch spec on stdin from the Node supervisor | C2 (the Rust supervisor passes the same spec; the flag stays so an older core can start a newer daemon) |
+| `repair --quiet` and `uninstall --yes` run the Node core | C6 |
+| The panel proxy | C8 |
+| Command forwarding, `SPAWNLOFT_ENTRY`, the bundled runtime | C10 |
+
+After C6 the installer and the uninstaller never start Node, which closes the whole class of
+"Node could not run during an install" failures (remaining-work plan A1) one phase before the
+runtime itself leaves.
+
+## 4. Inventory and port order
+
+Node lines per phase are measured; Rust lines and thread weeks are estimates. Rust runs about
+1.2 to 1.4 times the JavaScript it replaces, tests not counted.
+
+| Phase | Node modules | Node lines | Commands that flip to Rust | Weeks |
+| --- | --- | --- | --- | --- |
+| **C0 Parity rig** | none ported | 0 | none | 1 to 2 |
+| **C1 Foundation and read-only commands** | `util`, `settings`, `paths`, `env`, `platform`, `registry` (writes and lock), `control` (client), `private-files`, `props`, `args`, `cli-output`, `cli-query`, `cli-metrics`, `activity` (reader), `data-format`, `entry`, `exposure`, `log-timeline` | 2,332 | `list`, `status`, `logs`, `why`, `metrics`, `jars`, `templates`, `reveal`, `help` | 2 to 3 |
+| **C2 Lifecycle and databases** | `supervisor`, `daemon-launch`, `java`, `services`, `mariadb`, `garnet`, `mysql`, `linux-libs`, `players` | 3,236 | `start`, `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set`, `props`, `db` | 2.5 to 3.5 |
+| **C3 Archives, backups, files** | `zip`, `tar`, `backup`, `worlds`, `files`, `config-files` | 2,495 | `backup`, `snapshots`, `restore`, `prune`, `verify`, `worlds`, `config` | 2 to 3 |
+| **C4 Creating and updating servers** | `download`, `cancel`, `create`, `manage`, `software`, `sources`, `paper`, `purpur`, `vanilla`, `asp`, `buildtools`, `fabric`, `neoforge`, `upgrade` | 2,082 | `new`, `clone`, `adopt`, `rm`, `rename`, `rebuild`, `paper`, `upgrade`, `launchers` | 1.5 to 2.5 |
+| **C5 Plugins and modpacks** | `plugins`, `plugin-actions`, `mrpack` | 1,514 | `plugins`, `pack` | 1.5 to 2 |
+| **C6 Scheduler and maintenance** | `schedule`, `schedule-mac`, `schedule-linux`, `task-steps`, `relocate`, `data-move`, `tree`, `private-copy`, `uninstall`, `doctor`, `diag-bundle`, `mclogs` | 3,084 | `task`, `repair`, `data`, `uninstall`, `diag`, `doctor` (with C7) | 2.5 to 3.5 |
+| **C7 Client launcher** | the 22 `client*.mjs` modules and `doctor-client` | 6,645 | `client` | 5 to 7 |
+| **C8 Panel API** | `ui`, `panel-open`, `first-run`, `appearance` | 2,718 | `ui` | 3 to 4 |
+| **C9 MCP and bots** | `mcp`, `mcp-tools`, `mcp-client-tools`, `bots` | 1,497 | `mcp`, `bot` | 1.5 to 2.5 |
+| **C10 Node leaves** | deletes `src/*.mjs`, `mcctl.mjs`, the runtime | 0 | none left to forward | 2 to 3 |
+| **Total** | | 25,603, plus the 2,499-line command table spread over the phases | | **25 to 36** |
+
+Why this order:
+
+- **C0 first** because nothing may flip without a way to prove parity (section 6).
+- **C1** is the layer 72 other modules import (`util` alone). Its commands are read-only, so the
+  first Rust commands a user runs cannot damage data, and they prove the rig end to end.
+  `list --json` and `status --json` are also what task shims and scripts call most.
+- **C2 before backups and creation** because a backup stops or flushes a running server and a
+  new server is started at the end of `new`. It also removes the first Node seam (`resume`).
+- **C3, C4 to C5, and C7 are three independent tracks** once C2 has landed: backups and files;
+  creation then plugins; the client launcher. C7 depends only on C1, `download` (C4's first
+  module, which C7 may take first if it starts earlier) and `java`.
+- **C6 after C3 and C4** because a task runs backups, restarts and commands, `data move` copies
+  what backups know how to walk, and `repair` rewrites the launchers `create` defines.
+- **C8 and C9 last** because the panel and MCP call every module. By then each route and tool is
+  a thin layer over library code that the command line has already exercised for weeks.
+- **C10** only when the forward table is empty.
+
+```
+C0 ─ C1 ─ C2 ─┬─ C3 ───────┬─ C6 ─┬─ C8 ─┬─ C10
+              ├─ C4 ─ C5 ──┘      │      │
+              └─ C7 ──────────────┴─ C9 ─┘
+```
+
+### Phase notes
+
+**C0, parity rig.** Section 6 describes it. Also delivered: the lock inventory and cross-process
+lock test, the new contract fixtures of 3.4, the regex list, a fake download host for the
+software sources (Paper, Purpur, Mojang, Modrinth, Hangar, Fabric, NeoForge) where the Node
+tests do not already have one, and the `--json` fixtures for every command and the tool list of
+the MCP server (the original plan's "first week of step 2").
+
+**C1.** The registry becomes read-write in Rust under the shared lock. `private-files` moves
+from `icacls.exe` to the owner-only DACL code the daemon already has
+(`platform/windows.rs`); the resulting ACL is compared with what `icacls` produced. New
+dependency candidates across the port, each added under the `SUPPLY-CHAIN.md` rule in the phase
+that needs it: `sha1` (Mojang and Modrinth hashes), `md-5` (Purpur's download hash, offline
+player UUIDs), `flate2` (zip and gzip), an Ed25519 verifier for the signed harness index
+(`ed25519-dalek`, or the Ed25519 inside `minisign-verify` if it can be reached).
+
+**C2.** `console` is interactive: raw input and console modes on Windows, signals on Unix. The
+database engines keep the layout of the engine store exactly, since a running database's files
+are the user's data. `handover resume` starts servers in-process; `nodecore.rs`'s `Starter`
+goes.
+
+**C3.** The zip and tar readers get `cargo fuzz` targets and a differential test: archives made
+by Node are read by Rust and the reverse, including non-ASCII names, the UTF-8 flag, symlinks
+and path-traversal entries (which must be refused the same way). Fable review.
+
+**C4.** Downloads keep every verification Node does (sha1, sha256, md5, sizes), the retry and
+redirect rules, the user agent and the cancel behaviour. BuildTools still runs Java and Git as
+it does today.
+
+**C5.** Modpack install keeps the hardening tests (`modpack-hardening.test.mjs`) case for case.
+Fable review.
+
+**C6.** The scheduler keeps calling `schtasks`, `launchctl`, `systemctl --user` and `loginctl`
+exactly as Node does; a native Task Scheduler client is not part of the port. The capitals-only
+rename fix (#233) and the per-user repair of the CLI package (#234) are carried over with their
+tests. `uninstall` and `data move` delete and move user data: Fable review.
+
+**C7.** The largest phase and the least coupled. Microsoft sign-in (OAuth with PKCE, the Xbox
+chain), the Mojang metadata, five loaders including the Forge installer engine, Java runtime
+download, the harness socket and the signed harness index. It may be split in two threads at
+the natural line: accounts, metadata, install and launch first; loaders second. Token storage
+and signature checks: Fable review. Sign-in is re-verified by Victor on all three platforms
+(gate G2).
+
+**C8.** The Rust panel already terminates HTTP and applies the sign-in rule. It gains a router
+and serves the three pages itself. Groups, in order: (a) static pages, `health`, `settings`,
+`appearance`, `setup`, `java`, `jars`, `software`, `feedback`, `diagnostics`, `mcp`; (b)
+`overview`, `activity`, `scheduler`, `databases`; (c) `instances`, `jobs`, `modpacks` and the
+three event streams, together, because they share the job table; (d) `client` and accounts,
+with the loopback sign-in callback. The final PR removes the proxy and `start_node_panel`.
+The pages are compiled into the binary, so the headless package is one file and a page can
+never be a different version from the API behind it; `SPAWNLOFT_CORE_DIR` still reads them from
+disk for development. Fable review of the whole API surface (path checks, upload limits,
+origin and host rules, what each route may touch).
+
+**C9.** The MCP server over stdio with the tool list byte-equal to the fixture, the scrubber,
+`--allow-destructive` and `--show-ips`. `bot` moves; the Mineflayer host it drives does not
+(section 5.4).
+
+**C10.** Section 5.
+
+## 5. What happens to the bundled Node, the CLI and MCP
+
+### 5.1 The bundled runtime
+
+It leaves the package in C10, together with everything that exists only to carry it:
+
+- `resources/runtime/` and `resources/core/` (the Node source, the `.mjs` forwarders,
+  `package.json`, `internal-defaults.json`). The pages and the bot host files are inside the
+  core binary from C8 and C9.
+- `stage-runtime.mjs`, `desktop/node-pin.mjs`, `node.entitlements` (the Mac build no longer
+  signs anything with JIT entitlements), the `node-pin.yml` workflow, `libstdc++` from the Linux
+  package dependencies, and `runtime.rs`, `nodecore.rs`, the forward path in `cli.rs`.
+- The release gate's Node version and hash check becomes its opposite: a package that contains a
+  `node` binary or a `src/*.mjs` core file is refused.
+- `daemon.mjs` goes with the rest, so `SPAWNLOFT_DAEMON=node` and the `daemon` setting stop
+  meaning anything; a leftover `"daemon": "node"` is ignored and `doctor` says so.
+
+Expected effect, to be measured in C10 and not promised here: the Windows installer drops from
+about 30 MB to under 10, a command line call from a Node start (hundreds of milliseconds) to a
+few, and a scheduled backup no longer starts a JavaScript engine.
+
+### 5.2 The command line
+
+Nothing a person types changes. `spawnloft` and `mcctl` stay as forwarders to `spawnloft-core`
+at the 1.x paths, on PATH where 2.0 already puts them. The 48 commands, their aliases, flags,
+`--json` output and exit codes are the contract the rig holds. `--core-help` folds into `help`.
+
+Compatibility forms that must keep working after Node is gone:
+
+| Who still runs the old form | Form | What answers it after C10 |
+| --- | --- | --- |
+| 1.x task shims not yet rewritten, hand-written 1.x MCP configs (desktop) | `SpawnLoft.exe <...>\mcctl.mjs <command>` | The shell's argv compatibility, already there, hands the command to `spawnloft-core`. The `.mjs` file does not need to exist: the argument is dropped, never run |
+| 1.x CLI package shims and MCP configs | `/opt/spawnloft-cli/bin/node /opt/spawnloft-cli/core/mcctl.mjs <command>` | `bin/node` becomes a link to `spawnloft-core`, and the core gains the same rule: a first argument ending in `mcctl.mjs` or `spawnloft.mjs` is dropped. It only ever strips that one argument and never executes it |
+| 2.0 internal builds | `spawnloft-core <command>` | Unchanged |
+
+Running from a checkout becomes `cargo run -p spawnloft-core -- <command>`; the root
+`spawnloft.mjs` and `mcctl.mjs` go.
+
+### 5.3 MCP
+
+The config form `spawnloft-core mcp` has been the documented one since W1 and does not change.
+The server name, the 39 tool names and their schemas are a fixture. An MCP session that was
+started before an update keeps running the old program until the assistant restarts it; section
+7 covers the file it holds.
+
+### 5.4 The bot host and the harness mod
+
+Both stay as they are. The harness mod is Java. The bot host is Mineflayer, which is npm
+packages installed on demand by `bot setup`, and that already needs a Node.js with npm on the
+machine (`BOTS.md`). Today the host then runs on the bundled Node; after C10 it runs on the same
+system Node that installed it, found on PATH or named by a `bot.node` setting, and `bot check`
+and `doctor` say when there is none. Bots are a plugin-testing tool, so asking for Node there is
+reasonable (Q4).
+
+### 5.5 Tooling that stays Node
+
+The release scripts and smokes under `desktop/`, the installer packaging scripts, the test
+fakes (`fake-java.mjs`, fake MariaDB, fake Garnet, fake client) and the black-box tests stay
+JavaScript and run on the developer's or the runner's Node. Node becomes a build and test tool,
+not something a user's machine ever runs (Q5).
+
+## 6. What proves parity
+
+The existing Node suite cannot be pointed at Rust as it is: 124 of the 140 test files import
+`src/` modules and call their functions. So the proof has six layers.
+
+1. **Contract fixtures** (3.4): file formats and protocols, asserted by Node tests and by
+   `cargo test` from the same JSON.
+2. **The differential rig** (new, `tools/parity/`). A scenario is a list of command lines with
+   the fakes it needs. The rig runs it twice in two scratch data roots, once with
+   `SPAWNLOFT_CORE_IMPL=node` and once without, and compares stdout, stderr, the exit code and
+   the resulting data tree: file list, JSON files after normalising pids, times, ports and
+   paths, archive listings, file modes and ACLs. The same runner replays HTTP request lists
+   against the Node panel and the Rust panel (C8) and JSON-RPC lists against both MCP servers
+   (C9). It runs in `rust-internal.yml` on Windows, macOS and Linux on every pull request. Each
+   phase adds the scenarios for its commands before it flips them, including failure paths
+   (wrong name, port in use, bad archive, download refused, cancelled job).
+3. **The Node suite stays green.** It proves the frozen Node side did not move, and the daemon
+   suites keep running under the Rust daemon. The 19 test files that already spawn the CLI, and
+   the panel tests that only use HTTP, are switched to start `spawnloft-core`, so they test
+   whichever side owns the command.
+4. **Rust unit tests from the Node tests.** Each phase PR carries a table: Node test file, its
+   cases, the Rust test that covers each. A dropped case needs a reason. About 1,650 tests are
+   the checklist.
+5. **Real servers and real clients.** The bot harness (`spawnloft bot check`, scenario runs)
+   against a real Paper server created, started, backed up and restored by the Rust core, on
+   Desktop-Main through Remote Control (never mc-test at .131). The harness mod and
+   `client_launch` for C7. The installer workflows (`installer.yml`, `installer-mac.yml`,
+   `installer-linux.yml`) with their no-Node-on-PATH scenarios. The panel in a real browser and
+   in the Tauri window (`smoke-panel.cjs`, `smoke-tauri.cjs`) for C8.
+6. **Fuzzing** of every reader of outside bytes: zip, tar, mrpack, `server.properties`,
+   `servers.dat`, Mojang and loader metadata, JSON-RPC, HTTP request heads.
+
+Before C10 deletes Node, the rig's Node-side outputs are frozen as golden files, so the same
+scenarios keep guarding the Rust core against itself afterwards. The Node unit tests of deleted
+modules are deleted with them; their cases live on as the Rust tests of layer 4.
+
+## 7. Migration and upgrade safety
+
+**From 1.x (1.5.0 stable, 1.6 betas) to the all-Rust 2.0.** The handover is the one already
+built and checked on 2026-11-20: stop servers, install over the 1.x folder, repair shims,
+resume. What changes is that `resume`, `repair` and `uninstall` no longer start Node, so the
+installer has no runtime to depend on. The data folder is untouched: same `instances.json`,
+same backups, same schedules, same accounts. `dataFormat` is not bumped by the port.
+
+**From a 2.0 internal build (the 1001 to 1010 builds on Victor's machines) to the all-Rust
+build.** These are the only installs that carry the bundled Node; no public user has one unless
+a hybrid beta is published first (Q1). The update still handles them properly:
+
+- Windows: an update-mode install never deletes files the new package does not list (design
+  5.6), so the C10 installer removes `resources\runtime` and `resources\core` itself. A
+  `node.exe` still held by a long-lived process started before the update (an MCP session, a
+  bot run) is moved aside into an `old-<stamp>` folder, as the core already is, and removed by
+  the cleanup at the next install once nothing holds it. That old process keeps working: it is
+  the previous build's code talking to the same files and locks.
+- macOS: the bundle is replaced whole. Linux: the package manager removes what the new package
+  does not ship.
+- Shims and launchers already name `spawnloft-core`, so nothing is rewritten. If C6 finds it
+  cannot reproduce a shim's text exactly, `RUNTIME_FORMAT` goes to 3 and `repair` rewrites them
+  once, as it did for 2.
+
+**Going back.** "Reinstall a previous version" keeps working in both directions because the
+data format is the same; an older hybrid build simply brings its Node back. The manual return
+to 1.x in the release notes is unchanged. This is the reason for rule 4: at no point in the
+port may Rust write a file an older build cannot read.
+
+**Mixed versions at run time.** Daemons survive updates, so an old daemon talks to a new core
+until its server restarts. That is already designed for (the protocol version in `ping`,
+`doctor` naming servers on an older daemon); the port must not change the control protocol.
+
+**What must be checked by hand before any release** (gate G3): 1.5.0 to all-Rust with servers
+running and a scheduled task; a hybrid internal build to all-Rust with an MCP session open; a
+machine with no Node.js at all; the Microsoft accounts still signed in afterwards; a rollback
+each way.
+
+## 8. Platforms
+
+**Windows x64.**
+- Shell-outs become native calls: `taskkill`, `tasklist`, `icacls`, PowerShell process queries.
+  `schtasks` stays as called today.
+- No console window may flash when the window app starts a helper (#232's lesson): every spawn
+  goes through the existing `hide_window` and `no_new_window_flag` helpers.
+- File semantics: rename-over retries (`RENAME_RETRIES`), `EPERM` from antivirus and indexers,
+  held files, case-insensitive names (the #233 class), long paths, CRLF in `.cmd` shims.
+- `console` needs raw console input. Detached daemons must leave the caller's job object as
+  they do now.
+- The core binary grows from about 3 MB to perhaps 8 to 12. It is Authenticode-signed like
+  today; because it is a new, larger signed binary, it goes to Microsoft's analysis submission
+  before a public build (remaining-work plan D5, still owed).
+
+**macOS, Apple Silicon only.**
+- launchd plists are written as text, as Node does; no new crate.
+- Rosetta: old Minecraft versions and Java 8 need x64 natives; the client code's `arch` checks
+  are ported as they are and re-checked on the mini.
+- The Node entitlements file goes, so no binary in the bundle is allowed JIT memory. Signing
+  and notarization of the core are unchanged.
+- No quarantine attribute may be added by our own extraction (design 6, still marked
+  unverified; C3 verifies it).
+
+**Linux, deb and rpm, x64 and arm64.**
+- The core is already a static musl binary, so the CLI package keeps its low floor. Check in C1
+  that name resolution and TLS behave the same under musl on both architectures.
+- systemd user units, `loginctl enable-linger`, the `linux-libs` checks for MariaDB (`ldd`,
+  `ldconfig`) are ported as they are.
+- The desktop package drops its `libstdc++` dependency with the runtime. The CLI package's
+  `bin/node` becomes the compatibility link of 5.2. The EL9 package swap (#234) is re-run.
+- arm64 runs every parity scenario on `ubuntu-24.04-arm`, not only x64.
+
+**All three.** TLS roots stay the bundled `webpki-roots` (Node also used its own bundle, so no
+behaviour change); proxies, retries, redirects and time-outs match Node's; schedule times and
+time zones; non-ASCII file names in archives and paths; JSON key order and number form.
+
+## 9. Gates with Victor's hands
+
+| Gate | After | What |
+| --- | --- | --- |
+| **G1** | C2 and C3 | His own servers on a build where start, stop, console, backups and restores are Rust, for a few days, on Desktop-Main. A bot scenario run against one of them |
+| **G2** | C7 | Microsoft sign-in on Windows, the Mac mini and a Linux VM; launch vanilla, Fabric, Forge, NeoForge and Quilt once each, as in the 2026-11-20 checks |
+| **G3** | C10 | The beta checklist again on the all-Rust build, plus the hand checks of section 7 |
+
+Signed builds for these come from his signing machine as today. Publishing anything stays his
+call and is not part of this plan.
+
+## 10. Risks
+
+| Risk | Answer |
+| --- | --- |
+| Two implementations of one operation disagree while both are live (a backup from the panel is Node, from the CLI is Rust) | The rig compares the data tree, not only the output; archives are cross-read in both directions; the panel moves last so the overlap is short |
+| A lock is missed and both sides write `instances.json` | C0's lock inventory and cross-process test; registry writes in Rust go through one function |
+| The port drifts into redesign | Rule 1; reviews check for behaviour changes; improvements are listed in a follow-up file, not made |
+| C7 is underestimated (it was the freshest and largest Node work) | Split in two threads; loaders have captured real fixtures (`loader-fixtures.yml`) to hold Rust to |
+| Parallel tracks collide in `spawnloft-lib` | C1 fixes the module layout first; one module per Node module; tracks rebase on `v2` daily |
+| The frozen Node side needs a fix mid-port | Rule 2: fix both in one PR |
+| The Tauri window and panel regress in C8 | The window smoke and browser smoke run on every PR; the proxy stays as a fallback route until the last C8 PR |
+| A hybrid build is published and then needs Node security releases | Q1: hold the public beta until C10 |
+
+## 11. Threads (for the coordinator)
+
+All on `v2` through pull requests into `v2`; branch names `v2-port-<topic>`; author and
+committer joogiebear; no attribution anywhere; never commit `.agents/` or `skills-lock.json`.
+Each brief carries this document, the contract fixtures README, and a done-when line. Models
+per Victor's routing: Opus builds, Fable 5.2 reviews the phases marked below, Sonnet for docs.
+
+| Thread | Model | Needs | Done when |
+| --- | --- | --- | --- |
+| **C0** parity rig and contracts | Opus | nothing | The rig runs a scenario on both sides on three platforms in `rust-internal.yml` and fails on a seeded difference; lock inventory and cross-process lock test; fixtures of 3.4; `--json` fixtures for all 48 commands and the MCP tool list; the regex list |
+| **C1** foundation | Opus, Opus review | C0 | The C1 commands answer in Rust with scenarios green on three platforms; the registry is written under the shared lock; the module layout for later phases is in place |
+| **C2** lifecycle and databases | Opus, Opus review | C1 | C2 commands flipped; `handover resume` in-process; the daemon and installer workflows green; G1 can start |
+| **C3** archives, backups, files | Opus, **Fable review** | C2 | C3 commands flipped; fuzz targets; cross-read archive tests both ways; quarantine check on macOS |
+| **C4** creating and updating servers | Opus, Opus review | C2 | C4 commands flipped against the fake download host; a real Paper and a real Fabric server created once on a runner |
+| **C5** plugins and modpacks | Opus, **Fable review** | C4 | C5 commands flipped; hardening cases mapped one to one |
+| **C6** scheduler and maintenance | Opus, **Fable review** | C3, C4 | C6 commands flipped; installer and uninstaller run with no Node present at all; EL9 swap re-run; a real task fires on each platform |
+| **C7a** client: accounts, metadata, install, launch | Opus, **Fable review** | C1, `download` | `client` flipped for vanilla; fake-client lifecycle scenarios green |
+| **C7b** client: loaders | Opus, Opus review | C7a | Five loaders against the captured fixtures; `loader-install.yml` green on the Rust core; G2 can start |
+| **C8** panel API | Opus, **Fable review** | C2 to C7 | Every route family answered in Rust; route replay green; browser and window smokes green; proxy removed |
+| **C9** MCP and bots | Opus, **Fable review** | C2 to C7 | `mcp` and `bot` flipped; JSON-RPC replay green; tool list equal to the fixture |
+| **C10** Node leaves | Opus, **Fable review of `v2` as a whole** | C8, C9 | No Node binary and no core `.mjs` in any package; golden files frozen; installer removal step with a held `node.exe` tested; sizes and timings measured; docs updated (Sonnet); G3 can start |
+
+Start now: **C0**. Then C1, then C2. After C2, three tracks at once: C3 then C6; C4 then C5;
+C7a then C7b. C8 and C9 run side by side at the end.
+
+Owed from before this plan and independent of it: the 1010 build and re-test of #233 and #234 on
+Victor's machines.
+
+## 12. Open questions for Victor
+
+Each has a recommendation; "go with your recommendations" closes all of them.
+
+- **Q1. When is the first public 2.0 beta?** Recommendation: after C10, as the all-Rust build.
+  No public user then ever has a bundled Node, there is one upgrade path to test instead of
+  two, and a Node security release never forces a SpawnLoft release. The cost is that the
+  finished installer, updater and window wait for the port before real users try them. The
+  port keeps `v2` shippable after every merge, so this can be revisited at any gate.
+- **Q2. Feature freeze during the port.** Recommendation: fixes only in the Node core; new
+  features wait until their area is Rust. Launcher and panel page work in the HTML files is not
+  frozen.
+- **Q3. No async runtime in the core** (rule 6). Recommendation: yes, stay on threads and
+  blocking I/O. This reverses the original plan's `tokio` and `axum` line, on the evidence of
+  what the daemon, updater and proxy needed.
+- **Q4. Test players need Node.js installed** once the bundled one is gone (5.4).
+  Recommendation: accept; `bot setup` already needs it for npm.
+- **Q5. Build and test tooling stays JavaScript** (5.5). Recommendation: yes; porting release
+  scripts buys users nothing.
+- **Q6. Java download for servers** (the 2026-11-06 plan, never built). The original plan said
+  to build it once, in Rust. Recommendation: as the first Rust-only feature right after C7,
+  which ports the client's Java download it shares code with; in 2.0 if the beta waits for C10
+  anyway, and it does not block removing Node.
+- **Q7. Three hardware gates** (section 9) instead of one check at the end. Recommendation:
+  yes; G1 in particular puts his own servers on the Rust lifecycle early, where a problem is
+  cheap.
+
+## 13. Facts checked for this plan
+
+- `v2` at c9f1ea1 (#234). `src/*.mjs`: 105 files, 27,645 lines; `mcctl.mjs` 2,499;
+  `bot-host.cjs` 398; pages 21,517. Rust: 21,573 lines (`spawnloft-lib` 16,908, `spawnloft-core`
+  1,907, `spawnloft-shell` 2,652, `spawnloft-fakes` 106).
+- The Node core imports only Node built-ins (`fs`, `net`, `http`, `crypto`, `zlib`,
+  `child_process`, `readline`, `dns`, and a few more); the only npm packages are the bot
+  host's.
+- `mcctl.mjs:2385-2444`: 61 command names for 48 commands. `ui.mjs`: 18 top-level route
+  families and three `text/event-stream` responses (lines 1690, 1953, 2272); the job table at
+  313 to 318. MCP: 30 tools in `mcp-tools.mjs`, 9 in `mcp-client-tools.mjs`.
+- `cli.rs` `forwards`: own commands are `--version`, `--core-help`, `daemon`, `probe-process`,
+  `handover`, `update`, `user-path`, `ui` with a window flag, `repair --quiet`,
+  `uninstall --yes`. `nodecore.rs` is the seam for `resume`, `repair` and `uninstall`.
+- Tests: 140 files, 27,986 lines, about 1,650 `test(` calls; 124 files import `../src/`, 19
+  spawn the CLI entry.
+- Hashes used by Node: sha1, sha256, sha512, md5, HMAC-SHA256, one Ed25519 verify
+  (`client-harness-index.mjs:98`). Compression: raw deflate and inflate, gunzip, crc32.
+- External programs the Node core runs: `java`, `taskkill`, `tasklist`, `schtasks`,
+  `powershell`, `icacls`, `explorer.exe`, `systemctl`, `loginctl`, `launchctl`, `tar`, `ldd`,
+  `ldconfig`, `open`, `xdg-open`, `arch`, `ps`.
+- Seven regex lines in `src/` and `mcctl.mjs` use lookaround or a backreference.
+- The Linux core is built for `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`
+  (`installer-linux.yml`).
+- The server Java download plan of 2026-11-06 was never built: there is no `java-runtime`
+  module in `src/`.
