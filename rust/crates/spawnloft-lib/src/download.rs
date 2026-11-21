@@ -55,7 +55,20 @@ pub(crate) fn agent(
 
 /// Where a fetch is sent: the URL itself, or in a test-hooks build the parity rig's fake host.
 pub(crate) fn target(url: &str) -> Result<String, String> {
-    crate::test_origins::rewrite(url)
+    crate::test_origins::rewrite(&normalized(url))
+}
+
+/// The URL as `fetch` sends it: parsed and serialised by the WHATWG rules (dot segments
+/// resolved, spaces and non-ASCII percent-encoded). Text that does not parse is left as it is,
+/// for the caller's own refusal.
+pub(crate) fn normalized(url: &str) -> String {
+    url::Url::parse(url).map_or_else(|_| url.to_string(), |u| u.to_string())
+}
+
+/// `res.json()`'s text: a UTF-8 byte order mark before the JSON is dropped.
+pub(crate) fn json_text(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// Why a request got no answer, in Node's `err.cause?.message || err.message` place.
@@ -256,7 +269,7 @@ pub fn fetch_json(url: &str, label: &str) -> Result<serde_json::Value, Failure> 
             }
         });
     }
-    crate::jsjson::parse(&String::from_utf8_lossy(&text)).map_err(Failure::syntax)
+    crate::jsjson::parse(&json_text(&text)).map_err(Failure::syntax)
 }
 
 /// `partPath(dest)`: where a download is written until it is whole. One name per attempt: two

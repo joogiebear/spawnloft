@@ -107,11 +107,36 @@
        }
       }
      ]
+    },
+    "GET /v3/projects/paper/versions/1.20.6/builds": {
+     "json": [
+      {
+       "id": 5,
+       "time": "2026-09-01T10:00:00Z",
+       "channel": null,
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.20.6-5.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/y/../a b.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/a%20b.jar}"
+         },
+         "size": 1000
+        }
+       }
+      }
+     ]
     }
    }
   },
   "https://fill-data.papermc.io": {
    "routes": {
+    "GET /v1/objects/a%20b.jar": {
+     "bytes": {
+      "size": 1000,
+      "seed": "spaced"
+     }
+    },
     "GET /v1/objects/16/paper-1.21.4-16.jar": {
      "bytes": {
       "size": 3000,
@@ -176,6 +201,18 @@
      "json": {
       "build": "2399",
       "md5": "00000000000000000000000000000000"
+     }
+    },
+    "GET /v2/purpur/1.21.3": {
+     "text": "﻿{\"builds\":{\"latest\":\"7\",\"all\":[\"7\"]}}"
+    },
+    "GET /v2/purpur/1.21.3/7": {
+     "text": "﻿{\"md5\":\"${md5:https://api.purpurmc.org/v2/purpur/1.21.3/7/download}\"}"
+    },
+    "GET /v2/purpur/1.21.3/7/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-7"
      }
     },
     "GET /v2/purpur/1.21.4/2399/download": {
@@ -1237,6 +1274,51 @@
    ],
    "expect": {
     "code": 1
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds",
+    ".."
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "builds",
+    "1.20.6"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "paper",
+    "fetch",
+    "1.20.6"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "checksum verified"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "pb",
+    "--purpur",
+    "1.21.3",
+    "--java",
+    "{run}/bin/java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "purpur-1.21.3-7.jar"
    }
   },
   {

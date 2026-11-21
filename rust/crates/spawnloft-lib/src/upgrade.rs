@@ -30,7 +30,7 @@ fn label_of(software: &str) -> &'static str {
 
 static JARS: LazyLock<Vec<(&'static str, Regex)>> = LazyLock::new(|| {
     const MC: &str = r"([0-9]+\.[0-9]+(?:\.[0-9]+)?)";
-    let re = |s: &str| Regex::new(&format!("(?i)^{s}$")).expect("jar pattern");
+    let re = |s: &str| Regex::new(&format!("(?i-u)^{s}$")).expect("jar pattern");
     vec![
         ("paper", re(&format!(r"paper-{MC}-([0-9]+)\.jar"))),
         ("folia", re(&format!(r"folia-{MC}-([0-9]+)\.jar"))),
@@ -98,7 +98,7 @@ fn number_value(n: f64) -> Value {
 /// names follow the software's pattern, the two names otherwise.
 pub fn jar_change_words(from: Option<&Value>, to: &str) -> String {
     static PARTS: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)^([a-z]+)-([0-9][A-Za-z0-9_.]*?)-([0-9]+)\.jar$").expect("parts pattern")
+        Regex::new(r"(?i-u)^([a-z]+)-([0-9][A-Za-z0-9_.]*?)-([0-9]+)\.jar$").expect("parts pattern")
     });
     let from_text = jar_text(from);
     let a = PARTS.captures(&from_text);

@@ -57,6 +57,9 @@ enum Net {
     /// the parity rig's origin map refused it (a `test-hooks` build only); Node's `err.message`
     Refused(String),
     Failed(ureq::Error),
+    /// undici's own limits on a request with no time limit of its own: 10 s to connect, 300 s
+    /// for the headers; `fetch failed`, with the limit's name as the cause
+    Quiet(&'static str),
 }
 
 struct Answer {
@@ -78,12 +81,23 @@ impl Answer {
 /// `fetch(url, { headers, signal: AbortSignal.timeout(limit) })`.
 fn get(url: &str, accept: Option<&str>, limit: Option<Duration>) -> Result<Answer, Net> {
     let sent = download::target(url).map_err(Net::Refused)?;
-    let agent = download::agent(|b| b.timeout_global(limit));
+    let agent = download::agent(|b| match limit {
+        Some(_) => b.timeout_global(limit),
+        None => b
+            .timeout_connect(Some(Duration::from_secs(10)))
+            .timeout_recv_response(Some(Duration::from_secs(300))),
+    });
     let mut req = agent.get(&sent).header("User-Agent", download::UA);
     if let Some(a) = accept {
         req = req.header("Accept", a);
     }
-    let res = req.call().map_err(Net::Failed)?;
+    let res = req.call().map_err(|e| match e {
+        ureq::Error::Timeout(ureq::Timeout::Connect) if limit.is_none() => {
+            Net::Quiet("Connect Timeout Error")
+        }
+        ureq::Error::Timeout(_) if limit.is_none() => Net::Quiet("Headers Timeout Error"),
+        e => Net::Failed(e),
+    })?;
     let status = res.status().as_u16();
     let length = res
         .headers()
@@ -107,6 +121,7 @@ fn why(e: &Net) -> String {
         Net::Refused(m) => m.clone(),
         Net::Failed(e) if download::is_timeout(e) => TIMED_OUT.into(),
         Net::Failed(e) => download::cause(e),
+        Net::Quiet(cause) => (*cause).into(),
     }
 }
 
@@ -115,7 +130,7 @@ fn message_only(e: &Net) -> String {
     match e {
         Net::Refused(m) => m.clone(),
         Net::Failed(e) if download::is_timeout(e) => TIMED_OUT.into(),
-        Net::Failed(_) => "fetch failed".into(),
+        Net::Failed(_) | Net::Quiet(_) => "fetch failed".into(),
     }
 }
 
@@ -132,7 +147,7 @@ fn raw(e: &Net) -> Failure {
             message: TIMED_OUT.into(),
             code: None,
         },
-        Net::Failed(_) => Failure::type_error("fetch failed"),
+        Net::Failed(_) | Net::Quiet(_) => Failure::type_error("fetch failed"),
     }
 }
 
@@ -157,7 +172,7 @@ fn body_bytes(a: Answer) -> Result<Vec<u8>, Failure> {
 /// `res.json()`.
 fn body_json(a: Answer) -> Result<Value, Failure> {
     let bytes = body_bytes(a)?;
-    crate::jsjson::parse(&String::from_utf8_lossy(&bytes)).map_err(Failure::syntax)
+    crate::jsjson::parse(&download::json_text(&bytes)).map_err(Failure::syntax)
 }
 
 /// `for (const v of value)` over what an API answered: an array's items, a string's characters;

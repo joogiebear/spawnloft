@@ -383,6 +383,9 @@ jobs:
     timeout-minutes: 30
     env:
       SPAWNLOFT_DATA_ROOT: ${{ github.workspace }}/../sl-real/data
+      # no Node core to forward to: every command here must be answered by the Rust core
+      SPAWNLOFT_CORE_DIR: /nonexistent/spawnloft-core
+      SPAWNLOFT_NODE: /nonexistent/node
       MC: 1.21.4
     steps:
       - uses: actions/checkout@v4

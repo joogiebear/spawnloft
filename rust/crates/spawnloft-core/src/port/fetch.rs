@@ -84,7 +84,11 @@ pub fn paper(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 };
                 rows.push(vec![
                     js::string(Some(&b.build)),
-                    js::string(Some(&b.channel)),
+                    // `String(cell ?? '')`
+                    match &b.channel {
+                        Value::Null => String::new(),
+                        v => js::string(Some(v)),
+                    },
                     utf16_prefix(&time, 10),
                     name,
                 ]);
