@@ -124,6 +124,14 @@
     {
       "path": "fake.zip",
       "text": "PK not really"
+    },
+    {
+      "path": "logs/padded.log.gz",
+      "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "path": "logs/junk.log.gz",
+      "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAABw=="
     }
   ],
   "instance": {
@@ -2967,6 +2975,40 @@
         "first": true,
         "after": false
       }
+    },
+    {
+      "op": "readTail",
+      "args": [
+        "logs/padded.log.gz",
+        {}
+      ],
+      "result": {
+        "path": "logs/padded.log.gz",
+        "size": 546,
+        "modified": "<time>",
+        "text": "one\ntwo\nthree\n",
+        "whole": true,
+        "shown": 14,
+        "of": 14,
+        "packed": true
+      }
+    },
+    {
+      "op": "readTail",
+      "args": [
+        "logs/junk.log.gz",
+        {}
+      ],
+      "result": {
+        "path": "logs/junk.log.gz",
+        "size": 37,
+        "modified": "<time>",
+        "text": "one\ntwo\nthree\n",
+        "whole": true,
+        "shown": 14,
+        "of": 14,
+        "packed": true
+      }
     }
   ],
   "pure": [
@@ -3554,6 +3596,33 @@
         "./x.txt"
       ],
       "result": ".txt"
+    },
+    {
+      "op": "summarizeChange",
+      "args": [
+        "\r",
+        "a: 1\r",
+        3
+      ],
+      "result": "@@ line 1 @@\n- \r\n+ a: 1\r"
+    },
+    {
+      "op": "summarizeChange",
+      "args": [
+        null,
+        "a: 1\n\r",
+        5
+      ],
+      "result": "@@ line 1 @@\n- \n+ a: 1\n+ \r"
+    },
+    {
+      "op": "summarizeChange",
+      "args": [
+        "x\r\ny\r",
+        "x\r\nz\r\n",
+        5
+      ],
+      "result": "@@ line 2 @@\n  x\n- y\r\n+ z\n+ "
     }
   ],
   "activity": [

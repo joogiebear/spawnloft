@@ -781,10 +781,14 @@ pub fn restore_hidden(before: &str, shown_text: &str) -> Result<String, Failure>
 }
 
 /// `text.split(/\r?\n/)`.
+/// `text.split(/\r?\n/)`: a `\r` goes only when a `\n` follows it, so the last line keeps one.
 fn split_lines(text: &str) -> Vec<&str> {
-    text.split('\n')
-        .map(|l| l.strip_suffix('\r').unwrap_or(l))
-        .collect()
+    let mut lines: Vec<&str> = text.split('\n').collect();
+    let last = lines.len() - 1;
+    for l in &mut lines[..last] {
+        *l = l.strip_suffix('\r').unwrap_or(l);
+    }
+    lines
 }
 
 /// `checkFormat(shown, text)`: not a validator; it catches only what stops a config loading at

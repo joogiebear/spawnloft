@@ -123,6 +123,14 @@
   {
    "path": "fake.zip",
    "text": "PK not really"
+  },
+  {
+   "path": "logs/padded.log.gz",
+   "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  {
+   "path": "logs/junk.log.gz",
+   "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAABw=="
   }
  ],
  "instance": {
@@ -1587,6 +1595,20 @@
      "newText": "a: 3"
     }
    ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/padded.log.gz",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/junk.log.gz",
+    {}
+   ]
   }
  ],
  "pure": [
@@ -2088,6 +2110,30 @@
    "op": "extname",
    "args": [
     "./x.txt"
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "\r",
+    "a: 1\r",
+    3
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    null,
+    "a: 1\n\r",
+    5
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "x\r\ny\r",
+    "x\r\nz\r\n",
+    5
    ]
   }
  ]

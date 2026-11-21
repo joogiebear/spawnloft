@@ -194,16 +194,9 @@ pub fn find_world_root(dir: &Path, max_depth: usize) -> Option<PathBuf> {
     None
 }
 
+/// The `finally` that clears an import's unpack folder: best effort.
 fn rm_rf(p: &Path) {
-    match std::fs::symlink_metadata(p) {
-        Ok(m) if m.is_dir() => {
-            let _ = std::fs::remove_dir_all(p);
-        }
-        Ok(_) => {
-            let _ = std::fs::remove_file(p);
-        }
-        Err(_) => {}
-    }
+    let _ = crate::backup::rm_tree(p);
 }
 
 /// What `importWorld` answers.
@@ -479,11 +472,11 @@ pub fn delete_world(layout: &Layout, inst: &Instance, name: &str) -> Result<Dele
         return Err(Failure::user(format!("\"{name}\" is not a world in {dir}")));
     }
     let mut removed = vec![name.to_string()];
-    rm_rf(&join(&dir, &[name]));
+    crate::backup::rm_tree(&join(&dir, &[name]))?;
     for s in DIM_SUFFIXES {
         let companion = join(&dir, &[&format!("{name}{s}")]);
         if companion.exists() {
-            rm_rf(&companion);
+            crate::backup::rm_tree(&companion)?;
             removed.push(format!("{name}{s}"));
         }
     }

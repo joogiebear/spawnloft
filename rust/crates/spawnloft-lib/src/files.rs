@@ -418,25 +418,40 @@ enum TailError {
 
 /// `gunzipTail(full, bytes, max)`: the last `bytes` of what a .gz unpacks to, and how much that is.
 fn gunzip_tail(full: &Path, bytes: usize, max: u64) -> Result<(Vec<u8>, u64), TailError> {
+    use std::io::BufRead;
     let f = std::fs::File::open(full).map_err(|_| TailError::Bad)?;
-    let mut gz = flate2::read::MultiGzDecoder::new(std::io::BufReader::new(f));
+    let mut input = std::io::BufReader::new(f);
     let mut ring: std::collections::VecDeque<u8> = std::collections::VecDeque::with_capacity(bytes);
     let mut total: u64 = 0;
     let mut chunk = vec![0u8; 64 * 1024];
+    // one member after another, as Node's gunzip goes on
     loop {
-        let n = match gz.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(n) => n,
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => return Err(TailError::Bad),
-        };
-        total += n as u64;
-        if total > max {
-            return Err(TailError::TooLarge);
+        let mut gz = flate2::bufread::GzDecoder::new(&mut input);
+        loop {
+            let n = match gz.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => return Err(TailError::Bad),
+            };
+            total += n as u64;
+            if total > max {
+                return Err(TailError::TooLarge);
+            }
+            ring.extend(&chunk[..n]);
+            while ring.len() > bytes {
+                ring.pop_front();
+            }
         }
-        ring.extend(&chunk[..n]);
-        while ring.len() > bytes {
-            ring.pop_front();
+        drop(gz);
+        let rest = input.fill_buf().map_err(|_| TailError::Bad)?;
+        if rest.is_empty() {
+            break;
+        }
+        if rest[0] == 0 {
+            // Node's rule: a zero byte where the next member would start ends the stream, and
+            // whatever follows it is not read
+            break;
         }
     }
     Ok((ring.into_iter().collect(), total))
