@@ -209,6 +209,10 @@ pub const PORTED: &[Row] = &[
         names: &["config"],
         when: When::Always,
     },
+    Row {
+        names: &["worlds"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -668,6 +672,7 @@ mod tests {
             &["prune", "survival"],
             &["verify", "survival", "--all"],
             &["config", "show"],
+            &["worlds", "survival", "list"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),

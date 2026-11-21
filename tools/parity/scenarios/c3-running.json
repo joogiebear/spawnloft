@@ -1,5 +1,5 @@
 {
- "about": "C3's backups against a running server (the JVM stand-in answering RCON) with attached databases: the flush before a snapshot and save-on after it, a flush that fails, a save-on that is not confirmed and a server that goes away, the SQL dump of a running MariaDB stand-in, a stopped database and a Garnet one left out with their reasons, restore refused while the server runs, then a restore that imports the dump, and one that leaves it because the database is stopped.",
+ "about": "C3's backups against a running server (the JVM stand-in answering RCON) with attached databases: the flush before a snapshot and save-on after it, a flush that fails, a save-on that is not confirmed and a server that goes away, the SQL dump of a running MariaDB stand-in, a stopped database and a Garnet one left out with their reasons, restore refused while the server runs, then a restore that imports the dump, and one that leaves it because the database is stopped, and worlds refusing to export, switch or delete while the server runs.",
  "env": {
   "FAKE_JAVA_RCON": "1",
   "FAKE_MARIADB_STABLE_DUMP": "1",
@@ -257,6 +257,51 @@
    ],
    "expect": {
     "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "run1",
+    "export"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "saving into"
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "run1",
+    "use",
+    "world"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is running"
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "run1",
+    "delete",
+    "other",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is running"
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "run1"
+   ],
+   "expect": {
+    "code": 0
    }
   },
   {

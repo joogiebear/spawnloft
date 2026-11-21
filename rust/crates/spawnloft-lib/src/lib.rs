@@ -64,6 +64,7 @@ pub mod time;
 pub mod update;
 pub mod user_path;
 pub mod util;
+pub mod worlds;
 pub mod zip;
 
 /// The JSON library the daemon reads and writes with, for the binary crates.

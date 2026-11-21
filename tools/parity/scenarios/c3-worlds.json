@@ -1,0 +1,618 @@
+{
+ "about": "C3's worlds command: list with dimensions folded in and the active world first, use and its refusals, import from a folder (a wrapped map with a companion), a .tar.gz, a .zip, a zip that reaches outside and archives with no world, names derived and given, export of the active and another world into exports/, and delete with a copy kept and with --no-copy.",
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "\\.mcctl-import-\\d+",
+   "replace": ".mcctl-import-<n>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/srv1/server.properties",
+   "text": "#Minecraft server properties\nlevel-name=world\nmotd=Hi\n"
+  },
+  {
+   "write": "data/instances/srv1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/srv1/world/region/r.0.0.mca",
+   "text": "region"
+  },
+  {
+   "write": "data/instances/srv1/world/session.lock",
+   "text": "lock"
+  },
+  {
+   "write": "data/instances/srv1/world_nether/level.dat",
+   "text": "nether"
+  },
+  {
+   "write": "data/instances/srv1/world_the_end/level.dat",
+   "text": "end"
+  },
+  {
+   "write": "data/instances/srv1/zeta/level.dat",
+   "text": "z"
+  },
+  {
+   "write": "data/instances/srv1/Beta/level.dat",
+   "text": "b"
+  },
+  {
+   "write": "data/instances/srv1/alpha/level.dat",
+   "text": "a"
+  },
+  {
+   "write": "data/instances/srv1/alpha_the_end/level.dat",
+   "text": "ae"
+  },
+  {
+   "write": "data/instances/srv1/lonely_nether/level.dat",
+   "text": "ln"
+  },
+  {
+   "write": "data/instances/srv1/.importing/level.dat",
+   "text": "hidden"
+  },
+  {
+   "write": "data/instances/srv1/plugins/Essentials/config.yml",
+   "text": "a: 1\n"
+  },
+  {
+   "write": "data/instances/srv1/notaworld/readme.txt",
+   "text": "no"
+  },
+  {
+   "mkdir": "data/instances/srv2"
+  },
+  {
+   "write": "maps/Wrapped/Inner/Map/level.dat",
+   "text": "map"
+  },
+  {
+   "write": "maps/Wrapped/Inner/Map/session.lock",
+   "text": "lock"
+  },
+  {
+   "write": "maps/Wrapped/Inner/Map/region/r.0.0.mca",
+   "text": "mr"
+  },
+  {
+   "write": "maps/Wrapped/Inner/Map_nether/level.dat",
+   "text": "mn"
+  },
+  {
+   "write": "maps/Wrapped/Inner/Map_the_end/notes.txt",
+   "text": "not a world"
+  },
+  {
+   "write": "maps/Empty/readme.txt",
+   "text": "nothing"
+  },
+  {
+   "write": "maps/Island Pack.tar.gz",
+   "base64": "H4sIAAAAAAAC/+2YQWrDMBREdRSfwJFk6WtdaBZZFEIuUIQt0hDHAUktPX5Ud1UvAgZLSfE8LySMwYthnr+8t+15w/LCE0brcU1M13EvlJbKGK7G+0SkWaVZAT5DtD69kq2T/U/+h+3L69u2jt8xW/6k1J38zd/8BW+Is4oj/+x4Z7vq4hhYcf93obdDl+0zMNv/Ij1v4P/S+ffuy/V1Z2OG/O/7nyb5CzIK/i/BaYweHoT/u01wIZyuQ91f23PZ/qtJ/6WShP6XYOmswf/tv3fHVP/lx8D5859oSGL+e1D+vubpurS2nP/F1P/a4Pxf5vwPBcL/v/1/H1z8cP4p/K+SLuD/x+S/+G+A+f5vZIPzfxEGKBAAAAAAAAAAVsENTmKsoAAoAAA="
+  },
+  {
+   "write": "maps/noworld.tgz",
+   "base64": "H4sIAAAAAAAC/+3RMQ6AIAxA0R7FEyhokfOweACBxOPbsOnghonxvw4lLB1+LnXbJunKmRhC2+a+29trmDVGp+0/+mWVIcgLai5pt5PyT7n1T2M5Stf+q+pDf3/t722sv6N/d0kAAAAAAAAAAAAAAAAAfNUJnB3OLwAoAAA="
+  },
+  {
+   "write": "maps/Sky.ZIP",
+   "base64": "UEsDBBQAAAAAAAAAIVjvdCYGAwAAAAMAAAANAAAAU2t5L2xldmVsLmRhdHNreVBLAwQUAAAAAAAAACFYgxbcjAEAAAABAAAADgAAAFNreS9kYXRhL3guZGF0eFBLAwQUAAAAAAAAACFYsTP8AAMAAAADAAAAFQAAAFNreV90aGVfZW5kL2xldmVsLmRhdGVuZFBLAQIUAxQAAAAAAAAAIVjvdCYGAwAAAAMAAAANAAAAAAAAAAAAAACkAQAAAABTa3kvbGV2ZWwuZGF0UEsBAhQDFAAAAAAAAAAhWIMW3IwBAAAAAQAAAA4AAAAAAAAAAAAAAKQBLgAAAFNreS9kYXRhL3guZGF0UEsBAhQDFAAAAAAAAAAhWLEz/AADAAAAAwAAABUAAAAAAAAAAAAAAKQBWwAAAFNreV90aGVfZW5kL2xldmVsLmRhdFBLBQYAAAAAAwADALoAAACRAAAAAAA="
+  },
+  {
+   "write": "maps/evil.zip",
+   "base64": "UEsDBBQAAAAAAAAAIVhaetrvAQAAAAEAAAARAAAALi4vZXZpbC9sZXZlbC5kYXRlUEsBAhQDFAAAAAAAAAAhWFp62u8BAAAAAQAAABEAAAAAAAAAAAAAAIABAAAAAC4uL2V2aWwvbGV2ZWwuZGF0UEsFBgAAAAABAAEAPwAAADAAAAAAAA=="
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47971
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47972
+     },
+     "srv3": {
+      "dir": "{data}/instances/srv3",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47973
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "worlds"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "bad name"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv2"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv3"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "frobnicate"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    "a/b"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    ".."
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    "notaworld"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    "missing"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    "zeta"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "use",
+    "world"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/none-here"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Empty",
+    "--as",
+    "empty"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "bad name"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "world"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Wrapped",
+    "--as",
+    "Copied"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Island Pack.tar.gz"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/noworld.tgz",
+    "--as",
+    "nw"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/Sky.ZIP"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "import",
+    "{run}/maps/evil.zip",
+    "--as",
+    "evil"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "export"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "export",
+    "alpha"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "export",
+    "notaworld"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "export",
+    "../x"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv2",
+    "export"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "alpha"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "world",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "notaworld",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "a\\b",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "alpha",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1",
+    "delete",
+    "Beta",
+    "--yes",
+    "--no-copy"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "worlds",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

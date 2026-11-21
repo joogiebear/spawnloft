@@ -189,6 +189,58 @@ pub fn readdir_names(dir: &Path) -> std::io::Result<Vec<String>> {
     Ok(names)
 }
 
+/// `fs.readdirSync(dir, { withFileTypes: true })` in its order (see [`readdir_names`]): each name
+/// with its type, links not followed.
+pub fn readdir_typed(dir: &Path) -> std::io::Result<Vec<(String, std::fs::FileType)>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        out.push((
+            entry.file_name().to_string_lossy().into_owned(),
+            entry.file_type()?,
+        ));
+    }
+    if cfg!(unix) {
+        out.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    }
+    Ok(out)
+}
+
+/// `fs.cpSync(src, dest, { recursive: true })` into a `dest` that is not there yet: folders made,
+/// files copied with their mode, links made again pointing where they pointed (a relative target
+/// made absolute against the link's folder, as `verbatimSymlinks: false` does).
+pub fn copy_tree(src: &Path, dest: &Path) -> Result<(), crate::failure::Failure> {
+    use crate::failure::Failure;
+    let meta = std::fs::symlink_metadata(src).map_err(|e| Failure::io(&e, "lstat", Some(src)))?;
+    if meta.file_type().is_symlink() {
+        let target = std::fs::read_link(src).map_err(|e| Failure::io(&e, "readlink", Some(src)))?;
+        let target = if target.is_absolute() {
+            target
+        } else {
+            src.parent().unwrap_or(Path::new(".")).join(target)
+        };
+        #[cfg(unix)]
+        let made = std::os::unix::fs::symlink(&target, dest);
+        #[cfg(windows)]
+        let made = if std::fs::metadata(&target).is_ok_and(|m| m.is_dir()) {
+            std::os::windows::fs::symlink_dir(&target, dest)
+        } else {
+            std::os::windows::fs::symlink_file(&target, dest)
+        };
+        return made.map_err(|e| Failure::io(&e, "symlink", Some(dest)));
+    }
+    if meta.is_dir() {
+        std::fs::create_dir(dest).map_err(|e| Failure::io(&e, "mkdir", Some(dest)))?;
+        for (name, _) in readdir_typed(src).map_err(|e| Failure::io(&e, "opendir", Some(src)))? {
+            copy_tree(&src.join(&name), &dest.join(&name))?;
+        }
+        return Ok(());
+    }
+    std::fs::copy(src, dest)
+        .map(|_| ())
+        .map_err(|e| Failure::io(&e, "copyfile", Some(src)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
