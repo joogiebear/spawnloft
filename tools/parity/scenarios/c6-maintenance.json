@@ -1,0 +1,347 @@
+{
+ "about": "C6's installer and uninstaller commands: `repair` (text and --json, its refusals) rewriting task shims and server launchers and recording run/runtime.json, and `uninstall` (its refusal without --yes; with --yes a running server stopped and every task removed through the fake scheduler; with --data what SpawnLoft made deleted: its own servers but not an adopted one, jars, templates, run, tasks, the registry, both settings files and the 1.x desktop folder, and from a chosen backups folder only the files SpawnLoft provably wrote, folders removed only when that empties them).",
+ "env": {
+  "FAKE_JAVA_RCON": "1"
+ },
+ "ignore": [
+  "data/run/live/**",
+  "data/instances/live/logs/**"
+ ],
+ "normalize": [
+  {
+   "pattern": "\"runtime\":\"[^\"]*\"",
+   "replace": "\"runtime\":\"<exe>\""
+  },
+  {
+   "pattern": "server\\(s\\) for [^\\n]+\\.$",
+   "flags": "gm",
+   "replace": "server(s) for <exe>."
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/alpha/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/alpha/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/alpha/server.properties",
+   "text": "motd=alpha\nserver-port=47881\nenable-rcon=true\nrcon.port=47891\nrcon.password=test\n"
+  },
+  {
+   "write": "data/instances/alpha/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances/live/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/live/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/live/server.properties",
+   "text": "motd=live\nserver-port=47882\nenable-rcon=true\nrcon.port=47892\nrcon.password=test\n"
+  },
+  {
+   "write": "data/instances/live/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "elsewhere/kept/server.jar",
+   "text": ""
+  },
+  {
+   "write": "elsewhere/kept/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "alpha": {
+      "dir": "{data}/instances/alpha",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47881,
+      "rcon": {
+       "port": 47891,
+       "password": "test"
+      }
+     },
+     "live": {
+      "dir": "{data}/instances/live",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47882,
+      "rcon": {
+       "port": 47892,
+       "password": "test"
+      },
+      "java": "{repo}/test/fixtures/fake-java.mjs"
+     },
+     "kept": {
+      "dir": "{run}/elsewhere/kept",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47883,
+      "rcon": {
+       "port": 47893,
+       "password": "test"
+      },
+      "origin": {
+       "adopted": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "write": "data/jars/paper-1.21.jar",
+   "text": "jar"
+  },
+  {
+   "write": "data/templates/basic/server.properties",
+   "text": "motd=t\n"
+  },
+  {
+   "write": "home/.config/spawnloft/settings.json",
+   "json": {
+    "backupsDir": "{run}/mybackups"
+   }
+  },
+  {
+   "write": "home/AppData/Roaming/spawnloft/settings.json",
+   "json": {
+    "backupsDir": "{run}/mybackups"
+   }
+  },
+  {
+   "write": "home/.config/mcctl/settings.json",
+   "json": {}
+  },
+  {
+   "write": "home/AppData/Roaming/mcctl/settings.json",
+   "json": {}
+  },
+  {
+   "write": "home/.config/mcctl-desktop/window-state.json",
+   "json": {
+    "x": 1
+   }
+  },
+  {
+   "write": "home/AppData/Roaming/mcctl-desktop/window-state.json",
+   "json": {
+    "x": 1
+   }
+  },
+  {
+   "write": "home/.config/OtherApp/window-state.json",
+   "json": {
+    "x": 1
+   }
+  },
+  {
+   "write": "mybackups/alpha/standard_2026-11-01_100000.tar.gz",
+   "text": "t"
+  },
+  {
+   "write": "mybackups/alpha/standard_2026-11-01_100000.json",
+   "json": {
+    "instance": "alpha"
+   }
+  },
+  {
+   "write": "mybackups/alpha/.snapshot.lock",
+   "text": ""
+  },
+  {
+   "write": "mybackups/alpha/standard_2026-11-02_100000.tar.gz.pending",
+   "text": ""
+  },
+  {
+   "write": "mybackups/alpha/notes.txt",
+   "text": "mine"
+  },
+  {
+   "write": "mybackups/alpha/exports/alpha_2026-11-01_100000.zip",
+   "text": "z"
+  },
+  {
+   "write": "mybackups/alpha/exports/alpha_2026-11-01_100000_2.LOG",
+   "text": "z"
+  },
+  {
+   "write": "mybackups/alpha/exports/keep.zip",
+   "text": "z"
+  },
+  {
+   "write": "mybackups/stranger/old.tar.gz",
+   "text": "t"
+  },
+  {
+   "write": "mybackups/stranger/old.json",
+   "json": {
+    "instance": "Stranger"
+   }
+  },
+  {
+   "write": "mybackups/stranger/standard_2026-11-01_100000.tar.gz",
+   "text": "t"
+  },
+  {
+   "write": "mybackups/stranger/.snapshot.lock",
+   "text": ""
+  },
+  {
+   "write": "mybackups/mydb/mydb_2026-11-01_100000.sql",
+   "text": "s"
+  },
+  {
+   "write": "mybackups/mydb/mydb_2026-11-01_100000.json",
+   "json": {
+    "database": "mydb"
+   }
+  },
+  {
+   "write": "mybackups/client/client_2026-11-01_100000.tar.gz",
+   "text": "t"
+  },
+  {
+   "write": "mybackups/loose.tar.gz",
+   "text": "t"
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "repair"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Rewrote 1 task shim(s) and the launchers of 3 server(s)"
+   }
+  },
+  {
+   "run": [
+    "repair",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "repair",
+    "extra"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "repair",
+    "--bogus"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "uninstall"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "uninstall",
+    "--data"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "start",
+    "live"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 60000
+  },
+  {
+   "run": [
+    "uninstall",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Stopped: live"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "status",
+    "live"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "05:00"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "uninstall",
+    "--yes",
+    "--data"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Deleted"
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

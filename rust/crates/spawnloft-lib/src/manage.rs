@@ -42,7 +42,9 @@ pub fn rm_rf(target: &Path) -> Result<(), Failure> {
                 Err(e)
             }
         }),
-        Err(_) => return Ok(()),
+        // only a missing path is nothing to do; rmSync's lstat throws for anything else
+        Err(e) if jspath::is_enoent(&e) => return Ok(()),
+        Err(e) => return Err(Failure::io(&e, "lstat", Some(target))),
     };
     match res {
         Err(e) if !jspath::is_enoent(&e) => Err(Failure::io(&e, "rm", Some(target))),

@@ -689,3 +689,106 @@ mod user_name_tests {
         assert!(!name.is_empty());
     }
 }
+
+/// `fs.statSync(p).dev`: the device a path is on (links followed).
+pub fn device_of(p: &std::path::Path) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(p).ok().map(|m| m.dev())
+}
+
+/// A folder's access and modified times set (`fs.utimes` on a folder).
+pub fn set_dir_times(dir: &std::path::Path, times: std::fs::FileTimes) -> std::io::Result<()> {
+    std::fs::File::open(dir)?.set_times(times)
+}
+
+/// `fs.statfsSync(p)`: `bavail * bsize`, the bytes this user may still write there.
+pub fn free_bytes(p: &std::path::Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(p.as_os_str().as_bytes()).ok()?;
+    free_bytes_c(&c)
+}
+
+// the layout below is the one these three share; others differ
+#[cfg(all(
+    target_os = "linux",
+    any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")
+))]
+fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
+    // `struct statfs` on 64-bit Linux, glibc and musl alike
+    #[repr(C)]
+    struct StatFs {
+        f_type: i64,
+        f_bsize: i64,
+        f_blocks: u64,
+        f_bfree: u64,
+        f_bavail: u64,
+        f_files: u64,
+        f_ffree: u64,
+        f_fsid: [i32; 2],
+        f_namelen: i64,
+        f_frsize: i64,
+        f_flags: i64,
+        f_spare: [i64; 4],
+    }
+    unsafe extern "C" {
+        fn statfs(path: *const std::ffi::c_char, buf: *mut StatFs) -> i32;
+    }
+    let mut s = std::mem::MaybeUninit::<StatFs>::zeroed();
+    // SAFETY: a NUL-terminated path and a buffer of the struct the call fills
+    let s = unsafe {
+        if statfs(c.as_ptr(), s.as_mut_ptr()) != 0 {
+            return None;
+        }
+        s.assume_init()
+    };
+    Some(s.f_bavail.saturating_mul(u64::try_from(s.f_bsize).ok()?))
+}
+
+// the 64-bit-inode layout, which plain `statfs` binds on Apple Silicon only
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn free_bytes_c(c: &std::ffi::CStr) -> Option<u64> {
+    // `struct statfs` with 64-bit inodes, the only layout on Apple silicon
+    #[repr(C)]
+    struct StatFs {
+        f_bsize: u32,
+        f_iosize: i32,
+        f_blocks: u64,
+        f_bfree: u64,
+        f_bavail: u64,
+        f_files: u64,
+        f_ffree: u64,
+        f_fsid: [i32; 2],
+        f_owner: u32,
+        f_type: u32,
+        f_flags: u32,
+        f_fssubtype: u32,
+        f_fstypename: [std::ffi::c_char; 16],
+        f_mntonname: [std::ffi::c_char; 1024],
+        f_mntfromname: [std::ffi::c_char; 1024],
+        f_flags_ext: u32,
+        f_reserved: [u32; 7],
+    }
+    unsafe extern "C" {
+        fn statfs(path: *const std::ffi::c_char, buf: *mut StatFs) -> i32;
+    }
+    let mut s = std::mem::MaybeUninit::<StatFs>::zeroed();
+    // SAFETY: a NUL-terminated path and a buffer of the struct the call fills
+    let s = unsafe {
+        if statfs(c.as_ptr(), s.as_mut_ptr()) != 0 {
+            return None;
+        }
+        s.assume_init()
+    };
+    Some(s.f_bavail.saturating_mul(u64::from(s.f_bsize)))
+}
+
+#[cfg(not(any(
+    all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "riscv64")
+    ),
+    all(target_os = "macos", target_arch = "aarch64")
+)))]
+fn free_bytes_c(_c: &std::ffi::CStr) -> Option<u64> {
+    None
+}
