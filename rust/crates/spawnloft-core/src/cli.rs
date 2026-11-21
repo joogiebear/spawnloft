@@ -216,7 +216,6 @@ pub const PORTED: &[Row] = &[
         names: &["worlds"],
         when: When::Always,
     },
-<<<<<<< HEAD
     // C4: making servers and fetching their software. `new --modpack` is C5's
     Row {
         names: &["new"],
@@ -229,24 +228,6 @@ pub const PORTED: &[Row] = &[
     Row {
         names: &["upgrade"],
         when: When::Always,
-=======
-    // C4: making servers. `new` with a software flag fetches or builds its jar (C4 part 2);
-    // `new --modpack` is C5's
-    Row {
-        names: &["new"],
-        when: When::NoneTruthy(&[
-            "modpack",
-            "paper",
-            "folia",
-            "purpur",
-            "asp",
-            "vanilla",
-            "spigot",
-            "craftbukkit",
-            "fabric",
-            "neoforge",
-        ]),
->>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
     },
     Row {
         names: &["clone"],
@@ -692,11 +673,7 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
     fn new_is_answered_here_unless_it_installs_a_modpack() {
-=======
-    fn new_is_answered_here_unless_it_fetches_a_jar_or_a_modpack() {
->>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
         for line in [
             &["new", "a", "--jar", "x.jar"][..],
             &["new", "a", "--template", "t"],
@@ -704,7 +681,6 @@ mod tests {
             &["new", "a", "--modpack="],
             &["new", "a", "--no-paper", "--jar", "x.jar"],
             &["new", "a", "--", "--paper", "1.21"],
-<<<<<<< HEAD
             &["new", "a", "--paper", "1.21.4"],
             &["new", "a", "--paper"],
             &["new", "a", "--neoforge=21.1"],
@@ -713,8 +689,6 @@ mod tests {
             &["new", "a", "--no-modpack", "--paper", "1.21"],
             &["paper", "fetch", "1.21.4"],
             &["upgrade", "a", "--check"],
-=======
->>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
             &["clone", "a", "b"],
             &["adopt", "a", "/x"],
             &["templates"],
@@ -731,15 +705,7 @@ mod tests {
         for line in [
             &["new", "a", "--modpack", "pack.mrpack"][..],
             &["new", "a", "--modpack=x"],
-<<<<<<< HEAD
             &["new", "a", "--paper", "1.21", "--modpack", "x"],
-=======
-            &["new", "a", "--paper", "1.21.4"],
-            &["new", "a", "--paper"],
-            &["new", "a", "--neoforge=21.1"],
-            &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
-            &["new", "a", "--spigot", "1.21"],
->>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
         ] {
             assert!(
                 forwards_with(&os(line), false, PORTED),

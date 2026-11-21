@@ -182,10 +182,6 @@ pub fn list_jars(jars_dir: &str) -> Result<Vec<StoredJar>, Failure> {
                 .ok()
                 .map(|t| match t.duration_since(std::time::UNIX_EPOCH) {
                     Ok(d) => (d.as_micros() / 1000) as f64,
-<<<<<<< HEAD
-                    // before 1970: Node's mtimeMs is negative
-                    Err(e) => -((e.duration().as_micros() as f64 / 1000.0).ceil()),
-=======
                     // before 1970: Node's mtimeMs is negative, except on Windows, where libuv
                     // hands the whole seconds over as an unsigned 32-bit number (a jar from
                     // 1969-12-31 lists as 2106-02-07)
@@ -198,7 +194,6 @@ pub fn list_jars(jars_dir: &str) -> Result<Vec<StoredJar>, Failure> {
                             ms
                         }
                     }
->>>>>>> 7cf3c1a08dc671921c8ebf061f79065d370a84de
                 })
                 .unwrap_or(0.0);
             out.push(StoredJar {
