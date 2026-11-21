@@ -76,6 +76,8 @@ a scratch folder.
   `bytes: {size, seed}` or `file`. It can also set `status`, `headers`, `redirect` and
   `delayMs`. A `redirect` must point at a faked origin (or a path on this one): one to anywhere
   else is answered with a 500 and logged, since the client would follow it to the network.
+  A route can be `{ "sequence": [route, ...] }` instead: the n-th request gets the n-th answer,
+  and the last one once they run out; the count starts over for each side.
   `${sha256:<url>}` (also sha1, sha512, md5 and size) fills in another route's checksum. Every
   request is logged and the two sides' logs are compared, sorted, so two cores that ask in a
   different order but for the same things agree: method, path and query, user agent, accept, the
@@ -140,6 +142,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c7-client-versions` | `client versions`, `new` and `set` over faked Mojang, Fabric, Quilt, Forge and NeoForge lists: the table and its filters, versions on disk, each loader's refusals, near ids for a typo, every field check of a new profile, `set`'s value rules and its re-check when the version or loader changes, and the cache each list leaves |
 | `c7-client-versions-offline` | the same with no list reachable: downloaded versions only, with a note and `?` for every loader, `new` from a version on disk, a stale cached list used when the network fails, and damaged cached lists |
 | `c7-client-harness-index` | `client versions` with the signed harness list's refresh on and GitHub faked: a malformed signature, an unsigned cached copy dropped with its reason, the hour's wait after a failure, and a status file holding null (exit 1 on both sides) |
+| `c7-client-login` | `client login`: the Microsoft device code and the Xbox Live, XSTS and Minecraft chain after it, over fakes answering in turn (a route's `sequence`): every refusal and hiccup sentence, `SPAWNLOFT_MSA_CLIENT_ID`, the stale same-name entry a fresh sign-in replaces, and accounts lists that are not arrays |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

@@ -10,7 +10,9 @@
 // filler, for a jar or an archive whose content does not matter) or `file` (relative to the
 // scenario), plus optional `status`, `headers`, `redirect` (a path, or a URL on a faked origin;
 // any other target is refused with a 500, since the client would follow it to the network)
-// and `delayMs`. A route key may carry a query (`GET /x?y=1`); it is tried before the bare path.
+// and `delayMs`. A route may instead be `{ "sequence": [route, ...] }`: the n-th request to it
+// gets the n-th answer, the last one again once they run out (a sign-in that polls until the
+// person has entered the code); the count starts over for each side. A route key may carry a query (`GET /x?y=1`); it is tried before the bare path.
 // Strings in `json`, `text` and `headers` may name another route's body as `${sha1:<url>}`,
 // `${sha256:<url>}`, `${sha512:<url>}`, `${md5:<url>}` or `${size:<url>}`, so a metadata answer can
 // carry the checksum of the file it points at. A request no route answers gets a 404 and is
@@ -79,6 +81,15 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
     if (location.startsWith('/')) return map[origin] + location
     throw new Error(`fake host: ${origin} redirects to ${location}, which is not a faked origin`)
   }
+  // how many requests each sequence route has answered on this side
+  const counts = new Map()
+  const pick = (origin, key, route) => {
+    if (!route?.sequence) return route
+    const id = `${origin} ${key}`
+    const n = counts.get(id) ?? 0
+    counts.set(id, n + 1)
+    return route.sequence[Math.min(n, route.sequence.length - 1)]
+  }
   origins.forEach((origin, i) => {
     const routes = hosts[origin].routes ?? {}
     servers[i].on('request', (req, res) => {
@@ -86,7 +97,8 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
       req.on('data', c => chunks.push(c))
       req.on('end', () => {
         const pathname = req.url.split('?')[0]
-        const route = routes[`${req.method} ${req.url}`] ?? routes[`${req.method} ${pathname}`]
+        const key = routes[`${req.method} ${req.url}`] ? `${req.method} ${req.url}` : `${req.method} ${pathname}`
+        const route = pick(origin, key, routes[key])
         const sent = Buffer.concat(chunks)
         log.push({ origin, method: req.method, url: req.url, userAgent: req.headers['user-agent'] ?? null,
           accept: req.headers.accept ?? null, bodyBytes: sent.length,
@@ -131,7 +143,7 @@ export async function startHosts(hosts = {}, { baseDir = '.' } = {}) {
     map,
     env: origins.length ? JSON.stringify(map) : null,
     // what was asked since the last take, and a fresh log for the next side
-    take() { return log.splice(0) },
+    take() { counts.clear(); return log.splice(0) },
     async close() {
       await Promise.all(servers.map(s => new Promise(r => { s.closeAllConnections?.(); s.close(r) })))
     },

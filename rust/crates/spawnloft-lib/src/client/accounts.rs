@@ -163,6 +163,24 @@ pub fn update(
     Ok(next)
 }
 
+/// `updateAccounts(change)` for a `change` that walks the list with `for...of`: a list that is
+/// text is walked character by character, and anything else that is not an array throws.
+pub fn update_iterating(
+    paths: &Paths,
+    change: impl FnOnce(Vec<Value>) -> Result<Vec<Value>, Failure>,
+) -> Result<Vec<Value>, Failure> {
+    let data = read_json(&paths.accounts_file())?;
+    let list = match prop(data.as_ref(), "accounts") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::Array(items)) => items.clone(),
+        Some(Value::String(s)) => s.chars().map(|c| json!(c.to_string())).collect(),
+        Some(_) => return Err(Failure::type_error("list is not iterable")),
+    };
+    let next = change(list)?;
+    save(paths, &next)?;
+    Ok(next)
+}
+
 /// `removeAccount(uuid)`: by uuid, whatever else changed meanwhile. The removed entry, without
 /// tokens, or `None`.
 pub fn remove(paths: &Paths, uuid: Option<&Value>) -> Result<Option<Value>, Failure> {

@@ -5,8 +5,10 @@
 //! played.json, server-list.json, client.log, launch.lock) and the game folders themselves.
 
 pub mod accounts;
+pub mod auth;
 pub mod harness;
 pub mod harness_index;
+pub mod http;
 pub mod loaders;
 pub mod log;
 pub mod meta;

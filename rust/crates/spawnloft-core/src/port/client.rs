@@ -5,7 +5,7 @@
 use serde_json::{Value, json};
 
 use spawnloft_lib::client::paths::Paths;
-use spawnloft_lib::client::{accounts, log, meta, profiles, prop, state, versions};
+use spawnloft_lib::client::{accounts, auth, http, log, meta, profiles, prop, state, versions};
 use spawnloft_lib::failure::Failure;
 use spawnloft_lib::js;
 
@@ -188,6 +188,64 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 for l in lines {
                     ctx.out.line(&l);
                 }
+            }
+            Ok(())
+        }
+        Some("login") => {
+            check_flags(ctx.args, &["json"])?;
+            if !rest.is_empty() {
+                return Err(usage());
+            }
+            // Ctrl-C ends the wait at once (the code stays valid on Microsoft's side until it
+            // expires, but nothing here polls for it any more). SIGTERM ends the process as it
+            // ends Node's, which listens for SIGINT only.
+            spawnloft_lib::platform::watch_interrupts();
+            let mut sleep = |d: std::time::Duration| {
+                let end = std::time::Instant::now() + d;
+                loop {
+                    match spawnloft_lib::platform::interrupted() {
+                        Some(130) => return true,
+                        Some(code) => std::process::exit(i32::from(code)),
+                        None => {}
+                    }
+                    let left = end.saturating_duration_since(std::time::Instant::now());
+                    if left.is_zero() {
+                        return false;
+                    }
+                    std::thread::sleep(left.min(std::time::Duration::from_millis(50)));
+                }
+            };
+            let now = || spawnloft_lib::time::now_ms() as f64;
+            let chain = auth::Chain {
+                send: &http::send,
+                now: &now,
+                timeout: None,
+            };
+            let account = {
+                let out = &mut ctx.out;
+                auth::device_code_login(
+                    chain,
+                    // on stderr, so --json keeps stdout for the one envelope
+                    &mut |code| out.err(&code.prompt()),
+                    &mut sleep,
+                )?
+            };
+            // re-read and upsert by uuid: a sign-in from the launcher meanwhile survives this one
+            accounts::update_iterating(&paths, |list| accounts::upsert(list, account.clone(), None))?;
+            let name = js::string(account.get("name"));
+            if quiet {
+                emit(
+                    ctx,
+                    json!({ "account": {
+                        "type": account.get("type").cloned(),
+                        "name": account.get("name").cloned(),
+                        "uuid": account.get("uuid").cloned(),
+                    } }),
+                );
+            } else {
+                ctx.out.line(&format!(
+                    "Signed in as {name}. Use it: spawnloft client launch <profile> --account {name}, or spawnloft client set <profile> account={name}"
+                ));
             }
             Ok(())
         }
