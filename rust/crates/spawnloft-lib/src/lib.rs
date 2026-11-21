@@ -35,6 +35,7 @@ pub mod jsregex;
 pub mod linux_libs;
 pub mod lock;
 pub mod log_timeline;
+pub mod manage;
 pub mod mariadb;
 pub mod metrics;
 pub mod mysql;

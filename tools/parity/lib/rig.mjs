@@ -133,6 +133,11 @@ function applySetup(step, ctx, baseDir) {
       const at = new Date(step.mtime)
       fs.utimesSync(file, at, at)
     }
+  } else if (step.hardlink !== undefined) {
+    // a second name for an existing file: `{ "hardlink": "new/name", "to": "existing/file" }`
+    const file = target(step.hardlink)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.linkSync(target(step.to), file)
   } else if (step.remove !== undefined) {
     fs.rmSync(target(step.remove), { recursive: true, force: true })
   } else {

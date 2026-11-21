@@ -1,0 +1,22 @@
+{
+ "about": "C4 against a running server (the JVM stand-in): rebuild is refused while it runs and works once it stopped, and a template and a clone can still be made from it (the Node core does not ask the server to stop for those).",
+ "env": { "FAKE_JAVA_RCON": "1" },
+ "ignore": ["data/run/run1/**", "data/instances/run1/logs/**", "data/instances/cl1/logs/**", "data/templates/tp1/logs/**"],
+ "normalize": [
+  { "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{20}\\b", "replace": "<password>" },
+  { "pattern": "\\(build [^)]*\\)", "replace": "(build)" }
+ ],
+ "steps": [
+  { "write": "data/instances/run1/server.jar", "text": "" },
+  { "write": "data/instances/run1/eula.txt", "text": "eula=true\n" },
+  { "write": "data/instances/run1/server.properties", "text": "motd=Run\nserver-port=47781\nenable-rcon=true\nrcon.port=47791\nrcon.password=test\n" },
+  { "write": "data/instances/run1/world/level.dat", "text": "w" },
+  { "write": "data/instances.json", "json": { "version": 1, "instances": { "run1": { "dir": "{data}/instances/run1", "jar": "server.jar", "java": "{repo}/test/fixtures/fake-java.mjs", "memory": "1G", "port": 47781, "rcon": { "port": 47791, "password": "test" } } } } },
+  { "run": ["start", "run1"], "expect": { "code": 0 }, "golden": false },
+  { "run": ["rebuild", "run1", "--yes"], "expect": { "code": 1, "stderrIncludes": "is running" } },
+  { "run": ["templates", "save", "run1", "tp1"], "expect": { "code": 0 } },
+  { "run": ["clone", "run1", "cl1", "--port", "47782"], "expect": { "code": 0 } },
+  { "run": ["stop", "run1"], "expect": { "code": 0 }, "golden": false },
+  { "run": ["rebuild", "run1", "--yes", "--no-snapshot"], "expect": { "code": 0, "stdoutIncludes": "world" } }
+ ]
+}
