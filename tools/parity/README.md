@@ -135,6 +135,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c7-client-edges` | damaged accounts files for those subcommands: `accounts` that is not a list, null and nameless entries, an empty default account, a world-readable file that `logout` rewrites owner-only, and `-n 0x2` and an empty `--n=` |
 | `c7-client-versions` | `client versions`, `new` and `set` over faked Mojang, Fabric, Quilt, Forge and NeoForge lists: the table and its filters, versions on disk, each loader's refusals, near ids for a typo, every field check of a new profile, `set`'s value rules and its re-check when the version or loader changes, and the cache each list leaves |
 | `c7-client-versions-offline` | the same with no list reachable: downloaded versions only, with a note and `?` for every loader, `new` from a version on disk, a stale cached list used when the network fails, and damaged cached lists |
+| `c7-client-harness-index` | `client versions` with the signed harness list's refresh on and GitHub faked: a malformed signature, an unsigned cached copy dropped with its reason, the hour's wait after a failure, and a status file holding null (exit 1 on both sides) |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

@@ -535,9 +535,14 @@ fn failure_code(e: &Failure) -> Option<&str> {
 /// a day (an hour after a failed try), or now with `force` (at most once a minute). Never fails:
 /// the outcome goes to the status file and is returned. `fetch` is a test's own; without one,
 /// `SPAWNLOFT_HARNESS_INDEX_FETCH=off` turns the refresh off.
-pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn() -> f64) -> &'static str {
+pub fn refresh(
+    o: Opts<'_>,
+    force: bool,
+    fetch: Option<Fetch<'_>>,
+    now: &dyn Fn() -> f64,
+) -> Result<&'static str, Failure> {
     if fetch.is_none() && std::env::var("SPAWNLOFT_HARNESS_INDEX_FETCH").as_deref() == Ok("off") {
-        return "off";
+        return Ok("off");
     }
     let fetch: Fetch<'_> = fetch.unwrap_or(&default_fetch);
     let dir = o.cache_dir;
@@ -546,9 +551,15 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
     let fetched_at = read_json_file(&file(dir, "harness-index.json.fetched-at"))
         .map_or(f64::NAN, |v| js::number(Some(&v)));
     if !force {
+        // `old.outcome` on a status file that holds null throws, as Node's does
+        if old.is_some_and(Value::is_null) {
+            return Err(Failure::type_error(
+                "Cannot read properties of null (reading 'outcome')",
+            ));
+        }
         index_rows(o);
         if fetched_at.is_finite() && now() - fetched_at < FRESH_MS && loaded_get(dir).flatten().is_some() {
-            return "fresh";
+            return Ok("fresh");
         }
         let outcome = prop(old, "outcome");
         let failed = js::truthy(outcome)
@@ -556,7 +567,7 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
         let last = js::number(prop(old, "lastCheck"));
         let last = if last.is_nan() { 0.0 } else { last };
         if failed && now() - last < RETRY_AFTER_FAILURE_MS {
-            return "recently-failed";
+            return Ok("recently-failed");
         }
     }
     let tried = LAST_TRIED
@@ -565,7 +576,7 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
         .and_then(|m| m.as_ref().and_then(|m| m.get(dir).copied()))
         .unwrap_or(f64::NEG_INFINITY);
     if now() - tried < FORCE_GUARD_MS {
-        return "recently-tried";
+        return Ok("recently-tried");
     }
     if let Ok(mut m) = LAST_TRIED.lock() {
         m.get_or_insert_with(HashMap::new).insert(dir.to_string(), now());
@@ -600,14 +611,18 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
             } else {
                 "harness-index-unreachable"
             };
-            return record(outcome, Some(err.message().to_string()), current().as_ref());
+            return Ok(record(
+                outcome,
+                Some(err.message().to_string()),
+                current().as_ref(),
+            ));
         }
     };
 
     let stored_revoked = read_revoked(o);
     let fresh = match parse(&bytes, &sig, o.keys, o.min_serial, &stored_revoked) {
         Ok(f) => f,
-        Err(err) => return record(err.code, Some(err.message), current().as_ref()),
+        Err(err) => return Ok(record(err.code, Some(err.message), current().as_ref())),
     };
 
     // a key the new list revokes is out before the cached copy is compared with it
@@ -623,7 +638,7 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
     if let Some(cached) = &cached {
         if fresh.serial < cached.serial {
             loaded_set(dir, Some(cached.clone()));
-            return record(
+            return Ok(record(
                 "harness-index-serial",
                 Some(format!(
                     "serial {} is older than the cached list ({}); a replay of an old list",
@@ -631,31 +646,31 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
                     js::number_to_string(cached.serial)
                 )),
                 Some(cached),
-            );
+            ));
         }
         if fresh.serial == cached.serial {
             loaded_set(dir, Some(cached.clone()));
             if bytes != cached.bytes {
-                return record(
+                return Ok(record(
                     "harness-index-serial",
                     Some(format!(
                         "serial {} was published again with different content",
                         js::number_to_string(fresh.serial)
                     )),
                     Some(cached),
-                );
+                ));
             }
             if let Err(err) = super::write_atomic(
                 &file(dir, "harness-index.json.fetched-at"),
                 js::number_to_string(now()).as_bytes(),
             ) {
-                return record(
+                return Ok(record(
                     "harness-index-store",
                     Some(format!("could not write to {dir}: {}", err.message())),
                     Some(cached),
-                );
+                ));
             }
-            return record("unchanged", None, Some(cached));
+            return Ok(record("unchanged", None, Some(cached)));
         }
     }
 
@@ -677,18 +692,18 @@ pub fn refresh(o: Opts<'_>, force: bool, fetch: Option<Fetch<'_>>, now: &dyn Fn(
     })();
     if let Err(err) = stored {
         loaded_set(dir, cached.clone());
-        return record(
+        return Ok(record(
             "harness-index-store",
             Some(format!("could not write to {dir}: {}", err.message())),
             cached.as_ref(),
-        );
+        ));
     }
     loaded_set(dir, Some(fresh.clone()));
-    record("accepted", None, Some(&fresh))
+    Ok(record("accepted", None, Some(&fresh)))
 }
 
 /// `refreshHarnessIndex()` for the profile store's cache folder, on the clock.
-pub fn refresh_default(paths: &Paths, force: bool) -> &'static str {
+pub fn refresh_default(paths: &Paths, force: bool) -> Result<&'static str, Failure> {
     let dir = paths.cache_dir();
     refresh(Opts::new(&dir), force, None, &crate::util::now)
 }
@@ -829,45 +844,60 @@ mod tests {
         let status = || read_json_file(&file(&dir_s, STATUS_FILE)).unwrap();
 
         *serve.lock().unwrap() = signed(&a, &list(2, None));
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "accepted");
+        assert_eq!(refresh(o, true, Some(&fetch), &now).unwrap(), "accepted");
         assert_eq!(status()["serial"], json!(2));
         assert_eq!(status()["key"], json!("primary"));
         assert_eq!(index_rows(o).len(), 1);
         // within the minute, even forced, the network is not asked again
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "recently-tried");
+        assert_eq!(refresh(o, true, Some(&fetch), &now).unwrap(), "recently-tried");
         // fresh for a day
         tick(120_000);
-        assert_eq!(refresh(o, false, Some(&fetch), &now), "fresh");
+        assert_eq!(refresh(o, false, Some(&fetch), &now).unwrap(), "fresh");
         // the same bytes again
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "unchanged");
+        assert_eq!(refresh(o, true, Some(&fetch), &now).unwrap(), "unchanged");
         // a replay of an older list, and the same serial with other content
         tick(120_000);
         *serve.lock().unwrap() = signed(&a, &list(1, None));
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "harness-index-serial");
+        assert_eq!(
+            refresh(o, true, Some(&fetch), &now).unwrap(),
+            "harness-index-serial"
+        );
         tick(120_000);
         let mut other = list(2, None);
         other["generated"] = json!("changed");
         *serve.lock().unwrap() = signed(&a, &other);
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "harness-index-serial");
+        assert_eq!(
+            refresh(o, true, Some(&fetch), &now).unwrap(),
+            "harness-index-serial"
+        );
         assert_eq!(status()["source"], json!("index"));
         // a list signed by neither key, then one too large
         tick(120_000);
         *serve.lock().unwrap() = signed(&signer(), &list(9, None));
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "harness-index-signature");
+        assert_eq!(
+            refresh(o, true, Some(&fetch), &now).unwrap(),
+            "harness-index-signature"
+        );
         tick(120_000);
         *serve.lock().unwrap() = (vec![b' '; 70_000], String::new());
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "harness-index-oversized");
+        assert_eq!(
+            refresh(o, true, Some(&fetch), &now).unwrap(),
+            "harness-index-oversized"
+        );
         // the spare revokes the primary: the primary's cached copy is dropped, the new list kept
         tick(120_000);
         *serve.lock().unwrap() = signed(&b, &list(3, Some(a.spki)));
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "accepted");
+        assert_eq!(refresh(o, true, Some(&fetch), &now).unwrap(), "accepted");
         assert_eq!(status()["key"], json!("spare"));
         let revoked = read_json_file(&file(&dir_s, REVOKED_FILE)).unwrap();
         assert_eq!(revoked["revoked"], json!([a.spki]));
         // from now on the primary's lists do not verify
         tick(120_000);
         *serve.lock().unwrap() = signed(&a, &list(4, None));
-        assert_eq!(refresh(o, true, Some(&fetch), &now), "harness-index-signature");
+        assert_eq!(
+            refresh(o, true, Some(&fetch), &now).unwrap(),
+            "harness-index-signature"
+        );
         // a cache edited by hand is dropped on the next load
         forget();
         std::fs::write(file(&dir_s, INDEX_FILE), b"{}").unwrap();

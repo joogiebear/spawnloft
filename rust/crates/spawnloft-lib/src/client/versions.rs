@@ -127,9 +127,10 @@ pub fn assert_version_id(paths: &Paths, typed: &Value, fetch: FetchJson<'_>) -> 
         && !js::truthy(prop(Some(d), "inheritsFrom"))
         && prop(Some(d), "id") == Some(&json!(mc))
     {
+        // `onDisk.type ?? 'release'`; a type that is not text matches none of versionKind's names
         let kind = match prop(Some(d), "type") {
             v if super::nullish(v) => Some("release".to_string()),
-            v => Some(js::string(v)),
+            v => v.and_then(Value::as_str).map(String::from),
         };
         return Ok(Known {
             mc,
@@ -158,7 +159,8 @@ pub fn assert_version_id(paths: &Paths, typed: &Value, fetch: FetchJson<'_>) -> 
         .into_iter()
         .find(|v| prop(Some(v), "id") == Some(&json!(mc)))
         .and_then(|v| prop(Some(v), "type"))
-        .map(|t| js::string(Some(t)));
+        .and_then(Value::as_str)
+        .map(String::from);
     Ok(Known {
         mc,
         manifest: Some(manifest),
@@ -279,18 +281,20 @@ fn parse_time(v: Option<&Value>) -> f64 {
 pub fn list_versions(paths: &Paths, refresh: bool, fetch: FetchJson<'_>) -> Result<Listing, Failure> {
     let installed = installed_versions(paths)?;
     // the lists side by side: each fetch may take its full timeout on a slow network
-    let (mojang, lists): (Result<Value, Failure>, Lists) = std::thread::scope(|s| {
+    type Got<'a> = (Result<Value, Failure>, Lists, Result<&'a str, Failure>);
+    let (mojang, lists, harness): Got<'_> = std::thread::scope(|s| {
         let m = s.spawn(|| fetch_manifest(paths, refresh, fetch));
         let l = s.spawn(|| loaders::loader_lists(paths, refresh, fetch));
         let h = s.spawn(|| super::harness_index::refresh_default(paths, refresh));
         let lists = l.join().unwrap_or_default();
-        let _ = h.join();
-        (
-            m.join()
-                .unwrap_or_else(|_| Err(Failure::user("the version list could not be read"))),
-            lists,
-        )
+        let harness = h.join().unwrap_or(Ok("off"));
+        let mojang = m
+            .join()
+            .unwrap_or_else(|_| Err(Failure::user("the version list could not be read")));
+        (mojang, lists, harness)
     });
+    // the one list whose failure fails the command: a status file Node cannot read
+    harness?;
     let (manifest, offline) = match mojang {
         Ok(m) => (Some(m), None),
         Err(e) => (
@@ -362,6 +366,12 @@ pub fn list_versions(paths: &Paths, refresh: bool, fetch: FetchJson<'_>) -> Resu
             }
         })
         .collect();
+    // each row's harnessFor reads the verified list in use (dropping a cached copy that no longer
+    // verifies), whether or not the refresh ran
+    if !versions.is_empty() {
+        let dir = paths.cache_dir();
+        super::harness_index::index_rows(super::harness_index::Opts::new(&dir));
+    }
     // newest first, by release time; a row without one keeps its place at the end
     versions.sort_by(|a, b| {
         let d = parse_time(b.release_time.as_ref()) - parse_time(a.release_time.as_ref());
