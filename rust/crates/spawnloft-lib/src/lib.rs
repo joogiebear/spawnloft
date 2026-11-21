@@ -11,6 +11,7 @@ pub mod fsx;
 pub mod handover;
 pub mod js;
 pub mod json;
+pub mod lock;
 pub mod metrics;
 pub mod nodecore;
 pub mod notify;
