@@ -328,3 +328,15 @@ fn mutated_archives_never_panic() {
         fuzz_read(&data, 1 << 20);
     }
 }
+
+#[cfg(windows)]
+#[test]
+fn windows_paths_resolve_as_node_resolves_them() {
+    assert_eq!(resolve_from("C:\\w", "x\\y"), "C:\\w\\x\\y");
+    // a drive-relative name on the same drive keeps its own case, so it is not inside `C:\w`
+    assert_eq!(resolve_from("C:\\w", "c:x"), "c:\\w\\x");
+    assert_eq!(resolve_from("C:\\w", "C:x"), "C:\\w\\x");
+    assert_eq!(resolve_from("C:\\w", "\\x"), "C:\\x");
+    assert_eq!(resolve_from("C:\\w", "D:\\x"), "D:\\x");
+    assert!(!inside(&resolve_from("C:\\w", "c:x"), "C:\\w"));
+}

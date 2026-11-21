@@ -411,7 +411,7 @@ fn sep() -> &'static str {
 
 /// `path.resolve(base, p)` for an absolute `base`: `p` itself when it is absolute, else `p` under
 /// `base` (on Windows a rooted `\x` takes `base`'s drive, and a drive-relative `D:x` on `base`'s
-/// drive goes under `base`).
+/// drive goes under `base`, with the drive letter as `p` wrote it).
 pub fn resolve_from(base: &str, p: &str) -> String {
     if cfg!(windows) {
         let b = p.as_bytes();
@@ -419,7 +419,9 @@ pub fn resolve_from(base: &str, p: &str) -> String {
             b.len() >= 2 && b[1] == b':' && b[0].is_ascii_alphabetic() && !jspath::is_absolute(p);
         if drive_relative {
             if base.get(..2).is_some_and(|d| d.eq_ignore_ascii_case(&p[..2])) {
-                return jspath::resolve(&format!("{base}\\{}", &p[2..]));
+                // the drive keeps the case `p` gave it (`c:x` under `C:\w` is `c:\w\x`), so
+                // the confinement check, which compares text, refuses it as Node's does
+                return jspath::resolve(&format!("{}{}\\{}", &p[..2], &base[2..], &p[2..]));
             }
             return jspath::resolve(p);
         }
