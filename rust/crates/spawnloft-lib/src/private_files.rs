@@ -378,11 +378,33 @@ mod tests {
             .unwrap();
         assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stdout));
         protect(&native, PRIVATE_MODE).unwrap();
-        // icacls may add the auto-inherited flags (AI, AR); the protection and the entries are what count
+        // icacls may add the auto-inherited flags (AI, AR), and the SDDL may name this user by an
+        // alias (LA for the built-in administrator, as on the CI runners)
         let shape = |s: String| s.replace("AI", "").replace("AR", "");
-        let want = shape(crate::platform::dacl_sddl(&by_icacls).unwrap());
-        assert_eq!(shape(crate::platform::dacl_sddl(&native).unwrap()), want);
-        assert_eq!(want, format!("D:P(A;;FA;;;{sid})"));
+        let want = shape(crate::platform::dacl_sddl(&native).unwrap());
+        let me = want
+            .strip_prefix("D:P(A;;FA;;;")
+            .and_then(|r| r.strip_suffix(')'))
+            .unwrap_or_else(|| panic!("one full-access entry, protected: {want}"));
+        assert!(
+            me == sid || (me.len() == 2 && me.bytes().all(|b| b.is_ascii_uppercase())),
+            "{want} for {sid}"
+        );
+        // icacls leaves the same entry, protected; where the folder gave SYSTEM and Administrators
+        // explicit entries it keeps those too, which a private file allows
+        let theirs = shape(crate::platform::dacl_sddl(&by_icacls).unwrap());
+        assert!(
+            theirs.starts_with("D:P(") && theirs.contains(&format!("(A;;FA;;;{me})")),
+            "{theirs}"
+        );
+        let rest = theirs.replace(&format!("(A;;FA;;;{me})"), "");
+        assert!(
+            rest.trim_start_matches("D:P")
+                .replace("(A;;FA;;;SY)", "")
+                .replace("(A;;FA;;;BA)", "")
+                .is_empty(),
+            "icacls left others: {theirs}"
+        );
         assert_eq!(inspect(&native), State::Private);
         assert_eq!(inspect(&by_icacls), State::Private);
 
