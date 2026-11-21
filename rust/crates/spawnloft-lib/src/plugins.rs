@@ -622,7 +622,8 @@ pub fn list_plugins(inst: &Instance) -> Result<Vec<Value>, Failure> {
 /// `Array.prototype.sort` with a comparator that can throw, as V8 runs it: the first run counted
 /// (and reversed when strictly descending), then a binary insertion of the rest. For fewer than
 /// 64 items that is V8's TimSort exactly; beyond, it gives the same order (the sort is stable)
-/// and differs only in which comparisons are made.
+/// and differs only in which comparisons are made, so a comparator that throws for one item can
+/// throw here where V8's merge never reached it (declared difference `sort-comparisons-over-64`).
 pub fn js_sort<T: Clone>(
     items: &mut [T],
     mut cmp: impl FnMut(&T, &T) -> Result<Ordering, Failure>,
