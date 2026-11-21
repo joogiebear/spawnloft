@@ -1,5 +1,6 @@
 //! The parts of `util.mjs` the lifecycle and database commands need (C2): labels, passwords,
-//! free ports, timers with JavaScript's `setTimeout` arithmetic, and killing a process tree.
+//! free ports, timers with JavaScript's `setTimeout` arithmetic, and killing a process tree. C3
+//! (backups) adds the file-name stamp, the checks on paths read from manifests, and folder sizes.
 
 use std::time::Duration;
 
@@ -108,6 +109,69 @@ pub fn kill_tree(pid: i32) {
             crate::platform::kill_tree_pid(pid as u32);
         }
     }
+}
+
+/// `stamp(d)`: `YYYY-MM-DD_HHMMSS` in local time, as backups and exports name their files.
+pub fn stamp_at(ms: f64) -> String {
+    match crate::jsdate::local_fields(ms) {
+        Some(f) => format!(
+            "{}-{:02}-{:02}_{:02}{:02}{:02}",
+            f.year, f.month, f.day, f.hour, f.minute, f.second
+        ),
+        None => "NaN-NaN-NaN_NaNNaNNaN".to_string(),
+    }
+}
+
+/// `stamp()`, now.
+pub fn stamp() -> String {
+    stamp_at(crate::time::now_ms() as f64)
+}
+
+/// `safeRelativePath(raw)`: for paths from files SpawnLoft did not write (a snapshot manifest),
+/// normalised to forward slashes, or `None` if absolute, a drive letter, a `..` segment, a NUL,
+/// or empty.
+pub fn safe_relative_path(raw: &str) -> Option<String> {
+    let clean = raw.replace('\\', "/");
+    let drive = {
+        let b = clean.as_bytes();
+        b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':'
+    };
+    if clean.is_empty() || clean.contains('\0') || clean.starts_with('/') || drive {
+        return None;
+    }
+    let parts: Vec<&str> = clean.split('/').filter(|p| !p.is_empty() && *p != ".").collect();
+    if parts.is_empty() || parts.contains(&"..") {
+        return None;
+    }
+    Some(parts.join("/"))
+}
+
+/// `isInside(parent, child)` for two resolved paths: `child` is `parent` or below it.
+pub fn is_inside(parent: &std::path::Path, child: &std::path::Path) -> bool {
+    let rel = crate::jspath::relative(&parent.to_string_lossy(), &child.to_string_lossy());
+    let sep = if cfg!(windows) { "..\\" } else { "../" };
+    rel.is_empty() || (rel != ".." && !rel.starts_with(sep) && !crate::jspath::is_absolute(&rel))
+}
+
+/// `dirSizeAsync(dir)`: the bytes of every file below `dir`, links not followed; whatever cannot
+/// be read counts as nothing.
+pub fn dir_size(dir: &std::path::Path) -> u64 {
+    let mut total = 0;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(cur) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&cur) else {
+            continue;
+        };
+        for e in entries.flatten() {
+            let Ok(t) = e.file_type() else { continue };
+            if t.is_dir() {
+                stack.push(e.path());
+            } else if t.is_file() {
+                total += std::fs::metadata(e.path()).map(|m| m.len()).unwrap_or(0);
+            }
+        }
+    }
+    total
 }
 
 #[cfg(test)]

@@ -160,6 +160,33 @@ pub fn is_absolute(p: &str) -> bool {
     }
 }
 
+/// `path.relative(from, to)`: both resolved, then the way from one to the other; on Windows the
+/// names compare without case, and two different roots answer `to` itself.
+pub fn relative(from: &str, to: &str) -> String {
+    let (from, to) = (resolve(from), resolve(to));
+    let same = |a: &str, b: &str| {
+        if cfg!(windows) {
+            a.eq_ignore_ascii_case(b)
+        } else {
+            a == b
+        }
+    };
+    if same(&from, &to) {
+        return String::new();
+    }
+    let (from_root, _, from_rest) = split_root(&from);
+    let (to_root, _, to_rest) = split_root(&to);
+    if !same(&from_root, &to_root) {
+        return to;
+    }
+    let a: Vec<&str> = from_rest.split(is_sep).filter(|s| !s.is_empty()).collect();
+    let b: Vec<&str> = to_rest.split(is_sep).filter(|s| !s.is_empty()).collect();
+    let common = a.iter().zip(&b).take_while(|(x, y)| same(x, y)).count();
+    let mut out: Vec<&str> = vec![".."; a.len() - common];
+    out.extend_from_slice(&b[common..]);
+    out.join(&SEP.to_string())
+}
+
 /// `path.dirname(p)`: everything before the last separator (trailing ones ignored), the root
 /// when that is all there is, `.` when there is no separator.
 pub fn dirname(p: &str) -> String {

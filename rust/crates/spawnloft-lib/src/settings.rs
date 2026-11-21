@@ -18,6 +18,9 @@ pub struct Read {
     pub exists: bool,
     /// Why it is unusable, in the Node core's words.
     pub error: Option<String>,
+    /// The file was read but its content is unusable (kind `content`), as against not readable
+    /// at all (kind `io`). Only content damage can be mended by setting the file aside.
+    pub content_damage: bool,
 }
 
 /// `read(file)` in settings.mjs.
@@ -29,6 +32,7 @@ pub fn read(file: &Path) -> Read {
                 settings: Map::new(),
                 exists: false,
                 error: None,
+                content_damage: false,
             };
         }
         Err(e) => {
@@ -36,6 +40,7 @@ pub fn read(file: &Path) -> Read {
                 settings: Map::new(),
                 exists: true,
                 error: Some(jspath::read_error(&e, file)),
+                content_damage: false,
             };
         }
     };
@@ -45,16 +50,19 @@ pub fn read(file: &Path) -> Read {
             settings: map,
             exists: true,
             error: None,
+            content_damage: false,
         },
         Ok(_) => Read {
             settings: Map::new(),
             exists: true,
             error: Some("it is not a JSON object".into()),
+            content_damage: true,
         },
         Err(e) => Read {
             settings: Map::new(),
             exists: true,
             error: Some(e),
+            content_damage: true,
         },
     }
 }
@@ -71,6 +79,128 @@ pub fn load() -> (Map<String, Value>, Option<String>) {
         )
     });
     (found.settings, warning)
+}
+
+/// `linkTarget(file)`: a dotfile manager's symlink is written through, not replaced.
+fn link_target(file: &Path) -> PathBuf {
+    match std::fs::symlink_metadata(file) {
+        Ok(m) if m.file_type().is_symlink() => {
+            crate::fsx::realpath(file).unwrap_or_else(|_| file.to_path_buf())
+        }
+        _ => file.to_path_buf(),
+    }
+}
+
+/// `save(patch, { replaceUnreadable, onSetAside })`: merges `patch` into the settings through a
+/// temp file and a rename, so a crash leaves the old file whole. Refuses when the existing file
+/// is unreadable, since merging into nothing would erase the data folder; `replace_unreadable`
+/// (choosing the data folder on purpose) copies a file with damaged content aside and replaces
+/// it. Answers the merged settings and where a damaged file was kept.
+pub fn save(
+    patch: &[(&str, Value)],
+    replace_unreadable: bool,
+) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
+    use crate::failure::Failure;
+    let file = link_target(Path::new(&settings_file_text()));
+    let shown = file.display().to_string();
+    let found = read(&file);
+    let damaged = found.error.is_some();
+    if damaged && !(replace_unreadable && found.content_damage) {
+        return Err(Failure::user(format!(
+            "settings file {shown} could not be read ({}), so it was not changed; fix it or delete it (a deleted file forgets your data folder: spawnloft config set-root <folder> sets it again), then try again",
+            found.error.unwrap_or_default()
+        )));
+    }
+    let mut merged = found.settings;
+    for (k, v) in patch {
+        merged.insert((*k).to_string(), v.clone());
+    }
+    let tmp = PathBuf::from(format!("{shown}.{}.tmp", std::process::id()));
+    let mut aside: Option<PathBuf> = None;
+    let attempt = (|| -> Result<(), String> {
+        if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
+            crate::fsx::mkdir_all(dir).map_err(|f| f.message().to_string())?;
+        }
+        let mut ordered = Value::Object(merged.clone());
+        jsjson::js_order(&mut ordered);
+        let text = format!("{}\n", jsjson::stringify_pretty(&ordered));
+        write_synced(&tmp, text.as_bytes()).map_err(|e| jspath::node_error(&e, "open", Some(&tmp)))?;
+        // Windows: the file gets its explicit ACL before it becomes the settings file. Not
+        // fatal: the file names folders, not secrets.
+        let _ = crate::private_files::protect(&tmp, 0o600);
+        if damaged {
+            let at = crate::time::iso_now().replace([':', '.'], "-");
+            let to = PathBuf::from(format!("{shown}.unreadable-{at}"));
+            copy_new(&file, &to)?;
+            aside = Some(to);
+        }
+        crate::fsx::rename_over(&tmp, &file)
+            .map_err(|e| crate::fsx::rename_failure(&e, &tmp, &file).message().to_string())
+    })();
+    if let Err(why) = attempt {
+        // undo whatever was half done; the old file is untouched
+        let _ = std::fs::remove_file(&tmp);
+        if let Some(a) = &aside {
+            let _ = std::fs::remove_file(a);
+        }
+        return Err(Failure::user(format!(
+            "could not write settings file {shown} ({why}); it was left as it was"
+        )));
+    }
+    Ok((merged, aside.map(|a| a.display().to_string())))
+}
+
+/// The temp file of [`save`]: owner-only from the moment it is made, flushed to the disk.
+fn write_synced(tmp: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(tmp)?;
+    #[cfg(unix)]
+    {
+        // fchmod: also tightens a leftover temp file made with wider permissions
+        use std::os::unix::fs::PermissionsExt;
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    f.write_all(data)?;
+    f.sync_all()
+}
+
+/// `fs.copyFileSync(from, to, COPYFILE_EXCL)`, with Node's message on failure.
+fn copy_new(from: &Path, to: &Path) -> Result<(), String> {
+    let fail = |e: std::io::Error| {
+        let (code, text) = jspath::error_code(&e);
+        format!(
+            "{code}: {text}, copyfile '{}' -> '{}'",
+            from.display(),
+            to.display()
+        )
+    };
+    let mut src = std::fs::File::open(from).map_err(fail)?;
+    let mut dst = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(to)
+        .map_err(fail)?;
+    std::io::copy(&mut src, &mut dst).map_err(fail)?;
+    // copyfile gives the copy the source's permissions
+    let perms = src.metadata().map_err(fail)?.permissions();
+    dst.set_permissions(perms).map_err(fail)
+}
+
+/// `checkWritable(dir)`: write-tested rather than inspected, since permission bits and free
+/// space both lie on network shares, read-only mounts and unplugged drives. The error is Node's.
+pub fn check_writable(dir: &str) -> Result<(), String> {
+    let probe = jspath::join_path(dir, &[".spawnloft-write-test"]);
+    crate::fsx::mkdir_all(Path::new(dir)).map_err(|f| f.message().to_string())?;
+    std::fs::write(&probe, "ok").map_err(|e| jspath::node_error(&e, "open", Some(&probe)))?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
 }
 
 /// The resolved layout (`resolveRoots`).

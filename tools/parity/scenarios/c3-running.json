@@ -1,0 +1,484 @@
+{
+ "about": "C3's backups against a running server (the JVM stand-in answering RCON) with attached databases: the flush before a snapshot and save-on after it, a flush that fails, a save-on that is not confirmed and a server that goes away, the SQL dump of a running MariaDB stand-in, a stopped database and a Garnet one left out with their reasons, restore refused while the server runs, then a restore that imports the dump, and one that leaves it because the database is stopped.",
+ "env": {
+  "FAKE_JAVA_RCON": "1",
+  "FAKE_MARIADB_STABLE_DUMP": "1",
+  "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+ },
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "\\(build [^)]*\\)",
+   "replace": "(build)"
+  }
+ ],
+ "ignore": [
+  "data/run/**",
+  "data/instances/run1/logs/**",
+  "data/services/*/data/fake-shutdowns.log",
+  "data/services/*/*.log"
+ ],
+ "steps": [
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadbd.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-admin.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-dump.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-install-db.mjs"
+  },
+  {
+   "write": "data/services/db1/my.ini",
+   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=47821\nbind-address=127.0.0.1\n"
+  },
+  {
+   "mkdir": "data/services/db1/data"
+  },
+  {
+   "write": "data/services/db2/my.ini",
+   "text": "[mysqld]\ndatadir={data}/services/db2/data\nport=47822\nbind-address=127.0.0.1\n"
+  },
+  {
+   "mkdir": "data/services/db2/data"
+  },
+  {
+   "mkdir": "data/services/kv1/data"
+  },
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "#Minecraft server properties\nenable-rcon=true\nrcon.port=47831\nrcon.password=test\nlevel-name=world\n"
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/run1/plugins/a.jar",
+   "text": "jar"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47830,
+      "rcon": {
+       "port": 47831,
+       "password": "test"
+      }
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/db1",
+      "port": 47821,
+      "root": {
+       "user": "root",
+       "password": "pw-test"
+      },
+      "attachments": {
+       "run1": {
+        "database": "shop",
+        "user": "run1",
+        "password": "pw-run1",
+        "createdAt": "2026-11-01T00:00:00.000Z"
+       }
+      }
+     },
+     "db2": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/db2",
+      "port": 47822,
+      "root": {
+       "user": "root",
+       "password": "pw-test"
+      },
+      "attachments": {
+       "run1": {
+        "database": "logs",
+        "user": "run1",
+        "password": "pw-run1",
+        "createdAt": "2026-11-01T00:00:00.000Z"
+       }
+      }
+     },
+     "kv1": {
+      "kind": "database",
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/kv1",
+      "port": 47823,
+      "root": {
+       "password": "pw-kv"
+      },
+      "attachments": {
+       "run1": {
+        "database": "0",
+        "user": "run1",
+        "password": "pw-run1",
+        "createdAt": "2026-11-01T00:00:00.000Z"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "backup",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Flushing world"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--no-flush",
+    "--label",
+    "nf",
+    "--json"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\"flushed\":false"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "snapshot",
+    "run1",
+    "--label",
+    "p",
+    "--scope",
+    "plugins",
+    "--json"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\"flushed\":true"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "snapshots",
+    "run1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "run1",
+    "--all"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "read back whole"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "restore",
+    "run1",
+    "nf"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "imports:"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "changed"
+  },
+  {
+   "run": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "imported database shop"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "snapshots",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "pre-restore"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--label",
+    "stopped"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "database: shop"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000,
+   "env": {
+    "FAKE_JAVA_RCON_OPTS": "{\"drop\":{\"save-all flush\":1000000}}"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--label",
+    "noflush",
+    "--scope",
+    "worlds"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "could not flush"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000,
+   "env": {
+    "FAKE_JAVA_RCON_OPTS": "{\"drop\":{\"save-on\":1000000}}"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--label",
+    "nosaveon",
+    "--scope",
+    "worlds",
+    "--json"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\"saveOnWarning\":\"autosave"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000,
+   "env": {
+    "FAKE_JAVA_RCON_OPTS": "{\"stopAfter\":\"save-off\"}"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--label",
+    "gone",
+    "--scope",
+    "worlds"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "db1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "restore",
+    "run1",
+    "nf",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "not imported"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "snapshots",
+    "run1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

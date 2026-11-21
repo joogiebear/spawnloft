@@ -1,7 +1,8 @@
 //! `services.mjs` (C2): databases are registered like servers, run by the same daemon, and
 //! attached to servers with their own credentials. An external database is registered by
-//! address and root credentials and is never started or stopped from here. The database
-//! backups, dumps of attachments and their import are C3's (backups), on top of this.
+//! address and root credentials and is never started or stopped from here. C3 (backups) adds
+//! the dumps of a server's attached databases that go into its snapshots, and their import when
+//! one is restored.
 
 use serde_json::{Map, Value, json};
 use std::path::Path;
@@ -128,6 +129,18 @@ impl Engine {
         match self {
             Engine::Garnet => garnet::credentials_for(inst, record),
             _ => mariadb::credentials_for(inst, record),
+        }
+    }
+    /// `module.dump(inst, database, file)`: the bytes written. Only for an engine that
+    /// [`can_dump`](Engine::can_dump).
+    fn dump(self, layout: &Layout, inst: &Instance, database: &str, file: &Path) -> Result<u64, Failure> {
+        mariadb::dump(layout, &self.sql_target(layout, inst)?, database, file)
+    }
+    /// `module.importSql(inst, file)`: Garnet has none, and calling it is a TypeError in Node.
+    fn import_sql(self, layout: &Layout, inst: &Instance, file: &Path) -> Result<(), Failure> {
+        match self {
+            Engine::Garnet => Err(Failure::type_error("engineOf(...).importSql is not a function")),
+            _ => mariadb::import_sql(layout, &self.sql_target(layout, inst)?, file),
         }
     }
     /// `module.binary?.(dir, 'client')`: Garnet has no client tool.
@@ -737,6 +750,218 @@ pub fn update_external(layout: &Layout, name: &str, to: Address) -> Result<(Inst
     let next = registry::update_instance(registry_file(layout), name, &patch)?;
     let reachable = engine_of(&next).and_then(|e| e.probe(layout, &next)).is_ok();
     Ok((next, reachable))
+}
+
+/// `obj[key] = value` where `value` may be `undefined`, which JSON.stringify leaves out.
+fn put(map: &mut Map<String, Value>, key: &str, value: Option<&Value>) {
+    if let Some(v) = value {
+        map.insert(key.to_string(), v.clone());
+    }
+}
+
+/// One attachment of a server: the database it is on and the record of that attachment.
+#[derive(Debug)]
+pub struct Attachment {
+    pub service: String,
+    pub record: Value,
+}
+
+/// `serverAttachments(serverName)`: what a backup needs of it (the database and the record).
+pub fn server_attachments(layout: &Layout, server: &str) -> Result<Vec<Attachment>, Failure> {
+    let mut out = Vec::new();
+    for db in registry::list_services(registry_file(layout))? {
+        let Some(record) = db.get("attachments").filter(|a| !a.is_null()).and_then(|a| {
+            registry::entries_of(a)
+                .into_iter()
+                .find(|(k, _)| k == server)
+                .map(|(_, v)| v)
+        }) else {
+            continue;
+        };
+        if !js::truthy(Some(&record)) {
+            continue;
+        }
+        out.push(Attachment {
+            service: db.name.clone(),
+            record,
+        });
+    }
+    Ok(out)
+}
+
+/// `dumpFileFor(service, database)`, as `path.join` spells it on this system.
+pub fn dump_file_for(service: &str, database: &str) -> String {
+    crate::jspath::join(&["databases", &format!("{service}__{database}.sql")])
+}
+
+/// What [`dump_attachments`] made: the dumps (records for the manifest) and the databases left
+/// out, each `{ service, database, reason }`.
+#[derive(Debug, Default, Clone)]
+pub struct Dumps {
+    pub dumped: Vec<Value>,
+    pub skipped: Vec<Value>,
+}
+
+fn skip(service: &str, database: Option<&Value>, reason: String) -> Value {
+    let mut m = Map::new();
+    m.insert("service".into(), json!(service));
+    put(&mut m, "database", database);
+    m.insert("reason".into(), json!(reason));
+    Value::Object(m)
+}
+
+/// `dumpAttachments(serverName, dir)`: one SQL dump per attached database into
+/// `<dir>/databases/`. A database that cannot be dumped (not running, an engine with its own
+/// checkpoints, a dump that failed) is reported as skipped, so the rest of the snapshot is
+/// still taken.
+pub fn dump_attachments(layout: &Layout, server: &str, dir: &Path) -> Result<Dumps, Failure> {
+    let mut out = Dumps::default();
+    for a in server_attachments(layout, server)? {
+        let db = get_database(layout, &a.service)?;
+        let engine = engine_of(&db)?;
+        let database = a.record.get("database");
+        if !engine.can_dump() {
+            out.skipped.push(skip(
+                &db.name,
+                database,
+                format!("{} keeps its own checkpoints; it is not dumped", engine.label()),
+            ));
+            continue;
+        }
+        if !is_up(layout, &db)? {
+            out.skipped
+                .push(skip(&db.name, database, "the database is not running".into()));
+            continue;
+        }
+        if crate::control::is_restoring(Path::new(&layout.state_file(&db.name))) {
+            out.skipped.push(skip(
+                &db.name,
+                database,
+                "a backup was being put back into it at the time".into(),
+            ));
+            continue;
+        }
+        let database_text = js::string(database);
+        let rel = dump_file_for(&db.name, &database_text);
+        let file = crate::jspath::join_path(&dir.to_string_lossy(), &[&rel]);
+        match engine.dump(layout, &db, &database_text, &file) {
+            Ok(bytes) => {
+                let mut m = Map::new();
+                m.insert("service".into(), json!(db.name));
+                put(&mut m, "engine", db.get("engine"));
+                put(&mut m, "version", db.get("version"));
+                put(&mut m, "database", database);
+                put(&mut m, "user", a.record.get("user"));
+                m.insert("file".into(), json!(rel.replace('\\', "/")));
+                m.insert("bytes".into(), json!(bytes));
+                out.dumped.push(Value::Object(m));
+            }
+            Err(e) => out
+                .skipped
+                .push(skip(&db.name, database, e.message().to_string())),
+        }
+    }
+    Ok(out)
+}
+
+/// What [`import_dumps`] did: the dumps imported, and the rest, each with a `reason`.
+#[derive(Debug, Default, Clone)]
+pub struct Imported {
+    pub imported: Vec<Value>,
+    pub skipped: Vec<Value>,
+}
+
+fn with_reason(d: &Value, reason: String) -> Value {
+    // `{ ...d, reason }`: a dump record that is not an object spreads nothing
+    let mut m = match d {
+        Value::Object(m) => m.clone(),
+        Value::String(s) => s
+            .encode_utf16()
+            .enumerate()
+            .map(|(i, u)| (i.to_string(), json!(String::from_utf16_lossy(&[u]))))
+            .collect(),
+        _ => Map::new(),
+    };
+    m.insert("reason".into(), json!(reason));
+    Value::Object(m)
+}
+
+/// `importDumps(serverName, dumps, baseDir)`: each dump a restored snapshot recorded, from
+/// `<baseDir>/databases/`, into the database it came from. The manifest names the file and the
+/// import runs as the database's root, so only a file in `databases/` inside the server folder
+/// is taken: no climbing out, no links leading out.
+pub fn import_dumps(layout: &Layout, dumps: &[Value], base_dir: &str) -> Result<Imported, Failure> {
+    let mut out = Imported::default();
+    for d in dumps {
+        let field = |k: &str| d.as_object().and_then(|m| m.get(k));
+        let rel = match field("file") {
+            Some(Value::String(f)) => crate::util::safe_relative_path(f),
+            _ => None,
+        };
+        let Some(rel) = rel.filter(|r| r.starts_with("databases/")) else {
+            out.skipped.push(with_reason(
+                d,
+                "the manifest names a dump outside the server folder's databases folder; it was not imported"
+                    .into(),
+            ));
+            continue;
+        };
+        let parts: Vec<&str> = rel.split('/').collect();
+        let file = crate::jspath::join_path(base_dir, &parts);
+        let shown = file.display().to_string();
+        if !file.exists() {
+            out.skipped
+                .push(with_reason(d, "the dump is missing from the archive".into()));
+            continue;
+        }
+        let base_real = crate::fsx::realpath(Path::new(base_dir))
+            .map_err(|e| Failure::io(&e, "realpath", Some(Path::new(base_dir))))?;
+        let file_real = crate::fsx::realpath(&file).map_err(|e| Failure::io(&e, "realpath", Some(&file)))?;
+        if !crate::util::is_inside(&base_real, &file_real) {
+            out.skipped.push(with_reason(
+                d,
+                "the dump leads outside the server folder; it was not imported".into(),
+            ));
+            continue;
+        }
+        let service = js::string(field("service"));
+        let known = has_instance(layout, &service)?
+            && registry::lookup(registry_file(layout), &service)
+                .map(|i| i.is_database())
+                .unwrap_or(false);
+        if !known {
+            out.skipped.push(with_reason(
+                d,
+                format!("\"{service}\" is no longer here; the dump is left at {shown}"),
+            ));
+            continue;
+        }
+        let db = get_database(layout, &service)?;
+        if !is_up(layout, &db)? {
+            out.skipped.push(with_reason(
+                d,
+                format!("\"{service}\" is not running; the dump is left at {shown}"),
+            ));
+            continue;
+        }
+        if crate::control::is_restoring(Path::new(&layout.state_file(&db.name))) {
+            out.skipped.push(with_reason(
+                d,
+                format!(
+                    "a backup is being put back into \"{service}\" right now; the dump is left at {shown}"
+                ),
+            ));
+            continue;
+        }
+        match engine_of(&db).and_then(|e| e.import_sql(layout, &db, &file)) {
+            Ok(()) => out.imported.push(d.clone()),
+            Err(e) => out.skipped.push(with_reason(
+                d,
+                format!("{}; the dump is left at {shown}", e.message()),
+            )),
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

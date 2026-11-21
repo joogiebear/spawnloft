@@ -159,6 +159,22 @@ pub fn rename_failure(e: &std::io::Error, from: &Path, to: &Path) -> crate::fail
     }
 }
 
+/// `fs.realpathSync(p)`: the path with every link resolved. On Windows the system's answer
+/// carries the `\\?\` prefix, which Node's does not.
+pub fn realpath(p: &Path) -> std::io::Result<std::path::PathBuf> {
+    let real = std::fs::canonicalize(p)?;
+    if cfg!(windows) {
+        let text = real.to_string_lossy();
+        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+            return Ok(std::path::PathBuf::from(format!(r"\\{rest}")));
+        }
+        if let Some(rest) = text.strip_prefix(r"\\?\") {
+            return Ok(std::path::PathBuf::from(rest));
+        }
+    }
+    Ok(real)
+}
+
 /// `fs.readdirSync(dir)`'s names in its order: libuv's scandir sorts them byte by byte on Unix
 /// (`alphasort` over the raw names); Windows gives them as the file system lists them, which is
 /// what `read_dir` gives too.

@@ -234,11 +234,13 @@ pub fn timeout_ms() -> f64 {
     if n > 0.0 { n } else { 8000.0 }
 }
 
-/// A failed `rconExec`; `unsent` when nothing could have been written.
+/// A failed `rconExec`; `unsent` when nothing could have been written, `refused` when nothing
+/// listens on the port (the error's `refused` in rcon.mjs).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecError {
     pub message: String,
     pub unsent: bool,
+    pub refused: bool,
 }
 
 /// `rconExec` options.
@@ -280,6 +282,7 @@ pub fn exec(
         return Err(ExecError {
             message: format!("instance \"{}\" has no RCON port configured", inst.name),
             unsent: true,
+            refused: false,
         });
     };
     let password = inst.rcon_password().unwrap_or_default();
@@ -305,6 +308,7 @@ pub fn exec(
                     return Err(ExecError {
                         message: e.message,
                         unsent: !connected,
+                        refused: e.refused,
                     });
                 }
                 crate::util::sleep(f64::from(120 * attempt));

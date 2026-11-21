@@ -1,0 +1,1015 @@
+{
+ "about": "C3's backups over stopped servers: backup with every scope, label and flag and their usage errors, the leave-out list, snapshots and backups (text and --json), verify by name, part of a name and --all, a damaged archive, restore with its preview and its copy of what it replaces, prune and --keep with a locked snapshot, and config with the backup mirror and a damaged settings file.",
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "unreadable-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z",
+   "replace": "unreadable-<time>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/srv1/server.properties",
+   "text": "#Minecraft server properties\nlevel-name=world\nmotd=Hi\n"
+  },
+  {
+   "write": "data/instances/srv1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/srv1/ops.json",
+   "text": "[]\n"
+  },
+  {
+   "write": "data/instances/srv1/bukkit.yml",
+   "text": "settings: {}\n"
+  },
+  {
+   "write": "data/instances/srv1/plugins/Essentials.jar",
+   "text": "jar bytes"
+  },
+  {
+   "write": "data/instances/srv1/plugins/Essentials/config.yml",
+   "text": "a: 1\n"
+  },
+  {
+   "write": "data/instances/srv1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/srv1/world/region/r.0.0.mca",
+   "text": "region"
+  },
+  {
+   "write": "data/instances/srv1/world/session.lock",
+   "text": "lock"
+  },
+  {
+   "write": "data/instances/srv1/world_nether/level.dat",
+   "text": "nether"
+  },
+  {
+   "write": "data/instances/srv1/extra/level.dat",
+   "text": "extra"
+  },
+  {
+   "write": "data/instances/srv1/.importing/level.dat",
+   "text": "hidden"
+  },
+  {
+   "write": "data/instances/srv1/config/paper-world-defaults.yml",
+   "text": "x: 1\n"
+  },
+  {
+   "write": "data/instances/srv1/logs/latest.log",
+   "text": "log line\n"
+  },
+  {
+   "write": "data/instances/srv1/cache/x.bin",
+   "text": "cache"
+  },
+  {
+   "write": "data/instances/srv1/-dash/file.txt",
+   "text": "dash member"
+  },
+  {
+   "write": "data/instances/srv1/server.jar",
+   "text": ""
+  },
+  {
+   "mkdir": "data/instances/srv2"
+  },
+  {
+   "write": "data/instances/srv3/mods/fabric-api.jar",
+   "text": "mod"
+  },
+  {
+   "write": "data/instances/srv3/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances/srv3/notes.log",
+   "text": "leave me out"
+  },
+  {
+   "write": "data/instances/srv3/plugins/dynmap/web/index.html",
+   "text": "web"
+  },
+  {
+   "write": "data/instances/srv3/plugins/dynmap.jar",
+   "text": "dyn"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "srv1": {
+      "dir": "{data}/instances/srv1",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47961
+     },
+     "srv2": {
+      "dir": "{data}/instances/srv2",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47962
+     },
+     "srv3": {
+      "dir": "{data}/instances/srv3",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47963,
+      "backupExclude": [
+       "*.log",
+       "plugins/dynmap/web"
+      ]
+     },
+     "gone": {
+      "dir": "{data}/instances/gone",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47964
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "backup"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--json",
+    "--scope",
+    "bad"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "extra",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--keep",
+    "0"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--keep"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--json",
+    "--label"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--json",
+    "--flush=1"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--json",
+    "--bogus"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--json=1"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "gone"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope",
+    "bogus"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--label"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No snapshots"
+   }
+  },
+  {
+   "run": [
+    "snapshots"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "restore",
+    "srv1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Nothing to prune"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Wrote"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope",
+    "plugins",
+    "--label",
+    "pre install"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "included: plugins"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope",
+    "worlds",
+    "--label",
+    "w",
+    "--json"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\"ok\":true"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope",
+    "config",
+    "--label",
+    "c"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--scope",
+    "full",
+    "--label",
+    "f"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "snapshot",
+    "srv1",
+    "--label",
+    "é😀 x",
+    "--no-flush"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv1",
+    "--no-label",
+    "--scope",
+    "plugins"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "mods"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3b",
+    "--scope",
+    "full",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "SCOPE"
+   }
+  },
+  {
+   "run": [
+    "backups",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "backups",
+    "srv3",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1",
+    "x",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "backups",
+    "srv1",
+    "--json",
+    "--all"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "ok"
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "--all"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "read back whole"
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "pre-install"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "plugins"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "nomatch"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "data/backups/srv1/broken_standard_2020-01-01_000000.tar.gz",
+   "text": "this is not gzip"
+  },
+  {
+   "write": "data/backups/srv1/broken_standard_2020-01-01_000000.json",
+   "json": {
+    "instance": "srv1",
+    "scope": "standard",
+    "label": "broken",
+    "members": [
+     "world"
+    ],
+    "databases": []
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "broken"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "FAIL"
+   }
+  },
+  {
+   "run": [
+    "restore",
+    "srv1",
+    "broken"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "DOES NOT READ BACK"
+   }
+  },
+  {
+   "run": [
+    "restore",
+    "srv1",
+    "broken",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "--all"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "FAILED"
+   }
+  },
+  {
+   "remove": "data/backups/srv1/broken_standard_2020-01-01_000000.tar.gz"
+  },
+  {
+   "remove": "data/backups/srv1/broken_standard_2020-01-01_000000.json"
+  },
+  {
+   "run": [
+    "restore",
+    "srv1",
+    "w"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "reads back cleanly"
+   }
+  },
+  {
+   "write": "data/instances/srv1/world/level.dat",
+   "text": "changed since"
+  },
+  {
+   "write": "data/instances/srv1/world/new-file.txt",
+   "text": "made after the backup"
+  },
+  {
+   "run": [
+    "restore",
+    "srv1",
+    "w",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Restored"
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "pre-restore"
+   }
+  },
+  {
+   "run": [
+    "verify",
+    "srv1",
+    "pre-restore"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "restore",
+    "srv1",
+    "pre-install",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "restore",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "restore"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "srv1",
+    "--keep",
+    "abc"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "srv1",
+    "--keep",
+    "-1"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "prune"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "srv1",
+    "--keep",
+    "3"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Removed"
+   }
+  },
+  {
+   "run": [
+    "prune",
+    "srv1",
+    "--keep",
+    "3"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Nothing to prune"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3c",
+    "--keep",
+    "1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Pruned"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv3",
+    "--label",
+    "s3d",
+    "--keep",
+    "1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\"pruned\":["
+   }
+  },
+  {
+   "run": [
+    "snapshots",
+    "srv3"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "config"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "data root"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "show"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "(none"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-backup-mirror"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-backup-mirror",
+    "{run}/mirror"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "also copies to"
+   }
+  },
+  {
+   "run": [
+    "config"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "mirror"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "srv3",
+    "--label",
+    "m",
+    "--scope",
+    "plugins"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "mirrored:"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-backup-mirror",
+    "OFF"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "turned off"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-instances"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-instances",
+    "{run}/elsewhere"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Instances directory"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "show"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "separate location"
+   }
+  },
+  {
+   "run": [
+    "config",
+    "same-drive"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "config",
+    "bogus"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-root"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-root",
+    "{run}/root2"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Data root"
+   }
+  },
+  {
+   "write": "home/.config/spawnloft/settings.json",
+   "text": "{ not json"
+  },
+  {
+   "write": "home/AppData/Roaming/spawnloft/settings.json",
+   "text": "{ not json"
+  },
+  {
+   "run": [
+    "config",
+    "set-backup-mirror",
+    "{run}/mirror2"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "config",
+    "set-root",
+    "{run}/root3"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "kept as"
+   }
+  }
+ ]
+}

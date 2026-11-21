@@ -251,7 +251,21 @@ pub fn query(ctx: &mut Ctx<'_>, command: &str) -> Result<Value, Failure> {
                 "scope": "recent-console-and-crash-reports",
             }))
         }
-        // plugins and backups are not ported: the ownership table never sends them here
+        "backups" => {
+            let rows: Vec<Value> = spawnloft_lib::backup::list_snapshots(ctx.layout, &name)?
+                .iter()
+                .map(|row| {
+                    json!({
+                        "name": row.name, "path": row.path, "sizeBytes": row.size,
+                        "modifiedAt": spawnloft_lib::time::iso(row.mtime_ms as i64),
+                        "scope": row.scope, "label": row.label, "taskId": row.task_id,
+                        "members": row.members,
+                    })
+                })
+                .collect();
+            Ok(json!({ "instance": name, "backups": rows }))
+        }
+        // plugins are not ported: the ownership table never sends them here
         other => Err(Failure::usage(format!(
             "JSON output is not supported for {other}"
         ))),

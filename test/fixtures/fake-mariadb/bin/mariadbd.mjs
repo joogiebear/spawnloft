@@ -9,6 +9,7 @@
  *   dump <base64 db>  answer "ok <base64 dump text>" and close, the way a dump streams
  *
  * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.
+ * FAKE_MARIADB_STABLE_DUMP=1 leaves the time out of a dump, so two runs dump the same bytes.
  */
 import fs from 'node:fs'
 import net from 'node:net'
@@ -50,7 +51,7 @@ const server = net.createServer((socket) => {
         socket.write('ok\n')
       } else if (line.startsWith('dump ')) {
         const db = Buffer.from(line.slice(5), 'base64').toString('utf8')
-        const text = `-- MariaDB dump (fake) of ${db}\nCREATE DATABASE IF NOT EXISTS \`${db}\`;\nUSE \`${db}\`;\n-- dumped at ${Date.now()}\n`
+        const text = `-- MariaDB dump (fake) of ${db}\nCREATE DATABASE IF NOT EXISTS \`${db}\`;\nUSE \`${db}\`;\n${process.env.FAKE_MARIADB_STABLE_DUMP === '1' ? '' : `-- dumped at ${Date.now()}\n`}`
         socket.end(`ok ${Buffer.from(text).toString('base64')}\n`)
       } else {
         socket.write('error unknown\n')

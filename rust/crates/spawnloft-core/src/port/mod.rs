@@ -6,9 +6,12 @@
 //! C1 (rust/PLAN-CORE-PORT.md section 4) moved the read-only group: `help`, `list`, `status`,
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
 //! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`, and the
-//! databases: `db`.
+//! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
+//! `verify`, with their aliases, and `config`.
 
 pub mod args;
+mod backup;
+mod config;
 mod configure;
 mod db;
 mod lifecycle;
@@ -154,6 +157,12 @@ fn dispatch(
         "set" => configure::set(&mut ctx),
         "props" => configure::props(&mut ctx),
         "db" => db::db(&mut ctx),
+        "backup" | "snapshot" => backup::backup(&mut ctx),
+        "snapshots" | "backups" => backup::snapshots(&mut ctx),
+        "restore" => backup::restore(&mut ctx),
+        "prune" => backup::prune(&mut ctx),
+        "verify" => backup::verify(&mut ctx),
+        "config" => config::config(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

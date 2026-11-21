@@ -3,6 +3,7 @@
 //! Internal phase: the build identity and the per-server daemon (R1) with what it needs.
 
 pub mod activity;
+pub mod backup;
 pub mod build;
 pub mod cancel;
 pub mod collate;
