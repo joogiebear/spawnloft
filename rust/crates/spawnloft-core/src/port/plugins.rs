@@ -51,7 +51,8 @@ pub fn plugins(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         ));
         return Ok(());
     }
-    if sub.is_some() {
+    // `if (sub)`: an empty subcommand lists, as no subcommand does
+    if sub.as_deref().is_some_and(|s| !s.is_empty()) {
         return Err(Failure::user(
             "usage: spawnloft plugins <name> [enable|disable <plugin>]",
         ));

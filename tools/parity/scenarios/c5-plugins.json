@@ -1,5 +1,5 @@
 {
- "about": "C5's plugins command: the list (text and --json) over plugin.yml, paper-plugin.yml, fabric.mod.json and NeoForge mods.toml manifests, stored and deflated entries, jars that are not zips, a folder named like a jar, records SpawnLoft keeps (and odd ones: a number, a store whose managed is an array, a store that is not JSON), names that are not text (a list, a number: the sort and the lookup throw), enable and disable by name and by file, no-ops, and every refusal and usage error.",
+ "about": "C5's plugins command: the list (text and --json) over plugin.yml, paper-plugin.yml, fabric.mod.json and NeoForge mods.toml manifests, stored and deflated entries, jars that are not zips, a folder named like a jar, records SpawnLoft keeps (and odd ones: a number, a store whose managed is an array, a store that is not JSON), names that are not text (a list, a number: the sort and the lookup throw), enable and disable by name and by file, no-ops, an empty subcommand (lists), and every refusal and usage error.",
  "steps": [
   {
    "write": "data/instances.json",
@@ -556,6 +556,27 @@
     "plugins",
     "srv",
     "--json=1"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "srv",
+    ""
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "plugins",
+    "bare",
+    "",
+    "--json"
    ],
    "expect": {
     "code": 2
