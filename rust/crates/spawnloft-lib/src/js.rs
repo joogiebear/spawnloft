@@ -131,6 +131,11 @@ pub fn trim(s: &str) -> &str {
     s.trim_matches(is_js_space)
 }
 
+/// `str.trimEnd()`.
+pub fn trim_end(s: &str) -> &str {
+    s.trim_end_matches(is_js_space)
+}
+
 /// `Number(text)` (ECMA-262 StringToNumber): blank is 0; `0x`, `0o` and `0b` integers;
 /// `Infinity` with an optional sign; decimal literals; NaN for anything else.
 pub fn string_to_number(text: &str) -> f64 {
@@ -351,5 +356,42 @@ mod tests {
         assert!(number(Some(&json!("x"))).is_nan());
         assert!(number(None).is_nan());
         assert_eq!(number(Some(&json!(90000))), 90000.0);
+    }
+}
+
+/// `Object.entries` of a plain object built by `obj[key] = value` for each pair in turn: a key
+/// keeps its first place and its last value, array-index keys come first in numeric order, and
+/// `__proto__` (whose assignment of a string changes nothing) is left out.
+pub fn object_entries<V>(pairs: Vec<(String, V)>) -> Vec<(String, V)> {
+    let mut out: Vec<(String, V)> = Vec::new();
+    for (k, v) in pairs {
+        if k == "__proto__" {
+            continue;
+        }
+        match out.iter_mut().find(|(ok, _)| *ok == k) {
+            Some(slot) => slot.1 = v,
+            None => out.push((k, v)),
+        }
+    }
+    let (mut index, named): (Vec<_>, Vec<_>) =
+        out.into_iter().partition(|(k, _)| crate::jsjson::is_index_key(k));
+    index.sort_by_key(|(k, _)| k.parse::<u64>().unwrap_or(u64::MAX));
+    index.extend(named);
+    index
+}
+
+#[cfg(test)]
+mod object_tests {
+    #[test]
+    fn entries_order_like_an_object() {
+        let p = |k: &str, v: u8| (k.to_string(), v);
+        let got = super::object_entries(vec![
+            p("b", 1),
+            p("10", 2),
+            p("__proto__", 3),
+            p("2", 4),
+            p("b", 5),
+        ]);
+        assert_eq!(got, vec![p("2", 4), p("10", 2), p("b", 5)]);
     }
 }

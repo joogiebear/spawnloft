@@ -15,6 +15,11 @@ use std::time::{Duration, Instant};
 
 pub const TIMEOUT: Duration = Duration::from_secs(5);
 
+/// `acceptableWebhook(url)`: an http(s) URL as the WHATWG parser reads it.
+pub fn acceptable_webhook(url: &str) -> bool {
+    url::Url::parse(url).is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
+}
+
 /// The payload, exactly as `formatDiscord` builds it.
 pub fn format_discord(instance: &str, message: &str) -> String {
     serde_json::json!({ "content": format!("**{instance}** \u{2014} {message}") }).to_string()

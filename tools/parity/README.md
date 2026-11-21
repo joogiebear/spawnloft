@@ -122,6 +122,9 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c1-settings` | the data root and the other folders chosen by `settings.json` (XDG and Windows locations), a damaged settings file and its warning |
 | `c1-running` | the same commands against a running server (the fake JVM), text and `--json` |
 | `c1-review` | what the C1 review found: half an emoji or a record's own `name` in the registry, pids as `process.kill` coerces them, crash reports with equal times, `/i` patterns beyond ASCII and Annex B escapes, a large console with a count that is not whole, a sample past the year 9999 |
+| `c2-lifecycle` | C2's lifecycle over the JVM stand-in answering RCON (`FAKE_JAVA_RCON=1`): `start`, `stop`, `restart`, `kill`, `cmd`/`rcon`, `players`, `send`, `console` fed from a pipe, `set` with every key and `props`, their refusals and usage errors, and a start that fails |
+| `c2-rust-daemon` | the same lifecycle with `SPAWNLOFT_DAEMON=rust`, so both supervisors start `spawnloft-core daemon` |
+| `c2-databases-node`, `c2-databases-rust` | databases under each daemon: the MariaDB and Garnet stand-ins in the engine store (copied in by `write` with `copy`), a missing engine, an external database, start, stop, restart, kill and a failed start |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

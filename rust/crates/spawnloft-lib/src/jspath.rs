@@ -160,6 +160,40 @@ pub fn is_absolute(p: &str) -> bool {
     }
 }
 
+/// `path.dirname(p)`: everything before the last separator (trailing ones ignored), the root
+/// when that is all there is, `.` when there is no separator.
+pub fn dirname(p: &str) -> String {
+    if p.is_empty() {
+        return ".".into();
+    }
+    let (root, _, _) = split_root(p);
+    let body = &p[root.len().min(p.len())..];
+    let trimmed = body.trim_end_matches(is_sep);
+    match trimmed.rfind(is_sep) {
+        Some(i) => {
+            let head = &trimmed[..i];
+            if head.is_empty() {
+                p[..root.len()].to_string()
+            } else {
+                format!("{}{head}", &p[..root.len()])
+            }
+        }
+        None if !root.is_empty() => p[..root.len()].to_string(),
+        None => ".".into(),
+    }
+}
+
+/// `path.basename(p)`: the last segment, trailing separators ignored (a root alone is empty).
+pub fn basename(p: &str) -> String {
+    let (root, _, _) = split_root(p);
+    let body = &p[root.len().min(p.len())..];
+    let trimmed = body.trim_end_matches(is_sep);
+    match trimmed.rfind(is_sep) {
+        Some(i) => trimmed[i + 1..].to_string(),
+        None => trimmed.to_string(),
+    }
+}
+
 /// [`join`] over a path and plain names, as a `PathBuf`.
 pub fn join_path(base: &str, names: &[&str]) -> PathBuf {
     let mut all = vec![base];
@@ -219,6 +253,12 @@ fn raw_code(n: i32) -> Option<(&'static str, &'static str)> {
     } else {
         (63, 62, 66)
     };
+    // the socket errors differ between Linux and macOS
+    let (refused, reset, aborted, timed_out) = if cfg!(target_os = "linux") {
+        (111, 104, 103, 110)
+    } else {
+        (61, 54, 53, 60)
+    };
     Some(match n {
         1 => ("EPERM", "operation not permitted"),
         2 => ("ENOENT", "no such file or directory"),
@@ -239,6 +279,10 @@ fn raw_code(n: i32) -> Option<(&'static str, &'static str)> {
         n if n == name_too_long => ("ENAMETOOLONG", "name too long"),
         n if n == looped => ("ELOOP", "too many symbolic links encountered"),
         n if n == not_empty => ("ENOTEMPTY", "directory not empty"),
+        n if n == refused => ("ECONNREFUSED", "connection refused"),
+        n if n == reset => ("ECONNRESET", "connection reset by peer"),
+        n if n == aborted => ("ECONNABORTED", "software caused connection abort"),
+        n if n == timed_out => ("ETIMEDOUT", "connection timed out"),
         _ => return None,
     })
 }
@@ -261,6 +305,10 @@ fn raw_code(n: i32) -> Option<(&'static str, &'static str)> {
         232 => ("EPIPE", "broken pipe"),
         267 => ("ENOTDIR", "not a directory"),
         1921 => ("ELOOP", "too many symbolic links encountered"),
+        10061 => ("ECONNREFUSED", "connection refused"),
+        10054 => ("ECONNRESET", "connection reset by peer"),
+        10053 => ("ECONNABORTED", "software caused connection abort"),
+        10060 => ("ETIMEDOUT", "connection timed out"),
         _ => return None,
     })
 }
@@ -280,6 +328,21 @@ pub fn read_error(e: &std::io::Error, file: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn dirname_and_basename_like_node() {
+        use super::{basename, dirname};
+        assert_eq!(dirname("/a/b/"), "/a");
+        assert_eq!(dirname("/a//b"), "/a/");
+        assert_eq!(dirname("/a"), "/");
+        assert_eq!(dirname("a"), ".");
+        assert_eq!(dirname("/"), "/");
+        assert_eq!(dirname("a/b"), "a");
+        assert_eq!(basename("/a/b.jar/"), "b.jar");
+        assert_eq!(basename("b.jar"), "b.jar");
+        assert_eq!(basename("/"), "");
+    }
+
     use super::*;
 
     #[cfg(unix)]

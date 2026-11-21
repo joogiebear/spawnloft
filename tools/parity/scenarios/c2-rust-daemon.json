@@ -1,0 +1,321 @@
+{
+  "about": "C2's lifecycle with the Rust daemon chosen (SPAWNLOFT_DAEMON=rust): the Node supervisor and the Rust one both start spawnloft-core daemon; start, cmd, send, console, stop, restart, kill and a failed start.",
+  "env": {
+    "FAKE_JAVA_RCON": "1",
+    "SPAWNLOFT_DAEMON": "rust"
+  },
+  "normalize": [
+    {
+      "pattern": "\\(build [^)]*\\)",
+      "replace": "(build)"
+    }
+  ],
+  "ignore": [
+    "data/run/run1/**",
+    "data/run/bad1/**",
+    "data/instances/run1/logs/**",
+    "data/instances/bad1/logs/**"
+  ],
+  "steps": [
+    {
+      "write": "data/instances/run1/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/run1/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/run1/server.properties",
+      "text": "#Minecraft server properties\nmotd=A Minecraft Server\nmax-players=20\n\n"
+    },
+    {
+      "write": "data/instances/noeula/server.jar",
+      "text": ""
+    },
+    {
+      "mkdir": "data/instances/nojar"
+    },
+    {
+      "write": "data/instances/bad1/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/bad1/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/jars/paper-1.21.4-100.jar",
+      "text": "new jar"
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "run1": {
+            "dir": "{data}/instances/run1",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47761,
+            "rcon": {
+              "port": 47771,
+              "password": "test"
+            }
+          },
+          "noeula": {
+            "dir": "{data}/instances/noeula",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47762,
+            "rcon": {
+              "port": 47772,
+              "password": "test"
+            }
+          },
+          "nojar": {
+            "dir": "{data}/instances/nojar",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47763,
+            "rcon": {
+              "port": 47773,
+              "password": "test"
+            }
+          },
+          "bad1": {
+            "dir": "{data}/instances/bad1",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47764,
+            "rcon": {
+              "port": 47774,
+              "password": "test"
+            }
+          },
+          "db1": {
+            "kind": "database",
+            "engine": "mariadb",
+            "version": "11.4.5",
+            "dir": "{data}/services/db1",
+            "port": 47781
+          }
+        }
+      }
+    },
+    {
+      "run": [
+        "stop",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "was not running"
+      }
+    },
+    {
+      "run": [
+        "kill",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "was not running"
+      }
+    },
+    {
+      "write": "data/instances/run1/old-server.jar",
+      "text": "old"
+    },
+    {
+      "run": [
+        "start",
+        "run1",
+        "--timeout",
+        "60"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Ready - "
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "cmd",
+        "run1",
+        "tps"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "TPS from last"
+      }
+    },
+    {
+      "run": [
+        "cmd",
+        "run1",
+        "tps",
+        "--raw"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "rcon",
+        "run1",
+        "say",
+        "nothing"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "(no output)"
+      }
+    },
+    {
+      "run": [
+        "players",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "There are 0"
+      }
+    },
+    {
+      "run": [
+        "send",
+        "run1",
+        "hello",
+        "there"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "console",
+        "run1"
+      ],
+      "stdin": "",
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "detached"
+      }
+    },
+    {
+      "run": [
+        "stop",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "stopped (exit code 0)"
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "restart",
+        "run1",
+        "--timeout",
+        "60"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Ready - "
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "restart",
+        "run1",
+        "--timeout",
+        "60"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Stopping"
+      },
+      "timeoutMs": 180000
+    },
+    {
+      "run": [
+        "kill",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "force-killed"
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "kill",
+        "run1"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "was not running"
+      }
+    },
+    {
+      "run": [
+        "start",
+        "run1",
+        "--no-wait"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Not waiting"
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "stop",
+        "run1",
+        "--timeout",
+        "30"
+      ],
+      "expect": {
+        "code": 0
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "start",
+        "bad1",
+        "--timeout",
+        "30"
+      ],
+      "env": {
+        "FAKE_JAVA_FAIL": "start"
+      },
+      "expect": {
+        "code": 1,
+        "stdoutIncludes": "did not reach ready state"
+      },
+      "timeoutMs": 90000
+    },
+    {
+      "run": [
+        "stop",
+        "bad1"
+      ],
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

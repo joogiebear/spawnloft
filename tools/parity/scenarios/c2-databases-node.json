@@ -1,0 +1,260 @@
+{
+ "about": "C2's lifecycle for databases with the node daemon (SPAWNLOFT_DAEMON=node): MariaDB and Garnet stand-ins in the engine store, a missing engine, an external database, start, stop, restart, kill and a start that fails.",
+ "env": {
+  "SPAWNLOFT_DAEMON": "node"
+ },
+ "ignore": [
+  "data/run/**",
+  "data/services/*/data/fake-shutdowns.log",
+  "data/services/kv1/data/checkpoint.txt"
+ ],
+ "steps": [
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadbd.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadbd.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-admin.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-admin.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-dump.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-dump.mjs"
+  },
+  {
+   "write": "data/engines/mariadb-0.0.0-fake/bin/mariadb-install-db.mjs",
+   "copy": "../../../test/fixtures/fake-mariadb/bin/mariadb-install-db.mjs"
+  },
+  {
+   "write": "data/engines/garnet-0.0.0-fake/GarnetServer.mjs",
+   "copy": "../../../test/fixtures/fake-garnet/GarnetServer.mjs"
+  },
+  {
+   "write": "data/services/db1/my.ini",
+   "text": "[mysqld]\ndatadir={data}/services/db1/data\nport=47811\nbind-address=127.0.0.1\n"
+  },
+  {
+   "mkdir": "data/services/db1/data"
+  },
+  {
+   "mkdir": "data/services/kv1/data"
+  },
+  {
+   "mkdir": "data/services/nodb"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/db1",
+      "port": 47811,
+      "root": {
+       "user": "root",
+       "password": "pw-test"
+      }
+     },
+     "kv1": {
+      "kind": "database",
+      "engine": "garnet",
+      "version": "0.0.0-fake",
+      "dir": "{data}/services/kv1",
+      "port": 47812,
+      "root": {
+       "password": "pw-kv"
+      }
+     },
+     "nodb": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "9.9.9",
+      "dir": "{data}/services/nodb",
+      "port": 47813,
+      "root": {
+       "user": "root",
+       "password": "x"
+      }
+     },
+     "ext1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "external": true,
+      "host": "127.0.0.1",
+      "port": 47814,
+      "root": {
+       "user": "root",
+       "password": "x"
+      }
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "start",
+    "nodb"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "start",
+    "ext1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "status",
+    "db1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "cmd",
+    "db1",
+    "x"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "players",
+    "db1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "stop",
+    "db1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "restart",
+    "db1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "kill",
+    "db1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "force-killed"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "kv1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "kv1"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped"
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "start",
+    "db1",
+    "--timeout",
+    "30"
+   ],
+   "env": {
+    "FAKE_MARIADB_FAIL": "start"
+   },
+   "expect": {
+    "code": 1
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "db1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

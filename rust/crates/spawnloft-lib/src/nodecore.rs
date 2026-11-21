@@ -1,20 +1,16 @@
 //! The Node core the 2.0 package still carries in `resources/core/` until the core port (R4, R6)
-//! lands: the seam through which `handover resume`, `repair` and `uninstall` reach the business
-//! core today. When R4 lands these calls become in-process and this module goes.
+//! lands: the seam through which `repair` and `uninstall` reach the business core today
+//! (`handover resume` starts servers in-process since C2). When the port lands these calls
+//! become in-process and this module goes.
 //!
 //! It runs on the Node the package carries (`crate::runtime`), and names this binary as the entry
 //! point, so what `repair` writes runs `spawnloft-core`, never a Node path.
 
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use crate::handover::resume::Starter;
-use crate::handover::{Kind, Log};
-
-/// How long one `start` may take before it counts as failed (resume waits for ready: 180 s).
-pub const START_TIMEOUT: Duration = Duration::from_secs(200);
+use crate::handover::Log;
 
 #[derive(Debug, Clone)]
 pub struct NodeCore {
@@ -108,23 +104,5 @@ impl NodeCore {
             .status()
             .map_err(|e| format!("{}: {e}", self.node.display()))?;
         Ok(status.code().unwrap_or(1))
-    }
-}
-
-impl Starter for NodeCore {
-    fn start(&self, name: &str, _kind: Kind, log: &Log) -> Result<(), String> {
-        match self.run_logged(&["start", name, "--timeout", "180"], START_TIMEOUT, log)? {
-            (0, _) => Ok(()),
-            (code, out) => Err(format!(
-                "exit {code}: {}",
-                out.trim().lines().last().unwrap_or("")
-            )),
-        }
-    }
-
-    fn registered(&self) -> Option<BTreeSet<String>> {
-        let text = std::fs::read_to_string(self.data_root.join("instances.json")).ok()?;
-        let v: serde_json::Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
-        Some(v.get("instances")?.as_object()?.keys().cloned().collect())
     }
 }

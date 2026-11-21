@@ -15,6 +15,7 @@ const SIGTERM: i32 = 15;
 unsafe extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
     fn getuid() -> u32;
+    fn setsid() -> i32;
     fn umask(mask: ModeT) -> ModeT;
     fn signal(sig: i32, handler: usize) -> usize;
     #[cfg(target_os = "linux")]
@@ -60,6 +61,20 @@ pub fn hide_window(_cmd: &mut Command) {}
 /// for end when the pipe to their stdin closes, which a kill of this process closes too.
 pub fn end_with_this_process(_child: &Child) -> bool {
     false
+}
+
+/// Node's `spawn(..., { detached: true })`: the child leads a new session, so it outlives the
+/// terminal and the process group of whoever started it.
+pub fn detach(cmd: &mut Command) {
+    // SAFETY: setsid is async-signal-safe and touches nothing but the child's own session.
+    unsafe {
+        cmd.pre_exec(|| {
+            if setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
 }
 
 /// Puts the server in a process group of its own, led by it, so `kill(-pid)` reaches its forks.

@@ -32,6 +32,8 @@ hmac = "0.13.0"
 getrandom = "0.4.3"
 # zip.rs: deflate and inflate for world exports, imports and jar manifests (miniz_oxide, pure Rust)
 flate2 = "1.1.11"
+# notify.rs: acceptableWebhook parses as WHATWG URL does (already in the tree through ureq)
+url = "2.5.8"
 
 [dev-dependencies]
 # signs test envelopes and artifacts with throwaway keys; never linked into a binary

@@ -388,6 +388,56 @@ fn unreadable_root(data_root: &Path, why: OwnRead, log: &Log) -> Outcome {
 }
 
 /// Starts nothing and says why, when the 2.0 core cannot be reached.
+/// Starts what resume owes in this process, as `spawnloft start <name> --timeout 180` does (C2:
+/// the Node core's `start` is no longer run for it). Databases wait for ready like servers.
+struct InProcess {
+    layout: spawnloft_lib::settings::Layout,
+}
+
+impl InProcess {
+    fn new() -> Result<InProcess, String> {
+        let (loaded, _) = spawnloft_lib::settings::load();
+        let layout =
+            spawnloft_lib::settings::Layout::resolve(&loaded).map_err(|f| f.message().to_string())?;
+        layout.ensure_dirs().map_err(|f| f.message().to_string())?;
+        Ok(InProcess { layout })
+    }
+}
+
+impl Starter for InProcess {
+    fn start(&self, name: &str, _kind: Kind, log: &Log) -> Result<(), String> {
+        use spawnloft_lib::supervisor::{self, StartOptions};
+        log.line(&format!("2.0: spawnloft start {name} --timeout 180"));
+        let opts = StartOptions {
+            timeout: 180_000.0,
+            ..StartOptions::default()
+        };
+        let by = spawnloft_lib::activity::Actor::new("cli", None);
+        match supervisor::start(&self.layout, &by, name, opts) {
+            Ok(res) if res.ready => {
+                log.line(&format!(
+                    "2.0| Ready - {}",
+                    res.ready_line.as_deref().unwrap_or("")
+                ));
+                Ok(())
+            }
+            Ok(res) if res.failed => Err(format!(
+                "did not reach ready state: {}",
+                res.reason.as_deref().unwrap_or("unknown")
+            )),
+            Ok(_) => Err("timed out after 180s waiting for ready".into()),
+            Err(f) => Err(f.message().to_string()),
+        }
+    }
+
+    fn registered(&self) -> Option<std::collections::BTreeSet<String>> {
+        let file = Path::new(&self.layout.registry_file);
+        // unreadable: every entry is tried, and each start says why it failed
+        let all = spawnloft_lib::registry::list_all(file).ok()?;
+        Some(all.into_iter().map(|i| i.name).collect())
+    }
+}
+
 struct Unavailable(String);
 impl Starter for Unavailable {
     fn start(&self, _name: &str, _kind: Kind, _log: &Log) -> Result<(), String> {
@@ -513,7 +563,7 @@ fn resume_cmd(rest: &[String]) -> Outcome {
         return done(0, json!({ "exit": 0, "record": null }));
     };
     record = fresh;
-    let core = NodeCore::find(&data_root);
+    let core = InProcess::new();
     let unavailable;
     let starter: &dyn Starter = match &core {
         Ok(c) => c,

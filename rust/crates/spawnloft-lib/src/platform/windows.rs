@@ -343,6 +343,20 @@ fn taskkill(pid: u32) {
     let _ = cmd.spawn();
 }
 
+/// `taskkill /PID <pid> /T /F`, started and not waited for, as supervisor.mjs `killTree` does.
+pub fn kill_tree_pid(pid: u32) {
+    taskkill(pid);
+}
+
+/// Node's `spawn(..., { detached: true, windowsHide: true })`: libuv's `DETACHED_PROCESS` and
+/// `CREATE_NEW_PROCESS_GROUP`, so the child has no console and Ctrl+C in the caller's never
+/// reaches it.
+pub fn detach(cmd: &mut Command) {
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+}
+
 /// TerminateProcess, which is what Node's `child.kill('SIGTERM')` does on Windows.
 pub fn terminate(child: &mut Child) {
     let _ = child.kill();

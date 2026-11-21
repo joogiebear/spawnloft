@@ -8,21 +8,26 @@ use spawnloft_lib::{diagnose, registry, supervisor};
 use super::Ctx;
 use super::output::{diagnose_context, dir_text};
 
-pub fn why(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
-    let name = super::require_name(&ctx.args.positional, "why")?.to_string();
-    let registry_file = Path::new(&ctx.layout.registry_file);
-    registry::lookup(registry_file, &name)?;
-    // printFindings reads the record again, as the Node core does
-    let inst = registry::lookup(registry_file, &name)?;
-    let lines = supervisor::tail_log(Path::new(&ctx.layout.console_log(&name)), 400.0)?;
-    let dir = dir_text(&inst)?;
+/// `printFindings(name)`: the console's known failure shapes as advice; how many there were.
+pub fn print_findings(ctx: &mut Ctx<'_>, name: &str) -> Result<usize, Failure> {
+    let inst = registry::lookup(Path::new(&ctx.layout.registry_file), name)?;
+    let lines = supervisor::tail_log(Path::new(&ctx.layout.console_log(name)), 400.0)?;
     let findings = diagnose::diagnose(&lines, &diagnose_context(&inst));
     for f in &findings {
         ctx.out.line("");
         ctx.out.line(&format!(">> {}", f.title));
         ctx.out.line(&format!("   {}", f.advice));
     }
-    if findings.is_empty() {
+    Ok(findings.len())
+}
+
+pub fn why(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
+    let name = super::require_name(&ctx.args.positional, "why")?.to_string();
+    let registry_file = Path::new(&ctx.layout.registry_file);
+    let inst = registry::lookup(registry_file, &name)?;
+    let found = print_findings(ctx, &name)?;
+    let dir = dir_text(&inst)?;
+    if found == 0 {
         ctx.out
             .line("Nothing SpawnLoft recognises in the recent console. The last lines of the log are the");
         ctx.out.line(&format!(
