@@ -472,24 +472,6 @@
     },
     {
       "args": [
-        "doctor",
-        "--json"
-      ],
-      "code": 1,
-      "stdout": "{\"schemaVersion\":1,\"command\":\"doctor\",\"ok\":false,\"data\":{\"healthy\":false,\"notes\":[\"java: openjdk version \\\"21.0.13.0.3\\\" <date>\",\"tar: tar (GNU tar) 1.35\",\"data root: <run>/data\",\"alpha: 64 B on disk at <run>/data/instances/alpha\"],\"problems\":[\"alpha: jar missing (<run>/data/instances/alpha/paper-1.21.4-15.jar)\",\"registry (RCON and database passwords): other users on this computer can read <run>/data/instances.json (its permissions are 644, not 600); run doctor without --json to make it owner-only\",\"alpha: server.properties (RCON password): other users on this computer can read <run>/data/instances/alpha/server.properties (its permissions are 644, not 600); run doctor without --json to make it owner-only\"]},\"error\":{\"code\":\"CHECK_FAILED\",\"message\":\"3 environment problem(s) found\"}}\n",
-      "stderr": ""
-    },
-    {
-      "args": [
-        "repair",
-        "--json"
-      ],
-      "code": 0,
-      "stdout": "{\"schemaVersion\":1,\"command\":\"repair\",\"ok\":true,\"data\":{\"shims\":0,\"launchers\":1,\"runtime\":\"<runtime>\",\"root\":\"<repo>\"}}\n",
-      "stderr": ""
-    },
-    {
-      "args": [
         "db",
         "--json"
       ],

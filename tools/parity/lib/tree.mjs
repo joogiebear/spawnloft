@@ -63,7 +63,8 @@ export function zipListing(buf) {
 }
 
 function tarListing(file) {
-  const r = spawnSync('tar', ['-tf', file], { encoding: 'utf8', windowsHide: true })
+  // by its bare name from its own folder: GNU tar (Git for Windows' bash) reads `D:\...` as a remote host
+  const r = spawnSync('tar', ['-tf', path.basename(file)], { cwd: path.dirname(file), encoding: 'utf8', windowsHide: true })
   return r.status === 0 ? r.stdout.replace(/\r\n/g, '\n') : null
 }
 

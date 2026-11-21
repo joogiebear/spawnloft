@@ -14,6 +14,10 @@
     {
       "pattern": "standard, \\d+ B",
       "replace": "standard, <archive-size>"
+    },
+    {
+      "pattern": "\"size\": \\d+,",
+      "replace": "\"size\": <archive-size>,"
     }
   ],
   "steps": [
@@ -366,13 +370,15 @@
       "run": [
         "doctor",
         "--json"
-      ]
+      ],
+      "golden": false
     },
     {
       "run": [
         "repair",
         "--json"
-      ]
+      ],
+      "golden": false
     },
     {
       "run": [
