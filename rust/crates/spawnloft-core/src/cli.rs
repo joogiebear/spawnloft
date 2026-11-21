@@ -180,6 +180,10 @@ pub const PORTED: &[Row] = &[
         names: &["props"],
         when: When::Always,
     },
+    Row {
+        names: &["db"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -598,8 +602,7 @@ mod tests {
     #[test]
     fn what_is_forwarded_to_the_node_core() {
         for line in [
-            &["db", "list"][..],
-            &["mcp"],
+            &["mcp"][..],
             &["task", "run", "abc"],
             &["backup", "survival"],
             &["ui"],
@@ -631,6 +634,7 @@ mod tests {
             &["user-path", "add"],
             &["start", "survival"],
             &["console", "survival"],
+            &["db", "list"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),

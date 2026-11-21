@@ -282,7 +282,7 @@ async function installRuntime(dir, staging, onProgress) {
   if (!RUNTIME_HASHES[rid]) fail(`No verified Redis runtime for ${rid}.`)
   const suffix = process.platform === 'win32' ? 'zip' : 'tar.gz'
   const url = `https://builds.dotnet.microsoft.com/dotnet/Runtime/${RUNTIME_VERSION}/dotnet-runtime-${RUNTIME_VERSION}-${rid}.${suffix}`
-  const res = await fetchRetry(url, {}, { timeoutMs: 600000 })
+  const res = await fetchRetry(url, { headers: { 'User-Agent': UA } }, { timeoutMs: 600000 })
   if (!res.ok || !res.body) fail(`Redis runtime download failed (${res.status}). Please retry.`)
   const file = path.join(staging, 'runtime-archive')
   const hash = crypto.createHash('sha512')

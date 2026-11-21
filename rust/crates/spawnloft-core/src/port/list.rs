@@ -98,47 +98,53 @@ pub fn list(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let dbs = registry::list_services(registry_file)?;
     if !dbs.is_empty() {
         ctx.out.line("");
-        let mut rows = vec![
-            [
-                "DATABASE", "STATUS", "ENGINE", "PORT", "ATTACHED", "UPTIME", "DIR",
-            ]
-            .map(String::from)
-            .to_vec(),
-        ];
-        for db in &dbs {
-            let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(db.path_name()?)))?;
-            let external = js::truthy(db.get("external"));
-            let version = match db.get("version") {
-                None | Some(Value::Null) => String::new(),
-                v => js::string(v),
-            };
-            let host = match db.get("host") {
-                None | Some(Value::Null) => "127.0.0.1".into(),
-                v => js::string(v),
-            };
-            let attached = attachment_names(db.get("attachments"));
-            rows.push(vec![
-                db.name.clone(),
-                if external {
-                    "external".into()
-                } else {
-                    status.label().into()
-                },
-                js::trim(&format!("{} {version}", engine_label(db.get("engine")))).to_string(),
-                if external {
-                    format!("{host}:{}", js::string(db.get("port")))
-                } else {
-                    cell(db.get("port"))
-                },
-                if attached.is_empty() { "-".into() } else { attached },
-                uptime_cell(status, state.as_ref()),
-                match db.get("dir") {
-                    None | Some(Value::Null) => "-".into(),
-                    v => js::string(v),
-                },
-            ]);
-        }
+        let rows = database_rows(ctx, &dbs)?;
         ctx.out.line(&text::table(&rows));
     }
     Ok(())
+}
+
+/// `databaseRows(dbs)`: the databases' table, header first.
+pub fn database_rows(ctx: &Ctx<'_>, dbs: &[Instance]) -> Result<Vec<Vec<String>>, Failure> {
+    let mut rows = vec![
+        [
+            "DATABASE", "STATUS", "ENGINE", "PORT", "ATTACHED", "UPTIME", "DIR",
+        ]
+        .map(String::from)
+        .to_vec(),
+    ];
+    for db in dbs {
+        let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(db.path_name()?)))?;
+        let external = js::truthy(db.get("external"));
+        let version = match db.get("version") {
+            None | Some(Value::Null) => String::new(),
+            v => js::string(v),
+        };
+        let host = match db.get("host") {
+            None | Some(Value::Null) => "127.0.0.1".into(),
+            v => js::string(v),
+        };
+        let attached = attachment_names(db.get("attachments"));
+        rows.push(vec![
+            db.name.clone(),
+            if external {
+                "external".into()
+            } else {
+                status.label().into()
+            },
+            js::trim(&format!("{} {version}", engine_label(db.get("engine")))).to_string(),
+            if external {
+                format!("{host}:{}", js::string(db.get("port")))
+            } else {
+                cell(db.get("port"))
+            },
+            if attached.is_empty() { "-".into() } else { attached },
+            uptime_cell(status, state.as_ref()),
+            match db.get("dir") {
+                None | Some(Value::Null) => "-".into(),
+                v => js::string(v),
+            },
+        ]);
+    }
+    Ok(rows)
 }

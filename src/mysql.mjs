@@ -14,6 +14,9 @@ import * as maria from './mariadb.mjs'
 import { MARIADB_READY_RE } from './ready.mjs'
 import { ensureLibraries, libraryEnv } from './linux-libs.mjs'
 
+// named like every other SpawnLoft download (2.0's Rust core sends the same)
+const UA = 'SpawnLoft (github.com/joogiebear/spawnloft)'
+
 export const ENGINE = 'mysql'
 export const LABEL = 'MySQL'
 export const KIND = 'mariadb'
@@ -93,7 +96,7 @@ export async function fetchEngine(version, { onProgress = null } = {}) {
     const file = path.join(staging, archive.file)
     const unpacked = path.join(staging, 'engine')
     fs.mkdirSync(unpacked)
-    const response = await fetchRetry(archive.url, {}, { timeoutMs: 600000 })
+    const response = await fetchRetry(archive.url, { headers: { 'User-Agent': UA } }, { timeoutMs: 600000 })
     if (!response.ok || !response.body) fail(`MySQL download failed (${response.status}). Please retry.`)
     const total = Number(response.headers.get('content-length')) || 0
     let received = 0
