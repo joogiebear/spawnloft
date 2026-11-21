@@ -70,7 +70,21 @@ export const isTwoX = version => Number(String(version).split('.')[0]) >= 2
 // data, after the files are in place (deb postinst; rpm %posttrans, after the old package's
 // removal). Idempotent, so an upgrade of this package running it again does no harm. Never fails
 // the install: a user it misses can run `spawnloft repair`.
-export const AFTER_INSTALL_2X = `if command -v runuser >/dev/null 2>&1 && command -v getent >/dev/null 2>&1; then
+// A user with tasks is found by their systemd units too, since data under a custom XDG_DATA_HOME
+// or dataRoot is not in the folders checked. As that user (never as root: the shim is theirs), the
+// data root and XDG folders a task shim exports are read back, so the repair finds the same data.
+// No single quotes in it: it is passed inside them. `spawnloft` is a parameter only for the test.
+export const REPAIR_AS_USER = `units="$HOME/.config/systemd/user"
+for unit in "$units"/spawnloft-*.service; do
+  [ -f "$unit" ] || continue
+  shim=$(sed -n "s|^ExecStart=/bin/sh \\"\\(.*\\)\\"$|\\1|p" "$unit" | head -n 1)
+  [ -n "$shim" ] && [ -f "$shim" ] || continue
+  eval "$(grep -E "^export (SPAWNLOFT_DATA_ROOT|XDG_CONFIG_HOME|XDG_DATA_HOME)=" "$shim")"
+  break
+done
+exec "$0" repair --quiet`
+
+export const afterInstall2x = ({ spawnloft = '/usr/bin/spawnloft' } = {}) => `if command -v runuser >/dev/null 2>&1 && command -v getent >/dev/null 2>&1; then
   getent passwd | while IFS=: read -r user _ uid _ _ home _; do
     case "$uid" in ''|*[!0-9]*) continue ;; esac
     if [ "$uid" -ne 0 ] && { [ "$uid" -lt 1000 ] || [ "$uid" -eq 65534 ]; }; then continue; fi
@@ -79,13 +93,18 @@ export const AFTER_INSTALL_2X = `if command -v runuser >/dev/null 2>&1 && comman
     for dir in .local/share/spawnloft .local/share/mcctl .config/spawnloft .config/mcctl; do
       [ -e "$home/$dir" ] && found=1
     done
+    for unit in "$home"/.config/systemd/user/spawnloft-*.service; do
+      [ -f "$unit" ] && found=1
+    done
     [ -n "$found" ] || continue
-    timeout 120 runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" PATH=/usr/bin:/bin \\
-      /usr/bin/spawnloft repair --quiet </dev/null >/dev/null 2>&1 || true
+    # above the core's own 120 s limit on the Node core, so that one ends first and cleans up
+    timeout 150 runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" PATH=/usr/bin:/bin \\
+      /bin/sh -c '${REPAIR_AS_USER}' ${spawnloft} </dev/null >/dev/null 2>&1 || true
   done
 fi
 exit 0
 `
+export const AFTER_INSTALL_2X = afterInstall2x()
 
 export const debPostinst2x = () => `#!/bin/sh
 case "$1" in
