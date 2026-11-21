@@ -1579,10 +1579,10 @@ pub fn make_junction(target: &std::path::Path, at: &std::path::Path) -> std::io:
     if let Some(rest) = text.strip_prefix(r"\\?\") {
         text = rest.to_string();
     }
-    // libuv's fs__create_junction ends both names with a separator, so the link reads back as
-    // Node's own junctions do
-    if !text.ends_with('\\') {
-        text.push('\\');
+    // no separator at the end: the link reads back as Node's junctions do (`readlinkSync` gives
+    // the folder without one), which `data status` prints
+    while text.len() > 3 && text.ends_with('\\') {
+        text.pop();
     }
     let sub: Vec<u16> = format!(r"\??\{text}").encode_utf16().collect();
     let print: Vec<u16> = text.encode_utf16().collect();
