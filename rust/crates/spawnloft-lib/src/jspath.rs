@@ -160,6 +160,8 @@ pub fn join_path(base: &str, names: &[&str]) -> PathBuf {
 pub fn node_error(e: &std::io::Error, syscall: &str, path: Option<&Path>) -> String {
     let (code, text) = error_code(e);
     match path {
+        // Node on Windows names the path as the system was given it: resolved, with backslashes
+        Some(p) if cfg!(windows) => format!("{code}: {text}, {syscall} '{}'", resolve(&p.to_string_lossy())),
         Some(p) => format!("{code}: {text}, {syscall} '{}'", p.display()),
         None => format!("{code}: {text}, {syscall}"),
     }
