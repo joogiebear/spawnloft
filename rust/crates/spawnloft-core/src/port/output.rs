@@ -265,7 +265,7 @@ pub fn query(ctx: &mut Ctx<'_>, command: &str) -> Result<Value, Failure> {
                 .collect();
             Ok(json!({ "instance": name, "backups": rows }))
         }
-        // plugins are not ported: the ownership table never sends them here
+        "plugins" => Ok(json!({ "instance": name, "plugins": spawnloft_lib::plugins::list_plugins(&inst)? })),
         other => Err(Failure::usage(format!(
             "JSON output is not supported for {other}"
         ))),

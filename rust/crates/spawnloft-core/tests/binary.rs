@@ -79,7 +79,7 @@ process.stdin.on('end', () => {
     .unwrap();
     use std::io::Write;
     let mut child = std::process::Command::new(BIN)
-        .args(["plugins", "7", "--json", "a b"])
+        .args(["bot", "7", "--json", "a b"])
         .env("SPAWNLOFT_CORE_DIR", core.path())
         .env("SPAWNLOFT_NODE", &node)
         .env("ELECTRON_RUN_AS_NODE", "1")
@@ -98,7 +98,7 @@ process.stdin.on('end', () => {
         String::from_utf8_lossy(&out.stderr)
     );
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
-    assert_eq!(v["args"], serde_json::json!(["plugins", "7", "--json", "a b"]));
+    assert_eq!(v["args"], serde_json::json!(["bot", "7", "--json", "a b"]));
     assert_eq!(v["stdin"], "hello mcp");
     assert_eq!(
         v["electron"],
@@ -117,7 +117,7 @@ process.stdin.on('end', () => {
 fn a_missing_node_core_is_reported_not_a_crash() {
     let core = TempDir::new("forward-missing");
     let out = std::process::Command::new(BIN)
-        .arg("plugins")
+        .arg("bot")
         .env("SPAWNLOFT_CORE_DIR", core.path())
         .env("SPAWNLOFT_NODE", "node")
         .output()
