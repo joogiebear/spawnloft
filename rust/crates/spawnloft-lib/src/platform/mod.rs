@@ -34,24 +34,76 @@ pub struct InterfaceAddress {
     pub internal: bool,
 }
 
-/// Signal names as Node reports them in `exitSignal`.
+/// Signal names as Node reports them in `exitSignal` (the numbers differ between Linux and macOS
+/// past the classic few).
 pub fn signal_name(n: i32) -> String {
-    let name = match n {
-        1 => "SIGHUP",
-        2 => "SIGINT",
-        3 => "SIGQUIT",
-        4 => "SIGILL",
-        5 => "SIGTRAP",
-        6 => "SIGABRT",
-        8 => "SIGFPE",
-        9 => "SIGKILL",
-        11 => "SIGSEGV",
-        13 => "SIGPIPE",
-        14 => "SIGALRM",
-        15 => "SIGTERM",
-        _ => return format!("SIG{n}"),
+    let common = match n {
+        1 => Some("SIGHUP"),
+        2 => Some("SIGINT"),
+        3 => Some("SIGQUIT"),
+        4 => Some("SIGILL"),
+        5 => Some("SIGTRAP"),
+        6 => Some("SIGABRT"),
+        8 => Some("SIGFPE"),
+        9 => Some("SIGKILL"),
+        11 => Some("SIGSEGV"),
+        13 => Some("SIGPIPE"),
+        14 => Some("SIGALRM"),
+        15 => Some("SIGTERM"),
+        _ => None,
     };
-    name.to_string()
+    let bsd = cfg!(any(target_os = "macos", target_os = "freebsd"));
+    let other = if bsd {
+        match n {
+            7 => Some("SIGEMT"),
+            10 => Some("SIGBUS"),
+            12 => Some("SIGSYS"),
+            16 => Some("SIGURG"),
+            17 => Some("SIGSTOP"),
+            18 => Some("SIGTSTP"),
+            19 => Some("SIGCONT"),
+            20 => Some("SIGCHLD"),
+            21 => Some("SIGTTIN"),
+            22 => Some("SIGTTOU"),
+            23 => Some("SIGIO"),
+            24 => Some("SIGXCPU"),
+            25 => Some("SIGXFSZ"),
+            26 => Some("SIGVTALRM"),
+            27 => Some("SIGPROF"),
+            28 => Some("SIGWINCH"),
+            29 => Some("SIGINFO"),
+            30 => Some("SIGUSR1"),
+            31 => Some("SIGUSR2"),
+            _ => None,
+        }
+    } else {
+        match n {
+            7 => Some("SIGBUS"),
+            10 => Some("SIGUSR1"),
+            12 => Some("SIGUSR2"),
+            16 => Some("SIGSTKFLT"),
+            17 => Some("SIGCHLD"),
+            18 => Some("SIGCONT"),
+            19 => Some("SIGSTOP"),
+            20 => Some("SIGTSTP"),
+            21 => Some("SIGTTIN"),
+            22 => Some("SIGTTOU"),
+            23 => Some("SIGURG"),
+            24 => Some("SIGXCPU"),
+            25 => Some("SIGXFSZ"),
+            26 => Some("SIGVTALRM"),
+            27 => Some("SIGPROF"),
+            28 => Some("SIGWINCH"),
+            29 => Some("SIGIO"),
+            30 => Some("SIGPWR"),
+            31 => Some("SIGSYS"),
+            _ => None,
+        }
+    };
+    match common.or(other) {
+        Some(name) => name.to_string(),
+        None => format!("SIG{n}"),
+    }
 }
 
 /// Logical processors, as Node's `os.cpus().length` counts them (the whole machine, not this

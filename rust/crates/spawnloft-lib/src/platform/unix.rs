@@ -179,6 +179,21 @@ pub fn detach(cmd: &mut Command) {
     }
 }
 
+/// libuv's child setup: every signal back to its default before the program runs, so one this
+/// process ignores (`nohup`, a `trap '' TERM`) is not ignored by the child too.
+pub fn default_signals(cmd: &mut Command) {
+    // SAFETY: signal is async-signal-safe; a number the system refuses (SIGKILL, SIGSTOP) fails
+    // harmlessly.
+    unsafe {
+        cmd.pre_exec(|| {
+            for n in 1..32 {
+                signal(n, 0);
+            }
+            Ok(())
+        });
+    }
+}
+
 /// Puts the server in a process group of its own, led by it, so `kill(-pid)` reaches its forks.
 pub fn prepare_server(cmd: &mut Command) {
     cmd.process_group(0);

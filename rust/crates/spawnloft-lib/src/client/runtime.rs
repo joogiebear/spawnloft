@@ -430,19 +430,6 @@ fn sha1_of(file: &str) -> Option<String> {
     Some(crate::sha1::hex(&bytes))
 }
 
-fn rm_file(p: &str) -> Result<(), Failure> {
-    match std::fs::remove_file(p) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-            // a folder in the way goes too, as rmSync({ force, recursive }) would take it
-            if std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir()) {
-                return std::fs::remove_dir_all(p).map_err(|e| Failure::io(&e, "rm", Some(Path::new(p))));
-            }
-            Err(Failure::io(&e, "rm", Some(Path::new(p))))
-        }
-        _ => Ok(()),
-    }
-}
-
 /// What `ensureRuntime` answers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ensured {
@@ -588,7 +575,7 @@ fn ensure_locked(
                         let dest = jspath::join(&[dir, &d.rel]);
                         let one = (|| {
                             crate::fsx::mkdir_all(Path::new(&jspath::dirname(&dest)))?;
-                            rm_file(&dest)?;
+                            super::rm_force(&dest)?;
                             fetch(
                                 &d.url,
                                 Path::new(&dest),
@@ -598,7 +585,7 @@ fn ensure_locked(
                             if let Some(size) = d.size
                                 && std::fs::metadata(&dest).map_or(true, |m| m.len() as f64 != size)
                             {
-                                rm_file(&dest)?;
+                                super::rm_force(&dest)?;
                                 return Err(user(format!("{component} {} came back the wrong size", d.rel)));
                             }
                             Ok(())

@@ -893,6 +893,8 @@ pub fn spawn_client(
         c.env("ELECTRON_RUN_AS_NODE", "1");
     }
     crate::platform::detach(&mut c);
+    // as libuv does for every child: signals this process ignores are not the game's to ignore
+    crate::platform::default_signals(&mut c);
     let child = c.spawn().map_err(|e| {
         user(format!(
             "could not start {}: spawn {cmd} {}",
@@ -958,7 +960,7 @@ pub fn note_exit(paths: &Paths, name: &str, started: &Started, status: std::proc
         &paths.last_exit(name),
         &json!({
             "pid": started.pid,
-            "code": status.code(),
+            "code": exit_code(&status),
             "signal": signal,
             "startedAt": started.started_at,
             "endedAt": iso_now(),
@@ -969,6 +971,17 @@ pub fn note_exit(paths: &Paths, name: &str, started: &Started, status: std::proc
     if mine {
         let _ = super::rm_force(&paths.state_file(name));
     }
+}
+
+/// The exit code as Node reports it: Windows' is a DWORD, so a crash is 3221225477, not negative.
+fn exit_code(status: &std::process::ExitStatus) -> Option<i64> {
+    status.code().map(|c| {
+        if cfg!(windows) {
+            i64::from(c as u32)
+        } else {
+            i64::from(c)
+        }
+    })
 }
 
 #[cfg(unix)]

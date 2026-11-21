@@ -407,6 +407,9 @@ pub fn kill_tree_pid(pid: u32) {
     taskkill(pid);
 }
 
+/// Unix only: Windows has no ignored signals for a child to inherit.
+pub fn default_signals(_cmd: &mut Command) {}
+
 /// Node's `spawn(..., { detached: true, windowsHide: true })`: libuv's `DETACHED_PROCESS` and
 /// `CREATE_NEW_PROCESS_GROUP`, so the child has no console and Ctrl+C in the caller's never
 /// reaches it.
