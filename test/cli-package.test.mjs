@@ -68,3 +68,54 @@ test('the runtime is pinned to a version and a published hash for each architect
   const wanted = Number(/>=(\d+)/.exec(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).engines.node)[1])
   assert.ok(Number(NODE_VERSION.split('.')[0]) >= wanted)
 })
+
+// Swapping the 1.x desktop package for this one leaves task shims naming the removed
+// /opt/SpawnLoft, so the 2.x package repairs them as each user who has SpawnLoft data.
+test('a 2.x package repairs the task shims of every user with SpawnLoft data after install', async () => {
+  const { AFTER_INSTALL_2X, debPostinst2x } = await import('../desktop/build-cli-package.mjs')
+  const fs = await import('node:fs')
+  const os = await import('node:os')
+  const path = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+  if (process.platform === 'win32') return
+
+  const spec2 = rpmSpec({ version: '2.0.0-beta.1010', staging: '/tmp/stage' })
+  assert.match(spec2, /\n%posttrans\n[\s\S]*spawnloft repair --quiet/, 'the rpm runs the repair after the old package is gone')
+  assert.doesNotMatch(rpmSpec({ version: '1.6.0', staging: '/tmp/stage' }), /%posttrans/, 'a 1.x package has no 2.x repair')
+  assert.match(debPostinst2x(), /^#!\/bin\/sh\ncase "\$1" in\n  configure\)/)
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-cli-postinst-'))
+  try {
+    const bin = path.join(dir, 'bin')
+    const log = path.join(dir, 'calls.log')
+    fs.mkdirSync(bin)
+    const homes = { victor: path.join(dir, 'victor'), olduser: path.join(dir, 'olduser'), fresh: path.join(dir, 'fresh'), daemon: path.join(dir, 'daemon') }
+    fs.mkdirSync(path.join(homes.victor, '.local', 'share', 'mcctl'), { recursive: true })
+    fs.mkdirSync(path.join(homes.olduser, '.config', 'spawnloft'), { recursive: true })
+    fs.mkdirSync(homes.fresh)
+    fs.mkdirSync(path.join(homes.daemon, '.local', 'share', 'spawnloft'), { recursive: true })
+    const passwd = [
+      `victor:x:1000:1000::${homes.victor}:/bin/bash`,
+      `olduser:x:1001:1001::${homes.olduser}:/bin/bash`,
+      `fresh:x:1002:1002::${homes.fresh}:/bin/bash`,
+      `daemon:x:2:2::${homes.daemon}:/usr/sbin/nologin`,
+      `nobody:x:65534:65534::${homes.victor}:/usr/sbin/nologin`,
+      `gone:x:1003:1003::${path.join(dir, 'missing')}:/bin/bash`,
+    ].join('\n')
+    fs.writeFileSync(path.join(dir, 'passwd'), passwd + '\n')
+    const tool = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 })
+    tool('getent', `cat '${path.join(dir, 'passwd')}'`)
+    tool('timeout', 'shift; exec "$@"')
+    // a failing repair must not fail the install
+    tool('runuser', `echo "$*" >> '${log}'; exit 1`)
+
+    const res = spawnSync('sh', ['-c', AFTER_INSTALL_2X], { env: { PATH: `${bin}:/usr/bin:/bin` }, encoding: 'utf8' })
+    assert.equal(res.status, 0, res.stderr)
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n')
+    assert.equal(calls.length, 2, calls.join('\n'))
+    assert.match(calls[0], new RegExp(`^-u victor -- env -i HOME=${homes.victor} USER=victor .* /usr/bin/spawnloft repair --quiet$`))
+    assert.match(calls[1], /^-u olduser -- /)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
