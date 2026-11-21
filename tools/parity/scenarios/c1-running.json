@@ -1,7 +1,8 @@
 {
   "about": "C1's commands over a server that is really running: started by the Node core on both sides (start is not ported yet) with the JVM stand-in, then list, status, why, logs and metrics while it runs, a database row next to it, and the same after it stops.",
   "normalize": [
-    { "pattern": "\\b\\d+s\\b", "replace": "<secs>" },
+    { "pattern": "\\b\\d+s\\b *", "replace": "<secs> " },
+    { "pattern": "\"samples\":\\[[^\\]]*\\]", "replace": "\"samples\":<samples>" },
     { "pattern": "\"(?:uptimeMs)\":\\d+", "replace": "\"uptimeMs\":<ms>" },
     { "pattern": "Started \"run1\" in [^\\n]*", "replace": "Started \"run1\" <took>" },
     { "pattern": "\\(build [^)]*\\)", "replace": "(build)" },

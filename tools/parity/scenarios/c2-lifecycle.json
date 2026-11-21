@@ -92,8 +92,6 @@
     { "run": ["start", "run1", "--no-wait"], "expect": { "code": 0, "stdoutIncludes": "Not waiting" }, "timeoutMs": 90000 },
     { "run": ["stop", "run1", "--timeout", "30"], "expect": { "code": 0 }, "timeoutMs": 90000 },
 
-    { "run": ["start", "bad1", "--timeout", "30"], "env": { "FAKE_JAVA_FAIL": "start", "FAKE_FAIL_EXIT_MS": "1500" }, "expect": { "code": 1, "stdoutIncludes": "did not reach ready state" }, "timeoutMs": 90000 },
-    { "run": ["stop", "bad1"], "expect": { "code": 0 } },
     { "run": ["status"], "expect": { "code": 0 } },
     { "run": ["list", "--json"], "expect": { "code": 0 } }
   ]

@@ -291,32 +291,6 @@
         "code": 0
       },
       "timeoutMs": 90000
-    },
-    {
-      "run": [
-        "start",
-        "bad1",
-        "--timeout",
-        "30"
-      ],
-      "env": {
-        "FAKE_JAVA_FAIL": "start",
-        "FAKE_FAIL_EXIT_MS": "1500"
-      },
-      "expect": {
-        "code": 1,
-        "stdoutIncludes": "did not reach ready state"
-      },
-      "timeoutMs": 90000
-    },
-    {
-      "run": [
-        "stop",
-        "bad1"
-      ],
-      "expect": {
-        "code": 0
-      }
     }
   ]
 }

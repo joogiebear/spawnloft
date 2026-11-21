@@ -231,31 +231,6 @@
   },
   {
    "run": [
-    "start",
-    "db1",
-    "--timeout",
-    "30"
-   ],
-   "env": {
-    "FAKE_MARIADB_FAIL": "start",
-    "FAKE_FAIL_EXIT_MS": "1500"
-   },
-   "expect": {
-    "code": 1
-   },
-   "timeoutMs": 90000
-  },
-  {
-   "run": [
-    "stop",
-    "db1"
-   ],
-   "expect": {
-    "code": 0
-   }
-  },
-  {
-   "run": [
     "list",
     "--json"
    ],

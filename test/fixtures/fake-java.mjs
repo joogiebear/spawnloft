@@ -11,9 +11,7 @@
  *   fork        starts a helper process and prints its pid, so a force kill can be checked to reach it
  *   anything else is echoed, which proves a line reached the server
  *
- * FAKE_JAVA_FAIL=start makes it die during startup the way a taken port does; with
- * FAKE_FAIL_EXIT_MS it dies that long after saying so, so whoever reads the console sees the
- * failure before the process is gone (a fixed order for the activity log in the parity rig).
+ * FAKE_JAVA_FAIL=start makes it die during startup the way a taken port does.
  * FAKE_JAVA_RCON=1 makes it answer RCON (test/fixtures/fake-rcon.mjs) on the rcon.port and
  * rcon.password of the server.properties in its folder, as a server with enable-rcon=true does.
  */
@@ -26,7 +24,6 @@ const say = (line) => process.stdout.write(`[00:00:00 INFO]: ${line}\n`)
 say(`Starting minecraft server (fake) with ${process.argv.slice(2).join(' ')}`)
 if (process.env.FAKE_JAVA_FAIL === 'start') {
   say('Failed to start the minecraft server')
-  await new Promise((resolve) => setTimeout(resolve, Number(process.env.FAKE_FAIL_EXIT_MS) || 0))
   process.exit(1)
 }
 
