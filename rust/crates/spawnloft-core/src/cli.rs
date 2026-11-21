@@ -260,6 +260,11 @@ pub const PORTED: &[Row] = &[
         names: &["rebuild"],
         when: When::Always,
     },
+    // C5: plugins and modpacks
+    Row {
+        names: &["plugins"],
+        when: When::Always,
+    },
     // C6: scheduled tasks, and what moves or drops a server with its tasks
     Row {
         names: &["task"],
@@ -284,6 +289,7 @@ pub const PORTED: &[Row] = &[
 /// profiles, accounts and running games without the network).
 pub const CLIENT_PORTED: &[&str] = &[
     "list", "status", "logs", "accounts", "logout", "remove", "stop", "versions", "new", "set", "login",
+    "install",
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -711,7 +717,7 @@ mod tests {
             assert!(is_ported(&strings), "{line:?}");
         }
         assert!(!is_ported(&["--version".to_string()]));
-        assert!(!is_ported(&["plugins".to_string()]));
+        assert!(!is_ported(&["pack".to_string()]));
     }
 
     #[test]
@@ -771,16 +777,12 @@ mod tests {
             &["client", "set", "p", "memory=4G"],
             &["client", "versions", "--all"],
             &["client", "login", "--json"],
+            &["client", "install", "p", "--verify"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
         }
-        for line in [
-            &["client"][..],
-            &["client", "launch", "p"],
-            &["client", "install", "p"],
-            &["client", "--json"],
-        ] {
+        for line in [&["client"][..], &["client", "launch", "p"], &["client", "--json"]] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
                 "{line:?} stays with Node"
@@ -804,7 +806,7 @@ mod tests {
     fn what_is_forwarded_to_the_node_core() {
         for line in [
             &["mcp"][..],
-            &["plugins", "survival"],
+            &["pack", "survival"],
             &["ui"],
             &["ui", "--port", "8080"],
             &["repair"],

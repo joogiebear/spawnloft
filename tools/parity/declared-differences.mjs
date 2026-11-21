@@ -116,7 +116,7 @@ export const DECLARED = [
     // the registry then holds as "\ud83d". Node prints it as U+FFFD and re-escapes it in --json;
     // a Rust string cannot hold the half, so it reads as U+FFFD from the start
     id: 'lone-surrogate',
-    where: 'a JSON file holding half of a surrogate pair (`"\\ud83d"`)',
+    where: 'a JSON file holding half of a surrogate pair (`"\\ud83d"`), or a jar manifest string the reader cuts inside a pair (an unterminated `\'\'\'` string in mods.toml)',
     node: 'kept; printed as U+FFFD, re-escaped as `\\ud83d` in JSON output',
     rust: 'read as U+FFFD, printed and written as that character',
     apply: (text) => text.replace(/\\ud[89a-f][0-9a-f]{2}/gi, '\ufffd'),
@@ -128,7 +128,17 @@ export const DECLARED = [
     node: 'read as Infinity',
     rust: 'refused as a file that does not parse',
     apply: null,
-    held: 'no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); scenarios do not hand-write one',
+    held: 'no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); a mod\'s own fabric.mod.json could, and its row then falls back to mods.toml or the file name (no published mod writes one); scenarios do not hand-write one',
+  },
+  {
+    // found by the C5 review: js_sort (spawnloft-lib plugins.rs) is V8's TimSort below 64 items
+    // only; beyond, it makes a superset of V8's comparisons
+    id: 'sort-comparisons-over-64',
+    where: '`plugins` on a folder of 64 or more jars, one of whose manifests gives a name that is not text',
+    node: 'lists, unless V8\'s merge happens to compare that name on the left',
+    rust: 'can fail with `a.name.localeCompare is not a function` where Node lists',
+    apply: null,
+    held: 'scenarios list fewer than 64 jars, or only text names',
   },
   {
     // design D4 (rust/INSTALLER-UPDATER-DESIGN.md): 2.0's daemon records daemonStartTime, the

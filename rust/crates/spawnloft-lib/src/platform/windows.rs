@@ -252,6 +252,27 @@ pub fn interrupted() -> Option<u8> {
     }
 }
 
+/// `os.release()`: `major.minor.build` as RtlGetVersion reports it (GetVersionEx would answer
+/// 6.2 to a process without a compatibility manifest).
+pub fn os_release() -> String {
+    use windows_sys::Win32::System::SystemInformation::OSVERSIONINFOW;
+    #[link(name = "ntdll")]
+    unsafe extern "system" {
+        fn RtlGetVersion(info: *mut OSVERSIONINFOW) -> i32;
+    }
+    // SAFETY: a zeroed OSVERSIONINFOW with its size set is what RtlGetVersion fills in.
+    let mut info: OSVERSIONINFOW = unsafe { std::mem::zeroed() };
+    info.dwOSVersionInfoSize = std::mem::size_of::<OSVERSIONINFOW>() as u32;
+    // SAFETY: info is a valid, writable OSVERSIONINFOW.
+    if unsafe { RtlGetVersion(&mut info) } != 0 {
+        return String::new();
+    }
+    format!(
+        "{}.{}.{}",
+        info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber
+    )
+}
+
 /// The interrupt [`watch_interrupts`] caught, cleared so the next one is seen too.
 pub fn take_interrupt() -> Option<u8> {
     match INTERRUPT_CODE.swap(0, std::sync::atomic::Ordering::SeqCst) {
