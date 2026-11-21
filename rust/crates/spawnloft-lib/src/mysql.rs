@@ -134,8 +134,10 @@ pub fn launch_spec(layout: &Layout, inst: &Instance) -> Result<LaunchSpec, Failu
     }
     #[cfg(unix)]
     socket_for(inst)?;
-    let server = mariadb::binary(&dir, "server").expect("checked by has_engine");
-    let admin = mariadb::binary(&dir, "admin").expect("checked by has_engine");
+    // has_engine checked both; a folder changed in between fails as a missing engine, never a panic
+    let missing = || Failure::user("The managed MySQL engine is missing or incomplete.");
+    let server = mariadb::binary(&dir, "server").ok_or_else(missing)?;
+    let admin = mariadb::binary(&dir, "admin").ok_or_else(missing)?;
     let mut env = Env::new();
     crate::linux_libs::library_env(&server.path, &mut env);
     let mut args = vec![format!("--defaults-file={}", mariadb::ini_file(inst))];

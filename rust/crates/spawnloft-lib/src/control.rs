@@ -55,26 +55,39 @@ pub fn pid_alive(v: Option<&Value>) -> bool {
 }
 
 /// The process table `processImage` reads (`ps -A -o pid=,comm=`, or `tasklist` on Windows),
-/// pid to image name. Read again when older than two seconds, as util.mjs does.
-fn process_image(pid: f64) -> Option<String> {
+/// pid to image name, and when it was read (epoch ms). Read again when older than two seconds,
+/// or at once when `force` (sameProcess's recheck), as util.mjs does.
+fn process_image(pid: f64, force: bool) -> (Option<String>, i64) {
     use std::sync::Mutex;
     use std::time::{Duration, Instant};
-    type Table = Option<(Instant, Option<Vec<(f64, String)>>)>;
+    type Table = Option<(Instant, i64, Option<Vec<(f64, String)>>)>;
     static TABLE: Mutex<Table> = Mutex::new(None);
     let mut held = TABLE.lock().unwrap_or_else(|e| e.into_inner());
     let fresh = held
         .as_ref()
-        .is_some_and(|(at, _)| at.elapsed() <= Duration::from_secs(2));
-    if !fresh {
-        *held = Some((Instant::now(), read_process_table()));
+        .is_some_and(|(at, _, _)| at.elapsed() <= Duration::from_secs(2));
+    if force || !fresh {
+        let (at, wall) = (Instant::now(), crate::time::now_ms());
+        match read_process_table() {
+            Some(rows) => *held = Some((at, wall, Some(rows))),
+            // a failed recheck keeps the table it had, as util.mjs does
+            None if force && held.is_some() => {}
+            None => *held = Some((at, wall, None)),
+        }
     }
-    let rows = held.as_ref().and_then(|(_, rows)| rows.as_ref())?;
-    rows.iter()
-        .rfind(|(p, _)| *p == pid)
-        .map(|(_, name)| name.clone())
+    let Some((_, wall, rows)) = held.as_ref() else {
+        return (None, 0);
+    };
+    let name = rows
+        .as_ref()
+        .and_then(|rows| rows.iter().rfind(|(p, _)| *p == pid))
+        .map(|(_, name)| name.clone());
+    (name, *wall)
 }
 
+/// `readProcessTable()`: `None` when the command fails or takes over 10 s.
 fn read_process_table() -> Option<Vec<(f64, String)>> {
+    use std::io::Read;
     let (cmd, args): (&str, &[&str]) = if cfg!(windows) {
         ("tasklist", &["/FO", "CSV", "/NH"])
     } else {
@@ -84,20 +97,41 @@ fn read_process_table() -> Option<Vec<(f64, String)>> {
     command
         .args(args)
         .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW, as windowsHide
     }
-    let out = command.output().ok()?;
-    if !out.status.success() {
+    let mut child = command.spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        let _ = tx.send(buf);
+    });
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(s)) => break s,
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    };
+    let left = deadline.saturating_duration_since(std::time::Instant::now());
+    let out = rx.recv_timeout(left).ok()?;
+    if !status.success() {
         return None;
     }
-    Some(parse_process_table(
-        &String::from_utf8_lossy(&out.stdout),
-        cfg!(windows),
-    ))
+    Some(parse_process_table(&String::from_utf8_lossy(&out), cfg!(windows)))
 }
 
 /// `parseProcessTable`.
@@ -178,7 +212,17 @@ fn same(state: &Map<String, Value>, pid_key: &str, exe_key: &str, start_key: Opt
     let Some(key) = raw.and_then(Value::as_f64) else {
         return true;
     };
-    match process_image(key) {
+    let (mut actual, table_at) = process_image(key, false);
+    // pids are reused: a table older than this launch that contradicts the record is read again
+    // before it is believed, so a new daemon is not taken for the previous owner of its pid
+    let started_at = js::number(state.get("startedAt"));
+    if let Some(a) = &actual
+        && started_at > table_at as f64
+        && !same_image(a, &expected, linux)
+    {
+        actual = process_image(key, true).0;
+    }
+    match actual {
         Some(actual) => same_image(&actual, &expected, linux),
         None => true,
     }
@@ -367,6 +411,49 @@ pub fn control_request(addr: &str, name: &str, req: &Value, timeout_ms: f64) -> 
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[cfg(unix)]
+    #[test]
+    fn the_control_channel_fails_as_the_node_client_does() {
+        let dir = std::env::temp_dir().join(format!("sl-ctl-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sock = dir.join("control.sock");
+        let addr = sock.to_string_lossy().into_owned();
+        // nothing there: not running
+        let f = control_request(&addr, "s", &json!({ "op": "ping" }), 1000.0).unwrap_err();
+        assert_eq!(f.message(), "instance \"s\" is not running");
+        // a listener that hangs up, one that answers garbage, one that never answers
+        let listener = std::os::unix::net::UnixListener::bind(&sock).unwrap();
+        let serve = std::thread::spawn(move || {
+            use std::io::{Read, Write};
+            let mut b = [0u8; 64];
+            // read the request, then hang up (a hang-up with it unread is a reset instead)
+            let (mut c, _) = listener.accept().unwrap();
+            let _ = c.read(&mut b);
+            drop(c);
+            let (mut c, _) = listener.accept().unwrap();
+            let _ = c.read(&mut b);
+            c.write_all(b"not json\n").unwrap();
+            let (c, _) = listener.accept().unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            drop(c);
+        });
+        let f = control_request(&addr, "s", &json!({ "op": "ping" }), 1000.0).unwrap_err();
+        assert_eq!(
+            f.message(),
+            "daemon for \"s\" closed the connection without replying to \"ping\""
+        );
+        let f = control_request(&addr, "s", &json!({ "op": "ping" }), 1000.0).unwrap_err();
+        assert!(
+            f.message().starts_with("bad response from daemon: "),
+            "{}",
+            f.message()
+        );
+        let f = control_request(&addr, "s", &json!({ "op": "stop" }), 100.0).unwrap_err();
+        assert_eq!(f.message(), "control request \"stop\" timed out for \"s\"");
+        serve.join().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn pids_coerce_as_process_kill_does() {

@@ -8,7 +8,8 @@
  *   sql <base64>      append the statements to <datadir>/sql.log, answer "ok"
  *   dump <base64 db>  answer "ok <base64 dump text>" and close, the way a dump streams
  *
- * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does.
+ * FAKE_MARIADB_FAIL=start makes it die during startup the way a taken port does, FAKE_FAIL_EXIT_MS
+ * after saying so (0 by default).
  */
 import fs from 'node:fs'
 import net from 'node:net'
@@ -24,6 +25,7 @@ note(`Starting fake MariaDB ${process.argv.slice(2).join(' ')}`)
 if (process.env.FAKE_MARIADB_FAIL === 'start') {
   process.stderr.write("2026-09-05 12:00:00 0 [ERROR] Can't start server: Bind on TCP/IP port. Got error: 10048\n")
   process.stderr.write('2026-09-05 12:00:00 0 [ERROR] Aborting\n')
+  await new Promise((resolve) => setTimeout(resolve, Number(process.env.FAKE_FAIL_EXIT_MS) || 0))
   process.exit(1)
 }
 

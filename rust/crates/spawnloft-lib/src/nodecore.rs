@@ -17,7 +17,7 @@ pub struct NodeCore {
     pub node: PathBuf,
     /// the folder holding spawnloft.mjs
     pub dir: PathBuf,
-    /// for the registry check
+    /// the data root it serves (repair and uninstall act on it)
     pub data_root: PathBuf,
 }
 

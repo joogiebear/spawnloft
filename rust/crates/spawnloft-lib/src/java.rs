@@ -99,27 +99,34 @@ fn run(bin: &str, args: &[&str]) -> Run {
             };
         }
     };
-    let take = |r: Option<Box<dyn std::io::Read + Send>>| {
+    // execFile's timeout covers the streams too: a wrapper that leaves a grandchild holding the
+    // pipes must not hold the probe past its deadline, so the readers report on a channel
+    let (tx, rx) = std::sync::mpsc::channel::<(usize, String)>();
+    let take = |i: usize, r: Option<Box<dyn std::io::Read + Send>>| {
+        let tx = tx.clone();
         std::thread::spawn(move || {
             let mut buf = Vec::new();
             if let Some(mut r) = r {
                 let _ = r.read_to_end(&mut buf);
             }
-            String::from_utf8_lossy(&buf).into_owned()
-        })
+            let _ = tx.send((i, String::from_utf8_lossy(&buf).into_owned()));
+        });
     };
-    let out = take(
+    take(
+        0,
         child
             .stdout
             .take()
             .map(|s| Box::new(s) as Box<dyn std::io::Read + Send>),
     );
-    let err = take(
+    take(
+        1,
         child
             .stderr
             .take()
             .map(|s| Box::new(s) as Box<dyn std::io::Read + Send>),
     );
+    drop(tx);
     let deadline = std::time::Instant::now() + Duration::from_millis(PROBE_TIMEOUT_MS);
     let status = loop {
         match child.try_wait() {
@@ -133,7 +140,17 @@ fn run(bin: &str, args: &[&str]) -> Run {
             Err(_) => break None,
         }
     };
-    let (stdout, stderr) = (out.join().unwrap_or_default(), err.join().unwrap_or_default());
+    let mut streams = [None, None];
+    if status.is_some() {
+        while streams.iter().any(Option::is_none) {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            match rx.recv_timeout(left) {
+                Ok((i, text)) => streams[i] = Some(text),
+                Err(_) => return Run::TimedOut,
+            }
+        }
+    }
+    let [stdout, stderr] = streams.map(Option::unwrap_or_default);
     let Some(status) = status else {
         return Run::TimedOut;
     };
@@ -514,6 +531,22 @@ mod tests {
             "Java could not be run: exit 3"
         );
         assert_eq!(probe(&dir.join("none").to_string_lossy()).reason, "not-installed");
+        // a wrapper whose child keeps the pipes open: the deadline still ends the probe
+        let wrapper = dir.join("wrapper");
+        std::fs::write(
+            &wrapper,
+            "#!/bin/sh\nsleep 60 &\necho 'openjdk version \"21\"' >&2\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let started = std::time::Instant::now();
+        let p = probe(&wrapper.to_string_lossy());
+        assert!(
+            started.elapsed() < Duration::from_secs(30),
+            "{:?}",
+            started.elapsed()
+        );
+        assert_eq!(p.message, "Java did not answer within 8 seconds, twice.");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

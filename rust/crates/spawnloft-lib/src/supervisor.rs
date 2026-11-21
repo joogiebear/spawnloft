@@ -7,11 +7,13 @@ use serde_json::{Map, Value, json};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use crate::activity::{self, Actor};
 use crate::control::{self, Status};
 use crate::failure::Failure;
+use crate::paths::Roots;
 use crate::registry::{self, Instance};
 use crate::settings::Layout;
-use crate::{js, jsjson, time};
+use crate::{daemon_launch, js, jsjson, time, util};
 
 /// `x ?? null`.
 fn or_null(state: Option<&Map<String, Value>>, key: &str) -> Value {
@@ -211,10 +213,6 @@ pub fn follow_log(file: &Path, mut on_line: impl FnMut(&str) -> bool) {
 
 // ------------------------------------------------------------------------- the lifecycle (C2)
 
-use crate::activity::{self, Actor};
-use crate::daemon_launch;
-use crate::paths::Roots;
-
 fn roots(layout: &Layout) -> Roots {
     Roots::new(&layout.data_root)
 }
@@ -281,8 +279,16 @@ pub fn sync_props(inst: &Instance) -> Result<(), Failure> {
 /// `assertEula(inst)`.
 pub fn assert_eula(inst: &Instance) -> Result<(), Failure> {
     use std::sync::LazyLock;
-    static RE: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r"(?imR)^\s*eula\s*=\s*true\s*$").expect("valid"));
+    // /^\s*eula\s*=\s*true\s*$/im with JavaScript's \s (U+FEFF and U+2028 among it, no U+0085)
+    // and its line ends for ^ and $ (\n, \r, U+2028, U+2029)
+    static RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        let ws = r"[\t\n\x0B\x0C\r \u{a0}\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}]";
+        let eol = r"[\n\r\u{2028}\u{2029}]";
+        regex::Regex::new(&format!(
+            r"(?i)(?:\A|{eol}){ws}*eula{ws}*={ws}*true{ws}*(?:\z|{eol})"
+        ))
+        .expect("valid")
+    });
     let eula = crate::jspath::join(&[&text(inst.get("dir")), "eula.txt"]);
     let body = if Path::new(&eula).exists() {
         match std::fs::read(&eula) {
@@ -538,8 +544,6 @@ fn launch(layout: &Layout, name: &str, opts: StartOptions, launched: &mut bool) 
     Ok(out)
 }
 
-use crate::util;
-
 /// The spawn errors that prove nothing was launched (`FALLBACK_CODES`).
 const FALLBACK_CODES: [&str; 4] = ["ENOENT", "EACCES", "ENOEXEC", "UNKNOWN"];
 
@@ -574,6 +578,13 @@ fn spawn_node_daemon(name: &str) -> Result<u32, Failure> {
         ))
     })?;
     let script = daemon_launch::daemon_cwd().join("daemon.mjs");
+    // without the Node core there is nothing to run: say so now, not after the 15 s wait
+    if !script.is_file() {
+        return Err(Failure::user(format!(
+            "\"{name}\" could not start: the Node daemon is not installed ({} is missing)",
+            script.display()
+        )));
+    }
     let mut cmd = daemon_command(
         &node.to_string_lossy(),
         &[script.to_string_lossy().into_owned(), name.to_string()],
@@ -612,10 +623,13 @@ fn spawn_daemon(layout: &Layout, name: &str, inst: &Instance, database: bool) ->
         Ok(c) => c,
         Err(e) => {
             let (code, _) = crate::jspath::error_code(&e);
-            let code = if matches!(e.raw_os_error(), Some(8)) && cfg!(unix) {
-                "ENOEXEC"
-            } else {
-                code
+            // libuv's names where the generic mapping has none: ENOEXEC on Unix; on Windows
+            // EFTYPE for a file that is not a program (193) or not for this machine (216), which
+            // Node does not fall back on either
+            let code = match e.raw_os_error() {
+                Some(8) if cfg!(unix) => "ENOEXEC",
+                Some(193 | 216) if cfg!(windows) => "EFTYPE",
+                _ => code,
             };
             if !FALLBACK_CODES.contains(&code) {
                 return Err(Failure::user(format!(
@@ -878,6 +892,25 @@ pub fn is_running(layout: &Layout, name: &str) -> Result<bool, Failure> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_eula_is_read_as_javascript_reads_it() {
+        let dir = std::env::temp_dir().join(format!("sl-eula-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let inst = crate::registry::spread("e", &json!({ "dir": dir.to_string_lossy() }));
+        let check = |body: &str| {
+            std::fs::write(dir.join("eula.txt"), body).unwrap();
+            assert_eula(&inst).is_ok()
+        };
+        assert!(check("\u{feff}eula=true\n"));
+        assert!(check("#by\r\nEULA = TRUE\r\n"));
+        assert!(check("eula=true\u{2028}zzz"));
+        assert!(check("eula\n=\ntrue"));
+        assert!(!check("eula=true\u{85}"));
+        assert!(!check("eula=false\n"));
+        assert!(!check("# eula=true"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn slices_like_javascript() {

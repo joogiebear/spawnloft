@@ -300,7 +300,8 @@
         "30"
       ],
       "env": {
-        "FAKE_JAVA_FAIL": "start"
+        "FAKE_JAVA_FAIL": "start",
+        "FAKE_FAIL_EXIT_MS": "1500"
       },
       "expect": {
         "code": 1,

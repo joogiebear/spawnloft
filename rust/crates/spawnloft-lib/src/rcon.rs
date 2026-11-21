@@ -99,7 +99,9 @@ impl Rcon {
         loop {
             let packet = rcon
                 .read_packet(deadline)?
-                .ok_or_else(|| err("RCON authentication timed out"))?;
+                // the connect phase's `timeout` listener is still armed in rcon.mjs, and the idle
+                // timeout (armed again by the auth write) fires just before the auth timer
+                .ok_or_else(|| err("RCON connection failed: connection timed out"))?;
             if packet.id == -1 {
                 return Err(err("RCON authentication failed - wrong rcon.password"));
             }
@@ -315,6 +317,22 @@ pub fn exec(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exec_retries_only_what_rcon_mjs_retries() {
+        assert!(transient("RCON error: RCON connection closed", false));
+        assert!(transient("RCON error: read ECONNRESET", false));
+        assert!(!transient("RCON error: RCON timed out", false));
+        assert!(transient("RCON error: RCON timed out", true));
+        assert!(!transient(
+            "RCON authentication failed - wrong rcon.password",
+            true
+        ));
+        let inst = crate::registry::spread("x", &serde_json::json!({}));
+        let e = exec(&inst, &["list"], ExecOptions::default()).unwrap_err();
+        assert_eq!(e.message, "instance \"x\" has no RCON port configured");
+        assert!(e.unsent);
+    }
     use std::net::TcpListener;
 
     fn packet_from(stream: &mut TcpStream) -> (i32, i32, String) {

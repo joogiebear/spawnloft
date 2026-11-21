@@ -514,6 +514,7 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | The bytes of a zip the core writes (added in C1; world exports from C3) | zlib's deflate | miniz_oxide's: the same entries, names, times, modes and contents, so the archive is not byte-identical |
 | A jar entry whose compressed data is damaged part way (added in C1) | zlib's words for that damage (`invalid distance too far back`) | `invalid compressed data`; data cut short is `unexpected end of file` on both |
 | The cause named when a download gets no answer at all (added in C1) | undici's (`getaddrinfo ENOTFOUND x`, `connect ECONNREFUSED`) | ureq's; the sentence around it is Node's |
+| `console` given `/detach` or `/exit` with more lines behind it in the same piped read (added in C2) | the lines after it in that read are still sent | nothing after it is sent |
 
 ### 6.2 Faking the network for a spawned process
 

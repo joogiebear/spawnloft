@@ -259,9 +259,9 @@ pub fn console(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     std::thread::spawn(move || {
         supervisor::follow_log(&log_file, |line| logs.send(Event::Log(line.to_string())).is_ok());
     });
-    // readline's SIGINT, which it has only when it reads a terminal; elsewhere Ctrl-C ends the
-    // process as Node's default does
-    let terminal = std::io::stdin().is_terminal();
+    // readline's SIGINT, which it has only when it reads a terminal and writes to one (its
+    // `terminal` follows stdout); elsewhere Ctrl-C ends the process as Node's default does
+    let terminal = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
     if terminal {
         platform::watch_interrupts();
     }
