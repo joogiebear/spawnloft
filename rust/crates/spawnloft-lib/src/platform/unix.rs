@@ -75,6 +75,45 @@ pub fn uid() -> u32 {
     unsafe { getuid() }
 }
 
+/// `os.userInfo().username`: the account's name from the system's user database (`getpwuid_r`,
+/// so LDAP, sssd and systemd-homed accounts are found as Node finds them).
+#[cfg(target_os = "linux")]
+pub fn user_name(uid: u32) -> Option<String> {
+    use std::ffi::{CStr, c_char, c_int};
+    // `struct passwd`, the same in glibc and musl
+    #[repr(C)]
+    struct Passwd {
+        pw_name: *mut c_char,
+        pw_passwd: *mut c_char,
+        pw_uid: u32,
+        pw_gid: u32,
+        pw_gecos: *mut c_char,
+        pw_dir: *mut c_char,
+        pw_shell: *mut c_char,
+    }
+    unsafe extern "C" {
+        fn getpwuid_r(
+            uid: u32,
+            pwd: *mut Passwd,
+            buf: *mut c_char,
+            len: usize,
+            result: *mut *mut Passwd,
+        ) -> c_int;
+    }
+    let mut buf = vec![0 as c_char; 16 * 1024];
+    let mut pwd = std::mem::MaybeUninit::<Passwd>::uninit();
+    let mut result: *mut Passwd = std::ptr::null_mut();
+    // SAFETY: every pointer is to memory this frame owns, `len` is the buffer's real length, and
+    // the name is read only when the call reports a record, whose strings live in `buf`.
+    unsafe {
+        let rc = getpwuid_r(uid, pwd.as_mut_ptr(), buf.as_mut_ptr(), buf.len(), &mut result);
+        if rc != 0 || result.is_null() || (*result).pw_name.is_null() {
+            return None;
+        }
+        Some(CStr::from_ptr((*result).pw_name).to_string_lossy().into_owned())
+    }
+}
+
 /// Unix programs have no console window to hide.
 pub fn hide_window(_cmd: &mut Command) {}
 
@@ -598,4 +637,13 @@ pub fn network_interfaces() -> Vec<(String, Vec<super::InterfaceAddress>)> {
     // SAFETY: the list from getifaddrs, freed once.
     unsafe { freeifaddrs(list) };
     out
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod user_name_tests {
+    #[test]
+    fn this_account_has_a_name() {
+        let name = super::user_name(super::uid()).expect("a passwd record for this process");
+        assert!(!name.is_empty());
+    }
 }

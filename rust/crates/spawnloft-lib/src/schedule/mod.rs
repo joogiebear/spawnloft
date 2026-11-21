@@ -736,13 +736,16 @@ impl Sched {
             if crate::jsdate::parse(at).is_nan() {
                 continue;
             }
-            rows.push(json!({
-                "at": at,
-                "id": if legacy { Value::Null } else { json!(parts[1]) },
-                "status": status,
-                "action": action,
-                "detail": detail,
-            }));
+            let mut row = serde_json::Map::new();
+            row.insert("at".into(), json!(at));
+            row.insert("id".into(), if legacy { Value::Null } else { json!(parts[1]) });
+            row.insert("status".into(), json!(status));
+            // a line too short to name one leaves the key out, as `undefined` does in JSON
+            if let Some(a) = action {
+                row.insert("action".into(), json!(a));
+            }
+            row.insert("detail".into(), json!(detail));
+            rows.push(Value::Object(row));
         }
         rows.reverse();
         rows.truncate(limit);

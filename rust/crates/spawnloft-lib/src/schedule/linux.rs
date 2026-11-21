@@ -312,17 +312,9 @@ pub fn run_now(s: &Sched, id: &str) -> Result<(), Failure> {
 
 /// `os.userInfo().username`: this user's entry in the password database.
 fn username() -> String {
-    #[cfg(unix)]
-    {
-        let uid = crate::platform::uid().to_string();
-        if let Ok(text) = std::fs::read_to_string("/etc/passwd") {
-            for line in text.lines() {
-                let f: Vec<&str> = line.split(':').collect();
-                if f.len() > 2 && f[2] == uid {
-                    return f[0].to_string();
-                }
-            }
-        }
+    #[cfg(target_os = "linux")]
+    if let Some(name) = crate::platform::user_name(crate::platform::uid()) {
+        return name;
     }
     std::env::var("USER")
         .or_else(|_| std::env::var("LOGNAME"))
