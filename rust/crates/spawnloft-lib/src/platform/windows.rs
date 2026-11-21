@@ -210,6 +210,38 @@ fn kill_on_close_job() -> Option<OwnedHandle> {
 /// Windows has no SIGTERM; a stop always comes over the control pipe.
 pub fn install_signal_handlers() {}
 
+static INTERRUPT_CODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// For a command that follows until stopped (`metrics --follow`): Ctrl+C and Ctrl+Break are
+/// caught and remembered as exit code 130, what Node's emulated SIGINT ends the CLI with.
+pub fn watch_interrupts() {
+    unsafe extern "system" fn handler(kind: u32) -> i32 {
+        use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+        if kind == CTRL_C_EVENT || kind == CTRL_BREAK_EVENT {
+            let _ = INTERRUPT_CODE.compare_exchange(
+                0,
+                130,
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+            );
+            return 1;
+        }
+        0
+    }
+    // SAFETY: registers a function with the documented signature that lives for the process.
+    unsafe {
+        windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(handler), 1);
+    }
+}
+
+/// The exit code of an interrupt [`watch_interrupts`] caught, if one came.
+pub fn interrupted() -> Option<u8> {
+    match INTERRUPT_CODE.load(std::sync::atomic::Ordering::SeqCst) {
+        0 => None,
+        c => Some(c),
+    }
+}
+
 pub fn take_sigterm() -> bool {
     false
 }

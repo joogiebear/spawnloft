@@ -1,0 +1,1622 @@
+{
+  "about": "diagnose() from src/diagnose.mjs over console lines in three contexts. Made by tools/parity/make-c1-fixtures.mjs; spawnloft-lib diagnose.rs must agree on every case.",
+  "contexts": {
+    "cli": {
+      "port": 25566,
+      "memory": "4G",
+      "dir": "/srv/smp",
+      "crashDir": "/srv/smp/crash-reports"
+    },
+    "panel": {
+      "port": 25565,
+      "memory": "2G",
+      "dir": "/srv/smp",
+      "panel": true
+    },
+    "none": {}
+  },
+  "cases": [
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:01 WARN]: FAILED TO BIND TO PORT!"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25566 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "[12:00:01 WARN]: FAILED TO BIND TO PORT!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:01 WARN]: java.net.BindException: Address already in use"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25566 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "[12:00:01 WARN]: java.net.BindException: Address already in use",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Failed to bind to address 0.0.0.0:25565"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25566 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "Failed to bind to address 0.0.0.0:25565",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:01 INFO]: You need to agree to the EULA in order to run the server."
+      ],
+      "findings": [
+        {
+          "id": "eula",
+          "title": "The EULA is not accepted",
+          "advice": "Set eula=true in /srv/smp/eula.txt (see https://aka.ms/MinecraftEULA) and start again.",
+          "line": "[12:00:01 INFO]: You need to agree to the EULA in order to run the server.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 21 or newer, and the Java that launched it is older. Install Java 21+ and, if several are installed, point this server at it with \"spawnloft set <name> java=<path-to-java.exe>\".",
+          "line": "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 17 or newer, and the Java that launched it is older. Install Java 17+ and, if several are installed, point this server at it with \"spawnloft set <name> java=<path-to-java.exe>\".",
+          "line": "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnsupportedClassVersionError\rclass file version 65"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space"
+      ],
+      "findings": [
+        {
+          "id": "out-of-memory",
+          "title": "The server ran out of memory",
+          "advice": "It has 4G and wants more. Raise it under Manage (modded servers usually want 4G or more), and make sure the machine has that to give.",
+          "line": "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "java.io.IOException: No space left on device"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"spawnloft config set-instances\" onto a drive that has some. \"spawnloft prune\" can thin old snapshots.",
+          "line": "java.io.IOException: No space left on device",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "There is not enough space on the disk"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"spawnloft config set-instances\" onto a drive that has some. \"spawnloft prune\" can thin old snapshots.",
+          "line": "There is not enough space on the disk",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\" and \"Vault\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"My.Plugin\" and \"Plugin Name\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Vault\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyException: Unknown dependency"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: Unknown dependency",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyException: null"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: null",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyException: Some.Plugin-2.x"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Some.Plugin-2.x\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "UnknownDependencyException: Some.Plugin-2.x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "UnknownDependencyExceptionX: Vault"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Mod sodium-extra requires any version of sodium, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"sodium\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod sodium-extra requires any version of sodium, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"fabric-api\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:02 ERROR]: Exception reading ./world/level.dat"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "[12:00:02 ERROR]: Exception reading ./world/level.dat",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Failed to load level"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Failed to load level",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "ChunkIoErrorReport: x"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "ChunkIoErrorReport: x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Corrupted chunk at 1, 2"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Corrupted chunk at 1, 2",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:02 ERROR]: Ticking entity: minecraft:zombie"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see /srv/smp/crash-reports. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "[12:00:02 ERROR]: Ticking entity: minecraft:zombie",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Ticking block entity"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see /srv/smp/crash-reports. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Ticking block entity",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Exception ticking world"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see /srv/smp/crash-reports. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Exception ticking world",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)"
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Considering it to be crashed, server will forcibly shut down."
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "Considering it to be crashed, server will forcibly shut down.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Error: Unable to access jarfile server.jar"
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"server.jar\". Re-download it (\"spawnloft upgrade\" for Paper, or re-choose a jar with \"spawnloft set <name> jar=...\"), or restore the folder from a snapshot.",
+          "line": "Error: Unable to access jarfile server.jar",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "Error: Unable to access jarfile   spaced name.jar   "
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"spaced name.jar\". Re-download it (\"spawnloft upgrade\" for Paper, or re-choose a jar with \"spawnloft set <name> jar=...\"), or restore the folder from a snapshot.",
+          "line": "Error: Unable to access jarfile   spaced name.jar   ",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "[12:00:00 INFO]: Done (3.2s)! For help, type \"help\""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "failed to bind to port (lower case)"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25566 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "failed to bind to port (lower case)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "ＦAILED TO BIND TO PORT"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        ""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "cli",
+      "lines": [
+        "java.lang.OutOfMemoryError",
+        "FAILED TO BIND TO PORT",
+        "No space left on device",
+        "Ambiguous plugin name",
+        "Corrupted chunk",
+        "FAILED TO BIND TO PORT again"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "Ambiguous plugin name",
+          "at": 3
+        },
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Corrupted chunk",
+          "at": 4
+        },
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25566 - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "FAILED TO BIND TO PORT again",
+          "at": 5
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:01 WARN]: FAILED TO BIND TO PORT!"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25565 - usually another server, or another copy of this one. Stop the other one, or give this server a port of its own: the menu beside Stop, then \"Rename, memory and port\".",
+          "line": "[12:00:01 WARN]: FAILED TO BIND TO PORT!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:01 WARN]: java.net.BindException: Address already in use"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25565 - usually another server, or another copy of this one. Stop the other one, or give this server a port of its own: the menu beside Stop, then \"Rename, memory and port\".",
+          "line": "[12:00:01 WARN]: java.net.BindException: Address already in use",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Failed to bind to address 0.0.0.0:25565"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25565 - usually another server, or another copy of this one. Stop the other one, or give this server a port of its own: the menu beside Stop, then \"Rename, memory and port\".",
+          "line": "Failed to bind to address 0.0.0.0:25565",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:01 INFO]: You need to agree to the EULA in order to run the server."
+      ],
+      "findings": [
+        {
+          "id": "eula",
+          "title": "The EULA is not accepted",
+          "advice": "Open eula.txt in Files, change eula=false to eula=true (see https://aka.ms/MinecraftEULA) and start again.",
+          "line": "[12:00:01 INFO]: You need to agree to the EULA in order to run the server.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 21 or newer, and the Java that launched it is older. Install Java 21+ and, if several are installed, choose it for this server under Settings, Java and memory.",
+          "line": "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 17 or newer, and the Java that launched it is older. Install Java 17+ and, if several are installed, choose it for this server under Settings, Java and memory.",
+          "line": "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnsupportedClassVersionError\rclass file version 65"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space"
+      ],
+      "findings": [
+        {
+          "id": "out-of-memory",
+          "title": "The server ran out of memory",
+          "advice": "It has 2G and wants more. Raise it under Settings, Java and memory (modded servers usually want 4G or more), and make sure the machine has that to give.",
+          "line": "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "java.io.IOException: No space left on device"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space on that drive. Old backups are the usual place to find some: delete the ones you no longer need in Backups.",
+          "line": "java.io.IOException: No space left on device",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "There is not enough space on the disk"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space on that drive. Old backups are the usual place to find some: delete the ones you no longer need in Backups.",
+          "line": "There is not enough space on the disk",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\" and \"Vault\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"My.Plugin\" and \"Plugin Name\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Vault\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyException: Unknown dependency"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: Unknown dependency",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyException: null"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: null",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyException: Some.Plugin-2.x"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Some.Plugin-2.x\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "UnknownDependencyException: Some.Plugin-2.x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "UnknownDependencyExceptionX: Vault"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Mod sodium-extra requires any version of sodium, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"sodium\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod sodium-extra requires any version of sodium, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"fabric-api\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:02 ERROR]: Exception reading ./world/level.dat"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest backup from Backups.",
+          "line": "[12:00:02 ERROR]: Exception reading ./world/level.dat",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Failed to load level"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest backup from Backups.",
+          "line": "Failed to load level",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "ChunkIoErrorReport: x"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest backup from Backups.",
+          "line": "ChunkIoErrorReport: x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Corrupted chunk at 1, 2"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest backup from Backups.",
+          "line": "Corrupted chunk at 1, 2",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:02 ERROR]: Ticking entity: minecraft:zombie"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "[12:00:02 ERROR]: Ticking entity: minecraft:zombie",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Ticking block entity"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Ticking block entity",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Exception ticking world"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Exception ticking world",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)"
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Considering it to be crashed, server will forcibly shut down."
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "Considering it to be crashed, server will forcibly shut down.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Error: Unable to access jarfile server.jar"
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"server.jar\". Download it again under Settings, Server software, or restore the folder from a backup.",
+          "line": "Error: Unable to access jarfile server.jar",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "Error: Unable to access jarfile   spaced name.jar   "
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"spaced name.jar\". Download it again under Settings, Server software, or restore the folder from a backup.",
+          "line": "Error: Unable to access jarfile   spaced name.jar   ",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "[12:00:00 INFO]: Done (3.2s)! For help, type \"help\""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "failed to bind to port (lower case)"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25565 - usually another server, or another copy of this one. Stop the other one, or give this server a port of its own: the menu beside Stop, then \"Rename, memory and port\".",
+          "line": "failed to bind to port (lower case)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "ＦAILED TO BIND TO PORT"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        ""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "panel",
+      "lines": [
+        "java.lang.OutOfMemoryError",
+        "FAILED TO BIND TO PORT",
+        "No space left on device",
+        "Ambiguous plugin name",
+        "Corrupted chunk",
+        "FAILED TO BIND TO PORT again"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "Ambiguous plugin name",
+          "at": 3
+        },
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest backup from Backups.",
+          "line": "Corrupted chunk",
+          "at": 4
+        },
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port 25565 - usually another server, or another copy of this one. Stop the other one, or give this server a port of its own: the menu beside Stop, then \"Rename, memory and port\".",
+          "line": "FAILED TO BIND TO PORT again",
+          "at": 5
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:01 WARN]: FAILED TO BIND TO PORT!"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port this server’s port - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "[12:00:01 WARN]: FAILED TO BIND TO PORT!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:01 WARN]: java.net.BindException: Address already in use"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port this server’s port - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "[12:00:01 WARN]: java.net.BindException: Address already in use",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Failed to bind to address 0.0.0.0:25565"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port this server’s port - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "Failed to bind to address 0.0.0.0:25565",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:01 INFO]: You need to agree to the EULA in order to run the server."
+      ],
+      "findings": [
+        {
+          "id": "eula",
+          "title": "The EULA is not accepted",
+          "advice": "Set eula=true in eula.txt (see https://aka.ms/MinecraftEULA) and start again.",
+          "line": "[12:00:01 INFO]: You need to agree to the EULA in order to run the server.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 21 or newer, and the Java that launched it is older. Install Java 21+ and, if several are installed, point this server at it with \"spawnloft set <name> java=<path-to-java.exe>\".",
+          "line": "java.lang.UnsupportedClassVersionError: net/minecraft/server/Main has been compiled by a more recent version of the Java Runtime (class file version 65.0)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0"
+      ],
+      "findings": [
+        {
+          "id": "wrong-java",
+          "title": "Java is too old for this server",
+          "advice": "This server is built for Java 17 or newer, and the Java that launched it is older. Install Java 17+ and, if several are installed, point this server at it with \"spawnloft set <name> java=<path-to-java.exe>\".",
+          "line": "UnsupportedClassVersionError: x (class file version 61.0), this version only recognizes up to 52.0",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnsupportedClassVersionError\rclass file version 65"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space"
+      ],
+      "findings": [
+        {
+          "id": "out-of-memory",
+          "title": "The server ran out of memory",
+          "advice": "It has its configured memory and wants more. Raise it under Manage (modded servers usually want 4G or more), and make sure the machine has that to give.",
+          "line": "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "java.io.IOException: No space left on device"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"spawnloft config set-instances\" onto a drive that has some. \"spawnloft prune\" can thin old snapshots.",
+          "line": "java.io.IOException: No space left on device",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "There is not enough space on the disk"
+      ],
+      "findings": [
+        {
+          "id": "out-of-disk",
+          "title": "The disk is full",
+          "advice": "The drive this server lives on has no room left - saves and logs are failing. Free space, or move the server with \"spawnloft config set-instances\" onto a drive that has some. \"spawnloft prune\" can thin old snapshots.",
+          "line": "There is not enough space on the disk",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib]. Please download and install these plugins to run 'Shop'.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"ProtocolLib\" and \"Vault\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [ProtocolLib, Vault]. Please download",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"My.Plugin\" and \"Plugin Name\", which are not installed. Install them from the Plugins tab, or disable the plugin that wants them.",
+          "line": "UnknownDependencyException: Unknown/missing dependency plugins: [My.Plugin, Plugin Name]. Please",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin."
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Vault\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "org.bukkit.plugin.UnknownDependencyException: Unknown dependency Vault. Please download and install Vault to run this plugin.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyException: Unknown dependency"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: Unknown dependency",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyException: null"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin depends on another plugin that is not installed - the lines above name it. Install the missing one from the Plugins tab, or disable the one that wants it.",
+          "line": "UnknownDependencyException: null",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyException: Some.Plugin-2.x"
+      ],
+      "findings": [
+        {
+          "id": "missing-plugin-dependency",
+          "title": "A plugin is missing a dependency",
+          "advice": "A plugin needs \"Some.Plugin-2.x\", which is not installed. Install it from the Plugins tab, or disable the plugin that wants it.",
+          "line": "UnknownDependencyException: Some.Plugin-2.x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "UnknownDependencyExceptionX: Vault"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Mod sodium-extra requires any version of sodium, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"sodium\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod sodium-extra requires any version of sodium, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!"
+      ],
+      "findings": [
+        {
+          "id": "missing-mod-dependency",
+          "title": "A mod is missing a dependency",
+          "advice": "A mod needs \"fabric-api\", which is not installed. Install it from the Mods tab - for most mods that means Fabric API first.",
+          "line": "Mod 'Lithium' (lithium) 0.11.2 requires version 0.15.0 of fabric-api, which is missing!",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "[12:00:00 ERROR]: Ambiguous plugin name `WorldEdit' for files `plugins/a.jar' and `plugins/b.jar'",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:02 ERROR]: Exception reading ./world/level.dat"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "[12:00:02 ERROR]: Exception reading ./world/level.dat",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Failed to load level"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Failed to load level",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "ChunkIoErrorReport: x"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "ChunkIoErrorReport: x",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Corrupted chunk at 1, 2"
+      ],
+      "findings": [
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Corrupted chunk at 1, 2",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:02 ERROR]: Ticking entity: minecraft:zombie"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "[12:00:02 ERROR]: Ticking entity: minecraft:zombie",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Ticking block entity"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Ticking block entity",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Exception ticking world"
+      ],
+      "findings": [
+        {
+          "id": "ticking-crash",
+          "title": "Something in the world crashed the server",
+          "advice": "An entity or block crashed the server mid-tick. The crash report names the exact thing and where it stands - see crash-reports in the server folder. If it repeats, that report is what the responsible plugin or mod’s author needs.",
+          "line": "Exception ticking world",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)"
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "[12:00:03 ERROR]: A single server tick took 60.00 seconds (should be max 0.05)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Considering it to be crashed, server will forcibly shut down."
+      ],
+      "findings": [
+        {
+          "id": "watchdog",
+          "title": "The server stalled and the watchdog stopped it",
+          "advice": "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.",
+          "line": "Considering it to be crashed, server will forcibly shut down.",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Error: Unable to access jarfile server.jar"
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"server.jar\". Re-download it (\"spawnloft upgrade\" for Paper, or re-choose a jar with \"spawnloft set <name> jar=...\"), or restore the folder from a snapshot.",
+          "line": "Error: Unable to access jarfile server.jar",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "Error: Unable to access jarfile   spaced name.jar   "
+      ],
+      "findings": [
+        {
+          "id": "missing-jar",
+          "title": "The server jar is missing",
+          "advice": "Java could not find \"spaced name.jar\". Re-download it (\"spawnloft upgrade\" for Paper, or re-choose a jar with \"spawnloft set <name> jar=...\"), or restore the folder from a snapshot.",
+          "line": "Error: Unable to access jarfile   spaced name.jar   ",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "[12:00:00 INFO]: Done (3.2s)! For help, type \"help\""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "failed to bind to port (lower case)"
+      ],
+      "findings": [
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port this server’s port - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "failed to bind to port (lower case)",
+          "at": 0
+        }
+      ]
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "ＦAILED TO BIND TO PORT"
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        ""
+      ],
+      "findings": []
+    },
+    {
+      "ctx": "none",
+      "lines": [
+        "java.lang.OutOfMemoryError",
+        "FAILED TO BIND TO PORT",
+        "No space left on device",
+        "Ambiguous plugin name",
+        "Corrupted chunk",
+        "FAILED TO BIND TO PORT again"
+      ],
+      "findings": [
+        {
+          "id": "duplicate-plugin",
+          "title": "Two plugins claim the same name",
+          "advice": "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.",
+          "line": "Ambiguous plugin name",
+          "at": 3
+        },
+        {
+          "id": "corrupt-world",
+          "title": "The world failed to load",
+          "advice": "Part of the world data would not read back - usually a hard power-off mid-save. Restore the latest snapshot from the Backups tab; \"spawnloft verify\" proves which ones are whole.",
+          "line": "Corrupted chunk",
+          "at": 4
+        },
+        {
+          "id": "port-in-use",
+          "title": "The port is already taken",
+          "advice": "Something else is listening on port this server’s port - usually another server, or another copy of this one. \"spawnloft list\" shows who; change the port under Manage if both should run at once.",
+          "line": "FAILED TO BIND TO PORT again",
+          "at": 5
+        }
+      ]
+    }
+  ]
+}

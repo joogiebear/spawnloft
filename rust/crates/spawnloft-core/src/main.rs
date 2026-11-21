@@ -7,6 +7,7 @@ use std::process::ExitCode;
 
 mod cli;
 mod handover_cmd;
+mod port;
 mod update_cmd;
 
 fn main() -> ExitCode {
@@ -20,6 +21,10 @@ fn main() -> ExitCode {
     // panic = "abort", not a crash)
     let args: Option<Vec<String>> = raw.into_iter().map(|a| a.into_string().ok()).collect();
     let outcome = match args {
+        Some(args) if cli::is_ported(&args) => {
+            let mut out = port::Out::stdio();
+            return ExitCode::from(port::run(&args, &mut out));
+        }
         Some(args) => cli::run(&args),
         None => cli::not_utf8(),
     };

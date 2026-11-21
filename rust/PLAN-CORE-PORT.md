@@ -474,6 +474,9 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | Number grouping (`toLocaleString`, `mcctl.mjs:921,939`) | the system locale | fixed en-US grouping |
 | A run-time pattern using lookaround or a backreference | accepted | refused with a clear message (3.4) |
 | The error text for an invalid run-time pattern | V8's | the `regex` crate's |
+| An unexpected failure (added in C1) | the error line, then JavaScript's stack | the error line alone |
+| The text of a JSON file that does not parse (added in C1) | V8's `JSON.parse` message | serde_json's |
+| A checkout whose code folder holds `instances.json` (added in C1, C0-CHECKS.md section 2) | the code folder is the data root | the per-user data folder |
 
 ### 6.2 Faking the network for a spawned process
 

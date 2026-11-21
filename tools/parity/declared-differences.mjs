@@ -76,6 +76,37 @@ export const DECLARED = [
       .replace(/Invalid regular expression: [^\n"]*/g, '<invalid pattern>')
       .replace(/regex parse error:[^\n"]*/g, '<invalid pattern>'),
   },
+  {
+    // found in C1: a failure that is not a person's mistake (a registry that is not JSON, a file
+    // that cannot be read, a nonsense -n) prints the error and then JavaScript's stack, whose
+    // lines name the Node core's own files and line numbers; the Rust core prints the first line
+    id: 'internal-error-stack',
+    where: 'an unexpected failure (a file that is not JSON or cannot be read, a nonsense argument)',
+    node: 'the error line, then JavaScript\'s stack (`    at ...` lines)',
+    rust: 'the error line alone',
+    apply: (text) => text.replace(/^ {4}at [^\n]*\n?/gm, ''),
+  },
+  {
+    // found in C1: JSON.parse's messages are V8's ("Expected ',' or '}' after property value in
+    // JSON at position 41 (line 1 column 42)"); the Rust core says "JSON parse error: " and
+    // serde_json's own text. The prefix and exit code are the same; only the description differs
+    id: 'json-parse-error-text',
+    where: 'the text of a JSON file that does not parse (registry, state file, settings)',
+    node: 'V8\'s `JSON.parse` message',
+    rust: '`JSON parse error: ` and serde_json\'s message',
+    apply: (text) => text
+      .replace(/Unexpected end of JSON input|(?:Unexpected token|Expected |Bad (?:control|escaped|Unicode)|Unterminated (?:string|fractional)|No number after|Exponent part|Unexpected non-whitespace|Unexpected (?:number|string))[^\n]*?(?:in JSON at position \d+(?: \(line \d+ column \d+\))?|is not valid JSON)/g, '<invalid json>')
+      .replace(/JSON parse error: [^\n")]*/g, '<invalid json>'),
+  },
+  {
+    // plan section 3.4 and test/fixtures/contracts/C0-CHECKS.md section 2
+    id: 'data-root-code-folder',
+    where: 'a checkout whose code folder holds `instances.json` and no settings choose a data root',
+    node: 'the code folder is the data root (and is listed among other registries)',
+    rust: 'the per-user data folder; the code folder is never a data root',
+    apply: null,
+    held: 'no installed build can be in that state (C0-CHECKS.md section 2); the rig\'s code folder is the checkout, which has no instances.json',
+  },
 ]
 
 // Both sides' text for one step, evened out by every row that applies to it.

@@ -59,7 +59,7 @@ a scratch folder.
   "golden": "test/fixtures/contracts/cli/x.json",
   "steps": [
     { "write": "data/instances.json", "json": {} },
-    { "write": "data/x.txt", "text": "...", "mode": "600" },
+    { "write": "data/x.txt", "text": "...", "mode": "600", "mtime": "2026-11-01T10:00:00Z" },
     { "mkdir": "data/instances/alpha" },
     { "remove": "data/x.txt" },
     { "run": ["list", "--json"], "stdin": "", "env": {}, "timeoutMs": 120000,
@@ -118,6 +118,9 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `mcp` | the MCP server over stdio. Golden: `test/fixtures/contracts/cli/mcp-tools.json` (the tool list C9 must equal) |
 | `network-refused` | a host with no fake is refused on both sides, with the same message, and nothing is sent |
 | `cli-json` | all 61 command names with `--json`, then the forms that answer with data. Golden: `test/fixtures/contracts/cli/cli-json.json` |
+| `c1-edges` | C1's commands (`help`, `list`, `status`, `logs`, `why`, `metrics`) over damaged registries, state files, logs, metrics and crash reports, every flag and its usage errors |
+| `c1-settings` | the data root and the other folders chosen by `settings.json` (XDG and Windows locations), a damaged settings file and its warning |
+| `c1-running` | the same commands against a running server (the fake JVM), text and `--json` |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
@@ -136,6 +139,9 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | number grouping (`toLocaleString`, mcctl.mjs) | the system locale | fixed en-US grouping | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 (Windows runners are en-US) |
 | a run-time pattern using lookaround or a backreference (`logs --grep`, MCP `get_logs`, bot scenarios) | accepted | refused with a clear message | scenarios give such a pattern only in a step that expects the refusal, and test/fixtures/contracts/regex.json lists the sites |
 | the error text for an invalid run-time pattern | V8's (`Invalid regular expression: /(/: Unterminated group`) | the `regex` crate's | evened out (`invalid-pattern-text`) |
+| an unexpected failure (a file that is not JSON or cannot be read, a nonsense argument) | the error line, then JavaScript's stack (`    at ...` lines) | the error line alone | evened out (`internal-error-stack`) |
+| the text of a JSON file that does not parse (registry, state file, settings) | V8's `JSON.parse` message | `JSON parse error: ` and serde_json's message | evened out (`json-parse-error-text`) |
+| a checkout whose code folder holds `instances.json` and no settings choose a data root | the code folder is the data root (and is listed among other registries) | the per-user data folder; the code folder is never a data root | no installed build can be in that state (C0-CHECKS.md section 2); the rig's code folder is the checkout, which has no instances.json |
 
 ## The download-host override
 

@@ -215,8 +215,8 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows and the locale row, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 7)
+test('the declared differences are the plan\'s six rows, the locale row and C1\'s three, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 10)
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'
@@ -224,6 +224,14 @@ test('the declared differences are the plan\'s six rows and the locale row, each
   assert.equal(applyDeclared(doctor, 'list'), doctor, 'a row applies only to its commands')
   assert.equal(applyDeclared('{"runtime":"/usr/bin/node"}', 'repair'), '{"runtime":"<runtime>"}')
   assert.match(declaredTable(), /^\| Where \| Node \| Rust \|/)
+  // a stack goes, the error line stays
+  assert.equal(applyDeclared('SyntaxError: x\n    at JSON.parse (<anonymous>)\n    at f (file:///a.mjs:1:2)\n', 'list'), 'SyntaxError: x\n')
+  for (const text of [
+    'Expected \',\' or \'}\' after property value in JSON at position 41 (line 1 column 42)',
+    'Unexpected token \'\ufeff\', "\ufeff{"version"... is not valid JSON',
+    'Unexpected end of JSON input',
+    'JSON parse error: EOF while parsing an object at line 1 column 41',
+  ]) assert.equal(applyDeclared(`SyntaxError: ${text}`, 'list'), 'SyntaxError: <invalid json>', text)
 })
 
 test('every scenario file loads and keeps to the rules', () => {

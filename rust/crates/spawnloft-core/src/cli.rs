@@ -110,9 +110,36 @@ pub const CORE_OWN: &[Row] = &[
 ];
 
 /// SpawnLoft CLI commands the core port has moved from the Node core to this binary
-/// (rust/PLAN-CORE-PORT.md section 4). A phase adds its commands here only once their parity
-/// scenarios (tools/parity/) are green on every platform. Empty until C1.
-pub const PORTED: &[Row] = &[];
+/// (rust/PLAN-CORE-PORT.md section 4), answered by `crate::port`. A phase adds its commands here
+/// only once their parity scenarios (tools/parity/) are green on every platform. A command line
+/// with no command at all is the CLI's usage, which is `help`'s and moved with it.
+pub const PORTED: &[Row] = &[
+    // C1: foundation and status
+    Row {
+        names: &["help", "--help", "-h"],
+        when: When::Always,
+    },
+    Row {
+        names: &["list", "ls"],
+        when: When::Always,
+    },
+    Row {
+        names: &["status"],
+        when: When::Always,
+    },
+    Row {
+        names: &["logs", "log"],
+        when: When::Always,
+    },
+    Row {
+        names: &["why", "diagnostics"],
+        when: When::Always,
+    },
+    Row {
+        names: &["metrics"],
+        when: When::Always,
+    },
+];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
 /// ported command to the Node core again, so the parity rig can run one scenario on both sides.
@@ -134,11 +161,24 @@ pub fn forwards(args: &[std::ffi::OsString]) -> bool {
     forwards_with(args, force_node, PORTED)
 }
 
+/// Whether a command line this binary answers is a ported SpawnLoft command (`crate::port`)
+/// rather than one of its own.
+pub fn is_ported(args: &[String]) -> bool {
+    match args.split_first() {
+        None => true,
+        Some((command, rest)) => {
+            let rest: Vec<std::ffi::OsString> = rest.iter().map(Into::into).collect();
+            !CORE_OWN.iter().any(|r| row_matches(r, command, &rest))
+                && PORTED.iter().any(|r| row_matches(r, command, &rest))
+        }
+    }
+}
+
 /// [`forwards`] with the switch and the ported table given, for tests.
 pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Row]) -> bool {
     let Some((command, rest)) = args.split_first() else {
-        // no arguments: the CLI's own usage
-        return true;
+        // no arguments: the CLI's own usage, which moves with `help`
+        return force_node || !ported.iter().any(|r| r.names.contains(&"help"));
     };
     let Some(command) = command.to_str() else {
         return true;
@@ -478,6 +518,31 @@ mod tests {
     }
 
     #[test]
+    fn c1_commands_are_answered_here_unless_the_switch_says_node() {
+        for line in [
+            &[][..],
+            &["help"],
+            &["--help"],
+            &["-h"],
+            &["list", "--json"],
+            &["ls"],
+            &["status", "alpha"],
+            &["logs", "alpha", "-f"],
+            &["log", "alpha"],
+            &["why", "alpha"],
+            &["diagnostics", "alpha", "--json"],
+            &["metrics", "alpha", "--csv"],
+        ] {
+            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
+            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
+            let strings: Vec<String> = line.iter().map(|s| s.to_string()).collect();
+            assert!(is_ported(&strings), "{line:?}");
+        }
+        assert!(!is_ported(&["--version".to_string()]));
+        assert!(!is_ported(&["plugins".to_string()]));
+    }
+
+    #[test]
     fn no_command_is_both_the_cores_own_and_ported() {
         for row in PORTED {
             for name in row.names {
@@ -492,11 +557,7 @@ mod tests {
     #[test]
     fn what_is_forwarded_to_the_node_core() {
         for line in [
-            &[][..],
-            &["help"],
-            &["--help"],
-            &["list", "--json"],
-            &["start", "survival"],
+            &["start", "survival"][..],
             &["mcp"],
             &["task", "run", "abc"],
             &["console", "survival"],

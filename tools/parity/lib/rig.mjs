@@ -116,6 +116,11 @@ function applySetup(step, ctx, baseDir) {
     else throw new Error(`write ${step.write}: give json, text, base64 or copy`)
     fs.writeFileSync(file, body)
     if (step.mode && process.platform !== 'win32') fs.chmodSync(file, parseInt(step.mode, 8))
+    // a fixed modification time, for readers that sort by it (crash reports, snapshots)
+    if (step.mtime) {
+      const at = new Date(step.mtime)
+      fs.utimesSync(file, at, at)
+    }
   } else if (step.remove !== undefined) {
     fs.rmSync(target(step.remove), { recursive: true, force: true })
   } else {

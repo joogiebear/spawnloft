@@ -620,6 +620,7 @@ impl Daemon {
                     .and_then(|i| i.get("memory"))
                     .map(|m| crate::js::string(Some(m))),
                 dir: inst.and_then(|i| i.dir()).map(String::from),
+                ..Default::default()
             };
             if let Some(finding) = diagnose::diagnose(&lines, &ctx).into_iter().next() {
                 cause = format!(" Likely cause: {}.", finding.title.to_lowercase());

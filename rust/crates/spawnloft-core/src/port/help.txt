@@ -1,0 +1,155 @@
+spawnloft - local Minecraft servers, from a terminal. mcctl remains a compatible alias.
+
+AUTOMATION
+  spawnloft status <name> --json     Versioned status record (no configured credentials)
+  spawnloft plugins <name> --json    Full plugin inventory
+  spawnloft backups <name> --json    Backup history (snapshots is an alias)
+  spawnloft diagnostics <name> --json  Recent console findings and crash report summaries
+  spawnloft doctor --json            Read-only environment checks
+  spawnloft backup <name> --json     Create a backup; return its result and warnings
+  spawnloft metrics <name> --json    Recorded CPU and memory measurements
+      --follow                       Stream new readings; --json uses JSON Lines
+      --seconds <n>                  Limit the initial history window
+      --csv [--output <file>]        CSV export; refuses to overwrite an existing file
+  Automation exit codes: 0 success, 1 operation/check failed, 2 invalid usage.
+  Follow interruption: 130 for Ctrl+C, 143 for SIGTERM. Both names run the same CLI.
+  spawnloft mcp                      MCP server on stdio, for an AI client to launch
+      --allow-destructive            Also offer restore, kill and upgrade_minecraft
+      --show-ips                     Stop hiding player IP addresses in console lines
+
+LIFECYCLE
+  spawnloft list                         Show every instance and its state
+  spawnloft status <name>                Detailed state for one instance
+  spawnloft start <name>                 Start and wait until the server reports ready
+      --detach                       Return as soon as the process launches
+      --timeout <sec>                Ready timeout (default 180)
+      --no-sync                      Do not push registry ports into server.properties
+  spawnloft stop <name> [--timeout sec]  Graceful shutdown via the console "stop" command
+  spawnloft restart <name>               Stop then start
+  spawnloft kill <name>                  Force-kill the process tree
+
+CONSOLE
+  spawnloft logs <name> [-n 60] [-f]     Read the captured console; -f follows
+      --grep <regex>                 Filter lines
+  spawnloft cmd <name> "<command>"       Run a command over RCON and print the reply
+  spawnloft send <name> "<line>"         Write a raw line to the server's stdin
+  spawnloft console <name>               Interactive attach (server survives detach)
+  spawnloft players <name>               Who is online
+
+INSTANCES
+  spawnloft adopt <name> <dir>           Register an existing server directory in place
+      --jar <file> --memory <4G>
+  spawnloft new <name> [options]         Create a fresh instance
+      --jar <file>                   Server jar from the jars/ store
+      --paper <version>              Download that Paper version and use it
+      --purpur | --folia | --asp     Same, for Purpur, Folia or Advanced Slime Paper
+      --vanilla <version>            Mojang's own server jar (no plugins, no mods)
+      --spigot | --craftbukkit <v>   Compiled here by BuildTools (needs a JDK, ~10 min)
+      --build <n>                    A specific build, for the sources that number them
+      --fabric <version>             Download Fabric for that version (mods, not plugins)
+      --neoforge <version>           Install NeoForge for that version (mods, not plugins)
+      --modpack <slug>               Build the whole server from a Modrinth modpack
+      --template <name>              Start from a saved template
+      --memory <4G> --port <n>
+      --accept-eula                  Write eula=true (you accept Mojang's EULA)
+      --offline                      Let anyone join as any name, no account needed.
+                                     Puts an OFFLINE/INSECURE banner in every log.
+  spawnloft clone <src> <new>            Copy plugins+config into a new instance
+      --with-worlds                  Also copy world data (default: fresh worlds)
+  spawnloft set <name> key=value...      memory, java, jar, port, rcon.port, rcon.password,
+                                     auto-restart=on|off, webhook=<url>|off
+  spawnloft props <name> [key=value...]  Read or edit server.properties
+  spawnloft plugins <name>               List plugins; flip one with: plugins <name> disable <x>
+  spawnloft worlds <name>                List worlds; use <w>, import <src> --as <n>,
+                                     export [w], delete <w> --yes
+  spawnloft rm <name> [--purge --yes]    Unregister (and optionally delete files)
+
+SNAPSHOTS
+  spawnloft backup <name>                Snapshot to backups/<name>/
+      --scope <plugins|worlds|config|standard|full>
+      --label <text> --keep <n>
+  spawnloft snapshots <name>             List snapshots
+  spawnloft restore <name> [ref] --yes   Restore (default ref: latest); server must be stopped
+  spawnloft prune <name> --keep <n>      Delete all but the newest n
+  spawnloft verify <name> [ref|--all]    Read a snapshot back end to end and check its coverage
+
+OTHER
+  spawnloft templates                    List templates
+  spawnloft templates save <inst> <tpl>  Save an instance's plugins+config as a template
+  spawnloft ui [--port n] [--no-open] [--launcher]
+                                    Serve the local control panel and sign a browser in to it
+                                    (--no-open only prints the one-use link);
+                                    --launcher opens the game launcher instead
+  spawnloft ui --link [--port n] [--launcher]
+                                    Print a new sign-in link for the panel already running
+  spawnloft paper versions               Paper versions available to download
+  spawnloft paper fetch <version>        Download a Paper build into the jar store
+  spawnloft upgrade <name> [--check]     Move to the newest build for its version (Paper,
+                                     Purpur, Folia or Advanced Slime Paper);
+                                     --version <v> --yes crosses Minecraft versions
+  spawnloft pack <name> [update --yes]   A modpack server's pack: show, check, update
+                                     (snapshot first; worlds and hand-added files untouched)
+  spawnloft config                       Show where servers, jars and backups live
+  spawnloft config set-root <path>       Move the data root (new servers only)
+  spawnloft config set-instances <path>  Put servers on a different drive
+  spawnloft data move <folder> [--yes]   Move the whole data folder and leave a link where it was,
+                                     so nothing stored needs changing (default: show the plan)
+  spawnloft data status|finish|rollback  Where the data is; delete the parked original; undo a move
+                                     that was interrupted
+  spawnloft config set-backup-mirror <path>|off
+                                     Copy every new snapshot to a second drive too
+  spawnloft rename <old> <new>           Rename an instance (and its folder)
+  spawnloft rebuild <name> --yes         Reset worlds; keeps plugins unless --wipe-plugins
+  spawnloft reveal <name>                Open the instance folder in Explorer
+  spawnloft launchers [name]             Write start/console/stop .bat files
+  spawnloft jars                         List stored server jars
+  spawnloft jars import <path> [--as x]  Add a server jar to the store
+  spawnloft why <name>                   Say what is wrong with a server, from its own console
+  spawnloft diag <name> [--client <p>]   Zip the console, daemon log, crash reports and findings
+                                     for a bug report (--lines N, --json)
+
+BOTS (plugin testing with scripted players)
+  spawnloft bot setup                    Install mineflayer into the data folder, once (needs npm, ~500 MB)
+  spawnloft bot check <server>           Say whether bots can join: offline mode, running, bound address
+  spawnloft bot run <scenario.json>      Join as the scenario's bots, run its steps, print a report
+      --instance <server>            Use this server instead of the scenario's
+      --json                         The report as one JSON line; exit 1 when a step fails
+
+CLIENT (a game client for your own servers)
+  spawnloft client list                  Profiles, with running state
+  spawnloft client versions              Minecraft versions with a column per mod loader (--snapshots, --all, -n 30)
+  spawnloft client new <name> --mc <v>   Make a profile (--loader, --memory, --java, --server, --harness)
+  spawnloft client set <name> key=val    Change mc, loader, loaderVersion, memory, java, server, harness, account, assistantAccount, serverList
+  spawnloft client remove <name>         Delete a profile (--purge also removes its game folder)
+  spawnloft client install <name>        Download what the profile needs, with progress on stderr
+  spawnloft client launch <name>         Install if needed and start the client (--as, --account, --server, --wait)
+  spawnloft client status <name>         Say whether the client is running
+  spawnloft client stop <name>           Stop a running client
+  spawnloft client logs <name>           SpawnLoft's capture (-n 100), or --latest for the game's latest.log
+  spawnloft client login                 Sign in with a Microsoft account (a code you type on Microsoft's page)
+  spawnloft client logout <name>         Forget a signed-in (or offline) account
+  spawnloft client accounts              Signed-in and offline accounts, and the launcher's default
+
+DATABASES
+  spawnloft db                           List databases
+  spawnloft db versions [--engine e]     Releases that can be run: mysql or garnet (Redis), on Windows and macOS
+  spawnloft db add <name> [--version v]  Download MySQL by default and set up a database on a free port [--engine garnet for Redis]
+  spawnloft db connect <name> --host h --port n --user u --password p   Register a database you already run
+  spawnloft db address <db> [--host h] [--port n] [--user u] [--password p]   Point a database you run elsewhere at a new address
+  spawnloft db create <server>           A database of the server's own on the port after its game port, started and attached
+  spawnloft db attach <db> <server>      Give a server its own database and user; prints the credentials
+  spawnloft db detach <db> <server>      Take the user away [--drop deletes the data too]
+  spawnloft db creds <db> <server>       Show a server's credentials again
+  spawnloft db remove <db> [--purge]     Forget a stopped database [and delete its files]
+  start, stop, restart, logs and status take a database's name like a server's.
+
+  spawnloft task list                    Scheduled tasks, when each last ran and runs next
+  spawnloft task add <server> --do <backup|restart|stop|start|command> [--line "<cmd>"]
+      --daily <HH:MM> | --weekly <day> --at <HH:MM> | --hourly <n> | --minutes <n> | --on-logon
+  spawnloft task run|rm|enable|disable <id>
+  spawnloft task linger [on]             Linux: whether tasks run while you are logged out, and turn that on
+
+  spawnloft doctor                       Check environment, ports, EULA, disk, stale state
+  spawnloft repair                       Rewrite task shims and server launchers for this install
+  spawnloft uninstall --yes [--data]     Stop servers, remove scheduled tasks; --data deletes what spawnloft made
+

@@ -86,6 +86,32 @@ pub fn install_signal_handlers() {
     }
 }
 
+static INTERRUPT_CODE: AtomicI32 = AtomicI32::new(0);
+
+extern "C" fn on_interrupt(sig: i32) {
+    // the first signal decides, as process.once does for each in cli-metrics.mjs
+    let code = if sig == SIGINT { 130 } else { 143 };
+    let _ = INTERRUPT_CODE.compare_exchange(0, code, Ordering::SeqCst, Ordering::SeqCst);
+}
+
+/// For a command that follows until stopped (`metrics --follow`): SIGINT and SIGTERM are caught
+/// and remembered as the exit codes 130 and 143 the Node CLI ends with.
+pub fn watch_interrupts() {
+    // SAFETY: the handler only touches an atomic, which is async-signal-safe.
+    unsafe {
+        signal(SIGINT, on_interrupt as extern "C" fn(i32) as usize);
+        signal(SIGTERM, on_interrupt as extern "C" fn(i32) as usize);
+    }
+}
+
+/// The exit code of an interrupt [`watch_interrupts`] caught, if one came.
+pub fn interrupted() -> Option<u8> {
+    match INTERRUPT_CODE.load(Ordering::SeqCst) {
+        0 => None,
+        c => u8::try_from(c).ok(),
+    }
+}
+
 /// Whether a SIGTERM arrived since the last call.
 pub fn take_sigterm() -> bool {
     SIGTERM_SEEN.swap(false, Ordering::SeqCst)

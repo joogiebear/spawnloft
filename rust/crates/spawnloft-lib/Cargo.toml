@@ -22,7 +22,7 @@ test-hooks = []
 
 [dependencies]
 regex = "1.13.1"
-serde_json = { version = "1.0.154", features = ["preserve_order"] }
+serde_json = { version = "1.0.154", features = ["preserve_order", "float_roundtrip"] }
 # the updater (update/): minisign signatures, semver ordering, sha512 of artifacts, HTTPS fetches
 minisign-verify = "0.3.0"
 semver = "1.0.28"

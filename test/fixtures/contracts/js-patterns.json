@@ -1,0 +1,945 @@
+{
+  "about": "new RegExp(source, \"i\").test(subject) in Node for the run-time pattern sites (logs --grep). Made by tools/parity/make-c1-fixtures.mjs; spawnloft-lib jsregex.rs must agree, and must refuse exactly the patterns marked invalid.",
+  "subjects": [
+    "[10:00:01] [Server thread/INFO]: Starting",
+    "[10:00:02] [Server thread/WARN]: Can't keep up!",
+    "x WARN] y",
+    "java.lang.Error",
+    "abc",
+    "a\rc",
+    "a{",
+    "aa",
+    "x]",
+    "a",
+    "a-b",
+    "A",
+    "\n",
+    " ",
+    " ",
+    "﻿",
+    "",
+    "color",
+    "colour",
+    "ababz",
+    "yz",
+    "ab",
+    "",
+    "é",
+    "É",
+    "server.jar",
+    "b",
+    "d",
+    "/",
+    "-",
+    "\u0000",
+    "\n",
+    "\t",
+    "\b",
+    "aab",
+    "aaab",
+    "a{,2}",
+    "k",
+    "8",
+    "3-x",
+    "TRUE",
+    "ſ",
+    "K",
+    "S",
+    "s",
+    "K",
+    "٣",
+    "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+    "AAAA",
+    "&",
+    "a--b",
+    "😀"
+  ],
+  "patterns": [
+    {
+      "source": "info",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting"
+      ]
+    },
+    {
+      "source": "WARN",
+      "matches": [
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y"
+      ]
+    },
+    {
+      "source": " ERROR]| WARN]|Exception",
+      "matches": [
+        "x WARN] y"
+      ]
+    },
+    {
+      "source": "^\\[10:00:0[12]\\]",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!"
+      ]
+    },
+    {
+      "source": "\\d{2}:\\d{2}",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!"
+      ]
+    },
+    {
+      "source": "\\bjava\\.",
+      "matches": [
+        "java.lang.Error"
+      ]
+    },
+    {
+      "source": "[\\w-]+:",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!"
+      ]
+    },
+    {
+      "source": "\\[[^\\]]+\\]",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!"
+      ]
+    },
+    {
+      "source": "a.c",
+      "matches": [
+        "abc"
+      ]
+    },
+    {
+      "source": "a{",
+      "matches": [
+        "a{",
+        "a{,2}"
+      ]
+    },
+    {
+      "source": "a{2}",
+      "matches": [
+        "aa",
+        "aab",
+        "aaab",
+        "AAAA"
+      ]
+    },
+    {
+      "source": "x]",
+      "matches": [
+        "x]"
+      ]
+    },
+    {
+      "source": "\\a",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "a",
+        "a-b",
+        "A",
+        "ababz",
+        "ab",
+        "server.jar",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "[\\w-]+$",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "aa",
+        "a",
+        "a-b",
+        "A",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "server.jar",
+        "b",
+        "d",
+        "-",
+        "aab",
+        "aaab",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "K",
+        "S",
+        "s",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "\\u0041",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "a",
+        "a-b",
+        "A",
+        "ababz",
+        "ab",
+        "server.jar",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "\\x41",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "a",
+        "a-b",
+        "A",
+        "ababz",
+        "ab",
+        "server.jar",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "[^]",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "é",
+        "É",
+        "server.jar",
+        "b",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "\\s",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "a\rc",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "\n",
+        "\t"
+      ]
+    },
+    {
+      "source": "\\S+",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "é",
+        "É",
+        "server.jar",
+        "b",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "\\D",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "é",
+        "É",
+        "server.jar",
+        "b",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "\\W",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "a\rc",
+        "a{",
+        "x]",
+        "a-b",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "é",
+        "É",
+        "server.jar",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "a{,2}",
+        "3-x",
+        "ſ",
+        "K",
+        "٣",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "\\B",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a{",
+        "aa",
+        "x]",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "",
+        "é",
+        "É",
+        "server.jar",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "TRUE",
+        "ſ",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "colou?r",
+      "matches": [
+        "color",
+        "colour"
+      ]
+    },
+    {
+      "source": "(ab)+",
+      "matches": [
+        "abc",
+        "ababz",
+        "ab",
+        "aab",
+        "aaab"
+      ]
+    },
+    {
+      "source": "(?:x|y)z",
+      "matches": [
+        "yz"
+      ]
+    },
+    {
+      "source": "(?<n>a)b",
+      "matches": [
+        "abc",
+        "ababz",
+        "ab",
+        "aab",
+        "aaab"
+      ]
+    },
+    {
+      "source": "^$",
+      "matches": [
+        ""
+      ]
+    },
+    {
+      "source": "é",
+      "matches": [
+        "é",
+        "É"
+      ]
+    },
+    {
+      "source": "É",
+      "matches": [
+        "é",
+        "É"
+      ]
+    },
+    {
+      "source": "\\.jar$",
+      "matches": [
+        "server.jar"
+      ]
+    },
+    {
+      "source": "a|",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "",
+        "é",
+        "É",
+        "server.jar",
+        "b",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "|",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "",
+        "é",
+        "É",
+        "server.jar",
+        "b",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "[a-c]+",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "a",
+        "a-b",
+        "A",
+        "color",
+        "colour",
+        "ababz",
+        "ab",
+        "server.jar",
+        "b",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "[^a-c]",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "a\rc",
+        "a{",
+        "x]",
+        "a-b",
+        "\n",
+        " ",
+        " ",
+        "﻿",
+        "",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "é",
+        "É",
+        "server.jar",
+        "d",
+        "/",
+        "-",
+        "\u0000",
+        "\n",
+        "\t",
+        "\b",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "ſ",
+        "K",
+        "S",
+        "s",
+        "K",
+        "٣",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "&",
+        "a--b",
+        "😀"
+      ]
+    },
+    {
+      "source": "\\/",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "/"
+      ]
+    },
+    {
+      "source": "\\-",
+      "matches": [
+        "a-b",
+        "-",
+        "3-x",
+        "a--b"
+      ]
+    },
+    {
+      "source": "[\\-]",
+      "matches": [
+        "a-b",
+        "-",
+        "3-x",
+        "a--b"
+      ]
+    },
+    {
+      "source": "\\0",
+      "matches": [
+        "\u0000"
+      ]
+    },
+    {
+      "source": "\\cJ",
+      "matches": [
+        "\n",
+        "\n"
+      ]
+    },
+    {
+      "source": "\\c",
+      "matches": []
+    },
+    {
+      "source": "\\t",
+      "matches": [
+        "\t"
+      ]
+    },
+    {
+      "source": "[\\b]",
+      "matches": [
+        "\b"
+      ]
+    },
+    {
+      "source": "a*?b",
+      "matches": [
+        "abc",
+        "a-b",
+        "ababz",
+        "ab",
+        "b",
+        "aab",
+        "aaab",
+        "a--b"
+      ]
+    },
+    {
+      "source": "a{1,}b",
+      "matches": [
+        "abc",
+        "ababz",
+        "ab",
+        "aab",
+        "aaab"
+      ]
+    },
+    {
+      "source": "a{,2}",
+      "matches": [
+        "a{,2}"
+      ]
+    },
+    {
+      "source": "\\k",
+      "matches": [
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "k",
+        "K"
+      ]
+    },
+    {
+      "source": "\\8",
+      "matches": [
+        "8"
+      ]
+    },
+    {
+      "source": "[\\d-x]",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "x]",
+        "a-b",
+        "-",
+        "a{,2}",
+        "8",
+        "3-x",
+        "a--b"
+      ]
+    },
+    {
+      "source": "true",
+      "matches": [
+        "TRUE"
+      ]
+    },
+    {
+      "source": "ſ",
+      "matches": [
+        "ſ"
+      ]
+    },
+    {
+      "source": "k",
+      "matches": [
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "k",
+        "K"
+      ]
+    },
+    {
+      "source": "\\w",
+      "matches": [
+        "[10:00:01] [Server thread/INFO]: Starting",
+        "[10:00:02] [Server thread/WARN]: Can't keep up!",
+        "x WARN] y",
+        "java.lang.Error",
+        "abc",
+        "a\rc",
+        "a{",
+        "aa",
+        "x]",
+        "a",
+        "a-b",
+        "A",
+        "color",
+        "colour",
+        "ababz",
+        "yz",
+        "ab",
+        "server.jar",
+        "b",
+        "d",
+        "aab",
+        "aaab",
+        "a{,2}",
+        "k",
+        "8",
+        "3-x",
+        "TRUE",
+        "K",
+        "S",
+        "s",
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu",
+        "AAAA",
+        "a--b"
+      ]
+    },
+    {
+      "source": "\\u{41}",
+      "matches": [
+        "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+      ]
+    },
+    {
+      "source": "\\uD83D",
+      "matches": [
+        "😀"
+      ]
+    },
+    {
+      "source": "[&&]",
+      "matches": [
+        "&"
+      ]
+    },
+    {
+      "source": "a--b",
+      "matches": [
+        "a--b"
+      ]
+    }
+  ]
+}

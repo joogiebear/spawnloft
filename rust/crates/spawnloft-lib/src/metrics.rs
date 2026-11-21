@@ -387,3 +387,44 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
+
+/// One row of `metrics.log` as `readSamples` keeps it: seconds since the epoch, CPU as a share
+/// of the whole machine, resident memory in MiB.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Row {
+    pub at: f64,
+    pub cpu: f64,
+    pub rss: f64,
+}
+
+/// `readSamples(name, { strict })`: rows that are whole and in range, in file order. `strict`
+/// fails on a file that cannot be read (anything but missing).
+pub fn read_samples(file: &Path, strict: bool) -> Result<Vec<Row>, crate::failure::Failure> {
+    let text = match std::fs::read(file) {
+        Ok(b) => String::from_utf8_lossy(&b).into_owned(),
+        Err(e) => {
+            if strict && e.kind() != std::io::ErrorKind::NotFound {
+                return Err(crate::failure::Failure::read(&e, file));
+            }
+            return Ok(Vec::new());
+        }
+    };
+    let mut rows = Vec::new();
+    for line in text.split('\n') {
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split(' ');
+        let mut field = || parts.next().map_or(f64::NAN, crate::js::string_to_number);
+        let (at, cpu, rss) = (field(), field(), field());
+        if !(at.is_finite() && cpu.is_finite() && rss.is_finite())
+            || at <= 0.0
+            || !(0.0..=100.0).contains(&cpu)
+            || rss < 0.0
+        {
+            continue;
+        }
+        rows.push(Row { at, cpu, rss });
+    }
+    Ok(rows)
+}

@@ -264,7 +264,7 @@ jobs:
       - name: The rig's own tests and the cross-process lock tests
         env:
           TMPDIR: ${{ runner.temp }}
-        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
