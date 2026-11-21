@@ -991,3 +991,82 @@ fn a_search_everywhere_keeps_one_sources_hits_when_the_other_is_down() {
         json!({ "results": [], "errors": ["Vanilla runs no plugins or mods"] })
     );
 }
+
+#[test]
+fn a_null_hangar_build_and_a_result_that_is_not_a_list_fail_as_node_does() {
+    let err = pick_hangar_version(&json!([null]), None).unwrap_err();
+    assert_eq!(
+        err.message(),
+        "Cannot read properties of null (reading 'channel')"
+    );
+    // the first pass reads every build's channel, so a null after a fine one fails too
+    let err = pick_hangar_version(&json!([hv(json!({ "channel": null })), null]), None).unwrap_err();
+    assert_eq!(
+        err.message(),
+        "Cannot read properties of null (reading 'channel')"
+    );
+
+    let (_dir, inst) = paper("hangar-odd");
+    answers(vec![("/projects/Odd/versions", j(json!({ "result": "x" })))]);
+    assert_eq!(
+        install_from_hangar(&inst, "Odd", None).unwrap_err().message(),
+        "versions.find is not a function"
+    );
+    answers(vec![("/projects/None/versions", j(json!({ "result": null })))]);
+    assert_eq!(
+        install_from_hangar(&inst, "None", None).unwrap_err().message(),
+        "that project has no downloadable Paper build on Hangar"
+    );
+}
+
+#[test]
+fn the_plugins_folder_is_made_even_when_the_offered_name_is_refused() {
+    let (dir, inst) = paper("odd-name-dir");
+    let jar = b"j".to_vec();
+    answers(vec![
+        (
+            "/projects/Chunky/versions",
+            j(
+                json!({ "result": [hv(json!({ "downloads": { "PAPER": { "downloadUrl": "https://hangarcdn.papermc.io/x", "fileInfo": { "name": "x.zip" } } } }))] }),
+            ),
+        ),
+        ("hangarcdn", Body::Bytes(jar)),
+    ]);
+    let _ = std::fs::remove_dir_all(dir.join("plugins"));
+    assert_eq!(
+        install_from_hangar(&inst, "Chunky", None).unwrap_err().message(),
+        "Hangar offered a file named \"x.zip\", which is not a plugin jar"
+    );
+    assert!(dir.join("plugins").is_dir());
+}
+
+#[test]
+fn an_old_jar_that_turned_into_a_folder_stops_the_update_before_its_record_is_dropped() {
+    let (dir, inst) = paper("retire-dir");
+    let p = dir.join("plugins");
+    std::fs::create_dir_all(p.join("Old.jar")).unwrap();
+    plugins::record_managed(
+        &inst,
+        "Old.jar",
+        json!({ "source": "hangar", "project": "Chunky", "version": "1" }),
+    )
+    .unwrap();
+    let jar = b"new".to_vec();
+    answers(vec![
+        (
+            "/projects/Chunky/versions",
+            j(
+                json!({ "result": [hv(json!({ "downloads": { "PAPER": { "downloadUrl": "https://hangarcdn.papermc.io/x", "fileInfo": { "name": "New.jar" } } } }))] }),
+            ),
+        ),
+        ("hangarcdn", Body::Bytes(jar)),
+    ]);
+    let err = update_plugin(&inst, "Old.jar", None).unwrap_err();
+    let old = jspath::join(&[&p.to_string_lossy(), "Old.jar"]);
+    assert_eq!(
+        err.message(),
+        format!("Path is a directory: rm returned EISDIR (is a directory) {old}")
+    );
+    assert!(p.join("New.jar").exists());
+    assert!(read_managed(&inst).unwrap()["managed"].get("Old.jar").is_some());
+}

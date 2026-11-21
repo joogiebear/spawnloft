@@ -286,7 +286,8 @@ pub fn primary_file(version: &Value) -> Result<Option<Value>, Failure> {
             return Ok(Some(f.clone()));
         }
     }
-    Ok(files.first().filter(|f| !f.is_null()).cloned())
+    // `files[0] ?? null`, which every caller then tests with `!file`
+    Ok(files.first().filter(|f| js::truthy(Some(f))).cloned())
 }
 
 /// `new URLSearchParams({ key: value }).toString()` for one pair.
@@ -354,6 +355,9 @@ mod tests {
             "a.jar"
         );
         assert_eq!(primary_file(&json!({"files": []})).unwrap(), None);
+        // `files[0] ?? null` is 0 or false, which every caller reads as no file
+        assert_eq!(primary_file(&json!({"files": [0]})).unwrap(), None);
+        assert_eq!(primary_file(&json!({"files": [false]})).unwrap(), None);
     }
 
     #[test]

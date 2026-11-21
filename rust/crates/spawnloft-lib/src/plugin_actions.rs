@@ -221,7 +221,11 @@ pub fn update_all_with_snapshot(
     if !updated.is_empty() {
         let names: Vec<String> = updated
             .iter()
-            .map(|u| crate::js::string(u.get("updated")))
+            // `u.updated` of a row that came back without one joins as ''
+            .map(|u| match u.get("updated") {
+                None | Some(Value::Null) => String::new(),
+                v => crate::js::string(v),
+            })
             .collect();
         let mut detail = names.join(", ");
         if !failed.is_empty() {

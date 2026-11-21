@@ -311,22 +311,24 @@ pub fn pick_hangar_version(
     let list = items(Some(versions), "find", "versions")?;
     let game_version = game_version.filter(|g| !g.is_empty());
     let downloadable = |v: &Value| -> Result<bool, Failure> {
-        let paper = opt(opt(Some(v), "downloads"), "PAPER");
+        let paper = opt(prop(Some(v), "downloads")?, "PAPER");
         let url = opt(paper, "downloadUrl");
         Ok(js::truthy(url) && js::truthy(opt(paper, "fileInfo")))
     };
     let exact = |v: &Value| -> Result<bool, Failure> {
         let Some(g) = game_version else { return Ok(true) };
-        let paper = opt(opt(Some(v), "platformDependencies"), "PAPER");
+        let paper = opt(prop(Some(v), "platformDependencies")?, "PAPER");
         if nullish(paper) {
             return Ok(false);
         }
         includes(paper, g, "(v.platformDependencies?.PAPER ?? [])")
     };
-    let release = |v: &Value| opt(opt(Some(v), "channel"), "name").and_then(Value::as_str) == Some("Release");
+    let release = |v: &Value| -> Result<bool, Failure> {
+        Ok(opt(prop(Some(v), "channel")?, "name").and_then(Value::as_str) == Some("Release"))
+    };
     let mut pick = None;
     for v in list {
-        if release(v) && downloadable(v)? && exact(v)? {
+        if release(v)? && downloadable(v)? && exact(v)? {
             pick = Some(v);
             break;
         }
@@ -360,7 +362,13 @@ fn hangar_versions(slug: &str) -> Result<Value, Failure> {
         "/projects/{}/versions?limit=25&platform=PAPER",
         encode(slug)
     ))?;
-    Ok(Value::Array(result_of(&data, "find")?.to_vec()))
+    // `data.result ?? []` as it came: what is not an array fails in pickHangarVersion's `find`
+    let r = prop(Some(&data), "result")?;
+    Ok(if nullish(r) {
+        json!([])
+    } else {
+        r.cloned().unwrap_or(Value::Null)
+    })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -383,10 +391,15 @@ fn fetch_jar(url: &str) -> Result<Vec<u8>, Failure> {
     modrinth::read_all(reply)
 }
 
-fn write_jar(inst: &Instance, name: &str, bytes: &[u8]) -> Result<(), Failure> {
+/// `fs.mkdirSync(pluginsDir(inst), { recursive: true })`, made before the file name is judged.
+fn make_plugins_dir(inst: &Instance) -> Result<String, Failure> {
     let dir = plugins_dir(inst)?;
     std::fs::create_dir_all(&dir).map_err(|e| Failure::io(&e, "mkdir", Some(std::path::Path::new(&dir))))?;
-    let file = jspath::join(&[&dir, name]);
+    Ok(dir)
+}
+
+fn write_jar(dir: &str, name: &str, bytes: &[u8]) -> Result<(), Failure> {
+    let file = jspath::join(&[dir, name]);
     std::fs::write(&file, bytes).map_err(|e| Failure::io(&e, "open", Some(std::path::Path::new(&file))))
 }
 
@@ -429,6 +442,7 @@ pub fn install_from_hangar(
             ));
         }
     }
+    let dir = make_plugins_dir(inst)?;
     let named = prop(info, "name")?;
     let name = jspath::basename(&if js::truthy(named) {
         s(named)
@@ -440,7 +454,7 @@ pub fn install_from_hangar(
             "Hangar offered a file named \"{name}\", which is not a plugin jar"
         )));
     }
-    write_jar(inst, &name, &bytes)?;
+    write_jar(&dir, &name, &bytes)?;
     let paper = opt(opt(Some(version), "platformDependencies"), "PAPER");
     let mut meta = Map::new();
     meta.insert("source".into(), json!("hangar"));
@@ -530,6 +544,7 @@ pub fn install_plugin(
             ));
         }
     }
+    let dir = make_plugins_dir(inst)?;
     let named = prop(Some(&file), "filename")?;
     let name = jspath::basename(&if js::truthy(named) {
         s(named)
@@ -541,7 +556,7 @@ pub fn install_plugin(
             "Modrinth offered a file named \"{name}\", which is not a plugin jar"
         )));
     }
-    write_jar(inst, &name, &bytes)?;
+    write_jar(&dir, &name, &bytes)?;
     let project = or_nullish(version.get("project_id"), None);
     let mut meta = Map::new();
     meta.insert("source".into(), json!("modrinth"));
@@ -1071,7 +1086,7 @@ pub fn check_updates_report(inst: &Instance, game_version: Option<&str>) -> Resu
 
 fn retire(inst: &Instance, current: &str, file: &str, installed: &Value) -> Result<(), Failure> {
     if installed.as_str() != Some(file) {
-        let _ = std::fs::remove_file(current);
+        crate::backup::rm_force(current)?;
         plugins::forget_managed(inst, file)?;
     }
     Ok(())
