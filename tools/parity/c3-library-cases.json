@@ -1,0 +1,2140 @@
+{
+ "tree": [
+  {
+   "path": "server.properties",
+   "text": "#Minecraft server properties\nlevel-name=world\nserver-port=25565\nserver-ip=\nrcon.password=hunter2\nmotd=Hi\n"
+  },
+  {
+   "path": "eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "path": "banned-ips.json",
+   "text": "[]\n"
+  },
+  {
+   "path": "usercache.json",
+   "text": "[]\n"
+  },
+  {
+   "path": "ops.json",
+   "text": "[]\n"
+  },
+  {
+   "path": "plugins/Essentials/config.yml",
+   "text": "a: 1\npassword: secret123\nnested:\n  token: abc\n  tokens: 5\n"
+  },
+  {
+   "path": "plugins/Essentials.jar",
+   "text": "jar bytes"
+  },
+  {
+   "path": "plugins/Shop/config.json",
+   "text": "{\"apiKey\": \"abc\", \"n\": 1}\n"
+  },
+  {
+   "path": "plugins/Shop/data.yml",
+   "text": "x: 1\r\ny: 2\r\n"
+  },
+  {
+   "path": "plugins/Bom/config.yml",
+   "text": "\ufeffa: 1\n"
+  },
+  {
+   "path": "plugins/Db/config.yml",
+   "text": "url: jdbc:mysql://host/db?user=x&password=pw1\nredis: redis://:pw2@host:6379\n"
+  },
+  {
+   "path": "config/paper-global.yml",
+   "text": "x: 1\n"
+  },
+  {
+   "path": "world/level.dat",
+   "base64": "AAFsZXZlbA=="
+  },
+  {
+   "path": "world/region/r.0.0.mca",
+   "base64": "cmVnaW9u"
+  },
+  {
+   "path": "world_nether/level.dat",
+   "text": "n"
+  },
+  {
+   "path": "logs/latest.log",
+   "text": "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\nline 31\nline 32\nline 33\nline 34\nline 35\nline 36\nline 37\nline 38\nline 39\n"
+  },
+  {
+   "path": "logs/old.log.gz",
+   "base64": "H4sIAAAAAAAC/y3OsQ2AMBBD0T5TZATsECD7pETK/h2RP82/yk+33llV1q7Tlp5pT6/0Tp90pDo4rMVc7AUgBEEIQyBCMYr/H1CMYhSjGMUoRvEoHzmijOPCAAAA"
+  },
+  {
+   "path": "logs/two.log.gz",
+   "base64": "H4sIAAAAAAAC/0vLLCou4QIAKrNKxwYAAAAfiwgAAAAAAAL/K05Nzs9L4QIAfsAPBgcAAAA="
+  },
+  {
+   "path": "logs/bad.log.gz",
+   "text": "not gzip at all"
+  },
+  {
+   "path": "logs/nul.log",
+   "base64": "dGV4dABtb3JlCg=="
+  },
+  {
+   "path": "notes/File10.txt",
+   "text": "10"
+  },
+  {
+   "path": "notes/file2.txt",
+   "text": "2"
+  },
+  {
+   "path": "notes/File1.txt",
+   "text": "1"
+  },
+  {
+   "path": "notes/Readme.TXT",
+   "text": "read"
+  },
+  {
+   "path": "notes/sub/deep.txt",
+   "text": "deep"
+  },
+  {
+   "path": "icon.png",
+   "base64": "iVBORw0KGgoAAAANSUhEUg=="
+  },
+  {
+   "path": "fake.png",
+   "text": "not an image at all"
+  },
+  {
+   "path": "emptydir/.keep",
+   "text": ""
+  },
+  {
+   "path": "archive.zip",
+   "base64": "UEsDBBQAAAAAAAAAIVhDvrfoAQAAAAEAAAALAAAAaW5uZXIvYS50eHRhUEsDBBQAAAAAAAAAIVj5775xAQAAAAEAAAAFAAAAYi50eHRiUEsBAhQDFAAAAAAAAAAhWEO+t+gBAAAAAQAAAAsAAAAAAAAAAAAAAKQBAAAAAGlubmVyL2EudHh0UEsBAhQDFAAAAAAAAAAhWPnvvnEBAAAAAQAAAAUAAAAAAAAAAAAAAKQBKgAAAGIudHh0UEsFBgAAAAACAAIAbAAAAE4AAAAAAA=="
+  },
+  {
+   "path": "pack.tar.gz",
+   "base64": "H4sIAAAAAAAC/+3NMQrCQBRF0b8UV2Am4cdZT7C0kTjCLN8hpb2CeE5z4TXvvl1vUz+33uJjynDJPDq8d5hjznXJWksee61LxqnEFzwfbdvHZfynHgAAAAAAAAAAAPyiF1TC8FEAKAAA"
+  },
+  {
+   "path": "fake.zip",
+   "text": "PK not really"
+  },
+  {
+   "path": "logs/padded.log.gz",
+   "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  {
+   "path": "logs/junk.log.gz",
+   "base64": "H4sIAAAAAAAC/8vPS+UqKc/nKskoSk3lAgC21eYlDgAAAAAABw=="
+  }
+ ],
+ "instance": {
+  "jar": "server.jar",
+  "port": 47999,
+  "bind": "0.0.0.0"
+ },
+ "ops": [
+  {
+   "op": "resolvePath",
+   "args": [
+    "",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "/etc/passwd",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "C:/x",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "../x",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "a/../b",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "./plugins/",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "plugins\\Essentials",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "nope/x",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "x\u0000y",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "  notes//File1.txt  ",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    ".//notes",
+    {
+     "mustExist": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "",
+    {
+     "allowRoot": true
+    }
+   ]
+  },
+  {
+   "op": "resolvePath",
+   "args": [
+    "nope/deeper/x",
+    {
+     "mustExist": false
+    }
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    null
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    ""
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "."
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    ".."
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "a/b"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "a\\b"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "a:b"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "a?"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "tab\there"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "dot."
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "space "
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "ok name.txt"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "emptydir",
+    "\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00"
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    ""
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "plugins"
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "notes"
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "world/level.dat"
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "plugins",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "server.properties"
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "world/level.dat"
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "plugins/Shop/data.yml"
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "notes"
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "nope.txt"
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/latest.log",
+    {
+     "bytes": 20
+    }
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/latest.log",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/old.log.gz",
+    {
+     "bytes": 30
+    }
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/two.log.gz",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/bad.log.gz",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/old.log.gz",
+    {
+     "maxUnpacked": 10
+    }
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/nul.log",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "pack.tar.gz",
+    {
+     "bytes": 10
+    }
+   ]
+  },
+  {
+   "op": "imageFile",
+   "args": [
+    "icon.png"
+   ]
+  },
+  {
+   "op": "imageFile",
+   "args": [
+    "fake.png"
+   ]
+  },
+  {
+   "op": "imageFile",
+   "args": [
+    "notes"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "89504e470d0a1a0a0000000d"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "ffd8ffe000104a4649460001"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "474946383961010001000000"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "474946383561010001000000"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "524946460000000057454250"
+   ]
+  },
+  {
+   "op": "imageKind",
+   "args": [
+    "89504e47"
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "server.properties",
+    {
+     "text": 5
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "server.properties",
+    {
+     "text": "x",
+     "version": "wrong"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "server.properties",
+    {
+     "text": "#Minecraft server properties\nlevel-name=world\nserver-port=25566\nserver-ip=\nrcon.password=hunter2\nmotd=Hi\n"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "server.properties",
+    {
+     "text": "#Minecraft server properties\nlevel-name=world\nserver-port=25565\nserver-ip=\nrcon.password=hunter2\nmotd=Changed\n"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "plugins/Shop/data.yml",
+    {
+     "text": "x: 1\ny: 3\n"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "plugins/Bom/config.yml",
+    {
+     "text": "a: 2\n"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "text": "a:\n\tb: 1\n"
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "text": "a:\n\tb: 1\n",
+     "force": true
+    }
+   ]
+  },
+  {
+   "op": "writeFileFresh",
+   "args": [
+    "plugins/Shop/config.json",
+    {
+     "text": "{broken"
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "plugins/New/x.yml",
+    {
+     "text": "new: 1\n",
+     "create": true
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "plugins/New/x.yml",
+    {
+     "text": "new: 1\n",
+     "create": true
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "plugins/New/bad:.yml",
+    {
+     "text": "new: 1\n",
+     "create": true
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "notes",
+    {
+     "text": "x",
+     "version": null
+    }
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "",
+    "newdir"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "",
+    "newdir"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "",
+    "bad:name"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "notes",
+    "inner"
+   ]
+  },
+  {
+   "op": "makeFolder",
+   "args": [
+    "nope",
+    "x"
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "plugins",
+    "Pack/sub/a.yml",
+    "uploaded",
+    {}
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "",
+    "server.properties",
+    "x",
+    {}
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "",
+    "ops.json",
+    "[1]\n",
+    {
+     "overwrite": true,
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "",
+    "plugins/Essentials.jar",
+    "new jar",
+    {
+     "overwrite": true,
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "",
+    "notes",
+    "x",
+    {
+     "overwrite": true
+    }
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "",
+    "",
+    "x",
+    {}
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "notes/File1.txt",
+    "a",
+    "x",
+    {}
+   ]
+  },
+  {
+   "op": "uploadFile",
+   "args": [
+    "notes",
+    "File1.txt/x",
+    "x",
+    {}
+   ]
+  },
+  {
+   "op": "sameButForCase",
+   "args": [
+    "a/b.yml",
+    "a/B.yml",
+    [
+     "b.yml"
+    ]
+   ]
+  },
+  {
+   "op": "sameButForCase",
+   "args": [
+    "a/b.yml",
+    "a/B.yml",
+    [
+     "b.yml",
+     "B.yml"
+    ]
+   ]
+  },
+  {
+   "op": "sameButForCase",
+   "args": [
+    "a/b.yml",
+    "a/c.yml",
+    [
+     "b.yml"
+    ]
+   ]
+  },
+  {
+   "op": "sameButForCase",
+   "args": [
+    "a",
+    "a",
+    []
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/file2.txt",
+    "notes/Two.txt",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "plugins",
+    "plugins/x",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/File10.txt",
+    "notes/File1.txt",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/File10.txt",
+    "nowhere/x.txt",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/File10.txt",
+    "notes/File10.txt",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "world",
+    "oldworld",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/File10.txt",
+    "notes/bad?.txt",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "notes/File10.txt",
+    "icon.png/x",
+    {}
+   ]
+  },
+  {
+   "op": "movePath",
+   "args": [
+    "ops.json",
+    "notes/ops.json",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [],
+    {}
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [
+     "notes/File1.txt",
+     "notes",
+     "notes/"
+    ],
+    {}
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [
+     "emptydir"
+    ],
+    {
+     "withoutCopy": true
+    }
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [
+     "plugins"
+    ],
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [
+     "plugins/Essentials.jar"
+    ],
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "deletePaths",
+   "args": [
+    [
+     "nope"
+    ],
+    {}
+   ]
+  },
+  {
+   "op": "undoLast",
+   "args": []
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "notes"
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [
+     "plugins/Shop"
+    ],
+    null
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [
+     "plugins/Shop"
+    ],
+    null
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [
+     "plugins/Shop",
+     "config"
+    ],
+    null
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [
+     "plugins/Shop",
+     "plugins/Bom"
+    ],
+    "both"
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [],
+    null
+   ]
+  },
+  {
+   "op": "archivePaths",
+   "args": [
+    [
+     "config"
+    ],
+    "bad:"
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "archive.zip",
+    {}
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "archive.zip",
+    {}
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "pack.tar.gz",
+    {}
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "server.properties",
+    {}
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "fake.zip",
+    {}
+   ]
+  },
+  {
+   "op": "extractArchive",
+   "args": [
+    "plugins",
+    {}
+   ]
+  },
+  {
+   "op": "listDir",
+   "args": [
+    "archive"
+   ]
+  },
+  {
+   "op": "searchNames",
+   "args": [
+    "",
+    "co",
+    {}
+   ]
+  },
+  {
+   "op": "searchNames",
+   "args": [
+    "",
+    "x",
+    {}
+   ]
+  },
+  {
+   "op": "searchNames",
+   "args": [
+    "plugins",
+    "YML",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "searchNames",
+   "args": [
+    "",
+    "level",
+    {
+     "running": true
+    }
+   ]
+  },
+  {
+   "op": "backupStandard",
+   "args": []
+  },
+  {
+   "op": "undoLast",
+   "args": []
+  },
+  {
+   "op": "downloadable",
+   "args": [
+    "icon.png"
+   ]
+  },
+  {
+   "op": "downloadable",
+   "args": [
+    "plugins/Shop"
+   ]
+  },
+  {
+   "op": "downloadable",
+   "args": [
+    "nope"
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    null,
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "  ",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "/etc/x.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "C:/x.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "../x.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "world/level.dat",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "WORLD_nether/x.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "logs/latest.log",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "eula.txt",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "banned-ips.json",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "usercache.json",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins/Essentials.jar",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins/Missing.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins/Essentials",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "notes/Readme.TXT",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "./server.properties",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins\\Essentials\\config.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    ".yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins/a..yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "cache/x.yml",
+    {}
+   ]
+  },
+  {
+   "op": "resolveConfigPath",
+   "args": [
+    "plugins/New2/x.yml",
+    {
+     "mustExist": false
+    }
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    ""
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "plugins"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "world"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "../x"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "./"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "/"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "nope"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "plugins/"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "."
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "logs"
+   ]
+  },
+  {
+   "op": "listConfigFiles",
+   "args": [
+    "notes/File1.txt"
+   ]
+  },
+  {
+   "op": "readConfigFile",
+   "args": [
+    "server.properties"
+   ]
+  },
+  {
+   "op": "readConfigFile",
+   "args": [
+    "plugins/Essentials/config.yml"
+   ]
+  },
+  {
+   "op": "readConfigFile",
+   "args": [
+    "plugins/Db/config.yml"
+   ]
+  },
+  {
+   "op": "readConfigFile",
+   "args": [
+    "world/level.dat"
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "content": "x",
+     "oldText": "a",
+     "newText": "b"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {}
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "",
+     "newText": "b"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "a: 1",
+     "newText": 5
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "content": "password: [redacted]\n"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "content": "a: 2\n"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "content": "a: 2\n",
+     "hiddenRestored": true
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "zzz",
+     "newText": "b"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "password: [redacted]",
+     "newText": "b"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "1",
+     "newText": "2"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "a: 1",
+     "newText": "a: 1"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Essentials/config.yml",
+    {
+     "oldText": "a: 1",
+     "newText": "a:\n\t1"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Shop/data.yml",
+    {
+     "oldText": "x: 1\ny: 3",
+     "newText": "x: 2\ny: 3"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Shop/config.json",
+    {
+     "content": "{bad"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "server.properties",
+    {
+     "oldText": "motd=Changed",
+     "newText": "motd=New"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "server.properties",
+    {
+     "oldText": "server-port=25565",
+     "newText": "server-port=1"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "server.properties",
+    {
+     "oldText": "server-ip=",
+     "newText": "server-ip=1.2.3.4"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Fresh/new.yml",
+    {
+     "content": "fresh: 1\n"
+    }
+   ]
+  },
+  {
+   "op": "planConfigWrite",
+   "args": [
+    "plugins/Fresh/new.yml",
+    {
+     "content": null
+    }
+   ]
+  },
+  {
+   "op": "applyPlan",
+   "args": [
+    "plugins/Fresh/new.yml",
+    {
+     "content": "fresh: 1\n"
+    }
+   ]
+  },
+  {
+   "op": "applyPlan",
+   "args": [
+    "server.properties",
+    {
+     "oldText": "motd=Changed",
+     "newText": "motd=Applied"
+    }
+   ]
+  },
+  {
+   "op": "unchangedSince",
+   "args": [
+    "plugins/Bom/config.yml",
+    {
+     "oldText": "a: 2",
+     "newText": "a: 3"
+    }
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/padded.log.gz",
+    {}
+   ]
+  },
+  {
+   "op": "readTail",
+   "args": [
+    "logs/junk.log.gz",
+    {}
+   ]
+  }
+ ],
+ "pure": [
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: hunter2"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "  - password: 'x y'"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: \"\""
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: null"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: ~"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password:"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "db.password = x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "\"apiKey\": \"abc\","
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "apiKey: abc  , "
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "token: t"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "tokens: 5"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "token-cost: 3"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "authToken: z"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "bypass: y"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "pass: q"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "user.pwd=1"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "private_key: k"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "access-key: a"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "webhook: https://x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{\"a\": 1, \"password\": \"x\"}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{a: 1, secret: y}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{'secret': 'a b', other: 2}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{\"password\": \"esc\\\"aped\", \"b\": 1}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{\"password\": }"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{password: [], x: 1}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "url=jdbc:x://h/db?user=u&password=p;pwd=q"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "x?token=abc&b=1"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "http://user:pw@host/x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "redis://:pw@h:6379"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "nothing here"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    ""
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "key: [redacted]"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "-----BEGIN RSA PRIVATE KEY-----\nabc\ndef\n-----END RSA PRIVATE KEY-----\nafter: 1"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "k: -----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "a: 1\r\npassword: x\r\n"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "Password: Big"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "PASSWORD = 'x'"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "passwordHint: x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: '\u00e9'"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{\"a\": \"x\", \"token\": \"secret\", \"c\": \"secret\"}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "list: {password: a, password: b}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{\"secret': 1}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "{secret\": 1}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "x: {\u00a0password: y}"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "pass\u00a0word: x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password:\u00a0x"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "\ufeffpassword: bom"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "password: x # comment"
+   ]
+  },
+  {
+   "op": "redactConfig",
+   "args": [
+    "a = b, password = c"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.yml",
+    "a:\n\tb"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.yml",
+    "a:\n  \tb"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.YAML",
+    "ok: 1"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.json",
+    "{}"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.json",
+    "\ufeff{}"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.json",
+    "{bad"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.json5",
+    "{bad"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "x.txt",
+    "\tok"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "noext",
+    "\t"
+   ]
+  },
+  {
+   "op": "checkFormat",
+   "args": [
+    "a.yml",
+    "ok\r\n\tbad"
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "a\nb\nc\n",
+    "a\nB\nc\n",
+    40
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    null,
+    "new\n",
+    40
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "password: x\nb\n",
+    "password: y\nb\n",
+    40
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "l0\nl1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\nl13\nl14\nl15\nl16\nl17\nl18\nl19\nl20\nl21\nl22\nl23\nl24\nl25\nl26\nl27\nl28\nl29\nl30\nl31\nl32\nl33\nl34\nl35\nl36\nl37\nl38\nl39\nl40\nl41\nl42\nl43\nl44\nl45\nl46\nl47\nl48\nl49\n",
+    "m0\nm1\nm2\nm3\nm4\nm5\nm6\nm7\nm8\nm9\nm10\nm11\nm12\nm13\nm14\nm15\nm16\nm17\nm18\nm19\nm20\nm21\nm22\nm23\nm24\nm25\nm26\nm27\nm28\nm29\nm30\nm31\nm32\nm33\nm34\nm35\nm36\nm37\nm38\nm39\nm40\nm41\nm42\nm43\nm44\nm45\nm46\nm47\nm48\nm49\n",
+    10
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "same\n",
+    "same\n",
+    40
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "\ufeffa\r\nb\r\n",
+    "a\nc\n",
+    40
+   ]
+  },
+  {
+   "op": "restoreHidden",
+   "args": [
+    "a=1\nrcon.password=secret\nmotd=x\nrcon.password=two\n",
+    "a=2\nrcon.password=[redacted]\nmotd=y\nrcon.password=[redacted]\n"
+   ]
+  },
+  {
+   "op": "restoreHidden",
+   "args": [
+    "a=1\nrcon.password=secret\nmotd=x\nrcon.password=two\n",
+    "a=2\nrcon.password=[redacted]\nnew=[redacted]\n"
+   ]
+  },
+  {
+   "op": "restoreHidden",
+   "args": [
+    "x: 1\r\npassword: s\r\n",
+    "x: 2\r\npassword: [redacted]\r\n"
+   ]
+  },
+  {
+   "op": "restoreHidden",
+   "args": [
+    "a=1\nrcon.password=secret\nmotd=x\nrcon.password=two\n",
+    "rcon.password=[redacted]\nrcon.password=[redacted]\nrcon.password=[redacted]\n"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "a.yml"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    ".bashrc"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    ".."
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "a."
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "a.b.c"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "...yml"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "x/.y"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "noext"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "a..yml"
+   ]
+  },
+  {
+   "op": "extname",
+   "args": [
+    "./x.txt"
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "\r",
+    "a: 1\r",
+    3
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    null,
+    "a: 1\n\r",
+    5
+   ]
+  },
+  {
+   "op": "summarizeChange",
+   "args": [
+    "x\r\ny\r",
+    "x\r\nz\r\n",
+    5
+   ]
+  }
+ ]
+}

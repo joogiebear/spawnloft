@@ -1,7 +1,7 @@
 //! File writes the Node core's readers rely on: JSON replaced atomically by temp file and rename
 //! (`writeJson`), with the Windows retry for a file a virus scanner or indexer is holding.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// How many times a held file is retried, with growing waits (about 1.5 s in total).
@@ -189,9 +189,139 @@ pub fn readdir_names(dir: &Path) -> std::io::Result<Vec<String>> {
     Ok(names)
 }
 
+/// `fs.readdirSync(dir, { withFileTypes: true })` in its order (see [`readdir_names`]): each name
+/// with its type, links not followed.
+pub fn readdir_typed(dir: &Path) -> std::io::Result<Vec<(String, std::fs::FileType)>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        out.push((
+            entry.file_name().to_string_lossy().into_owned(),
+            entry.file_type()?,
+        ));
+    }
+    if cfg!(unix) {
+        out.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    }
+    Ok(out)
+}
+
+/// `fs.cpSync(src, dest, { recursive: true })` into a `dest` that is not there yet: folders made,
+/// files copied with their mode, links made again pointing where they pointed (a relative target
+/// made absolute against the link's folder, as `verbatimSymlinks: false` does).
+///
+/// As `cpSync` does, a `dest` inside `src` is refused before anything is made, and what is
+/// neither a file, a folder nor a link (a FIFO, a socket, a device) is left out.
+pub fn copy_tree(src: &Path, dest: &Path) -> Result<(), crate::failure::Failure> {
+    use crate::failure::Failure;
+    if inside(src, dest) {
+        let s = src.to_string_lossy();
+        let sep = std::path::MAIN_SEPARATOR;
+        let s = if s.ends_with(sep) {
+            s.to_string()
+        } else {
+            format!("{s}{sep}")
+        };
+        return Err(Failure::Internal {
+            head: "Error".into(),
+            message: format!(
+                "Cannot copy {s} to a subdirectory of self {}",
+                dest.to_string_lossy()
+            ),
+            code: Some("ERR_FS_CP_EINVAL".into()),
+        });
+    }
+    copy_entry(src, dest)
+}
+
+/// Whether `dest` is `src` or under it, as written or once links are resolved (the folder
+/// `dest` would be made in is resolved, since `dest` is not there yet).
+fn inside(src: &Path, dest: &Path) -> bool {
+    let abs = |p: &Path| PathBuf::from(crate::jspath::resolve(&p.to_string_lossy()));
+    if abs(dest).starts_with(abs(src)) {
+        return true;
+    }
+    let real_src = std::fs::canonicalize(src);
+    let real_dest = dest
+        .parent()
+        .and_then(|d| std::fs::canonicalize(d).ok())
+        .zip(dest.file_name())
+        .map(|(d, n)| d.join(n));
+    match (real_src, real_dest) {
+        (Ok(s), Some(d)) => d.starts_with(s),
+        _ => false,
+    }
+}
+
+fn copy_entry(src: &Path, dest: &Path) -> Result<(), crate::failure::Failure> {
+    use crate::failure::Failure;
+    let meta = std::fs::symlink_metadata(src).map_err(|e| Failure::io(&e, "lstat", Some(src)))?;
+    if meta.file_type().is_symlink() {
+        let target = std::fs::read_link(src).map_err(|e| Failure::io(&e, "readlink", Some(src)))?;
+        let target = if target.is_absolute() {
+            target
+        } else {
+            let base = src.parent().unwrap_or(Path::new("."));
+            PathBuf::from(crate::jspath::resolve(&base.join(target).to_string_lossy()))
+        };
+        #[cfg(unix)]
+        let made = std::os::unix::fs::symlink(&target, dest);
+        #[cfg(windows)]
+        let made = if std::fs::metadata(&target).is_ok_and(|m| m.is_dir()) {
+            std::os::windows::fs::symlink_dir(&target, dest)
+        } else {
+            std::os::windows::fs::symlink_file(&target, dest)
+        };
+        return made.map_err(|e| Failure::io(&e, "symlink", Some(dest)));
+    }
+    if meta.is_dir() {
+        std::fs::create_dir(dest).map_err(|e| Failure::io(&e, "mkdir", Some(dest)))?;
+        for (name, _) in readdir_typed(src).map_err(|e| Failure::io(&e, "opendir", Some(src)))? {
+            copy_entry(&src.join(&name), &dest.join(&name))?;
+        }
+        return Ok(());
+    }
+    if !meta.is_file() {
+        return Ok(());
+    }
+    std::fs::copy(src, dest)
+        .map(|_| ())
+        .map_err(|e| Failure::io(&e, "copyfile", Some(src)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copy_tree_refuses_a_copy_into_itself_and_leaves_out_fifos() {
+        let d = std::env::temp_dir().join(format!("sl-fsx-cp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join("w/srv")).unwrap();
+        std::fs::write(d.join("w/level.dat"), "x").unwrap();
+        let e = copy_tree(&d.join("w"), &d.join("w/srv/copy")).unwrap_err();
+        assert!(
+            matches!(&e, crate::failure::Failure::Internal { code: Some(c), message, .. }
+                if c == "ERR_FS_CP_EINVAL" && message.starts_with("Cannot copy ")),
+            "{e:?}"
+        );
+        assert!(!d.join("w/srv/copy").exists());
+        #[cfg(unix)]
+        {
+            // the same folder reached through a link
+            std::os::unix::fs::symlink(d.join("w"), d.join("via")).unwrap();
+            assert!(copy_tree(&d.join("via"), &d.join("w/srv/copy")).is_err());
+            assert!(!d.join("w/srv/copy").exists());
+            let fifo = d.join("w/pipe");
+            let made = std::process::Command::new("mkfifo").arg(&fifo).status();
+            if made.is_ok_and(|s| s.success()) {
+                copy_tree(&d.join("w"), &d.join("out")).unwrap();
+                assert!(d.join("out/level.dat").exists());
+                assert!(!d.join("out/pipe").exists());
+            }
+        }
+        std::fs::remove_dir_all(&d).unwrap();
+    }
 
     #[test]
     fn writes_pretty_json_like_node() {

@@ -7,7 +7,7 @@
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
 //! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`, and the
 //! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
-//! `verify`, with their aliases, and `config`.
+//! `verify`, with their aliases, `config` and `worlds`.
 
 pub mod args;
 mod backup;
@@ -21,6 +21,7 @@ mod metrics;
 mod output;
 mod status;
 mod why;
+mod worlds;
 
 use spawnloft_lib::failure::Failure;
 use spawnloft_lib::settings::{self, Layout};
@@ -163,6 +164,7 @@ fn dispatch(
         "prune" => backup::prune(&mut ctx),
         "verify" => backup::verify(&mut ctx),
         "config" => config::config(&mut ctx),
+        "worlds" => worlds::worlds(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

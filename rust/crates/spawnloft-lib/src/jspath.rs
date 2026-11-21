@@ -210,6 +210,44 @@ pub fn dirname(p: &str) -> String {
     }
 }
 
+/// `path.extname(p)`: from the last `.` of the last segment, `''` when that segment has none or
+/// only a leading one (`.bashrc`, `..`), as Node computes it.
+pub fn extname(p: &str) -> String {
+    let b = p.as_bytes();
+    let (mut start_dot, mut start_part, mut end) = (None::<usize>, 0usize, None::<usize>);
+    let mut matched_slash = true;
+    let mut pre_dot = 0i8;
+    for i in (0..b.len()).rev() {
+        let c = b[i];
+        if c == b'/' || (cfg!(windows) && c == b'\\') {
+            if !matched_slash {
+                start_part = i + 1;
+                break;
+            }
+            continue;
+        }
+        if end.is_none() {
+            matched_slash = false;
+            end = Some(i + 1);
+        }
+        if c == b'.' {
+            if start_dot.is_none() {
+                start_dot = Some(i);
+            } else if pre_dot != 1 {
+                pre_dot = 1;
+            }
+        } else if start_dot.is_some() {
+            pre_dot = -1;
+        }
+    }
+    match (start_dot, end) {
+        (Some(d), Some(e)) if pre_dot != 0 && !(pre_dot == 1 && d + 1 == e && d == start_part + 1) => {
+            p[d..e].to_string()
+        }
+        _ => String::new(),
+    }
+}
+
 /// `path.basename(p)`: the last segment, trailing separators ignored (a root alone is empty).
 pub fn basename(p: &str) -> String {
     let (root, _, _) = split_root(p);
