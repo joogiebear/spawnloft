@@ -21,8 +21,12 @@ import { fileURLToPath } from 'node:url'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const NODE_PROBE = path.join(HERE, 'fixtures', 'registry-node-probe.mjs')
 const RUST_PROBE = process.env.SPAWNLOFT_REGISTRY_PROBE
+// a probe that is named but missing is a broken setup (CI names it), not a reason to skip
+if (RUST_PROBE && !fs.existsSync(RUST_PROBE)) {
+  throw new Error(`SPAWNLOFT_REGISTRY_PROBE names ${RUST_PROBE}, which does not exist; build it with: cd rust && cargo build -p spawnloft-fakes`)
+}
 const skip = RUST_PROBE
-  ? (fs.existsSync(RUST_PROBE) ? false : `SPAWNLOFT_REGISTRY_PROBE names ${RUST_PROBE}, which does not exist; build it with: cd rust && cargo build -p spawnloft-fakes`)
+  ? false
   : 'set SPAWNLOFT_REGISTRY_PROBE to the built registry-probe binary (cd rust && cargo build -p spawnloft-fakes; then SPAWNLOFT_REGISTRY_PROBE=$PWD/rust/target/debug/registry-probe)'
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-reg-x-'))

@@ -592,7 +592,6 @@ pub fn private_file_sddl(sid: &str) -> String {
 /// A new file only this user can open, failing when the name exists. The ACL is on the file
 /// when it is created, so it is never there under its folder's permissions.
 pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::File> {
-    use std::os::windows::ffi::OsStrExt;
     let sddl = wide(&private_file_sddl(&user_sid().map_err(std::io::Error::other)?));
     let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
     // SAFETY: valid NUL-terminated string and out-pointer; the descriptor is freed below.
@@ -612,7 +611,7 @@ pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::Fi
         lpSecurityDescriptor: sd,
         bInheritHandle: 0,
     };
-    let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let name = path_wide(path);
     // SAFETY: a NUL-terminated path and attributes that live through the call; the result is
     // checked, and CREATE_NEW never opens a file that exists.
     let handle = unsafe {
@@ -641,9 +640,20 @@ pub struct AccessEntry {
     pub inherited: bool,
 }
 
+/// A path for the wide API calls. A long absolute one gets the verbatim prefix (`\\\\?\\`), as
+/// std's own file calls give it, so a data root past MAX_PATH is protected like any other.
 fn path_wide(path: &std::path::Path) -> Vec<u16> {
-    use std::os::windows::ffi::OsStrExt;
-    path.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
+    let text = path.to_string_lossy();
+    let shown = if text.len() < 240 || text.starts_with("\\\\?\\") {
+        text.into_owned()
+    } else if let Some(rest) = text.strip_prefix("\\\\").or_else(|| text.strip_prefix("//")) {
+        format!("\\\\?\\UNC\\{}", rest.replace('/', "\\"))
+    } else if text.as_bytes().get(1) == Some(&b':') {
+        format!("\\\\?\\{}", text.replace('/', "\\"))
+    } else {
+        text.into_owned()
+    };
+    shown.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 /// Replaces the file's access list with the private one: inheritance cut and one full-access

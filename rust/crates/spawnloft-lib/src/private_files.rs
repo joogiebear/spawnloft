@@ -52,40 +52,50 @@ pub fn protect(file: &Path, mode: u32) -> Result<(), String> {
 }
 
 /// `writePrivateFile`: writes `data` to `file` so it is never on disk under the folder's
-/// permissions. On Windows a new file is created with the private list already on it; a file
-/// that exists (a leftover temp file) is protected before the data goes in. The outer error is a
-/// write that failed; the inner one is [`protect`]'s answer.
+/// permissions. The file is made new and private (exclusive create, mode 0600 or the private
+/// access list from the first moment); a leftover of that name (a temp file from a crash) is
+/// removed first, so its owner or a reader holding it open never sees the data. Where neither
+/// works, the file is emptied and protected before the data goes in, as in Node. The outer error
+/// is a write that failed; the inner one is [`protect`]'s answer.
 pub fn write(file: &Path, data: &[u8], mode: u32) -> std::io::Result<Result<(), String>> {
     use std::io::Write;
-    #[cfg(windows)]
-    if owner_only(mode) {
-        match crate::platform::create_private_new(file) {
-            Ok(mut f) => {
-                f.write_all(data)?;
-                return Ok(Ok(()));
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let protection = protect(file, mode);
-                std::fs::write(file, data)?;
-                return Ok(protection);
-            }
-            // the API refused (a drive with no ACLs): written plainly, then the same attempt
-            // icacls would make, whose reason is the answer
-            Err(_) => {
-                std::fs::write(file, data)?;
-                return Ok(protect(file, mode));
-            }
+    let fresh = |file: &Path| -> std::io::Result<std::fs::File> {
+        #[cfg(windows)]
+        if owner_only(mode) {
+            return crate::platform::create_private_new(file);
         }
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(mode);
+        }
+        opts.open(file)
+    };
+    let made = match fresh(file) {
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            let _ = std::fs::remove_file(file);
+            fresh(file)
+        }
+        other => other,
+    };
+    if let Ok(mut f) = made {
+        f.write_all(data)?;
+        drop(f);
+        // the mode given at creation passed through the umask; chmod sets it exactly
+        return Ok(if cfg!(windows) {
+            Ok(())
+        } else {
+            protect(file, mode)
+        });
     }
-    let mut opts = std::fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(mode);
-    }
-    opts.open(file)?.write_all(data)?;
-    Ok(protect(file, mode))
+    // a leftover that cannot be removed, or a drive the private create does not work on: emptied,
+    // protected, then written
+    std::fs::write(file, b"")?;
+    let protection = protect(file, mode);
+    std::fs::write(file, data)?;
+    Ok(protection)
 }
 
 /// `inspectPrivateFile`.
@@ -342,7 +352,12 @@ mod tests {
         let g = d.join("token.json");
         std::fs::write(&g, "old").unwrap();
         std::fs::set_permissions(&g, std::fs::Permissions::from_mode(0o666)).unwrap();
+        let held = std::fs::File::open(&g).unwrap();
         write(&g, b"new", PRIVATE_MODE).unwrap().unwrap();
+        // a new file: a reader of the leftover never sees the secret
+        let mut seen = String::new();
+        std::io::Read::read_to_string(&mut &held, &mut seen).unwrap();
+        assert_eq!(seen, "old");
         assert_eq!(std::fs::metadata(&g).unwrap().permissions().mode() & 0o777, 0o600);
         assert_eq!(std::fs::read_to_string(&g).unwrap(), "new");
 

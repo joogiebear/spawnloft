@@ -343,7 +343,7 @@ pub fn save(registry_file: &Path, data: &Value) -> Result<(), crate::failure::Fa
     .map(|_| ())
 }
 
-fn lock_failure(e: crate::lock::LockError) -> crate::failure::Failure {
+fn lock_failure(e: crate::lock::LockError, lock: &Path) -> crate::failure::Failure {
     use crate::failure::Failure;
     use crate::lock::LockError;
     match e {
@@ -354,11 +354,8 @@ fn lock_failure(e: crate::lock::LockError) -> crate::failure::Failure {
             message: e.to_string(),
             code: None,
         },
-        LockError::Io(io) => Failure::Internal {
-            head: "Error".into(),
-            message: crate::jspath::node_error(&io, "open", None),
-            code: Some(crate::jspath::error_code(&io).0.into()),
-        },
+        // the folder was made beforehand, so what is left is opening the lock file
+        LockError::Io(io) => Failure::io(&io, "open", Some(lock)),
     }
 }
 
@@ -367,13 +364,18 @@ fn change<T>(
     registry_file: &Path,
     f: impl FnOnce(&mut Value) -> Result<T, crate::failure::Failure>,
 ) -> Result<T, crate::failure::Failure> {
-    crate::lock::with_lock(&lock_file(registry_file), crate::lock::Options::default(), || {
+    let lock = lock_file(registry_file);
+    // tryLock makes the folder first; done here so its failure names it as Node's does
+    if let Some(dir) = lock.parent().filter(|d| !d.as_os_str().is_empty()) {
+        crate::fsx::mkdir_all(dir)?;
+    }
+    crate::lock::with_lock(&lock, crate::lock::Options::default(), || {
         let mut data = load_document(registry_file)?;
         let out = f(&mut data)?;
         save(registry_file, &data)?;
         Ok(out)
     })
-    .map_err(lock_failure)?
+    .map_err(|e| lock_failure(e, &lock))?
 }
 
 /// `reg.instances[name] = cfg` with JavaScript's rules for what `instances` may hold: an object
@@ -728,6 +730,45 @@ mod tests {
         let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../test/fixtures/contracts/c1-library.json");
         serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap()
+    }
+
+    // what the Rust registry leaves after a write: this user alone, nothing from the folder
+    #[cfg(windows)]
+    #[test]
+    fn a_saved_registry_is_owner_only_on_windows() {
+        let dir = std::env::temp_dir().join(format!("sl-reg-acl-{}", std::process::id()));
+        let file = dir.join("instances.json");
+        put_instance(&file, "smp", json!({ "rcon": { "password": "x" } })).unwrap();
+        let sddl = crate::platform::dacl_sddl(&file)
+            .unwrap()
+            .replace("AI", "")
+            .replace("AR", "");
+        assert!(
+            sddl.starts_with("D:P(A;;FA;;;") && sddl.matches('(').count() == 1,
+            "{sddl}"
+        );
+        assert_eq!(
+            crate::private_files::inspect(&file),
+            crate::private_files::State::Private
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_registry_under_a_file_names_the_folder() {
+        let dir = std::env::temp_dir().join(format!("sl-reg-blocked-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("afile"), "").unwrap();
+        let e = put_instance(&dir.join("afile").join("instances.json"), "smp", json!({})).unwrap_err();
+        assert_eq!(
+            e.message(),
+            format!(
+                "EEXIST: file already exists, mkdir '{}'",
+                dir.join("afile").display()
+            )
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

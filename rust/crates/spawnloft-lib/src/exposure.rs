@@ -440,6 +440,37 @@ mod tests {
         );
     }
 
+    // the same list Node makes, where a node is on PATH (the CI runners have one)
+    #[test]
+    fn interfaces_are_what_node_lists() {
+        let Ok(out) = std::process::Command::new("node")
+            .args([
+                "-p",
+                "JSON.stringify(Object.entries(require('os').networkInterfaces()).map(([n, l]) => [n, l.filter(e => e.family === 'IPv4').map(e => [e.address, e.internal])]).filter(([, l]) => l.length))",
+            ])
+            .output()
+        else {
+            return;
+        };
+        if !out.status.success() {
+            return;
+        }
+        let node: Value = serde_json::from_slice(&out.stdout).unwrap();
+        let ours: Vec<Value> = interfaces()
+            .into_iter()
+            .map(|(n, l)| {
+                let v4: Vec<Value> = l
+                    .iter()
+                    .filter(|e| e.ipv4)
+                    .map(|e| json!([e.address, e.internal]))
+                    .collect();
+                json!([n, v4])
+            })
+            .filter(|p| !p[1].as_array().unwrap().is_empty())
+            .collect();
+        assert_eq!(Value::Array(ours), node);
+    }
+
     #[test]
     fn bound_reads_only_its_own_line() {
         assert_eq!(bound_in("server-ip=\nserver-port=25565\n"), "");

@@ -478,7 +478,7 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | The text of a JSON file that does not parse (added in C1) | V8's `JSON.parse` message | serde_json's |
 | A checkout whose code folder holds `instances.json` (added in C1, C0-CHECKS.md section 2) | the code folder is the data root | the per-user data folder |
 | A run-time pattern meeting a character outside the BMP (added in C1) | matched as two UTF-16 units | matched as one character |
-| A JSON file holding half of a surrogate pair (added in C1) | kept, re-escaped in JSON output | read as U+FFFD |
+| A JSON file holding half of a surrogate pair (added in C1) | kept, re-escaped in JSON output | read as U+FFFD, and written back so when the Rust core changes that file (the registry from C1) |
 | A JSON number beyond the double range (added in C1) | Infinity | refused as unparseable |
 | A state file's `daemonStartTime` (added in C1, design D4) | ignored | decides, where the system reports a creation time |
 | A settings value of the wrong type (added in C1) | uncaught crash with excerpt, stack and version | the error line alone |

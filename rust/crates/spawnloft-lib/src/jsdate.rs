@@ -130,7 +130,9 @@ fn digits(s: &[u8]) -> Option<i64> {
 /// (`YYYY-MM-DD[Tt ]HH:MM:SS[.fff][Z|+HH:MM|+HHMM]`), each with V8's rules: a `T` (either case)
 /// is the ISO form, a space the legacy parser, which reads a year below 100 as 19xx or 20xx and
 /// takes any hours and minutes in a colonless offset. Both overflow day 29 to 31 into the next month,
-/// and a time with no offset is local. Anything else is NaN.
+/// and a time with no offset is local. Anything else is NaN. Not followed: the legacy parser's
+/// reading of a year from 0001 to 0031 as a month and day (`0001-10-09` is 2009-01-10 in V8),
+/// which no log writes.
 pub fn parse(text: &str) -> f64 {
     let b = text.as_bytes();
     // the six-digit signed year toISOString writes outside 0-9999 (ISO form only)
@@ -219,7 +221,7 @@ fn parse_parts(b: &[u8], year_override: Option<i64>) -> Option<f64> {
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) || minute > 59 || second > 59 || hour > 24 {
         return None;
     }
-    if hour == 24 && (minute != 0 || second != 0 || !fraction_zero) {
+    if hour == 24 && (minute != 0 || second != 0 || (iso && !fraction_zero) || (!iso && ms != 0)) {
         return None;
     }
     let local = make_day(year, month - 1, day as f64) * DAY_MS

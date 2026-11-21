@@ -90,7 +90,7 @@ pub fn write_json_node(
 ) -> Result<Result<(), String>, crate::failure::Failure> {
     use crate::failure::Failure;
     if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
-        std::fs::create_dir_all(dir).map_err(|e| Failure::io(&e, "mkdir", Some(dir)))?;
+        mkdir_all(dir)?;
     }
     let mut tmp = file.as_os_str().to_owned();
     tmp.push(".tmp");
@@ -112,6 +112,26 @@ pub fn write_json_node(
     }
     rename_over(&tmp, file).map_err(|e| rename_failure(&e, &tmp, file))?;
     Ok(protection)
+}
+
+/// `fs.mkdirSync(dir, { recursive: true })` with Node's failure: ENOTDIR when a folder on the way
+/// is a file (Windows says "already exists" for that), else the system's error for `dir`.
+pub fn mkdir_all(dir: &Path) -> Result<(), crate::failure::Failure> {
+    std::fs::create_dir_all(dir).map_err(|e| {
+        let blocked = dir
+            .ancestors()
+            .skip(1)
+            .any(|a| a.metadata().is_ok_and(|m| !m.is_dir()));
+        if blocked {
+            crate::failure::Failure::Internal {
+                head: "Error".into(),
+                message: format!("ENOTDIR: not a directory, mkdir '{}'", dir.display()),
+                code: Some("ENOTDIR".into()),
+            }
+        } else {
+            crate::failure::Failure::io(&e, "mkdir", Some(dir))
+        }
+    })
 }
 
 /// How `renameOver` reports a rename that failed: a file still held after the retries is a

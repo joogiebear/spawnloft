@@ -26,7 +26,6 @@ pub enum Probe {
     Gone,
 }
 
-/// Signal names as Node reports them in `exitSignal`.
 /// One address of a network interface, as `os.networkInterfaces()` lists it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceAddress {
@@ -35,6 +34,7 @@ pub struct InterfaceAddress {
     pub internal: bool,
 }
 
+/// Signal names as Node reports them in `exitSignal`.
 pub fn signal_name(n: i32) -> String {
     let name = match n {
         1 => "SIGHUP",
