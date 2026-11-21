@@ -66,6 +66,10 @@ fn made_table(made: &Made, rows: &[&str]) -> String {
 /// `--from` another server.
 pub fn new(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let name = require_name(&ctx.args.positional, "new")?.to_string();
+    // --modpack is its own creation path
+    if ctx.args.get("modpack").is_some_and(super::args::Flag::truthy) {
+        return super::pack::new_modpack(ctx, &name);
+    }
     if super::fetch::new_with_software(ctx, &name)? {
         return Ok(());
     }

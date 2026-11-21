@@ -26,6 +26,7 @@ mod list;
 mod logs;
 mod metrics;
 mod output;
+mod pack;
 mod plugins;
 mod status;
 mod tasks;
@@ -190,6 +191,7 @@ fn dispatch(
         "paper" => fetch::paper(&mut ctx),
         "upgrade" => fetch::upgrade(&mut ctx),
         "plugins" => plugins::plugins(&mut ctx),
+        "pack" => pack::pack(&mut ctx),
         "client" => client::client(&mut ctx),
         "task" => tasks::task(&mut ctx),
         "rm" | "remove" => tasks::remove(&mut ctx),
