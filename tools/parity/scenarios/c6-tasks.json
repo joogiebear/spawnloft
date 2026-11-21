@@ -1,0 +1,783 @@
+{
+ "about": "C6's scheduled tasks against the fake scheduler (SPAWNLOFT_TEST_SCHEDULER: schtasks and PowerShell on Windows, launchctl on macOS, systemctl and loginctl on Linux): `task` add with every schedule kind and its refusals, a registration the scheduler refuses taken back, list, enable, disable, rm, linger, then `rename` (its refusals, snapshots, run folder and tasks moving with the server, a capitals-only rename) and `rm` with and without --purge dropping the server's tasks. The fake's calls.log holds the order of every change made to the scheduler.",
+ "normalize": [
+  {
+   "pattern": "\\(\\d+(?:\\.\\d)? (?:B|KB)\\)",
+   "replace": "(<size>)"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/alpha/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/beta/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/Gamma/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "alpha": {
+      "dir": "{data}/instances/alpha",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47801,
+      "rcon": {
+       "port": 47811,
+       "password": "test"
+      }
+     },
+     "beta": {
+      "dir": "{data}/instances/beta",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47802,
+      "rcon": {
+       "port": 47812,
+       "password": "test"
+      }
+     },
+     "Gamma": {
+      "dir": "{data}/instances/Gamma",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47803,
+      "rcon": {
+       "port": 47813,
+       "password": "test"
+      }
+     }
+    }
+   }
+  },
+  {
+   "write": "scheduler/state.json",
+   "json": {
+    "fail": [
+     {
+      "tool": "schtasks",
+      "args": [
+       "/Create"
+      ],
+      "status": 1,
+      "stderr": "ERROR: Access is denied.\n",
+      "times": 1
+     },
+     {
+      "tool": "launchctl",
+      "args": [
+       "bootstrap"
+      ],
+      "status": 5,
+      "stderr": "Bootstrap failed: 5: Input/output error\n",
+      "times": 1
+     },
+     {
+      "tool": "systemctl",
+      "args": [
+       "enable"
+      ],
+      "status": 1,
+      "stderr": "Failed to enable unit: Access denied\n",
+      "times": 1
+     }
+    ]
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No scheduled tasks."
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "list"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No scheduled tasks."
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "04:00"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Created \"alpha-backup\""
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "backup",
+    "--weekly",
+    "sun",
+    "--at",
+    "23:59",
+    "--name",
+    "Weekly copy"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command",
+    "--line",
+    " say hello ",
+    "--hourly",
+    "3"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "restart",
+    "--minutes",
+    "45"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "stop",
+    "--on-logon"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "start",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "beta",
+    "--do",
+    "verify",
+    "--daily"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "Gamma",
+    "--do",
+    "backup",
+    "--at",
+    "05:30"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "Gamma",
+    "--do",
+    "command",
+    "--line",
+    "save-all",
+    "--minutes",
+    "1439"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "usage: spawnloft task add"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "nope"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no instance named"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "../x"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "--do command needs --line"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "command",
+    "--line",
+    "   "
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "a command is required"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "dance"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "unknown action"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--do",
+    "steps"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "add at least one step"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "24:00"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is not a time"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--daily",
+    "4:00"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--weekly",
+    "funday"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is not a day"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--minutes",
+    "1440"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "1439"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--hourly",
+    "24"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "23"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "alpha",
+    "--hourly",
+    "2.5"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "whole number"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "list"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "alpha-backup-2"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "disable",
+    "alpha-backup"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "disable",
+    "beta-start"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "enable",
+    "beta-start"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "disable",
+    "nope"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no scheduled task \"nope\""
+   }
+  },
+  {
+   "run": [
+    "task",
+    "enable"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "usage: spawnloft task enable <id>"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "beta-stop"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "usage: spawnloft task run <id>"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "nope"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no scheduled task"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "bogus"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "usage: spawnloft task [list"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "linger",
+    "off"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "linger"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "rename"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "usage: spawnloft rename"
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "alpha"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "alpha",
+    "bad name"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is not a usable name"
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "nope",
+    "x1"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no instance named"
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "alpha",
+    "beta"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "alpha",
+    "gamma"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "differs from it only in capitals"
+   }
+  },
+  {
+   "mkdir": "data/backups/delta"
+  },
+  {
+   "write": "data/backups/delta/old.tar.gz",
+   "text": "x"
+  },
+  {
+   "write": "data/backups/alpha/standard_2026-11-01_100000.tar.gz",
+   "text": "a"
+  },
+  {
+   "run": [
+    "rename",
+    "alpha",
+    "delta"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already holds snapshots"
+   }
+  },
+  {
+   "remove": "data/backups/delta"
+  },
+  {
+   "write": "data/run/alpha/console.log",
+   "text": "old line\n"
+  },
+  {
+   "run": [
+    "rename",
+    "alpha",
+    "delta"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "directory moved to"
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "delta-backup"
+   }
+  },
+  {
+   "run": [
+    "rename",
+    "Gamma",
+    "gamma"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "gamma-command"
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "rm"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "rm requires an instance name"
+   }
+  },
+  {
+   "run": [
+    "rm",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "rm",
+    "beta",
+    "--purge"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "--purge deletes"
+   }
+  },
+  {
+   "run": [
+    "rm",
+    "beta"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Also removed 3 scheduled task(s)"
+   }
+  },
+  {
+   "run": [
+    "remove",
+    "gamma",
+    "--purge",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "and deleted"
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "rm",
+    "delta",
+    "--purge",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No scheduled tasks."
+   }
+  }
+ ]
+}

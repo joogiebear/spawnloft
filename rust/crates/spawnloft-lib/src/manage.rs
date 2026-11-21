@@ -1,9 +1,9 @@
 //! `manage.mjs`: what changes a server as a whole. C4 ports `rebuild` and `reveal` (with its
-//! `openFolder`); `rename` and `destroy` call the scheduler and move in C6.
+//! `openFolder`); C6 `rename` and `destroy`, which call the scheduler.
 
 use std::path::Path;
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::activity::{self, Actor};
 use crate::backup;
@@ -31,7 +31,7 @@ pub struct Rebuilt {
 }
 
 /// `fs.rmSync(target, { recursive: true, force: true })`: a link is removed, not followed.
-fn rm_rf(target: &Path) -> Result<(), Failure> {
+pub fn rm_rf(target: &Path) -> Result<(), Failure> {
     let res = match std::fs::symlink_metadata(target) {
         Ok(m) if m.is_dir() => std::fs::remove_dir_all(target),
         // a junction or folder link on Windows is removed with rmdir, as rmSync falls back to
@@ -218,4 +218,198 @@ pub fn open_folder(target: &str) -> Result<String, Failure> {
         Ok(_child) => Ok(target.to_string()),
         Err(e) => Err(refused(target, &e, cmd)),
     }
+}
+
+/// `sameEntry(a, b)`: on a disk that ignores case (Windows, macOS by default) `backups/gamma`
+/// exists as soon as `backups/Gamma` does, because it is the same folder; a rename that only
+/// changes capitals must not read that as someone else's folder in the way.
+pub fn same_entry(a: &str, b: &str) -> bool {
+    crate::platform::same_entry(Path::new(a), Path::new(b))
+}
+
+/// `err.message` of a failed `renameSync(a, b)`.
+fn rename_message(e: &std::io::Error, a: &str, b: &str) -> String {
+    let (code, text) = jspath::error_code(e);
+    format!("{code}: {text}, rename '{a}' -> '{b}'")
+}
+
+/// What `rename` did.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Renamed {
+    pub dir: String,
+    pub moved_dir: bool,
+    pub tasks_moved: usize,
+}
+
+/// `rename(oldName, newName)`: the server's record, snapshots, run folder, mirror copies,
+/// launchers and scheduled tasks move to the new name. The folder moves only when it sits where
+/// SpawnLoft put it; an adopted server keeps its path.
+pub fn rename(layout: &Layout, by: &Actor, old: &str, new: &str) -> Result<Renamed, Failure> {
+    let reg = Path::new(&layout.registry_file);
+    // the registry's own rule, checked first: refusing the name once the folder had moved would
+    // lose the server
+    if registry::validate_name(new).is_err() {
+        return Err(Failure::user(format!(
+            "\"{new}\" is not a usable name - start with a letter or digit, then letters, digits, dash or underscore, up to 32 characters."
+        )));
+    }
+    let inst = registry::lookup(reg, old)?;
+    if registry::entries_of(&registry::load(reg)?)
+        .iter()
+        .any(|(k, _)| k == new)
+    {
+        return Err(Failure::user(format!("\"{new}\" already exists")));
+    }
+    // Windows and macOS see "gamma" and "Gamma" as one folder and one task name
+    if let Some(clash) = registry::list_all(reg)?
+        .into_iter()
+        .find(|i| i.name != old && i.name.to_lowercase() == new.to_lowercase())
+    {
+        return Err(Failure::user(format!(
+            "\"{}\" already exists, and \"{new}\" differs from it only in capitals",
+            clash.name
+        )));
+    }
+    assert_stopped(layout, old, "renaming it")?;
+    let mut cfg = inst.fields.clone();
+    cfg.shift_remove("name");
+
+    // Snapshots move first, while backing out is free: they are keyed by the name, and this is
+    // the one step worth refusing the rename over.
+    let old_backups = jspath::join(&[&layout.backups_dir, old]);
+    let new_backups = jspath::join(&[&layout.backups_dir, new]);
+    let mut moved_backups = false;
+    if Path::new(&old_backups).exists() {
+        if Path::new(&new_backups).exists() && !same_entry(&old_backups, &new_backups) {
+            return Err(Failure::user(format!(
+                "{new_backups} already holds snapshots - from an earlier server called \"{new}\".\n  \"{old}\" has not been renamed. Move or delete that folder first, or pick another name."
+            )));
+        }
+        if let Err(e) = std::fs::rename(&old_backups, &new_backups) {
+            return Err(Failure::user(format!(
+                "could not move the snapshots from {old_backups} to {new_backups}: {}\n  \"{old}\" has not been renamed. Close anything reading that folder and try again.",
+                rename_message(&e, &old_backups, &new_backups)
+            )));
+        }
+        moved_backups = true;
+    }
+
+    let dir = crate::create::path_arg(inst.get("dir"), "paths[0]")?.to_string();
+    let was_default = jspath::resolve(&dir) == jspath::resolve(&jspath::join(&[&layout.instances_dir, old]));
+    let mut new_dir = dir.clone();
+    if was_default {
+        let dest = jspath::join(&[&layout.instances_dir, new]);
+        if let Err(e) = std::fs::rename(&dir, &dest) {
+            if moved_backups {
+                let _ = std::fs::rename(&new_backups, &old_backups);
+            }
+            return Err(Failure::user(format!(
+                "could not move {dir} to {dest}: {}",
+                rename_message(&e, &dir, &dest)
+            )));
+        }
+        cfg.insert("dir".into(), json!(dest));
+        new_dir = dest;
+    }
+
+    // the run folder (console log, state file) is keyed by name; a locked console log is not
+    // worth failing over
+    let old_run = layout.run_dir_of(old);
+    if Path::new(&old_run).exists() {
+        let _ = std::fs::rename(&old_run, layout.run_dir_of(new));
+    }
+
+    registry::remove_instance(reg, old)?;
+    registry::put_instance(reg, new, Value::Object(cfg.clone()))?;
+
+    // the mirror is keyed by name too, or retention would never find the old copies
+    if let Ok(Some(mirror)) = backup::mirror_root() {
+        let from = jspath::join(&[&mirror, old]);
+        let to = jspath::join(&[&mirror, new]);
+        if Path::new(&from).exists() && (!Path::new(&to).exists() || same_entry(&from, &to)) {
+            let _ = std::fs::rename(&from, &to);
+        }
+    }
+
+    // the launchers carry the name; a convenience, never a reason to fail
+    let _ = crate::create::write_launchers(new, cfg.get("dir"));
+
+    // tasks name the server: done last, and never a failure, since the server has already moved
+    let sched = crate::schedule::Sched::new(&layout.data_root, &layout.run_dir, by.clone());
+    let tasks_moved = sched.rename_instance(old, new).map_or(0, |(n, _)| n);
+    let roots = Roots::new(&layout.data_root);
+    activity::rename_server(&roots, old, new);
+    activity::record_by(
+        &roots,
+        by,
+        new,
+        "rename",
+        Some(&format!("from {old}")),
+        None,
+        true,
+    );
+    Ok(Renamed {
+        dir: new_dir,
+        moved_dir: was_default,
+        tasks_moved,
+    })
+}
+
+/// What `destroy` did.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Destroyed {
+    pub purged: bool,
+    pub snapshot: Option<String>,
+    pub tasks_removed: usize,
+}
+
+/// `destroy(name, { purge, snapshot })` (the panel's and MCP's delete): a snapshot first when
+/// the files are going, the files before the record (a failed delete leaves the server
+/// registered), then its scheduled tasks.
+pub fn destroy(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    purge: bool,
+    snapshot: bool,
+) -> Result<Destroyed, Failure> {
+    let reg = Path::new(&layout.registry_file);
+    let inst = registry::lookup(reg, name)?;
+    assert_stopped(layout, name, "deleting it")?;
+    let mut snapshot_file = None;
+    if purge && snapshot {
+        let opts = backup::Options {
+            label: json!("pre-delete"),
+            quiet: true,
+            ..backup::Options::default()
+        };
+        snapshot_file = Some(backup::create_snapshot(layout, by, &inst, &opts)?.file);
+    }
+    if purge {
+        let dir = crate::create::path_arg(inst.get("dir"), "path")?.to_string();
+        if let Err(f) = rm_rf(Path::new(&dir)) {
+            return Err(Failure::user(format!(
+                "could not delete {dir}: {}\n  \"{name}\" is still registered. Close anything using that folder and try again.",
+                f.message()
+            )));
+        }
+    }
+    registry::remove_instance(reg, name)?;
+    let sched = crate::schedule::Sched::new(&layout.data_root, &layout.run_dir, by.clone());
+    let tasks_removed = sched.remove_for_instance(name).unwrap_or(0);
+    let snap = snapshot_file.as_deref().map(jspath::basename);
+    activity::record_by(
+        &Roots::new(&layout.data_root),
+        by,
+        name,
+        "delete",
+        Some(if purge { "files deleted" } else { "files kept" }),
+        snap.as_deref(),
+        true,
+    );
+    Ok(Destroyed {
+        purged: purge,
+        snapshot: snapshot_file,
+        tasks_removed,
+    })
 }

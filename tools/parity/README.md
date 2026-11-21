@@ -39,12 +39,24 @@ so absolute paths in shims and records compare exactly. The machine's own `SPAWN
 `TZ=UTC`, `LANG=LC_ALL=en_US.UTF-8` and the bundled-runtime stand-ins `SPAWNLOFT_NODE` and
 `SPAWNLOFT_CORE_DIR`. `SPAWNLOFT_TEST_ORIGINS` is always set: it holds the scenario's fake
 hosts, and with none it is `{}`. That refuses every host that is not on this machine, so no
-scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL` or
-`SPAWNLOFT_TEST_ORIGINS` itself, in its own `env` or a step's: the rig refuses it.
+scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL`,
+`SPAWNLOFT_TEST_ORIGINS`, `SPAWNLOFT_TEST_SCHEDULER` or `FAKE_SCHEDULER_DIR` itself, in its own `env` or a
+step's: the rig refuses it.
 
-Not isolated: the system's scheduler (`schtasks`, `launchctl`, `systemctl --user`) and the
-Windows user PATH. Scenarios do not create tasks until C6 brings a way to point the scheduler at
-a scratch folder.
+The system's scheduler is played by `fake-scheduler` (spawnloft-fakes, built beside the core,
+or `SPAWNLOFT_FAKE_SCHEDULER`): each side gets `SPAWNLOFT_TEST_SCHEDULER` naming it and
+`FAKE_SCHEDULER_DIR=run/scheduler`, so every run of `schtasks`, `powershell`, `launchctl`,
+`systemctl` or `loginctl` runs `fake-scheduler <tool> <args...>` instead (the Node core with
+NODE_ENV=test, `installScheduler` in `src/test-origins.mjs`; the Rust core in a `test-hooks`
+build, `test_origins::scheduler_command`). Without the fake the variable names a file that is not
+there, so a side fails to start the tool rather than reaching the machine's own scheduler. The fake
+keeps its state in `run/scheduler/state.json` and appends every call that changes something to
+`run/scheduler/calls.log`, so the two sides' calls are compared in order. A scenario can seed
+`state.json` with failures to inject (`"fail": [{ "tool", "args", "status", "stderr", "times" }]`),
+tasks shown as running (`"running"`) and `"linger"`; see the top of
+`rust/crates/spawnloft-fakes/src/bin/fake-scheduler.rs`.
+
+Not isolated: the Windows user PATH.
 
 ## Scenario format
 
@@ -141,6 +153,8 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c5-plugins` | C5's `plugins`: the list in text and `--json` over plugin.yml, paper-plugin.yml, fabric.mod.json and NeoForge mods.toml manifests (stored and deflated entries, a jar that is not a zip, a folder named like a jar), the records SpawnLoft keeps and odd ones (a number, a `managed` that is an array, a store that is not JSON), names that are not text (a list, a number: the lookup and the sort throw as in Node), `enable` and `disable` by name and by file, no-ops, and every refusal and usage error |
 | `c5-modpack` | C5 part 2, modpacks: `new --modpack` from faked Modrinth hosts (a Fabric pack with overrides, server-overrides and a client-only file; the release preferred over a newer beta), every refusal of a pack or one of its files before anything is made, and `pack` status, check and update (the snapshot first, only files the old pack owned and the new one dropped retired, Minecraft moving, managed records following). Linux and macOS; snapshot sizes evened out |
 | `c5-modpack-neo` | C5 part 2, a NeoForge modpack: `new --modpack` with the NeoForge installer played by a stand-in java found on a relative PATH, then `pack` status. Linux only: on macOS the two sides resolve a relative PATH entry differently once the installer runs in the server folder, so the stand-in is not what both run (c4-fetch covers the installer on macOS, given `--java`) |
+| `c6-tasks` | C6's `task` against the fake scheduler on each system: `add` with every schedule kind and its refusals, a registration the scheduler refuses taken back, `list`, `enable`, `disable`, `rm`, `linger`, then `rename` (its refusals, the snapshots, run folder and tasks moving with the server, a capitals-only rename, #233) and `rm` with and without `--purge` dropping the server's tasks |
+| `c6-task-run` | `task run`, what the scheduler starts: each single action skipped, done and failed over the JVM stand-in, `steps` chains written as the panel writes them (skipped steps, a failed step ending the chain, `keepGoing`, `onlyWhenRunning`), a backup task pruning its own, and a failed check posted to the server's webhook (faked) |
 | `c7-client-store` | C7's client subcommands that need no network: `client list`, `status`, `logs` (the capture's log4j events turned into plain lines, `--latest`, `-n` and its refusals), `accounts`, `logout`, `remove` with and without `--purge` and `stop`, over damaged and hand-made profile, account and state files, then around a game the Node core launches (the fake client, `MCCTL_FAKE_CLIENT`) |
 | `c7-client-edges` | damaged accounts files for those subcommands: `accounts` that is not a list, null and nameless entries, an empty default account, a world-readable file that `logout` rewrites owner-only, and `-n 0x2` and an empty `--n=` |
 | `c7-client-versions` | `client versions`, `new` and `set` over faked Mojang, Fabric, Quilt, Forge and NeoForge lists: the table and its filters, versions on disk, each loader's refusals, near ids for a typo, every field check of a new profile, `set`'s value rules and its re-check when the version or loader changes, and the cache each list leaves |
@@ -177,7 +191,7 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | `plugins` on a folder of 64 or more jars, one of whose manifests gives a name that is not text | lists, unless V8's merge happens to compare that name on the left | can fail with `a.name.localeCompare is not a function` where Node lists | scenarios list fewer than 64 jars, or only text names |
 | a state file whose `daemonStartTime` (written by 2.0's daemon) differs from the live process under that pid | the field is ignored; the pid and the image name decide | the creation time decides where the system reports one | the Node daemon never writes the field; scenarios write it only as the running daemon's own |
 | a settings value of the wrong type (`"dataRoot": 5`) | an uncaught crash: source excerpt, the error line, the stack, `{ code: ... }` and `Node.js v<version>` | the error line alone, exit 1 | evened out (`settings-type-crash`) |
-| Windows: `start`, `restart` and `db create` for a server (which starts it) read through a pipe (the rig, a script capturing the output) | the pipe stays open after the command exits, until the server stops (the rig waits 10 s and notes it) | the pipe closes when the command exits | evened out (`windows-daemon-holds-pipes`) |
+| Windows: `start`, `restart`, `db create` for a server (which starts it) and `task run` of a start or restart task, read through a pipe (the rig, a script capturing the output) | the pipe stays open after the command exits, until the server stops (the rig waits 10 s and notes it) | the pipe closes when the command exits | evened out (`windows-daemon-holds-pipes`) |
 | `console` (`attach`) given `/detach` or `/exit` with more lines behind it in the same read (piped input) | the lines after it in that read are still sent to the server | nothing after `/detach` or `/exit` is sent | scenarios feed `console` input that ends at `/detach` or `/exit`, or none |
 | a checkout whose code folder holds `instances.json` and no settings choose a data root | the code folder is the data root (and is listed among other registries) | the per-user data folder; the code folder is never a data root | no installed build can be in that state (C0-CHECKS.md section 2); the rig's code folder is the checkout, which has no instances.json |
 

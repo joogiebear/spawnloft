@@ -9,8 +9,9 @@
 //! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
 //! `verify`, with their aliases, `config` and `worlds`. C4 moves making servers: `new` (but
 //! `--modpack`, C5), `clone`, `adopt`, `templates`, `jars`, `launchers`, `reveal` and `rebuild`. C5
-//! moves plugins and modpacks: `plugins`, then `pack` and `new --modpack`. C7 moves the client
-//! launcher, one group of `client` subcommands at a time.
+//! moves plugins and modpacks: `plugins`, then `pack` and `new --modpack`. C6 moves the scheduled
+//! tasks and what moves or drops a server with them: `task`, `rm` (and `remove`) and `rename`. C7
+//! moves the client launcher, one group of `client` subcommands at a time.
 
 pub mod args;
 mod backup;
@@ -28,6 +29,7 @@ mod output;
 mod pack;
 mod plugins;
 mod status;
+mod tasks;
 mod why;
 mod worlds;
 
@@ -191,6 +193,9 @@ fn dispatch(
         "plugins" => plugins::plugins(&mut ctx),
         "pack" => pack::pack(&mut ctx),
         "client" => client::client(&mut ctx),
+        "task" => tasks::task(&mut ctx),
+        "rm" | "remove" => tasks::remove(&mut ctx),
+        "rename" => tasks::rename(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

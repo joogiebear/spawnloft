@@ -60,7 +60,7 @@ pub fn env_var(name: &str) -> Option<String> {
     None
 }
 
-fn home() -> PathBuf {
+pub fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))

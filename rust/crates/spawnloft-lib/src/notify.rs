@@ -63,7 +63,8 @@ fn post_plain(rest: &str, body: &str) -> Result<u16, String> {
     let mut stream = TcpStream::connect_timeout(&addr, TIMEOUT).map_err(|e| format!("fetch failed: {e}"))?;
     let _ = stream.set_write_timeout(Some(TIMEOUT));
     let request = format!(
-        "POST {path} HTTP/1.1\r\nHost: {host_port}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        // the user agent and accept Node's fetch sends, so the parity rig sees the same request
+        "POST {path} HTTP/1.1\r\nHost: {host_port}\r\ncontent-type: application/json\r\naccept: */*\r\nuser-agent: node\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
         body.len()
     );
     stream

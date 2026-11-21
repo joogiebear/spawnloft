@@ -266,6 +266,19 @@ pub const PORTED: &[Row] = &[
         names: &["pack"],
         when: When::Always,
     },
+    // C6: scheduled tasks, and what moves or drops a server with its tasks
+    Row {
+        names: &["task"],
+        when: When::Always,
+    },
+    Row {
+        names: &["rm", "remove"],
+        when: When::Always,
+    },
+    Row {
+        names: &["rename"],
+        when: When::Always,
+    },
     // C7: the client launcher, a group of subcommands at a time
     Row {
         names: &["client"],
@@ -777,7 +790,6 @@ mod tests {
     fn what_is_forwarded_to_the_node_core() {
         for line in [
             &["mcp"][..],
-            &["task", "run", "abc"],
             &["bot", "check"],
             &["ui"],
             &["ui", "--port", "8080"],
@@ -818,6 +830,9 @@ mod tests {
             &["verify", "survival", "--all"],
             &["config", "show"],
             &["worlds", "survival", "list"],
+            &["task", "run", "abc"],
+            &["rm", "survival"],
+            &["rename", "a", "b"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),
