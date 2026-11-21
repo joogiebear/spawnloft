@@ -3,6 +3,10 @@
 //! holds (passwords, webhooks, tokens) become `[redacted]`, and player IPs `[ip hidden]` unless
 //! they are asked for. test/fixtures/contracts/c6-library.json holds Node's answers.
 
+use std::path::Path;
+use std::sync::LazyLock;
+
+use regex::Regex;
 use serde_json::Value;
 
 use crate::settings::Layout;
@@ -153,26 +157,51 @@ fn walk(value: &Value, key: &str, found: &mut Vec<String>) {
     }
 }
 
+/// `"key": "value"` pairs, for a file the JSON parser refuses where `JSON.parse` would not (a
+/// number too big for a double, which JavaScript reads as Infinity).
+static PAIR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#""((?:[^"\\]|\\.)*)"\s*:\s*("(?:[^"\\]|\\.)*")"#).unwrap());
+
+/// One file's secrets: `pick` takes the part Node walks. A file that cannot be read adds none;
+/// one that does not parse is searched for its `"key": "value"` pairs instead, so a parser
+/// difference never lets a secret through.
+fn walk_file(file: &Path, pick: impl FnOnce(Value) -> Value, found: &mut Vec<String>) {
+    let Ok(bytes) = std::fs::read(file) else {
+        return;
+    };
+    let text = String::from_utf8_lossy(&bytes);
+    match crate::jsjson::parse(&text) {
+        Ok(v) => walk(&pick(v), "", found),
+        Err(_) => {
+            for c in PAIR.captures_iter(&text) {
+                let key: String = serde_json::from_str(&format!("\"{}\"", &c[1])).unwrap_or_default();
+                if let Ok(Value::String(v)) = serde_json::from_str::<Value>(&c[2]) {
+                    walk(&Value::String(v), &key, found);
+                }
+            }
+        }
+    }
+}
+
 /// `collectSecrets()`: every string of four or more characters under a key that names a password,
 /// webhook, secret or token, in the registry, the accounts and each client's state file; longest
 /// first, so a secret containing another is not half-replaced. A file that cannot be read hides
 /// nothing and stops nothing.
 pub fn collect_secrets(layout: &Layout) -> Vec<String> {
     let mut found = Vec::new();
-    if let Ok(reg) = crate::registry::load(std::path::Path::new(&layout.registry_file)) {
-        walk(&reg, "", &mut found);
-    }
+    // each file read as Node reads it: lossy UTF-8, the whole document walked whatever its shape
+    walk_file(Path::new(&layout.registry_file), |v| v, &mut found);
     let client = crate::client::paths::Paths::new(layout);
-    if let Ok(accounts) = crate::client::accounts::load(&client) {
-        walk(&Value::Array(accounts), "", &mut found);
-    }
+    walk_file(
+        Path::new(&client.accounts_file()),
+        |v| match v {
+            Value::Object(mut m) => m.shift_remove("accounts").unwrap_or(Value::Null),
+            _ => Value::Null,
+        },
+        &mut found,
+    );
     for p in crate::client::profiles::list(&client).unwrap_or_default() {
-        let file = client.state_file(&p.name());
-        if let Ok(text) = std::fs::read_to_string(&file)
-            && let Ok(state) = crate::jsjson::parse(&text)
-        {
-            walk(&state, "", &mut found);
-        }
+        walk_file(Path::new(&client.state_file(&p.name())), |v| v, &mut found);
     }
     // stable, as V8's sort is: secrets of one length keep the order they were found in
     found.sort_by_key(|s| std::cmp::Reverse(crate::text::js_len(s)));

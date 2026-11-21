@@ -56,41 +56,29 @@
     {
       "path": "logs/empty.log",
       "text": "  \n"
+    },
+    {
+      "path": "abs/w/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat",
+      "text": "d"
+    },
+    {
+      "path": "lvl/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat",
+      "text": "d"
     }
   ],
   "instance": {
     "port": 25565
   },
   "secrets": {
-    "registry": {
-      "version": 1,
-      "instances": {
-        "srv": {
-          "rcon": {
-            "port": 25575,
-            "password": "hunter2pass"
-          },
-          "webhook": "https://discord.com/api/webhooks/1/xyz",
-          "notes": {
-            "apiToken": "abc"
-          },
-          "list": [
-            {
-              "secretKey": "long-secret-value"
-            }
-          ]
+    "registry": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv\": {\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2pass\"\n      },\n      \"webhook\": \"https://discord.com/api/webhooks/1/xyz\",\n      \"notes\": {\n        \"apiToken\": \"abc\"\n      },\n      \"list\": [\n        {\n          \"secretKey\": \"long-secret-value\"\n        }\n      ]\n    }\n  },\n  \"panelPassword\": \"toplevel-secret\",\n  \"tps\": 1e999\n}\n",
+    "accounts": {
+      "accounts": {
+        "me": {
+          "name": "Me",
+          "accessToken": "tok-abcdef",
+          "refreshToken": "objtoken123"
         }
       }
-    },
-    "accounts": {
-      "accounts": [
-        {
-          "name": "Me",
-          "uuid": "u",
-          "accessToken": "tok-abcdef",
-          "refreshToken": "tok-abcdef"
-        }
-      ]
     },
     "profiles": {
       "profiles": {
@@ -1146,12 +1134,178 @@
       }
     },
     {
-      "op": "scrubber",
+      "op": "writeFile",
       "args": [
-        "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc",
+        "server.properties",
+        "level-name=/abs/w\n"
+      ],
+      "result": "ok"
+    },
+    {
+      "op": "storedPlayers",
+      "args": [],
+      "result": {
+        "count": 1,
+        "offline": 0,
+        "online": 1,
+        "unknown": 0
+      }
+    },
+    {
+      "op": "forgetPlayer",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000009",
         false
       ],
-      "result": "rcon [redacted] and hook [redacted] from /[ip hidden]:4000, token [redacted], short abc"
+      "result": {
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000009",
+        "name": null,
+        "removed": 1,
+        "files": [
+          "w/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat"
+        ]
+      }
+    },
+    {
+      "op": "writeFile",
+      "args": [
+        "server.properties",
+        "level-name=a/../lvl\n"
+      ],
+      "result": "ok"
+    },
+    {
+      "op": "listPlayers",
+      "args": [],
+      "result": [
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000004",
+          "name": "@a",
+          "op": false,
+          "opLevel": null,
+          "banned": true,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": "<ban stamp>",
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "name": "Alicia",
+          "op": true,
+          "opLevel": 4,
+          "banned": true,
+          "banReason": "too many words",
+          "banSource": "mcctl",
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "48f83307-567a-33d7-8604-3b22ee4c1b84",
+          "name": "Ghost",
+          "op": true,
+          "opLevel": 4,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "258509ef-4f9f-3ee4-8c9e-953438c8db49",
+          "name": "Newbie",
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+          "name": "Notch",
+          "op": true,
+          "opLevel": 4,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000003",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000009",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": true,
+          "lastSeen": "<time>"
+        },
+        {
+          "uuid": "bad",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        }
+      ]
+    },
+    {
+      "op": "forgetPlayer",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000009",
+        false
+      ],
+      "result": {
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000009",
+        "name": null,
+        "removed": 1,
+        "files": [
+          "lvl/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat"
+        ]
+      }
+    },
+    {
+      "op": "scrubber",
+      "args": [
+        "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc panel toplevel-secret objtoken123",
+        false
+      ],
+      "result": "rcon [redacted] and hook [redacted] from /[ip hidden]:4000, token [redacted], short abc panel [redacted] [redacted]"
     },
     {
       "op": "scrubber",

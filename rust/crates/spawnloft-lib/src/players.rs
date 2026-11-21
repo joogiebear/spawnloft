@@ -82,16 +82,22 @@ fn level_of(dir: &Path) -> Result<String, Failure> {
         .to_string())
 }
 
-/// `playerDirs(instDir, level)`.
+/// `playerDirs(instDir, level)`, joined as `path.join` joins: an absolute or `..` level name stays
+/// inside the server folder's text, as in Node, rather than replacing it.
 fn player_dirs(dir: &Path, level: &str) -> Vec<PathBuf> {
-    let l = dir.join(level);
+    let d = dir.to_string_lossy();
+    let at = |parts: &[&str]| {
+        let mut all = vec![d.as_ref(), level];
+        all.extend_from_slice(parts);
+        PathBuf::from(crate::jspath::join(&all))
+    };
     vec![
-        l.join("players").join("data"),
-        l.join("players").join("stats"),
-        l.join("players").join("advancements"),
-        l.join("playerdata"),
-        l.join("stats"),
-        l.join("advancements"),
+        at(&["players", "data"]),
+        at(&["players", "stats"]),
+        at(&["players", "advancements"]),
+        at(&["playerdata"]),
+        at(&["stats"]),
+        at(&["advancements"]),
     ]
 }
 
@@ -667,8 +673,8 @@ pub fn get_url(url: &str) -> Result<Answer, String> {
         _ => "fetch failed".to_string(),
     })?;
     let status = res.status().as_u16();
-    // `redirect: 'error'`: a redirect is a failed fetch
-    if (300..400).contains(&status) && res.headers().contains_key("location") {
+    // `redirect: 'error'`: a redirect is a failed fetch (undici's redirect statuses only)
+    if matches!(status, 301 | 302 | 303 | 307 | 308) && res.headers().contains_key("location") {
         return Err("fetch failed".into());
     }
     let body = res
@@ -866,21 +872,29 @@ pub fn forget_player(name: &str, dir: &Path, uuid: &str, running: bool) -> Resul
                 continue;
             }
             let full = d.join(&entry);
-            // rmSync with force: a missing file is fine, anything else fails
+            // rmSync with force: a missing file is fine, a folder is Node's ERR_FS_EISDIR,
+            // anything else fails as the system says
+            if std::fs::symlink_metadata(&full).is_ok_and(|m| m.is_dir()) {
+                return Err(Failure::Internal {
+                    head: "SystemError [ERR_FS_EISDIR]".into(),
+                    message: format!(
+                        "Path is a directory: rm returned EISDIR (is a directory) {}",
+                        full.display()
+                    ),
+                    code: Some("ERR_FS_EISDIR".into()),
+                });
+            }
             if let Err(e) = std::fs::remove_file(&full)
                 && !crate::jspath::is_enoent(&e)
             {
                 return Err(Failure::io(&e, "rm", Some(&full)));
             }
-            let parent = d.parent().and_then(Path::file_name).unwrap_or_default();
-            let base = d.file_name().unwrap_or_default();
-            removed.push(
-                Path::new(parent)
-                    .join(base)
-                    .join(&entry)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
+            let d_text = d.to_string_lossy();
+            removed.push(crate::jspath::join(&[
+                &crate::jspath::basename(&crate::jspath::dirname(&d_text)),
+                &crate::jspath::basename(&d_text),
+                &entry,
+            ]));
         }
     }
     Ok(

@@ -55,41 +55,29 @@
   {
    "path": "logs/empty.log",
    "text": "  \n"
+  },
+  {
+   "path": "abs/w/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat",
+   "text": "d"
+  },
+  {
+   "path": "lvl/playerdata/a1b2c3d4-0000-4000-8000-000000000009.dat",
+   "text": "d"
   }
  ],
  "instance": {
   "port": 25565
  },
  "secrets": {
-  "registry": {
-   "version": 1,
-   "instances": {
-    "srv": {
-     "rcon": {
-      "port": 25575,
-      "password": "hunter2pass"
-     },
-     "webhook": "https://discord.com/api/webhooks/1/xyz",
-     "notes": {
-      "apiToken": "abc"
-     },
-     "list": [
-      {
-       "secretKey": "long-secret-value"
-      }
-     ]
+  "registry": "{\n  \"version\": 1,\n  \"instances\": {\n    \"srv\": {\n      \"rcon\": {\n        \"port\": 25575,\n        \"password\": \"hunter2pass\"\n      },\n      \"webhook\": \"https://discord.com/api/webhooks/1/xyz\",\n      \"notes\": {\n        \"apiToken\": \"abc\"\n      },\n      \"list\": [\n        {\n          \"secretKey\": \"long-secret-value\"\n        }\n      ]\n    }\n  },\n  \"panelPassword\": \"toplevel-secret\",\n  \"tps\": 1e999\n}\n",
+  "accounts": {
+   "accounts": {
+    "me": {
+     "name": "Me",
+     "accessToken": "tok-abcdef",
+     "refreshToken": "objtoken123"
     }
    }
-  },
-  "accounts": {
-   "accounts": [
-    {
-     "name": "Me",
-     "uuid": "u",
-     "accessToken": "tok-abcdef",
-     "refreshToken": "tok-abcdef"
-    }
-   ]
   },
   "profiles": {
    "profiles": {
@@ -607,9 +595,45 @@
    ]
   },
   {
+   "op": "writeFile",
+   "args": [
+    "server.properties",
+    "level-name=/abs/w\n"
+   ]
+  },
+  {
+   "op": "storedPlayers",
+   "args": []
+  },
+  {
+   "op": "forgetPlayer",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000009",
+    false
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "server.properties",
+    "level-name=a/../lvl\n"
+   ]
+  },
+  {
+   "op": "listPlayers",
+   "args": []
+  },
+  {
+   "op": "forgetPlayer",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000009",
+    false
+   ]
+  },
+  {
    "op": "scrubber",
    "args": [
-    "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc",
+    "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc panel toplevel-secret objtoken123",
     false
    ]
   },
