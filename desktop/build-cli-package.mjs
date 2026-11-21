@@ -63,6 +63,56 @@ exec ${PREFIX}/bin/spawnloft-core "$@"
 
 export const isTwoX = version => Number(String(version).split('.')[0]) >= 2
 
+// Swapping the desktop package for this one (the only 2.0 route on EL9, which lacks the desktop
+// package's webkit2gtk4.1) removes /opt/SpawnLoft, and every task shim 1.x wrote names a binary
+// there, so each task fails with exit 127. The desktop app repairs on its first start; a machine
+// with no screen has no such start, so the package runs the repair, as each user with SpawnLoft
+// data, after the files are in place (deb postinst; rpm %posttrans, after the old package's
+// removal). Idempotent, so an upgrade of this package running it again does no harm. Never fails
+// the install: a user it misses can run `spawnloft repair`.
+// A user with tasks is found by their systemd units too, since data under a custom XDG_DATA_HOME
+// or dataRoot is not in the folders checked. As that user (never as root: the shim is theirs), the
+// data root and XDG folders a task shim exports are read back, so the repair finds the same data.
+// No single quotes in it: it is passed inside them. `spawnloft` is a parameter only for the test.
+export const REPAIR_AS_USER = `units="$HOME/.config/systemd/user"
+for unit in "$units"/spawnloft-*.service; do
+  [ -f "$unit" ] || continue
+  shim=$(sed -n "s|^ExecStart=/bin/sh \\"\\(.*\\)\\"$|\\1|p" "$unit" | head -n 1)
+  [ -n "$shim" ] && [ -f "$shim" ] || continue
+  eval "$(grep -E "^export (SPAWNLOFT_DATA_ROOT|XDG_CONFIG_HOME|XDG_DATA_HOME)=" "$shim")"
+  break
+done
+exec "$0" repair --quiet`
+
+export const afterInstall2x = ({ spawnloft = '/usr/bin/spawnloft' } = {}) => `if command -v runuser >/dev/null 2>&1 && command -v getent >/dev/null 2>&1; then
+  getent passwd | while IFS=: read -r user _ uid _ _ home _; do
+    case "$uid" in ''|*[!0-9]*) continue ;; esac
+    if [ "$uid" -ne 0 ] && { [ "$uid" -lt 1000 ] || [ "$uid" -eq 65534 ]; }; then continue; fi
+    [ -d "$home" ] || continue
+    found=
+    for dir in .local/share/spawnloft .local/share/mcctl .config/spawnloft .config/mcctl; do
+      [ -e "$home/$dir" ] && found=1
+    done
+    for unit in "$home"/.config/systemd/user/spawnloft-*.service; do
+      [ -f "$unit" ] && found=1
+    done
+    [ -n "$found" ] || continue
+    # above the core's own 120 s limit on the Node core, so that one ends first and cleans up
+    timeout 150 runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" PATH=/usr/bin:/bin \\
+      /bin/sh -c '${REPAIR_AS_USER}' ${spawnloft} </dev/null >/dev/null 2>&1 || true
+  done
+fi
+exit 0
+`
+export const AFTER_INSTALL_2X = afterInstall2x()
+
+export const debPostinst2x = () => `#!/bin/sh
+case "$1" in
+  configure) ;;
+  *) exit 0 ;;
+esac
+${AFTER_INSTALL_2X}`
+
 // 2.x: runtime/ is what stage-runtime.mjs stages for the desktop packages, record and all, so
 // the core finds Node the same way and the release gate can check it the same way
 const stageRuntime = async (opts) =>
@@ -120,6 +170,7 @@ export function rpmSpec({ version, staging }) {
     '%files',
     `%attr(-, root, root) ${PREFIX}`,
     '%attr(0755, root, root) /usr/bin/spawnloft',
+    ...(isTwoX(version) ? ['%posttrans', AFTER_INSTALL_2X.trimEnd()] : []),
     '',
   ].join('\n')
 }
@@ -240,6 +291,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const debRoot = stageKind('deb', node)
     fs.mkdirSync(path.join(debRoot, 'DEBIAN'))
     fs.writeFileSync(path.join(debRoot, 'DEBIAN', 'control'), debControl({ ...info, installedKb: kilobytes(debRoot) }))
+    if (twoX) fs.writeFileSync(path.join(debRoot, 'DEBIAN', 'postinst'), debPostinst2x(), { mode: 0o755 })
     run('dpkg-deb', ['--root-owner-group', '-Zxz', '--build', debRoot, path.join(dist, debName)])
 
     // not releasable: the manifest step requires both files

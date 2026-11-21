@@ -68,3 +68,78 @@ test('the runtime is pinned to a version and a published hash for each architect
   const wanted = Number(/>=(\d+)/.exec(JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).engines.node)[1])
   assert.ok(Number(NODE_VERSION.split('.')[0]) >= wanted)
 })
+
+// Swapping the 1.x desktop package for this one leaves task shims naming the removed
+// /opt/SpawnLoft, so the 2.x package repairs them as each user who has SpawnLoft data.
+test('a 2.x package repairs the task shims of every user with SpawnLoft data after install', async () => {
+  const { afterInstall2x, REPAIR_AS_USER, debPostinst2x } = await import('../desktop/build-cli-package.mjs')
+  const fs = await import('node:fs')
+  const os = await import('node:os')
+  const path = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+
+  const spec2 = rpmSpec({ version: '2.0.0-beta.1010', staging: '/tmp/stage' })
+  assert.match(spec2, /\n%posttrans\n[\s\S]*\/usr\/bin\/spawnloft </, 'the rpm runs the repair after the old package is gone')
+  assert.doesNotMatch(rpmSpec({ version: '1.6.0', staging: '/tmp/stage' }), /%posttrans/, 'a 1.x package has no 2.x repair')
+  assert.doesNotMatch(REPAIR_AS_USER, /'/, 'the per-user script is passed inside single quotes')
+  if (process.platform === 'win32') return
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spawnloft-cli-postinst-'))
+  try {
+    const bin = path.join(dir, 'bin')
+    const log = path.join(dir, 'calls.log')
+    fs.mkdirSync(bin)
+    const home = (name) => path.join(dir, 'home', name)
+    fs.mkdirSync(path.join(home('victor'), '.local', 'share', 'mcctl'), { recursive: true })
+    fs.mkdirSync(path.join(home('olduser'), '.config', 'spawnloft'), { recursive: true })
+    fs.mkdirSync(path.join(home('root'), '.local', 'share', 'spawnloft'), { recursive: true })
+    fs.mkdirSync(home('fresh'), { recursive: true })
+    fs.mkdirSync(path.join(home('daemon'), '.local', 'share', 'spawnloft'), { recursive: true })
+    // data under a custom XDG_DATA_HOME: found only by its systemd unit, which names the shim
+    const custom = path.join(dir, 'srv data', 'spawnloft')
+    fs.mkdirSync(path.join(custom, 'tasks'), { recursive: true })
+    const shim = path.join(custom, 'tasks', 'alpha-backup.sh')
+    fs.writeFileSync(shim, `#!/bin/sh\nexport SPAWNLOFT_DATA_ROOT='${custom}'\nexport HOME='/elsewhere'\nexport XDG_DATA_HOME='${path.dirname(custom)}'\nexec '/opt/SpawnLoft/spawnloft-desktop' task run 'alpha-backup'\n`)
+    const units = path.join(home('xdguser'), '.config', 'systemd', 'user')
+    fs.mkdirSync(units, { recursive: true })
+    fs.writeFileSync(path.join(units, 'spawnloft-0123456789abcdef-alpha-backup.service'), `[Unit]\nDescription=x\n[Service]\nType=oneshot\nExecStart=/bin/sh "${shim}"\n`)
+
+    fs.writeFileSync(path.join(dir, 'passwd'), [
+      `root:x:0:0::${home('root')}:/bin/bash`,
+      `victor:x:1000:1000::${home('victor')}:/bin/bash`,
+      `olduser:x:1001:1001::${home('olduser')}:/bin/bash`,
+      `fresh:x:1002:1002::${home('fresh')}:/bin/bash`,
+      `xdguser:x:1004:1004::${home('xdguser')}:/bin/bash`,
+      `daemon:x:2:2::${home('daemon')}:/usr/sbin/nologin`,
+      `nobody:x:65534:65534::${home('victor')}:/usr/sbin/nologin`,
+      `gone:x:1003:1003::${path.join(dir, 'missing')}:/bin/bash`,
+    ].join('\n') + '\n')
+    const tool = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 })
+    tool('getent', `cat '${path.join(dir, 'passwd')}'`)
+    tool('timeout', `[ "$1" -gt 120 ] || exit 99\nshift\nexec "$@"`)
+    tool('runuser', `[ "$1" = -u ] || exit 98\nprintf '%s ' "$2" >> '${log}'\nshift 3\nexec "$@"`)
+    // a failing repair must not fail the install; HOME comes from passwd, never from the shim
+    tool('spawnloft', `echo "$* | $HOME | $SPAWNLOFT_DATA_ROOT | $XDG_DATA_HOME" >> '${log}'\nexit 1`)
+
+    const script = afterInstall2x({ spawnloft: path.join(bin, 'spawnloft') })
+    const res = spawnSync('sh', ['-c', script], { env: { PATH: `${bin}:/usr/bin:/bin` }, encoding: 'utf8' })
+    assert.equal(res.status, 0, res.stderr)
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n')
+    assert.deepEqual(calls, [
+      `root repair --quiet | ${home('root')} |  | `,
+      `victor repair --quiet | ${home('victor')} |  | `,
+      `olduser repair --quiet | ${home('olduser')} |  | `,
+      `xdguser repair --quiet | ${home('xdguser')} | ${custom} | ${path.dirname(custom)}`,
+    ])
+
+    // the deb runs it on configure only, not on abort-upgrade and the like
+    fs.rmSync(log)
+    const deb = debPostinst2x().replace('/usr/bin/spawnloft', path.join(bin, 'spawnloft'))
+    for (const arg of ['abort-upgrade', 'configure']) {
+      assert.equal(spawnSync('sh', ['-c', deb, 'postinst', arg], { env: { PATH: `${bin}:/usr/bin:/bin` } }).status, 0)
+    }
+    assert.equal(fs.readFileSync(log, 'utf8').trim().split('\n').length, 4, 'abort-upgrade ran the repair')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
