@@ -18,6 +18,7 @@ unsafe extern "C" {
     fn setsid() -> i32;
     fn umask(mask: ModeT) -> ModeT;
     fn signal(sig: i32, handler: usize) -> usize;
+    fn access(path: *const std::ffi::c_char, mode: i32) -> i32;
     #[cfg(target_os = "linux")]
     fn sysconf(name: i32) -> i64;
 }
@@ -46,6 +47,17 @@ pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::Fi
         .create_new(true)
         .mode(0o600)
         .open(path)
+}
+
+/// `fs.accessSync(path, fs.constants.W_OK)` succeeding: whether this process may write there.
+pub fn writable(path: &std::path::Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    const W_OK: i32 = 2;
+    // SAFETY: `c` is a NUL-terminated string that outlives the call; access only reads it.
+    unsafe { access(c.as_ptr(), W_OK) == 0 }
 }
 
 /// This process's user id.

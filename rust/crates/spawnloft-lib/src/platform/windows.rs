@@ -43,6 +43,15 @@ use windows_sys::Win32::System::Threading::{
 
 use super::Probe;
 
+/// `fs.accessSync(path, fs.constants.W_OK)` succeeding, as libuv answers it on Windows: the path
+/// exists, and it is a folder or a file without the read-only attribute.
+pub fn writable(path: &std::path::Path) -> bool {
+    match std::fs::metadata(path) {
+        Ok(m) => m.is_dir() || !m.permissions().readonly(),
+        Err(_) => false,
+    }
+}
+
 /// No console window for a program the daemon starts (the daemon itself has no console).
 pub fn hide_window(cmd: &mut Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);

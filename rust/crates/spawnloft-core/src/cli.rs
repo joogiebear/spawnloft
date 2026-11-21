@@ -184,6 +184,31 @@ pub const PORTED: &[Row] = &[
         names: &["db"],
         when: When::Always,
     },
+    // C3: backups, and where the data lives
+    Row {
+        names: &["backup", "snapshot"],
+        when: When::Always,
+    },
+    Row {
+        names: &["snapshots", "backups"],
+        when: When::Always,
+    },
+    Row {
+        names: &["restore"],
+        when: When::Always,
+    },
+    Row {
+        names: &["prune"],
+        when: When::Always,
+    },
+    Row {
+        names: &["verify"],
+        when: When::Always,
+    },
+    Row {
+        names: &["config"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -604,7 +629,7 @@ mod tests {
         for line in [
             &["mcp"][..],
             &["task", "run", "abc"],
-            &["backup", "survival"],
+            &["plugins", "survival"],
             &["ui"],
             &["ui", "--port", "8080"],
             &["repair"],
@@ -635,6 +660,14 @@ mod tests {
             &["start", "survival"],
             &["console", "survival"],
             &["db", "list"],
+            &["backup", "survival", "--json"],
+            &["snapshot", "survival"],
+            &["snapshots", "survival"],
+            &["backups", "survival", "--json"],
+            &["restore", "survival", "latest", "--yes"],
+            &["prune", "survival"],
+            &["verify", "survival", "--all"],
+            &["config", "show"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),

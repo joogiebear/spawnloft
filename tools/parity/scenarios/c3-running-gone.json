@@ -1,0 +1,111 @@
+{
+ "about": "C3's backup of a running server that goes away after save-off: the snapshot is taken with the flush reported as failed. Not on Windows, where the Node core's CLI exits 0 there with nothing written once the RCON connection is refused (its event loop drains with the flush still pending); the Rust core takes the backup.",
+ "platforms": [
+  "linux",
+  "darwin"
+ ],
+ "env": {
+  "FAKE_JAVA_RCON": "1",
+  "FAKE_MARIADB_STABLE_DUMP": "1",
+  "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+ },
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "\\(build [^)]*\\)",
+   "replace": "(build)"
+  }
+ ],
+ "ignore": [
+  "data/run/**",
+  "data/instances/run1/logs/**"
+ ],
+ "steps": [
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "#Minecraft server properties\nenable-rcon=true\nrcon.port=47831\nrcon.password=test\nlevel-name=world\n"
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "level"
+  },
+  {
+   "write": "data/instances/run1/plugins/a.jar",
+   "text": "jar"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47830,
+      "rcon": {
+       "port": 47831,
+       "password": "test"
+      }
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "start",
+    "run1",
+    "--timeout",
+    "60"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Ready - "
+   },
+   "timeoutMs": 90000,
+   "env": {
+    "FAKE_JAVA_RCON_OPTS": "{\"stopAfter\":\"save-off\"}"
+   }
+  },
+  {
+   "run": [
+    "backup",
+    "run1",
+    "--label",
+    "gone",
+    "--scope",
+    "worlds"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "stop",
+    "run1"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  }
+ ]
+}
