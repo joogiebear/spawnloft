@@ -52,6 +52,9 @@ pub enum When {
     Always,
     /// Only with one of these flags: the forms only the installer and the window use.
     AnyFlag(&'static [&'static str]),
+    /// Unless one of these flags is truthy once the line is parsed as `args.mjs` parses it
+    /// (`new --modpack` stays with the Node core until C5).
+    NoneTruthy(&'static [&'static str]),
 }
 
 /// One row of the ownership table: a command, its aliases, and when this binary answers it.
@@ -213,6 +216,51 @@ pub const PORTED: &[Row] = &[
         names: &["worlds"],
         when: When::Always,
     },
+    // C4: making servers. `new` with a software flag fetches or builds its jar (C4 part 2);
+    // `new --modpack` is C5's
+    Row {
+        names: &["new"],
+        when: When::NoneTruthy(&[
+            "modpack",
+            "paper",
+            "folia",
+            "purpur",
+            "asp",
+            "vanilla",
+            "spigot",
+            "craftbukkit",
+            "fabric",
+            "neoforge",
+        ]),
+    },
+    Row {
+        names: &["clone"],
+        when: When::Always,
+    },
+    Row {
+        names: &["adopt"],
+        when: When::Always,
+    },
+    Row {
+        names: &["templates", "template"],
+        when: When::Always,
+    },
+    Row {
+        names: &["jars"],
+        when: When::Always,
+    },
+    Row {
+        names: &["launchers"],
+        when: When::Always,
+    },
+    Row {
+        names: &["reveal", "open"],
+        when: When::Always,
+    },
+    Row {
+        names: &["rebuild"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -225,6 +273,18 @@ fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
         && match row.when {
             When::Always => true,
             When::AnyFlag(flags) => flags.iter().any(|f| rest.iter().any(|a| a == f)),
+            When::NoneTruthy(flags) => {
+                // a line that is not UTF-8 is not one the ported side can read: Node keeps it
+                let Some(rest) = rest
+                    .iter()
+                    .map(|a| a.to_str().map(String::from))
+                    .collect::<Option<Vec<String>>>()
+                else {
+                    return false;
+                };
+                let parsed = crate::port::args::parse(&rest);
+                !flags.iter().any(|f| parsed.get(f).is_some_and(|v| v.truthy()))
+            }
         }
 }
 
@@ -614,6 +674,41 @@ mod tests {
         }
         assert!(!is_ported(&["--version".to_string()]));
         assert!(!is_ported(&["plugins".to_string()]));
+    }
+
+    #[test]
+    fn new_is_answered_here_unless_it_fetches_a_jar_or_a_modpack() {
+        for line in [
+            &["new", "a", "--jar", "x.jar"][..],
+            &["new", "a", "--template", "t"],
+            &["new", "a", "--from", "b", "--with-worlds"],
+            &["new", "a", "--modpack="],
+            &["new", "a", "--no-paper", "--jar", "x.jar"],
+            &["new", "a", "--", "--paper", "1.21"],
+            &["clone", "a", "b"],
+            &["adopt", "a", "/x"],
+            &["templates"],
+            &["template", "save", "a", "t"],
+            &["jars", "import", "x"],
+            &["launchers"],
+            &["reveal", "a"],
+            &["open", "a"],
+            &["rebuild", "a", "--yes"],
+        ] {
+            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
+            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
+        }
+        for line in [
+            &["new", "a", "--modpack", "pack.mrpack"][..],
+            &["new", "a", "--modpack=x"],
+            &["new", "a", "--paper", "1.21.4"],
+            &["new", "a", "--paper"],
+            &["new", "a", "--neoforge=21.1"],
+            &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
+            &["new", "a", "--spigot", "1.21"],
+        ] {
+            assert!(forwards_with(&os(line), false, PORTED), "{line:?} stays with Node");
+        }
     }
 
     #[test]

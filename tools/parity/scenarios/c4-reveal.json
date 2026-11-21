@@ -1,0 +1,14 @@
+{
+ "about": "C4's reveal on Linux, where nothing real opens: refused with no display, a stand-in xdg-open on PATH run with the folder once a display is set (open is the alias), and the message when there is no file manager at all. The Node core printed 'Opening [object Promise]' and then crashed on the unhandled refusal; this PR makes it await the opener, so both cores answer the same.",
+ "platforms": ["linux"],
+ "steps": [
+  { "write": "data/instances.json", "json": { "version": 1, "instances": { "alpha": { "dir": "{data}/instances/alpha", "jar": "paper-1.21.4-1.jar", "port": 25565 } } } },
+  { "mkdir": "data/instances/alpha" },
+  { "run": ["reveal", "alpha"], "env": { "DISPLAY": "", "WAYLAND_DISPLAY": "" }, "expect": { "code": 1, "stderrIncludes": "no desktop" } },
+  { "write": "bin/xdg-open", "text": "#!/bin/sh\nexit 0\n", "mode": "755" },
+  { "run": ["reveal", "alpha"], "env": { "DISPLAY": ":99", "PATH": "{run}/bin:/usr/bin:/bin" }, "expect": { "code": 0, "stdoutIncludes": "Opening" } },
+  { "run": ["open", "alpha"], "env": { "WAYLAND_DISPLAY": "wayland-0", "DISPLAY": "", "PATH": "{run}/bin:/usr/bin:/bin" }, "expect": { "code": 0 } },
+  { "remove": "bin/xdg-open" },
+  { "run": ["reveal", "alpha"], "env": { "DISPLAY": ":99", "PATH": "{run}/bin" }, "expect": { "code": 1, "stderrIncludes": "no file manager" } }
+ ]
+}

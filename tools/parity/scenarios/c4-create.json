@@ -1,0 +1,1134 @@
+{
+ "about": "C4 part 1, making servers without a download: the jar store (jars, jars import), new from a stored jar, a path, a template and another server (--from), with every flag and the refusals, clone with and without worlds, templates save and the listing (with damaged and bare template folders), adopt (jar picking, ports and password kept from server.properties, the loader guessed, the jar kept inside the folder), launchers, rebuild with and without a snapshot, and the reveal refusals.",
+ "normalize": [
+  {
+   "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{20}\\b",
+   "replace": "<password>"
+  },
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  }
+ ],
+ "steps": [
+  {
+   "run": [
+    "jars"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No jars stored"
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in/missing.jar"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "jar not found"
+   }
+  },
+  {
+   "write": "in/paper-1.21.4-15.jar",
+   "text": "PAPER JAR"
+  },
+  {
+   "write": "in/Other.jar",
+   "text": "OTHER"
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in/paper-1.21.4-15.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in/Other.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in/Other.jar",
+    "--as"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "jars"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "custom.jar"
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "templates"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "No templates"
+   }
+  },
+  {
+   "run": [
+    "new"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no server jar specified"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a",
+    "--jar",
+    "nothere.jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "is not in"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "BAD!",
+    "--jar",
+    "custom.jar"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--memory",
+    "5X"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "invalid memory"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--memory"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "invalid memory"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--no-memory"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "invalid memory"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "c",
+    "--jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "c",
+    "--no-jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a",
+    "--jar",
+    "paper-1.21.4-15.jar",
+    "--java",
+    "java",
+    "--accept-eula"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Start it with"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "a",
+    "--jar",
+    "paper-1.21.4-15.jar"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "b",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "/opt/java/bin/java",
+    "--port",
+    "26000",
+    "--rcon-port",
+    "26001",
+    "--offline",
+    "--motd",
+    "Hello there",
+    "--memory",
+    "6144M"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "EULA is NOT accepted"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "d",
+    "--jar",
+    "{run}/in/Other.jar",
+    "--java",
+    "java",
+    "--port",
+    "abc"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "e2",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "--motd"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/instances/full/keep.txt",
+   "text": "x"
+  },
+  {
+   "run": [
+    "new",
+    "full",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "not empty"
+   }
+  },
+  {
+   "write": "data/instances/afile",
+   "text": "x"
+  },
+  {
+   "run": [
+    "new",
+    "afile",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "new",
+    "x1",
+    "--modpack=",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/instances/a/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances/a/world/region/r.0.0.mca",
+   "text": "r"
+  },
+  {
+   "write": "data/instances/a/world_nether/level.dat",
+   "text": "n"
+  },
+  {
+   "write": "data/instances/a/world_the_end/level.dat",
+   "text": "e"
+  },
+  {
+   "write": "data/instances/a/world_custom/level.dat",
+   "text": "c"
+  },
+  {
+   "write": "data/instances/a/worldly/level.dat",
+   "text": "not a dimension"
+  },
+  {
+   "write": "data/instances/a/plugins/P.jar",
+   "text": "p"
+  },
+  {
+   "write": "data/instances/a/plugins/P/config.yml",
+   "text": "a: 1\n"
+  },
+  {
+   "write": "data/instances/a/plugins/P/logs/old.log",
+   "text": "nested log"
+  },
+  {
+   "write": "data/instances/a/logs/latest.log",
+   "text": "log"
+  },
+  {
+   "write": "data/instances/a/cache/c.bin",
+   "text": "c"
+  },
+  {
+   "write": "data/instances/a/usercache.json",
+   "text": "[]"
+  },
+  {
+   "write": "data/instances/a/version_history.json",
+   "text": "{}"
+  },
+  {
+   "write": "data/instances/a/session.lock",
+   "text": "l"
+  },
+  {
+   "write": "data/instances/a/ops.json",
+   "text": "[]"
+  },
+  {
+   "write": "data/instances/a/banned-ips.json",
+   "text": "[]"
+  },
+  {
+   "write": "data/instances/a/crash-reports/c.txt",
+   "text": "crash"
+  },
+  {
+   "write": "data/instances/a/libraries/lib.jar",
+   "text": "lib"
+  },
+  {
+   "write": "data/instances/a/versions/v.jar",
+   "text": "v"
+  },
+  {
+   "write": "data/run/a/console.log",
+   "text": "[00:00:00] hello\n"
+  },
+  {
+   "run": [
+    "clone"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "a"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "nope",
+    "e"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no instance named"
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "a",
+    "BAD!"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "a",
+    "e",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "fresh worlds"
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "a",
+    "f",
+    "--with-worlds",
+    "--memory",
+    "6G",
+    "--port",
+    "27000",
+    "--no-accept-eula"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "with worlds"
+   }
+  },
+  {
+   "run": [
+    "clone",
+    "a",
+    "e"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "a"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "nope",
+    "t1"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "a",
+    "t1"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "a",
+    "t1"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "a",
+    "t2",
+    "--with-worlds"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "templates",
+    "save",
+    "a",
+    "bad name"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "data/templates/t3/server.properties",
+   "text": "motd=bare\n"
+  },
+  {
+   "write": "data/templates/t4/template.json",
+   "text": "{ not json"
+  },
+  {
+   "write": "data/templates/t5/template.json",
+   "text": "{\"jar\": \"custom.jar\", \"includesWorlds\": 1, \"sourceInstance\": \"elsewhere\", \"memory\": \"2G\"}"
+  },
+  {
+   "write": "data/templates/t6/template.json",
+   "text": "[1,2]"
+  },
+  {
+   "write": "data/templates/aaa-file",
+   "text": "not a template"
+  },
+  {
+   "run": [
+    "templates"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "NAME"
+   }
+  },
+  {
+   "run": [
+    "template",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "g",
+    "--template",
+    "t1",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "h",
+    "--template",
+    "nope"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no template named"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "i",
+    "--template",
+    "t3",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no server jar"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "j",
+    "--template",
+    "t5",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "k",
+    "--template",
+    "t1",
+    "--from",
+    "a",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "l",
+    "--from",
+    "a",
+    "--with-worlds",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "m",
+    "--template"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "x"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "x",
+    "{run}/nope"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "directory not found"
+   }
+  },
+  {
+   "write": "srv/two/paper-1.21.4-1.jar",
+   "text": "p"
+  },
+  {
+   "write": "srv/two/purpur-1.21.4-2.jar",
+   "text": "q"
+  },
+  {
+   "write": "srv/two/zlib.jar",
+   "text": "z"
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "multiple jars"
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "../x.jar"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "must be a file inside"
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "..fun.jar"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "missing.jar"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "jar not found"
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--memory",
+    "lots"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "write": "srv/two/server.properties",
+   "text": "server-port=25999\nrcon.port=26999\nrcon.password=KeepThisPasswordAAAA\nmotd=Mine\n"
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two",
+    "--jar",
+    "purpur-1.21.4-2.jar",
+    "--java",
+    "java",
+    "--memory",
+    "3G"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "srv/one/custom-build.jar",
+   "text": "c"
+  },
+  {
+   "write": "srv/one/server.properties",
+   "text": "server-port=abc\nrcon.port=0\n"
+  },
+  {
+   "run": [
+    "adopt",
+    "one",
+    "{run}/srv/one",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "srv/neo/server.jar",
+   "text": "s"
+  },
+  {
+   "write": "srv/neo/libraries/net/neoforged/x.txt",
+   "text": "n"
+  },
+  {
+   "run": [
+    "adopt",
+    "neo",
+    "{run}/srv/neo",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "srv/fab/fabric-server-mc.1.21.4-loader.0.16.10-launcher.1.0.1.jar",
+   "text": "f"
+  },
+  {
+   "write": "srv/fab/sub/inner.jar",
+   "text": "i"
+  },
+  {
+   "run": [
+    "adopt",
+    "fab",
+    "{run}/srv/fab",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "fab2",
+    "{run}/srv/fab",
+    "--jar",
+    "sub/inner.jar",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "mkdir": "srv/empty"
+  },
+  {
+   "run": [
+    "adopt",
+    "empty",
+    "{run}/srv/empty"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "no .jar found"
+   }
+  },
+  {
+   "write": "srv/afile",
+   "text": "x"
+  },
+  {
+   "run": [
+    "adopt",
+    "afile",
+    "{run}/srv/afile"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "adopt",
+    "two",
+    "{run}/srv/two"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "already exists"
+   }
+  },
+  {
+   "run": [
+    "launchers",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "launchers",
+    "a",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "launchers",
+    "a"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "launchers"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "rebuild"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "a"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "--yes"
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "nope",
+    "--yes"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--no-snapshot"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Plugins kept"
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--no-snapshot"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "nothing to remove"
+   }
+  },
+  {
+   "write": "data/instances/a/world/level.dat",
+   "text": "w2"
+  },
+  {
+   "write": "data/instances/a/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/a/server.properties",
+   "text": "level-name=custom\nserver-port=25565\n"
+  },
+  {
+   "write": "data/instances/a/custom_nether/level.dat",
+   "text": "cn"
+  },
+  {
+   "run": [
+    "rebuild",
+    "a",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Snapshot:"
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--wipe-plugins",
+    "--no-snapshot"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Plugins wiped"
+   }
+  },
+  {
+   "run": [
+    "rebuild",
+    "a",
+    "--yes",
+    "--json"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "reveal"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "open",
+    "nope"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}
