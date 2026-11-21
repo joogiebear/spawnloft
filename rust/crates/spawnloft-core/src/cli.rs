@@ -52,9 +52,6 @@ pub enum When {
     Always,
     /// Only with one of these flags: the forms only the installer and the window use.
     AnyFlag(&'static [&'static str]),
-    /// Unless one of these flags is truthy once the line is parsed as `args.mjs` parses it
-    /// (`new --modpack` stays with the Node core until C5).
-    NoneTruthy(&'static [&'static str]),
     /// Only for these subcommands: the first positional argument once the line is parsed as
     /// `args.mjs` parses it (`client`, ported a group of subcommands at a time in C7).
     Sub(&'static [&'static str]),
@@ -219,10 +216,10 @@ pub const PORTED: &[Row] = &[
         names: &["worlds"],
         when: When::Always,
     },
-    // C4: making servers and fetching their software. `new --modpack` is C5's
+    // C4: making servers and fetching their software (`new --modpack` came with C5)
     Row {
         names: &["new"],
-        when: When::NoneTruthy(&["modpack"]),
+        when: When::Always,
     },
     Row {
         names: &["paper"],
@@ -265,6 +262,10 @@ pub const PORTED: &[Row] = &[
         names: &["plugins"],
         when: When::Always,
     },
+    Row {
+        names: &["pack"],
+        when: When::Always,
+    },
     // C7: the client launcher, a group of subcommands at a time
     Row {
         names: &["client"],
@@ -288,18 +289,6 @@ fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
         && match row.when {
             When::Always => true,
             When::AnyFlag(flags) => flags.iter().any(|f| rest.iter().any(|a| a == f)),
-            When::NoneTruthy(flags) => {
-                // a line that is not UTF-8 is not one the ported side can read: Node keeps it
-                let Some(rest) = rest
-                    .iter()
-                    .map(|a| a.to_str().map(String::from))
-                    .collect::<Option<Vec<String>>>()
-                else {
-                    return false;
-                };
-                let parsed = crate::port::args::parse(&rest);
-                !flags.iter().any(|f| parsed.get(f).is_some_and(|v| v.truthy()))
-            }
             When::Sub(subs) => {
                 // a line that is not UTF-8 is not one the ported side can read: Node keeps it
                 let Some(rest) = rest
@@ -703,11 +692,11 @@ mod tests {
             assert!(is_ported(&strings), "{line:?}");
         }
         assert!(!is_ported(&["--version".to_string()]));
-        assert!(!is_ported(&["pack".to_string()]));
+        assert!(!is_ported(&["mcp".to_string()]));
     }
 
     #[test]
-    fn new_is_answered_here_unless_it_installs_a_modpack() {
+    fn new_is_answered_here_with_or_without_a_modpack() {
         for line in [
             &["new", "a", "--jar", "x.jar"][..],
             &["new", "a", "--template", "t"],
@@ -732,19 +721,14 @@ mod tests {
             &["reveal", "a"],
             &["open", "a"],
             &["rebuild", "a", "--yes"],
+            &["new", "a", "--modpack", "pack.mrpack"],
+            &["new", "a", "--modpack=x"],
+            &["new", "a", "--paper", "1.21", "--modpack", "x"],
+            &["pack", "a", "update", "--yes"],
+            &["plugins", "a"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
-        }
-        for line in [
-            &["new", "a", "--modpack", "pack.mrpack"][..],
-            &["new", "a", "--modpack=x"],
-            &["new", "a", "--paper", "1.21", "--modpack", "x"],
-        ] {
-            assert!(
-                forwards_with(&os(line), false, PORTED),
-                "{line:?} stays with Node"
-            );
         }
     }
 
@@ -797,7 +781,7 @@ mod tests {
         for line in [
             &["mcp"][..],
             &["task", "run", "abc"],
-            &["pack", "survival"],
+            &["bot", "check"],
             &["ui"],
             &["ui", "--port", "8080"],
             &["repair"],

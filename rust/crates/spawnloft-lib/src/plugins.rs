@@ -754,4 +754,4 @@ pub fn remove_plugin(data_root: &str, by: &Actor, inst: &Instance, file: &str) -
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
