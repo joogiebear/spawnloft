@@ -145,7 +145,7 @@ fn write_text(file: &str, text: &str) -> Result<(), Failure> {
 }
 
 /// `linkOrCopy(from, to)`.
-fn link_or_copy(from: &str, to: &str) -> Result<(), Failure> {
+pub(crate) fn link_or_copy(from: &str, to: &str) -> Result<(), Failure> {
     // `fs.rmSync(to, { force: true })`: not recursive, so a folder in the way is refused
     match std::fs::symlink_metadata(to) {
         Ok(m) if m.is_dir() => {

@@ -5,7 +5,9 @@
 use serde_json::{Value, json};
 
 use spawnloft_lib::client::paths::Paths;
-use spawnloft_lib::client::{accounts, auth, http, install, log, meta, profiles, prop, state, versions};
+use spawnloft_lib::client::{
+    accounts, auth, http, install, launch, log, meta, profiles, prop, state, versions,
+};
 use spawnloft_lib::failure::Failure;
 use spawnloft_lib::js;
 
@@ -67,13 +69,22 @@ fn uses_loader(profile: &profiles::Profile) -> bool {
 /// twice. Anything that fails here is left to the Rust side, which reports it as Node would.
 pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::settings::Layout) -> bool {
     let pos = &args.positional;
-    if pos.first().map(String::as_str) != Some("install") || pos.len() != 2 {
+    if pos.len() != 2 {
         return false;
     }
-    if check_flags(args, &["json", "verify"]).is_err() {
+    let (allowed, hands): (&[&str], fn(&profiles::Profile) -> bool) = match pos[0].as_str() {
+        "install" => (&["json", "verify"], uses_loader),
+        // a launch also hands over a harness profile, whose mod the Node core sets up
+        "launch" => (
+            &["as", "account", "server", "wait", "json"],
+            launch::node_launches,
+        ),
+        _ => return false,
+    };
+    if check_flags(args, allowed).is_err() {
         return false;
     }
-    profiles::get(&Paths::new(layout), &pos[1]).is_ok_and(|p| uses_loader(&p))
+    profiles::get(&Paths::new(layout), &pos[1]).is_ok_and(|p| hands(&p))
 }
 
 pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
@@ -411,6 +422,92 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                     js::string(prop(Some(&result), "id")),
                     js::string(prop(Some(&result), "downloaded")),
                     js::string(prop(Some(&result), "bytes"))
+                ));
+            }
+            Ok(())
+        }
+        Some("launch") => {
+            check_flags(ctx.args, &["as", "account", "server", "wait", "json"])?;
+            let [name] = rest.as_slice() else {
+                return Err(usage());
+            };
+            let text = |key: &str, why: &str| -> Result<Option<String>, Failure> {
+                match ctx.args.get(key) {
+                    None => Ok(None),
+                    Some(Flag::Text(s)) => Ok(Some(s.clone())),
+                    Some(_) => Err(Failure::usage(why)),
+                }
+            };
+            let player_name = text("as", "--as needs a player name")?;
+            let account = text(
+                "account",
+                "--account needs \"offline:<player name>\" or a signed-in account name",
+            )?;
+            let server = text("server", "--server needs a server name")?;
+            let wait = ctx.args.get("wait") == Some(&Flag::Bool(true));
+            let out = std::sync::Mutex::new(&mut *ctx.out);
+            let say = |text: &str| out.lock().unwrap_or_else(|p| p.into_inner()).err(text);
+            let on_progress = |p: &install::Progress| {
+                if !quiet && p.bytes > 0.0 {
+                    say(&format!(
+                        "{} {}/{} ({})\n",
+                        p.phase,
+                        p.done,
+                        p.total,
+                        spawnloft_lib::text::human_bytes(Some(p.bytes))
+                    ));
+                }
+            };
+            // a warning (the target server is stopped) comes out before the launch line
+            let on_warning = |w: &str| {
+                if !quiet {
+                    say(&format!("warning: {w}\n"));
+                }
+            };
+            let mut res = launch::launch(
+                &paths,
+                ctx.layout,
+                name,
+                &launch::LaunchOpts {
+                    player_name,
+                    account,
+                    server,
+                    on_progress: &on_progress,
+                    on_warning: &on_warning,
+                    fake_java: launch::fake_client_java(),
+                },
+            )?;
+            if wait {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+                while std::time::Instant::now() < deadline {
+                    // the game this process started is heard as it exits, as Node's exit handler
+                    if let Ok(Some(status)) = res.started.child.try_wait() {
+                        launch::note_exit(&paths, name, &res.started, status);
+                    }
+                    if !state::status(&paths, name)?.running {
+                        return Err(Failure::user(format!(
+                            "the client exited within 5 s; see spawnloft client logs {name}"
+                        )));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
+            }
+            if quiet {
+                emit(
+                    ctx,
+                    json!({
+                        "pid": res.started.pid,
+                        "version": res.version,
+                        "account": res.account,
+                        "profile": res.profile.to_json(),
+                        "warnings": res.warnings,
+                    }),
+                );
+            } else {
+                ctx.out.line(&format!(
+                    "Launched \"{name}\" as {} (pid {})",
+                    js::string(prop(Some(&res.account), "name")),
+                    res.started.pid
                 ));
             }
             Ok(())

@@ -1,0 +1,104 @@
+{
+  "about": "C7 part 3c: client launch with the fake game (Mojang's version file on disk, so nothing downloads): offline players named by --as, by the profile and by default, a Microsoft account as saved and as the default, an account whose sign-in is renewed (refused as over, then Microsoft unreachable and the saved one used with a warning), every refusal before the game starts (usage, an unknown or contradictory account, an unknown, database, portless or unjoinable server, an unknown host, an offline player against an online-mode server, a running profile), a stopped server joined by quick play with its warnings and the Multiplayer list filled, --wait over a game that exits at once, and a Fabric profile, which the Node core still launches.",
+  "hosts": {
+    "https://login.microsoftonline.com": {
+      "routes": {
+        "POST /consumers/oauth2/v2.0/token": {
+          "sequence": [
+            { "status": 400, "json": { "error": "invalid_grant" } },
+            { "status": 503, "text": "busy" }
+          ]
+        }
+      }
+    }
+  },
+  "env": { "NODE_ENV": "test" },
+  "normalize": [
+    { "pattern": "\"refreshFailedAt\":\"[^\"]*\"", "replace": "\"refreshFailedAt\":\"<t>\"" }
+  ],
+  "steps": [
+    { "write": "data/client/versions/1.21.11/1.21.11.json", "copy": "../../../test/fixtures/client/1.21.11.json" },
+    { "mkdir": "data/instances/s1" },
+    { "write": "data/instances/s1/server.properties", "text": "online-mode=false\nserver-port=25570\n" },
+    { "mkdir": "data/instances/s2" },
+    { "write": "data/instances/s2/server.properties", "text": "online-mode=true\n" },
+    { "mkdir": "data/instances/s3" },
+    { "mkdir": "data/instances/s4" },
+    { "write": "data/instances/s4/server.properties", "text": "server-ip=nowhere.invalid\nonline-mode=false\n" },
+    { "mkdir": "data/instances/s5" },
+    { "write": "data/instances/s5/server.properties", "text": "server-ip=bad_host\n" },
+    { "mkdir": "data/instances/s6" },
+    { "write": "data/instances/s6/server.properties", "text": "online-mode=false\nserver-ip=[::1]\n" },
+    { "write": "data/instances.json", "json": { "version": 1, "instances": {
+      "s1": { "dir": "{data}/instances/s1", "port": 25570, "mcVersion": "1.21.10", "label": "Survival" },
+      "s2": { "dir": "{data}/instances/s2", "port": 25571, "mcVersion": "1.21.11" },
+      "s3": { "dir": "{data}/instances/s3", "port": "abc", "mcVersion": "1.21.11" },
+      "s4": { "dir": "{data}/instances/s4", "port": 25573, "mcVersion": "1.21.11" },
+      "s5": { "dir": "{data}/instances/s5", "port": 25574, "mcVersion": "1.21.11" },
+      "s6": { "dir": "{data}/instances/s6", "port": 25575, "mcVersion": "1.21.11", "label": "Local six" },
+      "d1": { "dir": "{data}/instances/d1", "kind": "database", "port": 3306 }
+    } } },
+    { "write": "data/client/accounts.json", "mode": "600", "json": { "version": 1, "accounts": [
+      { "type": "microsoft", "name": "Mia", "uuid": "aaaaaaaa-1111-2222-3333-444444444444", "accessToken": "mia-token", "refreshToken": "mia-refresh", "expiresAt": "2099-01-01T00:00:00.000Z", "xuid": "123", "clientId": "cid", "userType": "msa" },
+      { "type": "microsoft", "name": "Old", "uuid": "bbbbbbbb-1111-2222-3333-444444444444", "accessToken": "old-token", "refreshToken": "old-refresh", "expiresAt": "2020-01-01T00:00:00.000Z" }
+    ] } },
+    { "write": "data/client/profiles.json", "json": { "version": 1, "profiles": {
+      "p1": { "mc": "1.21.11", "loader": "vanilla", "memory": "1G" },
+      "ms": { "mc": "1.21.11", "memory": "2G", "account": "Mia" },
+      "old": { "mc": "1.21.11", "account": "Old" },
+      "srv": { "mc": "1.21.11", "server": "s1" },
+      "fab": { "mc": "1.21.11", "loader": "fabric", "loaderVersion": null }
+    } } },
+
+    { "run": ["client", "launch"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "a", "b"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "p1", "--as"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "p1", "--account"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "p1", "--server"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "p1", "--bogus"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 2 } },
+    { "run": ["client", "launch", "nope"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--as", "x"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--as", "Steve", "--account", "Mia"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--account", "Nobody"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--account", "cccccccc-1111-2222-3333-444444444444", "--json"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "ms", "--as", "Steve"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "zz"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "d1"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "s2"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "s3", "--json"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "s4"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "p1", "--server", "s5"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "fab"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "launch", "old"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "accounts", "--json"], "expect": { "code": 0 } },
+
+    { "run": ["client", "launch", "p1", "--as", "Steve_2", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stdoutIncludes": "as Steve_2" } },
+    { "run": ["client", "status", "p1", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"launchedBy\":\"cli\"" } },
+    { "run": ["client", "launch", "p1"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 1 } },
+    { "run": ["client", "stop", "p1"], "expect": { "code": 0 } },
+    { "run": ["client", "launch", "p1", "--account", "offline:Alex", "--json", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stdoutIncludes": "\"name\":\"Alex\"" } },
+    { "run": ["client", "stop", "p1", "--json"], "expect": { "code": 0 } },
+
+    { "run": ["client", "launch", "ms", "--json", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stdoutIncludes": "\"type\":\"microsoft\"" } },
+    { "run": ["client", "stop", "ms"], "expect": { "code": 0 } },
+    { "run": ["client", "launch", "old", "--json", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stdoutIncludes": "could not reach Microsoft" } },
+    { "run": ["client", "stop", "old"], "expect": { "code": 0 } },
+
+    { "run": ["client", "launch", "srv", "--as", "Joiner", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stderrIncludes": "is not running" } },
+    { "run": ["client", "status", "srv", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"server\":\"s1\"" } },
+    { "run": ["client", "stop", "srv"], "expect": { "code": 0 } },
+    { "run": ["client", "launch", "p1", "--as", "Joiner", "--server", "s6", "--json", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0 } },
+    { "run": ["client", "stop", "p1"], "expect": { "code": 0 } },
+
+    { "write": "data/client/profiles.json", "json": { "version": 1, "defaultAccount": "aaaaaaaa-1111-2222-3333-444444444444", "profiles": {
+      "p1": { "mc": "1.21.11", "loader": "vanilla", "memory": "1G" },
+      "short": { "mc": "1.21.11" }
+    } } },
+    { "run": ["client", "launch", "p1", "--json", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0, "stdoutIncludes": "\"name\":\"Mia\"" } },
+    { "run": ["client", "stop", "p1"], "expect": { "code": 0 } },
+    { "run": ["client", "launch", "short", "--as", "Kid", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs", "FAKE_CLIENT_FAIL": "window" }, "expect": { "code": 1 } },
+    { "run": ["client", "status", "short"], "expect": { "code": 0, "stdoutIncludes": "is stopped" } },
+    { "run": ["client", "launch", "short", "--as", "Kid", "--wait", "--json"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0 } },
+    { "run": ["client", "stop", "short"], "expect": { "code": 0 } }
+  ]
+}

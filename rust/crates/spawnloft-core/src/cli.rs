@@ -294,7 +294,7 @@ pub const PORTED: &[Row] = &[
 /// profiles, accounts and running games without the network).
 pub const CLIENT_PORTED: &[&str] = &[
     "list", "status", "logs", "accounts", "logout", "remove", "stop", "versions", "new", "set", "login",
-    "install",
+    "install", "launch",
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -780,11 +780,12 @@ mod tests {
             &["client", "versions", "--all"],
             &["client", "login", "--json"],
             &["client", "install", "p", "--verify"],
+            &["client", "launch", "p", "--wait"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
         }
-        for line in [&["client"][..], &["client", "launch", "p"], &["client", "--json"]] {
+        for line in [&["client"][..], &["client", "doctor"], &["client", "--json"]] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
                 "{line:?} stays with Node"
