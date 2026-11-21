@@ -1,0 +1,123 @@
+{
+  "about": "C7 part 1: the client subcommands that need no network. list, status, logs (the capture with log4j events, latest.log, -n), accounts, logout, remove (with and without --purge, refused while running) and stop, over damaged and hand-made files, and around a game the Node core launches (the fake client).",
+  "normalize": [
+    { "pattern": "up \\d+s\\)", "replace": "up <n>s)" }
+  ],
+  "ignore": ["data/client/run/live/client.log", "data/client/profiles/live/**"],
+  "steps": [
+    { "run": ["client", "list"], "expect": { "code": 0, "stdoutIncludes": "No client profiles yet" } },
+    { "run": ["client", "list", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "accounts"], "expect": { "code": 0 } },
+    { "run": ["client", "accounts", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "status", "nope"], "expect": { "code": 1 } },
+    { "run": ["client", "status", "nope", "--json"], "expect": { "code": 1 } },
+    { "run": ["client", "logs", "nope"], "expect": { "code": 1 } },
+    { "run": ["client", "remove", "nope"], "expect": { "code": 1 } },
+    { "run": ["client", "stop", "nope"], "expect": { "code": 1 } },
+    { "run": ["client", "logout", "nobody"], "expect": { "code": 1 } },
+    { "run": ["client", "status", "bad name"], "expect": { "code": 1 } },
+
+    { "write": "data/client/profiles.json", "json": {
+      "version": 1,
+      "profiles": {
+        "zeta": { "mc": "1.21.11", "loader": "vanilla", "loaderVersion": null, "java": null, "memory": "2G", "harness": false, "server": null, "account": null, "assistantAccount": false, "createdAt": "2026-11-01T10:00:00.000Z" },
+        "alpha": { "mc": "1.20.1", "loader": "fabric", "loaderVersion": "0.16.9", "java": null, "memory": "4G", "harness": true, "server": "s1", "account": "aaaaaaaa-1111-2222-3333-444444444444", "createdAt": "2026-11-01T10:00:00.000Z" },
+        "Beta": { "mc": "1.8.9", "loader": "vanilla", "memory": "1536M", "account": "offline:Bob", "serverList": false, "assistantAccount": true },
+        "gone-acct": { "mc": "1.21.4", "account": "OldName" },
+        "num": { "mc": 26.1, "memory": 3 }
+      },
+      "defaultAccount": "bbbbbbbb-1111-2222-3333-444444444444"
+    } },
+    { "write": "data/client/accounts.json", "mode": "600", "json": {
+      "version": 1,
+      "accounts": [
+        { "type": "microsoft", "name": "Steve", "uuid": "aaaaaaaa-1111-2222-3333-444444444444", "accessToken": "secret-access", "refreshToken": "secret-refresh", "expiresAt": "2026-12-01T00:00:00.000Z", "xuid": "1", "userType": "msa", "clientId": "c" },
+        { "type": "offline", "name": "Alex", "uuid": "bbbbbbbb-1111-2222-3333-444444444444" },
+        { "name": "Legacy", "uuid": "cccccccc-1111-2222-3333-444444444444", "accessToken": "t", "expiresAt": "2026-10-01T00:00:00.000Z", "refreshFailedAt": "2026-11-02T00:00:00.000Z" }
+      ]
+    } },
+    { "run": ["client", "list"], "expect": { "code": 0 } },
+    { "run": ["client", "list", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "status", "alpha"], "expect": { "code": 0, "stdoutIncludes": "is stopped" } },
+    { "run": ["client", "status", "alpha", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "status", "beta"], "expect": { "code": 1 } },
+    { "run": ["client", "accounts"], "expect": { "code": 0, "stdoutIncludes": "(default)" } },
+    { "run": ["client", "accounts", "--json"], "expect": { "code": 0 } },
+
+    { "run": ["client", "logs", "alpha"], "expect": { "code": 0 } },
+    { "run": ["client", "logs", "alpha", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/run/alpha/client.log", "text": "ight\"><log4j:Message><![CDATA[cut]]></log4j:Message>\n</log4j:Event>\n[00:00:00] [main/INFO]: plain before\n<log4j:Event logger=\"net.minecraft\" timestamp=\"1763716981000\" level=\"INFO\" thread=\"Render thread\">\n  <log4j:Message><![CDATA[Setting user: Steve]]></log4j:Message>\n</log4j:Event>\n<log4j:Event logger=\"x\" timestamp=\"1763716982500\" level=\"ERROR\" thread=\"Worker &amp; Co\">\n  <log4j:Message><![CDATA[a <b> ]]>]]&gt;<![CDATA[ c]]></log4j:Message>\n  <log4j:Throwable><![CDATA[java.lang.RuntimeException: boom\n\tat x.y(z.java:1)\n]]></log4j:Throwable>\n</log4j:Event>\nError: Could not create the Java Virtual Machine.\r\n<log4j:Event logger=\"x\" timestamp=\"1763716983000\" level=\"INFO\" thread=\"Render thread\">\n  <log4j:Message><![CDATA[half" },
+    { "run": ["client", "logs", "alpha"], "expect": { "code": 0, "stdoutIncludes": "[09:23:01] [Render thread/INFO]: Setting user: Steve" } },
+    { "run": ["client", "logs", "alpha", "-n", "2"], "expect": { "code": 0 } },
+    { "run": ["client", "logs", "alpha", "-n", "1", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "logs", "alpha", "-n", "0"], "expect": { "code": 2 } },
+    { "run": ["client", "logs", "alpha", "-n", "1.5"], "expect": { "code": 2 } },
+    { "run": ["client", "logs", "alpha", "-n", "x"], "expect": { "code": 2 } },
+    { "run": ["client", "logs", "alpha", "-n"], "expect": { "code": 2 } },
+    { "run": ["client", "logs", "nope", "-n", "0"], "expect": { "code": 1 } },
+    { "run": ["client", "logs", "alpha", "--latest"], "expect": { "code": 0 } },
+    { "write": "data/client/profiles/alpha/logs/latest.log", "text": "[10:00:00] [main/INFO]: one\r\n[10:00:01] [main/INFO]: two\n\n[10:00:02] [main/INFO]: three\n" },
+    { "run": ["client", "logs", "alpha", "--latest"], "expect": { "code": 0, "stdoutIncludes": "three" } },
+    { "run": ["client", "logs", "alpha", "--latest", "-n", "2", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "logs", "alpha", "--bogus"], "expect": { "code": 2 } },
+
+    { "write": "data/client/run/zeta/state.json", "json": { "pid": 2147483646, "javaExe": "java", "startedAt": "2026-11-21T10:00:00.000Z", "mode": "offline", "account": { "type": "offline", "name": "zeta" }, "harness": { "token": "t", "port": null } } },
+    { "write": "data/client/profiles/zeta/spawnloft-harness.json", "json": { "port": 1, "pid": 2147483646 } },
+    { "run": ["client", "status", "zeta", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "stop", "zeta"], "expect": { "code": 0, "stdoutIncludes": "was not running" } },
+    { "run": ["client", "stop", "zeta", "--json"], "expect": { "code": 0 } },
+    { "write": "data/client/run/zeta/state.json", "text": "{ not json" },
+    { "run": ["client", "status", "zeta"], "expect": { "code": 1 } },
+    { "run": ["client", "list"], "expect": { "code": 1 } },
+    { "write": "data/client/run/zeta/state.json", "text": "null" },
+    { "run": ["client", "status", "zeta"], "expect": { "code": 0 } },
+
+    { "run": ["client", "list", "extra"], "expect": { "code": 2 } },
+    { "run": ["client", "list", "--all"], "expect": { "code": 2 } },
+    { "run": ["client", "status"], "expect": { "code": 2 } },
+    { "run": ["client", "status", "a", "b"], "expect": { "code": 2 } },
+    { "run": ["client", "stop"], "expect": { "code": 2 } },
+    { "run": ["client", "logs"], "expect": { "code": 2 } },
+    { "run": ["client", "logout"], "expect": { "code": 2 } },
+    { "run": ["client", "accounts", "x"], "expect": { "code": 2 } },
+    { "run": ["client", "remove"], "expect": { "code": 2 } },
+    { "run": ["client", "remove", "zeta", "--json=1"], "expect": { "code": 2 } },
+    { "run": ["client", "stop", "zeta", "--purge"], "expect": { "code": 2 } },
+
+    { "run": ["client", "logout", "alex"], "expect": { "code": 0, "stdoutIncludes": "Removed the offline account Alex." } },
+    { "run": ["client", "accounts", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "logout", "AAAAAAAA111122223333444444444444", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "logout", "legacy"], "expect": { "code": 0, "stdoutIncludes": "Signed out Legacy." } },
+    { "run": ["client", "accounts"], "expect": { "code": 0, "stdoutIncludes": "No Microsoft account" } },
+    { "run": ["client", "list", "--json"], "expect": { "code": 0 } },
+
+    { "write": "data/client/run/alpha/last-exit.json", "json": { "pid": 1, "code": 0, "signal": null, "startedAt": "2026-11-01T10:00:00.000Z", "endedAt": "2026-11-01T11:00:00.000Z", "stopped": false } },
+    { "write": "data/client/run/alpha/played.json", "json": { "lastPlayedAt": "2026-11-01T10:00:00.000Z", "totalMs": 3600000, "launches": 1 } },
+    { "write": "data/client/profiles/alpha/options.txt", "text": "lang:en_us\n" },
+    { "run": ["client", "remove", "alpha"], "expect": { "code": 0, "stdoutIncludes": "Removed \"alpha\"" } },
+    { "run": ["client", "remove", "alpha"], "expect": { "code": 1 } },
+    { "write": "data/client/profiles/Beta/options.txt", "text": "lang:en_us\n" },
+    { "write": "data/client/run/Beta/played.json", "json": { "launches": 2 } },
+    { "run": ["client", "remove", "Beta", "--purge", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "list"], "expect": { "code": 0 } },
+
+    { "write": "data/client/versions/1.21.11/1.21.11.json", "copy": "../../../test/fixtures/client/1.21.11.json" },
+    { "write": "data/client/profiles.json", "json": {
+      "version": 1,
+      "profiles": {
+        "live": { "mc": "1.21.11", "loader": "vanilla", "loaderVersion": null, "java": null, "memory": "1G", "harness": false, "server": null, "account": null, "assistantAccount": false, "createdAt": "2026-11-01T10:00:00.000Z" }
+      }
+    } },
+    { "run": ["client", "launch", "live", "--as", "tester", "--wait"], "env": { "MCCTL_FAKE_CLIENT": "{repo}/test/fixtures/fake-client.mjs" }, "expect": { "code": 0 } },
+    { "run": ["client", "status", "live"], "expect": { "code": 0, "stdoutIncludes": "is running" } },
+    { "run": ["client", "status", "live", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "list"], "expect": { "code": 0, "stdoutIncludes": "running" } },
+    { "run": ["client", "logs", "live", "-n", "1"], "expect": { "code": 0 } },
+    { "run": ["client", "remove", "live"], "expect": { "code": 1 } },
+    { "run": ["client", "stop", "live", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"stopped\":true" } },
+    { "run": ["client", "status", "live", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"running\":false" } },
+    { "run": ["client", "stop", "live"], "expect": { "code": 0, "stdoutIncludes": "was not running" } },
+    { "remove": "data/client/run/live/stop-asked.json" },
+    { "run": ["client", "remove", "live", "--purge"], "expect": { "code": 0 } }
+  ]
+}

@@ -6,6 +6,7 @@ pub mod activity;
 pub mod backup;
 pub mod build;
 pub mod cancel;
+pub mod client;
 pub mod collate;
 pub mod config_files;
 pub mod control;

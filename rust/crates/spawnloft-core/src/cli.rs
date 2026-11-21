@@ -52,6 +52,9 @@ pub enum When {
     Always,
     /// Only with one of these flags: the forms only the installer and the window use.
     AnyFlag(&'static [&'static str]),
+    /// Only for these subcommands: the first positional argument once the line is parsed as
+    /// `args.mjs` parses it (`client`, ported a group of subcommands at a time in C7).
+    Sub(&'static [&'static str]),
 }
 
 /// One row of the ownership table: a command, its aliases, and when this binary answers it.
@@ -213,7 +216,16 @@ pub const PORTED: &[Row] = &[
         names: &["worlds"],
         when: When::Always,
     },
+    // C7: the client launcher, a group of subcommands at a time
+    Row {
+        names: &["client"],
+        when: When::Sub(CLIENT_PORTED),
+    },
 ];
+
+/// The `client` subcommands answered here so far (C7 part 1: what reads and changes the
+/// profiles, accounts and running games without the network).
+pub const CLIENT_PORTED: &[&str] = &["list", "status", "logs", "accounts", "logout", "remove", "stop"];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
 /// ported command to the Node core again, so the parity rig can run one scenario on both sides.
@@ -225,6 +237,21 @@ fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
         && match row.when {
             When::Always => true,
             When::AnyFlag(flags) => flags.iter().any(|f| rest.iter().any(|a| a == f)),
+            When::Sub(subs) => {
+                // a line that is not UTF-8 is not one the ported side can read: Node keeps it
+                let Some(rest) = rest
+                    .iter()
+                    .map(|a| a.to_str().map(String::from))
+                    .collect::<Option<Vec<String>>>()
+                else {
+                    return false;
+                };
+                let parsed = crate::port::args::parse(&rest);
+                parsed
+                    .positional
+                    .first()
+                    .is_some_and(|s| subs.contains(&s.as_str()))
+            }
         }
 }
 
@@ -614,6 +641,36 @@ mod tests {
         }
         assert!(!is_ported(&["--version".to_string()]));
         assert!(!is_ported(&["plugins".to_string()]));
+    }
+
+    #[test]
+    fn client_moves_one_subcommand_at_a_time() {
+        for line in [
+            &["client", "list"][..],
+            &["client", "list", "--json"],
+            &["client", "status", "p"],
+            &["client", "logs", "p", "-n", "5"],
+            &["client", "--json", "accounts"],
+            &["client", "logout", "Steve"],
+            &["client", "remove", "p", "--purge"],
+            &["client", "stop", "p"],
+        ] {
+            assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
+            assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
+        }
+        for line in [
+            &["client"][..],
+            &["client", "launch", "p"],
+            &["client", "new", "p", "--mc", "1.21.11"],
+            &["client", "login"],
+            &["client", "versions"],
+            &["client", "--json"],
+        ] {
+            assert!(
+                forwards_with(&os(line), false, PORTED),
+                "{line:?} stays with Node"
+            );
+        }
     }
 
     #[test]

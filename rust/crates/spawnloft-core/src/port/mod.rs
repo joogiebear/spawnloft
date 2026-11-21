@@ -7,10 +7,12 @@
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
 //! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`, and the
 //! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
-//! `verify`, with their aliases, `config` and `worlds`.
+//! `verify`, with their aliases, `config` and `worlds`. C7 moves the client launcher, one group
+//! of `client` subcommands at a time.
 
 pub mod args;
 mod backup;
+mod client;
 mod config;
 mod configure;
 mod db;
@@ -165,6 +167,7 @@ fn dispatch(
         "verify" => backup::verify(&mut ctx),
         "config" => config::config(&mut ctx),
         "worlds" => worlds::worlds(&mut ctx),
+        "client" => client::client(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),
