@@ -187,7 +187,11 @@ fn rename(from: &Path, to: &Path) -> Result<(), Failure> {
         let (code, text) = jspath::error_code(&e);
         Failure::Internal {
             head: "Error".into(),
-            message: format!("{code}: {text}, rename '{}' -> '{}'", from.display(), to.display()),
+            message: format!(
+                "{code}: {text}, rename '{}' -> '{}'",
+                from.display(),
+                to.display()
+            ),
             code: Some(code.into()),
         }
     })
@@ -195,7 +199,11 @@ fn rename(from: &Path, to: &Path) -> Result<(), Failure> {
 
 /// A body streamed into `<dest>.<pid>-<hex>.part`, hashed as it arrives; the part file is
 /// dropped when the body breaks. Answers the part file, its size and the digest.
-fn stream_to_part(a: Answer, dest: &Path, hash: Option<Hash>) -> Result<(PathBuf, u64, Option<String>), Failure> {
+fn stream_to_part(
+    a: Answer,
+    dest: &Path,
+    hash: Option<Hash>,
+) -> Result<(PathBuf, u64, Option<String>), Failure> {
     use std::io::Write;
     let tmp = download::part_path(dest);
     let mut file = std::fs::File::create(&tmp).map_err(|e| Failure::io(&e, "open", Some(&tmp)))?;
@@ -347,11 +355,17 @@ fn paper_label(project: &str) -> String {
 
 /// `paper.resolveBuild(version, wanted, { project })`: the build asked for, else the newest
 /// STABLE one, else the newest of any channel.
-pub fn paper_resolve_build(project: &str, version: &str, wanted: Option<&str>) -> Result<PaperBuild, Failure> {
+pub fn paper_resolve_build(
+    project: &str,
+    version: &str,
+    wanted: Option<&str>,
+) -> Result<PaperBuild, Failure> {
     let all = paper_builds(project, version)?;
     let label = paper_label(project);
     let Some(first) = all.first() else {
-        return Err(Failure::user(format!("{label} has no builds for version {version}.")));
+        return Err(Failure::user(format!(
+            "{label} has no builds for version {version}."
+        )));
     };
     if let Some(w) = wanted {
         return match all.iter().find(|b| js::string(Some(&b.build)) == w) {
@@ -436,7 +450,10 @@ pub fn purpur_versions() -> Result<Vec<String>, Failure> {
 
 /// `purpur.builds(version)`: newest first, and the build the project calls latest.
 pub fn purpur_builds(version: &str) -> Result<(String, Vec<Value>), Failure> {
-    let data = download::fetch_json(&format!("{PURPUR_API}/{}", encode_uri_component(version)), PURPUR_LABEL)?;
+    let data = download::fetch_json(
+        &format!("{PURPUR_API}/{}", encode_uri_component(version)),
+        PURPUR_LABEL,
+    )?;
     let builds = data.get("builds");
     let all = match builds.and_then(|b| b.get("all")) {
         None | Some(Value::Null) => Vec::new(),
@@ -444,7 +461,9 @@ pub fn purpur_builds(version: &str) -> Result<(String, Vec<Value>), Failure> {
     };
     let all: Vec<Value> = all.into_iter().rev().collect();
     if all.is_empty() {
-        return Err(Failure::user(format!("Purpur has no builds for version {version}.")));
+        return Err(Failure::user(format!(
+            "Purpur has no builds for version {version}."
+        )));
     }
     let latest = match builds.and_then(|b| b.get("latest")) {
         None | Some(Value::Null) => js::string(all.first()),
@@ -455,7 +474,12 @@ pub fn purpur_builds(version: &str) -> Result<(String, Vec<Value>), Failure> {
 
 /// `purpur.fetchBuild(version, wanted, { force })`: checked against the md5 Purpur publishes for
 /// the build.
-pub fn purpur_fetch(jars_dir: &str, version: &str, wanted: Option<&str>, force: bool) -> Result<Fetched, Failure> {
+pub fn purpur_fetch(
+    jars_dir: &str,
+    version: &str,
+    wanted: Option<&str>,
+    force: bool,
+) -> Result<Fetched, Failure> {
     let (latest, all) = purpur_builds(version)?;
     let build = wanted.map(str::to_string).unwrap_or_else(|| latest.clone());
     if !all.iter().any(|b| b.as_str() == Some(build.as_str())) {
@@ -504,7 +528,9 @@ fn mojang_versions_list(data: &Value) -> Result<Vec<Value>, Failure> {
     match data.get("versions") {
         None | Some(Value::Null) => Ok(Vec::new()),
         Some(Value::Array(a)) => Ok(a.clone()),
-        Some(_) => Err(Failure::type_error("(data.versions ?? []).filter is not a function")),
+        Some(_) => Err(Failure::type_error(
+            "(data.versions ?? []).filter is not a function",
+        )),
     }
 }
 
@@ -645,7 +671,11 @@ pub fn asp_pick_build(builds: &Value, mc: &str) -> Option<Value> {
         .into_iter()
         .filter(|b| asp_has_server_jar(b) && asp_mc_versions(b).iter().any(|m| m == mc))
         .collect();
-    fit.sort_by(|a, b| asp_date(b).partial_cmp(&asp_date(a)).unwrap_or(std::cmp::Ordering::Equal));
+    fit.sort_by(|a, b| {
+        asp_date(b)
+            .partial_cmp(&asp_date(a))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     fit.into_iter().next()
 }
 
@@ -657,7 +687,11 @@ fn first8(v: Option<&Value>) -> String {
 /// `compareBuilds(builds, mc, currentPrefix)`: the newest build for the version, and whether it
 /// is newer than the one whose id starts with the prefix (by date; a prefix the API no longer
 /// lists counts as older).
-pub fn asp_compare(builds: &Value, mc: &str, current_prefix: &str) -> Result<Option<(String, String, bool)>, Failure> {
+pub fn asp_compare(
+    builds: &Value,
+    mc: &str,
+    current_prefix: &str,
+) -> Result<Option<(String, String, bool)>, Failure> {
     let Some(latest) = asp_pick_build(builds, mc) else {
         return Ok(None);
     };
@@ -665,14 +699,12 @@ pub fn asp_compare(builds: &Value, mc: &str, current_prefix: &str) -> Result<Opt
     let current = asp_list(builds)
         .into_iter()
         .find(|b| js::string(b.get("id")).starts_with(current_prefix));
-    let time = crate::jsdate::to_iso(asp_date(&latest))
-        .ok_or_else(|| Failure::Internal {
-            head: "RangeError".into(),
-            message: "Invalid time value".into(),
-            code: None,
-        })?;
-    let newer = prefix != current_prefix
-        && current.is_none_or(|c| asp_date(&latest) > asp_date(&c));
+    let time = crate::jsdate::to_iso(asp_date(&latest)).ok_or_else(|| Failure::Internal {
+        head: "RangeError".into(),
+        message: "Invalid time value".into(),
+        code: None,
+    })?;
+    let newer = prefix != current_prefix && current.is_none_or(|c| asp_date(&latest) > asp_date(&c));
     Ok(Some((prefix, time, newer)))
 }
 
@@ -742,7 +774,11 @@ pub fn parse_version_index(html: &str) -> Vec<String> {
             seen.push(v);
         }
     }
-    let parts = |v: &str| -> Vec<f64> { v.split('.').map(|p| p.parse::<f64>().unwrap_or(f64::NAN)).collect() };
+    let parts = |v: &str| -> Vec<f64> {
+        v.split('.')
+            .map(|p| p.parse::<f64>().unwrap_or(f64::NAN))
+            .collect()
+    };
     seen.sort_by(|a, b| {
         let (x, y) = (parts(a), parts(b));
         for i in 0..3 {
@@ -975,17 +1011,34 @@ pub fn buildtools_build(
             ..download::Options::default()
         },
     )?;
-    let mut args: Vec<String> = ["-jar", "BuildTools.jar", "--rev", mc, "--output-dir", &out_dir, "--final-name", &name]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let mut args: Vec<String> = [
+        "-jar",
+        "BuildTools.jar",
+        "--rev",
+        mc,
+        "--output-dir",
+        &out_dir,
+        "--final-name",
+        &name,
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
     if flavour == "craftbukkit" {
         args.push("--compile".into());
         args.push("craftbukkit".into());
     }
-    say(&format!("Building {flavour} {mc} - this takes several minutes the first time"));
-    let ran = run_java(java, &args, Path::new(&work), 4000, Some(&mut say))?
-        .map_err(|e| spawn_failure(&e, java, &format!("build {flavour}"), "BuildTools failed to start"))?;
+    say(&format!(
+        "Building {flavour} {mc} - this takes several minutes the first time"
+    ));
+    let ran = run_java(java, &args, Path::new(&work), 4000, Some(&mut say))?.map_err(|e| {
+        spawn_failure(
+            &e,
+            java,
+            &format!("build {flavour}"),
+            "BuildTools failed to start",
+        )
+    })?;
     let built = jspath::join(&[&out_dir, &name]);
     // a build stopped on purpose has no last words worth showing
     if ran.cancelled {
@@ -1074,7 +1127,12 @@ fn lands_in(jars_dir: &str, dest: &str) -> bool {
 /// `fabric.fetchLauncher(game, { loader, force })`: the loader is the newest stable unless one is
 /// pinned (a modpack), the installer always the newest stable. Fabric publishes no checksum, so
 /// a size floor stands in for one.
-pub fn fabric_fetch(jars_dir: &str, game: &str, pinned: Option<&str>, force: bool) -> Result<Fetched, Failure> {
+pub fn fabric_fetch(
+    jars_dir: &str,
+    game: &str,
+    pinned: Option<&str>,
+    force: bool,
+) -> Result<Fetched, Failure> {
     assert_safe_version(game, "the Minecraft version")?;
     if let Some(p) = pinned {
         assert_safe_version(p, "the Fabric loader version")?;
@@ -1090,9 +1148,15 @@ pub fn fabric_fetch(jars_dir: &str, game: &str, pinned: Option<&str>, force: boo
                 None => fabric_latest_stable("/versions/loader", "loader"),
             })
         });
-        let ih = s.spawn(move || cancel::with_cancel(job2, || fabric_latest_stable("/versions/installer", "installer")));
-        let l = lh.join().unwrap_or_else(|_| Err(Failure::type_error("the loader request failed")));
-        let i = ih.join().unwrap_or_else(|_| Err(Failure::type_error("the installer request failed")));
+        let ih = s.spawn(move || {
+            cancel::with_cancel(job2, || fabric_latest_stable("/versions/installer", "installer"))
+        });
+        let l = lh
+            .join()
+            .unwrap_or_else(|_| Err(Failure::type_error("the loader request failed")));
+        let i = ih
+            .join()
+            .unwrap_or_else(|_| Err(Failure::type_error("the installer request failed")));
         (l, i)
     });
     let loader = loader?;
@@ -1167,7 +1231,10 @@ pub fn neo_mc_of(neo: &str) -> Option<String> {
 /// `pickBuild(all, mc)`: the newest build for a Minecraft version, a beta only when there is no
 /// stable one (the maven lists oldest first).
 pub fn neo_pick_build(all: &[String], mc: &str) -> Option<String> {
-    let matches: Vec<&String> = all.iter().filter(|v| neo_mc_of(v).as_deref() == Some(mc)).collect();
+    let matches: Vec<&String> = all
+        .iter()
+        .filter(|v| neo_mc_of(v).as_deref() == Some(mc))
+        .collect();
     let stable: Vec<&String> = matches.iter().copied().filter(|v| !v.contains('-')).collect();
     let pool = if stable.is_empty() { matches } else { stable };
     pool.last().map(|s| s.to_string())
@@ -1215,12 +1282,17 @@ pub fn neo_resolve_build(mc: &str, wanted: Option<&str>) -> Result<String, Failu
         return Ok(w.to_string());
     }
     let names: Vec<String> = all.iter().filter_map(|v| v.as_str().map(String::from)).collect();
-    neo_pick_build(&names, mc).ok_or_else(|| Failure::user(format!("NeoForge has no build for Minecraft {mc}")))
+    neo_pick_build(&names, mc)
+        .ok_or_else(|| Failure::user(format!("NeoForge has no build for Minecraft {mc}")))
 }
 
 /// `neoforge.fetchInstaller(neoVersion)`: the installer, checked against the `.sha256` the maven
 /// publishes beside it.
-pub fn neo_fetch_installer(jars_dir: &str, neo: &str, on_message: &mut dyn FnMut(&str)) -> Result<Fetched, Failure> {
+pub fn neo_fetch_installer(
+    jars_dir: &str,
+    neo: &str,
+    on_message: &mut dyn FnMut(&str),
+) -> Result<Fetched, Failure> {
     assert_safe_version(neo, "the NeoForge version")?;
     crate::fsx::mkdir_all(Path::new(jars_dir))?;
     let name = format!("neoforge-{neo}-installer.jar");
@@ -1281,7 +1353,12 @@ pub fn neo_fetch_installer(jars_dir: &str, neo: &str, on_message: &mut dyn FnMut
 /// `neoforge.installServer(dir, installerPath, { java })`: the installer lays the server down
 /// (it downloads a couple of hundred MB of libraries); its log is removed on success and kept
 /// on failure.
-pub fn neo_install_server(dir: &str, installer: &str, java: &str, on_message: &mut dyn FnMut(&str)) -> Result<(), Failure> {
+pub fn neo_install_server(
+    dir: &str,
+    installer: &str,
+    java: &str,
+    on_message: &mut dyn FnMut(&str),
+) -> Result<(), Failure> {
     on_message("Installing NeoForge (this downloads its libraries and takes a few minutes)");
     let args: Vec<String> = ["-jar", installer, "--install-server", dir, "--server-jar"]
         .iter()
@@ -1356,11 +1433,12 @@ pub fn neo_create_server(
         },
     )?;
     let dir = made.text("dir");
-    let installed = neo_install_server(&dir, &installer.path, &made.text("java"), on_message).and_then(|()| {
-        let mut patch = serde_json::Map::new();
-        patch.insert("jar".into(), json!("server.jar"));
-        crate::registry::update_instance(Path::new(&layout.registry_file), name, &patch).map(|_| ())
-    });
+    let installed =
+        neo_install_server(&dir, &installer.path, &made.text("java"), on_message).and_then(|()| {
+            let mut patch = serde_json::Map::new();
+            patch.insert("jar".into(), json!("server.jar"));
+            crate::registry::update_instance(Path::new(&layout.registry_file), name, &patch).map(|_| ())
+        });
     if let Err(e) = installed {
         // the original error is the one worth reporting
         if crate::registry::remove_instance(Path::new(&layout.registry_file), name).is_ok() {
@@ -1390,7 +1468,16 @@ fn remove_tree_patiently(dir: &Path) {
 
 /// The software whose server is one jar fetched into the store (`JAR_IDS`); NeoForge is
 /// installed instead.
-pub const JAR_IDS: [&str; 8] = ["paper", "purpur", "folia", "asp", "spigot", "craftbukkit", "vanilla", "fabric"];
+pub const JAR_IDS: [&str; 8] = [
+    "paper",
+    "purpur",
+    "folia",
+    "asp",
+    "spigot",
+    "craftbukkit",
+    "vanilla",
+    "fabric",
+];
 
 /// `sources.fetchJar(id, version, { build, java, onProgress })`.
 pub fn fetch_jar(
@@ -1408,7 +1495,9 @@ pub fn fetch_jar(
         "vanilla" => vanilla_fetch(jars_dir, version, false).map(|(f, _)| f),
         "spigot" | "craftbukkit" => buildtools_build(jars_dir, version, id, java, false, on_message),
         "fabric" => fabric_fetch(jars_dir, version, None, false),
-        other => Err(Failure::type_error(format!("\"{other}\" is not fetched as a jar"))),
+        other => Err(Failure::type_error(format!(
+            "\"{other}\" is not fetched as a jar"
+        ))),
     }
 }
 
@@ -1439,7 +1528,10 @@ mod tests {
     #[test]
     fn the_spigot_index_lists_minecraft_versions_newest_first() {
         let html = r#"<a href="1.21.4.json">x</a><a href="4647.json"></a><a href="1.21.json"></a><a href="1.9.json"></a><a href="1.21.10.json"></a><a href="latest.json"></a><a href="1.21.4.json"></a>"#;
-        assert_eq!(parse_version_index(html), vec!["1.21.10", "1.21.4", "1.21", "1.9"]);
+        assert_eq!(
+            parse_version_index(html),
+            vec!["1.21.10", "1.21.4", "1.21", "1.9"]
+        );
     }
 
     #[test]
@@ -1447,7 +1539,9 @@ mod tests {
         assert_eq!(neo_mc_of("26.2.0.75").as_deref(), Some("26.2"));
         assert_eq!(neo_mc_of("21.1.2.15-beta").as_deref(), Some("21.1.2"));
         assert_eq!(neo_mc_of("21.1"), None);
-        let all: Vec<String> = ["21.1.0.1", "21.1.0.2-beta", "21.1.0.3", "21.2.0.1-beta"].map(String::from).to_vec();
+        let all: Vec<String> = ["21.1.0.1", "21.1.0.2-beta", "21.1.0.3", "21.2.0.1-beta"]
+            .map(String::from)
+            .to_vec();
         assert_eq!(neo_pick_build(&all, "21.1").as_deref(), Some("21.1.0.3"));
         assert_eq!(neo_pick_build(&all, "21.2").as_deref(), Some("21.2.0.1-beta"));
         assert_eq!(neo_pick_build(&all, "1.20"), None);
@@ -1464,7 +1558,9 @@ mod tests {
         assert!(assert_safe_version("é", "v").is_err());
         assert!(assert_safe_version(&"1".repeat(65), "v").is_err());
         assert_eq!(
-            assert_safe_version(&format!("{}/", "a".repeat(50)), "the x").unwrap_err().message(),
+            assert_safe_version(&format!("{}/", "a".repeat(50)), "the x")
+                .unwrap_err()
+                .message(),
             format!("the x \"{}\" is not a valid version", "a".repeat(40))
         );
     }

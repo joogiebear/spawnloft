@@ -184,11 +184,7 @@ pub fn upgrade(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         return Ok(());
     }
 
-    let version = ctx
-        .args
-        .get("version")
-        .filter(|f| f.truthy())
-        .map(Flag::text);
+    let version = ctx.args.get("version").filter(|f| f.truthy()).map(Flag::text);
     let current = upgrade::parse_server_jar(inst.get("jar"));
     if let (Some(v), Some(c)) = (&version, &current)
         && *v != c.version
@@ -221,14 +217,11 @@ pub fn upgrade(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             } else {
                 String::new()
             };
-            ctx.out.line(&format!(
-                "{name}: {} -> {to}{tag}",
-                js::string(Some(&from))
-            ));
+            ctx.out
+                .line(&format!("{name}: {} -> {to}{tag}", js::string(Some(&from))));
             if !old_jars.is_empty() {
-                ctx.out.line(
-                    "  Old jar kept in the instance folder - the way back if this build misbehaves.",
-                );
+                ctx.out
+                    .line("  Old jar kept in the instance folder - the way back if this build misbehaves.");
             }
             ctx.out.line(if running {
                 "  The server is running; the new jar loads at its next restart."
@@ -261,8 +254,7 @@ fn pick_java(ctx: &Ctx<'_>, version: &str) -> Result<String, Failure> {
         Some(Flag::Bool(true)) => {
             return Err(Failure::Internal {
                 head: "TypeError [ERR_INVALID_ARG_TYPE]".into(),
-                message: "The \"file\" argument must be of type string. Received type boolean (true)"
-                    .into(),
+                message: "The \"file\" argument must be of type string. Received type boolean (true)".into(),
                 code: Some("ERR_INVALID_ARG_TYPE".into()),
             });
         }
@@ -326,8 +318,7 @@ pub fn new_with_software(ctx: &mut Ctx<'_>, name: &str) -> Result<bool, Failure>
                 Some(s) if !s.is_empty() => format!(", {s}"),
                 _ => String::new(),
             };
-            ctx.out
-                .line(&format!("Downloaded {}{build}{size}.", res.name));
+            ctx.out.line(&format!("Downloaded {}{build}{size}.", res.name));
         }
         let o = NewOptions {
             loader: id.into(),
@@ -362,8 +353,7 @@ pub fn new_with_software(ctx: &mut Ctx<'_>, name: &str) -> Result<bool, Failure>
             res.mc.as_deref().unwrap_or("null"),
             js::number_to_string(res.port)
         ));
-        ctx.out
-            .line(&format!("Start it with: spawnloft start {name}"));
+        ctx.out.line(&format!("Start it with: spawnloft start {name}"));
         return Ok(true);
     }
     Ok(false)

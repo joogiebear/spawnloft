@@ -82,13 +82,16 @@ pub fn parse_server_jar(jar: Option<&Value>) -> Option<ServerJar> {
 
 /// A JavaScript number as a value (NaN and the infinities have no JSON form and print as text).
 fn number_value(n: f64) -> Value {
-    serde_json::Number::from_f64(n).map_or_else(|| json!(js::number_to_string(n)), |x| {
-        if n.fract() == 0.0 && n.abs() < 9.007_199_254_740_992e15 {
-            json!(n as i64)
-        } else {
-            Value::Number(x)
-        }
-    })
+    serde_json::Number::from_f64(n).map_or_else(
+        || json!(js::number_to_string(n)),
+        |x| {
+            if n.fract() == 0.0 && n.abs() < 9.007_199_254_740_992e15 {
+                json!(n as i64)
+            } else {
+                Value::Number(x)
+            }
+        },
+    )
 }
 
 /// `jarChangeWords(from, to)`: "Paper 1.21.4, build 100 to 130" for the Activity list when both
@@ -362,7 +365,10 @@ mod tests {
     #[test]
     fn jars_are_parsed_and_changes_worded() {
         let p = parse_server_jar(Some(&json!("Paper-1.21.4-130.jar"))).unwrap();
-        assert_eq!((p.software, p.version.as_str(), p.build.clone()), ("paper", "1.21.4", json!(130)));
+        assert_eq!(
+            (p.software, p.version.as_str(), p.build.clone()),
+            ("paper", "1.21.4", json!(130))
+        );
         let a = parse_server_jar(Some(&json!("asp-26.3-b77d5e97.jar"))).unwrap();
         assert_eq!(a.build, json!("b77d5e97"));
         assert!(parse_server_jar(Some(&json!("custom.jar"))).is_none());
