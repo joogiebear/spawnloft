@@ -1,5 +1,5 @@
 {
- "about": "C7 part 3b: client install over faked Mojang hosts (made by make-c7-install-scenario.mjs). A modern version with its jar, log config, asset index, duplicate libraries and assets, and natives for every OS and arch (extracted without META-INF), installed again from the checked-files list, a damaged library fetched again, natives extracted again after their stamp goes, --verify; the virtual and resources asset layouts; an LWJGL 2 version with old-style natives and excludes (Linux arm64 and the arm64 Mac refuse it); an unknown layout, an index path that leaves its folder, a missing library, a checksum mismatch, a library only a loader makes, a version not in the list, an unknown profile, usage errors, and a Fabric profile, which the Node core still sets up.",
+ "about": "C7 part 3b: client install over faked Mojang hosts (made by make-c7-install-scenario.mjs). A modern version with its jar, log config, asset index, duplicate libraries and assets, and natives for every OS and arch (extracted without META-INF), installed again from the checked-files list, a damaged library fetched again, natives extracted again after their stamp goes, --verify; the virtual and resources asset layouts; an LWJGL 2 version with old-style natives and excludes (Linux arm64 and the arm64 Mac refuse it); an unknown layout, an index path that leaves its folder, a missing library, a checksum mismatch, a library only a loader makes (alone, and first of twelve, when the other seven workers still fetch theirs), a natives jar with an entry that leaves its folder, a version not in the list, an unknown profile, usage errors, and a Fabric profile, which the Node core still sets up.",
  "platforms": [
   "linux-x64",
   "darwin",
@@ -52,6 +52,12 @@
     },
     "GET /v1/packages/9efbc417ecb142e28ceebc6ca47c4e26f4c19277/lib-bad-sum.json": {
      "base64": "eyJpZCI6ImxpYi1iYWQtc3VtIiwidHlwZSI6InNuYXBzaG90IiwiYXNzZXRJbmRleCI6eyJpZCI6ImVtcHR5Iiwic2hhMSI6IjYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMiLCJzaXplIjoxNCwidG90YWxTaXplIjoxLCJ1cmwiOiJodHRwczovL3Bpc3Rvbi1tZXRhLm1vamFuZy5jb20vdjEvcGFja2FnZXMvNjJlYTc4N2MxZjgwMGMwOTFiOTg2NzhiMDUwNDUzYTVhZTU5ZDdiYy9lbXB0eS5qc29uIn0sImxpYnJhcmllcyI6W3sibmFtZSI6ImNvbS5leGFtcGxlOmJlbnQ6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vZXhhbXBsZS9iZW50LzEuMC9iZW50LTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9leGFtcGxlL2JlbnQvMS4wL2JlbnQtMS4wLmphciIsInNoYTEiOiIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic2l6ZSI6ODB9fX1dfQ=="
+    },
+    "GET /v1/packages/d0ad59767826dfa76f722a0751929a81a0b88905/many-made.json": {
+     "base64": "eyJpZCI6Im1hbnktbWFkZSIsInR5cGUiOiJzbmFwc2hvdCIsImFzc2V0SW5kZXgiOnsiaWQiOiJlbXB0eSIsInNoYTEiOiI2MmVhNzg3YzFmODAwYzA5MWI5ODY3OGIwNTA0NTNhNWFlNTlkN2JjIiwic2l6ZSI6MTQsInRvdGFsU2l6ZSI6MSwidXJsIjoiaHR0cHM6Ly9waXN0b24tbWV0YS5tb2phbmcuY29tL3YxL3BhY2thZ2VzLzYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMvZW1wdHkuanNvbiJ9LCJsaWJyYXJpZXMiOlt7Im5hbWUiOiJjb20ubWFueTpsMDoxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9tYW55L2wwLzEuMC9sMC0xLjAuamFyIiwidXJsIjoiIiwic2hhMSI6ImI0OTc5MTNhOWFhODJhMGNiNTc4ZDhhYWJhZmZjNjRiY2RjZjA4ODQiLCJzaXplIjoyfX19LHsibmFtZSI6ImNvbS5tYW55OmwxOjEuMCIsImRvd25sb2FkcyI6eyJhcnRpZmFjdCI6eyJwYXRoIjoiY29tL21hbnkvbDEvMS4wL2wxLTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9tYW55L2wxLzEuMC9sMS0xLjAuamFyIiwic2hhMSI6ImNlOGVhOGZkYWQwYTAyOWQ4YTUyYTJiN2UwNDk3MDRhMWI3YThmYzMiLCJzaXplIjoxMDB9fX0seyJuYW1lIjoiY29tLm1hbnk6bDI6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vbWFueS9sMi8xLjAvbDItMS4wLmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvY29tL21hbnkvbDIvMS4wL2wyLTEuMC5qYXIiLCJzaGExIjoiZDlkMzA2ZGYxZmY2YzE4YjhlNGY4MDk1OGQxZWVmZGNkMDdkYTViZSIsInNpemUiOjEwMX19fSx7Im5hbWUiOiJjb20ubWFueTpsMzoxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9tYW55L2wzLzEuMC9sMy0xLjAuamFyIiwidXJsIjoiaHR0cHM6Ly9saWJyYXJpZXMubWluZWNyYWZ0Lm5ldC9jb20vbWFueS9sMy8xLjAvbDMtMS4wLmphciIsInNoYTEiOiJjZTE1ZGJmMWMwNGI2ODBhNGFiMjhiZTVhMGUxNDdhNGU0MDgzMmI1Iiwic2l6ZSI6MTAyfX19LHsibmFtZSI6ImNvbS5tYW55Omw0OjEuMCIsImRvd25sb2FkcyI6eyJhcnRpZmFjdCI6eyJwYXRoIjoiY29tL21hbnkvbDQvMS4wL2w0LTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9tYW55L2w0LzEuMC9sNC0xLjAuamFyIiwic2hhMSI6ImZiZWNmNjA0OWYzMTU4NDAxN2FhYzE5MGExOGNkYjMyNTcyNjY3YjUiLCJzaXplIjoxMDN9fX0seyJuYW1lIjoiY29tLm1hbnk6bDU6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vbWFueS9sNS8xLjAvbDUtMS4wLmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvY29tL21hbnkvbDUvMS4wL2w1LTEuMC5qYXIiLCJzaGExIjoiZmQ4YTQyZjdlZjM1Mzk1ZTU2NDE4MmZhMDc2Y2RlZDY2YTk5ODliYiIsInNpemUiOjEwNH19fSx7Im5hbWUiOiJjb20ubWFueTpsNjoxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9tYW55L2w2LzEuMC9sNi0xLjAuamFyIiwidXJsIjoiaHR0cHM6Ly9saWJyYXJpZXMubWluZWNyYWZ0Lm5ldC9jb20vbWFueS9sNi8xLjAvbDYtMS4wLmphciIsInNoYTEiOiJlNDBlNjlkNmQxNTI5Njc3N2EwNTVmN2E3ZjUyMTBjOTEyODBhOWJkIiwic2l6ZSI6MTA1fX19LHsibmFtZSI6ImNvbS5tYW55Omw3OjEuMCIsImRvd25sb2FkcyI6eyJhcnRpZmFjdCI6eyJwYXRoIjoiY29tL21hbnkvbDcvMS4wL2w3LTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9tYW55L2w3LzEuMC9sNy0xLjAuamFyIiwic2hhMSI6IjdkMzk0MzlhYzNlOGE1Yzc4NWI2YmZiNWIyNGU5NmYzYzIwZGY0YzMiLCJzaXplIjoxMDZ9fX0seyJuYW1lIjoiY29tLm1hbnk6bDg6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vbWFueS9sOC8xLjAvbDgtMS4wLmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvY29tL21hbnkvbDgvMS4wL2w4LTEuMC5qYXIiLCJzaGExIjoiYWEyYjZlMWQ4OWJhY2U5YzA1NWUwODQ1YzhlYjc5ZGMyNTljMmE2MiIsInNpemUiOjEwN319fSx7Im5hbWUiOiJjb20ubWFueTpsOToxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9tYW55L2w5LzEuMC9sOS0xLjAuamFyIiwidXJsIjoiaHR0cHM6Ly9saWJyYXJpZXMubWluZWNyYWZ0Lm5ldC9jb20vbWFueS9sOS8xLjAvbDktMS4wLmphciIsInNoYTEiOiJmYTg4MTc3NmQwNDFjNDVkZTdmMmQ3MTM5ZDVmOGE4ZWU1NTY2YjIzIiwic2l6ZSI6MTA4fX19LHsibmFtZSI6ImNvbS5tYW55OmwxMDoxLjAiLCJkb3dubG9hZHMiOnsiYXJ0aWZhY3QiOnsicGF0aCI6ImNvbS9tYW55L2wxMC8xLjAvbDEwLTEuMC5qYXIiLCJ1cmwiOiJodHRwczovL2xpYnJhcmllcy5taW5lY3JhZnQubmV0L2NvbS9tYW55L2wxMC8xLjAvbDEwLTEuMC5qYXIiLCJzaGExIjoiNTY3MzY1NmI2N2FiMDAxYzliZjY2NTY4NTc1NjhkMTJjM2ZjOWMzMyIsInNpemUiOjEwOX19fSx7Im5hbWUiOiJjb20ubWFueTpsMTE6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vbWFueS9sMTEvMS4wL2wxMS0xLjAuamFyIiwidXJsIjoiaHR0cHM6Ly9saWJyYXJpZXMubWluZWNyYWZ0Lm5ldC9jb20vbWFueS9sMTEvMS4wL2wxMS0xLjAuamFyIiwic2hhMSI6IjJlNWEyYzU4ZWNhMTU0ZWM0MDI5YTZiMDUwMmJjNWJlNjBhYjBhZmYiLCJzaXplIjoxMTB9fX1dfQ=="
+    },
+    "GET /v1/packages/6c113c292406ad29ed3867bf0a6b57091d1f41ec/hostile-natives.json": {
+     "base64": "eyJpZCI6Imhvc3RpbGUtbmF0aXZlcyIsInR5cGUiOiJzbmFwc2hvdCIsImFzc2V0SW5kZXgiOnsiaWQiOiJlbXB0eSIsInNoYTEiOiI2MmVhNzg3YzFmODAwYzA5MWI5ODY3OGIwNTA0NTNhNWFlNTlkN2JjIiwic2l6ZSI6MTQsInRvdGFsU2l6ZSI6MSwidXJsIjoiaHR0cHM6Ly9waXN0b24tbWV0YS5tb2phbmcuY29tL3YxL3BhY2thZ2VzLzYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMvZW1wdHkuanNvbiJ9LCJsaWJyYXJpZXMiOlt7Im5hbWUiOiJvcmcuZXZpbDpuYXRpdmVzOjEuMDpuYXRpdmVzLWxpbnV4IiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJvcmcvZXZpbC9uYXRpdmVzLzEuMC9uYXRpdmVzLTEuMC1uYXRpdmVzLWxpbnV4LmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvb3JnL2V2aWwvbmF0aXZlcy8xLjAvbmF0aXZlcy0xLjAtbmF0aXZlcy1saW51eC5qYXIiLCJzaGExIjoiNWMzMmY5OGU3MGM2ZWVmN2IwNGRmZjNiOGJkMzEzMWMwMTdkZTM5ZSIsInNpemUiOjIyM319LCJydWxlcyI6W3siYWN0aW9uIjoiYWxsb3ciLCJvcyI6eyJuYW1lIjoibGludXgifX1dfSx7Im5hbWUiOiJvcmcuZXZpbDpuYXRpdmVzOjEuMDpuYXRpdmVzLW1hY29zLWFybTY0IiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJvcmcvZXZpbC9uYXRpdmVzLzEuMC9uYXRpdmVzLTEuMC1uYXRpdmVzLW1hY29zLWFybTY0LmphciIsInVybCI6Imh0dHBzOi8vbGlicmFyaWVzLm1pbmVjcmFmdC5uZXQvb3JnL2V2aWwvbmF0aXZlcy8xLjAvbmF0aXZlcy0xLjAtbmF0aXZlcy1tYWNvcy1hcm02NC5qYXIiLCJzaGExIjoiNWMzMmY5OGU3MGM2ZWVmN2IwNGRmZjNiOGJkMzEzMWMwMTdkZTM5ZSIsInNpemUiOjIyM319LCJydWxlcyI6W3siYWN0aW9uIjoiYWxsb3ciLCJvcyI6eyJuYW1lIjoib3N4In19XX0seyJuYW1lIjoib3JnLmV2aWw6bmF0aXZlczoxLjA6bmF0aXZlcy13aW5kb3dzIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJvcmcvZXZpbC9uYXRpdmVzLzEuMC9uYXRpdmVzLTEuMC1uYXRpdmVzLXdpbmRvd3MuamFyIiwidXJsIjoiaHR0cHM6Ly9saWJyYXJpZXMubWluZWNyYWZ0Lm5ldC9vcmcvZXZpbC9uYXRpdmVzLzEuMC9uYXRpdmVzLTEuMC1uYXRpdmVzLXdpbmRvd3MuamFyIiwic2hhMSI6IjVjMzJmOThlNzBjNmVlZjdiMDRkZmYzYjhiZDMxMzFjMDE3ZGUzOWUiLCJzaXplIjoyMjN9fSwicnVsZXMiOlt7ImFjdGlvbiI6ImFsbG93Iiwib3MiOnsibmFtZSI6IndpbmRvd3MifX1dfV19"
     },
     "GET /v1/packages/fd027a4f738bf3b87ca3b7a8c5bd9f8926f86ede/loader-made.json": {
      "base64": "eyJpZCI6ImxvYWRlci1tYWRlIiwidHlwZSI6InNuYXBzaG90IiwiYXNzZXRJbmRleCI6eyJpZCI6ImVtcHR5Iiwic2hhMSI6IjYyZWE3ODdjMWY4MDBjMDkxYjk4Njc4YjA1MDQ1M2E1YWU1OWQ3YmMiLCJzaXplIjoxNCwidG90YWxTaXplIjoxLCJ1cmwiOiJodHRwczovL3Bpc3Rvbi1tZXRhLm1vamFuZy5jb20vdjEvcGFja2FnZXMvNjJlYTc4N2MxZjgwMGMwOTFiOTg2NzhiMDUwNDUzYTVhZTU5ZDdiYy9lbXB0eS5qc29uIn0sImxpYnJhcmllcyI6W3sibmFtZSI6ImNvbS5leGFtcGxlOm1hZGU6MS4wIiwiZG93bmxvYWRzIjp7ImFydGlmYWN0Ijp7InBhdGgiOiJjb20vZXhhbXBsZS9tYWRlLzEuMC9tYWRlLTEuMC5qYXIiLCJ1cmwiOiIiLCJzaGExIjoiZTU3MmY5NWY5ZDFmYWQxMDg4ZTQzOTM2OTMxZjEyYmJiYmRiYmIwNiIsInNpemUiOjR9fX1dfQ=="
@@ -109,6 +115,18 @@
         "type": "snapshot",
         "url": "https://piston-meta.mojang.com/v1/packages/9efbc417ecb142e28ceebc6ca47c4e26f4c19277/lib-bad-sum.json",
         "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/9efbc417ecb142e28ceebc6ca47c4e26f4c19277/lib-bad-sum.json}"
+       },
+       {
+        "id": "many-made",
+        "type": "snapshot",
+        "url": "https://piston-meta.mojang.com/v1/packages/d0ad59767826dfa76f722a0751929a81a0b88905/many-made.json",
+        "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/d0ad59767826dfa76f722a0751929a81a0b88905/many-made.json}"
+       },
+       {
+        "id": "hostile-natives",
+        "type": "snapshot",
+        "url": "https://piston-meta.mojang.com/v1/packages/6c113c292406ad29ed3867bf0a6b57091d1f41ec/hostile-natives.json",
+        "sha1": "${sha1:https://piston-meta.mojang.com/v1/packages/6c113c292406ad29ed3867bf0a6b57091d1f41ec/hostile-natives.json}"
        },
        {
         "id": "loader-made",
@@ -189,6 +207,48 @@
     },
     "GET /com/example/bent/1.0/bent-1.0.jar": {
      "base64": "DCtKaYinxuUJKEdmhaTD4gYlRGOCocDfAyJBYH+evdwAHz5dfJu62fgcO1p5mLfW9Rk4V3aVtNPyFjVUc5Kx0O8TMlFwj67N7BAvTm2Mq8o="
+    },
+    "GET /com/many/l1/1.0/l1-1.0.jar": {
+     "base64": "FDNScZCvzu0RME9ujazL6g4tTGuKqcjnCypJaIemxeQIJ0ZlhKPC4QUkQ2KBoL/eAiFAX36dvNv6Hj1ce5q52PcbOll4l7bV9Bg3VnWUs9LxFTRTcpGwz+4SMVBvjq3M6w8uTQ=="
+    },
+    "GET /com/many/l2/1.0/l2-1.0.jar": {
+     "base64": "FTRTcpGwz+4SMVBvjq3M6w8uTWyLqsnoDCtKaYinxuUJKEdmhaTD4gYlRGOCocDfAyJBYH+evdwAHz5dfJu62fgcO1p5mLfW9Rk4V3aVtNPyFjVUc5Kx0O8TMlFwj67N7BAvTm0="
+    },
+    "GET /com/many/l3/1.0/l3-1.0.jar": {
+     "base64": "FjVUc5Kx0O8TMlFwj67N7BAvTm2Mq8rpDSxLaomox+YKKUhnhqXE4wcmRWSDosHgBCNCYYCfvt0BID9efZy72vkdPFt6mbjX9ho5WHeWtdTzFzZVdJOy0fAUM1JxkK/O7REwT26N"
+    },
+    "GET /com/many/l4/1.0/l4-1.0.jar": {
+     "base64": "FzZVdJOy0fAUM1JxkK/O7REwT26NrMvqDi1Ma4qpyOcLKkloh6bF5AgnRmWEo8LhBSRDYoGgv94CIUBffp282/oePVx7mrnY9xs6WXiXttX0GDdWdZSz0vEVNFNykbDP7hIxUG+OrQ=="
+    },
+    "GET /com/many/l5/1.0/l5-1.0.jar": {
+     "base64": "GDdWdZSz0vEVNFNykbDP7hIxUG+OrczrDy5NbIuqyegMK0ppiKfG5QkoR2aFpMPiBiVEY4KhwN8DIkFgf5693AAfPl18m7rZ+Bw7WnmYt9b1GThXdpW00/IWNVRzkrHQ7xMyUXCPrs0="
+    },
+    "GET /com/many/l6/1.0/l6-1.0.jar": {
+     "base64": "GThXdpW00/IWNVRzkrHQ7xMyUXCPrs3sEC9ObYyryukNLEtqiajH5gopSGeGpcTjByZFZIOiweAEI0JhgJ++3QEgP159nLva+R08W3qZuNf2GjlYd5a11PMXNlV0k7LR8BQzUnGQr87t"
+    },
+    "GET /com/many/l7/1.0/l7-1.0.jar": {
+     "base64": "GjlYd5a11PMXNlV0k7LR8BQzUnGQr87tETBPbo2sy+oOLUxriqnI5wsqSWiHpsXkCCdGZYSjwuEFJENigaC/3gIhQF9+nbzb+h49XHuaudj3GzpZeJe21fQYN1Z1lLPS8RU0U3KRsM/uEg=="
+    },
+    "GET /com/many/l8/1.0/l8-1.0.jar": {
+     "base64": "GzpZeJe21fQYN1Z1lLPS8RU0U3KRsM/uEjFQb46tzOsPLk1si6rJ6AwrSmmIp8blCShHZoWkw+IGJURjgqHA3wMiQWB/nr3cAB8+XXybutn4HDtaeZi31vUZOFd2lbTT8hY1VHOSsdDvEzI="
+    },
+    "GET /com/many/l9/1.0/l9-1.0.jar": {
+     "base64": "HDtaeZi31vUZOFd2lbTT8hY1VHOSsdDvEzJRcI+uzewQL05tjKvK6Q0sS2qJqMfmCilIZ4alxOMHJkVkg6LB4AQjQmGAn77dASA/Xn2cu9r5HTxbepm41/YaOVh3lrXU8xc2VXSTstHwFDNS"
+    },
+    "GET /com/many/l10/1.0/l10-1.0.jar": {
+     "base64": "HTxbepm41/YaOVh3lrXU8xc2VXSTstHwFDNScZCvzu0RME9ujazL6g4tTGuKqcjnCypJaIemxeQIJ0ZlhKPC4QUkQ2KBoL/eAiFAX36dvNv6Hj1ce5q52PcbOll4l7bV9Bg3VnWUs9LxFTRTcg=="
+    },
+    "GET /com/many/l11/1.0/l11-1.0.jar": {
+     "base64": "Hj1ce5q52PcbOll4l7bV9Bg3VnWUs9LxFTRTcpGwz+4SMVBvjq3M6w8uTWyLqsnoDCtKaYinxuUJKEdmhaTD4gYlRGOCocDfAyJBYH+evdwAHz5dfJu62fgcO1p5mLfW9Rk4V3aVtNPyFjVUc5I="
+    },
+    "GET /org/evil/natives/1.0/natives-1.0-natives-linux.jar": {
+     "base64": "UEsDBBQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAb2suc29maW5lUEsDBBQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAALi4vLi4vZXNjYXBlZC5zb2JhZFBLAQIUABQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAAAAAAAAAAAAAAAAAAABvay5zb1BLAQIUABQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAAAAAAAAAAAAAAACcAAAAuLi8uLi9lc2NhcGVkLnNvUEsFBgAAAAACAAIAcQAAAFgAAAAAAA=="
+    },
+    "GET /org/evil/natives/1.0/natives-1.0-natives-macos-arm64.jar": {
+     "base64": "UEsDBBQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAb2suc29maW5lUEsDBBQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAALi4vLi4vZXNjYXBlZC5zb2JhZFBLAQIUABQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAAAAAAAAAAAAAAAAAAABvay5zb1BLAQIUABQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAAAAAAAAAAAAAAACcAAAAuLi8uLi9lc2NhcGVkLnNvUEsFBgAAAAACAAIAcQAAAFgAAAAAAA=="
+    },
+    "GET /org/evil/natives/1.0/natives-1.0-natives-windows.jar": {
+     "base64": "UEsDBBQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAb2suc29maW5lUEsDBBQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAALi4vLi4vZXNjYXBlZC5zb2JhZFBLAQIUABQAAAAAAAAAAACSVKm+BAAAAAQAAAAFAAAAAAAAAAAAAAAAAAAAAABvay5zb1BLAQIUABQAAAAAAAAAAAD7OSuCAwAAAAMAAAAQAAAAAAAAAAAAAAAAACcAAAAuLi8uLi9lc2NhcGVkLnNvUEsFBgAAAAACAAIAcQAAAFgAAAAAAA=="
     }
    }
   },
@@ -319,6 +379,26 @@
      },
      "made": {
       "mc": "loader-made",
+      "loader": "vanilla",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "many": {
+      "mc": "many-made",
+      "loader": "vanilla",
+      "loaderVersion": null,
+      "memory": "2G",
+      "java": null,
+      "server": null,
+      "harness": false,
+      "account": null
+     },
+     "hostile": {
+      "mc": "hostile-natives",
       "loader": "vanilla",
       "loaderVersion": null,
       "memory": "2G",
@@ -488,6 +568,28 @@
     "client",
     "install",
     "made"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "many",
+    "--json"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "client",
+    "install",
+    "hostile",
+    "--json"
    ],
    "expect": {
     "code": 1
