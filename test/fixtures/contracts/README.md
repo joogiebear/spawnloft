@@ -15,6 +15,31 @@ PLAN-RUST-TAURI.md section 3 item 2 and section 12 (P0-A).
 | `schedules.json` | scheduled task definitions, every action, step and schedule kind | `src/schedule.mjs`, `src/task-steps.mjs` | `spawnloft task run` |
 | `panel-auth.json` | who may call the panel's HTTP API: the sign-in tokens, and the answer to whole requests in order | `tools/make-panel-auth-fixture.mjs` | `src/panel-auth.mjs` (the Node panel) and `rust/crates/spawnloft-lib/src/panel_auth.rs` (`spawnloft-core ui`), which must agree |
 
+The C0 fixtures (rust/PLAN-CORE-PORT.md 3.4): every file the Node core and the Rust core will both
+write, and the rules both must sort and match by. Held by `test/contracts-files.test.mjs` unless
+the row says otherwise.
+
+| File | Contract | Written by | Read by |
+| --- | --- | --- | --- |
+| `instances-writes.json` | the exact text `instances.json` has after each registry call: key order, two-space JSON, the newline, owner-only mode | `src/registry.mjs` (`util.mjs` writeJson) | everyone; `instances.json` has the shapes |
+| `settings.json` | the per-user settings file: where it lives, the text of a save, that a save merges a patch and keeps keys it does not know, the refusal of a damaged file | `src/settings.mjs` save | every process, and 1.x after a rollback |
+| `data-format.json` | `<data>/data-format.json`, the newest release that used the folder, and when a reader warns | Node never writes it; 2.0 does | `src/data-format.mjs` |
+| `runtime.json` | `run/runtime.json` `{format, exe, root}`, when it counts as moved, and the text it is rewritten with | `src/relocate.mjs` (the panel at each start, `repair`) | the same |
+| `task-files.json` | the task shims (`.sh`, `.cmd`), the server launchers (`.sh`, `.bat`), launchd plists, systemd units and the `schtasks` and `systemctl` command lines, as exact text per platform | `src/schedule*.mjs`, `src/create.mjs`, `src/entry.mjs` | Task Scheduler, launchd, systemd, a double-click |
+| `task-runs.json` | `run/<server>/tasks.log` lines and how they are read back; `schedules.json` as create and update write it | `mcctl.mjs` runTask, `src/schedule.mjs` | the panel's task history, `spawnloft task run` |
+| `backups.json` | backup names and folder layout, the manifest's text and key order, archive members, every `tar` command line (`EXCLUDE_ARGS`, `tarMember`), the database dump manifest | `src/backup.mjs`, `src/tar.mjs`, `src/services.mjs` | restore and verify, 1.x and 2.0 both ways |
+| `zip.json` | zips as zip.mjs writes them: entry order, names, flags, methods, versions | `src/zip.mjs` (world export without a zip-capable tar, the file browser, diagnostics) | any unzip, `extractZip` |
+| `engines.json` | the engine store's folder names and `spawnloft-engine.json` markers with Node's platform names | `src/garnet.mjs`, `src/mysql.mjs`, `src/mariadb.mjs` | `hasEngine` |
+| `provenance.json` | the plugin store `.mcctl-plugins.json`, the modpack record `.mcctl-pack.json`, the client's `.spawnloft-mods.json` | `src/plugins.mjs`, `src/mrpack.mjs`, `src/client-fabric.mjs` | update checks |
+| `client-files.json` | the launcher's files: `profiles.json`, `accounts.json` (owner-only), the version store layout, a profile's `servers.dat` and SpawnLoft's memory of it | `src/client*.mjs` | the launcher, the game |
+| `activity.json` (`sites`, `dynamicSites`) | every `activity.record` call by file and line, with the actions it can record | every module | the panel's Activity page |
+| `ordering.json`, `ordering-pairs.json` | the order `localeCompare` gives, for each variant the source calls, every call site, and random pairs with Node's answers | `tools/make-ordering-fixture.mjs` | `rust/crates/spawnloft-lib/src/collate.rs` (`cargo test -p spawnloft-lib collate`) |
+| `regex.json` | the regular expressions the Rust `regex` crate cannot run (lookaround, backreferences), the four that take a pattern at run time and the policy for them, every other `new RegExp` | the source itself | each phase's rewrite |
+| `locks.json`, `EXCLUSION.md` | lock files and exclusive-create files: every `acquireLock` site, the record, the stale rules, the `.install-lock`, `.pending` and marker files | `src/util.mjs` and several | held by `test/contracts-locks.test.mjs` and `test/lock-cross-process.test.mjs` |
+
+`C0-CHECKS.md` records two confirmations the plan asks C0 for: that 1.5.0 keeps settings keys it
+does not know, and that no installed build can have `instances.json` in its code folder.
+
 Shapes are written in the small language described at the top of `shape.mjs`, which also checks
 them. Examples are concrete values; the tests substitute live pids and paths where needed.
 
@@ -50,5 +75,27 @@ Readers must accept fields they do not know; writers must not drop fields the fi
 Known quirk kept on purpose: a stop or kill during the restart delay replies `code: null` and leaves
 `exitCode: null` in the state, not the crash's code (see `control-protocol.json`).
 
-Not covered here (step 2 of the plan): CLI `--json` output and panel routes; `tasks.log` and the
-task shims; `console.log` text beyond the daemon's own lines.
+## How the C0 fixtures are checked
+
+`test/contracts-files.test.mjs` imports `test/contracts-files-observe.mjs` first, which points the
+data root, the settings folder and `HOME` at a scratch folder and then loads the Node modules. Each
+test makes the real Node call with the fixture's inputs and compares the exact text, with the
+scratch paths written back as placeholders (`<data>`, `<entry>`, `<code>`, `<node>`, `<mcctl>`,
+`<config>`, `<home>`, `<ns>`) and times stamped with "now" as `<at>`. Where a writer only runs on
+another platform it is run anyway when it only looks at `process.platform` at call time (the
+launchers); otherwise its template is checked in the source and its formula run (the Windows `.cmd`
+shim off Windows, `schtasks` everywhere), marked `"asserted": "source"`. Writers that need a
+network or a running database (engine installs, modpacks, database dumps) are held against the
+source. The launchd and systemd texts are compared on macOS and Linux, the `systemctl` calls and
+`schedules.json` writes on Linux only (a stand-in `systemctl` on PATH); everything else runs on all
+three.
+
+The order fixtures are generated: run `node tools/make-ordering-fixture.mjs` only when the order is
+meant to change, and say so in the commit. The test fails when this Node (its ICU, or the machine's
+default locale) sorts differently from the fixture.
+
+## Still not covered here
+
+The CLI `--json` output fixtures and the MCP tool list are being added under `cli/` in this folder.
+Panel routes (C8), `console.log` text beyond the daemon's own lines, and the files only the panel
+writes for itself (the panel key, the window's state) are not covered yet.

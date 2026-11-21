@@ -1,0 +1,282 @@
+{
+  "about": "A server backup as backup.mjs makes it: the archive, its manifest beside it, the folder they sit in, and the tar command lines (backups go through the system tar, tar.mjs). A 1.x build must restore a 2.0 backup and the reverse. test/contracts-files.test.mjs backs up a stopped server in a scratch data root (standard and full scopes) and compares names, manifest text and archive members; the tar argument lists are held against the source.",
+  "layout": {
+    "folder": "<backups>/<server>, where <backups> is settings.backupsDir or <data>/backups",
+    "observedFolder": "<data>/backups/survival",
+    "archive": "<label slug>_<scope>_<stamp>.tar.gz, the label slug being the label with every character outside [A-Za-z0-9_-] turned into -, and absent without a label; a second backup in the same second gets _2, _3 before .tar.gz",
+    "stamp": "util.mjs stamp: YYYY-MM-DD_HHMMSS in the machine's LOCAL time zone (createdAt in the manifest is UTC)",
+    "manifest": "the same name with .json for .tar.gz",
+    "pending": "tar writes <archive>.pending (reserved with an exclusive create, see locks.json), renamed to the archive only after the manifest is written",
+    "lock": ".snapshot.lock in the folder serialises backups of one server (locks.json)",
+    "mirror": "with settings.backupsMirrorDir, the archive and manifest are copied to <mirror>/<server>/ and deletions follow",
+    "names": [
+      "standard_<stamp>.tar.gz",
+      "before-1-21-_full_<stamp>.tar.gz"
+    ],
+    "files": [
+      "before-1-21-_full_<stamp>.json",
+      "before-1-21-_full_<stamp>.tar.gz",
+      "standard_<stamp>.json",
+      "standard_<stamp>.tar.gz"
+    ]
+  },
+  "manifest": {
+    "text": "util.mjs writeJson: JSON.stringify(manifest, null, 2) and \\n, through manifest.json.tmp",
+    "keyOrder": [
+      "instance",
+      "scope",
+      "label",
+      "changeCopy",
+      "taskId",
+      "members",
+      "databases",
+      "excluded (only when the server leaves paths out)",
+      "sourceDir",
+      "createdAt",
+      "size",
+      "serverWasRunning",
+      "flushed",
+      "skipped",
+      "warnings (at most 10)"
+    ],
+    "lockAndNote": "setSnapshotLocked and setSnapshotNote rewrite the manifest as { ...manifest, ...patch }: locked and note are added at the end. A note has tabs and newlines turned into spaces, is trimmed and cut to 80 characters; an empty note is stored as null. A backup with no manifest gets one holding only the patch.",
+    "placeholders": {
+      "<data>": "the data root",
+      "<at>": "createdAt, UTC ISO time",
+      "<size>": "the archive size in bytes, an integer"
+    },
+    "standard": "{\n  \"instance\": \"survival\",\n  \"scope\": \"standard\",\n  \"label\": null,\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"other_world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<data>/instances/survival\",\n  \"createdAt\": \"<at>\",\n  \"size\": \"<size>\",\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": []\n}\n",
+    "afterLockAndNote": "{\n  \"instance\": \"survival\",\n  \"scope\": \"standard\",\n  \"label\": null,\n  \"changeCopy\": false,\n  \"taskId\": null,\n  \"members\": [\n    \"plugins\",\n    \"world\",\n    \"other_world\",\n    \"server.properties\",\n    \"eula.txt\"\n  ],\n  \"databases\": [],\n  \"sourceDir\": \"<data>/instances/survival\",\n  \"createdAt\": \"<at>\",\n  \"size\": \"<size>\",\n  \"serverWasRunning\": false,\n  \"flushed\": false,\n  \"skipped\": [],\n  \"warnings\": [],\n  \"locked\": true,\n  \"note\": \"before the upgrade\"\n}\n",
+    "fullScope": {
+      "label": "before 1.21!",
+      "members": [
+        "./-dash",
+        "eula.txt",
+        "icon.png",
+        "other_world",
+        "plugins",
+        "server.properties",
+        "world"
+      ]
+    }
+  },
+  "members": {
+    "rule": "backup.mjs membersFor. plugins: plugins/ then mods/. worlds: the folders server.properties names (level-name, then its _nether and _the_end) that exist, then every other top folder with a level.dat, in readdir order. config: the root config files that exist, in ROOT_CONFIG_FILES order, then config/. standard is plugins + worlds + config. full is every top-level entry in readdir order except cache, libraries, versions and logs. The server's backupExclude paths are then dropped, and each member goes through tarMember.",
+    "rootConfigFiles": [
+      "server.properties",
+      "bukkit.yml",
+      "spigot.yml",
+      "paper.yml",
+      "paper-global.yml",
+      "permissions.yml",
+      "commands.yml",
+      "help.yml",
+      "ops.json",
+      "whitelist.json",
+      "banned-players.json",
+      "banned-ips.json",
+      "eula.txt"
+    ],
+    "fullExcludes": [
+      "cache",
+      "libraries",
+      "versions",
+      "logs"
+    ],
+    "standardListing": [
+      "eula.txt",
+      "other_world",
+      "other_world/level.dat",
+      "plugins",
+      "plugins/x.jar",
+      "server.properties",
+      "world",
+      "world/B.txt",
+      "world/DIM-1",
+      "world/Zed",
+      "world/Zed/z.txt",
+      "world/_x.txt",
+      "world/a.txt",
+      "world/level.dat",
+      "world/region",
+      "world/region/r.0.0.mca"
+    ],
+    "fullListing": [
+      "./-dash",
+      "eula.txt",
+      "icon.png",
+      "other_world",
+      "other_world/level.dat",
+      "plugins",
+      "plugins/x.jar",
+      "server.properties",
+      "world",
+      "world/B.txt",
+      "world/DIM-1",
+      "world/Zed",
+      "world/Zed/z.txt",
+      "world/_x.txt",
+      "world/a.txt",
+      "world/level.dat",
+      "world/region",
+      "world/region/r.0.0.mca"
+    ],
+    "listingNote": "tar -tzf output with / separators, trailing slashes dropped, sorted; archive order is tar's own walk and is not part of the contract. session.lock is never in an archive."
+  },
+  "tar": {
+    "binary": "tar.mjs tarBinary: %SystemRoot%\\System32\\tar.exe on Windows when it exists (bsdtar; never an MSYS GNU tar on PATH), else tar from PATH. runTar treats exit 1 as success (bsdtar warnings on a live server) and anything else as failure.",
+    "EXCLUDE_ARGS": [
+      "--exclude",
+      "session.lock"
+    ],
+    "tarMember": [
+      {
+        "name": "plugins",
+        "member": "plugins"
+      },
+      {
+        "name": "-dash",
+        "member": "./-dash"
+      },
+      {
+        "name": "@list",
+        "member": "./@list"
+      },
+      {
+        "name": "a-b",
+        "member": "a-b"
+      },
+      {
+        "name": "--checkpoint-action=exec=x",
+        "member": "./--checkpoint-action=exec=x"
+      }
+    ],
+    "calls": [
+      {
+        "file": "src/backup.mjs",
+        "what": "create a backup, cwd the server folder",
+        "code": "runTar(['-czf', reservation.pending, ...EXCLUDE_ARGS, ...skipArgs, ...members, ...dumpArgs], inst.dir)",
+        "args": [
+          "-czf",
+          "<archive>.pending",
+          "--exclude",
+          "session.lock",
+          "<--exclude <locked file>, Windows only>...",
+          "<--exclude <backupExclude pattern>>...",
+          "<members>...",
+          "<-C <dump dir> databases, when databases were dumped>"
+        ]
+      },
+      {
+        "file": "src/backup.mjs",
+        "what": "restore, cwd the server folder",
+        "code": "runTar(['-xzf', snapshot.path], inst.dir)",
+        "args": [
+          "-xzf",
+          "<archive>"
+        ]
+      },
+      {
+        "file": "src/backup.mjs",
+        "what": "verify: list the archive",
+        "code": "spawn(tarBinary(), ['-tzf', file], { windowsHide: true })",
+        "args": [
+          "-tzf",
+          "<archive>"
+        ]
+      },
+      {
+        "file": "src/files.mjs",
+        "what": "unpack a .tar.gz from the file browser",
+        "code": "runTar(['-xzf', src.full, '-C', staging], staging)",
+        "args": [
+          "-xzf",
+          "<file>",
+          "-C",
+          "<staging>"
+        ]
+      },
+      {
+        "file": "src/garnet.mjs",
+        "what": "unpack the Garnet engine",
+        "code": "runTar(['-xf', file, '-C', unpacked], staging)",
+        "args": [
+          "-xf",
+          "<download>",
+          "-C",
+          "<staging>/engine"
+        ]
+      },
+      {
+        "file": "src/garnet.mjs",
+        "what": "unpack the .NET runtime Garnet needs",
+        "code": "runTar(['-xf', file, '-C', runtime], staging)",
+        "args": [
+          "-xf",
+          "<download>",
+          "-C",
+          "<runtime>"
+        ]
+      },
+      {
+        "file": "src/mariadb.mjs",
+        "what": "unpack the MariaDB engine",
+        "code": "runTar(['-xf', archive, '--strip-components=1', '-C', dir], ENGINES_DIR)",
+        "args": [
+          "-xf",
+          "<zip>",
+          "--strip-components=1",
+          "-C",
+          "<engine dir>"
+        ]
+      },
+      {
+        "file": "src/mysql.mjs",
+        "what": "unpack the MySQL engine",
+        "code": "runTar(['-xf', file, '--strip-components=1', '-C', unpacked], staging)",
+        "args": [
+          "-xf",
+          "<download>",
+          "--strip-components=1",
+          "-C",
+          "<staging>/engine"
+        ]
+      },
+      {
+        "file": "src/worlds.mjs",
+        "what": "unpack an imported world archive",
+        "code": "runTar(['-xf', src], tmp)",
+        "args": [
+          "-xf",
+          "<archive>"
+        ]
+      },
+      {
+        "file": "src/worlds.mjs",
+        "what": "export a world as a zip when the tar can write zip (bsdtar: Windows, macOS); otherwise zip.mjs writes it (zip.json)",
+        "code": "runTar(['-a', '-cf', file, ...EXCLUDE_ARGS, ...members.map(tarMember)], inst.dir)",
+        "args": [
+          "-a",
+          "-cf",
+          "<file>.zip",
+          "--exclude",
+          "session.lock",
+          "<members>..."
+        ]
+      }
+    ]
+  },
+  "databaseDumps": {
+    "asserted": "source (a dump needs a running database)",
+    "about": "A database backup (services.mjs backupDatabase): <data>/services/<db>/backups/<tag>_<stamp>.sql, written as .pending and renamed, with <tag>_<stamp>.json beside it. Unlike every other manifest this one is JSON.stringify(value, null, 2) with NO trailing newline, written with fs.promises.writeFile.",
+    "source": "await fs.promises.writeFile(`${file.slice(0, -4)}.json`, JSON.stringify({\n      database: name, engine: db.engine, version: db.version ?? null, label: tag, databases, createdAt: new Date().toISOString(),\n    }, null, 2))",
+    "keyOrder": [
+      "database",
+      "engine",
+      "version",
+      "label",
+      "databases",
+      "createdAt"
+    ]
+  }
+}

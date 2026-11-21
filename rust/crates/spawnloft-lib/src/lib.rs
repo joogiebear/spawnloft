@@ -4,6 +4,7 @@
 
 pub mod activity;
 pub mod build;
+pub mod collate;
 pub mod crashguard;
 pub mod daemon;
 pub mod diagnose;
@@ -11,6 +12,7 @@ pub mod fsx;
 pub mod handover;
 pub mod js;
 pub mod json;
+pub mod lock;
 pub mod metrics;
 pub mod nodecore;
 pub mod notify;
@@ -25,6 +27,7 @@ pub mod registry;
 pub mod resp;
 pub mod runtime;
 pub mod sha256;
+pub mod test_origins;
 pub mod tick;
 pub mod time;
 pub mod update;

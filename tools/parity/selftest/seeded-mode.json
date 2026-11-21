@@ -1,0 +1,29 @@
+{
+  "about": "Self-test (POSIX): the same file, owner-only on one side and world-readable on the other. The rig must report the mode.",
+  "expect": "differ",
+  "expectDifferences": [
+    "data tree: data/instances/alpha/server.properties"
+  ],
+  "platforms": [
+    "linux",
+    "darwin"
+  ],
+  "steps": [
+    {
+      "write": "data/instances/alpha/server.properties",
+      "text": "server-port=25565\n",
+      "mode": "600"
+    },
+    {
+      "side": "rust",
+      "write": "data/instances/alpha/server.properties",
+      "text": "server-port=25565\n",
+      "mode": "644"
+    },
+    {
+      "run": [
+        "list"
+      ]
+    }
+  ]
+}

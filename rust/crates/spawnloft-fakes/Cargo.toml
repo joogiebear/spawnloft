@@ -10,3 +10,13 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# lock-probe takes the real lock; spawnloft-lib has no dependency on this crate, so no cycle
+spawnloft-lib.workspace = true
+
+# Test-only: takes and probes util.mjs's lock from a Rust process, for
+# test/lock-cross-process.test.mjs.
+[[bin]]
+name = "lock-probe"
+path = "src/bin/lock-probe.rs"

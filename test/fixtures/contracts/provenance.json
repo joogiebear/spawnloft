@@ -1,0 +1,71 @@
+{
+  "about": "What SpawnLoft records about the jars and packs it installed, which update checks compare against: the plugin store and the modpack record in a server folder, and the client's mods record. Hand-dropped jars have no record and are never offered updates. test/contracts-files.test.mjs writes the plugin store through plugins.mjs and holds the other writers against the source.",
+  "pluginStore": {
+    "asserted": "live",
+    "file": "<server>/plugins/.mcctl-plugins.json, or <server>/mods/.mcctl-plugins.json on a mod loader (contentKindFor): inside the folder so backups carry it",
+    "text": "util.mjs writeJson; { version: 1, managed: { <jar file name>: record } }, jars in the order they were first recorded; a rename moves the record to the new name at the end; a removal deletes it",
+    "record": {
+      "modrinth": {
+        "source": "modrinth",
+        "project": "<project id>",
+        "version": "<version_number>",
+        "installedAt": "<ISO time>",
+        "gameVersions": [
+          "<mc version>"
+        ]
+      },
+      "hangar": {
+        "source": "hangar",
+        "project": "<slug>",
+        "version": "<version name>",
+        "installedAt": "<ISO time>",
+        "gameVersions": [
+          "<mc version>"
+        ]
+      },
+      "modpack": {
+        "source": "modpack",
+        "project": "<pack project id>",
+        "version": "<pack version_number>",
+        "installedAt": "<ISO time>"
+      }
+    },
+    "observed": {
+      "paper": {
+        "file": "plugins/.mcctl-plugins.json",
+        "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"worldedit.jar\": {\n      \"source\": \"hangar\",\n      \"project\": \"WorldEdit\",\n      \"version\": \"7.3.9\",\n      \"installedAt\": \"2026-11-21T03:00:00.000Z\",\n      \"gameVersions\": [\n        \"1.21.4\"\n      ]\n    }\n  }\n}\n"
+      },
+      "fabric": {
+        "file": "mods/.mcctl-plugins.json",
+        "text": "{\n  \"version\": 1,\n  \"managed\": {\n    \"worldedit.jar\": {\n      \"source\": \"hangar\",\n      \"project\": \"WorldEdit\",\n      \"version\": \"7.3.9\",\n      \"installedAt\": \"2026-11-21T03:00:00.000Z\",\n      \"gameVersions\": [\n        \"1.21.4\"\n      ]\n    }\n  }\n}\n"
+      }
+    }
+  },
+  "modpack": {
+    "asserted": "source (an install needs Modrinth)",
+    "file": "<server>/.mcctl-pack.json (mrpack.mjs PACK_FILE), util.mjs writeJson",
+    "keyOrder": [
+      "project",
+      "versionId",
+      "versionNumber",
+      "name",
+      "mc",
+      "loader",
+      "installedAt",
+      "files",
+      "skippedClientOnly"
+    ],
+    "note": "install and update write the same keys; files is every path the pack laid down (index files, then overrides/, then server-overrides/), which an update removes before laying the new version"
+  },
+  "clientMods": {
+    "asserted": "source (needs Modrinth)",
+    "file": "<data>/client/profiles/<profile>/mods/.spawnloft-mods.json (client-fabric.mjs), util.mjs writeJson, { version: 1, managed: { <file>: record } }",
+    "record": {
+      "source": "modrinth",
+      "project": "fabric-api",
+      "version": "<version_number>",
+      "mc": "<mc version>",
+      "installedAt": "<ISO time>"
+    }
+  }
+}

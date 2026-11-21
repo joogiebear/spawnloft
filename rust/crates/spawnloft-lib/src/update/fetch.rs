@@ -167,8 +167,10 @@ impl Https {
         if !allowed_url(url) {
             return Err(FetchError::Scheme(url.to_string()));
         }
+        // a test-hooks build sends this to the parity rig's fake host, or refuses it
+        let url = crate::test_origins::rewrite(url).map_err(FetchError::Transport)?;
         let mut resp = agent
-            .get(url)
+            .get(&url)
             .header(
                 "Accept",
                 "application/octet-stream, application/json, application/atom+xml, */*",

@@ -1,0 +1,48 @@
+{
+  "about": "The per-user settings file (src/settings.mjs save): where the data folder and the other folders live, the theme, and keys a newer build adds (bot.node, PLAN-CORE-PORT.md 5.4). Read by 1.x after a rollback, so keys this build does not know must survive. test/contracts-files.test.mjs saves into a scratch config folder and compares the text.",
+  "file": {
+    "path": "<config>/spawnloft/settings.json, where <config> is %APPDATA% on Windows, else $XDG_CONFIG_HOME or ~/.config. A machine with only <config>/mcctl/settings.json (an install from before the rename) keeps reading and writing that one; when both exist spawnloft/ wins. 1.5.0 reads only mcctl/settings.json (see C0-CHECKS.md).",
+    "legacy": "<config>/mcctl/settings.json"
+  },
+  "rules": {
+    "merge": "save(patch) reads the file, writes { ...existing, ...patch }: unknown keys and their values (nested objects too) are kept where they were, a patched key keeps its place, a new key goes last, null is written as null. It returns the merged object.",
+    "text": "JSON.stringify(merged, null, 2) and one \\n.",
+    "write": "to settings.json.<pid>.tmp, opened with mode 0600 and fchmod-ed, fsync-ed, then renamed over the file; a symlinked file is written where the link points. On Windows the temp file gets an owner-only ACL before the rename.",
+    "damaged": "a file that is not a JSON object is refused (UserError) and left untouched, unless the caller passes replaceUnreadable (first-run wizard, config set-root), which copies it to settings.json.unreadable-<ISO time with : and . as -> first.",
+    "bom": "a leading UTF-8 byte-order mark is ignored on read."
+  },
+  "placeholders": {
+    "<config>": "the per-user config folder"
+  },
+  "saves": {
+    "fresh": {
+      "file": "<config>/spawnloft/settings.json",
+      "text": "{\n  \"dataRoot\": \"/srv/minecraft\"\n}\n",
+      "mode": "0600"
+    },
+    "merge": {
+      "returned": {
+        "theme": "dark",
+        "bot.node": "/usr/bin/node",
+        "future": {
+          "nested": [
+            1,
+            2
+          ]
+        },
+        "dataRoot": "/srv/minecraft",
+        "backupsDir": null
+      },
+      "text": "{\n  \"theme\": \"dark\",\n  \"bot.node\": \"/usr/bin/node\",\n  \"future\": {\n    \"nested\": [\n      1,\n      2\n    ]\n  },\n  \"dataRoot\": \"/srv/minecraft\",\n  \"backupsDir\": null\n}\n"
+    },
+    "legacy": {
+      "file": "<config>/mcctl/settings.json",
+      "text": "{\n  \"dataRoot\": \"/old\",\n  \"theme\": \"spawnloft\"\n}\n",
+      "currentMade": false
+    },
+    "damaged": {
+      "refused": true,
+      "kept": "{ not json"
+    }
+  }
+}

@@ -3650,6 +3650,9 @@ dependencies = [
 [[package]]
 name = "spawnloft-fakes"
 version = "2.0.0-internal.0"
+dependencies = [
+ "spawnloft-lib",
+]
 
 [[package]]
 name = "spawnloft-lib"

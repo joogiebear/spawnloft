@@ -1,0 +1,82 @@
+{
+  "about": "<data root>/data-format.json, { \"writtenBy\": \"<release>\", \"format\": <integer> }: the newest release that wrote the data folder. Node never writes it (src/data-format.mjs only reads it); 2.0 does, and 1.x reads it to warn that a newer SpawnLoft used the folder. A warning, never a refusal. test/contracts-files.test.mjs runs every case through readDataFormat and dataFormatWarning.",
+  "shape": {
+    "object": {
+      "writtenBy?": "string",
+      "format?": "integer"
+    },
+    "extra": true
+  },
+  "rules": {
+    "read": "a BOM is ignored; anything that is not a JSON object reads as no marker; unknown fields are kept and ignored.",
+    "warn": "only when writtenBy names a newer major release than the reader, or format is an integer above the reader's DATA_FORMAT (1). DATA_FORMAT does not change during the port.",
+    "writer": "for the Rust side: write it as Node writes every other small JSON file, JSON.stringify(value, null, 2) and a newline, writtenBy first."
+  },
+  "dataFormat": 1,
+  "cases": [
+    {
+      "text": "{\"writtenBy\":\"2.0.0\",\"format\":1}",
+      "version": "1.5.0",
+      "marker": {
+        "writtenBy": "2.0.0",
+        "format": 1
+      },
+      "warns": true
+    },
+    {
+      "text": "{\"writtenBy\":\"2.0.0\",\"format\":1}",
+      "version": "2.1.0",
+      "marker": {
+        "writtenBy": "2.0.0",
+        "format": 1
+      },
+      "warns": false
+    },
+    {
+      "text": "﻿{\"writtenBy\":\"3.0.0\"}",
+      "version": "2.0.0",
+      "marker": {
+        "writtenBy": "3.0.0"
+      },
+      "warns": true
+    },
+    {
+      "text": "{\"format\":2}",
+      "version": "2.0.0",
+      "marker": {
+        "format": 2
+      },
+      "warns": true
+    },
+    {
+      "text": "{\"format\":\"2\"}",
+      "version": "1.5.0",
+      "marker": {
+        "format": "2"
+      },
+      "warns": false
+    },
+    {
+      "text": "{\"writtenBy\":\"2.0.0\",\"format\":1,\"writtenAt\":\"2026-11-21\"}",
+      "version": "1.6.0",
+      "marker": {
+        "writtenBy": "2.0.0",
+        "format": 1,
+        "writtenAt": "2026-11-21"
+      },
+      "warns": true
+    },
+    {
+      "text": "[1]",
+      "version": "1.5.0",
+      "marker": null,
+      "warns": false
+    },
+    {
+      "text": "not json",
+      "version": "1.5.0",
+      "marker": null,
+      "warns": false
+    }
+  ]
+}

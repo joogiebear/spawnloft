@@ -21,6 +21,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 export const KEYS_RS = path.join(HERE, '..', 'rust', 'crates', 'spawnloft-lib', 'src', 'update', 'keys.rs')
 export const FEED_RELEASE = 'spawnloft-feed:release'
 export const FEED_INTERNAL = 'spawnloft-feed:internal'
+// spawnloft-lib build.rs TEST_HOOKS_MARKER: only in a build with the test-hooks feature (the parity
+// rig's: it honours SPAWNLOFT_TEST_ORIGINS), which no package may ship
+export const TEST_HOOKS = 'spawnloft-test-hooks:on'
 
 // The key id minisign prints for a key line (bytes 2..10, little endian), or null if the line is
 // not an Ed25519 minisign public key.
@@ -66,6 +69,7 @@ export function binaryProblems(bytes, kind, release = releaseKeys(), { shellKeys
   for (const id of keys.keys()) if (!ids.has(id)) problems.push(`trusts key ${id}, which is not a release key (built with SPAWNLOFT_UPDATE_PUBKEYS, a test key list)`)
   if (kind === 'core') {
     const text = bytes.toString('latin1')
+    if (text.includes(TEST_HOOKS)) problems.push('was built with the test-hooks feature (the parity rig\'s fake download hosts)')
     if (text.includes(FEED_INTERNAL)) problems.push('was built with the internal-feed feature (loopback test feeds)')
     else if (!text.includes(FEED_RELEASE)) problems.push(`carries no ${FEED_RELEASE} marker, so its feed code cannot be told (a build from before the marker?)`)
   }

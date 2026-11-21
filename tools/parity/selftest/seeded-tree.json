@@ -1,0 +1,51 @@
+{
+  "about": "Self-test: identical output, but the Rust side leaves one more file and a changed one in the data tree. The rig must report both.",
+  "expect": "differ",
+  "expectDifferences": [
+    "data tree: data/instances.json",
+    "data tree: data/instances/alpha/stray.txt"
+  ],
+  "steps": [
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "server.jar",
+            "java": "java",
+            "memory": "2G",
+            "port": 25565,
+            "rcon": {
+              "port": 25575,
+              "password": "pw"
+            }
+          }
+        }
+      }
+    },
+    {
+      "run": [
+        "list"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "side": "rust",
+      "write": "data/instances/alpha/stray.txt",
+      "text": "left behind\n"
+    },
+    {
+      "side": "rust",
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {}
+      },
+      "indent": 4
+    }
+  ]
+}

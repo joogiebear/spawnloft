@@ -1,8 +1,8 @@
 name: rust-internal
 
 # The checks of the v2 branch (the 2.0 line): the Rust workspace, cargo deny, the daemon suites
-# under both daemons, the Node suite, the Tauri window driven over WebDriver (Linux) and the panel
-# in a real browser on all three platforms. It runs on pull requests into v2 and on pushes to v2.
+# under both daemons, the core port's parity rig, the Node suite, the Tauri window driven over
+# WebDriver (Linux) and the panel in a real browser on all three platforms. It runs on pull requests into v2 and on pushes to v2.
 # It packages nothing and publishes nothing; the 2.0 packages are built by installer.yml,
 # installer-mac.yml and installer-linux.yml.
 #
@@ -203,6 +203,74 @@ jobs:
             echo "::endgroup::"
             echo "run $i of $REPEAT green"
           done
+
+  parity:
+    # The core port's parity rig (tools/parity/, rust/PLAN-CORE-PORT.md section 6): every scenario
+    # run twice, on the Node core (SPAWNLOFT_CORE_IMPL=node) and as the ownership table in cli.rs
+    # decides, outputs, exit codes, fake-host requests and data trees compared; the self-tests must
+    # find the differences they seed; the golden --json and MCP files must still match. Plus the
+    # lock contract across a Node and a Rust process. On every pull request, on the three
+    # platforms and on Linux arm64.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest, macos-15]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # the Node SpawnLoft ships (desktop/node-pin.mjs NODE_VERSION, plan D7)
+          node-version-file: .node-version
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      # a pull request restores v2's cache but saves none (see the rust job)
+      - uses: actions/cache@v4
+        if: github.event_name != 'pull_request'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - uses: actions/cache/restore@v4
+        if: github.event_name == 'pull_request'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core with the test hooks, and the lock probe
+        working-directory: rust
+        run: |
+          cargo build --locked -p spawnloft-core --features test-hooks
+          cargo build --locked -p spawnloft-fakes --bin lock-probe
+          exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
+          echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
+          echo "SPAWNLOFT_LOCK_PROBE=$GITHUB_WORKSPACE/rust/target/debug/lock-probe$exe" >> "$GITHUB_ENV"
+      - name: The library's tests with the test hooks on
+        working-directory: rust
+        run: cargo test --locked -p spawnloft-lib --features test-hooks
+      - name: The parity rig
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: node tools/parity/run.mjs --core "$SPAWNLOFT_CORE_BIN" --out parity-report
+      - name: The rig's own tests and the cross-process lock tests
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: parity-report-${{ github.run_number }}-${{ runner.os }}-${{ runner.arch }}
+          retention-days: 14
+          path: parity-report/
 
   node:
     # The whole Node suite, once per platform, on the default daemon.

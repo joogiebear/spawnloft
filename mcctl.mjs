@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // spawnloft: the SpawnLoft command line.
+// first, so a test's fake download hosts are in place before any module runs (NODE_ENV=test only)
+import './src/test-origins.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'

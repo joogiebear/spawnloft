@@ -1,0 +1,44 @@
+{
+  "about": "C1's read-only commands over a registry with two stopped servers: list, status, logs, why, metrics, props, plugins and backups, in text and --json, with the failure paths (unknown server, missing argument, bad flag).",
+  "steps": [
+    { "write": "data/instances.json", "json": {
+      "version": 1,
+      "instances": {
+        "alpha": { "dir": "{data}/instances/alpha", "jar": "paper-1.21.4-15.jar", "java": "java", "memory": "2G", "loader": "paper", "mcVersion": "1.21.4", "port": 25565, "rcon": { "port": 25575, "password": "rcon-secret-alpha" }, "createdAt": "2026-11-01T10:00:00.000Z" },
+        "Beta_2": { "dir": "{data}/instances/Beta_2", "jar": "fabric-server-launch.jar", "java": "java", "memory": "4G", "loader": "fabric", "mcVersion": "1.20.6", "port": 25566, "rcon": { "port": 25576, "password": "rcon-secret-beta" }, "createdAt": "2026-11-02T10:00:00.000Z" }
+      }
+    } },
+    { "write": "data/instances/alpha/server.properties", "text": "#Minecraft server properties\nserver-port=25565\nmotd=Alpha \\u00a7aworld\nmax-players=20\nenable-rcon=true\nrcon.port=25575\nrcon.password=rcon-secret-alpha\nonline-mode=true\n" },
+    { "write": "data/instances/alpha/eula.txt", "text": "eula=true\n" },
+    { "write": "data/instances/alpha/plugins/Essentials.jar", "base64": "UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA==" },
+    { "mkdir": "data/instances/Beta_2/mods" },
+    { "write": "data/run/alpha/console.log", "text": "[10:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[10:00:01] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n[10:00:01] [Server thread/WARN]: The exception was: java.net.BindException: Address already in use\n[10:00:02] [Server thread/INFO]: Stopping server\n" },
+    { "run": ["list"], "expect": { "code": 0, "stdoutIncludes": "alpha" } },
+    { "run": ["list", "--json"], "expect": { "code": 0 } },
+    { "run": ["status"] },
+    { "run": ["status", "alpha"] },
+    { "run": ["status", "alpha", "--json"], "expect": { "code": 0 } },
+    { "run": ["status", "Beta_2", "--json"] },
+    { "run": ["status", "alpha", "Beta_2", "--json"] },
+    { "run": ["logs", "alpha"], "expect": { "code": 0, "stdoutIncludes": "FAILED TO BIND" } },
+    { "run": ["logs", "alpha", "-n", "2"] },
+    { "run": ["logs", "alpha", "--grep", "WARN"] },
+    { "run": ["logs", "Beta_2"] },
+    { "run": ["why", "alpha"] },
+    { "run": ["why", "alpha", "--json"], "expect": { "code": 0 } },
+    { "run": ["diagnostics", "Beta_2", "--json"] },
+    { "run": ["metrics", "alpha"] },
+    { "run": ["metrics", "alpha", "--json"] },
+    { "run": ["metrics", "alpha", "--csv"] },
+    { "run": ["props", "alpha"] },
+    { "run": ["props", "alpha", "motd"] },
+    { "run": ["plugins", "alpha", "--json"] },
+    { "run": ["plugins", "Beta_2", "--json"] },
+    { "run": ["snapshots", "alpha", "--json"] },
+    { "run": ["backups", "alpha"] },
+    { "run": ["status", "gamma", "--json"], "expect": { "code": 1 } },
+    { "run": ["logs"], "expect": { "code": 1 } },
+    { "run": ["why", "--json"] },
+    { "run": ["list", "extra", "--json"] }
+  ]
+}

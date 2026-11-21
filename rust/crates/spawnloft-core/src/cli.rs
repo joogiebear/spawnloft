@@ -1,10 +1,10 @@
-//! Argument handling. Hand-written while there are few commands; `clap` replaces it when the
-//! command table grows (R6).
+//! Argument handling, by hand: the port parses flags the way `src/args.mjs` does, because flag
+//! handling is part of the CLI's contract (rust/PLAN-CORE-PORT.md rule 8).
 //!
 //! `spawnloft-core` is the one entry point of an install (PLAN-2.0-REMAINING.md section 4): the
 //! commands below are its own, and every other command line is the SpawnLoft CLI, forwarded to
 //! the Node core on the bundled Node ([`forwards`], `spawnloft_lib::runtime::forward`) until the
-//! core port (2.1) answers it here instead. The `spawnloft` and `mcctl` launchers, task shims,
+//! core port moves it here ([`PORTED`]). The `spawnloft` and `mcctl` launchers, task shims,
 //! server launchers and MCP configs all run this binary.
 
 use spawnloft_lib::build;
@@ -45,29 +45,108 @@ pub fn not_utf8() -> Outcome {
     usage_error("an argument is not valid UTF-8")
 }
 
-/// Whether this command line belongs to the SpawnLoft CLI (forwarded to the Node core) rather
-/// than to this binary. Overlapping names go to the Node core unless the form is the one only
-/// the installer and the window use: `ui` with a window flag, `repair --quiet`, `uninstall --yes`
-/// (whose fallback removes the scheduled tasks when the Node core cannot run, so it must never be
-/// reached by a person asking what `uninstall` does).
+/// When a row of the ownership table applies to a command line.
+#[derive(Debug, Clone, Copy)]
+pub enum When {
+    /// Whatever follows the command.
+    Always,
+    /// Only with one of these flags: the forms only the installer and the window use.
+    AnyFlag(&'static [&'static str]),
+}
+
+/// One row of the ownership table: a command, its aliases, and when this binary answers it.
+#[derive(Debug, Clone, Copy)]
+pub struct Row {
+    pub names: &'static [&'static str],
+    pub when: When,
+}
+
+/// This binary's own commands, which the Node core has no twin for (or, for `ui`, `repair` and
+/// `uninstall`, only the installer's and the window's forms, which keep their own exit codes).
+/// They are answered here whatever `SPAWNLOFT_CORE_IMPL` says. `uninstall --yes` is here because
+/// its fallback removes the scheduled tasks when the Node core cannot run, so it must never be
+/// reached by a person asking what `uninstall` does.
+pub const CORE_OWN: &[Row] = &[
+    Row {
+        names: &["--version", "-V", "version"],
+        when: When::Always,
+    },
+    Row {
+        names: &["--core-help"],
+        when: When::Always,
+    },
+    Row {
+        names: &["daemon"],
+        when: When::Always,
+    },
+    Row {
+        names: &["probe-process"],
+        when: When::Always,
+    },
+    Row {
+        names: &["handover"],
+        when: When::Always,
+    },
+    Row {
+        names: &["update"],
+        when: When::Always,
+    },
+    Row {
+        names: &["user-path"],
+        when: When::Always,
+    },
+    Row {
+        names: &["ui"],
+        when: When::AnyFlag(&["--exit-with-stdin", "--core-dir", "--upstream", "--node"]),
+    },
+    Row {
+        names: &["repair"],
+        when: When::AnyFlag(&["--quiet"]),
+    },
+    Row {
+        names: &["uninstall"],
+        when: When::AnyFlag(&["--yes"]),
+    },
+];
+
+/// SpawnLoft CLI commands the core port has moved from the Node core to this binary
+/// (rust/PLAN-CORE-PORT.md section 4). A phase adds its commands here only once their parity
+/// scenarios (tools/parity/) are green on every platform. Empty until C1.
+pub const PORTED: &[Row] = &[];
+
+/// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
+/// ported command to the Node core again, so the parity rig can run one scenario on both sides.
+/// Never written into a shim; removed when the Node core leaves (C10).
+pub const IMPL_ENV: &str = "SPAWNLOFT_CORE_IMPL";
+
+fn row_matches(row: &Row, command: &str, rest: &[std::ffi::OsString]) -> bool {
+    row.names.contains(&command)
+        && match row.when {
+            When::Always => true,
+            When::AnyFlag(flags) => flags.iter().any(|f| rest.iter().any(|a| a == f)),
+        }
+}
+
+/// Whether this command line belongs to the SpawnLoft CLI on the Node core rather than to this
+/// binary, by the ownership table and the process's `SPAWNLOFT_CORE_IMPL`.
 pub fn forwards(args: &[std::ffi::OsString]) -> bool {
+    let force_node = std::env::var_os(IMPL_ENV).is_some_and(|v| v == "node");
+    forwards_with(args, force_node, PORTED)
+}
+
+/// [`forwards`] with the switch and the ported table given, for tests.
+pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Row]) -> bool {
     let Some((command, rest)) = args.split_first() else {
         // no arguments: the CLI's own usage
         return true;
     };
-    let has = |flag: &str| rest.iter().any(|a| a == flag);
-    match command.to_str() {
-        Some(
-            "--version" | "-V" | "version" | "--core-help" | "daemon" | "probe-process" | "handover"
-            | "update" | "user-path",
-        ) => false,
-        Some("ui") => !["--exit-with-stdin", "--core-dir", "--upstream", "--node"]
-            .iter()
-            .any(|f| has(f)),
-        Some("repair") => !has("--quiet"),
-        Some("uninstall") => !has("--yes"),
-        _ => true,
+    let Some(command) = command.to_str() else {
+        return true;
+    };
+    if CORE_OWN.iter().any(|r| row_matches(r, command, rest)) {
+        return false;
     }
+    force_node || !ported.iter().any(|r| row_matches(r, command, rest))
 }
 
 pub fn help() -> String {
@@ -375,6 +454,42 @@ mod tests {
     }
 
     #[test]
+    fn the_impl_switch_forwards_ported_commands_only() {
+        let ported = [Row {
+            names: &["list", "ls"],
+            when: When::Always,
+        }];
+        // ported: answered here, unless the switch asks for the Node core
+        assert!(!forwards_with(&os(&["list", "--json"]), false, &ported));
+        assert!(!forwards_with(&os(&["ls"]), false, &ported));
+        assert!(forwards_with(&os(&["list", "--json"]), true, &ported));
+        // not ported: the Node core either way
+        assert!(forwards_with(&os(&["start", "s"]), false, &ported));
+        assert!(forwards_with(&os(&["start", "s"]), true, &ported));
+        // the core's own commands never move, switch or not
+        for line in [
+            &["--version"][..],
+            &["daemon", "s"],
+            &["repair", "--quiet"],
+            &["update", "check"],
+        ] {
+            assert!(!forwards_with(&os(line), true, &ported), "{line:?}");
+        }
+    }
+
+    #[test]
+    fn no_command_is_both_the_cores_own_and_ported() {
+        for row in PORTED {
+            for name in row.names {
+                assert!(
+                    !CORE_OWN.iter().any(|own| own.names.contains(name)),
+                    "{name} is in both tables"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn what_is_forwarded_to_the_node_core() {
         for line in [
             &[][..],
@@ -393,7 +508,10 @@ mod tests {
             &["uninstall", "--data"],
             &["frobnicate"],
         ] {
-            assert!(forwards(&os(line)), "{line:?} should be forwarded");
+            assert!(
+                forwards_with(&os(line), false, PORTED),
+                "{line:?} should be forwarded"
+            );
         }
         for line in [
             &["--version"][..],
@@ -410,7 +528,10 @@ mod tests {
             &["repair", "--quiet"],
             &["user-path", "add"],
         ] {
-            assert!(!forwards(&os(line)), "{line:?} is this binary's own");
+            assert!(
+                !forwards_with(&os(line), false, PORTED),
+                "{line:?} is this binary's own"
+            );
         }
     }
 }

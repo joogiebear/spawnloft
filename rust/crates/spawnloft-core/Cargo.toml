@@ -12,6 +12,10 @@ publish.workspace = true
 name = "spawnloft-core"
 path = "src/main.rs"
 
+[features]
+# test and CI builds only (spawnloft-lib's test-hooks); never in a release package
+test-hooks = ["spawnloft-lib/test-hooks"]
+
 [dependencies]
 spawnloft-lib.workspace = true
 semver = "1.0.28"

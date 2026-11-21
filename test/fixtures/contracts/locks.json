@@ -1,0 +1,93 @@
+{
+  "$comment": "The cross-process lock of src/util.mjs (acquireLock, acquireLockAsync, withLock, lockHolder) and every other exclusive-create file or pid marker in src/*.mjs and mcctl.mjs. A Rust writer (rust/crates/spawnloft-lib/src/lock.rs) and a Node writer must exclude each other on these files. test/contracts-locks.test.mjs holds the constants and the record against util.mjs and fails on a call site not listed here; test/lock-cross-process.test.mjs runs Node against the Rust lock. Prose: EXCLUSION.md.",
+  "implementation": { "node": "src/util.mjs", "rust": "rust/crates/spawnloft-lib/src/lock.rs" },
+  "record": {
+    "written": "JSON.stringify({ pid, token }): the keys in that order, no whitespace, no trailing newline",
+    "example": "{\"pid\":4242,\"token\":\"0f8fad5b-d9cb-469f-a165-70867728950e\"}",
+    "match": "^\\{\"pid\":[1-9][0-9]*,\"token\":\"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\"\\}$",
+    "token": "crypto.randomUUID(): a lowercase RFC 4122 version 4 UUID, new for every try",
+    "flag": "wx",
+    "readAs": "utf8, then String.prototype.trim (which strips a BOM)",
+    "legacy": "text matching ^\\d+$ after the trim is a bare pid (1.x), with no token",
+    "valid": "JSON whose pid is an integer above 0; anything else, or an empty file, is unwritten"
+  },
+  "rules": {
+    "samePidIsAlive": true,
+    "liveness": "the pid only, never the program: process.kill(pid, 0), EPERM counts as alive, a pid that is not a 32-bit integer is dead",
+    "release": "token-checked: the file is removed only while it parses to a record whose token equals the holder's (a legacy record never matches)",
+    "breaker": {
+      "suffix": ".break",
+      "flag": "wx",
+      "content": "the breaker's pid as decimal text, no newline",
+      "staleMs": 10000,
+      "rule": "only the process that created the breaker may remove a stale lock, and only if the lock still reads byte for byte as when it was judged dead; a breaker older than staleMs is removed by whoever meets it, who then reports the lock as held for this try"
+    },
+    "writeGraceMs": 2000,
+    "pollMs": 20,
+    "defaultMode": "wait",
+    "defaultTimeoutMs": 10000,
+    "busyCodes": ["EPERM", "EACCES", "EBUSY"],
+    "busyPauseMs": 5,
+    "unreadablePauseMs": 2,
+    "maxAttempts": 60,
+    "breakAttempts": 5,
+    "rmRetry": { "maxRetries": 10, "retryDelay": 10 },
+    "createsParentDir": true,
+    "messages": {
+      "timedOut": "timed out waiting for lock ${file} (held by pid ${holder})",
+      "notGot": "could not get a lock on ${file}"
+    }
+  },
+  "lockHolder": {
+    "absent": null,
+    "unwrittenYoungerThanGrace": -1,
+    "unwrittenOlderThanGrace": null,
+    "deadHolder": null,
+    "liveHolder": "pid",
+    "ownPid": "pid"
+  },
+  "sites": [
+    { "id": "registry-put", "file": "src/registry.mjs", "lines": ["withLock(REGISTRY_LOCK, () => {"], "call": "withLock", "lock": "<registry>.lock (instances.json.lock beside instances.json)", "mode": "wait", "timeoutMs": 10000, "protects": "putInstance: read-modify-write of instances.json" },
+    { "id": "registry-update", "file": "src/registry.mjs", "lines": ["return withLock(REGISTRY_LOCK, () => {"], "call": "withLock", "lock": "<registry>.lock", "mode": "wait", "timeoutMs": 10000, "protects": "updateInstance: read-modify-write of instances.json" },
+    { "id": "registry-remove", "file": "src/registry.mjs", "lines": ["withLock(REGISTRY_LOCK, () => {"], "call": "withLock", "lock": "<registry>.lock", "mode": "wait", "timeoutMs": 10000, "protects": "removeInstance: read-modify-write of instances.json" },
+    { "id": "registry-held", "file": "src/data-move.mjs", "lines": ["if (lockHolder(`${REGISTRY_FILE}.lock`)) held.push('the server registry (being changed)')"], "call": "lockHolder", "lock": "<registry>.lock", "protects": "data move refuses while the registry is being changed (-1 counts as held)" },
+    { "id": "players-list", "file": "src/players.mjs", "lines": ["return withLock(path.join(dir, `${file}.lock`), () => {"], "call": "withLock", "lock": "<server dir>/{ops,banned-players,whitelist}.json.lock", "mode": "wait", "timeoutMs": 10000, "protects": "read-modify-write of ops.json, banned-players.json, whitelist.json of a stopped server" },
+    { "id": "schedules", "file": "src/schedule.mjs", "lines": ["try { release = acquireLock(TASKS_LOCK(), { mode: 'wait', timeoutMs: 10000 }) }"], "call": "acquireLock", "lock": "<dataRoot>/schedules.lock", "mode": "wait", "timeoutMs": 10000, "protects": "read-modify-write of schedules.json; a timeout becomes 'another change to the scheduled tasks is still in progress'; re-entrant within one call chain by a depth counter" },
+    { "id": "server-start", "file": "src/supervisor.mjs", "lines": ["const release = acquireLock(path.join(runDir(name), 'start.lock'), { mode: 'fail' })"], "call": "acquireLock", "lock": "<run>/<name>/start.lock", "mode": "fail", "protects": "two starts of one server both reading 'not running' and spawning two daemons; held until the daemon publishes state.json" },
+    { "id": "server-start-held", "file": "src/data-move.mjs", "lines": ["if (lockHolder(path.join(runDir(i.name), 'start.lock'))) held.push(`${i.name} (being started)`)"], "call": "lockHolder", "lock": "<run>/<name>/start.lock", "protects": "data move refuses while a server is being started" },
+    { "id": "snapshot", "file": "src/backup.mjs", "lines": ["const release = await acquireLockAsync(path.join(dir, '.snapshot.lock'), { timeoutMs: 30 * 60 * 1000 })"], "call": "acquireLockAsync", "lock": "<backups>/<name>/.snapshot.lock", "mode": "wait", "timeoutMs": 1800000, "protects": "one snapshot per server at a time (save-off / save-on pairing), queued not refused" },
+    { "id": "snapshot-held", "file": "src/data-move.mjs", "lines": ["if (lockHolder(path.join(BACKUPS_DIR, i.name, '.snapshot.lock'))) held.push(`${i.name} (being backed up)`)"], "call": "lockHolder", "lock": "<backups>/<name>/.snapshot.lock", "protects": "data move refuses while a backup runs" },
+    { "id": "client-launch", "file": "src/client.mjs", "lines": ["const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })"], "call": "acquireLock", "lock": "<dataRoot>/client/run/<profile>/launch.lock", "mode": "fail", "protects": "launch: two Play clicks or panel plus CLI starting two games; held until state.json names the game" },
+    { "id": "client-remove", "file": "src/client.mjs", "lines": ["const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })"], "call": "acquireLock", "lock": "<dataRoot>/client/run/<profile>/launch.lock", "mode": "fail", "protects": "removeProfile: a launch recreating the run folder after a purge" },
+    { "id": "client-rename", "file": "src/client.mjs", "lines": ["const release = acquireLock(clientLaunchLock(name), { mode: 'fail' })"], "call": "acquireLock", "lock": "<dataRoot>/client/run/<profile>/launch.lock", "mode": "fail", "protects": "renameProfile while a launch is under way" },
+    { "id": "client-launch-held-edit", "file": "src/client.mjs", "lines": ["if (changing.length && !launching && lockHolder(clientLaunchLock(name)) !== null) {"], "call": "lockHolder", "lock": "<dataRoot>/client/run/<profile>/launch.lock", "protects": "updateProfile refuses to change running keys during a launch (-1 counts as held)" },
+    { "id": "client-launch-held-text", "file": "src/client.mjs", "lines": ["const holder = lockHolder(clientLaunchLock(name))"], "call": "lockHolder", "lock": "<dataRoot>/client/run/<profile>/launch.lock", "protects": "the pid in the 'is being launched (pid N)' message; null and -1 print '?'" },
+    { "id": "client-runtime-index", "file": "src/client-java.mjs", "lines": ["const release = acquireLock(path.join(RUNTIME_DIR, 'index.lock'))"], "call": "acquireLock", "lock": "<dataRoot>/client/runtime/index.lock", "mode": "wait", "timeoutMs": 10000, "protects": "read-modify-write of client/runtime/index.json shared by every Java runtime" },
+    { "id": "client-runtime", "file": "src/client-java.mjs", "lines": ["const release = await acquireLockAsync(path.join(RUNTIME_DIR, component, `${platform}.lock`), { timeoutMs: 15 * 60000 })"], "call": "acquireLockAsync", "lock": "<dataRoot>/client/runtime/<component>/<platform>.lock", "mode": "wait", "timeoutMs": 900000, "protects": "laying out one Mojang Java runtime (two profiles launched together)" },
+    { "id": "client-natives", "file": "src/client-install.mjs", "lines": ["const release = await acquireLockAsync(`${nativesDir(id)}.lock`, { timeoutMs: 60000 })"], "call": "acquireLockAsync", "lock": "<dataRoot>/client/natives/<version id>.lock", "mode": "wait", "timeoutMs": 60000, "protects": "extracting one version's natives folder" },
+    { "id": "client-loader-steps", "file": "src/client-forge-install.mjs", "lines": ["return await acquireLockAsync(file, { timeoutMs: 500 })"], "call": "acquireLockAsync", "lock": "<dataRoot>/client/cache/loader-steps/<mc>.lock", "mode": "wait", "timeoutMs": 500, "protects": "Forge/NeoForge loader builds for one Minecraft version; retried in 500 ms turns up to 30 minutes so a cancel ends the wait" },
+    { "id": "impl-with-lock", "file": "src/util.mjs", "lines": ["const release = acquireLock(lockFile, opts)"], "call": "acquireLock", "lock": "any", "protects": "withLock itself" },
+    { "id": "impl-lock-create", "file": "src/util.mjs", "lines": ["const body = JSON.stringify({ pid: process.pid, token })", "fs.writeFileSync(lockFile, body, { flag: 'wx' })", "if (err.code !== 'EEXIST') throw err"], "call": "wx", "lock": "any", "protects": "tryLock's exclusive create of the record" },
+    { "id": "impl-breaker", "file": "src/util.mjs", "lines": ["fs.writeFileSync(breaker, String(process.pid), { flag: 'wx' })", "if (err.code !== 'EEXIST' && !LOCK_BUSY.has(err.code)) throw err", "if (err.code === 'EEXIST' && fileAgeMs(breaker) > LOCK_BREAK_STALE_MS) fs.rmSync(breaker, RM_RETRY)"], "call": "wx", "lock": "<lock>.break", "protects": "breakStaleLock: clearing a stale lock is itself exclusive" }
+  ],
+  "exclusive": [
+    { "id": "garnet-install-lock", "file": "src/garnet.mjs", "lines": ["try { fd = fs.openSync(lock, 'wx', 0o600) }", "if (err.code === 'EEXIST') fail(`Redis installation is already in progress. If it was interrupted, close SpawnLoft and remove ${lock}, then retry.`)"], "path": "<engines>/garnet-<version>.install-lock", "kind": "install-lock", "record": "empty, mode 0600, held open until the install ends, then unlinked", "stale": "none: a crash leaves it until the user removes it (the message says so)", "readBy": "nobody reads it; its existence refuses a second install" },
+    { "id": "mysql-install-lock", "file": "src/mysql.mjs", "lines": ["try { fd = fs.openSync(lock, 'wx', 0o600) }", "if (err.code === 'EEXIST') fail(`MySQL installation is already in progress. If a previous installation was interrupted, close SpawnLoft and remove ${lock}, then retry.`)"], "path": "<engines>/mysql-<version>-<platform>-<arch>.install-lock", "kind": "install-lock", "record": "empty, mode 0600, held open until the install ends, then unlinked", "stale": "none", "readBy": "nobody reads it" },
+    { "id": "snapshot-pending", "file": "src/backup.mjs", "lines": ["try { fd = fs.openSync(pending, 'wx') }", "if (error.code === 'EEXIST') continue"], "path": "<backups>/<name>/<label>_<stamp>[_N].tar.gz.pending", "kind": "reservation", "record": "created empty, then tar's output; renamed to .tar.gz when verified, removed on failure", "stale": "none in the lock sense: an existing .pending (or .tar.gz or .json) moves the reservation to the next _N; uninstall removes stamped leftovers", "readBy": "reserveSnapshot (existence); uninstall.mjs (cleanup pattern)" },
+    { "id": "dump-pending", "file": "src/services.mjs", "lines": ["const out = fs.createWriteStream(pending, { flags: 'wx' })"], "path": "<backups>/<database>/<label>_<stamp>[_N].sql.pending (parts: .sql.pending.<i>)", "kind": "reservation", "record": "the joined SQL dump, renamed to .sql when complete, removed in finally", "stale": "none: the base name is chosen first by existsSync on .sql; an existing .pending fails the dump", "readBy": "nobody but its writer; uninstall removes stamped leftovers" },
+    { "id": "database-dir-claim", "file": "src/services.mjs", "lines": ["if (err.code === 'EEXIST') fail(`A database folder already exists at ${dir}. Move it aside or finish the existing setup before retrying.`)"], "path": "<services>/<database>/ (mkdirSync without recursive, mode 0700)", "kind": "dir-claim", "record": "a directory", "stale": "none", "readBy": "createDatabase (existence)" },
+    { "id": "mysql-bootstrap", "file": "src/mysql.mjs", "lines": ["].join('\\n'), { flag: 'wx', mode: 0o600 })"], "path": "<services>/<database>/bootstrap.sql", "kind": "no-overwrite", "record": "SQL text, mode 0600, removed after init", "stale": "none", "readBy": "mysqld --init-file" },
+    { "id": "garnet-download", "file": "src/garnet.mjs", "lines": ["await pipeline(source, fs.createWriteStream(file, { flags: 'wx', mode: 0o600 }))", "await pipeline(input, fs.createWriteStream(file, { flags: 'wx', mode: 0o600 }))"], "path": "<engines>/.garnet-download-XXXXXX/{download,runtime-archive}", "kind": "no-overwrite", "record": "a download inside a fresh mkdtemp folder", "stale": "the folder is removed in finally", "readBy": "its writer" },
+    { "id": "mysql-download", "file": "src/mysql.mjs", "lines": ["await pipeline(input, fs.createWriteStream(file, { flags: 'wx', mode: 0o600 }))"], "path": "<engines>/.mysql-download-XXXXXX/<archive>", "kind": "no-overwrite", "record": "a download inside a fresh mkdtemp folder", "stale": "the folder is removed in finally", "readBy": "its writer" },
+    { "id": "panel-key", "file": "src/panel-auth.mjs", "lines": ["if (err.code === 'EEXIST') return", "if (second.code === 'EEXIST') return", "const fd = fs.openSync(file, 'wx', 0o600)"], "path": "<config>/spawnloft/panel.key (and panel.key.<pid>.<hex>.tmp)", "kind": "private-create", "record": "base64url of 32 random bytes and a newline; made private before the key is written; published by hard link, or exclusive create where links fail", "stale": "none: first creator wins, everyone reads the winner (a reader waits up to 2 s for an empty file to fill)", "readBy": "loadKey (Node panel), rust panel_auth" },
+    { "id": "panel-open-page", "file": "src/panel-open.mjs", "lines": ["const fd = fs.openSync(file, 'wx', 0o600)"], "path": "<config>/spawnloft/open/<sha256(open.v1.nonce)[0:32]>.html", "kind": "private-create", "record": "an HTML redirect page holding a one-time login link", "stale": "swept after MAX_AGE_MS by mtime", "readBy": "the browser" },
+    { "id": "metrics-export", "file": "src/cli-metrics.mjs", "lines": ["fs.writeFileSync(flags.output, metricsCsv(first), { flag: 'wx' })"], "path": "the user's --output file", "kind": "no-overwrite", "record": "CSV", "stale": "n/a", "readBy": "the user" },
+    { "id": "settings-aside", "file": "src/settings.mjs", "lines": ["fs.copyFileSync(file, aside, fs.constants.COPYFILE_EXCL)"], "path": "<config>/spawnloft/settings.json.unreadable-<iso stamp>", "kind": "no-overwrite", "record": "a copy of a damaged settings.json", "stale": "n/a", "readBy": "the user" },
+    { "id": "tree-copy", "file": "src/tree.mjs", "lines": ["return await fs.promises.copyFile(from, to, fs.constants.COPYFILE_EXCL)"], "path": "any destination of a tree copy (data move, server copy)", "kind": "no-overwrite", "record": "a copied file", "stale": "n/a", "readBy": "n/a" },
+    { "id": "files-mkdir-message", "file": "src/files.mjs", "lines": ["fail(`could not make the folders for ${rel}: ${err.code === 'ENOTDIR' || err.code === 'EEXIST' ? 'a file is in the way' : err.message}`)"], "path": "n/a", "kind": "not-exclusion", "record": "an error message for a recursive mkdir", "stale": "n/a", "readBy": "n/a" }
+  ],
+  "markers": [
+    { "id": "restore-marker", "file": "src/control.mjs", "lines": ["fs.writeFileSync(file, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }))"], "path": "<run>/<name>/restoring.json (servers and databases)", "record": "{\"pid\":<pid>,\"at\":\"<ISO 8601>\"} from JSON.stringify: no whitespace, no newline; plain write, not exclusive (beginRestore checks isRestoring first, so two restores racing in the same instant can both pass)", "stale": "ignored unless pid is an integer and pidAlive(pid); not removed by readers", "readBy": "control.mjs isRestoring / restoreBlock / activeBlock (start, delete, rename, restore, database backup and delete)" },
+    { "id": "stop-asked", "file": "src/client-launch.mjs", "lines": ["try { writeJson(stopMark(name), { pid: state.pid, at: new Date().toISOString() }) } catch { /* the in-process mark still holds */ }"], "path": "<dataRoot>/client/run/<profile>/stop-asked.json", "record": "writeJson: JSON.stringify(x, null, 2) + newline via <file>.tmp and rename; {pid: the game's pid, at: ISO 8601}", "stale": "matches only the game whose pid it names; removed by the launcher before a new game and when the game exits, and by stop when the game did not stop", "readBy": "the launching process's exit handler (lastExit.stopped)" }
+  ]
+}

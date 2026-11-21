@@ -1,0 +1,26 @@
+{
+  "about": "Self-test: both sides leave a backup archive with the same member names and sizes, but one member's bytes differ on the Rust side. The rig must compare members by their content, not their names.",
+  "expect": "differ",
+  "expectDifferences": [
+    "data tree: data/backups/alpha/standard.tar.gz"
+  ],
+  "steps": [
+    {
+      "write": "data/backups/alpha/standard.tar.gz",
+      "base64": "H4sIAAAAAAAAA+3OMQqAMBBE0T2KJ9AvhFjvUQKxCwgx6vUFK0mfaLGvmelmri2nOKX1XNMYQ5EWALxzTwJ1Au7VEWa8X2SgyZvKsZeQhS5bP6Sq+vUHY4wx/d2KPNBwAAgAAA=="
+    },
+    {
+      "run": [
+        "list"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "side": "rust",
+      "write": "data/backups/alpha/standard.tar.gz",
+      "base64": "H4sIAAAAAAAAAyvPL8pJ0c9JLUvN0UtJLGGgBTAwMDAwMzEB0wYGBui0gYGBCRLbgMHA0MDMzJxBwYAmrkEDpcUliUUMBnSxaxACR0dHp4F2wygYBaNgFIwC+gMAsJ4/dAAIAAA="
+    }
+  ]
+}

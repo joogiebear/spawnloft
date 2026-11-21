@@ -1,0 +1,40 @@
+{
+  "about": "Self-test: the Rust side's registry is damaged, so status exits 1 where the Node side exits 0. The rig must report the exit code.",
+  "expect": "differ",
+  "expectDifferences": [
+    "(status alpha): exit code",
+    "(status alpha): stderr"
+  ],
+  "steps": [
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "alpha": {
+            "dir": "{data}/instances/alpha",
+            "jar": "server.jar",
+            "java": "java",
+            "memory": "2G",
+            "port": 25565,
+            "rcon": {
+              "port": 25575,
+              "password": "pw"
+            }
+          }
+        }
+      }
+    },
+    {
+      "side": "rust",
+      "write": "data/instances.json",
+      "text": "{ not json"
+    },
+    {
+      "run": [
+        "status",
+        "alpha"
+      ]
+    }
+  ]
+}

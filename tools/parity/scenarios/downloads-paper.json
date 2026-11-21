@@ -1,0 +1,46 @@
+{
+  "about": "Faked downloads (rust/PLAN-CORE-PORT.md 6.2): Paper's fill API and its data host answered by the rig, so the jar store, the checksum check, the cache and the failure paths run with no network. Both cores must ask the same questions (path, query, user agent) and leave the same jars and .part files.",
+  "hosts": {
+    "https://fill.papermc.io": {
+      "routes": {
+        "GET /v3/projects/paper": { "json": { "project": { "id": "paper", "name": "Paper" }, "versions": { "1.21": ["1.21.4", "1.21.4-rc1", "1.21.3", "1.21"], "1.20": ["1.20.6", "1.20.6-pre2"] } } },
+        "GET /v3/projects/paper/versions/1.21.4/builds": { "json": [
+          { "id": 16, "time": "2026-11-03T10:00:00Z", "channel": "EXPERIMENTAL", "downloads": { "server:default": { "name": "paper-1.21.4-16.jar", "url": "https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar", "checksums": { "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar}" }, "size": 3000 } } },
+          { "id": 15, "time": "2026-11-02T10:00:00Z", "channel": "STABLE", "downloads": { "server:default": { "name": "paper-1.21.4-15.jar", "url": "https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar", "checksums": { "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar}" }, "size": 2048 } } }
+        ] },
+        "GET /v3/projects/paper/versions/1.21.3/builds": { "json": [
+          { "id": 80, "time": "2026-10-01T10:00:00Z", "channel": "STABLE", "downloads": { "server:default": { "name": "paper-1.21.3-80.jar", "url": "https://fill-data.papermc.io/v1/objects/80/paper-1.21.3-80.jar", "checksums": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }, "size": 1000 } } }
+        ] },
+        "GET /v3/projects/paper/versions/1.20.6/builds": { "json": [
+          { "id": 151, "time": "2026-09-01T10:00:00Z", "channel": "STABLE", "downloads": { "server:default": { "name": "paper-1.20.6-151.jar", "url": "https://fill-data.papermc.io/v1/objects/151/paper-1.20.6-151.jar", "checksums": { "sha256": "abc" }, "size": 10 } } }
+        ] },
+        "GET /v3/projects/paper/versions/1.19/builds": { "status": 404, "json": { "ok": false, "error": "version not found" } },
+        "GET /v3/projects/paper/versions/1.21/builds": { "json": [] }
+      }
+    },
+    "https://fill-data.papermc.io": {
+      "routes": {
+        "GET /v1/objects/15/paper-1.21.4-15.jar": { "bytes": { "size": 2048, "seed": "paper-15" } },
+        "GET /v1/objects/16/paper-1.21.4-16.jar": { "bytes": { "size": 3000, "seed": "paper-16" } },
+        "GET /v1/objects/80/paper-1.21.3-80.jar": { "bytes": { "size": 1000, "seed": "paper-80" } },
+        "GET /v1/objects/151/paper-1.20.6-151.jar": { "status": 503, "text": "busy" }
+      }
+    }
+  },
+  "steps": [
+    { "run": ["paper"], "expect": { "code": 0, "stdoutIncludes": "1.21.4" } },
+    { "run": ["paper", "versions", "--unstable"] },
+    { "run": ["paper", "versions", "--limit", "2"] },
+    { "run": ["paper", "builds", "1.21.4"], "expect": { "code": 0, "stdoutIncludes": "STABLE" } },
+    { "run": ["paper", "builds", "1.19"], "expect": { "code": 1 } },
+    { "run": ["paper", "fetch", "1.21.4"], "expect": { "code": 0 } },
+    { "run": ["paper", "fetch", "1.21.4"], "expect": { "code": 0, "stdoutIncludes": "Already stored" } },
+    { "run": ["paper", "fetch", "1.21.4", "16"], "expect": { "code": 0 } },
+    { "run": ["paper", "fetch", "1.21.4", "99"], "expect": { "code": 1 } },
+    { "run": ["paper", "fetch", "1.21.3"], "expect": { "code": 1, "stderrIncludes": "checksum mismatch" } },
+    { "run": ["paper", "fetch", "1.20.6"], "expect": { "code": 1, "stderrIncludes": "503" } },
+    { "run": ["paper", "fetch", "1.21"], "expect": { "code": 1 } },
+    { "run": ["paper", "fetch"], "expect": { "code": 1 } },
+    { "run": ["jars"] }
+  ]
+}

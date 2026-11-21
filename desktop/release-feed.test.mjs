@@ -349,7 +349,7 @@ test('writeElectronFeeds writes identical channel pairs', () => {
 
 // ---- B4 completeness, B5 release mode and evidence, B6 what a build trusts ---------------------
 
-import { binaryProblems, embeddedKeys, releaseKeys, statusProblems, tarFiles, cpioFiles, keyIdOf, FEED_RELEASE, FEED_INTERNAL } from './build-trust.mjs'
+import { binaryProblems, embeddedKeys, releaseKeys, statusProblems, tarFiles, cpioFiles, keyIdOf, FEED_RELEASE, FEED_INTERNAL, TEST_HOOKS } from './build-trust.mjs'
 import { gateRecord, platformAssets } from './release-gate.mjs'
 
 const RELEASE = releaseKeys()
@@ -423,6 +423,9 @@ test('B6: a binary must carry exactly the release keys, and a core the release f
   const test = makeKey().parsed.keyLine
   assert.ok(binaryProblems(fakeBinary({ extraKeys: [test] }), 'core').some(p => /not a release key/.test(p)))
   assert.ok(binaryProblems(fakeBinary({ feed: FEED_INTERNAL }), 'core').some(p => /internal-feed/.test(p)))
+  // the parity rig's build: refused even with the release feed code
+  const hooked = Buffer.concat([fakeBinary(), Buffer.from(TEST_HOOKS), crypto.randomBytes(20)])
+  assert.ok(binaryProblems(hooked, 'core').some(p => /test-hooks/.test(p)))
   assert.ok(binaryProblems(fakeBinary({ feed: null }), 'core').some(p => /no spawnloft-feed:release marker/.test(p)))
   assert.ok(binaryProblems(fakeBinary({ keys: RELEASE.slice(0, 1) }), 'shell').some(p => /does not carry release key FABC/.test(p)))
   assert.deepEqual(binaryProblems(fakeBinary({ kind: 'shell', keys: [] }), 'shell'), [])
