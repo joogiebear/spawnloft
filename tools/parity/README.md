@@ -91,7 +91,7 @@ a scratch folder.
   must equal the file. A step with `"golden": false` is compared between the sides but kept out
   of the golden file. Use it for answers that depend on the machine. `goldenPlatforms` limits the
   check to some platforms.
-- `platforms`: run the scenario only there.
+- `platforms`: run the scenario only there: a platform (`linux`, `darwin`, `win32`) or a platform and arch (`linux-x64`).
 - `acl`: on Windows, also compare each entry's `icacls` listing. POSIX modes are always compared.
 
 The data tree records each file's mode and, by kind: a zip's entries in order with their method,
@@ -148,6 +148,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c7-client-harness-index` | `client versions` with the signed harness list's refresh on and GitHub faked: a malformed signature, an unsigned cached copy dropped with its reason, the hour's wait after a failure, and a status file holding null (exit 1 on both sides) |
 | `c7-client-login` | `client login`: the Microsoft device code and the Xbox Live, XSTS and Minecraft chain after it, over fakes answering in turn (a route's `sequence`): every refusal and hiccup sentence, `SPAWNLOFT_MSA_CLIENT_ID`, the stale same-name entry a fresh sign-in replaces, and accounts lists that are not arrays |
 | `c7-client-login-odd` | `client login` on odd answers: Mojang's refusal cut at 200 UTF-16 units through a surrogate pair, and a profile name that is a number, with an empty list and next to another entry |
+| `c7-client-install` | `client install` over faked Mojang hosts, made by `make-c7-install-scenario.mjs`: a modern version with natives for every OS and arch, the checked-files list, a damaged library, natives extracted again, `--verify`, the virtual and resources asset layouts, old-style natives with excludes, the refusals (unknown layout, an index path leaving its folder, a missing library, a checksum mismatch, a loader-made library, an unlisted version), and a Fabric profile, which the Node core still sets up. Not on Linux arm64, where the client is refused |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
