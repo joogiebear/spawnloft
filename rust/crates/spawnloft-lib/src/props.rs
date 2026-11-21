@@ -32,7 +32,7 @@ pub fn parse(text: &str) -> Props {
 pub fn read(file: &Path) -> Result<Props, Failure> {
     match std::fs::read(file) {
         Ok(b) => Ok(parse(&String::from_utf8_lossy(&b))),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Props::new()),
+        Err(e) if crate::jspath::is_enoent(&e) => Ok(Props::new()),
         Err(e) => Err(Failure::read(&e, file)),
     }
 }

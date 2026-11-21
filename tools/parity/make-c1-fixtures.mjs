@@ -73,12 +73,18 @@ const PATTERNS = [
   'a.c', 'a{', 'a{2}', 'x]', '\\a', '[\\w-]+$', '\\u0041', '\\x41', '[^]', '\\s', '\\S+', '\\D', '\\W', '\\B', 'colou?r', '(ab)+',
   '(?:x|y)z', '(?<n>a)b', '^$', 'é', 'É', '\\.jar$', 'a|', '|', '[a-c]+', '[^a-c]', '\\/', '\\-', '[\\-]', '\\0', '\\cJ', '\\c', '\\t',
   '[\\b]', 'a*?b', 'a{1,}b', 'a{,2}', '\\k', '\\8', '[\\d-x]', 'true', 'ſ', 'k', '\\w', '\\u{41}', '\\uD83D', '[&&]', 'a--b',
+  // nothing to repeat, and other refusals
+  'a**', 'a{2}{3}', 'x{1,2}{3}', 'a?+', '(?:a|b)++', '\\b+', '^*', '*a', 'a|*', 'a+??', '(?<1a>x)', '(?<a>x)(?<a>y)', 'x{3,2}',
+  // case mates beyond one pair, Annex B escapes, group names
+  'σ', 'Σ', 'ς', 'µ', 'μ', 'ǆ', 'ǅ', 'θ', 'ϑ', 'ı', 'İ', '[\\c1]', '[\\c_]', '\\c1', '\\k<x>', '(?<$x>a)', 'a+?', 'a{2}?', '[σ-ω]',
+  'x(?<n>a)\\k<n>', 'a{99999999999}',
 ]
 const SUBJECTS = [
   '[10:00:01] [Server thread/INFO]: Starting', '[10:00:02] [Server thread/WARN]: Can\'t keep up!', 'x WARN] y', 'java.lang.Error',
   'abc', 'a\rc', 'a{', 'aa', 'x]', 'a', 'a-b', 'A', '\n', ' ', '\u00a0', '\ufeff', '\u0085', 'color', 'colour', 'ababz', 'yz', 'ab', '',
   'é', 'É', 'server.jar', 'b', 'd', '/', '-', '\u0000', '\n', '\t', '\b', 'aab', 'aaab', 'a{,2}', 'k', '8', '3-x', 'TRUE', 'ſ', 'K',
   'S', 's', '\u212a', '\u0663', 'uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu', 'AAAA', '&', 'a--b', '😀',
+  'σ', 'Σ', 'ς', 'µ', 'μ', 'Μ', 'ǆ', 'ǅ', 'Ǆ', 'θ', 'ϑ', 'Θ', '\u0011', '\u001f', 'c1', '\\c1', 'k<x>', 'İ', 'ı', 'i', 'I', 'xaa', 'ω', 'Ω',
 ]
 const patterns = []
 for (const source of PATTERNS) {

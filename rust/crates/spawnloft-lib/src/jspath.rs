@@ -91,13 +91,10 @@ pub fn join(parts: &[&str]) -> String {
 /// `path.resolve(p)` against the current folder; no trailing separator except on a root.
 pub fn resolve(p: &str) -> String {
     let (_, absolute, _) = split_root(p);
-    let full = if absolute {
+    let full = if absolute && !(cfg!(windows) && !has_device(p)) {
         p.to_string()
     } else if cfg!(windows) {
-        // a drive-relative path (C:x) or a rooted one (\x) is completed by the system as Node does
-        return std::path::absolute(Path::new(p))
-            .map(|a| strip_trailing(&normalize(&a.to_string_lossy())))
-            .unwrap_or_else(|_| p.to_string());
+        win32_complete(p)
     } else {
         let cwd = std::env::current_dir()
             .map(|d| d.to_string_lossy().into_owned())
@@ -105,6 +102,41 @@ pub fn resolve(p: &str) -> String {
         format!("{cwd}/{p}")
     };
     strip_trailing(&normalize(&full))
+}
+
+fn has_device(p: &str) -> bool {
+    let (root, _, _) = split_root(p);
+    root.len() > 1
+}
+
+/// win32 `path.resolve` for a path without both a device and a root, done as Node does it in
+/// text (never through the system, which would also strip trailing dots and turn `nul` into a
+/// device path): a rooted `\x` takes the current folder's device; a drive-relative `D:x` takes
+/// that drive's remembered folder (`=D:` in the environment) or the current folder when it is on
+/// that drive, else `D:\`; anything else is joined to the current folder.
+fn win32_complete(p: &str) -> String {
+    let cwd = std::env::current_dir()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let (root, absolute, _) = split_root(p);
+    if absolute {
+        // rooted, no device
+        let (cwd_root, _, _) = split_root(&cwd);
+        let device = cwd_root.trim_end_matches('\\');
+        return format!("{device}{p}");
+    }
+    if root.len() == 2 {
+        let drive = root.to_ascii_lowercase();
+        let base = std::env::var(format!("={root}")).unwrap_or_else(|_| cwd.clone());
+        let other_drive = base.get(..2).map(str::to_ascii_lowercase).as_deref() != Some(drive.as_str());
+        let base = if other_drive && base.as_bytes().get(2) == Some(&b'\\') {
+            format!("{root}\\")
+        } else {
+            base
+        };
+        return format!("{base}\\{}", &p[2..]);
+    }
+    format!("{cwd}\\{p}")
 }
 
 fn strip_trailing(p: &str) -> String {
@@ -135,32 +167,8 @@ pub fn node_error(e: &std::io::Error, syscall: &str, path: Option<&Path>) -> Str
 
 /// libuv's name and text for an I/O error.
 pub fn error_code(e: &std::io::Error) -> (&'static str, &'static str) {
-    #[cfg(unix)]
-    if let Some(n) = e.raw_os_error() {
-        let known = match n {
-            1 => Some(("EPERM", "operation not permitted")),
-            2 => Some(("ENOENT", "no such file or directory")),
-            5 => Some(("EIO", "i/o error")),
-            9 => Some(("EBADF", "bad file descriptor")),
-            12 => Some(("ENOMEM", "not enough memory")),
-            13 => Some(("EACCES", "permission denied")),
-            16 => Some(("EBUSY", "resource busy or locked")),
-            17 => Some(("EEXIST", "file already exists")),
-            18 => Some(("EXDEV", "cross-device link not permitted")),
-            20 => Some(("ENOTDIR", "not a directory")),
-            21 => Some(("EISDIR", "illegal operation on a directory")),
-            22 => Some(("EINVAL", "invalid argument")),
-            24 => Some(("EMFILE", "too many open files")),
-            28 => Some(("ENOSPC", "no space left on device")),
-            30 => Some(("EROFS", "read-only file system")),
-            36 | 63 => Some(("ENAMETOOLONG", "name too long")),
-            40 | 62 => Some(("ELOOP", "too many symbolic links encountered")),
-            39 | 66 => Some(("ENOTEMPTY", "directory not empty")),
-            _ => None,
-        };
-        if let Some(k) = known {
-            return k;
-        }
+    if let Some(k) = e.raw_os_error().and_then(raw_code) {
+        return k;
     }
     use std::io::ErrorKind as K;
     match e.kind() {
@@ -176,6 +184,68 @@ pub fn error_code(e: &std::io::Error) -> (&'static str, &'static str) {
         K::InvalidFilename => ("ENAMETOOLONG", "name too long"),
         _ => ("EIO", "i/o error"),
     }
+}
+
+/// Whether Node would call this failure `ENOENT` (on Windows that includes an invalid name, as
+/// libuv maps `ERROR_INVALID_NAME`).
+pub fn is_enoent(e: &std::io::Error) -> bool {
+    error_code(e).0 == "ENOENT"
+}
+
+/// libuv's name and text for a system error number (`uv_translate_sys_error`, then
+/// `uv_err_name` and `uv_strerror`), for the ones file reads and writes meet.
+#[cfg(unix)]
+fn raw_code(n: i32) -> Option<(&'static str, &'static str)> {
+    // the numbers below 35 are the same on Linux and macOS
+    let (name_too_long, looped, not_empty) = if cfg!(target_os = "linux") {
+        (36, 40, 39)
+    } else {
+        (63, 62, 66)
+    };
+    Some(match n {
+        1 => ("EPERM", "operation not permitted"),
+        2 => ("ENOENT", "no such file or directory"),
+        5 => ("EIO", "i/o error"),
+        9 => ("EBADF", "bad file descriptor"),
+        12 => ("ENOMEM", "not enough memory"),
+        13 => ("EACCES", "permission denied"),
+        16 => ("EBUSY", "resource busy or locked"),
+        17 => ("EEXIST", "file already exists"),
+        18 => ("EXDEV", "cross-device link not permitted"),
+        20 => ("ENOTDIR", "not a directory"),
+        21 => ("EISDIR", "illegal operation on a directory"),
+        22 => ("EINVAL", "invalid argument"),
+        24 => ("EMFILE", "too many open files"),
+        28 => ("ENOSPC", "no space left on device"),
+        30 => ("EROFS", "read-only file system"),
+        32 => ("EPIPE", "broken pipe"),
+        n if n == name_too_long => ("ENAMETOOLONG", "name too long"),
+        n if n == looped => ("ELOOP", "too many symbolic links encountered"),
+        n if n == not_empty => ("ENOTEMPTY", "directory not empty"),
+        _ => return None,
+    })
+}
+
+#[cfg(windows)]
+fn raw_code(n: i32) -> Option<(&'static str, &'static str)> {
+    Some(match n {
+        2 | 3 | 15 | 123 | 161 | 1231 => ("ENOENT", "no such file or directory"),
+        5 | 1314 => ("EPERM", "operation not permitted"),
+        4 => ("EMFILE", "too many open files"),
+        8 | 14 => ("ENOMEM", "not enough memory"),
+        17 => ("EXDEV", "cross-device link not permitted"),
+        19 => ("EROFS", "read-only file system"),
+        32 | 33 => ("EBUSY", "resource busy or locked"),
+        39 | 112 => ("ENOSPC", "no space left on device"),
+        80 | 183 => ("EEXIST", "file already exists"),
+        87 => ("EINVAL", "invalid argument"),
+        145 => ("ENOTEMPTY", "directory not empty"),
+        206 => ("ENAMETOOLONG", "name too long"),
+        232 => ("EPIPE", "broken pipe"),
+        267 => ("ENOTDIR", "not a directory"),
+        1921 => ("ELOOP", "too many symbolic links encountered"),
+        _ => return None,
+    })
 }
 
 /// Node's error for reading a whole file: a folder in its place fails at `read`, with no path.

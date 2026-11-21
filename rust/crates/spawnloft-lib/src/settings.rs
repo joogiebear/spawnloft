@@ -24,7 +24,7 @@ pub struct Read {
 pub fn read(file: &Path) -> Read {
     let text = match std::fs::read(file) {
         Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+        Err(e) if crate::jspath::is_enoent(&e) => {
             return Read {
                 settings: Map::new(),
                 exists: false,
@@ -67,7 +67,7 @@ pub fn load() -> (Map<String, Value>, Option<String>) {
     let warning = found.error.as_ref().map(|e| {
         format!(
             "spawnloft: settings file {} could not be read ({e}); using the defaults until you fix it or delete it\n",
-            file.display()
+            settings_file_text()
         )
     });
     (found.settings, warning)
@@ -89,31 +89,54 @@ pub struct Layout {
     pub settings_file: String,
 }
 
-fn text_of(v: Option<&Value>) -> Option<String> {
-    js::truthy(v).then(|| js::string(v))
+/// A truthy setting handed to `path.resolve`, which takes strings only. The Node core resolves
+/// the layout when paths.mjs is imported, so a wrong type there is an uncaught crash before any
+/// command (declared difference `settings-type-crash`: Node adds its source excerpt, stack and
+/// version line).
+fn text_of(v: Option<&Value>) -> Result<Option<String>, crate::failure::Failure> {
+    match v {
+        Some(Value::String(s)) if !s.is_empty() => Ok(Some(s.clone())),
+        _ if !js::truthy(v) => Ok(None),
+        _ => Err(crate::failure::Failure::Internal {
+            head: "TypeError [ERR_INVALID_ARG_TYPE]".into(),
+            message: format!(
+                "The \"paths[0]\" argument must be of type string. {}",
+                js::received(v)
+            ),
+            code: Some("ERR_INVALID_ARG_TYPE".into()),
+        }),
+    }
+}
+
+/// The settings file as `path.join` spells it (no doubled or trailing separators).
+pub fn settings_file_text() -> String {
+    jspath::normalize(&paths::settings_file().to_string_lossy())
 }
 
 impl Layout {
     /// From settings already loaded, the environment and the per-user defaults.
-    pub fn resolve(s: &Map<String, Value>) -> Layout {
+    pub fn resolve(s: &Map<String, Value>) -> Result<Layout, crate::failure::Failure> {
         let data_root = match paths::env_var("DATA_ROOT") {
             Some(forced) => jspath::resolve(&forced),
-            None => match text_of(s.get("dataRoot")) {
+            None => match text_of(s.get("dataRoot"))? {
                 Some(d) => jspath::resolve(&d),
                 None => default_data_root(),
             },
         };
         let separate = js::truthy(s.get("separateInstances")) && js::truthy(s.get("instancesDir"));
-        let instances_dir = if separate {
-            jspath::resolve(&js::string(s.get("instancesDir")))
-        } else {
-            jspath::join(&[&data_root, "instances"])
+        let instances_dir = match separate
+            .then(|| text_of(s.get("instancesDir")))
+            .transpose()?
+            .flatten()
+        {
+            Some(d) => jspath::resolve(&d),
+            None => jspath::join(&[&data_root, "instances"]),
         };
-        let backups_dir = match text_of(s.get("backupsDir")) {
+        let backups_dir = match text_of(s.get("backupsDir"))? {
             Some(b) => jspath::resolve(&b),
             None => jspath::join(&[&data_root, "backups"]),
         };
-        Layout {
+        Ok(Layout {
             instances_dir,
             separate_instances: separate,
             registry_file: jspath::join(&[&data_root, "instances.json"]),
@@ -123,9 +146,9 @@ impl Layout {
             run_dir: jspath::join(&[&data_root, "run"]),
             engines_dir: jspath::join(&[&data_root, "engines"]),
             services_dir: jspath::join(&[&data_root, "services"]),
-            settings_file: paths::settings_file().to_string_lossy().into_owned(),
+            settings_file: settings_file_text(),
             data_root,
-        }
+        })
     }
 
     pub fn run_dir_of(&self, name: &str) -> String {
@@ -142,7 +165,7 @@ impl Layout {
     }
 
     /// `ensureDirs()`: the folders every command but `data` makes before it runs.
-    pub fn ensure_dirs(&self) -> Result<(), String> {
+    pub fn ensure_dirs(&self) -> Result<(), crate::failure::Failure> {
         for d in [
             &self.instances_dir,
             &self.templates_dir,
@@ -152,7 +175,8 @@ impl Layout {
             &self.engines_dir,
             &self.services_dir,
         ] {
-            std::fs::create_dir_all(d).map_err(|e| jspath::node_error(&e, "mkdir", Some(Path::new(d))))?;
+            std::fs::create_dir_all(d)
+                .map_err(|e| crate::failure::Failure::io(&e, "mkdir", Some(Path::new(d))))?;
         }
         Ok(())
     }
@@ -196,16 +220,25 @@ pub fn servers_elsewhere(data_root: &str) -> Vec<(String, Vec<String>)> {
         if root == here {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(jspath::join(&[&root, "instances.json"])) else {
+        let Ok(bytes) = std::fs::read(jspath::join(&[&root, "instances.json"])) else {
             continue;
         };
-        let Ok(data) = jsjson::parse(&text) else {
+        let Ok(data) = jsjson::parse(&String::from_utf8_lossy(&bytes)) else {
             continue;
         };
-        let names: Vec<String> = match data.get("instances") {
-            Some(Value::Object(m)) => m.keys().cloned().collect(),
-            _ => Vec::new(),
-        };
+        // `Object.keys(data.instances ?? {})`, which throws (and skips the root) for a null file
+        if data.is_null() {
+            continue;
+        }
+        let names: Vec<String> = data
+            .get("instances")
+            .map(|v| {
+                crate::registry::entries_of(v)
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .collect()
+            })
+            .unwrap_or_default();
         if !names.is_empty() {
             found.push((root, names));
         }

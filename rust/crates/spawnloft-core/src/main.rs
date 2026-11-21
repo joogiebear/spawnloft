@@ -19,12 +19,15 @@ fn main() -> ExitCode {
     }
     // args_os: an argument that is not valid UTF-8 is a usage error, not a panic (and with
     // panic = "abort", not a crash)
+    // The ported commands read their arguments as Node does, with each invalid byte sequence
+    // (an unpaired UTF-16 half on Windows) as U+FFFD.
+    let lossy: Vec<String> = raw.iter().map(|a| a.to_string_lossy().into_owned()).collect();
+    if cli::is_ported(&lossy) {
+        let mut out = port::Out::stdio();
+        return ExitCode::from(port::run(&lossy, &mut out));
+    }
     let args: Option<Vec<String>> = raw.into_iter().map(|a| a.into_string().ok()).collect();
     let outcome = match args {
-        Some(args) if cli::is_ported(&args) => {
-            let mut out = port::Out::stdio();
-            return ExitCode::from(port::run(&args, &mut out));
-        }
         Some(args) => cli::run(&args),
         None => cli::not_utf8(),
     };

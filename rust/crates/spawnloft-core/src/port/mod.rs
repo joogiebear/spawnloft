@@ -57,7 +57,14 @@ pub fn run(argv: &[String], out: &mut Out) -> u8 {
     if let Some(w) = warning {
         out.err(&w);
     }
-    let layout = Layout::resolve(&loaded);
+    // a setting of the wrong type crashes the Node core at import: no envelope, even for --json
+    let layout = match Layout::resolve(&loaded) {
+        Ok(l) => l,
+        Err(crash) => {
+            out.err(&crash.stderr_text());
+            return 1;
+        }
+    };
     let command = argv.first().map(String::as_str);
     let parsed = args::parse(argv.get(1..).unwrap_or(&[]));
     let cli_command = match command {
@@ -120,11 +127,7 @@ fn dispatch(
         )));
     }
     // not for `data`, which is not ported; every other command makes its folders first
-    layout.ensure_dirs().map_err(|m| Failure::Internal {
-        head: "Error".into(),
-        message: m,
-        code: None,
-    })?;
+    layout.ensure_dirs()?;
     match command {
         "help" => {
             ctx.out.print(HELP);
@@ -179,7 +182,8 @@ mod tests {
         let layout = Layout::resolve(&serde_json::Map::from_iter([(
             "dataRoot".to_string(),
             serde_json::json!(root.to_string_lossy()),
-        )]));
+        )]))
+        .expect("a string data root");
         let mut out = Out::captured();
         let command = argv.first().map(String::as_str);
         let parsed = args::parse(argv.get(1..).unwrap_or(&[]));

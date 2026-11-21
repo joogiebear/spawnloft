@@ -83,7 +83,7 @@ pub fn list(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             .to_vec(),
     ];
     for inst in &instances {
-        let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(&inst.name)))?;
+        let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(inst.path_name()?)))?;
         rows.push(vec![
             inst.name.clone(),
             status.label().into(),
@@ -106,7 +106,7 @@ pub fn list(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             .to_vec(),
         ];
         for db in &dbs {
-            let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(&db.name)))?;
+            let (status, state) = control::read_state(Path::new(&ctx.layout.state_file(db.path_name()?)))?;
             let external = js::truthy(db.get("external"));
             let version = match db.get("version") {
                 None | Some(Value::Null) => String::new(),

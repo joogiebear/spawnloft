@@ -53,16 +53,13 @@ struct Shape {
 pub const JS_DOT: &str = r"[^\n\r\x{2028}\x{2029}]";
 pub const JS_SPACE: &str =
     r"[\t\n\x0B\x0C\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]";
-const JS_WORD: &str = "0-9A-Za-z_";
 
-fn shape(id: &'static str, pattern: &str, title: &'static str, advice: Advice) -> Shape {
-    let pattern = pattern
-        .replace("{dot}", JS_DOT)
-        .replace("{s}", JS_SPACE)
-        .replace("{w}", JS_WORD);
+/// A shape's pattern is diagnose.mjs's own source, compiled as JavaScript reads it (ASCII `\w`
+/// and `\b`, JavaScript's `.`, and `/i` folding no non-ASCII letter into ASCII).
+fn shape(id: &'static str, source: &str, ignore_case: bool, title: &'static str, advice: Advice) -> Shape {
     Shape {
         id,
-        test: Regex::new(&pattern).expect("diagnose pattern"),
+        test: crate::jsregex::compile(source, ignore_case).expect("diagnose pattern"),
         title,
         advice,
     }
@@ -73,14 +70,15 @@ fn class_version_to_java(major: f64) -> String {
 }
 
 static NOT_A_NAME: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^(unknown|missing|null)$").expect("name filter"));
+    LazyLock::new(|| crate::jsregex::compile("^(unknown|missing|null)$", true).expect("name filter"));
 
 // ordered from more specific and actionable to less, as in diagnose.mjs
 static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
     vec![
         shape(
             "port-in-use",
-            r"(?i)FAILED TO BIND TO PORT|Address already in use|Failed to bind to address",
+            r#"FAILED TO BIND TO PORT|Address already in use|Failed to bind to address"#,
+            true,
             "The port is already taken",
             |_, c| {
                 format!(
@@ -96,7 +94,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "eula",
-            r"(?i)You need to agree to the EULA",
+            r#"You need to agree to the EULA"#,
+            true,
             "The EULA is not accepted",
             |_, c| {
                 let start = if c.panel {
@@ -113,7 +112,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "wrong-java",
-            r"(?i)UnsupportedClassVersionError{dot}*class file version ([0-9]+)",
+            r#"UnsupportedClassVersionError.*class file version (\d+)"#,
+            true,
             "Java is too old for this server",
             |m, c| {
                 let needs = class_version_to_java(js::string_to_number(&m[1]));
@@ -129,7 +129,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "out-of-memory",
-            r"java\.lang\.OutOfMemoryError",
+            r#"java\.lang\.OutOfMemoryError"#,
+            false,
             "The server ran out of memory",
             |_, c| {
                 format!(
@@ -145,7 +146,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "out-of-disk",
-            r"(?i)No space left on device|There is not enough space on the disk",
+            r#"No space left on device|There is not enough space on the disk"#,
+            true,
             "The disk is full",
             |_, c| {
                 format!(
@@ -160,7 +162,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "missing-plugin-dependency",
-            r"UnknownDependencyException(?-u:\b):?{s}*(?:Unknown(?:/missing)?[/ ]dependenc[{w}]+(?:{s}+plugins?)?:?{s}*)?(?:\[([^\]]+)\]|([{w}-]+(?:\.[{w}-]+)*))?",
+            r#"UnknownDependencyException\b:?\s*(?:Unknown(?:\/missing)?[\/ ]dependenc\w+(?:\s+plugins?)?:?\s*)?(?:\[([^\]]+)\]|([\w-]+(?:\.[\w-]+)*))?"#,
+            false,
             "A plugin is missing a dependency",
             |m, _| {
                 let names: Vec<String> = match (m.get(1), m.get(2)) {
@@ -192,7 +195,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "missing-mod-dependency",
-            r"(?i)requires (?:any version|version [^ ]+) of ([{w}-]+), which is missing",
+            r#"requires (?:any version|version [^ ]+) of ([\w-]+), which is missing"#,
+            true,
             "A mod is missing a dependency",
             |m, _| {
                 format!(
@@ -203,7 +207,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "duplicate-plugin",
-            r"(?i)Ambiguous plugin name",
+            r#"Ambiguous plugin name"#,
+            true,
             "Two plugins claim the same name",
             |_, _| {
                 "Two jars in the plugins folder provide the same plugin - usually an old copy beside a new one, or WorldEdit installed beside FAWE, which already provides it. Disable one of them in the Plugins tab.".to_string()
@@ -211,7 +216,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "corrupt-world",
-            r"(?i)Exception reading {dot}*level\.dat|Failed to load level|ChunkIoErrorReport|Corrupted chunk",
+            r#"Exception reading .*level\.dat|Failed to load level|ChunkIoErrorReport|Corrupted chunk"#,
+            true,
             "The world failed to load",
             |_, c| {
                 format!(
@@ -226,7 +232,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "ticking-crash",
-            r"(?i)Exception ticking world|Ticking (entity|block entity)",
+            r#"Exception ticking world|Ticking (entity|block entity)"#,
+            true,
             "Something in the world crashed the server",
             |_, c| {
                 let where_ = match c.crash_dir.as_deref().filter(|d| !d.is_empty()) {
@@ -240,7 +247,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "watchdog",
-            r"(?i)A single server tick took [0-9]+|Considering it to be crashed, server will forcibly shut down",
+            r#"A single server tick took \d+|Considering it to be crashed, server will forcibly shut down"#,
+            true,
             "The server stalled and the watchdog stopped it",
             |_, _| {
                 "A tick took so long the server declared itself stuck - heavy world generation, a plugin doing too much at once, or the machine out of breath. The thread dump above the shutdown names what it was doing; more memory or fewer chunks loaded usually helps.".to_string()
@@ -248,7 +256,8 @@ static SHAPES: LazyLock<Vec<Shape>> = LazyLock::new(|| {
         ),
         shape(
             "missing-jar",
-            r"(?i)Unable to access jarfile ({dot}+)",
+            r#"Unable to access jarfile (.+)"#,
+            true,
             "The server jar is missing",
             |m, c| {
                 let what = match m.get(1) {
@@ -327,11 +336,15 @@ static DESCRIPTION: LazyLock<Regex> = LazyLock::new(|| {
     .expect("description")
 });
 
+/// `stat.mtime` in whole milliseconds (a Date truncates toward zero), before 1970 too.
 fn modified_ms(meta: &std::fs::Metadata) -> f64 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0.0, |d| d.as_millis() as f64)
+    let Ok(t) = meta.modified() else {
+        return 0.0;
+    };
+    match t.duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_millis() as f64,
+        Err(before) => -(before.duration().as_millis() as f64),
+    }
 }
 
 /// `crashReports(inst, { limit })`: `<dir>/crash-reports/*.txt`, newest first, each with the
@@ -342,12 +355,18 @@ pub fn crash_reports(inst_dir: &str, limit: usize) -> Result<(String, Vec<CrashR
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return Ok((dir, Vec::new()));
     };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|f| f.ends_with(".txt"))
+        .collect();
+    // libuv's scandir sorts names bytewise on Unix, and the stable sort below keeps that order
+    // for equal times; Windows lists in FindNextFile's order on both sides
+    if cfg!(unix) {
+        names.sort();
+    }
     let mut reports = Vec::new();
-    for entry in entries.flatten() {
-        let file = entry.file_name().to_string_lossy().into_owned();
-        if !file.ends_with(".txt") {
-            continue;
-        }
+    for file in names {
         let full = Path::new(&dir).join(&file);
         let meta = std::fs::metadata(&full).map_err(|e| Failure::io(&e, "stat", Some(&full)))?;
         let description = std::fs::File::open(&full).ok().and_then(|mut f| {

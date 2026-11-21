@@ -403,7 +403,7 @@ pub fn read_samples(file: &Path, strict: bool) -> Result<Vec<Row>, crate::failur
     let text = match std::fs::read(file) {
         Ok(b) => String::from_utf8_lossy(&b).into_owned(),
         Err(e) => {
-            if strict && e.kind() != std::io::ErrorKind::NotFound {
+            if strict && !crate::jspath::is_enoent(&e) {
                 return Err(crate::failure::Failure::read(&e, file));
             }
             return Ok(Vec::new());

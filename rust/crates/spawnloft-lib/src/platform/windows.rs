@@ -214,10 +214,11 @@ static INTERRUPT_CODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8
 
 /// For a command that follows until stopped (`metrics --follow`): Ctrl+C and Ctrl+Break are
 /// caught and remembered as exit code 130, what Node's emulated SIGINT ends the CLI with.
+/// Ctrl+Break is left to the default handler: the Node core has no SIGBREAK listener.
 pub fn watch_interrupts() {
     unsafe extern "system" fn handler(kind: u32) -> i32 {
-        use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
-        if kind == CTRL_C_EVENT || kind == CTRL_BREAK_EVENT {
+        use windows_sys::Win32::System::Console::CTRL_C_EVENT;
+        if kind == CTRL_C_EVENT {
             let _ = INTERRUPT_CODE.compare_exchange(
                 0,
                 130,
@@ -435,6 +436,12 @@ fn open_query(pid: u32) -> Option<OwnedHandle> {
 
 /// Whether `pid` names a process that has not exited. A process this user may not open (another
 /// user's, a protected one) counts as alive: the pid is taken, which is all a caller can know.
+/// `process.kill(pid, 0)` for any whole pid: libuv opens the pid as a DWORD, so a negative one
+/// names no process.
+pub fn signal_zero(pid: i32) -> bool {
+    pid_alive(pid as u32)
+}
+
 pub fn pid_alive(pid: u32) -> bool {
     if pid == 0 {
         return false;

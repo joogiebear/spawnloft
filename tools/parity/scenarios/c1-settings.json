@@ -42,6 +42,24 @@
     { "write": "home/AppData/Roaming/mcctl/settings.json", "json": { "dataRoot": "{run}/legacy-settings" } },
     { "run": ["list"] },
     { "run": ["metrics", "old"], "env": { "SPAWNLOFT_DATA_ROOT": "{run}/env-root" }, "expect": { "code": 1 } },
-    { "run": ["list"], "env": { "MCCTL_DATA_ROOT": "{run}/mcctl-env" } }
+    { "run": ["list"], "env": { "MCCTL_DATA_ROOT": "{run}/mcctl-env" } },
+    { "write": "home/.config/spawnloft/settings.json", "json": { "dataRoot": 5 } },
+    { "write": "home/AppData/Roaming/spawnloft/settings.json", "json": { "dataRoot": 5 } },
+    { "run": ["list"], "expect": { "code": 1 } },
+    { "run": ["list", "--json"], "expect": { "code": 1 } },
+    { "write": "home/.config/spawnloft/settings.json", "json": { "backupsDir": true } },
+    { "write": "home/AppData/Roaming/spawnloft/settings.json", "json": { "backupsDir": true } },
+    { "run": ["status"], "expect": { "code": 1 } },
+    { "write": "home/.config/spawnloft/settings.json", "json": { "separateInstances": true, "instancesDir": ["x"] } },
+    { "write": "home/AppData/Roaming/spawnloft/settings.json", "json": { "separateInstances": true, "instancesDir": ["x"] } },
+    { "run": ["help"], "expect": { "code": 1 } },
+    { "write": "home/.config/spawnloft/settings.json", "json": { "dataRoot": "{run}/a-file/below" } },
+    { "write": "home/AppData/Roaming/spawnloft/settings.json", "json": { "dataRoot": "{run}/a-file/below" } },
+    { "write": "a-file", "text": "not a folder\n" },
+    { "run": ["metrics", "x", "--json"], "expect": { "code": 1 } },
+    { "run": ["list"], "expect": { "code": 1 } },
+    { "write": "home/.config/spawnloft/settings.json", "text": "{\"dataRoot\": " },
+    { "write": "home/AppData/Roaming/spawnloft/settings.json", "text": "{\"dataRoot\": " },
+    { "run": ["list"], "env": { "XDG_CONFIG_HOME": "{home}//.config/" } }
   ]
 }

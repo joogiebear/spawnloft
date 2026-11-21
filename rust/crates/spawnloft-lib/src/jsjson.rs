@@ -13,10 +13,66 @@ pub const PARSE_ERROR_PREFIX: &str = "JSON parse error: ";
 
 /// `JSON.parse(text)`, strict as JavaScript's is: no byte-order mark, no trailing text. Objects
 /// come back with their keys in JavaScript's order (see [`js_order`]).
+///
+/// A `\uD800`-`\uDFFF` escape that is not half of a pair (`JSON.parse` takes it, and a label cut
+/// at 48 UTF-16 units can end in one) reads as U+FFFD, the character Node prints for it; `--json`
+/// output then shows U+FFFD where Node re-escapes the half (declared difference
+/// `lone-surrogate`). A number beyond the f64 range, which JavaScript reads as Infinity, is
+/// refused (declared difference `json-number-out-of-range`).
 pub fn parse(text: &str) -> Result<Value, String> {
-    let mut v: Value = serde_json::from_str(text).map_err(|e| format!("{PARSE_ERROR_PREFIX}{e}"))?;
+    let text = mend_lone_surrogates(text);
+    let mut v: Value = serde_json::from_str(&text).map_err(|e| format!("{PARSE_ERROR_PREFIX}{e}"))?;
     js_order(&mut v);
     Ok(v)
+}
+
+/// Rewrites each unpaired surrogate escape as `\uFFFD`. Backslashes occur only inside strings
+/// in valid JSON, so walking escapes from the start never mistakes `\\uD83D` (a backslash, then
+/// text) for one; invalid JSON stays invalid.
+fn mend_lone_surrogates(text: &str) -> std::borrow::Cow<'_, str> {
+    if !text.contains("\\u") {
+        return text.into();
+    }
+    let unit = |b: &[u8], at: usize| -> Option<u16> {
+        let hex = b.get(at..at + 4)?;
+        u16::from_str_radix(std::str::from_utf8(hex).ok()?, 16).ok()
+    };
+    let b = text.as_bytes();
+    let mut out = String::with_capacity(text.len());
+    let (mut i, mut copied) = (0, 0);
+    while i < b.len() {
+        if b[i] != b'\\' {
+            i += 1;
+            continue;
+        }
+        if b.get(i + 1) != Some(&b'u') {
+            i += 2;
+            continue;
+        }
+        let Some(u) = unit(b, i + 2) else {
+            i += 2;
+            continue;
+        };
+        let paired = (0xD800..0xDC00).contains(&u)
+            && b.get(i + 6) == Some(&b'\\')
+            && b.get(i + 7) == Some(&b'u')
+            && unit(b, i + 8).is_some_and(|l| (0xDC00..0xE000).contains(&l));
+        if paired {
+            i += 12;
+        } else if (0xD800..0xE000).contains(&u) {
+            out.push_str(&text[copied..i]);
+            out.push_str("\\uFFFD");
+            i += 6;
+            copied = i;
+        } else {
+            i += 6;
+        }
+    }
+    if copied == 0 {
+        return text.into();
+    }
+    out.push_str(&text[copied..]);
+    out.into()
 }
 
 /// A key JavaScript treats as an array index: `0`, or digits with no leading zero, below 2^32-1.
@@ -162,6 +218,18 @@ pub fn num(x: f64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_lone_surrogate_escape_reads_as_the_replacement_character() {
+        let v = parse(r#"{"a":"x\ud83d","b":"\ud83d\ude00","c":"\\ud83d","d":"\udc00y","e":"\uD83D\u0041"}"#)
+            .unwrap();
+        assert_eq!(v["a"], "x\u{fffd}");
+        assert_eq!(v["b"], "\u{1f600}");
+        assert_eq!(v["c"], "\\ud83d");
+        assert_eq!(v["d"], "\u{fffd}y");
+        assert_eq!(v["e"], "\u{fffd}A");
+        assert!(parse(r#"{"a":"\u12"}"#).is_err());
+    }
     use serde_json::json;
 
     #[test]

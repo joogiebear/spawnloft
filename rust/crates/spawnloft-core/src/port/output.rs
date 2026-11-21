@@ -30,7 +30,8 @@ impl Out {
             ..Out::default()
         }
     }
-    /// Writes to stdout; a closed stdout ends the command with exit 0, as the Node CLI does.
+    /// Writes to stdout. As in the Node CLI, a closed stdout (EPIPE) ends the command with exit
+    /// 0, and any other failure with `Output failed: ...` and exit 1.
     pub fn print(&mut self, text: &str) {
         if self.closed {
             return;
@@ -39,8 +40,16 @@ impl Out {
             Some((o, _)) => o.extend_from_slice(text.as_bytes()),
             None => {
                 let mut s = std::io::stdout().lock();
-                if s.write_all(text.as_bytes()).and_then(|()| s.flush()).is_err() {
-                    std::process::exit(0);
+                if let Err(e) = s.write_all(text.as_bytes()).and_then(|()| s.flush()) {
+                    if e.kind() == std::io::ErrorKind::BrokenPipe {
+                        std::process::exit(0);
+                    }
+                    let _ = writeln!(
+                        std::io::stderr(),
+                        "Output failed: {}",
+                        spawnloft_lib::jspath::node_error(&e, "write", None)
+                    );
+                    std::process::exit(1);
                 }
             }
         }
@@ -195,15 +204,7 @@ pub fn dir_text(inst: &Instance) -> Result<String, Failure> {
 
 /// The tail of Node's ERR_INVALID_ARG_TYPE message.
 pub fn received(v: Option<&Value>) -> String {
-    match v {
-        None => "Received undefined".into(),
-        Some(Value::Null) => "Received null".into(),
-        Some(Value::Bool(b)) => format!("Received type boolean ({b})"),
-        Some(Value::Number(_)) => format!("Received type number ({})", spawnloft_lib::js::string(v)),
-        Some(Value::String(s)) => format!("Received type string ('{s}')"),
-        Some(Value::Array(_)) => "Received an instance of Array".into(),
-        Some(Value::Object(_)) => "Received an instance of Object".into(),
-    }
+    spawnloft_lib::js::received(v)
 }
 
 /// `crashReports(inst, { limit })` as JSON.

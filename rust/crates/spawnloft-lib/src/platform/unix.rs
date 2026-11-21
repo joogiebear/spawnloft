@@ -122,6 +122,12 @@ fn send(pid: i32, sig: i32) -> bool {
     unsafe { kill(pid, sig) == 0 }
 }
 
+/// `process.kill(pid, 0)` for any whole pid, negative ones (process groups, -1 for all) included;
+/// EPERM counts as alive, as in `pidAlive`.
+pub fn signal_zero(pid: i32) -> bool {
+    send(pid, 0) || std::io::Error::last_os_error().raw_os_error() == Some(1)
+}
+
 /// Whether `pid` names a live process (EPERM counts: the pid is taken, just not ours).
 pub fn pid_alive(pid: u32) -> bool {
     let Ok(pid) = i32::try_from(pid) else {

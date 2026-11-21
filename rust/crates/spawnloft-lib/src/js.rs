@@ -231,6 +231,19 @@ pub fn positive_env(names: &[&str]) -> Option<f64> {
     None
 }
 
+/// The `Received ...` tail of Node's ERR_INVALID_ARG_TYPE message for a JSON value.
+pub fn received(v: Option<&Value>) -> String {
+    match v {
+        None => "Received undefined".into(),
+        Some(Value::Null) => "Received null".into(),
+        Some(Value::Bool(b)) => format!("Received type boolean ({b})"),
+        Some(Value::Number(_)) => format!("Received type number ({})", string(v)),
+        Some(Value::String(s)) => format!("Received type string ('{s}')"),
+        Some(Value::Array(_)) => "Received an instance of Array".into(),
+        Some(Value::Object(_)) => "Received an instance of Object".into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

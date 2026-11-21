@@ -59,7 +59,9 @@ export const DECLARED = [
   },
   {
     id: 'runtime-pattern-syntax',
-    where: 'a run-time pattern using lookaround or a backreference (`logs --grep`, MCP `get_logs`, bot scenarios)',
+    // C1 added the last three: a lone surrogate escape cannot be a Rust char, a count beyond
+    // 2^32 cannot be a Rust repetition, and the crate caps a pattern's compiled size and nesting
+    where: 'a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\\uD83D`), a repetition count beyond 2^32, or more than the matcher\'s size or nesting allows (`logs --grep`, MCP `get_logs`, bot scenarios)',
     node: 'accepted',
     rust: 'refused with a clear message',
     apply: null,
@@ -97,6 +99,59 @@ export const DECLARED = [
     apply: (text) => text
       .replace(/Unexpected end of JSON input|(?:Unexpected token|Expected |Bad (?:control|escaped|Unicode)|Unterminated (?:string|fractional)|No number after|Exponent part|Unexpected non-whitespace|Unexpected (?:number|string))[^\n]*?(?:in JSON at position \d+(?: \(line \d+ column \d+\))?|is not valid JSON)/g, '<invalid json>')
       .replace(/JSON parse error: [^\n")]*/g, '<invalid json>'),
+  },
+  {
+    // found by the C1 review: without the u flag JavaScript sees an emoji as two UTF-16 units,
+    // so `.` matches half of one and `[😀]` is a class of two halves; the Rust matcher works in
+    // whole characters
+    id: 'pattern-astral-units',
+    where: 'a run-time pattern meeting a character outside the Basic Multilingual Plane (an emoji)',
+    node: 'matched as two UTF-16 units (`^.{2} x` matches `😀 x`)',
+    rust: 'matched as one character (`^. x` matches `😀 x`)',
+    apply: null,
+    held: 'scenarios grep consoles whose emoji the pattern matches whole or not at all; test/fixtures/contracts/js-patterns.json has no pattern that splits one',
+  },
+  {
+    // found by the C1 review: a label cut at 48 UTF-16 units can end in half of an emoji, which
+    // the registry then holds as "\ud83d". Node prints it as U+FFFD and re-escapes it in --json;
+    // a Rust string cannot hold the half, so it reads as U+FFFD from the start
+    id: 'lone-surrogate',
+    where: 'a JSON file holding half of a surrogate pair (`"\\ud83d"`)',
+    node: 'kept; printed as U+FFFD, re-escaped as `\\ud83d` in JSON output',
+    rust: 'read as U+FFFD, printed and written as that character',
+    apply: (text) => text.replace(/\\ud[89a-f][0-9a-f]{2}/gi, '\ufffd'),
+  },
+  {
+    // found by the C1 review: JSON.parse reads 1e400 as Infinity; serde_json refuses it
+    id: 'json-number-out-of-range',
+    where: 'a JSON file holding a number beyond the double range (`1e400`)',
+    node: 'read as Infinity',
+    rust: 'refused as a file that does not parse',
+    apply: null,
+    held: 'no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); scenarios do not hand-write one',
+  },
+  {
+    // design D4 (rust/INSTALLER-UPDATER-DESIGN.md): 2.0's daemon records daemonStartTime, the
+    // kernel creation time of its process, which a reused pid cannot repeat; Node never reads it
+    id: 'process-start-time',
+    where: 'a state file whose `daemonStartTime` (written by 2.0\'s daemon) differs from the live process under that pid',
+    node: 'the field is ignored; the pid and the image name decide',
+    rust: 'the creation time decides where the system reports one',
+    apply: null,
+    held: 'the Node daemon never writes the field; scenarios write it only as the running daemon\'s own',
+  },
+  {
+    // found by the C1 review: paths.mjs resolves the layout on import, so a setting such as
+    // {"dataRoot": 5} crashes the Node core before main() runs, printing Node's source excerpt,
+    // the stack, the error's properties and its version line
+    id: 'settings-type-crash',
+    where: 'a settings value of the wrong type (`"dataRoot": 5`)',
+    node: 'an uncaught crash: source excerpt, the error line, the stack, `{ code: ... }` and `Node.js v<version>`',
+    rust: 'the error line alone, exit 1',
+    apply: (text) => text
+      .replace(/^node:[\w/]+:\d+\n[^\n]*\n *\^\n\n/m, '')
+      // the stack (and the ` {` that ends its last line) is gone by now: internal-error-stack
+      .replace(/^ {2}code: '[A-Z_]+'\n\}\n\nNode\.js v[^\n]*\n/m, ''),
   },
   {
     // plan section 3.4 and test/fixtures/contracts/C0-CHECKS.md section 2

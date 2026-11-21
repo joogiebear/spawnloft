@@ -472,11 +472,16 @@ The rig normalises these and nothing else; adding a row needs a reason in the PR
 | `repair` text and `--json` | `runtime: <node path>` | the core's own path |
 | Free-text sort order outside ASCII | ICU collation | the port's comparison function (3.4) |
 | Number grouping (`toLocaleString`, `mcctl.mjs:921,939`) | the system locale | fixed en-US grouping |
-| A run-time pattern using lookaround or a backreference | accepted | refused with a clear message (3.4) |
+| A run-time pattern using lookaround, a backreference, a lone surrogate escape, a count beyond 2^32 or more than the matcher's limits (the last three added in C1) | accepted | refused with a clear message (3.4) |
 | The error text for an invalid run-time pattern | V8's | the `regex` crate's |
 | An unexpected failure (added in C1) | the error line, then JavaScript's stack | the error line alone |
 | The text of a JSON file that does not parse (added in C1) | V8's `JSON.parse` message | serde_json's |
 | A checkout whose code folder holds `instances.json` (added in C1, C0-CHECKS.md section 2) | the code folder is the data root | the per-user data folder |
+| A run-time pattern meeting a character outside the BMP (added in C1) | matched as two UTF-16 units | matched as one character |
+| A JSON file holding half of a surrogate pair (added in C1) | kept, re-escaped in JSON output | read as U+FFFD |
+| A JSON number beyond the double range (added in C1) | Infinity | refused as unparseable |
+| A state file's `daemonStartTime` (added in C1, design D4) | ignored | decides, where the system reports a creation time |
+| A settings value of the wrong type (added in C1) | uncaught crash with excerpt, stack and version | the error line alone |
 
 ### 6.2 Faking the network for a spawned process
 

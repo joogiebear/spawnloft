@@ -121,6 +121,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c1-edges` | C1's commands (`help`, `list`, `status`, `logs`, `why`, `metrics`) over damaged registries, state files, logs, metrics and crash reports, every flag and its usage errors |
 | `c1-settings` | the data root and the other folders chosen by `settings.json` (XDG and Windows locations), a damaged settings file and its warning |
 | `c1-running` | the same commands against a running server (the fake JVM), text and `--json` |
+| `c1-review` | what the C1 review found: half an emoji or a record's own `name` in the registry, pids as `process.kill` coerces them, crash reports with equal times, `/i` patterns beyond ASCII and Annex B escapes, a large console with a count that is not whole, a sample past the year 9999 |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).
@@ -137,10 +138,15 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | free-text sort order outside ASCII | ICU collation | the port's comparison function (spawnloft-lib collate.rs) | scenarios sort ASCII names only; test/fixtures/contracts/ordering.json pins the ASCII order on both sides |
 | sort order on a machine whose locale tailors ASCII letters (da, nb, lt, et, ...) | that locale's order | the root order (what an en-US machine shows) | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 |
 | number grouping (`toLocaleString`, mcctl.mjs) | the system locale | fixed en-US grouping | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 (Windows runners are en-US) |
-| a run-time pattern using lookaround or a backreference (`logs --grep`, MCP `get_logs`, bot scenarios) | accepted | refused with a clear message | scenarios give such a pattern only in a step that expects the refusal, and test/fixtures/contracts/regex.json lists the sites |
+| a run-time pattern using lookaround, a backreference, a lone surrogate escape (`\uD83D`), a repetition count beyond 2^32, or more than the matcher's size or nesting allows (`logs --grep`, MCP `get_logs`, bot scenarios) | accepted | refused with a clear message | scenarios give such a pattern only in a step that expects the refusal, and test/fixtures/contracts/regex.json lists the sites |
 | the error text for an invalid run-time pattern | V8's (`Invalid regular expression: /(/: Unterminated group`) | the `regex` crate's | evened out (`invalid-pattern-text`) |
 | an unexpected failure (a file that is not JSON or cannot be read, a nonsense argument) | the error line, then JavaScript's stack (`    at ...` lines) | the error line alone | evened out (`internal-error-stack`) |
 | the text of a JSON file that does not parse (registry, state file, settings) | V8's `JSON.parse` message | `JSON parse error: ` and serde_json's message | evened out (`json-parse-error-text`) |
+| a run-time pattern meeting a character outside the Basic Multilingual Plane (an emoji) | matched as two UTF-16 units (`^.{2} x` matches `😀 x`) | matched as one character (`^. x` matches `😀 x`) | scenarios grep consoles whose emoji the pattern matches whole or not at all; test/fixtures/contracts/js-patterns.json has no pattern that splits one |
+| a JSON file holding half of a surrogate pair (`"\ud83d"`) | kept; printed as U+FFFD, re-escaped as `\ud83d` in JSON output | read as U+FFFD, printed and written as that character | evened out (`lone-surrogate`) |
+| a JSON file holding a number beyond the double range (`1e400`) | read as Infinity | refused as a file that does not parse | no SpawnLoft writer can produce one (JSON.stringify writes Infinity as null); scenarios do not hand-write one |
+| a state file whose `daemonStartTime` (written by 2.0's daemon) differs from the live process under that pid | the field is ignored; the pid and the image name decide | the creation time decides where the system reports one | the Node daemon never writes the field; scenarios write it only as the running daemon's own |
+| a settings value of the wrong type (`"dataRoot": 5`) | an uncaught crash: source excerpt, the error line, the stack, `{ code: ... }` and `Node.js v<version>` | the error line alone, exit 1 | evened out (`settings-type-crash`) |
 | a checkout whose code folder holds `instances.json` and no settings choose a data root | the code folder is the data root (and is listed among other registries) | the per-user data folder; the code folder is never a data root | no installed build can be in that state (C0-CHECKS.md section 2); the rig's code folder is the checkout, which has no instances.json |
 
 ## The download-host override

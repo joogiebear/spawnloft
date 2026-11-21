@@ -215,8 +215,8 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows, the locale row and C1\'s three, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 10)
+test('the declared differences are the plan\'s six rows, the locale row and C1\'s eight, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 15)
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'
@@ -232,6 +232,12 @@ test('the declared differences are the plan\'s six rows, the locale row and C1\'
     'Unexpected end of JSON input',
     'JSON parse error: EOF while parsing an object at line 1 column 41',
   ]) assert.equal(applyDeclared(`SyntaxError: ${text}`, 'list'), 'SyntaxError: <invalid json>', text)
+  // half of an emoji: Node's escape and the Rust core's U+FFFD read the same
+  assert.equal(applyDeclared('{"label":"a\\ud83d"}', 'list'), '{"label":"a\ufffd"}')
+  // a crash at import keeps only its error line
+  const crash = 'node:path:1272\n      validateString(path, `paths[${i}]`);\n      ^\n\nTypeError [ERR_INVALID_ARG_TYPE]: The "paths[0]" argument must be of type string. Received type number (5)\n' +
+    '    at Object.resolve (node:path:1272:7)\n    at f (file:///a.mjs:1:2) {\n  code: \'ERR_INVALID_ARG_TYPE\'\n}\n\nNode.js v22.23.5\n'
+  assert.equal(applyDeclared(crash, 'list'), 'TypeError [ERR_INVALID_ARG_TYPE]: The "paths[0]" argument must be of type string. Received type number (5)\n')
 })
 
 test('every scenario file loads and keeps to the rules', () => {

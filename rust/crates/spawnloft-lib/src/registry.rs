@@ -15,7 +15,7 @@ use std::sync::LazyLock;
 use crate::js;
 
 static NAME_RE: LazyLock<regex::Regex> =
-    LazyLock::new(|| regex::Regex::new(r"(?i)^[a-z0-9][a-z0-9_-]{0,31}$").expect("name pattern"));
+    LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$").expect("name pattern"));
 
 /// The same rule as `util.mjs` `validateName`: a name is a folder, a pipe name and an argument.
 pub fn validate_name(name: &str) -> Result<(), String> {
@@ -135,7 +135,7 @@ pub fn get_instance(registry_file: &Path, name: &str) -> Result<Instance, String
 fn load_instances(registry_file: &Path) -> Result<Map<String, Value>, String> {
     let text = match std::fs::read_to_string(registry_file) {
         Ok(t) => t,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Map::new()),
+        Err(e) if crate::jspath::is_enoent(&e) => return Ok(Map::new()),
         Err(e) => return Err(format!("could not read {}: {e}", registry_file.display())),
     };
     let data: Value = serde_json::from_str(text.trim_start_matches('\u{feff}'))
@@ -165,7 +165,8 @@ pub fn entries_of(v: &Value) -> Vec<(String, Value)> {
     }
 }
 
-/// `{ name, ...cfg }`: the name first, then the record's own fields.
+/// `{ name, ...cfg }`: the name first, then the record's own fields, so a record carrying its
+/// own `name` shows that one (in its first place).
 pub fn spread(name: &str, cfg: &Value) -> Instance {
     let mut fields = Map::new();
     fields.insert("name".into(), Value::String(name.into()));
@@ -173,7 +174,7 @@ pub fn spread(name: &str, cfg: &Value) -> Instance {
         fields.insert(k, v);
     }
     Instance {
-        name: name.to_string(),
+        name: js::string(fields.get("name")),
         fields,
     }
 }
@@ -184,7 +185,7 @@ pub fn load(registry_file: &Path) -> Result<Value, crate::failure::Failure> {
     use crate::failure::Failure;
     let text = match std::fs::read(registry_file) {
         Ok(b) => String::from_utf8_lossy(&b).into_owned(),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Value::Object(Map::new())),
+        Err(e) if crate::jspath::is_enoent(&e) => return Ok(Value::Object(Map::new())),
         Err(e) => return Err(Failure::read(&e, registry_file)),
     };
     let data = crate::jsjson::parse(&text).map_err(Failure::syntax)?;
@@ -219,8 +220,40 @@ pub fn load(registry_file: &Path) -> Result<Value, crate::failure::Failure> {
 pub fn list_all(registry_file: &Path) -> Result<Vec<Instance>, crate::failure::Failure> {
     let reg = load(registry_file)?;
     let mut all: Vec<Instance> = entries_of(&reg).iter().map(|(k, v)| spread(k, v)).collect();
+    // `a.name.localeCompare(b.name)` throws when `a.name` is not a string. V8 sorts a short
+    // array by binary insertion, where every record but the first is `a` at least once.
+    if let Some(bad) = all
+        .get(1..)
+        .unwrap_or_default()
+        .iter()
+        .find_map(|i| i.fields.get("name").filter(|v| !v.is_string()))
+    {
+        return Err(crate::failure::Failure::type_error(if bad.is_null() {
+            "Cannot read properties of null (reading 'localeCompare')".to_string()
+        } else {
+            "a.name.localeCompare is not a function".to_string()
+        }));
+    }
     all.sort_by(|a, b| crate::collate::compare(&a.name, &b.name));
     Ok(all)
+}
+
+impl Instance {
+    /// The name as a path segment: `path.join` takes strings only, so a record whose own `name`
+    /// is not one fails where its run folder is built.
+    pub fn path_name(&self) -> Result<&str, crate::failure::Failure> {
+        match self.fields.get("name") {
+            Some(Value::String(_)) | None => Ok(&self.name),
+            other => Err(crate::failure::Failure::Internal {
+                head: "TypeError [ERR_INVALID_ARG_TYPE]".into(),
+                message: format!(
+                    "The \"path\" argument must be of type string. {}",
+                    js::received(other)
+                ),
+                code: Some("ERR_INVALID_ARG_TYPE".into()),
+            }),
+        }
+    }
 }
 
 /// `listInstances()`: servers only.

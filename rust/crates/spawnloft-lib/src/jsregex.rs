@@ -116,6 +116,39 @@ fn group_count(chars: &[char]) -> usize {
     n
 }
 
+/// Whether the pattern has a named group, which turns `\k<name>` into a backreference.
+fn has_named_groups(chars: &[char]) -> bool {
+    let (mut i, mut in_class) = (0, false);
+    while i < chars.len() {
+        match chars[i] {
+            '\\' => i += 1,
+            '[' => in_class = true,
+            ']' => in_class = false,
+            '(' if !in_class
+                && chars.get(i + 1) == Some(&'?')
+                && chars.get(i + 2) == Some(&'<')
+                && !matches!(chars.get(i + 3), Some('=' | '!')) =>
+            {
+                return true;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    false
+}
+
+/// A group name as JavaScript accepts it: an identifier, `$` and `_` included.
+fn valid_group_name(name: &[char]) -> bool {
+    let Some((first, rest)) = name.split_first() else {
+        return false;
+    };
+    (first.is_alphabetic() || *first == '$' || *first == '_')
+        && rest
+            .iter()
+            .all(|c| c.is_alphanumeric() || matches!(c, '$' | '_' | '\u{200c}' | '\u{200d}'))
+}
+
 /// The escape at `chars[i] == '\\'` and how many chars it used.
 fn escape(chars: &[char], i: usize, in_class: bool) -> Result<(Atom, usize), PatternError> {
     let Some(&c) = chars.get(i + 1) else {
@@ -147,7 +180,8 @@ fn escape(chars: &[char], i: usize, in_class: bool) -> Result<(Atom, usize), Pat
         }
         // Annex B: \8 and \9 with no such group are the digits themselves
         '8' | '9' => (Atom::Char(c as u32), 2),
-        'k' if !in_class && chars.get(i + 2) == Some(&'<') => {
+        // with no named group in the pattern, Annex B reads `\k` as the letter k
+        'k' if !in_class && has_named_groups(chars) => {
             return Err(PatternError::Unsupported("a backreference"));
         }
         '0'..='7' => {
@@ -177,6 +211,8 @@ fn escape(chars: &[char], i: usize, in_class: bool) -> Result<(Atom, usize), Pat
         },
         'c' => match chars.get(i + 2) {
             Some(l) if l.is_ascii_alphabetic() => (Atom::Char(u32::from(*l) % 32), 3),
+            // Annex B ClassControlLetter: inside a class, a digit or `_` works as a letter does
+            Some(l) if in_class && (l.is_ascii_digit() || *l == '_') => (Atom::Char(u32::from(*l) % 32), 3),
             // Annex B: `\c` not followed by a letter is a backslash and a c
             _ => (Atom::Char('\\' as u32), 1),
         },
@@ -184,34 +220,43 @@ fn escape(chars: &[char], i: usize, in_class: bool) -> Result<(Atom, usize), Pat
     })
 }
 
-/// JavaScript's other case of `c` under the ignore-case flag without `u`: its upper case when
-/// that is one code unit, never crossing from outside ASCII into ASCII (so `ſ` is not `s`, and
-/// the Kelvin sign is not `k`); and every lower-case letter whose upper case is `c`.
+/// `Canonicalize(ch)` without `u`: the upper case when that is one code unit, never crossing
+/// from outside ASCII into ASCII (so `ſ` is not `s`, and the Kelvin sign is not `k`).
+fn canonical(x: char) -> u32 {
+    let mut up = x.to_uppercase();
+    match (up.next(), up.next()) {
+        (Some(u), None) if !(x as u32 >= 128 && (u as u32) < 128) && (u as u32) <= 0xffff => u as u32,
+        _ => x as u32,
+    }
+}
+
+/// Every code unit with the same canonical form as `c`: what `/c/i` matches. Characters beyond
+/// the BMP are two code units to JavaScript without `u`, and no case applies to them.
 fn case_mates(c: u32) -> Vec<u32> {
-    let Some(ch) = char::from_u32(c) else {
-        return vec![c];
-    };
-    let canon = |x: char| -> u32 {
-        let mut up = x.to_uppercase();
-        match (up.next(), up.next()) {
-            (Some(u), None) if !(x as u32 >= 128 && (u as u32) < 128) && (u as u32) <= 0xffff => u as u32,
-            _ => x as u32,
-        }
-    };
-    let target = canon(ch);
-    let mut out = vec![c];
-    let mut add = |x: u32| {
-        if !out.contains(&x) {
-            out.push(x);
-        }
-    };
-    add(target);
-    if let Some(t) = char::from_u32(target) {
-        for l in t.to_lowercase() {
-            if canon(l) == target {
-                add(l as u32);
+    use std::collections::HashMap;
+    use std::sync::LazyLock;
+    static BY_CANON: LazyLock<HashMap<u32, Vec<u32>>> = LazyLock::new(|| {
+        let mut map: HashMap<u32, Vec<u32>> = HashMap::new();
+        for x in (0..=0xffffu32).filter_map(char::from_u32) {
+            let k = canonical(x);
+            if k != x as u32 || map.contains_key(&k) {
+                map.entry(k).or_default().push(x as u32);
             }
         }
+        // each group holds its canonical member too
+        for (k, v) in map.iter_mut() {
+            if !v.contains(k) {
+                v.push(*k);
+            }
+        }
+        map
+    });
+    let Some(ch) = char::from_u32(c).filter(|_| c <= 0xffff) else {
+        return vec![c];
+    };
+    let mut out = vec![c];
+    if let Some(group) = BY_CANON.get(&canonical(ch)) {
+        out.extend(group.iter().copied().filter(|&m| m != c));
     }
     out
 }
@@ -256,17 +301,49 @@ fn set_text(set: &[(u32, u32)], negated: bool) -> String {
     format!("[{}{}]", if negated { "^" } else { "" }, ranges_text(set))
 }
 
+/// What came last, for the "Nothing to repeat" rule.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Last {
+    /// The start, `(` or `|`.
+    Nothing,
+    /// `^`, `$`, `\b` or `\B`, which JavaScript does not repeat.
+    Assertion,
+    Atom,
+    /// A quantifier, which a `?` may still make lazy.
+    Quantified,
+    Lazy,
+}
+
+impl Last {
+    fn quantified(self, question_mark: bool) -> Option<Last> {
+        match self {
+            Last::Atom => Some(Last::Quantified),
+            Last::Quantified if question_mark => Some(Last::Lazy),
+            _ => None,
+        }
+    }
+}
+
 /// The pattern in this crate's syntax.
 pub fn translate(source: &str, ignore_case: bool) -> Result<String, PatternError> {
     let chars: Vec<char> = source.chars().collect();
     let mut out = String::new();
     let mut i = 0;
     let mut depth = 0usize;
+    let mut names: Vec<String> = Vec::new();
+    // what a quantifier would apply to: JavaScript refuses one with nothing to repeat
+    let mut last = Last::Nothing;
+    let nothing = || PatternError::Invalid("Nothing to repeat".into());
     while i < chars.len() {
         let c = chars[i];
         match c {
             '\\' => {
                 let (atom, used) = escape(&chars, i, false)?;
+                last = if matches!(atom, Atom::Raw(_)) {
+                    Last::Assertion
+                } else {
+                    Last::Atom
+                };
                 out.push_str(&match atom {
                     Atom::Char(n) => char_text(n, ignore_case),
                     Atom::Set(set, neg) => set_text(set, neg),
@@ -276,6 +353,7 @@ pub fn translate(source: &str, ignore_case: bool) -> Result<String, PatternError
             }
             '.' => {
                 out.push_str(JS_DOT);
+                last = Last::Atom;
                 i += 1;
             }
             '(' => {
@@ -290,16 +368,24 @@ pub fn translate(source: &str, ignore_case: bool) -> Result<String, PatternError
                     return Err(PatternError::Invalid("Invalid group".into()));
                 }
                 depth += 1;
+                last = Last::Nothing;
                 if rest.starts_with("(?:") {
                     out.push_str("(?:");
                     i += 3;
                 } else if rest.starts_with("(?<") {
-                    // a named group: the name up to `>` is copied as it is
+                    // a named group; the name only matters to a backreference, which is refused,
+                    // so it is checked and dropped (this crate's names are narrower)
                     let end = chars[i..].iter().position(|&c| c == '>').map(|p| i + p);
-                    let Some(end) = end else {
+                    let name = end.map(|e| &chars[i + 3..e]).filter(|n| valid_group_name(n));
+                    let (Some(end), Some(name)) = (end, name) else {
                         return Err(PatternError::Invalid("Invalid capture group name".into()));
                     };
-                    out.extend(&chars[i..=end]);
+                    let name: String = name.iter().collect();
+                    if names.contains(&name) {
+                        return Err(PatternError::Invalid("Duplicate capture group name".into()));
+                    }
+                    names.push(name);
+                    out.push('(');
                     i = end + 1;
                 } else {
                     out.push('(');
@@ -312,29 +398,61 @@ pub fn translate(source: &str, ignore_case: bool) -> Result<String, PatternError
                 }
                 depth -= 1;
                 out.push(')');
+                last = Last::Atom;
                 i += 1;
             }
             '{' => match quantifier_len(&chars, i) {
                 Some(n) => {
+                    last = last.quantified(false).ok_or_else(nothing)?;
+                    let body: String = chars[i + 1..i + n - 1].iter().collect();
+                    let mut counts = body.split(',').filter(|d| !d.is_empty()).map(str::parse::<u32>);
+                    let (lo, hi) = (counts.next(), counts.next());
+                    if lo.as_ref().is_some_and(Result::is_err) || hi.as_ref().is_some_and(Result::is_err) {
+                        return Err(PatternError::Unsupported("a repetition count this large"));
+                    }
+                    if let (Some(Ok(lo)), Some(Ok(hi))) = (lo, hi)
+                        && lo > hi
+                    {
+                        return Err(PatternError::Invalid(
+                            "numbers out of order in {} quantifier".into(),
+                        ));
+                    }
                     out.extend(&chars[i..i + n]);
                     i += n;
                 }
                 None => {
                     out.push_str(&char_text('{' as u32, false));
+                    last = Last::Atom;
                     i += 1;
                 }
             },
             '}' | ']' => {
                 out.push_str(&char_text(c as u32, false));
+                last = Last::Atom;
                 i += 1;
             }
-            '[' => i = class(&chars, i, ignore_case, &mut out)?,
-            '|' | '^' | '$' | '*' | '+' | '?' => {
+            '[' => {
+                i = class(&chars, i, ignore_case, &mut out)?;
+                last = Last::Atom;
+            }
+            '|' => {
+                out.push(c);
+                last = Last::Nothing;
+                i += 1;
+            }
+            '^' | '$' => {
+                out.push(c);
+                last = Last::Assertion;
+                i += 1;
+            }
+            '*' | '+' | '?' => {
+                last = last.quantified(c == '?').ok_or_else(nothing)?;
                 out.push(c);
                 i += 1;
             }
             other => {
                 out.push_str(&char_text(other as u32, ignore_case));
+                last = Last::Atom;
                 i += 1;
             }
         }
@@ -442,18 +560,9 @@ pub fn compile(source: &str, ignore_case: bool) -> Result<Regex, PatternError> {
     regex::RegexBuilder::new(&translated)
         .size_limit(1 << 24)
         .build()
-        .map_err(|e| {
-            // the crate's message is several lines (the pattern, a caret, the error); its last line
-            // says what is wrong
-            let text = e.to_string();
-            let last = text
-                .lines()
-                .rev()
-                .find(|l| !l.trim().is_empty())
-                .unwrap_or("")
-                .trim();
-            PatternError::Invalid(last.strip_prefix("error: ").unwrap_or(last).to_string())
-        })
+        // translate has already refused what JavaScript refuses, so what is left is this
+        // crate's own limits (compiled size, nesting depth)
+        .map_err(|_| PatternError::Unsupported("more repetition or nesting than its matcher allows"))
 }
 
 #[cfg(test)]
@@ -502,7 +611,7 @@ mod tests {
             .map(|s| s.as_str().unwrap())
             .collect();
         // what the core refuses on purpose though JavaScript runs it (runtime-pattern-syntax)
-        let refused_on_purpose = ["\\uD83D"];
+        let refused_on_purpose = ["\\uD83D", "x(?<n>a)\\k<n>", "a{99999999999}"];
         // JavaScript compares UTF-16 units, so a pattern that is a single unit can match half of
         // an emoji; nothing here can split one
         for p in fx["patterns"].as_array().unwrap() {

@@ -20,12 +20,13 @@ fn or_null(state: Option<&Map<String, Value>>, key: &str) -> Value {
 /// `statusOf(name)`: the registry record with the live status and the state file's figures.
 pub fn status_of(layout: &Layout, name: &str) -> Result<(Instance, Status), Failure> {
     let inst = registry::lookup(Path::new(&layout.registry_file), name)?;
-    status_of_instance(layout, inst)
+    status_of_instance(layout, inst, name)
 }
 
-/// [`status_of`] for a record already read.
-pub fn status_of_instance(layout: &Layout, inst: Instance) -> Result<(Instance, Status), Failure> {
-    let name = inst.name.clone();
+/// [`status_of`] for a record already read. The run folder is the one of `key`, the name it was
+/// looked up by, even when the record carries a `name` of its own.
+pub fn status_of_instance(layout: &Layout, inst: Instance, key: &str) -> Result<(Instance, Status), Failure> {
+    let name = key.to_string();
     let (status, state) = control::read_state(Path::new(&layout.state_file(&name)))?;
     let s = state.as_ref();
     let mut fields = inst.fields;
@@ -60,7 +61,13 @@ pub fn status_of_instance(layout: &Layout, inst: Instance) -> Result<(Instance, 
     for (k, v) in rows {
         fields.insert(k.into(), v);
     }
-    Ok((Instance { name, fields }, status))
+    Ok((
+        Instance {
+            name: inst.name,
+            fields,
+        },
+        status,
+    ))
 }
 
 /// `array.slice(start)`'s first index for a JavaScript number `start`.
@@ -117,8 +124,33 @@ pub fn tail_log(file: &Path, count: f64) -> Result<Vec<String>, Failure> {
             code: Some("ERR_OUT_OF_RANGE".into()),
         });
     }
+    // readSync's position, size - readBytes, must be whole once the read starts past the start
+    if size > read_bytes && read_bytes.fract() != 0.0 {
+        return Err(Failure::Internal {
+            head: "RangeError [ERR_OUT_OF_RANGE]".into(),
+            message: format!(
+                "The value of \"position\" is out of range. It must be an integer. Received {}",
+                crate::js::number_to_string(size - read_bytes)
+            ),
+            code: Some("ERR_OUT_OF_RANGE".into()),
+        });
+    }
+    // Buffer.alloc rounds the size down
     let n = read_bytes.trunc() as u64;
-    let mut f = std::fs::File::open(file).map_err(|e| Failure::io(&e, "open", Some(file)))?;
+    // buf.toString refuses more bytes than V8's longest string; refuse before allocating them
+    if n > 0x1fff_ffe8 {
+        return Err(Failure::Internal {
+            head: "Error".into(),
+            message: "Cannot create a string longer than 0x1fffffe8 characters".into(),
+            code: Some("ERR_STRING_TOO_LONG".into()),
+        });
+    }
+    let mut f = match std::fs::File::open(file) {
+        Ok(f) => f,
+        // Windows will not open a folder, which Node opens and then fails to read
+        Err(e) if file.is_dir() => return Err(Failure::read(&e, file)),
+        Err(e) => return Err(Failure::io(&e, "open", Some(file))),
+    };
     f.seek(SeekFrom::Start(meta.len() - n))
         .map_err(|e| Failure::io(&e, "read", None))?;
     let mut buf = vec![0u8; n as usize];

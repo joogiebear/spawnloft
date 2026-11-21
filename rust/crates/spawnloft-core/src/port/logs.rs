@@ -13,7 +13,7 @@ use super::args::Flag;
 pub fn grep_pattern(source: &str) -> Result<spawnloft_lib::regex::Regex, Failure> {
     jsregex::compile(source, true).map_err(|e| match e {
         PatternError::Unsupported(what) => Failure::user(format!(
-            "the pattern /{source}/ uses {what}, which SpawnLoft cannot run; write it without one"
+            "the pattern /{source}/ uses {what}, which SpawnLoft cannot run; write the pattern another way"
         )),
         PatternError::Invalid(why) => Failure::syntax(format!(
             "Invalid regular expression: /{source}/i: regex parse error: {why}"
