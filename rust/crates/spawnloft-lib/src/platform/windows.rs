@@ -352,6 +352,27 @@ fn taskkill(pid: u32) {
     let _ = cmd.spawn();
 }
 
+/// `os.uptime()`: whole seconds since the machine started.
+pub fn uptime_secs() -> u64 {
+    // SAFETY: plain call with no arguments.
+    unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount64() / 1000 }
+}
+
+/// `taskkill /PID <pid> /T` without `/F`, waited for: Windows sends the game's window WM_CLOSE,
+/// which it takes as its window closing. Whether taskkill said it did.
+pub fn ask_to_close(pid: i32) -> bool {
+    if pid <= 0 {
+        return false;
+    }
+    let mut cmd = Command::new("taskkill");
+    cmd.args(["/PID", &pid.to_string(), "/T"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    hide_window(&mut cmd);
+    cmd.status().is_ok_and(|s| s.code() == Some(0))
+}
+
 /// `taskkill /PID <pid> /T /F`, started and not waited for, as supervisor.mjs `killTree` does.
 pub fn kill_tree_pid(pid: u32) {
     taskkill(pid);

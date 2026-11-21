@@ -136,6 +136,8 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c4-running` | the same against a running server: `rebuild` refused, a template and a clone made from it anyway, `rebuild` once it stopped |
 | `c4-reveal` | `reveal` and `open` on Linux: no display, a stand-in `xdg-open` on PATH, and no file manager at all. Linux only, so nothing opens on a desktop runner |
 | `c4-fetch` | `new` with every software flag against faked Paper, Folia, Purpur, Mojang, InfernalSuite, Fabric, NeoForge and SpigotMC hosts (sha256, sha1 and md5 checks, size floors, missing versions and builds), Java picked or refused before a download, BuildTools and the NeoForge installer played by a stand-in `java` (a failed install removes the server), `upgrade` with `--check`, `--build` and `--version --yes`, and `paper`'s listing flags. Linux and macOS (the stand-in is a shell script) |
+| `c7-client-store` | C7's client subcommands that need no network: `client list`, `status`, `logs` (the capture's log4j events turned into plain lines, `--latest`, `-n` and its refusals), `accounts`, `logout`, `remove` with and without `--purge` and `stop`, over damaged and hand-made profile, account and state files, then around a game the Node core launches (the fake client, `MCCTL_FAKE_CLIENT`) |
+| `c7-client-edges` | damaged accounts files for those subcommands: `accounts` that is not a list, null and nameless entries, an empty default account, a world-readable file that `logout` rewrites owner-only, and `-n 0x2` and an empty `--n=` |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

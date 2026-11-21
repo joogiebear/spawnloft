@@ -1,0 +1,27 @@
+{
+  "about": "C7 part 1, the review's edge cases: an accounts list that is not a list, null and nameless entries, an empty default account, a world-readable accounts file rewritten owner-only by logout, and -n written as 0x2 or empty.",
+  "steps": [
+    {"write": "data/client/profiles.json", "json": {"version": 1, "profiles": {"b": {"mc": "1", "account": "Steve"}, "10": {"mc": "x"}, "2": {"mc": "y"}}, "defaultAccount": ""}},
+    {"write": "data/client/accounts.json", "mode": "600", "json": {"version": 1, "accounts": {}}},
+    {"run": ["client", "list"]},
+    {"run": ["client", "accounts"]},
+    {"run": ["client", "logout", "x"]},
+    {"run": ["client", "status", "zz"]},
+    {"write": "data/client/accounts.json", "mode": "600", "json": {"version": 1, "accounts": [null]}},
+    {"run": ["client", "accounts"]},
+    {"run": ["client", "list"]},
+    {"run": ["client", "logout", "x"]},
+    {"write": "data/client/accounts.json", "mode": "600", "json": {"version": 1, "accounts": [{"name": "A"}, {"name": 5, "uuid": "u"}]}},
+    {"run": ["client", "accounts"]},
+    {"run": ["client", "logout", "x"]},
+    {"run": ["client", "logout", "a"]},
+    {"write": "data/client/accounts.json", "mode": "644", "json": {"version": 1, "accounts": [{"type": "offline", "name": "Z", "uuid": "aaaaaaaa-1111-2222-3333-444444444444", "accessToken": "tok"}, {"type": "offline", "name": "Y", "uuid": "b"}]}},
+    {"run": ["client", "logout", "Z", "--json"]},
+    {"write": "data/client/accounts.json", "mode": "600", "json": {"version": 1, "accounts": [{"name": "Q", "uuid": ""}]}},
+    {"write": "data/client/profiles.json", "json": {"version": 1, "profiles": {}, "defaultAccount": ""}},
+    {"run": ["client", "accounts"]},
+    {"write": "data/client/profiles.json", "json": {"version": 1, "profiles": {"b": {"mc": "1"}}}},
+    {"run": ["client", "logs", "b", "-n", "0x2"]},
+    {"run": ["client", "logs", "b", "--n=", "--json"]}
+  ]
+}
