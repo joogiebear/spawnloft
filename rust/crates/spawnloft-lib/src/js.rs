@@ -395,3 +395,17 @@ mod object_tests {
         assert_eq!(got, vec![p("2", 4), p("10", 2), p("b", 5)]);
     }
 }
+
+/// `a === b` for values read from JSON: primitives by value, an object or array never equal to
+/// another (two parses are two objects), `undefined` only to `undefined`.
+pub fn strict_equals(a: Option<&serde_json::Value>, b: Option<&serde_json::Value>) -> bool {
+    use serde_json::Value as V;
+    match (a, b) {
+        (None, None) => true,
+        (Some(V::Null), Some(V::Null)) => true,
+        (Some(V::Bool(x)), Some(V::Bool(y))) => x == y,
+        (Some(V::String(x)), Some(V::String(y))) => x == y,
+        (Some(V::Number(x)), Some(V::Number(y))) => x.as_f64() == y.as_f64(),
+        _ => false,
+    }
+}

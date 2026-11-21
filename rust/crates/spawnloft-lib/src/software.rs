@@ -1,5 +1,5 @@
-//! The parts of `software.mjs` the lifecycle needs before C4 ports the rest: the Minecraft
-//! version a server jar's name carries.
+//! `software.mjs`: the table of server software SpawnLoft can create, and what a jar's name says
+//! about the server (its Minecraft version, its loader).
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -20,6 +20,24 @@ pub fn version_from_jar(jar: &str) -> Option<String> {
         .map(|m| m[1].to_string())
 }
 
+/// `guessLoader(jar, { hasNeoforgeLibs })`: from the jar name, and for NeoForge from the
+/// libraries tree its installer leaves. Anything unrecognised is Paper.
+pub fn guess_loader(jar: &str, has_neoforge_libs: bool) -> String {
+    let lower = jar.to_ascii_lowercase();
+    if lower.starts_with("fabric-server") {
+        return "fabric".into();
+    }
+    if has_neoforge_libs {
+        return "neoforge".into();
+    }
+    for id in ["purpur", "folia", "asp", "spigot", "craftbukkit", "vanilla"] {
+        if lower.starts_with(&format!("{id}-")) {
+            return id.into();
+        }
+    }
+    "paper".into()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -34,5 +52,16 @@ mod tests {
         assert_eq!(v("fabric-server-mc.1.21.1.jar"), None);
         assert_eq!(v("server.jar"), None);
         assert_eq!(v("paper-26.1.jar").as_deref(), Some("26.1"));
+    }
+
+    #[test]
+    fn loaders_from_jar_names() {
+        use super::guess_loader as g;
+        assert_eq!(g("Fabric-Server-launch.jar", true), "fabric");
+        assert_eq!(g("server.jar", true), "neoforge");
+        assert_eq!(g("PURPUR-1.21.jar", false), "purpur");
+        assert_eq!(g("craftbukkit-1.21.jar", false), "craftbukkit");
+        assert_eq!(g("vanilla.jar", false), "paper");
+        assert_eq!(g("custom.jar", false), "paper");
     }
 }

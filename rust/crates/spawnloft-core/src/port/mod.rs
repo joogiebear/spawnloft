@@ -7,14 +7,16 @@
 //! `logs`, `why` and `metrics`, with their aliases. C2 moved the server lifecycle: `start`,
 //! `stop`, `restart`, `kill`, `cmd`, `send`, `console`, `players`, `set` and `props`, and the
 //! databases: `db`. C3 moved the backups: `backup`, `snapshots`, `restore`, `prune` and
-//! `verify`, with their aliases, `config` and `worlds`. C7 moves the client launcher, one group
-//! of `client` subcommands at a time.
+//! `verify`, with their aliases, `config` and `worlds`. C4 moves making servers: `new` (but
+//! `--modpack`, C5), `clone`, `adopt`, `templates`, `jars`, `launchers`, `reveal` and `rebuild`. C7 moves the client
+//! launcher, one group of `client` subcommands at a time.
 
 pub mod args;
 mod backup;
 mod client;
 mod config;
 mod configure;
+mod create;
 mod db;
 mod lifecycle;
 mod list;
@@ -167,6 +169,14 @@ fn dispatch(
         "verify" => backup::verify(&mut ctx),
         "config" => config::config(&mut ctx),
         "worlds" => worlds::worlds(&mut ctx),
+        "new" => create::new(&mut ctx),
+        "clone" => create::clone(&mut ctx),
+        "adopt" => create::adopt(&mut ctx),
+        "templates" | "template" => create::templates(&mut ctx),
+        "jars" => create::jars(&mut ctx),
+        "launchers" => create::launchers(&mut ctx),
+        "reveal" | "open" => create::reveal(&mut ctx),
+        "rebuild" => create::rebuild(&mut ctx),
         "client" => client::client(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
