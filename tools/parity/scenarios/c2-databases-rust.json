@@ -3,6 +3,12 @@
  "env": {
   "SPAWNLOFT_DAEMON": "rust"
  },
+ "normalize": [
+  {
+   "pattern": "uptime: +[^\\n]*",
+   "replace": "uptime: <uptime>"
+  }
+ ],
  "ignore": [
   "data/run/**",
   "data/services/*/data/fake-shutdowns.log",
