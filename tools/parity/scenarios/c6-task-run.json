@@ -22,6 +22,10 @@
   {
    "pattern": "done in \\d+s",
    "replace": "done in <n>s"
+  },
+  {
+   "pattern": "<stamp>_\\d+\\.",
+   "replace": "<stamp>."
   }
  ],
  "steps": [

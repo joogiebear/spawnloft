@@ -373,7 +373,7 @@ pub fn query(s: &Sched, tasks: &Map<String, Value>) -> Map<String, Value> {
     out
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
