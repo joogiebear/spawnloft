@@ -174,7 +174,8 @@ export async function list() {
   const data = load()
   const live = native ? await native.query(data.tasks, recentRuns) : await queryWindows()
   return Object.entries(data.tasks)
-    .map(([id, task]) => ({ id, ...task, windows: live.get(id) ?? null }))
+    // Task Scheduler names ignore case, and a task overwritten with /F keeps the case it had
+    .map(([id, task]) => ({ id, ...task, windows: live.get(native ? id : id.toLowerCase()) ?? null }))
     .sort((a, b) => a.instance.localeCompare(b.instance) || a.name.localeCompare(b.name))
 }
 
@@ -232,7 +233,7 @@ function queryWindows() {
           for (const row of Array.isArray(parsed) ? parsed : [parsed]) {
             // a task that never ran is reported as having run in 1999
             if (row.lastRun && new Date(row.lastRun).getFullYear() < 2000) row.lastRun = null
-            out.set(row.name, row)
+            out.set(String(row.name).toLowerCase(), row)
           }
         } catch {
           /* unparseable output: every task reports as unknown */
@@ -474,6 +475,30 @@ export function recentRuns(instance, limit = 40) {
   return rows.reverse().slice(0, limit)
 }
 
+// Task Scheduler names ignore case, and so do the plist and shim filenames on a default Windows
+// or macOS disk, so "gamma-backup" and "Gamma-backup" are one task there.
+export const caseOnlyChange = (a, b) => a !== b && a.toLowerCase() === b.toLowerCase()
+
+// Moves one task's registration from one id to another. Normally the new one goes in before the
+// old one comes out, so a failure never loses the schedule. When only the capitals change that
+// order destroys the task: writing the new id overwrites the old one, and removing the old id
+// then removes the new one. So the old one comes out first and is put back if the write fails.
+export function swapRegistration(from, to, { write, remove }) {
+  if (!caseOnlyChange(from, to)) {
+    write(to)
+    try { remove(from) } catch (error) {
+      try { remove(to) } catch { /* nothing more to try */ }
+      throw error
+    }
+    return
+  }
+  remove(from)
+  try { write(to) } catch (error) {
+    try { write(from) } catch { /* nothing more to try */ }
+    throw error
+  }
+}
+
 // Task ids are `<instance>-<action>`, so they move with the instance. Run log lines keep the
 // old id, which is what the task was called when it ran.
 function renameInstanceLocked(oldName, newName) {
@@ -497,9 +522,12 @@ function renameInstanceLocked(oldName, newName) {
       // stage the new agent disabled so a login trigger can't fire mid-rename
       data.tasks[m.to] = { ...m.task, enabled: false }
       writeJson(TASKS_FILE(), data)
-      try { native.write(m.to, data.tasks[m.to]); native.remove(m.from) }
-      catch (error) {
-        try { native.remove(m.to) } catch {}
+      try {
+        swapRegistration(m.from, m.to, {
+          write: (id) => native.write(id, id === m.to ? data.tasks[m.to] : data.tasks[m.from]),
+          remove: (id) => native.remove(id),
+        })
+      } catch (error) {
         delete data.tasks[m.to]
         writeJson(TASKS_FILE(), data)
         throw error
@@ -514,6 +542,20 @@ function renameInstanceLocked(oldName, newName) {
   // new trigger goes in before the old one comes out, so a half-failed rename never loses the schedule
   const stranded = []
   for (const m of moved) {
+    if (caseOnlyChange(m.from, m.to)) {
+      swapRegistration(m.from, m.to, {
+        write: (id) => writeWindowsTask(id, id === m.to ? m.task : data.tasks[m.from]),
+        // tolerant: if Windows keeps the old task, the /F in writeWindowsTask overwrites it in place
+        remove: (id) => {
+          try { schtasks(['/Delete', '/TN', `${TASK_FOLDER}\\${id}`, '/F']) } catch { /* overwritten next */ }
+          fs.rmSync(path.join(DATA_ROOT, 'tasks', `${id}.cmd`), { force: true })
+        },
+      })
+      delete data.tasks[m.from]
+      data.tasks[m.to] = m.task
+      writeJson(TASKS_FILE(), data)
+      continue
+    }
     writeWindowsTask(m.to, m.task)
     if (m.to !== m.from) {
       try {
