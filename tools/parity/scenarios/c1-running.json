@@ -1,0 +1,36 @@
+{
+  "about": "C1's commands over a server that is really running: started by the Node core on both sides (start is not ported yet) with the JVM stand-in, then list, status, why, logs and metrics while it runs, a database row next to it, and the same after it stops.",
+  "normalize": [
+    { "pattern": "\\b\\d+s\\b", "replace": "<secs>" },
+    { "pattern": "\"(?:uptimeMs)\":\\d+", "replace": "\"uptimeMs\":<ms>" },
+    { "pattern": "Started \"run1\" in [^\\n]*", "replace": "Started \"run1\" <took>" },
+    { "pattern": "\\(build [^)]*\\)", "replace": "(build)" },
+    { "pattern": "\"runId\":\"run1:\\d+\"", "replace": "\"runId\":\"run1:<epoch-ms>\"" },
+    { "pattern": "\"at\":\\d+,\"cpuPercent\":[\\d.]+,\"rssMiB\":[\\d.]+", "replace": "\"at\":<s>,\"cpuPercent\":<n>,\"rssMiB\":<n>" }
+  ],
+  "ignore": ["data/run/run1/**", "data/instances/run1/logs/**"],
+  "steps": [
+    { "write": "data/instances/run1/server.jar", "text": "" },
+    { "write": "data/instances/run1/eula.txt", "text": "eula=true\n" },
+    { "write": "data/instances.json", "json": {
+      "version": 1,
+      "instances": {
+        "run1": { "dir": "{data}/instances/run1", "jar": "server.jar", "java": "{repo}/test/fixtures/fake-java.mjs", "memory": "1G", "port": 47731, "rcon": { "port": 47741, "password": "test" } },
+        "db1": { "kind": "database", "engine": "mariadb", "version": "11.4.5", "dir": "{data}/services/db1", "port": 47751 }
+      }
+    } },
+    { "run": ["start", "run1", "--timeout", "60"], "expect": { "code": 0 }, "golden": false, "timeoutMs": 90000 },
+    { "run": ["list"], "expect": { "code": 0, "stdoutIncludes": "running" } },
+    { "run": ["status"], "expect": { "code": 0, "stdoutIncludes": "running" } },
+    { "run": ["status", "run1"], "expect": { "code": 0, "stdoutIncludes": "java pid" } },
+    { "run": ["status", "run1", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"status\":\"running\"" } },
+    { "run": ["list", "--json"], "expect": { "code": 0 } },
+    { "run": ["why", "run1"] },
+    { "run": ["logs", "run1", "--grep", "done \\("], "expect": { "code": 0, "stdoutIncludes": "Done" } },
+    { "run": ["metrics", "run1", "--json"], "expect": { "code": 0, "stdoutIncludes": "\"running\":true" } },
+    { "run": ["stop", "run1"], "expect": { "code": 0 }, "golden": false, "timeoutMs": 90000 },
+    { "run": ["status", "run1"], "expect": { "code": 0, "stdoutIncludes": "stopped" } },
+    { "run": ["status", "run1", "--json"] },
+    { "run": ["list"] }
+  ]
+}

@@ -19,15 +19,23 @@ pub fn now_secs() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// `2026-11-08T18:33:54.123Z` for a time in milliseconds.
+/// `2026-11-08T18:33:54.123Z` for a time in milliseconds, as `toISOString` writes it: a year
+/// outside 0-9999 in the six-digit signed form (`+011476-08-15T...`).
 pub fn iso(ms: i64) -> String {
     let secs = ms.div_euclid(1000);
     let milli = ms.rem_euclid(1000);
     let days = secs.div_euclid(86_400);
     let sod = secs.rem_euclid(86_400);
     let (y, m, d) = civil_from_days(days);
+    let year = if (0..=9999).contains(&y) {
+        format!("{y:04}")
+    } else if y < 0 {
+        format!("-{:06}", -y)
+    } else {
+        format!("+{y:06}")
+    };
     format!(
-        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{milli:03}Z",
+        "{year}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{milli:03}Z",
         sod / 3600,
         sod % 3600 / 60,
         sod % 60
@@ -109,6 +117,13 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::{iso, parse_iso_utc};
+
+    #[test]
+    fn years_outside_four_digits_take_the_extended_form() {
+        assert_eq!(iso(300_000_000_000_000), "+011476-08-15T05:20:00.000Z");
+        assert_eq!(iso(-62_198_755_200_000), "-000001-01-01T00:00:00.000Z");
+        assert_eq!(iso(-315_619_200_000), "1960-01-01T00:00:00.000Z");
+    }
 
     #[test]
     fn parses_what_iso_writes_and_only_utc() {

@@ -89,12 +89,24 @@ function runProcess(bin, args, { cwd, env, stdin, timeoutMs }) {
     child.on('error', (e) => err.push(Buffer.from(`spawn failed: ${e.message}\n`)))
     child.stdin.on('error', () => {})
     child.stdin.end(stdin ?? '')
-    child.on('close', (code, signal) => {
+    let done = false
+    const finish = (code, signal, held = false) => {
+      if (done) return
+      done = true
       clearTimeout(timer)
+      clearTimeout(grace)
+      // a process the command started that still holds its stdout or stderr is a finding, not a hang
+      if (held) err.push(Buffer.from('rig: the command exited but its output stayed open (a process it started holds the pipe)\n'))
       resolve({ stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8'), code, signal, timedOut })
-    })
+    }
+    let grace = null
+    child.on('exit', (code, signal) => { grace = setTimeout(() => finish(code, signal, true), PIPE_GRACE_MS) })
+    child.on('close', (code, signal) => finish(code, signal))
   })
 }
+
+// How long after a command exits its pipes may stay open before the rig stops waiting for them.
+const PIPE_GRACE_MS = 10000
 
 // A step that puts something in place: identical on both sides unless it names one.
 function applySetup(step, ctx, baseDir) {
@@ -116,6 +128,11 @@ function applySetup(step, ctx, baseDir) {
     else throw new Error(`write ${step.write}: give json, text, base64 or copy`)
     fs.writeFileSync(file, body)
     if (step.mode && process.platform !== 'win32') fs.chmodSync(file, parseInt(step.mode, 8))
+    // a fixed modification time, for readers that sort by it (crash reports, snapshots)
+    if (step.mtime) {
+      const at = new Date(step.mtime)
+      fs.utimesSync(file, at, at)
+    }
   } else if (step.remove !== undefined) {
     fs.rmSync(target(step.remove), { recursive: true, force: true })
   } else {
