@@ -830,7 +830,8 @@ mod tests {
 }
 
 /// The same dump as a Node script makes of client-meta.mjs over every fixture, for comparing
-/// the two by hand: `META_DUMP=<file> cargo test -p spawnloft-lib meta_dump -- --ignored`.
+/// the two by hand (tools/parity/client-meta-dump.mjs is the Node side):
+/// `META_DUMP=<file> cargo test -p spawnloft-lib meta_dump -- --ignored`.
 #[cfg(test)]
 mod dump {
     use super::super::rules::{self, Os};
@@ -909,6 +910,15 @@ mod dump {
                     "jvm": tryit(|| Ok(Value::Array(rules::jvm_arguments(&v, &os, &Map::new())?))),
                     "sub": tryit(|| Ok(json!(rules::natives_library_subdir(&v, &os)?))),
                     "extra": tryit(|| Ok(json!(rules::natives_extra_dirs(&v, &os)?))),
+                    "res": tryit(|| {
+                        let r = super::super::version::resolve_version(&v, &os, &super::super::version::launch_features(true), Some(true), super::super::version::LAUNCHER_FORMAT)?;
+                        let probs: Vec<Value> = r.problems.iter().map(|p| json!({ "code": p.code, "message": p.message })).collect();
+                        let j = &r.java;
+                        let refusal = match super::super::version::resolved_refusal(&r) { Some(Failure::User { message, code }) => json!({ "code": code, "message": message }), _ => Value::Null };
+                        Ok(json!([probs, { "major": crate::jsjson::num(j.major), "component": j.component, "min": crate::jsjson::num(j.min), "max": j.max.map_or(Value::Null, crate::jsjson::num), "prefer": crate::jsjson::num(j.prefer) },
+                            { "name": r.os.name, "arch": r.os.arch, "version": r.os.version }, r.emulated, r.variables, r.natives_stamp, r.natives_dir,
+                            { "minimumLauncherVersion": r.minimum_launcher_version.map_or(Value::Null, crate::jsjson::num), "ok": r.format_ok }, r.kind, r.client_jar, refusal]))
+                    }),
                     "problems": tryit(|| { let mut p = Vec::new(); for l in items(prop(Some(&v), "libraries"))? { p.extend(rules::rule_problems(prop(Some(&l), "rules"), &os)?); } Ok(json!(p)) }),
                 }));
             }
