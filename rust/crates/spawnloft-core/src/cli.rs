@@ -273,7 +273,9 @@ pub const PORTED: &[Row] = &[
 
 /// The `client` subcommands answered here so far (C7 part 1: what reads and changes the
 /// profiles, accounts and running games without the network).
-pub const CLIENT_PORTED: &[&str] = &["list", "status", "logs", "accounts", "logout", "remove", "stop"];
+pub const CLIENT_PORTED: &[&str] = &[
+    "list", "status", "logs", "accounts", "logout", "remove", "stop", "versions", "new", "set",
+];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
 /// ported command to the Node core again, so the parity rig can run one scenario on both sides.
@@ -752,6 +754,9 @@ mod tests {
             &["client", "logout", "Steve"],
             &["client", "remove", "p", "--purge"],
             &["client", "stop", "p"],
+            &["client", "new", "p", "--mc", "1.21.11"],
+            &["client", "set", "p", "memory=4G"],
+            &["client", "versions", "--all"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
@@ -759,9 +764,8 @@ mod tests {
         for line in [
             &["client"][..],
             &["client", "launch", "p"],
-            &["client", "new", "p", "--mc", "1.21.11"],
+            &["client", "install", "p"],
             &["client", "login"],
-            &["client", "versions"],
             &["client", "--json"],
         ] {
             assert!(

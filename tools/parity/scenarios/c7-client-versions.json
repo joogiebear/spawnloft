@@ -1,0 +1,103 @@
+{
+  "about": "C7 part 2: client versions, new and set over faked Mojang, Fabric, Quilt, Forge and NeoForge lists. The version table and its filters, a version on disk, the loader refusals (an old release, a version too old for Forge, an unknown loader), near ids for a typo, every field check of a new profile, set with its value rules and the re-check when the version or the loader changes, and the cache each list leaves.",
+  "normalize": [
+    { "pattern": "^1[5-9]\\d{11}$", "replace": "<epoch-ms>" }
+  ],
+  "hosts": {
+    "https://piston-meta.mojang.com": { "routes": { "GET /mc/game/version_manifest_v2.json": { "json": {
+      "latest": { "release": "1.21.11", "snapshot": "26.1-snapshot-1" },
+      "versions": [
+        { "id": "26.1-snapshot-1", "type": "snapshot", "releaseTime": "2026-11-18T10:00:00+00:00" },
+        { "id": "1.21.11", "type": "release", "releaseTime": "2026-10-01T10:00:00+00:00" },
+        { "id": "1.21.11-rc1", "type": "snapshot", "releaseTime": "2026-09-25T10:00:00+00:00" },
+        { "id": "1.21.11-pre2", "type": "snapshot", "releaseTime": "2026-09-20T10:00:00+00:00" },
+        { "id": "1.21.10", "type": "release", "releaseTime": "2026-08-01T10:00:00+00:00" },
+        { "id": "1.20.1", "type": "release", "releaseTime": "2023-06-12T10:00:00+00:00" },
+        { "id": "1.12.2", "type": "release", "releaseTime": "2017-09-18T10:00:00+00:00" },
+        { "id": "1.5.2", "type": "release", "releaseTime": "2013-04-25T10:00:00+00:00" },
+        { "id": "b1.7.3", "type": "old_beta", "releaseTime": "2011-07-07T22:00:00+00:00" },
+        { "id": "bad/id", "type": "release", "releaseTime": "2026-11-20T10:00:00+00:00" },
+        { "id": "no-time", "type": "snapshot" }
+      ]
+    } } } },
+    "https://meta.fabricmc.net": { "routes": { "GET /v2/versions/game": { "json": [
+      { "version": "26.1-snapshot-1", "stable": false }, { "version": "1.21.11", "stable": true }, { "version": "1.21.10", "stable": true }, { "version": "1.20.1", "stable": true }
+    ] } } },
+    "https://meta.quiltmc.org": { "routes": { "GET /v3/versions/game": { "json": [
+      { "version": "1.21.11", "stable": true }, { "version": "1.20.1", "stable": true }
+    ] } } },
+    "https://files.minecraftforge.net": { "routes": {
+      "GET /net/minecraftforge/forge/maven-metadata.json": { "json": { "1.12.2": ["1.12.2-14.23.5.2860"], "1.20.1": ["1.20.1-47.4.28", "1.20.1-47.4.0"], "1.5.2": ["1.5.2-7.8.1.738"] } },
+      "GET /net/minecraftforge/forge/promotions_slim.json": { "json": { "promos": { "1.20.1-recommended": "47.4.0" } } }
+    } },
+    "https://maven.neoforged.net": { "routes": { "GET /api/maven/versions/releases/net/neoforged/neoforge": { "json": { "versions": ["20.1.5-beta", "21.10.3", "21.11.1-beta", "21.11.2"] } } } }
+  },
+  "steps": [
+    { "run": ["client", "versions"], "expect": { "code": 0, "stdoutIncludes": "1.21.11" } },
+    { "run": ["client", "versions", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "versions", "--snapshots", "-n", "4"], "expect": { "code": 0 } },
+    { "run": ["client", "versions", "--all", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "versions", "-n", "0"], "expect": { "code": 2 } },
+    { "run": ["client", "versions", "extra"], "expect": { "code": 2 } },
+    { "run": ["client", "versions", "--bogus"], "expect": { "code": 2 } },
+
+    { "run": ["client", "new", "a", "--mc", "1.21.11"], "expect": { "code": 0, "stdoutIncludes": "Created profile \"a\"" } },
+    { "run": ["client", "new", "b", "--mc", " 1.20.1 ", "--loader", "forge", "--memory", "4G", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "c", "--mc", "1.21.11", "--loader", "fabric", "--harness", "--server", "s1", "--java", "/opt/java/bin/java"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "d", "--mc", "1.21.11", "--loader", "neoforge"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "e", "--mc", "1.21.11", "--loader", "quilt", "--account", "offline:Bob"], "expect": { "code": 0 } },
+    { "run": ["client", "new", "x", "--mc", "1.12.2", "--loader", "fabric"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "26.1-snapshot-1", "--loader", "quilt"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.5.2", "--loader", "forge"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.12.2", "--loader", "neoforge", "--json"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.99"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "9.9"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21..1"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--loader", "fabrik"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "A", "--mc", "1.21.11"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "bad name", "--mc", "1.21.11"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--harness"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--memory", "1.5G"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--memory", "lots"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--java", " "], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x", "--mc"], "expect": { "code": 1 } },
+    { "run": ["client", "new", "x"], "expect": { "code": 2 } },
+    { "run": ["client", "new"], "expect": { "code": 2 } },
+    { "run": ["client", "new", "x", "y", "--mc", "1.21.11"], "expect": { "code": 2 } },
+    { "run": ["client", "new", "x", "--mc", "1.21.11", "--purge"], "expect": { "code": 2 } },
+
+    { "run": ["client", "set", "a", "memory=3G", "java=/usr/bin/java"], "expect": { "code": 0, "stdoutIncludes": "Updated \"a\": memory=3G java=/usr/bin/java" } },
+    { "run": ["client", "set", "a", "java=", "serverList=false", "assistantAccount=true", "--json"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "loader=quilt"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "loaderVersion=0.29.1"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "mc=1.20.1"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "mc=1.12.2", "loader=fabric"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "a", "mc=1.20.1 ", "loader=quilt"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "loader=vanilla", "harness=true"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "a", "harness=maybe"], "expect": { "code": 2 } },
+    { "run": ["client", "set", "a", "bogus=1"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "a", "memory"], "expect": { "code": 2 } },
+    { "run": ["client", "set", "a", "memory=2G", "memory=5G"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "loaderVersion=../x"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "a", "account=Steve", "server=s2"], "expect": { "code": 0 } },
+    { "run": ["client", "set", "a", "account="], "expect": { "code": 0, "stdoutIncludes": "account cleared" } },
+    { "run": ["client", "set", "a"], "expect": { "code": 2 } },
+    { "run": ["client", "set", "nope", "memory=1G"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "nope", "mc=1.21.11"], "expect": { "code": 1 } },
+    { "run": ["client", "list"], "expect": { "code": 0 } },
+    { "run": ["client", "list", "--json"], "expect": { "code": 0 } },
+
+    { "write": "data/client/versions/1.21.10/1.21.10.json", "json": { "id": "1.21.10", "type": "release", "downloads": { "client": { "size": 5 } } } },
+    { "write": "data/client/versions/1.21.10/1.21.10.jar", "text": "12345" },
+    { "write": "data/client/versions/1.20.1/1.20.1.json", "json": { "id": "1.20.1", "type": "release", "downloads": { "client": { "size": 99 } } } },
+    { "write": "data/client/versions/1.20.1/1.20.1.jar", "text": "short" },
+    { "write": "data/client/versions/fabric-loader-0.16.9-1.21.11/fabric-loader-0.16.9-1.21.11.json", "json": { "id": "fabric-loader-0.16.9-1.21.11", "inheritsFrom": "1.21.11" } },
+    { "write": "data/client/versions/broken/broken.json", "text": "{ not json" },
+    { "run": ["client", "versions"], "expect": { "code": 0 } },
+    { "run": ["client", "versions", "--json", "-n", "3"], "expect": { "code": 0 } },
+
+    { "write": "data/client/profiles.json", "json": { "version": 1, "profiles": { "hand": { "mc": 26.1, "loader": "vanilla", "memory": "2G" } } } },
+    { "run": ["client", "set", "hand", "loader=fabric"], "expect": { "code": 1 } },
+    { "run": ["client", "set", "hand", "memory=3G"], "expect": { "code": 1 } }
+  ]
+}
