@@ -194,7 +194,16 @@ fn same(state: &Map<String, Value>, pid_key: &str, exe_key: &str, start_key: Opt
     {
         return want == got;
     }
-    let expected = state.get(exe_key);
+    same_image_of(raw, state.get(exe_key), js::number(state.get("startedAt")))
+}
+
+/// `sameProcess(pid, expectedImage, startedAt)` of util.mjs, for a pid already known to be
+/// alive: the image's file name against the recorded one (none recorded: yes). `started_at` is
+/// epoch ms; a process table older than that which contradicts the record is read again.
+pub fn same_image_of(raw: Option<&Value>, expected: Option<&Value>, started_at: f64) -> bool {
+    let Some(pid) = pid_of(raw) else {
+        return true;
+    };
     if !js::truthy(expected) {
         return true;
     }
@@ -215,7 +224,6 @@ fn same(state: &Map<String, Value>, pid_key: &str, exe_key: &str, start_key: Opt
     let (mut actual, table_at) = process_image(key, false);
     // pids are reused: a table older than this launch that contradicts the record is read again
     // before it is believed, so a new daemon is not taken for the previous owner of its pid
-    let started_at = js::number(state.get("startedAt"));
     if let Some(a) = &actual
         && started_at > table_at as f64
         && !same_image(a, &expected, linux)

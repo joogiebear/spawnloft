@@ -144,6 +144,43 @@ pub fn take_sigterm() -> bool {
     SIGTERM_SEEN.swap(false, Ordering::SeqCst)
 }
 
+#[repr(C)]
+struct Timespec {
+    tv_sec: i64,
+    tv_nsec: std::ffi::c_long,
+}
+
+unsafe extern "C" {
+    fn clock_gettime(clock: i32, out: *mut Timespec) -> i32;
+}
+
+/// `os.uptime()`: whole seconds since the machine started (libuv reads `CLOCK_BOOTTIME` on
+/// Linux; macOS's `CLOCK_MONOTONIC` also runs on through sleep). 0 when the clock cannot be read.
+pub fn uptime_secs() -> u64 {
+    #[cfg(target_os = "linux")]
+    const CLOCK: i32 = 7; // CLOCK_BOOTTIME
+    #[cfg(not(target_os = "linux"))]
+    const CLOCK: i32 = 6; // CLOCK_MONOTONIC on macOS
+    let mut t = Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: clock_gettime writes one timespec into memory this function owns.
+    if unsafe { clock_gettime(CLOCK, &mut t) } != 0 {
+        return 0;
+    }
+    u64::try_from(t.tv_sec).unwrap_or(0)
+}
+
+/// `process.kill(-pid, 'SIGTERM')`, else `process.kill(pid, 'SIGTERM')`: whether either was sent
+/// (the client's polite stop, which the game takes as its window closing).
+pub fn ask_to_close(pid: i32) -> bool {
+    if pid <= 1 {
+        return false;
+    }
+    send(-pid, SIGTERM) || send(pid, SIGTERM)
+}
+
 fn send(pid: i32, sig: i32) -> bool {
     // SAFETY: kill() with any pid and a valid signal number has no memory-safety preconditions.
     unsafe { kill(pid, sig) == 0 }
