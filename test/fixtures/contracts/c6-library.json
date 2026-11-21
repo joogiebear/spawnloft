@@ -1,0 +1,1490 @@
+{
+  "about": "players.mjs, mclogs.mjs and the scrubber in Node over the cases in tools/parity/c6-library-cases.json. Made by tools/parity/make-c6-fixtures.mjs; spawnloft-lib players.rs, mclogs.rs and scrubber.rs must agree on every case.",
+  "tree": [
+    {
+      "path": "server.properties",
+      "text": "level-name=world\nonline-mode=true\nwhite-list=false\nenforce-whitelist=true\n"
+    },
+    {
+      "path": "ops.json",
+      "text": "[\n  {\n    \"uuid\": \"A1B2C3D4-0000-4000-8000-000000000001\",\n    \"name\": \"Alice\",\n    \"level\": 4,\n    \"bypassesPlayerLimit\": false\n  },\n  {\n    \"uuid\": \"00000000-0000-0000-0000-000000000000\",\n    \"name\": \"Server\",\n    \"level\": 4\n  },\n  {\n    \"name\": \"NoId\",\n    \"level\": 2.5\n  },\n  5\n]\n"
+    },
+    {
+      "path": "banned-players.json",
+      "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000002\",\n    \"name\": \"Bob\",\n    \"created\": \"2026-01-01 00:00:00 +0000\",\n    \"source\": \"Server\",\n    \"expires\": \"forever\",\n    \"reason\": \"griefing\"\n  },\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000004\",\n    \"name\": \"@a\",\n    \"expires\": \"2027-01-01 00:00:00 +0000\",\n    \"reason\": \"\"\n  }\n]\n"
+    },
+    {
+      "path": "whitelist.json",
+      "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alice\"\n  },\n  {\n    \"uuid\": \"48f83307-567a-33d7-8604-3b22ee4c1b84\",\n    \"name\": \"Ghost\"\n  }\n]\n"
+    },
+    {
+      "path": "usercache.json",
+      "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alicia\",\n    \"expiresOn\": \"x\"\n  },\n  {\n    \"uuid\": \"bad\",\n    \"name\": \"\"\n  }\n]\n"
+    },
+    {
+      "path": "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat",
+      "text": "d"
+    },
+    {
+      "path": "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat_old",
+      "text": "d"
+    },
+    {
+      "path": "world/stats/a1b2c3d4-0000-4000-8000-000000000001.json",
+      "text": "{}"
+    },
+    {
+      "path": "world/players/data/a1b2c3d4-0000-4000-8000-000000000003.DAT",
+      "text": "d"
+    },
+    {
+      "path": "world/players/advancements/48f83307-567a-33d7-8604-3b22ee4c1b84.json",
+      "text": "{}"
+    },
+    {
+      "path": "world/playerdata/notes.txt",
+      "text": "x"
+    },
+    {
+      "path": "world/playerdata/a1b2c3d4-0000-4000-8000-00000000000x.dat",
+      "text": "bad hex"
+    },
+    {
+      "path": "logs/console.log",
+      "text": "[12:00] Steve[/203.0.113.5:51234] logged in\r\nC:\\Users\\Josh Smith\\AppData\\x and /home/josh/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n"
+    },
+    {
+      "path": "logs/empty.log",
+      "text": "  \n"
+    }
+  ],
+  "instance": {
+    "port": 25565
+  },
+  "secrets": {
+    "registry": {
+      "version": 1,
+      "instances": {
+        "srv": {
+          "rcon": {
+            "port": 25575,
+            "password": "hunter2pass"
+          },
+          "webhook": "https://discord.com/api/webhooks/1/xyz",
+          "notes": {
+            "apiToken": "abc"
+          },
+          "list": [
+            {
+              "secretKey": "long-secret-value"
+            }
+          ]
+        }
+      }
+    },
+    "accounts": {
+      "accounts": [
+        {
+          "name": "Me",
+          "uuid": "u",
+          "accessToken": "tok-abcdef",
+          "refreshToken": "tok-abcdef"
+        }
+      ]
+    },
+    "profiles": {
+      "profiles": {
+        "main": {
+          "version": "1.21"
+        },
+        "other": {
+          "version": "1.20"
+        }
+      }
+    },
+    "states": {
+      "main": {
+        "pid": 1,
+        "harnessToken": "harness-tok-1"
+      },
+      "other": "not json{"
+    }
+  },
+  "ops": [
+    {
+      "op": "listPlayers",
+      "args": [],
+      "result": [
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000004",
+          "name": "@a",
+          "op": false,
+          "opLevel": null,
+          "banned": true,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": "<ban stamp>",
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "name": "Alicia",
+          "op": true,
+          "opLevel": 4,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": true,
+          "lastSeen": "<time>"
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000002",
+          "name": "Bob",
+          "op": false,
+          "opLevel": null,
+          "banned": true,
+          "banReason": "griefing",
+          "banSource": "Server",
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "48f83307-567a-33d7-8604-3b22ee4c1b84",
+          "name": "Ghost",
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": true,
+          "lastSeen": "<time>"
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000003",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": true,
+          "lastSeen": "<time>"
+        },
+        {
+          "uuid": "bad",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        }
+      ]
+    },
+    {
+      "op": "storedPlayers",
+      "args": [],
+      "result": {
+        "count": 3,
+        "offline": 1,
+        "online": 2,
+        "unknown": 0
+      }
+    },
+    {
+      "op": "whitelistOn",
+      "args": [],
+      "result": false
+    },
+    {
+      "op": "whitelistEnforced",
+      "args": [],
+      "result": true
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000002",
+        true,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000002",
+          "op": true,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "A1B2C3D4-0000-4000-8000-000000000001",
+        false,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "op": false,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "readFile",
+      "args": [
+        "ops.json"
+      ],
+      "result": "[\n  {\n    \"uuid\": \"00000000-0000-0000-0000-000000000000\",\n    \"name\": \"Server\",\n    \"level\": 4\n  },\n  {\n    \"name\": \"NoId\",\n    \"level\": 2.5\n  },\n  5,\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000002\",\n    \"name\": \"Bob\",\n    \"level\": 4,\n    \"bypassesPlayerLimit\": false\n  }\n]\n"
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "nobody",
+        true,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "error": "\"srv\" has no record of a player with that id",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "setBan",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        true,
+        "  too \n many   words ",
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "banned": true,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "setBan",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000002",
+        false,
+        "",
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000002",
+          "banned": false,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "readFile",
+      "args": [
+        "banned-players.json"
+      ],
+      "result": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000004\",\n    \"name\": \"@a\",\n    \"expires\": \"<ban stamp>\",\n    \"reason\": \"\"\n  },\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alicia\",\n    \"created\": \"<ban stamp>\",\n    \"source\": \"mcctl\",\n    \"expires\": \"forever\",\n    \"reason\": \"too many words\"\n  }\n]\n"
+    },
+    {
+      "op": "setWhitelisted",
+      "args": [
+        "48f83307-567a-33d7-8604-3b22ee4c1b84",
+        false,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "48f83307-567a-33d7-8604-3b22ee4c1b84",
+          "whitelisted": false,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "setWhitelisted",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000003",
+        true,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000003",
+          "whitelisted": true,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "readFile",
+      "args": [
+        "whitelist.json"
+      ],
+      "result": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alice\"\n  },\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000003\",\n    \"name\": \"\"\n  }\n]\n"
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        true,
+        {
+          "running": true,
+          "replies": {
+            "op Alicia": "§aMade Alicia a server operator "
+          },
+          "writes": {
+            "ops.json": [
+              {
+                "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+                "name": "Alicia",
+                "level": 4
+              }
+            ]
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "op": true,
+          "via": "console",
+          "reply": "Made Alicia a server operator",
+          "took": true
+        },
+        "commands": [
+          "op Alicia"
+        ]
+      }
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        false,
+        {
+          "running": true,
+          "replies": {
+            "deop Alicia": "Nothing changed"
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "op": false,
+          "via": "console",
+          "reply": "Nothing changed",
+          "took": false
+        },
+        "commands": [
+          "deop Alicia"
+        ]
+      }
+    },
+    {
+      "op": "setOp",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000003",
+        true,
+        {
+          "running": true,
+          "replies": {}
+        }
+      ],
+      "result": {
+        "error": "SpawnLoft does not know the name behind a1b2c3d4-0000-4000-8000-000000000003, and opping needs one. Offline-mode ids are made by hashing a name, so they cannot be turned back into one - have the player join once while the server is running, or add them by name with \"Add a player\".",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "setBan",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000004",
+        true,
+        "x",
+        {
+          "running": true,
+          "replies": {}
+        }
+      ],
+      "result": {
+        "error": "\"@a\" is not a name the server's console can take, so banning has to be done with the server stopped.",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "setBan",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        true,
+        "spam  bot",
+        {
+          "running": true,
+          "replies": {
+            "ban Alicia spam bot": "Banned Alicia"
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "banned": true,
+          "via": "console",
+          "reply": "Banned Alicia",
+          "took": true
+        },
+        "commands": [
+          "ban Alicia spam bot"
+        ]
+      }
+    },
+    {
+      "op": "setWhitelisted",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        true,
+        {
+          "running": true,
+          "replies": {},
+          "fail": "connect ECONNREFUSED 127.0.0.1:25575"
+        }
+      ],
+      "result": {
+        "error": "connect ECONNREFUSED 127.0.0.1:25575",
+        "code": null,
+        "commands": [
+          "whitelist add Alicia"
+        ]
+      }
+    },
+    {
+      "op": "setWhitelistOn",
+      "args": [
+        true,
+        {
+          "running": true,
+          "replies": {
+            "whitelist on": "Whitelist is now turned on"
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "on": true,
+          "via": "console",
+          "reply": "Whitelist is now turned on",
+          "took": true
+        },
+        "commands": [
+          "whitelist on"
+        ]
+      }
+    },
+    {
+      "op": "whitelistOn",
+      "args": [],
+      "result": true
+    },
+    {
+      "op": "setWhitelistOn",
+      "args": [
+        false,
+        {
+          "running": true,
+          "replies": {
+            "whitelist off": "Unknown command"
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "on": false,
+          "via": "console",
+          "reply": "Unknown command",
+          "took": false
+        },
+        "commands": [
+          "whitelist off"
+        ]
+      }
+    },
+    {
+      "op": "setWhitelistOn",
+      "args": [
+        false,
+        {
+          "running": false
+        }
+      ],
+      "result": {
+        "answer": {
+          "on": false,
+          "via": "file"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "whitelistOn",
+      "args": [],
+      "result": false
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "  alicia ",
+        "whitelist",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "whitelisted": true,
+          "via": "file",
+          "name": "Alicia",
+          "as": "whitelist"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Notch",
+        "op",
+        "",
+        {
+          "running": false
+        },
+        {
+          "found": {
+            "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+            "name": "Notch"
+          }
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+          "op": true,
+          "via": "file",
+          "name": "Notch",
+          "as": "op"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Nobody1",
+        "ban",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "error": "No Minecraft account is called \"Nobody1\". Check the spelling.",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Flaky",
+        "ban",
+        "",
+        {
+          "running": false
+        },
+        {
+          "error": "fetch failed"
+        }
+      ],
+      "result": {
+        "error": "Could not look up \"Flaky\" with Mojang (fetch failed). Check the connection, or start the server and add them again: a running server finds players itself.",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "bad name",
+        "op",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "error": "A player name is up to 16 letters, digits or underscores, with no spaces.",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Fine",
+        "kick",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "error": "unknown way to add a player: kick",
+        "code": null,
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Runner",
+        "ban",
+        "because",
+        {
+          "running": true,
+          "replies": {
+            "ban Runner because": "Banned Runner"
+          }
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "",
+          "banned": true,
+          "via": "console",
+          "reply": "Banned Runner",
+          "took": false,
+          "name": "Runner",
+          "as": "ban"
+        },
+        "commands": [
+          "ban Runner because"
+        ]
+      }
+    },
+    {
+      "op": "writeFile",
+      "args": [
+        "server.properties",
+        "level-name=world\nonline-mode=false\n"
+      ],
+      "result": "ok"
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Newbie",
+        "whitelist",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "258509ef-4f9f-3ee4-8c9e-953438c8db49",
+          "whitelisted": true,
+          "via": "file",
+          "name": "Newbie",
+          "as": "whitelist"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "addByName",
+      "args": [
+        "Ghost",
+        "op",
+        "",
+        {
+          "running": false
+        },
+        {
+          "none": true
+        }
+      ],
+      "result": {
+        "answer": {
+          "uuid": "48f83307-567a-33d7-8604-3b22ee4c1b84",
+          "op": true,
+          "via": "file",
+          "name": "Ghost",
+          "as": "op"
+        },
+        "commands": []
+      }
+    },
+    {
+      "op": "readFile",
+      "args": [
+        "whitelist.json"
+      ],
+      "result": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000003\",\n    \"name\": \"\"\n  },\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alicia\"\n  },\n  {\n    \"uuid\": \"258509ef-4f9f-3ee4-8c9e-953438c8db49\",\n    \"name\": \"Newbie\"\n  }\n]\n"
+    },
+    {
+      "op": "forgetPlayer",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        true
+      ],
+      "error": "\"srv\" is running. Stop it before deleting player data - a running server holds that player's state in memory and writes it back over whatever is deleted.",
+      "code": null
+    },
+    {
+      "op": "forgetPlayer",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000001",
+        false
+      ],
+      "result": {
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+        "name": "Alicia",
+        "removed": 3,
+        "files": [
+          "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat",
+          "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat_old",
+          "world/stats/a1b2c3d4-0000-4000-8000-000000000001.json"
+        ]
+      }
+    },
+    {
+      "op": "forgetPlayer",
+      "args": [
+        "a1b2c3d4-0000-4000-8000-000000000003",
+        false
+      ],
+      "result": {
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000003",
+        "name": null,
+        "removed": 1,
+        "files": [
+          "players/data/a1b2c3d4-0000-4000-8000-000000000003.DAT"
+        ]
+      }
+    },
+    {
+      "op": "listPlayers",
+      "args": [],
+      "result": [
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000004",
+          "name": "@a",
+          "op": false,
+          "opLevel": null,
+          "banned": true,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": "<ban stamp>",
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+          "name": "Alicia",
+          "op": true,
+          "opLevel": 4,
+          "banned": true,
+          "banReason": "too many words",
+          "banSource": "mcctl",
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "48f83307-567a-33d7-8604-3b22ee4c1b84",
+          "name": "Ghost",
+          "op": true,
+          "opLevel": 4,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": true,
+          "lastSeen": "<time>"
+        },
+        {
+          "uuid": "258509ef-4f9f-3ee4-8c9e-953438c8db49",
+          "name": "Newbie",
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+          "name": "Notch",
+          "op": true,
+          "opLevel": 4,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "a1b2c3d4-0000-4000-8000-000000000003",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": true,
+          "joined": false,
+          "lastSeen": null
+        },
+        {
+          "uuid": "bad",
+          "name": null,
+          "op": false,
+          "opLevel": null,
+          "banned": false,
+          "banReason": null,
+          "banSource": null,
+          "banExpires": null,
+          "whitelisted": false,
+          "joined": false,
+          "lastSeen": null
+        }
+      ]
+    },
+    {
+      "op": "storedPlayers",
+      "args": [],
+      "result": {
+        "count": 1,
+        "offline": 1,
+        "online": 0,
+        "unknown": 0
+      }
+    },
+    {
+      "op": "exportConsole",
+      "args": [
+        "logs/console.log"
+      ],
+      "result": {
+        "file": "<root>/data/exports/srv_console_<stamp>.log",
+        "size": 151,
+        "sizeHuman": "151 B",
+        "lines": 3,
+        "copied": "[12:00] Steve[/203.0.113.5:51234] logged in\r\nC:\\Users\\Josh Smith\\AppData\\x and /home/josh/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n"
+      }
+    },
+    {
+      "op": "exportConsole",
+      "args": [
+        "logs/none.log"
+      ],
+      "error": "this server has no console log yet - start it once, and the log appears",
+      "code": null
+    },
+    {
+      "op": "exportConsole",
+      "args": [
+        "logs/empty.log"
+      ],
+      "error": "the console log is empty - there is nothing to export yet",
+      "code": null
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "status": 200,
+          "body": "{\"success\":true,\"id\":\"abc\",\"url\":\"https://mclo.gs/abc\",\"raw\":\"https://api.mclo.gs/1/raw/abc\",\"token\":\"tok123\"}"
+        }
+      ],
+      "result": {
+        "result": {
+          "url": "https://mclo.gs/abc",
+          "id": "abc",
+          "raw": "https://api.mclo.gs/1/raw/abc",
+          "lines": 3,
+          "trimmed": false,
+          "expires": null
+        },
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "status": 200,
+          "body": "{\"success\":true,\"id\":\"def\",\"url\":\"https://mclo.gs/def\",\"expires\":123}"
+        }
+      ],
+      "result": {
+        "result": {
+          "url": "https://mclo.gs/def",
+          "id": "def",
+          "raw": null,
+          "lines": 3,
+          "trimmed": false,
+          "expires": 123
+        },
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "readTokens",
+      "args": [],
+      "result": [
+        {
+          "id": "abc",
+          "url": "https://mclo.gs/abc",
+          "token": "tok123",
+          "instance": "srv",
+          "at": "<time>"
+        }
+      ]
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "status": 400,
+          "body": "{\"success\":false,\"error\":\"Required POST argument 'content' is empty.\"}"
+        }
+      ],
+      "result": {
+        "error": "mclo.gs refused the log: Required POST argument 'content' is empty.",
+        "code": null,
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "status": 500,
+          "body": "{\"success\":false}"
+        }
+      ],
+      "result": {
+        "error": "mclo.gs refused the log: it answered 500",
+        "code": null,
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "status": 502,
+          "body": "<html>bad gateway</html>"
+        }
+      ],
+      "result": {
+        "error": "mclo.gs answered 502 with something that was not a log",
+        "code": null,
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/console.log",
+        {
+          "throws": "getaddrinfo ENOTFOUND api.mclo.gs"
+        }
+      ],
+      "result": {
+        "error": "could not reach mclo.gs: getaddrinfo ENOTFOUND api.mclo.gs",
+        "code": null,
+        "sent": [
+          {
+            "url": "https://api.mclo.gs/1/log",
+            "body": {
+              "content": "[12:00] Steve[/203.0.113.5:51234] logged in\nC:\\Users\\<user>\\AppData\\x and /home/<user>/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n",
+              "source": "mcctl"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "op": "shareConsole",
+      "args": [
+        "logs/none.log",
+        {
+          "status": 200,
+          "body": "{}"
+        }
+      ],
+      "result": {
+        "error": "this server has no console log yet - start it once, and the log appears",
+        "code": null,
+        "sent": []
+      }
+    },
+    {
+      "op": "scrubber",
+      "args": [
+        "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc",
+        false
+      ],
+      "result": "rcon [redacted] and hook [redacted] from /[ip hidden]:4000, token [redacted], short abc"
+    },
+    {
+      "op": "scrubber",
+      "args": [
+        "rcon hunter2pass from /10.0.0.7:4000",
+        true
+      ],
+      "result": "rcon [redacted] from /10.0.0.7:4000"
+    }
+  ],
+  "mojang": [
+    {
+      "op": "mojangLookup",
+      "args": [
+        "notch",
+        {
+          "status": 200,
+          "body": "{\"id\":\"069A79F444E94726A5BEFCA90E38AAF5\",\"name\":\"Notch\"}"
+        }
+      ],
+      "result": {
+        "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+        "name": "Notch"
+      },
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/notch"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "Nobody",
+        {
+          "status": 204,
+          "body": ""
+        }
+      ],
+      "result": null,
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/Nobody"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "Nobody",
+        {
+          "status": 404,
+          "body": "{}"
+        }
+      ],
+      "result": null,
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/Nobody"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "x",
+        {
+          "status": 429,
+          "body": "{}"
+        }
+      ],
+      "error": "Mojang answered 429",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/x"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "x",
+        {
+          "status": 200,
+          "body": "not json"
+        }
+      ],
+      "error": "Mojang sent an answer SpawnLoft could not read",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/x"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "x",
+        {
+          "status": 200,
+          "body": "\"text\""
+        }
+      ],
+      "error": "Mojang sent an answer SpawnLoft could not read",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/x"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "x",
+        {
+          "status": 200,
+          "body": "{\"id\":\"123\"}"
+        }
+      ],
+      "error": "Mojang sent an answer SpawnLoft could not read",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/x"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "Notch",
+        {
+          "status": 200,
+          "body": "{\"id\":\"069a79f444e94726a5befca90e38aaf5\",\"name\":\"Jeb_\"}"
+        }
+      ],
+      "error": "Mojang sent an answer SpawnLoft could not read",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/Notch"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "Notch",
+        {
+          "status": 200,
+          "body": "{\"id\":\"069a79f444e94726a5befca90e38aaf5\"}"
+        }
+      ],
+      "result": {
+        "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+        "name": "Notch"
+      },
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/Notch"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "Notch",
+        {
+          "status": 200,
+          "body": "[]"
+        }
+      ],
+      "error": "Mojang sent an answer SpawnLoft could not read",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/Notch"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "a b/c",
+        {
+          "status": 404,
+          "body": ""
+        }
+      ],
+      "result": null,
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/a%20b%2Fc"
+      ]
+    },
+    {
+      "op": "mojangLookup",
+      "args": [
+        "x",
+        {
+          "throws": "fetch failed"
+        }
+      ],
+      "error": "fetch failed",
+      "urls": [
+        "https://api.mojang.com/users/profiles/minecraft/x"
+      ]
+    }
+  ],
+  "pure": [
+    {
+      "op": "redactAccountName",
+      "args": [
+        "C:\\Users\\Josh Smith\\AppData and C:/Users/Ann, D:\\\\Users\\\\Bo\\x \"C:\\Users\\Q\" /home/josh/x /Users/ann /home/<user>/y C:\\Users\\<user>\\z"
+      ],
+      "result": "C:\\Users\\<user>\\AppData and C:/Users/<user> D:\\\\Users\\\\<user>\\x \"C:\\Users\\<user>\" /home/<user>/x /Users/<user> /home/<user>/y C:\\Users\\<user>\\z"
+    },
+    {
+      "op": "redactAccountName",
+      "args": [
+        "e:/users/x C:\\Users\\élève\\a C:\\Users\\tab\there"
+      ],
+      "result": "e:/users/x C:\\Users\\<user>\\a C:\\Users\\<user>\there"
+    },
+    {
+      "op": "trimForUpload",
+      "args": [
+        "a\r\nb\rc\n"
+      ],
+      "result": {
+        "content": "a\nb\nc\n",
+        "lines": 3,
+        "trimmed": false
+      }
+    },
+    {
+      "op": "trimForUpload",
+      "args": [
+        ""
+      ],
+      "result": {
+        "content": "",
+        "lines": 1,
+        "trimmed": false
+      }
+    },
+    {
+      "op": "trimForUpload",
+      "gen": {
+        "unit": "line",
+        "repeat": 1,
+        "count": 25010,
+        "trailing": true
+      },
+      "result": {
+        "lines": 25000,
+        "trimmed": true,
+        "bytes": 125000,
+        "sha256": "ddb71159707f5f36cb57444083c55f05d29f41c8b216509bdae3233b8d3174f7",
+        "head": "line\nline\nli",
+        "tail": "e\nline\nline\n"
+      }
+    },
+    {
+      "op": "trimForUpload",
+      "gen": {
+        "unit": "x",
+        "repeat": 500,
+        "count": 22000,
+        "trailing": false
+      },
+      "result": {
+        "lines": 20929,
+        "trimmed": true,
+        "bytes": 10485428,
+        "sha256": "d337d4fe2a3e50aa5d40439e85e6ea058eaf3f7a4eac2b7f42a5ea940eadfc7a",
+        "head": "xxxxxxxxxxxx",
+        "tail": "xxxxxxxxxxxx"
+      }
+    },
+    {
+      "op": "trimForUpload",
+      "gen": {
+        "unit": "é",
+        "repeat": 5242881,
+        "count": 1,
+        "trailing": true
+      },
+      "result": {
+        "lines": 1,
+        "trimmed": true,
+        "bytes": 10485762,
+        "sha256": "b5eb4f5c2001114d18f1eefb1f0f8a6e8dae4b5636d87af41045a1022f70ecb5",
+        "head": "�ééééééééééé",
+        "tail": "ééééééééééé\n"
+      }
+    },
+    {
+      "op": "trimForUpload",
+      "gen": {
+        "unit": "aé",
+        "repeat": 3495254,
+        "count": 1,
+        "trailing": false
+      },
+      "result": {
+        "lines": 1,
+        "trimmed": true,
+        "bytes": 10485762,
+        "sha256": "6f18f6e1e973b3f350ca26045a377b6c352b545652ced122a0b28a8594db7577",
+        "head": "�aéaéaéaéaéa",
+        "tail": "aéaéaéaéaéaé"
+      }
+    },
+    {
+      "op": "hideIps",
+      "args": [
+        "Steve[/203.0.113.5:51234] logged in, /[2001:db8::1%eth0]:25565, /::1:25565, /fe80::1:80x, /1.2.3.4:123456, /1.2.3.4:80_ /999.1.2.3:7 /1.2.3.4.5:6 /abcd:ef:: :1 /a:b:c:d:e:f:1:2:3:4"
+      ],
+      "result": "Steve[/[ip hidden]:51234] logged in, /[ip hidden]:25565, /[ip hidden]:25565, /fe80::1:80x, /1.2.3.4:123456, /1.2.3.4:80_ /[ip hidden]:7 /1.2.3.4.5:6 /abcd:ef:: :1 /[ip hidden]:3:4"
+    },
+    {
+      "op": "scrub",
+      "args": [
+        "pw: hunter22 and hunter, /1.2.3.4:5",
+        [
+          "hunter22",
+          "hunter"
+        ],
+        false
+      ],
+      "result": "pw: [redacted] and [redacted], /[ip hidden]:5"
+    },
+    {
+      "op": "scrub",
+      "args": [
+        "",
+        [
+          "x"
+        ],
+        false
+      ],
+      "result": ""
+    },
+    {
+      "op": "offlineUuid",
+      "args": [
+        "Notch"
+      ],
+      "result": "b50ad385-829d-3141-a216-7e7d7539ba7f"
+    },
+    {
+      "op": "offlineUuid",
+      "args": [
+        "été"
+      ],
+      "result": "9df00f05-ef49-3b4d-9e70-73d916334bc3"
+    }
+  ]
+}

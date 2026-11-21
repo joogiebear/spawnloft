@@ -1,0 +1,846 @@
+{
+ "tree": [
+  {
+   "path": "server.properties",
+   "text": "level-name=world\nonline-mode=true\nwhite-list=false\nenforce-whitelist=true\n"
+  },
+  {
+   "path": "ops.json",
+   "text": "[\n  {\n    \"uuid\": \"A1B2C3D4-0000-4000-8000-000000000001\",\n    \"name\": \"Alice\",\n    \"level\": 4,\n    \"bypassesPlayerLimit\": false\n  },\n  {\n    \"uuid\": \"00000000-0000-0000-0000-000000000000\",\n    \"name\": \"Server\",\n    \"level\": 4\n  },\n  {\n    \"name\": \"NoId\",\n    \"level\": 2.5\n  },\n  5\n]\n"
+  },
+  {
+   "path": "banned-players.json",
+   "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000002\",\n    \"name\": \"Bob\",\n    \"created\": \"2026-01-01 00:00:00 +0000\",\n    \"source\": \"Server\",\n    \"expires\": \"forever\",\n    \"reason\": \"griefing\"\n  },\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000004\",\n    \"name\": \"@a\",\n    \"expires\": \"2027-01-01 00:00:00 +0000\",\n    \"reason\": \"\"\n  }\n]\n"
+  },
+  {
+   "path": "whitelist.json",
+   "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alice\"\n  },\n  {\n    \"uuid\": \"48f83307-567a-33d7-8604-3b22ee4c1b84\",\n    \"name\": \"Ghost\"\n  }\n]\n"
+  },
+  {
+   "path": "usercache.json",
+   "text": "[\n  {\n    \"uuid\": \"a1b2c3d4-0000-4000-8000-000000000001\",\n    \"name\": \"Alicia\",\n    \"expiresOn\": \"x\"\n  },\n  {\n    \"uuid\": \"bad\",\n    \"name\": \"\"\n  }\n]\n"
+  },
+  {
+   "path": "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat",
+   "text": "d"
+  },
+  {
+   "path": "world/playerdata/a1b2c3d4-0000-4000-8000-000000000001.dat_old",
+   "text": "d"
+  },
+  {
+   "path": "world/stats/a1b2c3d4-0000-4000-8000-000000000001.json",
+   "text": "{}"
+  },
+  {
+   "path": "world/players/data/a1b2c3d4-0000-4000-8000-000000000003.DAT",
+   "text": "d"
+  },
+  {
+   "path": "world/players/advancements/48f83307-567a-33d7-8604-3b22ee4c1b84.json",
+   "text": "{}"
+  },
+  {
+   "path": "world/playerdata/notes.txt",
+   "text": "x"
+  },
+  {
+   "path": "world/playerdata/a1b2c3d4-0000-4000-8000-00000000000x.dat",
+   "text": "bad hex"
+  },
+  {
+   "path": "logs/console.log",
+   "text": "[12:00] Steve[/203.0.113.5:51234] logged in\r\nC:\\Users\\Josh Smith\\AppData\\x and /home/josh/.minecraft\n/[2001:db8::1]:25565 /::1:25565 /1.2.3.4 /usr/lib\n"
+  },
+  {
+   "path": "logs/empty.log",
+   "text": "  \n"
+  }
+ ],
+ "instance": {
+  "port": 25565
+ },
+ "secrets": {
+  "registry": {
+   "version": 1,
+   "instances": {
+    "srv": {
+     "rcon": {
+      "port": 25575,
+      "password": "hunter2pass"
+     },
+     "webhook": "https://discord.com/api/webhooks/1/xyz",
+     "notes": {
+      "apiToken": "abc"
+     },
+     "list": [
+      {
+       "secretKey": "long-secret-value"
+      }
+     ]
+    }
+   }
+  },
+  "accounts": {
+   "accounts": [
+    {
+     "name": "Me",
+     "uuid": "u",
+     "accessToken": "tok-abcdef",
+     "refreshToken": "tok-abcdef"
+    }
+   ]
+  },
+  "profiles": {
+   "profiles": {
+    "main": {
+     "version": "1.21"
+    },
+    "other": {
+     "version": "1.20"
+    }
+   }
+  },
+  "states": {
+   "main": {
+    "pid": 1,
+    "harnessToken": "harness-tok-1"
+   },
+   "other": "not json{"
+  }
+ },
+ "ops": [
+  {
+   "op": "listPlayers",
+   "args": []
+  },
+  {
+   "op": "storedPlayers",
+   "args": []
+  },
+  {
+   "op": "whitelistOn",
+   "args": []
+  },
+  {
+   "op": "whitelistEnforced",
+   "args": []
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000002",
+    true,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "A1B2C3D4-0000-4000-8000-000000000001",
+    false,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "ops.json"
+   ]
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "nobody",
+    true,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "setBan",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    true,
+    "  too \n many   words ",
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "setBan",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000002",
+    false,
+    "",
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "banned-players.json"
+   ]
+  },
+  {
+   "op": "setWhitelisted",
+   "args": [
+    "48f83307-567a-33d7-8604-3b22ee4c1b84",
+    false,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "setWhitelisted",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000003",
+    true,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "whitelist.json"
+   ]
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    true,
+    {
+     "running": true,
+     "replies": {
+      "op Alicia": "§aMade Alicia a server operator "
+     },
+     "writes": {
+      "ops.json": [
+       {
+        "uuid": "a1b2c3d4-0000-4000-8000-000000000001",
+        "name": "Alicia",
+        "level": 4
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    false,
+    {
+     "running": true,
+     "replies": {
+      "deop Alicia": "Nothing changed"
+     }
+    }
+   ]
+  },
+  {
+   "op": "setOp",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000003",
+    true,
+    {
+     "running": true,
+     "replies": {}
+    }
+   ]
+  },
+  {
+   "op": "setBan",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000004",
+    true,
+    "x",
+    {
+     "running": true,
+     "replies": {}
+    }
+   ]
+  },
+  {
+   "op": "setBan",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    true,
+    "spam  bot",
+    {
+     "running": true,
+     "replies": {
+      "ban Alicia spam bot": "Banned Alicia"
+     }
+    }
+   ]
+  },
+  {
+   "op": "setWhitelisted",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    true,
+    {
+     "running": true,
+     "replies": {},
+     "fail": "connect ECONNREFUSED 127.0.0.1:25575"
+    }
+   ]
+  },
+  {
+   "op": "setWhitelistOn",
+   "args": [
+    true,
+    {
+     "running": true,
+     "replies": {
+      "whitelist on": "Whitelist is now turned on"
+     }
+    }
+   ]
+  },
+  {
+   "op": "whitelistOn",
+   "args": []
+  },
+  {
+   "op": "setWhitelistOn",
+   "args": [
+    false,
+    {
+     "running": true,
+     "replies": {
+      "whitelist off": "Unknown command"
+     }
+    }
+   ]
+  },
+  {
+   "op": "setWhitelistOn",
+   "args": [
+    false,
+    {
+     "running": false
+    }
+   ]
+  },
+  {
+   "op": "whitelistOn",
+   "args": []
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "  alicia ",
+    "whitelist",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Notch",
+    "op",
+    "",
+    {
+     "running": false
+    },
+    {
+     "found": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+      "name": "Notch"
+     }
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Nobody1",
+    "ban",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Flaky",
+    "ban",
+    "",
+    {
+     "running": false
+    },
+    {
+     "error": "fetch failed"
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "bad name",
+    "op",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Fine",
+    "kick",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Runner",
+    "ban",
+    "because",
+    {
+     "running": true,
+     "replies": {
+      "ban Runner because": "Banned Runner"
+     }
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "writeFile",
+   "args": [
+    "server.properties",
+    "level-name=world\nonline-mode=false\n"
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Newbie",
+    "whitelist",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "addByName",
+   "args": [
+    "Ghost",
+    "op",
+    "",
+    {
+     "running": false
+    },
+    {
+     "none": true
+    }
+   ]
+  },
+  {
+   "op": "readFile",
+   "args": [
+    "whitelist.json"
+   ]
+  },
+  {
+   "op": "forgetPlayer",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    true
+   ]
+  },
+  {
+   "op": "forgetPlayer",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000001",
+    false
+   ]
+  },
+  {
+   "op": "forgetPlayer",
+   "args": [
+    "a1b2c3d4-0000-4000-8000-000000000003",
+    false
+   ]
+  },
+  {
+   "op": "listPlayers",
+   "args": []
+  },
+  {
+   "op": "storedPlayers",
+   "args": []
+  },
+  {
+   "op": "exportConsole",
+   "args": [
+    "logs/console.log"
+   ]
+  },
+  {
+   "op": "exportConsole",
+   "args": [
+    "logs/none.log"
+   ]
+  },
+  {
+   "op": "exportConsole",
+   "args": [
+    "logs/empty.log"
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "status": 200,
+     "body": "{\"success\":true,\"id\":\"abc\",\"url\":\"https://mclo.gs/abc\",\"raw\":\"https://api.mclo.gs/1/raw/abc\",\"token\":\"tok123\"}"
+    }
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "status": 200,
+     "body": "{\"success\":true,\"id\":\"def\",\"url\":\"https://mclo.gs/def\",\"expires\":123}"
+    }
+   ]
+  },
+  {
+   "op": "readTokens",
+   "args": []
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "status": 400,
+     "body": "{\"success\":false,\"error\":\"Required POST argument 'content' is empty.\"}"
+    }
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "status": 500,
+     "body": "{\"success\":false}"
+    }
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "status": 502,
+     "body": "<html>bad gateway</html>"
+    }
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/console.log",
+    {
+     "throws": "getaddrinfo ENOTFOUND api.mclo.gs"
+    }
+   ]
+  },
+  {
+   "op": "shareConsole",
+   "args": [
+    "logs/none.log",
+    {
+     "status": 200,
+     "body": "{}"
+    }
+   ]
+  },
+  {
+   "op": "scrubber",
+   "args": [
+    "rcon hunter2pass and hook https://discord.com/api/webhooks/1/xyz from /10.0.0.7:4000, token tok-abcdef, short abc",
+    false
+   ]
+  },
+  {
+   "op": "scrubber",
+   "args": [
+    "rcon hunter2pass from /10.0.0.7:4000",
+    true
+   ]
+  }
+ ],
+ "mojang": [
+  {
+   "op": "mojangLookup",
+   "args": [
+    "notch",
+    {
+     "status": 200,
+     "body": "{\"id\":\"069A79F444E94726A5BEFCA90E38AAF5\",\"name\":\"Notch\"}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "Nobody",
+    {
+     "status": 204,
+     "body": ""
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "Nobody",
+    {
+     "status": 404,
+     "body": "{}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "x",
+    {
+     "status": 429,
+     "body": "{}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "x",
+    {
+     "status": 200,
+     "body": "not json"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "x",
+    {
+     "status": 200,
+     "body": "\"text\""
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "x",
+    {
+     "status": 200,
+     "body": "{\"id\":\"123\"}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "Notch",
+    {
+     "status": 200,
+     "body": "{\"id\":\"069a79f444e94726a5befca90e38aaf5\",\"name\":\"Jeb_\"}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "Notch",
+    {
+     "status": 200,
+     "body": "{\"id\":\"069a79f444e94726a5befca90e38aaf5\"}"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "Notch",
+    {
+     "status": 200,
+     "body": "[]"
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "a b/c",
+    {
+     "status": 404,
+     "body": ""
+    }
+   ]
+  },
+  {
+   "op": "mojangLookup",
+   "args": [
+    "x",
+    {
+     "throws": "fetch failed"
+    }
+   ]
+  }
+ ],
+ "pure": [
+  {
+   "op": "redactAccountName",
+   "args": [
+    "C:\\Users\\Josh Smith\\AppData and C:/Users/Ann, D:\\\\Users\\\\Bo\\x \"C:\\Users\\Q\" /home/josh/x /Users/ann /home/<user>/y C:\\Users\\<user>\\z"
+   ]
+  },
+  {
+   "op": "redactAccountName",
+   "args": [
+    "e:/users/x C:\\Users\\élève\\a C:\\Users\\tab\there"
+   ]
+  },
+  {
+   "op": "trimForUpload",
+   "args": [
+    "a\r\nb\rc\n"
+   ]
+  },
+  {
+   "op": "trimForUpload",
+   "args": [
+    ""
+   ]
+  },
+  {
+   "op": "trimForUpload",
+   "gen": {
+    "unit": "line",
+    "repeat": 1,
+    "count": 25010,
+    "trailing": true
+   }
+  },
+  {
+   "op": "trimForUpload",
+   "gen": {
+    "unit": "x",
+    "repeat": 500,
+    "count": 22000,
+    "trailing": false
+   }
+  },
+  {
+   "op": "trimForUpload",
+   "gen": {
+    "unit": "é",
+    "repeat": 5242881,
+    "count": 1,
+    "trailing": true
+   }
+  },
+  {
+   "op": "trimForUpload",
+   "gen": {
+    "unit": "aé",
+    "repeat": 3495254,
+    "count": 1,
+    "trailing": false
+   }
+  },
+  {
+   "op": "hideIps",
+   "args": [
+    "Steve[/203.0.113.5:51234] logged in, /[2001:db8::1%eth0]:25565, /::1:25565, /fe80::1:80x, /1.2.3.4:123456, /1.2.3.4:80_ /999.1.2.3:7 /1.2.3.4.5:6 /abcd:ef:: :1 /a:b:c:d:e:f:1:2:3:4"
+   ]
+  },
+  {
+   "op": "scrub",
+   "args": [
+    "pw: hunter22 and hunter, /1.2.3.4:5",
+    [
+     "hunter22",
+     "hunter"
+    ],
+    false
+   ]
+  },
+  {
+   "op": "scrub",
+   "args": [
+    "",
+    [
+     "x"
+    ],
+    false
+   ]
+  },
+  {
+   "op": "offlineUuid",
+   "args": [
+    "Notch"
+   ]
+  },
+  {
+   "op": "offlineUuid",
+   "args": [
+    "été"
+   ]
+  }
+ ]
+}
