@@ -119,3 +119,18 @@ test("another server's leftover backups folder still stops a rename", () => {
   assert.throws(() => manage.rename('epsilon', 'zeta'), /already holds snapshots/)
   assert.ok(hasInstance('epsilon'))
 })
+
+test('a capitals-only move whose removal fails part way puts the old task back', () => {
+  const s = caseBlindScheduler()
+  s.ops.write('gamma-backup')
+  const ops = { ...s.ops, remove: (id) => { s.ops.remove(id); throw new Error('launchctl refused') } }
+  assert.throws(() => swapRegistration('gamma-backup', 'Gamma-backup', ops), /launchctl refused/)
+  assert.equal(s.tasks.get('gamma-backup'), 'gamma-backup', 'the old task was not restored')
+})
+
+test('a rename to the capitals of another server is refused', () => {
+  makeInstance('eta', 40220)
+  makeInstance('theta', 40230)
+  assert.throws(() => manage.rename('theta', 'ETA'), /differs from it only in capitals/)
+  assert.ok(hasInstance('theta') && hasInstance('eta'))
+})

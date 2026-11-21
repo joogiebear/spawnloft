@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 import { BACKUPS_DIR, INSTANCES_DIR, runDir } from './paths.mjs'
-import { getInstance, hasInstance, putInstance, removeInstance } from './registry.mjs'
+import { getInstance, hasInstance, listAll, putInstance, removeInstance } from './registry.mjs'
 import * as backup from './backup.mjs'
 import { activeBlock } from './control.mjs'
 import * as schedule from './schedule.mjs'
@@ -50,6 +50,10 @@ export function rename(oldName, newName) {
   }
   const inst = getInstance(oldName)
   if (hasInstance(newName)) throw new UserError(`"${newName}" already exists`)
+  // Windows and macOS see "gamma" and "Gamma" as one folder and one task name, so another server
+  // that differs only in capitals would have its folders and tasks overwritten
+  const clash = listAll().find((i) => i.name !== oldName && i.name.toLowerCase() === newName.toLowerCase())
+  if (clash) throw new UserError(`"${clash.name}" already exists, and "${newName}" differs from it only in capitals`)
   assertStopped(oldName, 'renaming it')
 
   const { name: _drop, ...cfg } = inst

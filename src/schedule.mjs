@@ -492,8 +492,11 @@ export function swapRegistration(from, to, { write, remove }) {
     }
     return
   }
-  remove(from)
-  try { write(to) } catch (error) {
+  // a removal that fails part way (files gone, then launchctl or systemctl refuses) is put back too
+  try {
+    remove(from)
+    write(to)
+  } catch (error) {
     try { write(from) } catch { /* nothing more to try */ }
     throw error
   }
