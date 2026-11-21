@@ -354,7 +354,7 @@ jobs:
           cargo build --locked --release -p spawnloft-fakes --bin net-probe --target ${{ matrix.triple }}
           probe="$GITHUB_WORKSPACE/rust/target/${{ matrix.triple }}/release/net-probe"
           file "$probe"
-          file "$probe" | grep -q 'statically linked'
+          file "$probe" | grep -Eq 'static(ally|-pie) linked'
           echo "PROBE=$probe" >> "$GITHUB_ENV"
       - name: Names and TLS on the runner
         run: $PROBE $URLS
