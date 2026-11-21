@@ -139,6 +139,15 @@ pub fn interrupted() -> Option<u8> {
     }
 }
 
+/// The interrupt [`watch_interrupts`] caught, cleared so the next one is seen too (a second
+/// Ctrl-C after the first was taken as a cancel).
+pub fn take_interrupt() -> Option<u8> {
+    match INTERRUPT_CODE.swap(0, Ordering::SeqCst) {
+        0 => None,
+        c => u8::try_from(c).ok(),
+    }
+}
+
 /// Whether a SIGTERM arrived since the last call.
 pub fn take_sigterm() -> bool {
     SIGTERM_SEEN.swap(false, Ordering::SeqCst)

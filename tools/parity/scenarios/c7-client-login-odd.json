@@ -1,0 +1,143 @@
+{
+  "about": "C7 part 3a, odd answers: a Mojang refusal cut at 200 UTF-16 units through a surrogate pair, and a profile whose name is a number, signed in to an empty list (Node takes it) and next to another entry (Node's TypeError).",
+  "normalize": [
+    {
+      "pattern": "\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z",
+      "replace": "<time>"
+    }
+  ],
+  "hosts": {
+    "https://login.microsoftonline.com": {
+      "routes": {
+        "POST /consumers/oauth2/v2.0/devicecode": {
+          "json": {
+            "device_code": "D",
+            "user_code": "U",
+            "verification_uri": "https://x/l",
+            "expires_in": 900,
+            "interval": 0
+          }
+        },
+        "POST /consumers/oauth2/v2.0/token": {
+          "json": {
+            "access_token": "a",
+            "refresh_token": "r"
+          }
+        }
+      }
+    },
+    "https://user.auth.xboxlive.com": {
+      "routes": {
+        "POST /user/authenticate": {
+          "json": {
+            "Token": "t",
+            "DisplayClaims": {
+              "xui": [
+                {
+                  "uhs": "u"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "https://xsts.auth.xboxlive.com": {
+      "routes": {
+        "POST /xsts/authorize": {
+          "json": {
+            "Token": "t",
+            "DisplayClaims": {
+              "xui": [
+                {
+                  "uhs": "u"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "https://api.minecraftservices.com": {
+      "routes": {
+        "POST /authentication/login_with_xbox": {
+          "sequence": [
+            {
+              "status": 403,
+              "json": {
+                "errorMessage": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ud83d\ude00tail"
+              }
+            },
+            {
+              "json": {
+                "access_token": "m",
+                "expires_in": 60
+              }
+            }
+          ]
+        },
+        "GET /minecraft/profile": {
+          "json": {
+            "id": "AAAAAAAA111122223333444444444444",
+            "name": 123
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Signed in as 123."
+      }
+    },
+    {
+      "run": [
+        "client",
+        "accounts",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": [
+          {
+            "type": "offline",
+            "name": "Alex",
+            "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "account.name.toLowerCase is not a function"
+      }
+    }
+  ]
+}

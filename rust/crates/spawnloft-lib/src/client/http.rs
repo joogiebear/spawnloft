@@ -17,24 +17,44 @@ use crate::failure::Failure;
 /// What Node's `fetch` sends as the User-Agent when a caller names none.
 pub const NODE_FETCH_UA: &str = "node";
 
-/// One request of the chain.
-#[derive(Debug, Clone)]
+/// One request of the chain. Its Debug output names the method and URL only: the bodies and
+/// headers carry tokens and device codes.
+#[derive(Clone)]
 pub struct Request {
     pub method: &'static str,
     pub url: String,
     /// Header names in lower case, as client-auth.mjs writes them.
     pub headers: Vec<(&'static str, String)>,
     pub body: Option<String>,
-    /// `AbortSignal.timeout(ms)` on the whole request, body included.
+    /// `AbortSignal.timeout(ms)` on the whole request, body included. Without one, undici's own
+    /// bounds apply (10 s to connect, 300 s for the headers and for the body), and running into
+    /// them is `fetch failed`, as in Node.
     pub timeout: Option<Duration>,
+}
+
+impl std::fmt::Debug for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Request")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .finish_non_exhaustive()
+    }
 }
 
 /// An answer: the status and `bodyOf(res)` (`res.json() ?? {}`, `{}` when the body is not JSON
 /// or could not be read).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Answer {
     pub status: u16,
     pub body: Value,
+}
+
+impl std::fmt::Debug for Answer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Answer")
+            .field("status", &self.status)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Answer {
@@ -101,9 +121,13 @@ pub fn send(req: &Request) -> Result<Answer, Lost> {
         .http_status_as_error(false)
         .max_redirects(20)
         .user_agent(NODE_FETCH_UA);
-    if let Some(t) = req.timeout {
-        cfg = cfg.timeout_global(Some(t));
-    }
+    cfg = match req.timeout {
+        Some(t) => cfg.timeout_global(Some(t)),
+        None => cfg
+            .timeout_connect(Some(Duration::from_secs(10)))
+            .timeout_recv_response(Some(Duration::from_secs(300)))
+            .timeout_recv_body(Some(Duration::from_secs(300))),
+    };
     let agent = ureq::Agent::new_with_config(cfg.build());
     let url = crate::test_origins::rewrite(&req.url).map_err(|_| Lost::Failed)?;
     let accept = req
@@ -138,12 +162,8 @@ pub fn send(req: &Request) -> Result<Answer, Lost> {
     };
     let status = res.status().as_u16();
     let mut bytes = Vec::new();
-    // a body cut short or too slow is `{}`, as bodyOf's catch makes it; a timeout reading it is
-    // the request timing out (the signal covers the body)
-    if let Err(e) = res.into_body().into_reader().read_to_end(&mut bytes) {
-        if is_timeout(&ureq::Error::from(e)) {
-            return Err(Lost::Timeout);
-        }
+    // a body cut short or too slow, the signal's timeout included, is `{}`: bodyOf catches it
+    if res.into_body().into_reader().read_to_end(&mut bytes).is_err() {
         bytes.clear();
     }
     Ok(Answer {

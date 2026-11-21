@@ -81,13 +81,17 @@ fn is_str(v: Option<&Value>, s: &str) -> bool {
     matches!(v, Some(Value::String(x)) if x == s)
 }
 
-/// `String(x).slice(0, n)` in UTF-16 units (a character that would be cut in half is left out).
+/// `String(x).slice(0, n)` in UTF-16 units. A pair cut in half leaves its lone first half,
+/// which reaches the terminal as U+FFFD, so that is what is kept.
 fn slice_units(s: &str, n: usize) -> String {
     let mut used = 0;
     let mut out = String::new();
     for c in s.chars() {
         used += c.len_utf16();
         if used > n {
+            if used - n == 1 && c.len_utf16() == 2 {
+                out.push('\u{FFFD}');
+            }
             break;
         }
         out.push(c);
@@ -797,7 +801,8 @@ mod tests {
         assert_eq!(timer_ms(5000.0), 5000);
         assert_eq!(js::number(Some(&add_five(&json!(5)))), 10.0);
         assert_eq!(add_five(&json!("5")), json!("55"));
-        assert_eq!(slice_units("a😀b", 2), "a");
+        assert_eq!(slice_units("a😀b", 2), "a\u{FFFD}");
+        assert_eq!(slice_units("a😀b", 3), "a😀");
         assert!(iso(f64::NAN).is_err());
     }
 }

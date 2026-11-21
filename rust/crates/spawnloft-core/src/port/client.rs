@@ -196,17 +196,28 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             if !rest.is_empty() {
                 return Err(usage());
             }
-            // Ctrl-C ends the wait at once (the code stays valid on Microsoft's side until it
-            // expires, but nothing here polls for it any more). SIGTERM ends the process as it
-            // ends Node's, which listens for SIGINT only.
+            // As Node's `process.once('SIGINT')`: the first Ctrl-C cancels the sign-in at the
+            // next wait (a request under way finishes first), a second one ends the process, and
+            // SIGTERM ends it whenever it comes. A watcher thread sees them even while a request
+            // is waiting on the network.
+            static CANCELLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
             spawnloft_lib::platform::watch_interrupts();
+            std::thread::spawn(|| {
+                loop {
+                    if let Some(code) = spawnloft_lib::platform::take_interrupt()
+                        && (code != 130 || CANCELLED.swap(true, std::sync::atomic::Ordering::SeqCst))
+                    {
+                        std::process::exit(i32::from(code));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            });
+            let cancelled = || CANCELLED.load(std::sync::atomic::Ordering::SeqCst);
             let mut sleep = |d: std::time::Duration| {
                 let end = std::time::Instant::now() + d;
                 loop {
-                    match spawnloft_lib::platform::interrupted() {
-                        Some(130) => return true,
-                        Some(code) => std::process::exit(i32::from(code)),
-                        None => {}
+                    if cancelled() {
+                        return true;
                     }
                     let left = end.saturating_duration_since(std::time::Instant::now());
                     if left.is_zero() {

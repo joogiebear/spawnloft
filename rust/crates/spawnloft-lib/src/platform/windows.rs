@@ -252,6 +252,14 @@ pub fn interrupted() -> Option<u8> {
     }
 }
 
+/// The interrupt [`watch_interrupts`] caught, cleared so the next one is seen too.
+pub fn take_interrupt() -> Option<u8> {
+    match INTERRUPT_CODE.swap(0, std::sync::atomic::Ordering::SeqCst) {
+        0 => None,
+        c => Some(c),
+    }
+}
+
 pub fn take_sigterm() -> bool {
     false
 }
