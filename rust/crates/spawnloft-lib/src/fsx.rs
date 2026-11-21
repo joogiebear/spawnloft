@@ -77,6 +77,88 @@ pub fn write_json_durable(file: &Path, data: &serde_json::Value) -> std::io::Res
     rename_retrying(&tmp, file, crate::platform::rename_durable)
 }
 
+/// `util.mjs` `writeJson` for the command line's files: `JSON.stringify(data, null, 2)` (numbers
+/// and key order as JavaScript writes them) through `<file>.tmp` and [`rename_over`], with Node's
+/// failures. With `mode` (owner-only for secrets) the temp file is private before it holds the
+/// data; `strict` refuses to write a file that could not be made private. The answer is the
+/// protection's (a failed one is a reason, not a failure, unless `strict`).
+pub fn write_json_node(
+    file: &Path,
+    data: &serde_json::Value,
+    mode: Option<u32>,
+    strict: bool,
+) -> Result<Result<(), String>, crate::failure::Failure> {
+    use crate::failure::Failure;
+    if let Some(dir) = file.parent().filter(|d| !d.as_os_str().is_empty()) {
+        mkdir_all(dir)?;
+    }
+    let mut tmp = file.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    let mut ordered = data.clone();
+    crate::jsjson::js_order(&mut ordered);
+    let text = format!("{}\n", crate::jsjson::stringify_pretty(&ordered));
+    let protection = match mode {
+        None => std::fs::write(&tmp, &text).map(|()| Ok(())),
+        Some(mode) => crate::private_files::write(&tmp, text.as_bytes(), mode),
+    }
+    .map_err(|e| Failure::io(&e, "open", Some(&tmp)))?;
+    if strict && let Err(reason) = &protection {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(Failure::user(format!(
+            "could not make {} readable by you alone ({reason}), so it was not written; it needs a drive with file permissions (NTFS on Windows), see spawnloft config set-root",
+            file.display()
+        )));
+    }
+    rename_over(&tmp, file).map_err(|e| rename_failure(&e, &tmp, file))?;
+    Ok(protection)
+}
+
+/// `fs.mkdirSync(dir, { recursive: true })` with Node's failure: ENOTDIR when a folder on the way
+/// is a file (Windows says "already exists" for that), else the system's error for `dir`.
+pub fn mkdir_all(dir: &Path) -> Result<(), crate::failure::Failure> {
+    std::fs::create_dir_all(dir).map_err(|e| {
+        let blocked = dir
+            .ancestors()
+            .skip(1)
+            .any(|a| a.metadata().is_ok_and(|m| !m.is_dir()));
+        if blocked {
+            crate::failure::Failure::Internal {
+                head: "Error".into(),
+                message: format!("ENOTDIR: not a directory, mkdir '{}'", dir.display()),
+                code: Some("ENOTDIR".into()),
+            }
+        } else {
+            crate::failure::Failure::io(&e, "mkdir", Some(dir))
+        }
+    })
+}
+
+/// How `renameOver` reports a rename that failed: a file still held after the retries is a
+/// person's problem with one line, anything else is Node's `rename 'a' -> 'b'` error.
+pub fn rename_failure(e: &std::io::Error, from: &Path, to: &Path) -> crate::failure::Failure {
+    use crate::failure::Failure;
+    let (code, text) = crate::jspath::error_code(e);
+    if matches!(code, "EPERM" | "EBUSY" | "EACCES") {
+        return Failure::User {
+            message: format!(
+                "could not replace {}: another program (a virus scanner, indexer or sync client) is holding it ({code}); try again in a moment",
+                to.display()
+            ),
+            code: Some(code.into()),
+        };
+    }
+    Failure::Internal {
+        head: "Error".into(),
+        message: format!(
+            "{code}: {text}, rename '{}' -> '{}'",
+            from.display(),
+            to.display()
+        ),
+        code: Some(code.into()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

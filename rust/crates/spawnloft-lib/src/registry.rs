@@ -6,7 +6,12 @@
 //!
 //! The command line's view ([`load`], [`list_all`], [`lookup`]) is `registry.mjs` exactly,
 //! failures included: the same order, the same messages, and the same refusal of a file that is
-//! not JSON. Nothing here writes the registry yet.
+//! not JSON.
+//!
+//! The writes ([`put_instance`], [`update_instance`], [`remove_instance`]) are `registry.mjs`'s,
+//! under the same lock file (`instances.json.lock`, see `lock.rs`), so a Rust and a Node process
+//! changing the registry at once never lose each other's write. The file holds RCON, database and
+//! webhook secrets, so it is written owner-only (`private_files.rs`).
 
 use serde_json::{Map, Value};
 use std::path::Path;
@@ -295,6 +300,381 @@ pub fn lookup(registry_file: &Path, name: &str) -> Result<Instance, crate::failu
     }
 }
 
+/// The one lock for the whole registry: the daemon recording a pid while the panel changes a
+/// setting would otherwise lose one of the writes.
+pub fn lock_file(registry_file: &Path) -> std::path::PathBuf {
+    let mut f = registry_file.as_os_str().to_owned();
+    f.push(".lock");
+    f.into()
+}
+
+/// `loadRegistry()` for a write: the whole document, with `instances` made `{}` when it is
+/// missing or falsy, as Node leaves it before changing it. Failures are [`load`]'s.
+fn load_document(registry_file: &Path) -> Result<Value, crate::failure::Failure> {
+    use crate::failure::Failure;
+    let text = match std::fs::read(registry_file) {
+        Ok(b) => String::from_utf8_lossy(&b).into_owned(),
+        // readJson's fallback, { version: 1, instances: {} }
+        Err(e) if crate::jspath::is_enoent(&e) => {
+            return Ok(serde_json::json!({ "version": 1, "instances": {} }));
+        }
+        Err(e) => return Err(Failure::read(&e, registry_file)),
+    };
+    let mut data = crate::jsjson::parse(&text).map_err(Failure::syntax)?;
+    // the same refusals as a read
+    load(registry_file)?;
+    if let Value::Object(m) = &mut data
+        && !js::truthy(m.get("instances"))
+    {
+        m.insert("instances".into(), Value::Object(Map::new()));
+    }
+    Ok(data)
+}
+
+/// `saveRegistry`: the whole document, owner-only, through a temp file and a rename. A drive
+/// that cannot be made private is still written, as in Node (`strict` is off).
+pub fn save(registry_file: &Path, data: &Value) -> Result<(), crate::failure::Failure> {
+    crate::fsx::write_json_node(
+        registry_file,
+        data,
+        Some(crate::private_files::PRIVATE_MODE),
+        false,
+    )
+    .map(|_| ())
+}
+
+fn lock_failure(e: crate::lock::LockError, lock: &Path) -> crate::failure::Failure {
+    use crate::failure::Failure;
+    use crate::lock::LockError;
+    match e {
+        // fail(): a person's error
+        LockError::NotGot { .. } => Failure::user(e.to_string()),
+        LockError::TimedOut { .. } => Failure::Internal {
+            head: "Error".into(),
+            message: e.to_string(),
+            code: None,
+        },
+        // the folder was made beforehand, so what is left is opening the lock file
+        LockError::Io(io) => Failure::io(&io, "open", Some(lock)),
+    }
+}
+
+/// Runs `f` over the registry document under the registry lock, then saves what it left.
+fn change<T>(
+    registry_file: &Path,
+    f: impl FnOnce(&mut Value) -> Result<T, crate::failure::Failure>,
+) -> Result<T, crate::failure::Failure> {
+    let lock = lock_file(registry_file);
+    // tryLock makes the folder first; done here so its failure names it as Node's does
+    if let Some(dir) = lock.parent().filter(|d| !d.as_os_str().is_empty()) {
+        crate::fsx::mkdir_all(dir)?;
+    }
+    crate::lock::with_lock(&lock, crate::lock::Options::default(), || {
+        let mut data = load_document(registry_file)?;
+        let out = f(&mut data)?;
+        save(registry_file, &data)?;
+        Ok(out)
+    })
+    .map_err(|e| lock_failure(e, &lock))?
+}
+
+/// `reg.instances[name] = cfg` with JavaScript's rules for what `instances` may hold: an object
+/// takes the key (in place if it had it), an array takes an index-like name as an element (any
+/// other name is a property `JSON.stringify` drops), and a primitive refuses in strict mode.
+fn assign(instances: &mut Value, name: &str, cfg: Value) -> Result<(), crate::failure::Failure> {
+    match instances {
+        Value::Object(m) => {
+            m.insert(name.into(), cfg);
+            Ok(())
+        }
+        Value::Array(items) => {
+            if crate::jsjson::is_index_key(name)
+                && let Ok(i) = name.parse::<usize>()
+            {
+                if i >= items.len() {
+                    items.resize(i + 1, Value::Null);
+                }
+                items[i] = cfg;
+            }
+            Ok(())
+        }
+        other => Err(primitive_refusal(
+            other,
+            &format!("Cannot create property '{name}' on"),
+        )),
+    }
+}
+
+fn primitive_refusal(v: &Value, what: &str) -> crate::failure::Failure {
+    let (kind, shown) = match v {
+        Value::Bool(b) => ("boolean", b.to_string()),
+        Value::Number(_) => ("number", js::string(Some(v))),
+        _ => ("string", js::string(Some(v))),
+    };
+    crate::failure::Failure::type_error(format!("{what} {kind} '{shown}'"))
+}
+
+/// The document's `instances`, which [`load_document`] made present for an object document.
+/// An array document has none Node can keep: its writes go nowhere, as in Node.
+fn instances_of(data: &mut Value) -> Option<&mut Value> {
+    data.as_object_mut().and_then(|m| m.get_mut("instances"))
+}
+
+/// `putInstance`: adds or replaces a record.
+pub fn put_instance(registry_file: &Path, name: &str, cfg: Value) -> Result<(), crate::failure::Failure> {
+    validate_name(name).map_err(crate::failure::Failure::user)?;
+    change(registry_file, |data| match instances_of(data) {
+        Some(instances) => assign(instances, name, cfg),
+        None => Ok(()),
+    })
+}
+
+/// `updateInstance`: the record's fields with `patch` over them, in the record's own order and
+/// then the new keys; answers `{ name, ...record }` as saved.
+pub fn update_instance(
+    registry_file: &Path,
+    name: &str,
+    patch: &Map<String, Value>,
+) -> Result<Instance, crate::failure::Failure> {
+    use crate::failure::Failure;
+    change(registry_file, |data| {
+        let missing = || Failure::user(format!("no instance named \"{name}\""));
+        let Some(instances) = instances_of(data) else {
+            return Err(missing());
+        };
+        let Some(current) = entries_of(instances)
+            .into_iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v)
+        else {
+            return Err(missing());
+        };
+        let mut merged = Map::new();
+        for (k, v) in entries_of(&current) {
+            merged.insert(k, v);
+        }
+        for (k, v) in patch {
+            merged.insert(k.clone(), v.clone());
+        }
+        let merged = Value::Object(merged);
+        assign(instances, name, merged.clone())?;
+        Ok(spread(name, &merged))
+    })
+}
+
+/// `removeInstance`: deletes the record, keeping the others' order.
+pub fn remove_instance(registry_file: &Path, name: &str) -> Result<(), crate::failure::Failure> {
+    change(registry_file, |data| {
+        match instances_of(data) {
+            Some(Value::Object(m)) => {
+                m.shift_remove(name);
+            }
+            // `delete arr[i]` leaves a hole, which JSON.stringify writes as null
+            Some(Value::Array(items)) => {
+                if crate::jsjson::is_index_key(name)
+                    && let Ok(i) = name.parse::<usize>()
+                    && i < items.len()
+                {
+                    items[i] = Value::Null;
+                }
+            }
+            // a string's characters cannot be deleted in strict mode
+            Some(Value::String(s))
+                if crate::jsjson::is_index_key(name)
+                    && name.parse::<usize>().is_ok_and(|i| i < s.encode_utf16().count()) =>
+            {
+                return Err(crate::failure::Failure::type_error(format!(
+                    "Cannot delete property '{name}' of [object String]"
+                )));
+            }
+            _ => {}
+        }
+        Ok(())
+    })
+}
+
+/// `freeName`: the first of `base`, `base-2`, `base-3`... not taken, each within the 32-character
+/// limit with the dashes and underscores the cut leaves at the end dropped.
+pub fn free_name(registry_file: &Path, base: &str) -> Result<String, crate::failure::Failure> {
+    let taken: Vec<String> = entries_of(&load(registry_file)?)
+        .into_iter()
+        .map(|(k, _)| k)
+        .collect();
+    let mut name = base.to_string();
+    let mut i = 2u64;
+    while taken.contains(&name) {
+        let suffix = format!("-{i}");
+        let keep = 32usize.saturating_sub(suffix.len());
+        let cut: String = String::from_utf16_lossy(&base.encode_utf16().take(keep).collect::<Vec<_>>());
+        name = format!("{}{suffix}", cut.trim_end_matches(['-', '_']));
+        i += 1;
+    }
+    Ok(name)
+}
+
+/// A port as a record holds it: a JSON number (any other value is no port).
+fn port_of(v: Option<&Value>) -> Option<f64> {
+    v.and_then(Value::as_f64)
+}
+
+/// `usedPorts`: every game and RCON port a record names, truthy ones only.
+pub fn used_ports(registry_file: &Path) -> Result<Vec<f64>, crate::failure::Failure> {
+    let mut taken: Vec<f64> = Vec::new();
+    for inst in list_all(registry_file)? {
+        let rcon_port = inst.get("rcon").and_then(|r| r.get("port"));
+        for v in [inst.get("port"), rcon_port] {
+            if js::truthy(v) {
+                // a Set of whatever the record holds; only numbers matter to a caller
+                if let Some(p) = port_of(v)
+                    && !taken.contains(&p)
+                {
+                    taken.push(p);
+                }
+            }
+        }
+    }
+    Ok(taken)
+}
+
+/// `assertPortUsable`: a whole number from 1 to 65535 that no other record uses as its game or
+/// RCON port. `port` is what the caller was given, shown in the refusal as JavaScript prints it.
+pub fn assert_port_usable(
+    registry_file: &Path,
+    name: &str,
+    port: &Value,
+    label: &str,
+) -> Result<u16, crate::failure::Failure> {
+    use crate::failure::Failure;
+    let n = port
+        .as_f64()
+        .filter(|n| n.fract() == 0.0 && (1.0..=65535.0).contains(n));
+    let Some(n) = n else {
+        let shown = js::string(Some(port));
+        return Err(Failure::user(format!(
+            "{shown} is not a {label} number - use 1 to 65535"
+        )));
+    };
+    let clash = list_all(registry_file)?.into_iter().find(|i| {
+        i.name != name
+            && (port_of(i.get("port")) == Some(n)
+                || port_of(i.get("rcon").and_then(|r| r.get("port"))) == Some(n))
+    });
+    if let Some(c) = clash {
+        return Err(Failure::user(format!(
+            "port {n} is already used by \"{}\"",
+            c.name
+        )));
+    }
+    Ok(n as u16)
+}
+
+/// `defaultDir`: a new server's folder under the instances folder.
+pub fn default_dir(instances_dir: &str, name: &str) -> String {
+    crate::jspath::join(&[instances_dir, name])
+}
+
+/// `serverJarPath`.
+pub fn server_jar_path(inst: &Instance) -> String {
+    crate::jspath::join(&[inst.dir().unwrap_or(""), inst.jar().unwrap_or("")])
+}
+
+/// `assertInstanceDir`: the folder exists, and a server's jar is in it (a database's engine
+/// checks what it needs at launch).
+pub fn assert_instance_dir(inst: &Instance) -> Result<(), crate::failure::Failure> {
+    use crate::failure::Failure;
+    let dir = inst.dir().unwrap_or("");
+    if !Path::new(dir).exists() {
+        return Err(Failure::user(format!(
+            "instance \"{}\" directory is missing: {dir}",
+            inst.name
+        )));
+    }
+    if inst.is_database() {
+        return Ok(());
+    }
+    let jar = server_jar_path(inst);
+    if !Path::new(&jar).exists() {
+        return Err(Failure::user(format!(
+            "server jar not found for \"{}\": {jar}",
+            inst.name
+        )));
+    }
+    Ok(())
+}
+
+/// Java arguments every server gets before its own flags (`SERVER_SYSTEM_PROPERTIES`): the server
+/// runs with no TTY, so JLine is not tried.
+pub const SERVER_SYSTEM_PROPERTIES: [&str; 1] = ["-Dterminal.jline=false"];
+
+/// `serverJvmArgs`.
+pub fn server_jvm_args(memory: &str, flags: &[String], jar_name: &str) -> Vec<String> {
+    let mut out = vec![format!("-Xms{memory}"), format!("-Xmx{memory}")];
+    out.extend(SERVER_SYSTEM_PROPERTIES.iter().map(|s| s.to_string()));
+    out.extend(flags.iter().cloned());
+    out.extend(["-jar".into(), jar_name.into(), "--nogui".into()]);
+    out
+}
+
+/// `cleanJvmFlags`: a server's own Java arguments, from space- or line-separated text or a list.
+/// `None` for nothing (the recommended flags). Memory and the jar are refused: the Memory setting
+/// and the server's own jar decide those.
+pub fn clean_jvm_flags(input: &Value) -> Result<Option<Vec<String>>, crate::failure::Failure> {
+    use crate::failure::Failure;
+    let tokens: Vec<String> = match input {
+        Value::Null => return Ok(None),
+        Value::Array(items) => items
+            .iter()
+            .map(|v| js::trim(&js::string(Some(v))).to_string())
+            .filter(|t| !t.is_empty())
+            .collect(),
+        other => js::string(Some(other))
+            .split(js::is_js_space)
+            .map(|t| t.to_string())
+            .filter(|t| !t.is_empty())
+            .collect(),
+    };
+    if tokens.is_empty() {
+        return Ok(None);
+    }
+    if tokens.len() > 60 {
+        return Err(Failure::user("that is more than 60 Java arguments"));
+    }
+    for t in &tokens {
+        let units: Vec<u16> = t.encode_utf16().collect();
+        if units.len() > 300 {
+            let head = String::from_utf16_lossy(&units[..40]);
+            return Err(Failure::user(format!(
+                "\"{head}...\" is too long for one argument"
+            )));
+        }
+        if !t.starts_with('-') {
+            return Err(Failure::user(format!(
+                "\"{t}\" is not a Java option - each starts with a dash, like -XX:+UseG1GC"
+            )));
+        }
+        let lower = t.to_ascii_lowercase();
+        if lower.starts_with("-xms") || lower.starts_with("-xmx") {
+            return Err(Failure::user(format!(
+                "{t}: memory is set by the Memory setting, so both stay in step"
+            )));
+        }
+        if matches!(lower.as_str(), "-jar" | "-cp" | "-classpath" | "--class-path") {
+            return Err(Failure::user(format!(
+                "{t}: which jar runs is the server's own jar"
+            )));
+        }
+    }
+    Ok(Some(tokens))
+}
+
+/// `loaderOf`: absent means paper, for servers made before the field existed.
+pub fn loader_of(inst: &Instance) -> String {
+    match inst.get("loader") {
+        None | Some(Value::Null) => "paper".into(),
+        v => js::string(v),
+    }
+}
+
 static MEMORY_RE: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^([0-9]+(?:\.[0-9]+)?)\s*([GgMm])$").expect("memory pattern"));
 
@@ -345,6 +725,66 @@ pub fn jvm_flags_for(memory: &str) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn library() -> serde_json::Value {
+        let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../test/fixtures/contracts/c1-library.json");
+        serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap()
+    }
+
+    // what the Rust registry leaves after a write: this user alone, nothing from the folder
+    #[cfg(windows)]
+    #[test]
+    fn a_saved_registry_is_owner_only_on_windows() {
+        let dir = std::env::temp_dir().join(format!("sl-reg-acl-{}", std::process::id()));
+        let file = dir.join("instances.json");
+        put_instance(&file, "smp", json!({ "rcon": { "password": "x" } })).unwrap();
+        let sddl = crate::platform::dacl_sddl(&file)
+            .unwrap()
+            .replace("AI", "")
+            .replace("AR", "");
+        assert!(
+            sddl.starts_with("D:P(A;;FA;;;") && sddl.matches('(').count() == 1,
+            "{sddl}"
+        );
+        assert_eq!(
+            crate::private_files::inspect(&file),
+            crate::private_files::State::Private
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_registry_under_a_file_names_the_folder() {
+        let dir = std::env::temp_dir().join(format!("sl-reg-blocked-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("afile"), "").unwrap();
+        let e = put_instance(&dir.join("afile").join("instances.json"), "smp", json!({})).unwrap_err();
+        assert_eq!(
+            e.message(),
+            format!(
+                "EEXIST: file already exists, mkdir '{}'",
+                dir.join("afile").display()
+            )
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn jvm_flags_agree_with_node() {
+        let fx = library();
+        for c in fx["jvm"]["clean"].as_array().unwrap() {
+            match clean_jvm_flags(&c["input"]) {
+                Ok(tokens) => assert_eq!(json!(tokens), c["value"], "{c}"),
+                Err(e) => assert_eq!(e.message(), c["error"].as_str().unwrap_or("(no error)"), "{c}"),
+            }
+        }
+        assert_eq!(
+            json!(server_jvm_args("4G", &["-XX:+UseG1GC".to_string()], "paper.jar")),
+            fx["jvm"]["args"]
+        );
+    }
 
     fn write(dir: &Path, value: Value) -> std::path::PathBuf {
         let file = dir.join("instances.json");

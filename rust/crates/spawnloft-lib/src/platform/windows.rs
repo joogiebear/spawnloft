@@ -592,7 +592,6 @@ pub fn private_file_sddl(sid: &str) -> String {
 /// A new file only this user can open, failing when the name exists. The ACL is on the file
 /// when it is created, so it is never there under its folder's permissions.
 pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::File> {
-    use std::os::windows::ffi::OsStrExt;
     let sddl = wide(&private_file_sddl(&user_sid().map_err(std::io::Error::other)?));
     let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
     // SAFETY: valid NUL-terminated string and out-pointer; the descriptor is freed below.
@@ -612,7 +611,7 @@ pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::Fi
         lpSecurityDescriptor: sd,
         bInheritHandle: 0,
     };
-    let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let name = path_wide(path);
     // SAFETY: a NUL-terminated path and attributes that live through the call; the result is
     // checked, and CREATE_NEW never opens a file that exists.
     let handle = unsafe {
@@ -630,6 +629,255 @@ pub fn create_private_new(path: &std::path::Path) -> std::io::Result<std::fs::Fi
     // SAFETY: allocated by the conversion above and not used after this.
     unsafe { LocalFree(sd as _) };
     made.map(std::fs::File::from)
+}
+
+/// One access entry on a file, as `inspect` reads it: who it names (`DOMAIN\\name` as icacls prints
+/// it, or `*S-1-...` when the SID has no name here), its SID, and whether it came from the folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccessEntry {
+    pub principal: String,
+    pub sid: Option<String>,
+    pub inherited: bool,
+}
+
+/// A path for the wide API calls. A long absolute one gets the verbatim prefix (`\\\\?\\`), as
+/// std's own file calls give it, so a data root past MAX_PATH is protected like any other.
+fn path_wide(path: &std::path::Path) -> Vec<u16> {
+    let text = path.to_string_lossy();
+    let shown = if text.len() < 240 || text.starts_with("\\\\?\\") {
+        text.into_owned()
+    } else if let Some(rest) = text.strip_prefix("\\\\").or_else(|| text.strip_prefix("//")) {
+        format!("\\\\?\\UNC\\{}", rest.replace('/', "\\"))
+    } else if text.as_bytes().get(1) == Some(&b':') {
+        format!("\\\\?\\{}", text.replace('/', "\\"))
+    } else {
+        text.into_owned()
+    };
+    shown.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Replaces the file's access list with the private one: inheritance cut and one full-access
+/// entry for this user, what `icacls <file> /inheritance:r /grant:r *<sid>:F` leaves.
+pub fn protect_private(path: &std::path::Path) -> std::io::Result<()> {
+    use windows_sys::Win32::Security::Authorization::{SE_FILE_OBJECT, SetNamedSecurityInfoW};
+    use windows_sys::Win32::Security::{
+        ACL, DACL_SECURITY_INFORMATION, GetSecurityDescriptorDacl, PROTECTED_DACL_SECURITY_INFORMATION,
+    };
+    let sddl = wide(&private_file_sddl(&user_sid().map_err(std::io::Error::other)?));
+    let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
+    // SAFETY: valid NUL-terminated string and out-pointer; the descriptor is freed below.
+    if unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            SDDL_REVISION_1,
+            &mut sd,
+            std::ptr::null_mut(),
+        )
+    } == 0
+    {
+        return Err(last_error());
+    }
+    let mut present = 0;
+    let mut defaulted = 0;
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    // SAFETY: sd is the descriptor just made; the out-pointers are valid.
+    let got = unsafe { GetSecurityDescriptorDacl(sd, &mut present, &mut dacl, &mut defaulted) };
+    let result = if got == 0 || present == 0 {
+        Err(last_error())
+    } else {
+        let mut name = path_wide(path);
+        // SAFETY: a NUL-terminated path; the ACL lives in sd, alive until LocalFree below.
+        let code = unsafe {
+            SetNamedSecurityInfoW(
+                name.as_mut_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                dacl,
+                std::ptr::null(),
+            )
+        };
+        if code == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::from_raw_os_error(code as i32))
+        }
+    };
+    // SAFETY: allocated by the conversion above and not used after this.
+    unsafe { LocalFree(sd as _) };
+    result
+}
+
+/// The name icacls prints for a SID: `DOMAIN\\name`, the bare name for one with no domain
+/// (`Everyone`), or `*S-1-...` when it does not resolve.
+fn sid_principal(sid: *mut core::ffi::c_void, text: &Option<String>) -> String {
+    use windows_sys::Win32::Security::{LookupAccountSidW, SID_NAME_USE};
+    let mut name = [0u16; 256];
+    let mut domain = [0u16; 256];
+    let mut name_len = name.len() as u32;
+    let mut domain_len = domain.len() as u32;
+    let mut kind: SID_NAME_USE = 0;
+    // SAFETY: the SID is valid while its ACL is; both buffers hold their stated lengths.
+    let ok = unsafe {
+        LookupAccountSidW(
+            std::ptr::null(),
+            sid,
+            name.as_mut_ptr(),
+            &mut name_len,
+            domain.as_mut_ptr(),
+            &mut domain_len,
+            &mut kind,
+        )
+    };
+    if ok == 0 {
+        return format!("*{}", text.clone().unwrap_or_else(|| "unknown".into()));
+    }
+    let name = String::from_utf16_lossy(&name[..name_len as usize]);
+    let domain = String::from_utf16_lossy(&domain[..domain_len as usize]);
+    if domain.is_empty() {
+        name
+    } else {
+        format!("{domain}\\{name}")
+    }
+}
+
+/// Every entry of the file's access list, in order. `None` for a file with no list at all, which
+/// Windows reads as open to everyone.
+pub fn access_entries(path: &std::path::Path) -> std::io::Result<Option<Vec<AccessEntry>>> {
+    use windows_sys::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
+    use windows_sys::Win32::Security::{
+        ACE_HEADER, ACL, ACL_SIZE_INFORMATION, AclSizeInformation, DACL_SECURITY_INFORMATION, GetAce,
+        GetAclInformation, INHERITED_ACE,
+    };
+    let name = path_wide(path);
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
+    // SAFETY: a NUL-terminated path and valid out-pointers; sd is freed below.
+    let code = unsafe {
+        GetNamedSecurityInfoW(
+            name.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut dacl,
+            std::ptr::null_mut(),
+            &mut sd,
+        )
+    };
+    if code != 0 {
+        return Err(std::io::Error::from_raw_os_error(code as i32));
+    }
+    let read = || -> std::io::Result<Option<Vec<AccessEntry>>> {
+        if dacl.is_null() {
+            return Ok(None);
+        }
+        // SAFETY: a zeroed size structure is valid output space.
+        let mut size: ACL_SIZE_INFORMATION = unsafe { std::mem::zeroed() };
+        // SAFETY: dacl points into sd; the structure and its size match the class.
+        if unsafe {
+            GetAclInformation(
+                dacl,
+                (&mut size as *mut ACL_SIZE_INFORMATION).cast(),
+                std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32,
+                AclSizeInformation,
+            )
+        } == 0
+        {
+            return Err(last_error());
+        }
+        let mut out = Vec::new();
+        for i in 0..size.AceCount {
+            let mut ace: *mut core::ffi::c_void = std::ptr::null_mut();
+            // SAFETY: i is below the ACL's count; ace receives a pointer into the ACL.
+            if unsafe { GetAce(dacl, i, &mut ace) } == 0 {
+                return Err(last_error());
+            }
+            // SAFETY: every ACE starts with its header.
+            let header = unsafe { &*(ace as *const ACE_HEADER) };
+            // access allowed/denied and their audit/alarm kin (types 0 to 3) keep the SID after
+            // the 4-byte header and the 4-byte mask; the object kinds a file never carries do not
+            let sid = if header.AceType <= 3 {
+                // SAFETY: the SID of such an ACE starts 8 bytes in, within AceSize.
+                let p = unsafe { (ace as *mut u8).add(8) } as *mut core::ffi::c_void;
+                let mut text: *mut u16 = std::ptr::null_mut();
+                // SAFETY: a SID inside the ACL; text is freed below.
+                let s = if unsafe { ConvertSidToStringSidW(p, &mut text) } != 0 {
+                    // SAFETY: a NUL-terminated string allocated by the call above.
+                    let s = unsafe { from_wide(text) };
+                    unsafe { LocalFree(text as _) };
+                    Some(s)
+                } else {
+                    None
+                };
+                let principal = sid_principal(p, &s);
+                (s, principal)
+            } else {
+                (None, format!("an entry of type {}", header.AceType))
+            };
+            out.push(AccessEntry {
+                principal: sid.1,
+                sid: sid.0,
+                inherited: u32::from(header.AceFlags) & INHERITED_ACE != 0,
+            });
+        }
+        Ok(Some(out))
+    };
+    let result = read();
+    // SAFETY: allocated by GetNamedSecurityInfoW and not used after this.
+    unsafe { LocalFree(sd as _) };
+    result
+}
+
+/// The file's access list as SDDL (`D:P(A;;FA;;;S-1-...)`), for the tests that compare it with
+/// what icacls leaves.
+pub fn dacl_sddl(path: &std::path::Path) -> std::io::Result<String> {
+    use windows_sys::Win32::Security::Authorization::{
+        ConvertSecurityDescriptorToStringSecurityDescriptorW, GetNamedSecurityInfoW, SE_FILE_OBJECT,
+    };
+    use windows_sys::Win32::Security::{ACL, DACL_SECURITY_INFORMATION};
+    let name = path_wide(path);
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    let mut sd: *mut core::ffi::c_void = std::ptr::null_mut();
+    // SAFETY: as in access_entries.
+    let code = unsafe {
+        GetNamedSecurityInfoW(
+            name.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            &mut dacl,
+            std::ptr::null_mut(),
+            &mut sd,
+        )
+    };
+    if code != 0 {
+        return Err(std::io::Error::from_raw_os_error(code as i32));
+    }
+    let mut text: *mut u16 = std::ptr::null_mut();
+    // SAFETY: sd is the descriptor just read; text is freed below.
+    let ok = unsafe {
+        ConvertSecurityDescriptorToStringSecurityDescriptorW(
+            sd,
+            SDDL_REVISION_1,
+            DACL_SECURITY_INFORMATION,
+            &mut text,
+            std::ptr::null_mut(),
+        )
+    };
+    let result = if ok == 0 {
+        Err(last_error())
+    } else {
+        // SAFETY: a NUL-terminated string allocated by the call above.
+        let s = unsafe { from_wide(text) };
+        unsafe { LocalFree(text as _) };
+        Ok(s)
+    };
+    // SAFETY: allocated by GetNamedSecurityInfoW.
+    unsafe { LocalFree(sd as _) };
+    result
 }
 
 /// A server end of a named pipe, waiting for its client.
@@ -992,6 +1240,134 @@ pub fn detach_console() {
     use windows_sys::Win32::System::Console::FreeConsole;
     // SAFETY: no arguments; failing (no console) changes nothing.
     unsafe { FreeConsole() };
+}
+
+/// How far local time is ahead of UTC at `utc_secs`, in seconds, by the system's zone with its
+/// rules for that year. 0 outside the years Windows can convert (1601 to 30827).
+pub fn local_offset_secs(utc_secs: i64) -> i64 {
+    use windows_sys::Win32::Foundation::SYSTEMTIME;
+    use windows_sys::Win32::System::Time::{
+        DYNAMIC_TIME_ZONE_INFORMATION, GetDynamicTimeZoneInformation, SystemTimeToTzSpecificLocalTimeEx,
+    };
+    let days = utc_secs.div_euclid(86_400);
+    let sod = utc_secs.rem_euclid(86_400);
+    let (y, m, d) = crate::time::civil_from_days(days);
+    if !(1601..=30827).contains(&y) {
+        return 0;
+    }
+    let utc = SYSTEMTIME {
+        wYear: y as u16,
+        wMonth: m as u16,
+        wDayOfWeek: 0,
+        wDay: d as u16,
+        wHour: (sod / 3600) as u16,
+        wMinute: (sod % 3600 / 60) as u16,
+        wSecond: (sod % 60) as u16,
+        wMilliseconds: 0,
+    };
+    // SAFETY: zeroed structures are valid output space; the pointers live through the calls.
+    let mut zone: DYNAMIC_TIME_ZONE_INFORMATION = unsafe { std::mem::zeroed() };
+    unsafe { GetDynamicTimeZoneInformation(&mut zone) };
+    let mut local = SYSTEMTIME::default();
+    if unsafe { SystemTimeToTzSpecificLocalTimeEx(&zone, &utc, &mut local) } == 0 {
+        return 0;
+    }
+    let local_days = crate::time::days_from_civil(
+        i64::from(local.wYear),
+        u32::from(local.wMonth),
+        u32::from(local.wDay),
+    );
+    let local_secs = local_days * 86_400
+        + i64::from(local.wHour) * 3600
+        + i64::from(local.wMinute) * 60
+        + i64::from(local.wSecond);
+    local_secs - utc_secs
+}
+
+/// `os.networkInterfaces()`: each adapter that is up, by its friendly name ("Ethernet",
+/// "vEthernet (WSL)"), with its unicast addresses, as libuv lists them.
+pub fn network_interfaces() -> Vec<(String, Vec<super::InterfaceAddress>)> {
+    use windows_sys::Win32::NetworkManagement::IpHelper::{
+        GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
+        IF_TYPE_SOFTWARE_LOOPBACK, IP_ADAPTER_ADDRESSES_LH,
+    };
+    use windows_sys::Win32::NetworkManagement::Ndis::IfOperStatusUp;
+    use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC};
+    let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    let mut size: u32 = 16 * 1024;
+    let mut buf: Vec<u64>;
+    loop {
+        // u64 storage keeps the structures aligned
+        buf = vec![0u64; (size as usize).div_ceil(8)];
+        // SAFETY: the buffer holds `size` bytes; the call says how many it needs if not.
+        let code = unsafe {
+            GetAdaptersAddresses(
+                u32::from(AF_UNSPEC),
+                flags,
+                std::ptr::null(),
+                buf.as_mut_ptr().cast(),
+                &mut size,
+            )
+        };
+        match code {
+            0 => break,
+            // ERROR_BUFFER_OVERFLOW: size now holds what is needed
+            111 => continue,
+            _ => return Vec::new(),
+        }
+    }
+    let mut out: Vec<(String, Vec<super::InterfaceAddress>)> = Vec::new();
+    let mut cur = buf.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
+    while !cur.is_null() {
+        // SAFETY: a node of the list the call wrote into buf, alive here.
+        let a = unsafe { &*cur };
+        cur = a.Next;
+        if a.OperStatus != IfOperStatusUp || a.FriendlyName.is_null() {
+            continue;
+        }
+        // SAFETY: a NUL-terminated name in buf.
+        let name = unsafe { from_wide(a.FriendlyName) };
+        let internal = a.IfType == IF_TYPE_SOFTWARE_LOOPBACK;
+        let mut addrs = Vec::new();
+        let mut u = a.FirstUnicastAddress;
+        while !u.is_null() {
+            // SAFETY: a unicast entry in buf.
+            let ua = unsafe { &*u };
+            u = ua.Next;
+            let sa = ua.Address.lpSockaddr as *const u8;
+            if sa.is_null() {
+                continue;
+            }
+            // SAFETY: a sockaddr whose family is its first u16.
+            let fam = unsafe { *(sa as *const u16) };
+            let address = if fam == AF_INET {
+                // SAFETY: a SOCKADDR_IN: family, port, then the address.
+                let b = unsafe { std::slice::from_raw_parts(sa.add(4), 4) };
+                std::net::IpAddr::from([b[0], b[1], b[2], b[3]])
+            } else if fam == AF_INET6 {
+                // SAFETY: a SOCKADDR_IN6: family, port, flow info, then the address.
+                let b = unsafe { std::slice::from_raw_parts(sa.add(8), 16) };
+                let mut x = [0u8; 16];
+                x.copy_from_slice(b);
+                std::net::IpAddr::from(x)
+            } else {
+                continue;
+            };
+            addrs.push(super::InterfaceAddress {
+                address: address.to_string(),
+                ipv4: address.is_ipv4(),
+                internal,
+            });
+        }
+        if addrs.is_empty() {
+            continue;
+        }
+        match out.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, list)) => list.extend(addrs),
+            None => out.push((name, addrs)),
+        }
+    }
+    out
 }
 
 #[cfg(test)]

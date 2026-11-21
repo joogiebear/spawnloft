@@ -148,6 +148,18 @@ fn strip_trailing(p: &str) -> String {
     }
 }
 
+/// `path.isAbsolute` for this platform: a leading slash, and on Windows a backslash or a drive
+/// letter followed by one.
+pub fn is_absolute(p: &str) -> bool {
+    let b = p.as_bytes();
+    if cfg!(windows) {
+        matches!(b.first(), Some(b'/' | b'\\'))
+            || (b.len() > 2 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'/' | b'\\'))
+    } else {
+        b.first() == Some(&b'/')
+    }
+}
+
 /// [`join`] over a path and plain names, as a `PathBuf`.
 pub fn join_path(base: &str, names: &[&str]) -> PathBuf {
     let mut all = vec![base];

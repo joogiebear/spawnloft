@@ -14,9 +14,17 @@ workspace = true
 [dependencies]
 # lock-probe takes the real lock; spawnloft-lib has no dependency on this crate, so no cycle
 spawnloft-lib.workspace = true
+# registry-probe passes JSON through; already in the tree through spawnloft-lib
+serde_json = "1.0.154"
 
 # Test-only: takes and probes util.mjs's lock from a Rust process, for
 # test/lock-cross-process.test.mjs.
 [[bin]]
 name = "lock-probe"
 path = "src/bin/lock-probe.rs"
+
+# Test-only: changes instances.json through spawnloft-lib's registry writes, for
+# test/registry-cross-process.test.mjs.
+[[bin]]
+name = "registry-probe"
+path = "src/bin/registry-probe.rs"
