@@ -6,11 +6,16 @@
 
 pub mod accounts;
 pub mod harness;
+pub mod harness_index;
+pub mod loaders;
 pub mod log;
+pub mod meta;
 pub mod paths;
 pub mod profiles;
 pub mod server_list;
 pub mod state;
+pub mod version;
+pub mod versions;
 
 use serde_json::{Map, Value};
 use std::path::Path;
@@ -39,6 +44,21 @@ pub fn write_json(file: &str, data: &Value) -> Result<(), Failure> {
 /// failure.
 pub fn write_json_private(file: &str, data: &Value) -> Result<(), Failure> {
     crate::fsx::write_json_node(Path::new(file), data, Some(0o600), false).map(|_| ())
+}
+
+/// `writeAtomic(dest, data)` of util.mjs: a temporary file beside it, renamed over it.
+pub fn write_atomic(dest: &str, data: &[u8]) -> Result<(), Failure> {
+    let mut b = [0u8; 4];
+    let _ = getrandom::fill(&mut b);
+    let hex: String = b.iter().map(|x| format!("{x:02x}")).collect();
+    let tmp = format!("{dest}.{}.{hex}.tmp", std::process::id());
+    let tmp_path = Path::new(&tmp);
+    std::fs::write(tmp_path, data).map_err(|e| Failure::io(&e, "open", Some(tmp_path)))?;
+    if let Err(e) = crate::fsx::rename_over(tmp_path, Path::new(dest)) {
+        let _ = std::fs::remove_file(tmp_path);
+        return Err(crate::fsx::rename_failure(&e, tmp_path, Path::new(dest)));
+    }
+    Ok(())
 }
 
 /// `fs.rmSync(file, { force: true })`: a missing file is no error.

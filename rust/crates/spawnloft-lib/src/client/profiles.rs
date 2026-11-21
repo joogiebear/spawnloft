@@ -380,6 +380,224 @@ pub fn remove(paths: &Paths, name: &str, purge: bool) -> Result<(), Failure> {
     Ok(())
 }
 
+static MEMORY_UNITS: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[0-9]+[MGmg]$").expect("valid"));
+static LOADER_VERSION: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[0-9A-Za-z][0-9A-Za-z.+_-]*$").expect("valid"));
+
+fn coded(message: String, code: &str) -> Failure {
+    Failure::User {
+        message,
+        code: Some(code.into()),
+    }
+}
+
+/// `validateFields({ mc, loader, ... })`: an absent field is `undefined`, as destructuring
+/// leaves it (only `serverList` has a default, true).
+pub fn validate_fields(f: &Map<String, Value>) -> Result<(), Failure> {
+    let g = |k: &str| f.get(k);
+    super::versions::validate_mc(g("mc").unwrap_or(&Value::Null))?;
+    let memory = js::string(g("memory"));
+    crate::registry::parse_memory_gb(&memory).map_err(Failure::user)?;
+    // -Xmx takes whole units only: 1.5G is refused by Java
+    if !MEMORY_UNITS.is_match(&memory) {
+        return Err(Failure::user(format!(
+            "memory must be a whole number of M or G, like 2G or 1536M, not \"{memory}\""
+        )));
+    }
+    let loader = g("loader");
+    if !matches!(loader, Some(Value::String(l)) if LOADERS.contains(&l.as_str())) {
+        return Err(Failure::user(format!(
+            "unknown loader \"{}\" - use {}",
+            js::string(loader),
+            LOADERS.join(" or ")
+        )));
+    }
+    let is_bool = |k: &str| matches!(g(k), Some(Value::Bool(_)));
+    if !is_bool("harness") {
+        return Err(Failure::user("harness must be true or false"));
+    }
+    if !is_bool("assistantAccount") {
+        return Err(Failure::user("assistantAccount must be true or false"));
+    }
+    if g("serverList").is_some() && !is_bool("serverList") {
+        return Err(Failure::user("serverList must be true or false"));
+    }
+    if g("harness") == Some(&json!(true)) && loader != Some(&json!("fabric")) {
+        return Err(Failure::user("the harness mod needs the fabric loader"));
+    }
+    for key in ["loaderVersion", "java", "server", "account"] {
+        match g(key) {
+            Some(Value::Null) => {}
+            Some(Value::String(v)) if !js::trim(v).is_empty() => {}
+            _ => return Err(Failure::user(format!("{key} must be text or null"))),
+        }
+    }
+    // the loader version becomes part of a folder name under versions/
+    if let Some(Value::String(v)) = g("loaderVersion")
+        && !LOADER_VERSION.is_match(v)
+    {
+        return Err(Failure::user(format!(
+            "loaderVersion \"{v}\" must be a version like 0.16.9 (letters, digits, dots, +, _ and -)"
+        )));
+    }
+    Ok(())
+}
+
+fn assert_name_free(doc: &Doc, name: &str, except: Option<&str>) -> Result<(), Failure> {
+    let lower = name.to_lowercase();
+    for existing in doc.names() {
+        if Some(existing.as_str()) != except && existing.to_lowercase() == lower {
+            return Err(coded(
+                format!(
+                    "a profile named \"{existing}\" already exists (names must differ in more than case)"
+                ),
+                "name-taken",
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// What `createProfile` takes.
+#[derive(Debug, Clone)]
+pub struct NewProfile {
+    pub mc: Value,
+    pub loader: Value,
+    pub loader_version: Value,
+    pub java: Value,
+    pub memory: Value,
+    pub harness: Value,
+    pub server: Value,
+    pub account: Value,
+    pub server_list: bool,
+}
+
+/// `createProfile(name, opts)`: assistantAccount starts false for every profile.
+pub fn create(paths: &Paths, name: &str, o: NewProfile) -> Result<Profile, Failure> {
+    validate_name(name)?;
+    let mut doc = load(paths)?;
+    assert_name_free(&doc, name, None)?;
+    let mc = super::versions::trim_mc(&o.mc);
+    let mut fields = Map::new();
+    fields.insert("mc".into(), mc.clone());
+    fields.insert("loader".into(), o.loader.clone());
+    fields.insert("loaderVersion".into(), o.loader_version.clone());
+    fields.insert("java".into(), o.java.clone());
+    fields.insert("memory".into(), o.memory.clone());
+    fields.insert("harness".into(), o.harness.clone());
+    fields.insert("server".into(), o.server.clone());
+    fields.insert("account".into(), o.account.clone());
+    fields.insert("assistantAccount".into(), json!(false));
+    fields.insert("serverList".into(), json!(o.server_list));
+    validate_fields(&fields)?;
+    let dir = paths.profile_dir(name);
+    crate::fsx::mkdir_all(std::path::Path::new(&dir))?;
+    let options = crate::jspath::join(&[&dir, "options.txt"]);
+    if !std::path::Path::new(&options).exists() {
+        std::fs::write(&options, "lang:en_us\n")
+            .map_err(|e| Failure::io(&e, "open", Some(std::path::Path::new(&options))))?;
+    }
+    // what a removed profile of this name left about its games is not this one's history
+    for file in history_files(paths, name) {
+        super::rm_force(&file)?;
+    }
+    let mut profile = Map::new();
+    profile.insert("mc".into(), mc);
+    profile.insert("loader".into(), o.loader);
+    profile.insert("loaderVersion".into(), o.loader_version);
+    profile.insert("java".into(), o.java);
+    profile.insert("memory".into(), o.memory);
+    profile.insert("harness".into(), o.harness);
+    profile.insert("server".into(), o.server);
+    profile.insert("account".into(), account_key_for(paths, &o.account)?);
+    profile.insert("assistantAccount".into(), json!(false));
+    if !o.server_list {
+        profile.insert("serverList".into(), json!(false));
+    }
+    profile.insert("createdAt".into(), json!(crate::time::iso_now()));
+    let profile = Value::Object(profile);
+    doc.set(name, profile.clone())?;
+    save(paths, &mut doc)?;
+    let mut fields = Map::new();
+    fields.insert("name".into(), json!(name));
+    super::spread_into(&mut fields, &profile);
+    Ok(Profile { fields })
+}
+
+/// `updateProfile(name, patch)`, as `client set` calls it (not a launch's own write).
+pub fn update(paths: &Paths, name: &str, patch: Vec<(String, Value)>) -> Result<Profile, Failure> {
+    validate_name(name)?;
+    for (key, _) in &patch {
+        if !PROFILE_KEYS.contains(&key.as_str()) {
+            return Err(Failure::user(format!(
+                "unknown profile key \"{key}\" - use {}",
+                PROFILE_KEYS.join(", ")
+            )));
+        }
+    }
+    let mut patch: Map<String, Value> = patch.into_iter().collect();
+    if let Some(Value::String(mc)) = patch.get("mc") {
+        let t = js::trim(mc).to_string();
+        patch.insert("mc".into(), json!(t));
+    }
+    let existing = get(paths, name)?;
+    let changing: Vec<&str> = RUNNING_KEYS
+        .iter()
+        .copied()
+        .filter(|k| patch.contains_key(*k) && !super::strict_eq(patch.get(*k), existing.get(k)))
+        .collect();
+    if !changing.is_empty() && super::state::status(paths, name)?.running {
+        return Err(coded(
+            format!(
+                "profile \"{name}\" is running; stop it before changing {}: spawnloft client stop {name}",
+                changing.join(", ")
+            ),
+            "already-running",
+        ));
+    }
+    // a launch under way read the profile at its start and reads it again while it downloads
+    if !changing.is_empty() && crate::lock::holder(std::path::Path::new(&paths.launch_lock(name))).is_some() {
+        return Err(coded(
+            format!(
+                "profile \"{name}\" is being launched (pid {}); wait for it before changing {}",
+                holder_text(paths, name),
+                changing.join(", ")
+            ),
+            "launching",
+        ));
+    }
+    // a loader build is made for one Minecraft version and one loader
+    let differs = |k: &str| patch.contains_key(k) && !super::strict_eq(patch.get(k), existing.get(k));
+    let new_pair = differs("mc") || differs("loader");
+    if new_pair
+        && (!patch.contains_key("loaderVersion")
+            || super::strict_eq(patch.get("loaderVersion"), existing.get("loaderVersion")))
+    {
+        patch.insert("loaderVersion".into(), Value::Null);
+    }
+    let mut merged = existing.fields.clone();
+    for (k, v) in &patch {
+        merged.insert(k.clone(), v.clone());
+    }
+    validate_fields(&merged)?;
+    let mut doc = load(paths)?;
+    let mut cfg = Map::new();
+    if let Some(old) = doc.get(name) {
+        super::spread_into(&mut cfg, &old);
+    }
+    for (k, v) in &patch {
+        cfg.insert(k.clone(), v.clone());
+    }
+    if let Some(a) = patch.get("account") {
+        cfg.insert("account".into(), account_key_for(paths, a)?);
+    }
+    let cfg = Value::Object(cfg);
+    doc.set(name, cfg.clone())?;
+    save(paths, &mut doc)?;
+    Ok(Profile::of(name, &cfg))
+}
+
 /// A lock that could not be taken for a reason other than its holder, as Node throws it.
 pub fn lock_failure(e: &crate::lock::LockError) -> Failure {
     match e {
