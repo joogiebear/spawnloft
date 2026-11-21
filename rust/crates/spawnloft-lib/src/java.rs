@@ -468,6 +468,66 @@ pub fn is_script(bin: &str) -> bool {
     lower.ends_with(".js") || lower.ends_with(".mjs")
 }
 
+/// `pickJava({ explicit, needs, force, what })`: which Java a new server gets, decided before
+/// anything is downloaded. An explicit Java is probed and refused only when certainly too old
+/// (unless `force`); otherwise the newest installed Java that fits wins. None new enough is
+/// refused with the code `java-too-old` (the panel offers to override), or with `force` the best
+/// is used. No Java at all is not refused here: start says so.
+pub fn pick_java(
+    explicit: Option<&str>,
+    needs: Option<u32>,
+    force: bool,
+    what: &str,
+) -> Result<String, crate::failure::Failure> {
+    use crate::failure::Failure;
+    let too_old = |message: String| Failure::User {
+        message,
+        code: Some("java-too-old".into()),
+    };
+    if let Some(explicit) = explicit.filter(|e| !e.is_empty()) {
+        let state = probe(explicit);
+        if !state.found {
+            return Err(Failure::user(format!(
+                "{explicit} could not be run: {}",
+                state.message
+            )));
+        }
+        if let (Some(needs), Some(have)) = (needs, state.major)
+            && have < needs
+            && !force
+        {
+            return Err(too_old(format!(
+                "{what} needs Java {needs}, and {explicit} is Java {have}. Pick a newer Java, or pass --force to use it anyway."
+            )));
+        }
+        return Ok(explicit.to_string());
+    }
+    let Some(needs) = needs.filter(|n| *n != 0) else {
+        return Ok(default_java().unwrap_or_else(|| "java".into()));
+    };
+    if let Some(fit) = java_for(needs) {
+        return Ok(fit.path);
+    }
+    let Some(best) = discover().best else {
+        return Ok("java".into());
+    };
+    if force {
+        return Ok(best.path);
+    }
+    let have = best
+        .probe
+        .major
+        .map_or("undefined".to_string(), |m| m.to_string());
+    let at = if best.path == "java" {
+        String::new()
+    } else {
+        format!(" ({})", best.path)
+    };
+    Err(too_old(format!(
+        "{what} needs Java {needs}. The newest Java on this machine is {have}{at}. Install Java {needs} from {DOWNLOAD_URL}, or create it anyway and point it at a Java of your own afterwards."
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
