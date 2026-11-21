@@ -9,30 +9,70 @@ use super::{nullish, object, or_null, prop, read_json};
 use crate::failure::Failure;
 use crate::js;
 
-/// `loadAccounts()`: `readJson(ACCOUNTS_FILE, null)?.accounts ?? []`. A list that is not an
-/// array is refused the way the callers' `.map` and `.find` would refuse it.
-pub fn load(paths: &Paths) -> Result<Vec<Value>, Failure> {
+enum Loaded {
+    List(Vec<Value>),
+    /// `accounts` holds something other than a list (or null): each caller's own array method
+    /// then throws.
+    NotList,
+}
+
+fn load_raw(paths: &Paths) -> Result<Loaded, Failure> {
     let data = read_json(&paths.accounts_file())?;
-    match prop(data.as_ref(), "accounts") {
-        None | Some(Value::Null) => Ok(Vec::new()),
-        Some(Value::Array(items)) => Ok(items.clone()),
-        Some(_) => Err(Failure::type_error("the accounts list is not a list")),
+    Ok(match prop(data.as_ref(), "accounts") {
+        None | Some(Value::Null) => Loaded::List(Vec::new()),
+        Some(Value::Array(items)) => Loaded::List(items.clone()),
+        Some(_) => Loaded::NotList,
+    })
+}
+
+fn not_a_function(method: &str) -> Failure {
+    Failure::type_error(format!("{method} is not a function"))
+}
+
+/// `loadAccounts()`: `readJson(ACCOUNTS_FILE, null)?.accounts ?? []`. `method` is the array
+/// method the caller goes on to use (`list.findIndex`), whose TypeError a list that is not an
+/// array ends in.
+pub fn load_with(paths: &Paths, method: &str) -> Result<Vec<Value>, Failure> {
+    match load_raw(paths)? {
+        Loaded::List(l) => Ok(l),
+        Loaded::NotList => Err(not_a_function(method)),
     }
 }
 
-/// `accountsOrNull()`: the list, or `None` when the file cannot be read at all.
-pub fn load_or_none(paths: &Paths) -> Option<Vec<Value>> {
-    load(paths).ok()
+/// `loadAccounts()` for a caller that goes on to `findAccount`.
+pub fn load(paths: &Paths) -> Result<Vec<Value>, Failure> {
+    load_with(paths, "list.findIndex")
+}
+
+/// `accountsOrNull()`: the list, or `None` when the file cannot be read at all. A list that is
+/// not an array is no read failure: the caller's `method` throws on it.
+pub fn load_or_none(paths: &Paths, method: &str) -> Result<Option<Vec<Value>>, Failure> {
+    match load_raw(paths) {
+        Err(_) => Ok(None),
+        Ok(Loaded::List(l)) => Ok(Some(l)),
+        Ok(Loaded::NotList) => Err(not_a_function(method)),
+    }
+}
+
+/// `a[key]`, which throws for an entry that is null.
+pub fn field<'a>(a: &'a Value, key: &str) -> Result<Option<&'a Value>, Failure> {
+    if a.is_null() {
+        return Err(Failure::type_error(format!(
+            "Cannot read properties of null (reading '{key}')"
+        )));
+    }
+    Ok(prop(Some(a), key))
 }
 
 /// `publicAccount(a)`: what leaves the process about an account, never a token.
-pub fn public(a: &Value) -> Value {
+pub fn public(a: &Value) -> Result<Value, Failure> {
+    field(a, "name")?;
     let kind = match prop(Some(a), "type") {
         v if nullish(v) => json!("microsoft"),
         v => or_null(v),
     };
     let offline = prop(Some(a), "type") == Some(&json!("offline"));
-    object(vec![
+    Ok(object(vec![
         ("name", prop(Some(a), "name").cloned()),
         ("uuid", prop(Some(a), "uuid").cloned()),
         ("type", Some(kind)),
@@ -45,7 +85,7 @@ pub fn public(a: &Value) -> Value {
             }),
         ),
         ("refreshFailedAt", Some(or_null(prop(Some(a), "refreshFailedAt")))),
-    ])
+    ]))
 }
 
 /// `sameUuid(a, b)`: case and dashes do not matter.
@@ -62,8 +102,14 @@ pub fn same_uuid(a: Option<&Value>, b: Option<&Value>) -> bool {
 
 /// `a.name.toLowerCase()`, which throws for an entry whose name is not text.
 fn name_lower(a: &Value) -> Result<String, Failure> {
-    match prop(Some(a), "name") {
+    match field(a, "name")? {
         Some(Value::String(s)) => Ok(s.to_lowercase()),
+        None => Err(Failure::type_error(
+            "Cannot read properties of undefined (reading 'toLowerCase')",
+        )),
+        Some(Value::Null) => Err(Failure::type_error(
+            "Cannot read properties of null (reading 'toLowerCase')",
+        )),
         _ => Err(Failure::type_error("a.name.toLowerCase is not a function")),
     }
 }
@@ -80,11 +126,10 @@ pub fn find(list: &[Value], selector: &str) -> Result<Option<usize>, Failure> {
     let sel = selector.to_lowercase();
     let bare = sel.replace('-', "");
     if is_bare_uuid(&bare) {
-        let hit = list
-            .iter()
-            .position(|a| super::lower(prop(Some(a), "uuid")).replace('-', "") == bare);
-        if hit.is_some() {
-            return Ok(hit);
+        for (i, a) in list.iter().enumerate() {
+            if super::lower(field(a, "uuid")?).replace('-', "") == bare {
+                return Ok(Some(i));
+            }
         }
     }
     for (i, a) in list.iter().enumerate() {
@@ -110,9 +155,10 @@ pub fn save(paths: &Paths, list: &[Value]) -> Result<(), Failure> {
 /// `updateAccounts(change)`: re-reads the file first and writes what `change` makes of it.
 pub fn update(
     paths: &Paths,
+    method: &str,
     change: impl FnOnce(Vec<Value>) -> Result<Vec<Value>, Failure>,
 ) -> Result<Vec<Value>, Failure> {
-    let next = change(load(paths)?)?;
+    let next = change(load_with(paths, method)?)?;
     save(paths, &next)?;
     Ok(next)
 }
@@ -121,17 +167,16 @@ pub fn update(
 /// tokens, or `None`.
 pub fn remove(paths: &Paths, uuid: Option<&Value>) -> Result<Option<Value>, Failure> {
     let mut gone = None;
-    update(paths, |list| {
-        Ok(list
-            .into_iter()
-            .filter(|a| {
-                if !same_uuid(prop(Some(a), "uuid"), uuid) {
-                    return true;
-                }
-                gone = Some(public(a));
-                false
-            })
-            .collect())
+    update(paths, "list.filter", |list| {
+        let mut kept = Vec::new();
+        for a in list {
+            if !same_uuid(field(&a, "uuid")?, uuid) {
+                kept.push(a);
+                continue;
+            }
+            gone = Some(public(&a)?);
+        }
+        Ok(kept)
     })?;
     Ok(gone)
 }
@@ -221,15 +266,15 @@ mod tests {
     fn public_never_carries_a_token() {
         let a = json!({ "type": "microsoft", "name": "S", "uuid": "u", "accessToken": "t", "refreshToken": "r", "expiresAt": "2026" });
         assert_eq!(
-            public(&a),
+            public(&a).unwrap(),
             json!({ "name": "S", "uuid": "u", "type": "microsoft", "expiresAt": "2026", "refreshFailedAt": null })
         );
         let old = json!({ "name": "S", "uuid": "u" });
-        assert_eq!(public(&old)["type"], "microsoft");
+        assert_eq!(public(&old).unwrap()["type"], "microsoft");
         let off = json!({ "type": "offline", "name": "S", "uuid": "u", "expiresAt": "x" });
-        assert_eq!(public(&off)["expiresAt"], Value::Null);
+        assert_eq!(public(&off).unwrap()["expiresAt"], Value::Null);
         // an entry with no name leaves the key out, as JSON.stringify drops undefined
-        assert!(public(&json!({ "uuid": "u" })).get("name").is_none());
+        assert!(public(&json!({ "uuid": "u" })).unwrap().get("name").is_none());
     }
 
     #[test]

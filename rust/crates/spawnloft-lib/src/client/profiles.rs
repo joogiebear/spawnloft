@@ -155,20 +155,23 @@ impl Doc {
 }
 
 /// `accountExists(uuid)`: an unreadable accounts list counts as yes.
-fn account_exists(paths: &Paths, uuid: &Value) -> bool {
-    match accounts::load_or_none(paths) {
-        None => true,
-        Some(list) => list
-            .iter()
-            .any(|a| accounts::same_uuid(prop(Some(a), "uuid"), Some(uuid))),
+fn account_exists(paths: &Paths, uuid: &Value) -> Result<bool, Failure> {
+    let Some(list) = accounts::load_or_none(paths, "list.some")? else {
+        return Ok(true);
+    };
+    for a in &list {
+        if accounts::same_uuid(accounts::field(a, "uuid")?, Some(uuid)) {
+            return Ok(true);
+        }
     }
+    Ok(false)
 }
 
 /// `saveProfiles(data)`: a default account that was signed out is dropped, not an error.
 pub fn save(paths: &Paths, doc: &mut Doc) -> Result<(), Failure> {
     if let Some(d) = doc.default_account().cloned()
         && !d.is_null()
-        && !account_exists(paths, &d)
+        && !account_exists(paths, &d)?
     {
         doc.set_default_account(None);
     }
@@ -253,13 +256,15 @@ pub fn default_account(paths: &Paths) -> Result<Option<String>, Failure> {
     let Some(Value::String(uuid)) = doc.default_account() else {
         return Ok(None);
     };
-    let list = accounts::load_or_none(paths);
-    Ok(list
-        .filter(|l| {
-            l.iter()
-                .any(|a| accounts::same_uuid(prop(Some(a), "uuid"), Some(&json!(uuid))))
-        })
-        .map(|_| uuid.clone()))
+    let Some(list) = accounts::load_or_none(paths, "list.some")? else {
+        return Ok(None);
+    };
+    for a in &list {
+        if accounts::same_uuid(accounts::field(a, "uuid")?, Some(&json!(uuid))) {
+            return Ok(Some(uuid.clone()));
+        }
+    }
+    Ok(None)
 }
 
 /// `accountInfo(value)`: the name to show for a profile's account key (a uuid, a name, or
@@ -271,7 +276,7 @@ pub fn account_info(paths: &Paths, value: Option<&Value>) -> Result<(Value, Valu
     if let Some(name) = text.strip_prefix("offline:") {
         return Ok((json!(name), json!("offline")));
     }
-    let Some(list) = accounts::load_or_none(paths) else {
+    let Some(list) = accounts::load_or_none(paths, "list.findIndex")? else {
         return Ok((json!(text), Value::Null));
     };
     Ok(match accounts::find(&list, text)? {
@@ -296,7 +301,7 @@ pub fn account_uuid(paths: &Paths, value: Option<&Value>) -> Result<Option<Value
     if text.starts_with("offline:") {
         return Ok(None);
     }
-    let Some(list) = accounts::load_or_none(paths) else {
+    let Some(list) = accounts::load_or_none(paths, "list.findIndex")? else {
         return Ok(None);
     };
     Ok(accounts::find(&list, text)?.map(|i| super::or_null(prop(Some(&list[i]), "uuid"))))
@@ -311,7 +316,7 @@ pub fn account_key_for(paths: &Paths, value: &Value) -> Result<Value, Failure> {
     if text.starts_with("offline:") {
         return Ok(value.clone());
     }
-    let Some(list) = accounts::load_or_none(paths) else {
+    let Some(list) = accounts::load_or_none(paths, "list.findIndex")? else {
         return Ok(value.clone());
     };
     Ok(match accounts::find(&list, text)? {

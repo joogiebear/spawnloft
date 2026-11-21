@@ -166,7 +166,7 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
             };
             let gone = match accounts::remove(&paths, prop(Some(&list[at]), "uuid"))? {
                 Some(g) => g,
-                None => accounts::public(&list[at]),
+                None => accounts::public(&list[at])?,
             };
             let gone_name = js::string(gone.get("name"));
             if quiet {
@@ -192,7 +192,10 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 return Err(usage());
             }
             // names and expiry only: the tokens never leave the file
-            let list: Vec<Value> = accounts::load(&paths)?.iter().map(accounts::public).collect();
+            let list = accounts::load_with(&paths, "clientAuth.loadAccounts(...).map")?
+                .iter()
+                .map(accounts::public)
+                .collect::<Result<Vec<Value>, Failure>>()?;
             let default = profiles::default_account(&paths)?;
             if quiet {
                 emit(ctx, json!({ "accounts": list, "defaultAccount": default }));
@@ -201,9 +204,10 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                     .line("No Microsoft account is signed in. Sign in: spawnloft client login");
             } else {
                 for a in &list {
-                    let is_default = default
-                        .as_ref()
-                        .is_some_and(|d| accounts::same_uuid(a.get("uuid"), Some(&json!(d))));
+                    // `defaultAccount && sameUuid(...)`: an empty default marks nothing
+                    let is_default = default.as_ref().is_some_and(|d| {
+                        !d.is_empty() && accounts::same_uuid(a.get("uuid"), Some(&json!(d)))
+                    });
                     ctx.out.line(&format!(
                         "{}  {}  {}{}",
                         js::string(a.get("name")),
