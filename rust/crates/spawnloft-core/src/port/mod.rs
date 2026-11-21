@@ -24,6 +24,7 @@ mod fetch;
 mod lifecycle;
 mod list;
 mod logs;
+mod maintenance;
 mod metrics;
 mod output;
 mod pack;
@@ -196,6 +197,8 @@ fn dispatch(
         "task" => tasks::task(&mut ctx),
         "rm" | "remove" => tasks::remove(&mut ctx),
         "rename" => tasks::rename(&mut ctx),
+        "repair" => maintenance::repair(&mut ctx),
+        "uninstall" => maintenance::uninstall(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

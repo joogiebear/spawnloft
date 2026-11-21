@@ -1,5 +1,5 @@
-//! `handover stop|resume`, `repair` and `uninstall`: the commands the 2.0 installer and
-//! uninstaller run (rust/INSTALLER-UPDATER-DESIGN.md sections 2.3 to 2.5 and 9).
+//! `handover stop|resume` and `user-path`: commands the 2.0 installer and uninstaller run
+//! (`repair` and `uninstall` are ported commands since C6, port/maintenance.rs) (rust/INSTALLER-UPDATER-DESIGN.md sections 2.3 to 2.5 and 9).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -8,7 +8,6 @@ use spawnloft_lib::handover::legacy::{self, CliLegacy, OwnRead};
 use spawnloft_lib::handover::resume::{self, ResumeOptions, Starter};
 use spawnloft_lib::handover::tasks::WindowsTasks;
 use spawnloft_lib::handover::{self as h, Ctx, Files, Journal, Kind, Log, Marker, Record, Watch};
-use spawnloft_lib::nodecore::NodeCore;
 use spawnloft_lib::serde_json::json;
 use spawnloft_lib::{build, paths, platform, procid, time};
 
@@ -720,95 +719,6 @@ fn cleanup_cmd(rest: &[String]) -> Outcome {
         0,
         json!({ "skipped": r.skipped, "removed": r.removed, "failed": r.failed }),
     )
-}
-
-/// `repair [--quiet]`: task shims and server launchers rewritten for this install (the Node
-/// core's `repair` until R4; design 2.3 step 8). `--quiet` logs to `run/handover.log` only.
-pub fn repair(rest: &[String]) -> Outcome {
-    let f = match flags(rest, &[], &["--quiet"]) {
-        Ok(f) => f,
-        Err(o) => return o,
-    };
-    let data_root = paths::resolve_data_root();
-    let core = match NodeCore::find(&data_root) {
-        Ok(c) => c,
-        Err(e) => {
-            return Outcome {
-                stdout: String::new(),
-                stderr: format!("{}: repair: {e}\n", build::NAME),
-                code: 1,
-            };
-        }
-    };
-    if has(&f, "--quiet") {
-        let log = Log::open(Some(&Files::new(&data_root).log()), false);
-        let code = match core.run_logged(&["repair", "--json"], Duration::from_secs(120), &log) {
-            Ok((c, _)) => c,
-            Err(e) => {
-                log.line(&format!("repair: {e}"));
-                1
-            }
-        };
-        return Outcome {
-            code: u8::try_from(code).unwrap_or(1),
-            ..Outcome::default()
-        };
-    }
-    exit_of(core.run_inherit(&["repair"]))
-}
-
-/// `uninstall --yes [--data]`: what the uninstaller runs (design section 9). Through the Node
-/// core until R4; when that cannot run, the scheduled tasks are at least removed here (P0-F H3).
-pub fn uninstall(rest: &[String]) -> Outcome {
-    let args: Vec<&str> = std::iter::once("uninstall")
-        .chain(rest.iter().map(String::as_str))
-        .collect();
-    let data_root = paths::resolve_data_root();
-    match NodeCore::find(&data_root) {
-        Ok(core) => exit_of(core.run_inherit(&args)),
-        Err(e) => {
-            let removed = remove_tasks();
-            Outcome {
-                stdout: String::new(),
-                stderr: format!(
-                    "{}: uninstall: {e}; removed {removed} scheduled task(s); servers were not stopped\n",
-                    build::NAME
-                ),
-                code: 1,
-            }
-        }
-    }
-}
-
-fn remove_tasks() -> usize {
-    use spawnloft_lib::handover::Tasks;
-    let names = match WindowsTasks.enabled() {
-        Ok(n) => n,
-        Err(_) => return 0,
-    };
-    let mut n = 0;
-    for t in names {
-        let ok = std::process::Command::new("schtasks")
-            .args(["/Delete", "/TN", &format!("\\mcctl\\{t}"), "/F"])
-            .output()
-            .is_ok_and(|o| o.status.success());
-        n += usize::from(ok);
-    }
-    n
-}
-
-fn exit_of(r: Result<i32, String>) -> Outcome {
-    match r {
-        Ok(c) => Outcome {
-            code: u8::try_from(c).unwrap_or(1),
-            ..Outcome::default()
-        },
-        Err(e) => Outcome {
-            stdout: String::new(),
-            stderr: format!("{}: {e}\n", build::NAME),
-            code: 1,
-        },
-    }
 }
 
 /// `user-path add|remove`: the install's `resources\\bin` on the user's PATH (Windows,

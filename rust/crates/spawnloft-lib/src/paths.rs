@@ -72,7 +72,7 @@ fn env_dir(name: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-fn config_base() -> PathBuf {
+pub fn config_base() -> PathBuf {
     if cfg!(windows) {
         env_dir("APPDATA").unwrap_or_else(|| home().join("AppData").join("Roaming"))
     } else {

@@ -64,11 +64,10 @@ pub struct Row {
     pub when: When,
 }
 
-/// This binary's own commands, which the Node core has no twin for (or, for `ui`, `repair` and
-/// `uninstall`, only the installer's and the window's forms, which keep their own exit codes).
-/// They are answered here whatever `SPAWNLOFT_CORE_IMPL` says. `uninstall --yes` is here because
-/// its fallback removes the scheduled tasks when the Node core cannot run, so it must never be
-/// reached by a person asking what `uninstall` does.
+/// This binary's own commands, which the Node core has no twin for (or, for `ui`, only the
+/// window's forms, which keep their own exit codes). They are answered here whatever
+/// `SPAWNLOFT_CORE_IMPL` says. `repair` and `uninstall`, the installer's and uninstaller's
+/// commands, moved to [`PORTED`] in C6.
 pub const CORE_OWN: &[Row] = &[
     Row {
         names: &["--version", "-V", "version"],
@@ -101,14 +100,6 @@ pub const CORE_OWN: &[Row] = &[
     Row {
         names: &["ui"],
         when: When::AnyFlag(&["--exit-with-stdin", "--core-dir", "--upstream", "--node"]),
-    },
-    Row {
-        names: &["repair"],
-        when: When::AnyFlag(&["--quiet"]),
-    },
-    Row {
-        names: &["uninstall"],
-        when: When::AnyFlag(&["--yes"]),
     },
 ];
 
@@ -277,6 +268,14 @@ pub const PORTED: &[Row] = &[
     },
     Row {
         names: &["rename"],
+        when: When::Always,
+    },
+    Row {
+        names: &["repair"],
+        when: When::Always,
+    },
+    Row {
+        names: &["uninstall"],
         when: When::Always,
     },
     // C7: the client launcher, a group of subcommands at a time
@@ -546,8 +545,6 @@ pub fn run(args: &[String]) -> Outcome {
         "ui" => ui(rest),
         "probe-process" => probe_process(rest),
         "handover" => crate::handover_cmd::handover(rest),
-        "repair" => crate::handover_cmd::repair(rest),
-        "uninstall" => crate::handover_cmd::uninstall(rest),
         "update" => crate::update_cmd::run(rest),
         "user-path" => crate::handover_cmd::user_path(rest),
         other => usage_error(&format!("unknown command `{other}`")),
@@ -674,12 +671,7 @@ mod tests {
         assert!(forwards_with(&os(&["start", "s"]), false, &ported));
         assert!(forwards_with(&os(&["start", "s"]), true, &ported));
         // the core's own commands never move, switch or not
-        for line in [
-            &["--version"][..],
-            &["daemon", "s"],
-            &["repair", "--quiet"],
-            &["update", "check"],
-        ] {
+        for line in [&["--version"][..], &["daemon", "s"], &["update", "check"]] {
             assert!(!forwards_with(&os(line), true, &ported), "{line:?}");
         }
     }
@@ -793,10 +785,6 @@ mod tests {
             &["bot", "check"],
             &["ui"],
             &["ui", "--port", "8080"],
-            &["repair"],
-            &["repair", "--json"],
-            &["uninstall"],
-            &["uninstall", "--data"],
             &["frobnicate"],
         ] {
             assert!(
@@ -833,6 +821,10 @@ mod tests {
             &["task", "run", "abc"],
             &["rm", "survival"],
             &["rename", "a", "b"],
+            &["repair"],
+            &["repair", "--json"],
+            &["uninstall"],
+            &["uninstall", "--data"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),
