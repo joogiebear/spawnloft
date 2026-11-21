@@ -126,13 +126,12 @@ test('task shims: the Windows .cmd shim is the fixture\'s text (written for real
 
 test('server launchers: .sh and .bat are written exactly as the fixture says', () => {
   const got = o.launchers()
-  // the .bat bodies are a template literal, so their lines end as src/create.mjs was checked out
-  const crlfCheckout = fs.readFileSync(path.join(o.CODE, 'src', 'create.mjs'), 'utf8').includes('\r\n')
+  // the .bat bodies are a template literal: JavaScript reads a CRLF line end inside one as LF, so
+  // they end LF however src/create.mjs was checked out
   for (const [key, files] of Object.entries(tasks.launchers.files)) {
     assert.deepEqual(Object.keys(got[key]), Object.keys(files), key)
     for (const [name, want] of Object.entries(files)) {
-      const text = key.startsWith('win32') && crlfCheckout ? want.text.replace(/\r?\n/g, '\r\n') : want.text
-      assert.equal(got[key][name].text, text, `${key} ${name}`)
+      assert.equal(got[key][name].text, want.text, `${key} ${name}`)
       if (want.mode) sameMode(got[key][name].mode, want.mode, `${key} ${name}`)
     }
   }

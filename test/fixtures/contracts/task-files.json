@@ -63,7 +63,7 @@
   },
   "launchers": {
     "asserted": "live (writeLaunchers, with process.platform set to each platform for the call)",
-    "about": "start, console and stop in the server folder (create.mjs writeLaunchers): .sh on Linux, .bat on Windows and on macOS too (any platform but Linux). The .sh files are mode 0755 and single-quoted like the shims. The .bat files are a template literal in create.mjs: their lines end the way src/create.mjs is checked out (LF in an LF checkout, CRLF in a CRLF one), except windowsRun's set lines, which always end CRLF. The texts below are from an LF checkout; the test converts them when the source has CRLF.",
+    "about": "start, console and stop in the server folder (create.mjs writeLaunchers): .sh on Linux, .bat on Windows and on macOS too (any platform but Linux). The .sh files are mode 0755 and single-quoted like the shims. The .bat files are a template literal in create.mjs, so their lines end LF on every checkout (JavaScript reads a CRLF inside a template literal as LF), except windowsRun's set lines, which always end CRLF. A Rust writer must produce exactly these bytes.",
     "server": "survival",
     "files": {
       "linux-entry": {
