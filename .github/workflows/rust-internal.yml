@@ -374,6 +374,50 @@ jobs:
             node -e 'fetch(process.argv[1]).then(r => { if (!r.ok) process.exit(1); console.log(JSON.stringify({ url: process.argv[1], status: r.status })) })' "$url"
           done
 
+  real-servers:
+    # C4's last check (rust/PLAN-CORE-PORT.md): the Rust core makes a real Paper and a real Fabric
+    # server from the real download hosts, with the checksums and size floors the parity rig
+    # proves against fakes, and asks Paper's API whether there is a newer build.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SPAWNLOFT_DATA_ROOT: ${{ github.workspace }}/../sl-real/data
+      MC: 1.21.4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the pinned toolchain
+        working-directory: rust
+        run: rustup toolchain install
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
+          restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Build spawnloft-core
+        working-directory: rust
+        run: cargo build --release --locked -p spawnloft-core
+      - name: A real Paper and a real Fabric server
+        run: |
+          core="$GITHUB_WORKSPACE/rust/target/release/spawnloft-core"
+          mkdir -p "$SPAWNLOFT_DATA_ROOT"
+          "$core" new real-paper --paper "$MC" --java java --accept-eula
+          "$core" new real-fabric --fabric "$MC" --java java --accept-eula
+          "$core" upgrade real-paper --check
+          "$core" list
+          "$core" jars
+          for jar in "$SPAWNLOFT_DATA_ROOT"/instances/real-paper/paper-"$MC"-*.jar "$SPAWNLOFT_DATA_ROOT"/instances/real-fabric/fabric-server-mc."$MC"-*.jar; do
+            test -s "$jar" || { echo "::error::$jar is missing or empty"; exit 1; }
+            unzip -tq "$jar" >/dev/null || { echo "::error::$jar is not a whole jar"; exit 1; }
+          done
+
   node:
     # The whole Node suite, once per platform, on the default daemon.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'

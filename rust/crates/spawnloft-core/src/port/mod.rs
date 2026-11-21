@@ -16,6 +16,7 @@ mod config;
 mod configure;
 mod create;
 mod db;
+mod fetch;
 mod lifecycle;
 mod list;
 mod logs;
@@ -175,6 +176,8 @@ fn dispatch(
         "launchers" => create::launchers(&mut ctx),
         "reveal" | "open" => create::reveal(&mut ctx),
         "rebuild" => create::rebuild(&mut ctx),
+        "paper" => fetch::paper(&mut ctx),
+        "upgrade" => fetch::upgrade(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

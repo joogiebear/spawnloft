@@ -59,6 +59,8 @@ pub mod settings;
 pub mod sha1;
 pub mod sha256;
 pub mod software;
+pub mod sources;
+pub mod upgrade;
 pub mod supervisor;
 pub mod tar;
 pub mod test_origins;

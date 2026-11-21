@@ -66,7 +66,19 @@ fn made_table(made: &Made, rows: &[&str]) -> String {
 /// `--from` another server.
 pub fn new(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     let name = require_name(&ctx.args.positional, "new")?.to_string();
-    let o = NewOptions {
+    if super::fetch::new_with_software(ctx, &name)? {
+        return Ok(());
+    }
+    let o = new_options(ctx);
+    let made = create::new_instance(ctx.layout, &cli(), &name, o)?;
+    print_created(ctx, &made);
+    Ok(())
+}
+
+/// What `cmdNew` hands `newInstance` from its flags (a software flag then sets the jar, the
+/// loader, the Minecraft version and the Java).
+pub fn new_options(ctx: &Ctx<'_>) -> NewOptions {
+    NewOptions {
         loader: "paper".into(),
         mc_version: None,
         template: flag_value(ctx, "template"),
@@ -82,10 +94,7 @@ pub fn new(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         online_mode: !truthy(ctx, "offline"),
         motd: flag_value(ctx, "motd"),
         java: flag_value(ctx, "java"),
-    };
-    let made = create::new_instance(ctx.layout, &cli(), &name, o)?;
-    print_created(ctx, &made);
-    Ok(())
+    }
 }
 
 /// What `cmdNew` prints after a server is made.
