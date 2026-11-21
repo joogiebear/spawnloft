@@ -226,6 +226,11 @@ test('hostile and damaged archives are refused in the same words', { skip, timeo
     'dos link bits': [{ ...file('notlink', 'x'), madeBy: 0, attributes: (0o120777 << 16) >>> 0 }],
     'folder over file': [file('x', '1'), file('x/y', '2')],
     'deep': [file('a/b/c/d/e/f.txt', 'deep'), file('a/', '')],
+    // names Win32 would change are taken literally on Windows, as Node's namespaced paths are
+    'trailing dot and space': [file('a.', '1'), file('b ', '2'), file('a', '3')],
+    'device names': [file('w/nul', 'x'), file('com1.txt', 'y')],
+    'nul byte': [file('ok', '1'), file('a\u0000b', 'x')],
+    'nul byte in a folder': [file('d\u0000/x', 'x')],
   }
   for (const [label, entries] of Object.entries(cases)) {
     const zip = save(rawZip(entries), `${label.replace(/ /g, '-')}.zip`)
@@ -233,7 +238,8 @@ test('hostile and damaged archives are refused in the same words', { skip, timeo
     await same('list', zip)
     await same('jar-list', zip)
     await same('jar-extract', zip, '')
-    for (const e of entries) await same('jar-read', zip, Buffer.isBuffer(e.name) ? e.name.toString() : e.name)
+    // (a NUL cannot be passed as an argument)
+    for (const e of entries) if (!String(e.name).includes('\u0000')) await same('jar-read', zip, String(e.name))
   }
   const good = rawZip([file('a.txt', 'A'), file('b/c.txt', 'C')])
   const cd = good.readUInt32LE(good.length - 6)
@@ -249,6 +255,10 @@ test('hostile and damaged archives are refused in the same words', { skip, timeo
     'fake end record in the comment': rawZip([file('a', '1')], { comment: Buffer.concat([Buffer.from([0x50, 0x4b, 0x05, 0x06]), Buffer.alloc(18)]) }),
     'data prepended': rawZip([file('a', '1'), file('b', '2')], { prefix: Buffer.from('#!/bin/sh\nexit 0\n') }),
     'zip64 marker without a locator': (() => { const b = Buffer.from(good); b.writeUInt16LE(0xffff, b.length - 12); return b })(),
+    // an entry claiming 4 MiB past the end of the file: only what the file holds is read
+    'claims past its end': (() => { const b = rawZip([{ name: 'a.txt', method: 8, data: zlib.deflateRawSync('A'), size: 1 }]); const c = b.readUInt32LE(b.length - 6); b.writeUInt32LE(4 << 20, c + 20); return b })(),
+    // more out than the entry declares
+    'inflates past its size': rawZip([{ name: 'a.txt', method: 8, data: zlib.deflateRawSync(Buffer.alloc(100000)), crc: 0, size: 10 }]),
     'deflate cut short': rawZip([{ name: 'cut', method: 8, data: zlib.deflateRawSync(Buffer.alloc(5000, 'q')).subarray(0, 10), crc: 0, size: 5000 }]),
   }
   for (const [label, bytes] of Object.entries(damaged)) {

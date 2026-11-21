@@ -446,6 +446,85 @@ fn outside(name: &str) -> Failure {
     ))
 }
 
+/// `util.inspect(text)` for a string, as Node's ERR_INVALID_ARG_VALUE quotes the value.
+fn inspect(text: &str) -> String {
+    let quote = if text.contains('\'') && !text.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let mut out = String::from(quote);
+    for c in text.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\u{8}' => out.push_str("\\b"),
+            '\t' => out.push_str("\\t"),
+            '\n' => out.push_str("\\n"),
+            '\u{c}' => out.push_str("\\f"),
+            '\r' => out.push_str("\\r"),
+            c if c == quote => {
+                out.push('\\');
+                out.push(c);
+            }
+            c if (c as u32) < 0x20 || c == '\u{7f}' => out.push_str(&format!("\\x{:02X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push(quote);
+    out
+}
+
+/// Node refuses a path holding a NUL before it reaches the system.
+fn no_nul(p: &str) -> Result<(), Failure> {
+    if !p.contains('\0') {
+        return Ok(());
+    }
+    Err(Failure::Internal {
+        head: "TypeError [ERR_INVALID_ARG_VALUE]".into(),
+        message: format!(
+            "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received {}",
+            inspect(p)
+        ),
+        code: Some("ERR_INVALID_ARG_VALUE".into()),
+    })
+}
+
+/// What the file system is handed for the absolute path `p`. On Windows that is the `\\?\` form,
+/// as Node's `toNamespacedPath` makes it, so a name ending in a dot or a space, or one that is a
+/// device name (`nul`, `com1`), is taken literally instead of being changed by Win32.
+fn fs_path(p: &str) -> PathBuf {
+    if cfg!(windows) {
+        if let Some(unc) = p.strip_prefix("\\\\") {
+            if !unc.starts_with(['?', '.']) {
+                return PathBuf::from(format!("\\\\?\\UNC\\{unc}"));
+            }
+            return PathBuf::from(p);
+        }
+        if p.len() >= 3 && p.as_bytes()[1] == b':' {
+            return PathBuf::from(format!("\\\\?\\{p}"));
+        }
+    }
+    PathBuf::from(p)
+}
+
+/// `path.dirname(p)` of an absolute path.
+fn dirname(p: &str) -> String {
+    Path::new(p)
+        .parent()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_else(|| p.to_string())
+}
+
+/// `fs.mkdirSync(p, { recursive: true })`, with Node's words for a failure.
+fn make_dir(p: &str) -> Result<(), Failure> {
+    no_nul(p)?;
+    match std::fs::create_dir_all(fs_path(p)) {
+        Ok(()) => Ok(()),
+        // the words come from the same call on the plain path, which fails the same way
+        Err(e) => crate::fsx::mkdir_all(Path::new(p)).and(Err(Failure::io(&e, "mkdir", Some(Path::new(p))))),
+    }
+}
+
 /// A file that could not be opened for writing, as Node words it: Windows refuses a folder as
 /// access denied, where libuv says EISDIR.
 fn create_failed(e: &io::Error, target: &Path) -> Failure {
@@ -478,6 +557,7 @@ fn copy_entry<S: Source + ?Sized, W: Write>(
     data_at: u64,
     packed: u64,
     method: u16,
+    limit: Option<u64>,
     out: &mut W,
 ) -> Result<Copied, Failure> {
     let mut crc = Crc::new();
@@ -514,6 +594,9 @@ fn copy_entry<S: Source + ?Sized, W: Write>(
             if made > 0 {
                 crc.update(&output[..made]);
                 written += made as u64;
+                if limit.is_some_and(|l| written > l) {
+                    return Ok(Copied::Damaged);
+                }
                 out.write_all(&output[..made]).map_err(|e| write_failed(&e))?;
             }
             match status {
@@ -572,9 +655,8 @@ pub fn extract(file: &Path, dest: &Path) -> Result<u64, Failure> {
                 entry.name
             )));
         }
-        let target = PathBuf::from(target);
         if name.ends_with('/') {
-            crate::fsx::mkdir_all(&target)?;
+            make_dir(&target)?;
             continue;
         }
         if entry.made_by == 3 && (entry.attributes >> 16) & 0o170000 == 0o120000 {
@@ -601,15 +683,23 @@ pub fn extract(file: &Path, dest: &Path) -> Result<u64, Failure> {
                 entry.name
             )));
         }
-        if let Some(parent) = target.parent() {
-            crate::fsx::mkdir_all(parent)?;
-        }
-        let mut out = File::create(&target).map_err(|e| create_failed(&e, &target))?;
+        make_dir(&dirname(&target))?;
+        no_nul(&target)?;
+        let display = PathBuf::from(&target);
+        let mut out = File::create(fs_path(&target)).map_err(|e| create_failed(&e, &display))?;
         let copied = if entry.packed == 0 {
             Copied::Done { crc: 0, written: 0 }
         } else {
             let mut buffered = io::BufWriter::with_capacity(CHUNK, &mut out);
-            let copied = copy_entry(&mut src, data_at, entry.packed, entry.method, &mut buffered)?;
+            // more out than the entry declares is damage already: a bomb is not written in full
+            let copied = copy_entry(
+                &mut src,
+                data_at,
+                entry.packed,
+                entry.method,
+                Some(entry.size),
+                &mut buffered,
+            )?;
             buffered.flush().map_err(|e| write_failed(&e))?;
             copied
         };
@@ -617,7 +707,7 @@ pub fn extract(file: &Path, dest: &Path) -> Result<u64, Failure> {
         let whole =
             matches!(copied, Copied::Done { crc, written } if crc == entry.crc && written == entry.size);
         if !whole {
-            let _ = std::fs::remove_file(&target);
+            let _ = std::fs::remove_file(fs_path(&target));
             return Err(fail(format!(
                 "\"{}\" did not match its checksum; the archive is damaged and nothing more was extracted",
                 entry.name
@@ -681,10 +771,12 @@ fn mtime_ms(meta: &std::fs::Metadata) -> f64 {
     let Ok(t) = meta.modified() else {
         return 0.0;
     };
-    match t.duration_since(std::time::UNIX_EPOCH) {
-        Ok(d) => (d.as_secs_f64() * 1000.0).trunc(),
-        Err(e) => -(e.duration().as_secs_f64() * 1000.0).trunc(),
-    }
+    let ms = match t.duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs_f64() * 1000.0,
+        Err(e) => -(e.duration().as_secs_f64() * 1000.0),
+    };
+    // Node's `stat.mtime` is `new Date(Math.round(mtimeMs))`
+    (ms + 0.5).floor()
 }
 
 /// `walk`: directories before their contents, in a stable order; links, sockets and devices are
@@ -1096,26 +1188,40 @@ pub mod jar {
         }
         let data_at =
             u64::from(entry.local_offset) + 30 + u64::from(le16(&local, 26)) + u64::from(le16(&local, 28));
-        let data = read_once_at(src, entry.compressed as usize, data_at)?;
+        // only what the file holds (Node once zero-filled the rest, and zeros can inflate to
+        // gigabytes), and never more out than the entry says it holds
+        let size = src.size().map_err(|e| Failure::io(&e, "fstat", None))?;
+        let held = size.saturating_sub(data_at).min(u64::from(entry.compressed));
+        let data = read_once_at(src, held as usize, data_at)?;
         match entry.method {
             0 => Ok(Some(data)),
-            8 => inflate_raw(&data).map(Some),
+            8 => inflate_raw(&data, (entry.size as usize).max(1)),
             _ => Ok(None),
         }
     }
 
-    /// `zlib.inflateRawSync(data)`.
-    pub fn inflate_raw(data: &[u8]) -> Result<Vec<u8>, Failure> {
+    /// `zlib.inflateRawSync(data, { maxOutputLength })`: `None` when the output would pass
+    /// `max_out` (Node's ERR_BUFFER_TOO_LARGE, which the jar reader answers with `null`).
+    pub fn inflate_raw(data: &[u8], max_out: usize) -> Result<Option<Vec<u8>>, Failure> {
         let mut inflater = Decompress::new(false);
-        let mut out = Vec::with_capacity(data.len().saturating_mul(3).min(1 << 24));
+        let mut out = Vec::with_capacity(data.len().saturating_mul(3).min(1 << 24).min(max_out));
         loop {
+            if out.len() > max_out {
+                return Ok(None);
+            }
             if out.capacity() - out.len() < CHUNK {
-                out.reserve(CHUNK.max(out.len()));
+                out.reserve(
+                    CHUNK
+                        .max(out.len())
+                        .min(max_out + 1 - out.len().min(max_out))
+                        .max(1),
+                );
             }
             let used = inflater.total_in() as usize;
             let before = inflater.total_out();
             match inflater.decompress_vec(&data[used..], &mut out, FlushDecompress::None) {
-                Ok(Status::StreamEnd) => return Ok(out),
+                Ok(Status::StreamEnd) if out.len() > max_out => return Ok(None),
+                Ok(Status::StreamEnd) => return Ok(Some(out)),
                 Ok(_) => {
                     let moved = inflater.total_out() != before || inflater.total_in() as usize != used;
                     if !moved {
@@ -1188,11 +1294,9 @@ pub mod jar {
                 let base = basename(&file.to_string_lossy()).to_string();
                 return Err(fail(format!("could not read \"{}\" out of {base}", entry.name)));
             };
-            let target = PathBuf::from(target);
-            if let Some(parent) = target.parent() {
-                crate::fsx::mkdir_all(parent)?;
-            }
-            std::fs::write(&target, &data).map_err(|e| create_failed(&e, &target))?;
+            make_dir(&dirname(&target))?;
+            no_nul(&target)?;
+            std::fs::write(fs_path(&target), &data).map_err(|e| create_failed(&e, Path::new(&target)))?;
             written.push(mapped.replace('\\', "/"));
         }
         Ok(written)
@@ -1215,13 +1319,21 @@ pub fn fuzz_read(data: &[u8], cap: u64) {
                 continue;
             }
             let mut sink = Capped { left: cap };
-            let _ = copy_entry(&mut local_src, data_at, entry.packed, entry.method, &mut sink);
+            let _ = copy_entry(
+                &mut local_src,
+                data_at,
+                entry.packed,
+                entry.method,
+                None,
+                &mut sink,
+            );
         }
     }
     let mut src: &[u8] = data;
     if let Ok(list) = jar::entries(&mut src) {
         for entry in list.iter().take(4096) {
-            if u64::from(entry.compressed) > cap {
+            // the output is bounded by the declared size, which may honestly be large
+            if u64::from(entry.size) > cap {
                 continue;
             }
             let _ = jar::entry_data(&mut src, entry);

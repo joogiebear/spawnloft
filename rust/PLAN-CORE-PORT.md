@@ -303,7 +303,13 @@ C1 records, checked 2026-11-21:
   fixed on both sides in the same PR: a failure while writing an extracted entry (a folder in the
   way, a full disk, compressed data that does not inflate) was reported as `EBADF: bad file
   descriptor, close`, because the failed pipeline closed the archive's descriptor under the
-  `finally`. Damaged compressed data is now the checksum sentence on both.
+  `finally`. Damaged compressed data is now the checksum sentence on both. The Fable review
+  found a second, fixed on both sides too: the jar reader read an entry's declared compressed
+  size even past the end of the file (zero-filled) and inflated it without bound, so a jar of a
+  few hundred bytes in a mods folder could take gigabytes. It now reads only what the file holds
+  and inflates no more than the entry's declared size (`null` past it, as for any unreadable
+  entry). On Windows the Rust extraction hands the system `\\?\` paths, as Node's
+  `toNamespacedPath` does, so names ending in a dot or space and device names stay literal.
 
 **C2.** `console` is interactive: raw input and console modes on Windows, signals on Unix. The
 database engines keep the layout of the engine store exactly, since a running database's files

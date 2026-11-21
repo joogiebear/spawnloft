@@ -93,10 +93,13 @@ pub enum NoAnswer {
 /// every attempt was transient, are returned at once so the caller's message names the status.
 /// Only opening the response is retried; a download that breaks half way is the caller's to
 /// report. The pause before attempt n+1 is `delay` × n; a cancelled job ends the retrying.
+/// `retry_timeouts`: whether a time-out is an attempt to retry (Node's per-attempt `timeoutMs`)
+/// or the caller giving up (a signal the caller fired, as the download's stall watchdog is).
 pub fn fetch_retry(
     mut open: impl FnMut() -> Result<ureq::http::Response<ureq::Body>, ureq::Error>,
     attempts: u32,
     delay: Duration,
+    retry_timeouts: bool,
     mut on_retry: impl FnMut(u32, String),
 ) -> Result<ureq::http::Response<ureq::Body>, NoAnswer> {
     let mut attempt = 1;
@@ -105,7 +108,7 @@ pub fn fetch_retry(
         match open() {
             Err(e) => {
                 // a cancelled job is not a server having a bad moment
-                if last || cancel::check_cancelled().is_err() {
+                if last || cancel::check_cancelled().is_err() || (!retry_timeouts && is_timeout(&e)) {
                     return Err(NoAnswer::Failed(e));
                 }
                 on_retry(attempt, cause(&e));
@@ -398,6 +401,73 @@ fn retryable(message: String) -> Attempt {
     }
 }
 
+/// What the helper thread of a download hands back, in order.
+enum Arrived {
+    /// an attempt failed and another is coming (the watchdog winds back)
+    Retry,
+    /// every attempt failed, or the job was cancelled between them
+    NoAnswer(NoAnswer),
+    Head {
+        status: u16,
+        length: u64,
+    },
+    Chunk(Vec<u8>),
+    /// the body broke part way
+    Broken(ureq::Error),
+    End,
+}
+
+/// The helper thread's side: asks (with retries) and passes the body on. Ends as soon as the
+/// download stops listening.
+fn fetch_into(agent: &ureq::Agent, url: &str, tx: &std::sync::mpsc::SyncSender<Arrived>) {
+    let res = fetch_retry(
+        || agent.get(url).header("User-Agent", UA).call(),
+        4,
+        Duration::from_millis(1500),
+        false,
+        |_, _| {
+            let _ = tx.send(Arrived::Retry);
+        },
+    );
+    let res = match res {
+        Ok(r) => r,
+        Err(e) => {
+            let _ = tx.send(Arrived::NoAnswer(e));
+            return;
+        }
+    };
+    let status = res.status().as_u16();
+    let length = res
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .map(crate::js::string_to_number)
+        .filter(|n| n.is_finite() && *n > 0.0)
+        .unwrap_or(0.0) as u64;
+    if tx.send(Arrived::Head { status, length }).is_err() || !(200..300).contains(&status) {
+        return;
+    }
+    let mut reader = res.into_body().into_reader();
+    let mut chunk = vec![0u8; CHUNK];
+    loop {
+        let sent = match reader.read(&mut chunk) {
+            Ok(0) => {
+                let _ = tx.send(Arrived::End);
+                return;
+            }
+            Ok(n) => tx.send(Arrived::Chunk(chunk[..n].to_vec())),
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                let _ = tx.send(Arrived::Broken(body_error(e)));
+                return;
+            }
+        };
+        if sent.is_err() {
+            return;
+        }
+    }
+}
+
 /// `downloadFile(url, dest, options)`: the body goes to a `.part` file next to `dest`, hashed as
 /// it arrives, and gets its final name only once the size floor and the hash hold; a truncated
 /// download would otherwise look like a jar and fail later with an opaque class-loading error.
@@ -434,106 +504,126 @@ fn download_once(url: &str, dest: &Path, o: &mut Options) -> Result<Downloaded, 
             (stall.as_secs_f64()).round()
         ))
     };
-    // the watchdog: every phase of asking, and every read of the body, gets the full time
-    let limit = (stall > Duration::ZERO).then_some(stall);
+    // The request runs on a helper thread and hands back what arrives; this thread keeps Node's
+    // watchdog (one deadline from asking, wound back by every retry and every chunk) and watches
+    // for a cancel, so neither waits on a quiet connection. The agent's own time-outs only make
+    // an abandoned helper end.
+    let backstop = (stall > Duration::ZERO).then_some(stall + Duration::from_secs(5));
     let agent = agent(|b| {
-        b.timeout_resolve(limit)
-            .timeout_connect(limit)
-            .timeout_send_request(limit)
-            .timeout_recv_response(limit)
-            .timeout_per_read(limit)
+        b.timeout_resolve(backstop)
+            .timeout_connect(backstop)
+            .timeout_send_request(backstop)
+            .timeout_recv_response(backstop)
+            .timeout_per_read(backstop)
     });
     let sent =
         target(url).map_err(|e| coded(format!("download of {what} failed: {e}"), "download-failed"))?;
-    let res = fetch_retry(
-        || agent.get(&sent).header("User-Agent", UA).call(),
-        4,
-        Duration::from_millis(1500),
-        |_, _| {},
-    );
-    let res = match res {
-        Ok(r) => r,
-        Err(NoAnswer::Cancelled) => return Err(cancel::cancelled().into()),
-        Err(NoAnswer::Failed(_)) if cancel::check_cancelled().is_err() => {
-            return Err(cancel::cancelled().into());
-        }
-        Err(NoAnswer::Failed(e)) if is_timeout(&e) => return Err(stalled()),
-        Err(NoAnswer::Failed(e)) => {
-            return Err(coded(
-                format!("download of {what} failed: {}", cause(&e)),
-                "download-failed",
-            )
-            .into());
-        }
-    };
-    let status = res.status().as_u16();
-    if !(200..300).contains(&status) {
-        return Err(coded(
-            format!("download of {what} failed ({status}) from {url}"),
-            "download-failed",
-        )
-        .into());
-    }
-    let total = res
-        .headers()
-        .get("content-length")
-        .and_then(|v| v.to_str().ok())
-        .map(crate::js::string_to_number)
-        .filter(|n| n.is_finite() && *n > 0.0)
-        .unwrap_or(0.0) as u64;
+    let (tx, rx) = std::sync::mpsc::sync_channel::<Arrived>(8);
+    let job = cancel::current();
+    std::thread::spawn(move || cancel::with_cancel(job, || fetch_into(&agent, &sent, &tx)));
 
+    let part_way = |why: String| retryable(format!("download of {what} failed part way: {why}"));
     let tmp = part_path(dest);
+    let mut file: Option<File> = None;
     let mut digest = o.hash.map(Hasher::new);
     let mut received = 0u64;
-    let copied = (|| -> Result<(), Attempt> {
-        let part_way = |why: String| retryable(format!("download of {what} failed part way: {why}"));
-        let mut file = File::create(&tmp).map_err(|e| {
-            if disk_error(&e) {
-                Attempt::from(Failure::io(&e, "open", Some(&tmp)))
-            } else {
-                part_way(crate::jspath::node_error(&e, "open", Some(&tmp)))
-            }
-        })?;
-        let mut reader = res.into_body().into_reader();
-        let mut chunk = vec![0u8; CHUNK];
-        loop {
-            cancel::check_cancelled()?;
-            let n = match reader.read(&mut chunk) {
-                Ok(0) => break,
-                Ok(n) => n,
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                Err(e) => {
-                    let e = body_error(e);
-                    if cancel::check_cancelled().is_err() {
-                        return Err(cancel::cancelled().into());
-                    }
-                    if is_timeout(&e) {
-                        return Err(stalled());
-                    }
-                    return Err(part_way(cause(&e)));
-                }
-            };
-            if let Some(d) = digest.as_mut() {
-                d.update(&chunk[..n]);
-            }
-            received += n as u64;
-            if let Some(p) = o.on_progress.as_mut() {
-                p(received, total);
-            }
-            file.write_all(&chunk[..n]).map_err(|e| {
-                if disk_error(&e) {
-                    Attempt::from(Failure::io(&e, "write", None))
-                } else {
-                    part_way(crate::jspath::node_error(&e, "write", None))
-                }
-            })?;
+    let mut total = 0u64;
+    let wind = || (stall > Duration::ZERO).then(|| std::time::Instant::now() + stall);
+    let mut deadline = wind();
+    let outcome: Result<(), Attempt> = loop {
+        if cancel::check_cancelled().is_err() {
+            break Err(cancel::cancelled().into());
         }
-        file.flush()
-            .map_err(|e| Attempt::from(Failure::io(&e, "write", None)))?;
-        Ok(())
-    })();
-    if let Err(a) = copied {
+        let wait = match deadline {
+            Some(d) => d
+                .saturating_duration_since(std::time::Instant::now())
+                .min(Duration::from_millis(100)),
+            None => Duration::from_millis(100),
+        };
+        let arrived = match rx.recv_timeout(wait) {
+            Ok(a) => a,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if deadline.is_some_and(|d| std::time::Instant::now() >= d) {
+                    break Err(stalled());
+                }
+                continue;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                break Err(part_way("the connection ended".into()));
+            }
+        };
+        match arrived {
+            Arrived::Retry => deadline = wind(),
+            Arrived::NoAnswer(NoAnswer::Cancelled) => break Err(cancel::cancelled().into()),
+            Arrived::NoAnswer(NoAnswer::Failed(e)) => {
+                if cancel::check_cancelled().is_err() {
+                    break Err(cancel::cancelled().into());
+                }
+                if is_timeout(&e) {
+                    break Err(stalled());
+                }
+                break Err(coded(
+                    format!("download of {what} failed: {}", cause(&e)),
+                    "download-failed",
+                )
+                .into());
+            }
+            Arrived::Head { status, length } => {
+                // 204 and 205 have no body, which Node's `!res.body` refuses as well
+                if !(200..300).contains(&status) || status == 204 || status == 205 {
+                    break Err(coded(
+                        format!("download of {what} failed ({status}) from {url}"),
+                        "download-failed",
+                    )
+                    .into());
+                }
+                total = length;
+                match File::create(&tmp) {
+                    Ok(f) => file = Some(f),
+                    Err(e) if disk_error(&e) => break Err(Failure::io(&e, "open", Some(&tmp)).into()),
+                    Err(e) => break Err(part_way(crate::jspath::node_error(&e, "open", Some(&tmp)))),
+                }
+                deadline = wind();
+            }
+            Arrived::Chunk(chunk) => {
+                deadline = wind();
+                if let Some(d) = digest.as_mut() {
+                    d.update(&chunk);
+                }
+                received += chunk.len() as u64;
+                if let Some(p) = o.on_progress.as_mut() {
+                    p(received, total);
+                }
+                let Some(f) = file.as_mut() else { continue };
+                if let Err(e) = f.write_all(&chunk) {
+                    break Err(if disk_error(&e) {
+                        Attempt::from(Failure::io(&e, "write", None))
+                    } else {
+                        part_way(crate::jspath::node_error(&e, "write", None))
+                    });
+                }
+            }
+            Arrived::Broken(e) => {
+                break Err(if is_timeout(&e) {
+                    stalled()
+                } else {
+                    part_way(cause(&e))
+                });
+            }
+            Arrived::End => {
+                if let Some(f) = file.as_mut()
+                    && let Err(e) = f.flush()
+                {
+                    break Err(Failure::io(&e, "write", None).into());
+                }
+                break Ok(());
+            }
+        }
+    };
+    drop(file);
+    if let Err(a) = outcome {
         // stopped half way: the half is not left for a later download to trip on
+        drop(rx);
         drop_part(&tmp);
         return Err(a);
     }
@@ -549,7 +639,8 @@ fn download_once(url: &str, dest: &Path, o: &mut Options) -> Result<Downloaded, 
         ))
         .into());
     }
-    if let (Some(d), Some(expected)) = (digest, o.expected.as_deref()) {
+    // an empty digest is none, as Node's `digest && expected` reads it
+    if let (Some(d), Some(expected)) = (digest, o.expected.as_deref().filter(|e| !e.is_empty())) {
         let got = d.hex();
         if got.to_lowercase() != expected.to_lowercase() {
             let _ = std::fs::remove_file(&tmp);

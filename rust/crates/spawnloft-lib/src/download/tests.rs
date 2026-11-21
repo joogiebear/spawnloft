@@ -17,6 +17,8 @@ enum Reply {
     },
     /// a redirect to a path on the same server
     Redirect(&'static str),
+    /// the request is read and nothing is ever answered
+    Silent,
 }
 
 /// A plain-HTTP server on loopback that answers requests in order from `script` (the last
@@ -76,6 +78,7 @@ fn answer(mut stream: TcpStream, reply: Reply, seen: &Mutex<Vec<String>>) {
             let _ = stream.flush();
             std::thread::sleep(hold);
         }
+        Reply::Silent => std::thread::sleep(Duration::from_secs(20)),
         Reply::Redirect(to) => {
             let _ = write!(
                 stream,
@@ -421,4 +424,86 @@ fn proxy_variables_are_ignored_as_node_ignores_them() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
+}
+
+#[test]
+fn a_server_that_never_answers_is_asked_once_per_attempt() {
+    // Node's watchdog ends the asking at once; the attempts of downloadFile are the only retries
+    let srv = serve(vec![Reply::Silent]);
+    let dir = scratch("silent");
+    let started = std::time::Instant::now();
+    let err = download_file(
+        &format!("{}/q", srv.base),
+        &dir.join("q"),
+        Options {
+            label: Some("q".into()),
+            stall: Duration::from_millis(400),
+            attempts: 3,
+            retry_delay: Duration::from_millis(10),
+            ..Options::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        err.message(),
+        "download of q failed: nothing arrived for 0 seconds"
+    );
+    assert_eq!(srv.hits.load(Ordering::SeqCst), 3);
+    assert!(
+        started.elapsed() < Duration::from_secs(8),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn a_cancel_is_seen_while_the_server_is_quiet() {
+    let srv = serve(vec![Reply::Silent]);
+    let dir = scratch("quiet");
+    let token = cancel::Token::new();
+    let t = token.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(200));
+        t.cancel();
+    });
+    let started = std::time::Instant::now();
+    let err = cancel::with_cancel(Some(token), || {
+        download_file(&format!("{}/w", srv.base), &dir.join("w"), Options::default())
+    })
+    .unwrap_err();
+    assert!(cancel::is_cancelled(&err), "{err:?}");
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        started.elapsed()
+    );
+    assert!(leftovers(&dir).is_empty());
+}
+
+#[test]
+fn an_empty_expected_digest_is_not_checked_and_no_content_is_refused() {
+    let srv = serve(vec![Reply::Full(200, b"x".to_vec())]);
+    let dir = scratch("empty-digest");
+    download_file(
+        &format!("{}/e", srv.base),
+        &dir.join("e"),
+        Options {
+            hash: Some(Hash::Sha256),
+            expected: Some(String::new()),
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    let srv = serve(vec![Reply::Full(204, Vec::new())]);
+    let url = format!("{}/n", srv.base);
+    let err = download_file(
+        &url,
+        &dir.join("n"),
+        Options {
+            label: Some("n".into()),
+            ..Options::default()
+        },
+    )
+    .unwrap_err();
+    assert_eq!(err.message(), format!("download of n failed (204) from {url}"));
 }

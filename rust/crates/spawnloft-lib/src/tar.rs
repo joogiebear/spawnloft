@@ -38,10 +38,11 @@ fn version_text(program: &Path, limit: Duration) -> Option<String> {
     crate::platform::hide_window(&mut cmd);
     let mut child = cmd.spawn().ok()?;
     let mut stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
         let mut out = Vec::new();
         let _ = stdout.read_to_end(&mut out);
-        out
+        let _ = tx.send(out);
     });
     let deadline = Instant::now() + limit;
     loop {
@@ -56,7 +57,8 @@ fn version_text(program: &Path, limit: Duration) -> Option<String> {
             }
         }
     }
-    let out = reader.join().unwrap_or_default();
+    // something the program started may still hold its output open: what came is enough
+    let out = rx.recv_timeout(Duration::from_secs(1)).unwrap_or_default();
     Some(String::from_utf8_lossy(&out).into_owned())
 }
 

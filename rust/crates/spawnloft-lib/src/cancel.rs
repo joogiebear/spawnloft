@@ -152,11 +152,13 @@ const HARD_AFTER: Duration = Duration::from_secs(4);
 
 #[derive(Debug, Default)]
 struct WatchState {
+    /// the child has been reaped: its pid may belong to someone else now
     finished: bool,
     stopped: bool,
 }
 
-/// What [`stop_on_cancel`] returns: call [`Stopper::finish`] once the child has been waited for.
+/// What [`stop_on_cancel`] returns: wait for the child through [`Stopper::wait`], so that the
+/// child is never reaped while a signal is on its way to its pid.
 #[derive(Debug)]
 pub struct Stopper {
     shared: Option<Arc<(Mutex<WatchState>, Condvar)>>,
@@ -164,27 +166,42 @@ pub struct Stopper {
 }
 
 impl Stopper {
-    /// The child has exited and been waited for: the watch ends. Whether a cancel ended it, for
-    /// the caller to tell a cancel from a failure.
-    pub fn finish(mut self) -> bool {
+    /// `child.wait()`, and whether a cancel ended it (for the caller to tell a cancel from a
+    /// failure). The child is reaped under the same lock the watcher signals under, so a signal
+    /// never reaches a pid the child no longer holds.
+    pub fn wait(mut self, child: &mut Child) -> std::io::Result<(std::process::ExitStatus, bool)> {
         let Some(shared) = self.shared.take() else {
-            return false;
+            return Ok((child.wait()?, false));
         };
-        let stopped = {
-            let mut state = shared.0.lock().unwrap_or_else(|p| p.into_inner());
-            state.finished = true;
-            shared.1.notify_all();
-            state.stopped
+        let (lock, wake) = &*shared;
+        let result = loop {
+            let mut state = lock.lock().unwrap_or_else(|p| p.into_inner());
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    state.finished = true;
+                    wake.notify_all();
+                    break Ok((status, state.stopped));
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    state.finished = true;
+                    wake.notify_all();
+                    break Err(e);
+                }
+            }
+            drop(state);
+            std::thread::sleep(Duration::from_millis(20));
         };
         if let Some(w) = self.watcher.take() {
             let _ = w.join();
         }
-        stopped
+        result
     }
 }
 
 impl Drop for Stopper {
     fn drop(&mut self) {
+        // dropped without a wait: the caller has the child, and the watch ends here
         if let Some(shared) = self.shared.take() {
             shared.0.lock().unwrap_or_else(|p| p.into_inner()).finished = true;
             shared.1.notify_all();
@@ -196,7 +213,7 @@ impl Drop for Stopper {
 /// the child was started with [`own_group`], so its pid is its group's id (`inOwnGroup`). The
 /// tree is asked first and told [`HARD_AFTER`] on, on every system: SIGTERM then SIGKILL to the
 /// group off Windows; `taskkill /T /F` on Windows, with the child itself ended if taskkill is
-/// missing or refuses.
+/// missing or refuses. Wait for the child with [`Stopper::wait`].
 pub fn stop_on_cancel(child: &Child, group: bool) -> Stopper {
     let Some(token) = current() else {
         return Stopper {
@@ -210,24 +227,26 @@ pub fn stop_on_cancel(child: &Child, group: bool) -> Stopper {
     let watcher = std::thread::spawn(move || {
         let (lock, wake) = &*state;
         // wait for the cancel, or for the child to be done with
+        let mut guard = lock.lock().unwrap_or_else(|p| p.into_inner());
         loop {
-            let guard = lock.lock().unwrap_or_else(|p| p.into_inner());
             if guard.finished {
                 return;
             }
             if token.is_cancelled() {
                 break;
             }
-            let _ = wake.wait_timeout(guard, Duration::from_millis(50));
+            guard = wake
+                .wait_timeout(guard, Duration::from_millis(50))
+                .unwrap_or_else(|p| p.into_inner())
+                .0;
         }
-        lock.lock().unwrap_or_else(|p| p.into_inner()).stopped = true;
+        // still under the lock: the child has not been reaped
+        guard.stopped = true;
         end_tree(pid, group, false);
         let deadline = Instant::now() + HARD_AFTER;
-        let mut guard = lock.lock().unwrap_or_else(|p| p.into_inner());
         while !guard.finished {
             let now = Instant::now();
             if now >= deadline {
-                drop(guard);
                 end_tree(pid, group, true);
                 return;
             }
@@ -345,8 +364,8 @@ mod tests {
         let stopper = with_cancel(Some(token.clone()), || stop_on_cancel(&child, true));
         let started = Instant::now();
         token.cancel();
-        child.wait().unwrap();
-        assert!(stopper.finish());
+        let (_, stopped) = stopper.wait(&mut child).unwrap();
+        assert!(stopped);
         assert!(started.elapsed() < Duration::from_secs(10));
         // the grandchild is gone too (its parent was the shell, so init reaps it)
         // (a zombie counts as gone: a container's first process may never reap it)
@@ -377,12 +396,11 @@ mod tests {
         own_group(&mut cmd);
         let mut child = cmd.spawn().unwrap();
         let stopper = with_cancel(Some(Token::new()), || stop_on_cancel(&child, true));
-        child.wait().unwrap();
-        assert!(!stopper.finish());
+        let (status, stopped) = stopper.wait(&mut child).unwrap();
+        assert!(status.success() && !stopped);
         // outside a job there is nothing to watch
         let mut child = cmd.spawn().unwrap();
         let stopper = stop_on_cancel(&child, true);
-        child.wait().unwrap();
-        assert!(!stopper.finish());
+        assert!(!stopper.wait(&mut child).unwrap().1);
     }
 }
