@@ -306,10 +306,13 @@ export async function createFromModpack(name, projectId, {
   // Fetching the loader here caches it in the jars store, so the later install is a cache hit.
   let staged
   let inst
+  // A Fabric server starts as its launcher, which the instance must name from the start (a
+  // create with no jar is refused); NeoForge's starter is made by its installer afterwards.
+  let jar = null
   try {
     if (index.loader.kind === 'fabric') {
       onProgress({ message: `Fetching Fabric ${index.loader.version} for ${index.mc}`, percent: null })
-      await fabric.fetchLauncher(index.mc, { loader: index.loader.version })
+      jar = (await fabric.fetchLauncher(index.mc, { loader: index.loader.version })).name
     } else {
       await neoforge.fetchInstaller(index.loader.version, { onProgress })
     }
@@ -320,7 +323,7 @@ export async function createFromModpack(name, projectId, {
     checkCancelled()
     onProgress({ message: 'Creating the server', percent: null })
     inst = await create.newInstance(name, {
-      jar: null,
+      jar,
       loader: index.loader.kind,
       mcVersion: index.mc,
       memory,
@@ -410,11 +413,17 @@ export function packOf(inst) {
 // What an update may delete: files the old pack owned that the new one doesn't, and nothing else.
 // `protect` entries (worlds, root server files, spawnloft records) survive even a bad record; a path
 // matches exactly or as a directory prefix.
+// Paths are compared as the file they name, so `./ops.json` or `world//level.dat` in a pack's
+// overrides cannot slip past the guard, and a guard ignores case (Windows and macOS do).
 export function planRemovals(oldFiles = [], newFiles = [], { protect = [] } = {}) {
-  const keep = new Set(newFiles.map((p) => String(p).replace(/\\/g, '/')))
-  const guarded = (p) => protect.some((g) => p === g || p.startsWith(`${g}/`))
-  return [...new Set(oldFiles.map((p) => String(p).replace(/\\/g, '/')))]
-    .filter((p) => !keep.has(p) && !guarded(p) && !p.split('/').includes('..') && !p.startsWith('/'))
+  const keep = new Set(newFiles.map((p) => safeRelativePath(String(p))).filter((p) => p !== null))
+  const guards = protect.map((g) => String(g).toLowerCase())
+  const guarded = (p) => {
+    const low = p.toLowerCase()
+    return guards.some((g) => low === g || low.startsWith(`${g}/`))
+  }
+  return [...new Set(oldFiles.map((p) => safeRelativePath(String(p))).filter((p) => p !== null))]
+    .filter((p) => !keep.has(p) && !guarded(p))
 }
 
 function protectedPaths(inst) {

@@ -27,6 +27,14 @@ export function findCore(repo, env = process.env) {
   return found[0] ?? null
 }
 
+// The stand-in for the system scheduler (spawnloft-fakes fake-scheduler), built beside the core.
+export function findFakeScheduler(core, env = process.env) {
+  if (env.SPAWNLOFT_FAKE_SCHEDULER) return env.SPAWNLOFT_FAKE_SCHEDULER
+  if (!core) return null
+  const file = path.join(path.dirname(core), process.platform === 'win32' ? 'fake-scheduler.exe' : 'fake-scheduler')
+  return fs.existsSync(file) ? file : null
+}
+
 // {run}, {data}, {home}, {repo} in a step's strings, as this side's real paths.
 function expand(value, ctx) {
   if (typeof value === 'string') return value.replace(/\{(run|data|home|repo)\}/g, (_, k) => ctx[k])
@@ -62,6 +70,11 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
     // an empty map still refuses every host that is not on this machine: no scenario downloads
     // anything real, whether or not it fakes a host
     SPAWNLOFT_TEST_ORIGINS: origins ?? '{}',
+    // the system scheduler's programs played by the fake (C6): no scenario reaches the machine's
+    // own Task Scheduler, launchd or systemd, and a missing fake fails to start rather than
+    // falling through to the real one
+    SPAWNLOFT_TEST_SCHEDULER: ctx.scheduler ?? path.join(ctx.run, 'no-fake-scheduler'),
+    FAKE_SCHEDULER_DIR: path.join(ctx.run, 'scheduler'),
     // `spawnloft ui` hands its page to $BROWSER; Node given an HTML file stops at once
     BROWSER: process.execPath,
     TZ: 'UTC',
@@ -167,7 +180,7 @@ function checkExpect(step, result, side, label) {
 async function runSide(scenario, side, o) {
   const run = path.join(o.scratch, 'run')
   fs.rmSync(run, { recursive: true, force: true })
-  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo }
+  const ctx = { run, data: path.join(run, 'data'), home: path.join(run, 'home'), repo: o.repo, scheduler: findFakeScheduler(o.core) }
   fs.mkdirSync(ctx.data, { recursive: true })
   fs.mkdirSync(ctx.home, { recursive: true })
   const extra = scenario.normalize ?? []
@@ -305,7 +318,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   // the switch and the host map are the rig's to set: a scenario that set them could make both
   // sides the same core, or let one side reach the network
   for (const env of [scenario.env, ...scenario.steps.map(s => s.env)]) {
-    for (const k of Object.keys(env ?? {})) if ([IMPL_ENV, 'SPAWNLOFT_TEST_ORIGINS'].includes(k)) throw new Error(`${scenario.name}: a scenario may not set ${k}`)
+    for (const k of Object.keys(env ?? {})) if ([IMPL_ENV, 'SPAWNLOFT_TEST_ORIGINS', 'SPAWNLOFT_TEST_SCHEDULER', 'FAKE_SCHEDULER_DIR'].includes(k)) throw new Error(`${scenario.name}: a scenario may not set ${k}`)
   }
   fs.mkdirSync(scratch, { recursive: true })
   const hosts = await startHosts(scenario.hosts ?? {}, { baseDir })

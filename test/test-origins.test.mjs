@@ -6,9 +6,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { parseOrigins, rewriteUrl, install, ORIGINS_ENV } from '../src/test-origins.mjs'
+import { parseOrigins, rewriteUrl, install, ORIGINS_ENV, installScheduler, SCHEDULER_ENV } from '../src/test-origins.mjs'
 import { startHosts } from '../tools/parity/lib/fake-host.mjs'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -101,4 +101,32 @@ test('a redirect is followed one hop at a time, and one to a host with no fake i
   assert.equal(out.hop, 'ok')
   assert.match(out.away, /has no fake for https:\/\/example\.invalid; the request was not sent/)
   assert.deepEqual(out.seen, ['/hop', '/ok', '/away'])
+})
+
+test('SPAWNLOFT_TEST_SCHEDULER runs the stand-in for the scheduler tools, with NODE_ENV=test only', async () => {
+  assert.equal(installScheduler({ [SCHEDULER_ENV]: 'x' }), false)
+  assert.equal(installScheduler({ NODE_ENV: 'test' }), false)
+  // the stand-in is Node itself, and the tool's name a script beside it that prints its arguments
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-sched-'))
+  try {
+    for (const tool of ['launchctl', 'systemctl']) fs.writeFileSync(path.join(dir, tool), `console.log(JSON.stringify([${JSON.stringify(tool)}, ...process.argv.slice(2)]))`)
+    const script = `
+      await import(${JSON.stringify(new URL('../src/test-origins.mjs', import.meta.url).href)})
+      const { spawnSync, execFile } = await import('node:child_process')
+      const a = spawnSync('/bin/launchctl', ['print', 'gui/1/x'], { encoding: 'utf8' }).stdout.trim()
+      const b = await new Promise(r => execFile('systemctl', ['--user', 'show'], { encoding: 'utf8' }, (e, out) => r(out.trim())))
+      const c = spawnSync(process.execPath, ['-e', 'console.log(1)'], { encoding: 'utf8' }).stdout.trim()
+      console.log(JSON.stringify([a, b, c]))
+    `
+    const res = spawnSync(process.execPath, ['--input-type=module', '-e', script],
+      { cwd: dir, encoding: 'utf8', env: { ...process.env, NODE_ENV: 'test', [SCHEDULER_ENV]: process.execPath }, windowsHide: true })
+    assert.equal(res.status, 0, res.stderr)
+    assert.deepEqual(JSON.parse(res.stdout.trim().split('\n').pop()), [
+      '["launchctl","print","gui/1/x"]',
+      '["systemctl","--user","show"]',
+      '1',
+    ])
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })

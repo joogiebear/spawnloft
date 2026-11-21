@@ -1,0 +1,396 @@
+{
+ "about": "C6's `data`: `move` (its usage errors and every refusal: inside the folder, holding it, not empty, not a folder, the folder itself, a move already made, an interrupted one), the dry run as text and --json, a same-drive move with --yes (the folder renamed, a link left, its scheduled task paused and switched back on through the fake scheduler), `status` as text and --json before and after, `finish` with and without --yes, `rollback` refused without a record and after a finished move, and a move interrupted at \"moving\" put back.",
+ "normalize": [
+  {
+   "pattern": "Moved in [0-9.]+s",
+   "replace": "Moved in <n>s"
+  },
+  {
+   "pattern": "\\b[0-9.]+ (B|KB)\\b",
+   "replace": "<size>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/a/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/a/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/backups/a/notes.txt",
+   "text": "n"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "a": {
+      "dir": "{data}/instances/a",
+      "jar": "server.jar",
+      "memory": "1G",
+      "port": 47891,
+      "rcon": {
+       "port": 47892,
+       "password": "test"
+      }
+     }
+    }
+   }
+  },
+  {
+   "write": "full/somebody.txt",
+   "text": "theirs"
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "a",
+    "--daily",
+    "04:00"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "data"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "data",
+    "frob"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--bogus"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status",
+    "extra"
+   ],
+   "expect": {
+    "code": 2
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{data}/inner"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "is inside the folder being moved"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "the data folder is inside"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/full"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "is not empty"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/full/somebody.txt"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "exists and is not a folder"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{data}"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "that is the data folder already"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/moved"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Nothing was changed"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "finish"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "data",
+    "rollback"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "an ordinary folder"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/moved",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "is a link to it"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/again"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "is already a link"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "finished"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "data",
+    "rollback"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "run": [
+    "task",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "data",
+    "finish"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "no parked original"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "finish",
+    "--yes"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Cleared the record"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data.move.json",
+   "json": {
+    "version": 1,
+    "from": "{data}",
+    "to": "{run}/moved",
+    "mode": "rename",
+    "step": "moving",
+    "destExisted": false,
+    "parked": null,
+    "pausedTasks": [],
+    "privateAside": [],
+    "startedAt": "2026-11-01T10:00:00.000Z"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "stopped at \"moving\""
+   }
+  },
+  {
+   "run": [
+    "data",
+    "move",
+    "{run}/third"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "interrupted at \"moving\""
+   }
+  },
+  {
+   "run": [
+    "data",
+    "rollback"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "Put back."
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "an ordinary folder"
+   }
+  },
+  {
+   "run": [
+    "data",
+    "status",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

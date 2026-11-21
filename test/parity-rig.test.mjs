@@ -215,8 +215,8 @@ test('a step for one side only is refused outside a self-test', async () => {
   }
 })
 
-test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two and C5\'s one, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 18)
+test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two and C5\'s three, each with a way it is held', () => {
+  assert.equal(DECLARED.length, 20)
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'

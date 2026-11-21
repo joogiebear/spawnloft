@@ -78,7 +78,7 @@ fn exists(p: &str) -> bool {
 }
 
 /// `fs.rmSync(file, { force: true })`: a missing file is fine, anything else is thrown.
-fn rm_force(file: &str) -> Result<(), Failure> {
+pub(crate) fn rm_force(file: &str) -> Result<(), Failure> {
     if std::fs::symlink_metadata(file).is_ok_and(|m| m.is_dir()) {
         return Err(Failure::Internal {
             head: "SystemError [ERR_FS_EISDIR]".into(),

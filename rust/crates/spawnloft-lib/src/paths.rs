@@ -60,7 +60,7 @@ pub fn env_var(name: &str) -> Option<String> {
     None
 }
 
-fn home() -> PathBuf {
+pub fn home() -> PathBuf {
     std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
@@ -72,7 +72,7 @@ fn env_dir(name: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-fn config_base() -> PathBuf {
+pub fn config_base() -> PathBuf {
     if cfg!(windows) {
         env_dir("APPDATA").unwrap_or_else(|| home().join("AppData").join("Roaming"))
     } else {

@@ -128,6 +128,14 @@ pub fn forget_managed(inst: &Instance, file: &str) -> Result<(), Failure> {
     let mut store = read_managed(inst)?;
     let removed = match store.get_mut("managed") {
         Some(Value::Object(m)) => m.shift_remove(file).is_some(),
+        // `delete arr[i]` leaves a hole, which the store is written with as null
+        Some(Value::Array(a)) => match file.parse::<usize>() {
+            Ok(i) if crate::jsjson::is_index_key(file) && i < a.len() => {
+                a[i] = Value::Null;
+                true
+            }
+            _ => false,
+        },
         _ => false,
     };
     if removed {
@@ -661,7 +669,7 @@ pub fn js_sort<T: Clone>(
 
 /// `safePluginPath(dir, file)`: the name arrives over HTTP; only a plain jar name inside the
 /// plugins folder is allowed.
-fn safe_plugin_path(dir: &str, file: &str) -> Result<String, Failure> {
+pub(crate) fn safe_plugin_path(dir: &str, file: &str) -> Result<String, Failure> {
     let stem = file
         .strip_suffix(".jar.disabled")
         .or_else(|| file.strip_suffix(".jar"));
@@ -755,4 +763,4 @@ pub fn remove_plugin(data_root: &str, by: &Actor, inst: &Instance, file: &str) -
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
