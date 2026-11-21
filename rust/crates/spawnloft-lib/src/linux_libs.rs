@@ -35,9 +35,12 @@ pub fn library_env(binary_path: &str, env: &mut Vec<(String, String)>) {
 mod tests {
     #[test]
     fn the_libs_folder_is_beside_bin() {
-        assert_eq!(
-            super::libs_dir_for("/e/mysql-8/bin/mysqld"),
+        // path.join's separator: a backslash on Windows, as in Node
+        let want = if cfg!(windows) {
+            format!("\\e\\mysql-8\\{}", super::LIBS_FOLDER)
+        } else {
             format!("/e/mysql-8/{}", super::LIBS_FOLDER)
-        );
+        };
+        assert_eq!(super::libs_dir_for("/e/mysql-8/bin/mysqld"), want);
     }
 }
