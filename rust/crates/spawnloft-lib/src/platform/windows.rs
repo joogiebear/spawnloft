@@ -1517,6 +1517,120 @@ pub fn same_entry(a: &std::path::Path, b: &std::path::Path) -> bool {
     matches!((id(a), id(b)), (Some(x), Some(y)) if x == y && (x.1, x.2) != (0, 0))
 }
 
+/// `fs.statSync(p).dev` on Windows: the volume's serial number.
+pub fn device_of(p: &std::path::Path) -> Option<u64> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, GetFileInformationByHandle,
+    };
+    let f = std::fs::OpenOptions::new()
+        .access_mode(0)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(p)
+        .ok()?;
+    // SAFETY: a plain-data struct the call fills, for a handle that stays open meanwhile
+    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+    let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle() as _, &mut info) };
+    (ok != 0).then_some(u64::from(info.dwVolumeSerialNumber))
+}
+
+/// A folder's access and modified times set: the folder opened for its attributes only.
+pub fn set_dir_times(dir: &std::path::Path, times: std::fs::FileTimes) -> std::io::Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, FILE_WRITE_ATTRIBUTES};
+    std::fs::OpenOptions::new()
+        .access_mode(FILE_WRITE_ATTRIBUTES)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(dir)?
+        .set_times(times)
+}
+
+/// `fs.statfsSync(p)` on Windows: the bytes this user may still write on that volume.
+pub fn free_bytes(p: &std::path::Path) -> Option<u64> {
+    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let mut path = wide(&p.to_string_lossy());
+    if path.last() == Some(&0) {
+        path.pop();
+    }
+    path.push(0);
+    let mut avail = 0u64;
+    // SAFETY: a NUL-terminated path; the two totals not wanted are null, as the call allows
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            path.as_ptr(),
+            &mut avail,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    (ok != 0).then_some(avail)
+}
+
+/// `fs.symlinkSync(target, at, 'junction')`: a folder at `at` made a mount point leading to the
+/// absolute folder `target`. Needs no elevation, unlike a folder symlink.
+pub fn make_junction(target: &std::path::Path, at: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT};
+    use windows_sys::Win32::System::IO::DeviceIoControl;
+    const FSCTL_SET_REPARSE_POINT: u32 = 0x0009_00A4;
+    const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
+    let full = std::path::absolute(target)?;
+    let mut text = full.to_string_lossy().into_owned();
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        text = rest.to_string();
+    }
+    let sub: Vec<u16> = format!(r"\??\{text}").encode_utf16().collect();
+    let print: Vec<u16> = text.encode_utf16().collect();
+    let bytes = |v: &[u16]| {
+        u16::try_from(v.len() * 2).map_err(|_| std::io::Error::other("the path is too long for a junction"))
+    };
+    let (sub_len, print_len) = (bytes(&sub)?, bytes(&print)?);
+    // header: tag, data length, reserved; then the four offsets and lengths, then both names
+    let data_len = 8 + sub_len + 2 + print_len + 2;
+    let mut buf: Vec<u8> = Vec::with_capacity(8 + usize::from(data_len));
+    buf.extend_from_slice(&IO_REPARSE_TAG_MOUNT_POINT.to_le_bytes());
+    buf.extend_from_slice(&data_len.to_le_bytes());
+    buf.extend_from_slice(&0u16.to_le_bytes());
+    buf.extend_from_slice(&0u16.to_le_bytes());
+    buf.extend_from_slice(&sub_len.to_le_bytes());
+    buf.extend_from_slice(&(sub_len + 2).to_le_bytes());
+    buf.extend_from_slice(&print_len.to_le_bytes());
+    for c in sub.iter().chain(&[0]).chain(&print).chain(&[0]) {
+        buf.extend_from_slice(&c.to_le_bytes());
+    }
+    std::fs::create_dir(at)?;
+    let set = (|| {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
+            .open(at)?;
+        let mut returned = 0u32;
+        // SAFETY: the buffer is a complete REPARSE_DATA_BUFFER of the length given, for a handle
+        // that stays open for the call
+        let ok = unsafe {
+            DeviceIoControl(
+                f.as_raw_handle() as _,
+                FSCTL_SET_REPARSE_POINT,
+                buf.as_ptr().cast(),
+                u32::try_from(buf.len()).unwrap_or(u32::MAX),
+                std::ptr::null_mut(),
+                0,
+                &mut returned,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    })();
+    if set.is_err() {
+        let _ = std::fs::remove_dir(at);
+    }
+    set
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

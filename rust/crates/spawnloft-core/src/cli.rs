@@ -278,6 +278,10 @@ pub const PORTED: &[Row] = &[
         names: &["uninstall"],
         when: When::Always,
     },
+    Row {
+        names: &["data"],
+        when: When::Always,
+    },
     // C7: the client launcher, a group of subcommands at a time
     Row {
         names: &["client"],
@@ -825,6 +829,7 @@ mod tests {
             &["repair", "--json"],
             &["uninstall"],
             &["uninstall", "--data"],
+            &["data", "status"],
         ] {
             assert!(
                 !forwards_with(&os(line), false, PORTED),

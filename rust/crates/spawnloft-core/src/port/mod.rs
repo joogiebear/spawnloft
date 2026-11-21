@@ -19,6 +19,7 @@ mod client;
 mod config;
 mod configure;
 mod create;
+mod data;
 mod db;
 mod fetch;
 mod lifecycle;
@@ -151,8 +152,11 @@ fn dispatch(
             "--json is not supported for {command}; no action was performed"
         )));
     }
-    // not for `data`, which is not ported; every other command makes its folders first
-    layout.ensure_dirs()?;
+    // not for `data`: it is what puts things right after a move was interrupted, when the data
+    // folder is not there, and making its folders again - empty - is the very thing in its way
+    if command != "data" {
+        layout.ensure_dirs()?;
+    }
     match command {
         "help" => {
             ctx.out.print(HELP);
@@ -199,6 +203,7 @@ fn dispatch(
         "rename" => tasks::rename(&mut ctx),
         "repair" => maintenance::repair(&mut ctx),
         "uninstall" => maintenance::uninstall(&mut ctx),
+        "data" => data::data(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),
