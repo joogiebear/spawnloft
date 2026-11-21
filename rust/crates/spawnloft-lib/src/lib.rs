@@ -48,6 +48,8 @@ pub mod panel_auth;
 pub mod paths;
 pub mod patterns;
 pub mod platform;
+pub mod plugin_actions;
+pub mod plugin_sources;
 pub mod plugins;
 pub mod private_files;
 pub mod procid;

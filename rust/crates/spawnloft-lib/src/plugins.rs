@@ -669,7 +669,7 @@ pub fn js_sort<T: Clone>(
 
 /// `safePluginPath(dir, file)`: the name arrives over HTTP; only a plain jar name inside the
 /// plugins folder is allowed.
-fn safe_plugin_path(dir: &str, file: &str) -> Result<String, Failure> {
+pub(crate) fn safe_plugin_path(dir: &str, file: &str) -> Result<String, Failure> {
     let stem = file
         .strip_suffix(".jar.disabled")
         .or_else(|| file.strip_suffix(".jar"));

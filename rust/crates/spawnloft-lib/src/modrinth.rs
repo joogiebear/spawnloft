@@ -93,8 +93,21 @@ fn is_timeout(e: &ureq::Error) -> bool {
     }
 }
 
+/// A stand-in network for this crate's tests: set, every [`send`] on this thread asks it.
+#[cfg(test)]
+pub(crate) type FakeNet = Box<dyn FnMut(&Request<'_>) -> Result<Reply, Lost>>;
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FAKE: std::cell::RefCell<Option<FakeNet>> = const { std::cell::RefCell::new(None) };
+}
+
 /// The network.
 pub fn send(req: &Request<'_>) -> Result<Reply, Lost> {
+    #[cfg(test)]
+    if let Some(answer) = FAKE.with(|f| f.borrow_mut().as_mut().map(|f| f(req))) {
+        return answer;
+    }
     // `fetch` refuses text that is not a URL before anything is sent
     if url::Url::parse(req.url).is_err() {
         return Err(Lost::Failed("Invalid URL".into()));
@@ -213,7 +226,7 @@ pub fn prop<'a>(base: Option<&'a Value>, key: &str) -> Result<Option<&'a Value>,
 
 /// `list.includes(x)` for a string `x`: an array's strict equality, a string's substring search,
 /// anything else not a function.
-fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> {
+pub fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> {
     match list {
         Some(Value::Array(items)) => Ok(items.iter().any(|v| v.as_str() == Some(x))),
         Some(Value::String(s)) => Ok(s.contains(x)),
@@ -223,7 +236,7 @@ fn includes(list: Option<&Value>, x: &str, expr: &str) -> Result<bool, Failure> 
 }
 
 /// The items of `list` for an array method `method`.
-fn items<'a>(list: Option<&'a Value>, method: &str, expr: &str) -> Result<&'a [Value], Failure> {
+pub fn items<'a>(list: Option<&'a Value>, method: &str, expr: &str) -> Result<&'a [Value], Failure> {
     match list {
         Some(Value::Array(items)) => Ok(items),
         None | Some(Value::Null) => Err(no_props(list, method)),
@@ -273,7 +286,8 @@ pub fn primary_file(version: &Value) -> Result<Option<Value>, Failure> {
             return Ok(Some(f.clone()));
         }
     }
-    Ok(files.first().filter(|f| !f.is_null()).cloned())
+    // `files[0] ?? null`, which every caller then tests with `!file`
+    Ok(files.first().filter(|f| js::truthy(Some(f))).cloned())
 }
 
 /// `new URLSearchParams({ key: value }).toString()` for one pair.
@@ -341,6 +355,9 @@ mod tests {
             "a.jar"
         );
         assert_eq!(primary_file(&json!({"files": []})).unwrap(), None);
+        // `files[0] ?? null` is 0 or false, which every caller reads as no file
+        assert_eq!(primary_file(&json!({"files": [0]})).unwrap(), None);
+        assert_eq!(primary_file(&json!({"files": [false]})).unwrap(), None);
     }
 
     #[test]
