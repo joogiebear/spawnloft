@@ -466,13 +466,19 @@ mod db_tests {
 
     #[test]
     fn the_url_carries_the_password_encoded() {
-        assert_eq!(encode_uri_component("a b/c:d@é!*'()~"), "a%20b%2Fc%3Ad%40%C3%A9!*'()~");
+        assert_eq!(
+            encode_uri_component("a b/c:d@é!*'()~"),
+            "a%20b%2Fc%3Ad%40%C3%A9!*'()~"
+        );
         let inst = crate::registry::spread("kv", &json!({ "port": 6380, "root": { "password": "p w" } }));
         let rec = new_record("smp", &inst);
         assert_eq!(rec["keyPrefix"], "smp:");
         let c = credentials_for(&inst, &rec);
         assert_eq!(c[0], ("url".to_string(), json!("redis://:p%20w@127.0.0.1:6380")));
         let open = crate::registry::spread("kv", &json!({ "port": 6380, "root": {} }));
-        assert_eq!(credentials_for(&open, &json!({}))[0].1, json!("redis://127.0.0.1:6380"));
+        assert_eq!(
+            credentials_for(&open, &json!({}))[0].1,
+            json!("redis://127.0.0.1:6380")
+        );
     }
 }
