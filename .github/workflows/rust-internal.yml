@@ -246,15 +246,16 @@ jobs:
             rust/target
           key: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-parity-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core with the test hooks, and the lock and registry probes
+      - name: Build spawnloft-core with the test hooks, and the lock, registry and zip probes
         working-directory: rust
         run: |
           cargo build --locked -p spawnloft-core --features test-hooks
-          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe
+          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe --bin zip-probe
           exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
           echo "SPAWNLOFT_LOCK_PROBE=$GITHUB_WORKSPACE/rust/target/debug/lock-probe$exe" >> "$GITHUB_ENV"
           echo "SPAWNLOFT_REGISTRY_PROBE=$GITHUB_WORKSPACE/rust/target/debug/registry-probe$exe" >> "$GITHUB_ENV"
+          echo "SPAWNLOFT_ZIP_PROBE=$GITHUB_WORKSPACE/rust/target/debug/zip-probe$exe" >> "$GITHUB_ENV"
       - name: The library's tests with the test hooks on
         working-directory: rust
         run: cargo test --locked -p spawnloft-lib --features test-hooks
@@ -262,16 +263,116 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: node tools/parity/run.mjs --core "$SPAWNLOFT_CORE_BIN" --out parity-report
-      - name: The rig's own tests and the cross-process lock and registry tests
+      - name: The rig's own tests and the cross-process lock, registry and zip tests
         env:
           TMPDIR: ${{ runner.temp }}
-        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs test/zip-cross-process.test.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: parity-report-${{ github.run_number }}-${{ runner.os }}-${{ runner.arch }}
           retention-days: 14
           path: parity-report/
+
+  zip-fuzz:
+    # The cargo-fuzz targets of the zip readers (rust/fuzz), a minute each, seeded with archives
+    # both writers make. Nightly is pinned by date; the targets never ship.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NIGHTLY: nightly-2026-11-01
+      CARGO_FUZZ_VERSION: 0.13.2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install the pinned nightly and cargo-fuzz
+        working-directory: rust
+        run: |
+          rustup toolchain install "$NIGHTLY" --profile minimal
+          rustup toolchain install
+          cargo install cargo-fuzz --locked --version "$CARGO_FUZZ_VERSION"
+      - name: Seed archives from both writers
+        working-directory: rust
+        run: |
+          cargo build --locked -p spawnloft-fakes --bin zip-probe
+          seed="$RUNNER_TEMP/seed"; mkdir -p "$seed/src/w/d" fuzz/corpus/zip_read
+          printf 'level %.0s' $(seq 500) > "$seed/src/w/level.dat"
+          echo hi > "$seed/src/w/d/ü.txt"; : > "$seed/src/w/empty"
+          for z in "" --zip64; do
+            node ../test/fixtures/zip-node-probe.mjs create "fuzz/corpus/zip_read/node$z.zip" "$seed/src" $z -- w
+            target/debug/zip-probe create "fuzz/corpus/zip_read/rust$z.zip" "$seed/src" $z -- w
+          done
+      - name: Fuzz the zip readers
+        working-directory: rust/fuzz
+        run: |
+          cargo "+$NIGHTLY" fuzz run zip_read corpus/zip_read -- -max_total_time=60 -rss_limit_mb=2048
+          cargo "+$NIGHTLY" fuzz run zip_inflate -- -max_total_time=60 -rss_limit_mb=2048
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: zip-fuzz-${{ github.run_number }}
+          retention-days: 14
+          path: rust/fuzz/artifacts/
+
+  musl-network:
+    # The C1 network checks (rust/PLAN-CORE-PORT.md, phase C1): the static musl build resolves
+    # names and makes TLS connections with its bundled roots, on x64 and arm64, on the runner and
+    # in containers with no CA store; and it ignores proxy variables, as Node's fetch does.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            triple: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            triple: aarch64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      URLS: https://piston-meta.mojang.com/mc/game/version_manifest_v2.json https://github.com/joogiebear/spawnloft
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install the pinned toolchain, the static target and the musl C compiler
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          triple='${{ matrix.triple }}'
+          echo "CC_${triple//-/_}=musl-gcc" >> "$GITHUB_ENV"
+      - name: Build the probe static
+        working-directory: rust
+        run: |
+          cargo build --locked --release -p spawnloft-fakes --bin net-probe --target ${{ matrix.triple }}
+          probe="$GITHUB_WORKSPACE/rust/target/${{ matrix.triple }}/release/net-probe"
+          file "$probe"
+          file "$probe" | grep -q 'statically linked'
+          echo "PROBE=$probe" >> "$GITHUB_ENV"
+      - name: Names and TLS on the runner
+        run: $PROBE $URLS
+      - name: Names and TLS with no CA store (Debian slim, Alpine)
+        run: |
+          for image in debian:12-slim alpine:3.20; do
+            # whatever store the image has is removed first: the probe must not need one
+            docker run --rm -v "$PROBE:/probe:ro" "$image" sh -c 'rm -rf /etc/ssl /usr/share/ca-certificates /etc/ca-certificates && exec /probe "$@"' probe $URLS
+          done
+      - name: Proxy variables are ignored by both sides
+        run: |
+          refuse=http://127.0.0.1:9
+          for v in ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do export "$v=$refuse"; done
+          unset NO_PROXY no_proxy
+          $PROBE $URLS
+          for url in $URLS; do
+            node -e 'fetch(process.argv[1]).then(r => { if (!r.ok) process.exit(1); console.log(JSON.stringify({ url: process.argv[1], status: r.status })) })' "$url"
+          done
 
   node:
     # The whole Node suite, once per platform, on the default daemon.

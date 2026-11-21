@@ -1,0 +1,36 @@
+# cargo-fuzz targets for the readers of outside bytes (rust/PLAN-CORE-PORT.md section 6, layer 6).
+# Outside the workspace: it builds only on nightly, under cargo-fuzz, and never ships.
+#
+#   cargo install cargo-fuzz --locked
+#   cd rust/fuzz && cargo +nightly fuzz run zip_read -- -max_total_time=60
+#
+# CI runs each target for a minute (rust-internal.yml, the zip-fuzz job), seeded with archives
+# both zip writers make; a crashing input is kept as that run's artifact.
+[package]
+name = "spawnloft-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.10"
+spawnloft-lib = { path = "../crates/spawnloft-lib" }
+
+[[bin]]
+name = "zip_read"
+path = "fuzz_targets/zip_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zip_inflate"
+path = "fuzz_targets/zip_inflate.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

@@ -209,6 +209,19 @@ pub fn kill_group(pid: i32) {
     }
 }
 
+/// `sig` (SIGTERM or SIGKILL by name) to the group `pid` leads when `group`, else, or when there
+/// is no such group, to the process alone (cancel.mjs `killTree`).
+pub fn signal_tree(pid: i32, hard: bool, group: bool) {
+    if pid <= 1 {
+        return;
+    }
+    let sig = if hard { SIGKILL } else { SIGTERM };
+    if group && send(-pid, sig) {
+        return;
+    }
+    send(pid, sig);
+}
+
 /// SIGTERM to the process alone (Garnet's stop after its checkpoint).
 pub fn terminate(child: &mut Child) {
     send(child.id() as i32, SIGTERM);

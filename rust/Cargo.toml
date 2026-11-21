@@ -9,6 +9,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/spawnloft-lib", "crates/spawnloft-core", "crates/spawnloft-fakes", "crates/spawnloft-shell"]
+# the cargo-fuzz targets build on nightly only, under their own lockfile
+exclude = ["fuzz"]
 
 [workspace.package]
 # The version a local build prints. CI overrides it per run with SPAWNLOFT_VERSION
