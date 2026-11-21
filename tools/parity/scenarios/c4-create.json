@@ -107,6 +107,69 @@
   {
    "run": [
     "jars",
+    "import",
+    "{data}/jars/custom.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{data}/jars/custom.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "hardlink": "in/linked.jar",
+   "to": "data/jars/custom.jar"
+  },
+  {
+   "run": [
+    "jars",
+    "import",
+    "{run}/in/linked.jar",
+    "--as",
+    "custom.jar"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "remove": "in/linked.jar"
+  },
+  {
+   "write": "data/jars/old.jar",
+   "text": "OLD",
+   "mtime": "1960-05-05T00:00:00Z"
+  },
+  {
+   "write": "data/jars/edge.jar",
+   "text": "EDGE",
+   "mtime": "1969-12-31T23:59:59.500Z"
+  },
+  {
+   "run": [
+    "jars"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": [
+     "1960-05-05",
+     "1969-12-31"
+    ]
+   }
+  },
+  {
+   "run": [
+    "jars",
     "list",
     "--json"
    ],
@@ -719,6 +782,53 @@
    ],
    "expect": {
     "code": 1
+   }
+  },
+  {
+   "write": "data/templates/t7/template.json",
+   "text": "{\"name\": true, \"jar\": \"custom.jar\"}"
+  },
+  {
+   "run": [
+    "new",
+    "m",
+    "--template",
+    "--java",
+    "java"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "new",
+    "mb",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java",
+    "--memory",
+    "4G\u0085"
+   ],
+   "expect": {
+    "code": 1,
+    "stderrIncludes": "invalid memory"
+   }
+  },
+  {
+   "run": [
+    "new",
+    "mc",
+    "--jar",
+    "custom.jar",
+    "--java",
+    "java",
+    "--memory",
+    "\ufeff4G"
+   ],
+   "expect": {
+    "code": 0
    }
   },
   {

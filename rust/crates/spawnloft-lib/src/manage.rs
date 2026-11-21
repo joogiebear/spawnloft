@@ -34,7 +34,14 @@ pub struct Rebuilt {
 fn rm_rf(target: &Path) -> Result<(), Failure> {
     let res = match std::fs::symlink_metadata(target) {
         Ok(m) if m.is_dir() => std::fs::remove_dir_all(target),
-        Ok(_) => std::fs::remove_file(target),
+        // a junction or folder link on Windows is removed with rmdir, as rmSync falls back to
+        Ok(_) => std::fs::remove_file(target).or_else(|e| {
+            if cfg!(windows) && e.kind() != std::io::ErrorKind::NotFound {
+                std::fs::remove_dir(target).map_err(|_| e)
+            } else {
+                Err(e)
+            }
+        }),
         Err(_) => return Ok(()),
     };
     match res {
@@ -145,10 +152,10 @@ pub fn reveal(
     folder: Option<&str>,
 ) -> Result<String, Failure> {
     let inst: Instance = registry::lookup(Path::new(&layout.registry_file), name)?;
-    let dir = crate::create::path_arg(inst.get("dir"), "path")?.to_string();
+    // without a sub the record's dir is used as it is, `undefined` and all
     let mut target = match sub {
-        Some(s) if SUBS.contains(&s) => jspath::join(&[&dir, s]),
-        _ => dir,
+        Some(s) if SUBS.contains(&s) => jspath::join(&[crate::create::path_arg(inst.get("dir"), "path")?, s]),
+        _ => crate::js::string(inst.get("dir")),
     };
     if let Some(f) = folder.filter(|f| !f.is_empty()) {
         let r = files::resolve_path(&inst, Some(f), true, true)?;

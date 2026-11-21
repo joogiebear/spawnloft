@@ -88,6 +88,20 @@ pub fn stray_jars(dir: &str, current: &str) -> Vec<(String, u64)> {
 
 /// `fs.copyFileSync(src, dest)`, with Node's error: `ENOENT: ..., copyfile 'a' -> 'b'`.
 pub fn copyfile(src: &Path, dest: &Path) -> Result<(), Failure> {
+    // libuv returns early when both name the same file (the same path, a hard link, a link into
+    // the store); `std::fs::copy` would truncate the destination first and empty it. Windows'
+    // CopyFileW is what both sides call there.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Ok(a), Ok(b)) = (std::fs::metadata(src), std::fs::metadata(dest))
+            && a.is_file()
+            && a.dev() == b.dev()
+            && a.ino() == b.ino()
+        {
+            return Ok(());
+        }
+    }
     std::fs::copy(src, dest).map(|_| ()).map_err(|e| {
         // the standard library refuses a folder before asking the system; libuv opens it and
         // the system answers EISDIR
@@ -154,8 +168,11 @@ pub fn list_jars(jars_dir: &str) -> Result<Vec<StoredJar>, Failure> {
             let mtime_ms = m
                 .modified()
                 .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| (d.as_micros() / 1000) as f64)
+                .map(|t| match t.duration_since(std::time::UNIX_EPOCH) {
+                    Ok(d) => (d.as_micros() / 1000) as f64,
+                    // before 1970: Node's mtimeMs is negative
+                    Err(e) => -((e.duration().as_micros() as f64 / 1000.0).ceil()),
+                })
                 .unwrap_or(0.0);
             out.push(StoredJar {
                 name,
@@ -289,9 +306,7 @@ pub fn list_templates(templates_dir: &str) -> Result<Vec<Map<String, Value>>, Fa
     let dir = Path::new(templates_dir);
     crate::fsx::mkdir_all(dir)?;
     let mut out = Vec::new();
-    for (name, kind) in
-        crate::fsx::readdir_typed(dir).map_err(|e| Failure::io(&e, "scandir", Some(dir)))?
-    {
+    for (name, kind) in crate::fsx::readdir_typed(dir).map_err(|e| Failure::io(&e, "scandir", Some(dir)))? {
         if !kind.is_dir() {
             continue;
         }
@@ -317,9 +332,7 @@ pub fn list_templates(templates_dir: &str) -> Result<Vec<Map<String, Value>>, Fa
 /// left out at every depth; links, FIFOs and the rest are not copied.
 pub fn copy_tree(src: &Path, dest: &Path, skip: &[String]) -> Result<(), Failure> {
     crate::fsx::mkdir_all(dest)?;
-    for (name, kind) in
-        crate::fsx::readdir_typed(src).map_err(|e| Failure::io(&e, "scandir", Some(src)))?
-    {
+    for (name, kind) in crate::fsx::readdir_typed(src).map_err(|e| Failure::io(&e, "scandir", Some(src)))? {
         if skip.contains(&name) {
             continue;
         }
@@ -505,8 +518,8 @@ pub fn new_instance(layout: &Layout, by: &Actor, name: &str, o: NewOptions) -> R
     let dir = registry::default_dir(&layout.instances_dir, name);
     let dir_path = Path::new(&dir);
     if dir_path.exists() {
-        let names = crate::fsx::readdir_names(dir_path)
-            .map_err(|e| Failure::io(&e, "scandir", Some(dir_path)))?;
+        let names =
+            crate::fsx::readdir_names(dir_path).map_err(|e| Failure::io(&e, "scandir", Some(dir_path)))?;
         if !names.is_empty() {
             return Err(Failure::user(format!(
                 "directory already exists and is not empty: {dir}"
@@ -536,7 +549,7 @@ pub fn new_instance(layout: &Layout, by: &Actor, name: &str, o: NewOptions) -> R
     } else if js::truthy(Some(&o.template)) {
         let tpl = list_templates(&layout.templates_dir)?
             .into_iter()
-            .find(|t| matches!((t.get("name"), &o.template), (Some(Value::String(a)), Value::String(b)) if a == b));
+            .find(|t| js::strict_equals(t.get("name"), Some(&o.template)));
         let Some(tpl) = tpl else {
             return Err(Failure::user(format!(
                 "no template named \"{}\" - see: spawnloft templates",
@@ -551,7 +564,11 @@ pub fn new_instance(layout: &Layout, by: &Actor, name: &str, o: NewOptions) -> R
 
     // NeoForge has no jar to place: its installer runs after the instance exists and the caller
     // records the starter jar it produces
-    let chosen = if o.jar.is_null() { source_jar } else { o.jar.clone() };
+    let chosen = if o.jar.is_null() {
+        source_jar
+    } else {
+        o.jar.clone()
+    };
     let chosen_jar = js::truthy(Some(&chosen));
     if !chosen_jar && o.loader != "neoforge" {
         let have = list_jars(&layout.jars_dir)?
@@ -698,9 +715,17 @@ pub fn adopt_instance(
                     .any(|w| l.contains(w))
             })
             .collect();
-        let pool: Vec<&String> = if preferred.is_empty() { jars.iter().collect() } else { preferred };
+        let pool: Vec<&String> = if preferred.is_empty() {
+            jars.iter().collect()
+        } else {
+            preferred
+        };
         match pool.as_slice() {
-            [] => return Err(Failure::user(format!("no .jar found in {abs} - pass --jar <file>"))),
+            [] => {
+                return Err(Failure::user(format!(
+                    "no .jar found in {abs} - pass --jar <file>"
+                )));
+            }
             [one] => json!(one),
             many => {
                 let list: Vec<&str> = many.iter().map(|s| s.as_str()).collect();
@@ -818,7 +843,12 @@ pub fn save_template(
         }
     }
     meta.insert("includesWorlds".into(), json!(include_worlds));
-    meta.insert("sourceInstance".into(), json!(inst.name));
+    // `inst.name`: the record's own name when it carries one, whatever its type
+    let source = match inst.get("name") {
+        Some(v) => v.clone(),
+        None => json!(inst.name),
+    };
+    meta.insert("sourceInstance".into(), source);
     meta.insert("createdAt".into(), json!(crate::time::iso_now()));
     let file = jspath::join(&[&dest, "template.json"]);
     std::fs::write(

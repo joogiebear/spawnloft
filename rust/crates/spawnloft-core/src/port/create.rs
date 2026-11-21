@@ -122,9 +122,7 @@ pub fn clone(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     };
     let memory = match flag_value(ctx, "memory") {
         // the source's own, read before anything else (an absent one is the default)
-        Value::Null => registry::lookup(registry_file(ctx), &src)?
-            .get("memory")
-            .cloned(),
+        Value::Null => registry::lookup(registry_file(ctx), &src)?.get("memory").cloned(),
         v => Some(v),
     };
     let motd = match flag_value(ctx, "motd") {
@@ -147,8 +145,7 @@ pub fn clone(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     } else {
         " (fresh worlds)"
     };
-    ctx.out
-        .line(&format!("Cloned \"{src}\" -> \"{dst}\"{worlds}"));
+    ctx.out.line(&format!("Cloned \"{src}\" -> \"{dst}\"{worlds}"));
     ctx.out
         .line(&made_table(&made, &["directory:", "port:", "rcon port:"]));
     ctx.out.line("");
@@ -196,13 +193,13 @@ pub fn templates(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         };
         let inst = registry::lookup(registry_file(ctx), &inst_name)?;
         let dest = create::save_template(ctx.layout, &inst, &tpl, truthy(ctx, "withWorlds"))?;
-        ctx.out
-            .line(&format!("Saved template \"{tpl}\" -> {dest}"));
+        ctx.out.line(&format!("Saved template \"{tpl}\" -> {dest}"));
         return Ok(());
     }
     let tpls = create::list_templates(&ctx.layout.templates_dir)?;
     if tpls.is_empty() {
-        ctx.out.line("No templates. Create one from an existing instance:");
+        ctx.out
+            .line("No templates. Create one from an existing instance:");
         ctx.out
             .line("  spawnloft templates save <instance> <template-name>");
         return Ok(());
@@ -221,7 +218,12 @@ pub fn templates(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
         rows.push(vec![
             cell(t.get("name")),
             or_dash(t.get("jar")),
-            if js::truthy(t.get("includesWorlds")) { "yes" } else { "no" }.into(),
+            if js::truthy(t.get("includesWorlds")) {
+                "yes"
+            } else {
+                "no"
+            }
+            .into(),
             or_dash(t.get("sourceInstance")),
         ]);
     }
@@ -272,8 +274,7 @@ pub fn launchers(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     };
     for inst in &targets {
         let files = create::write_launchers(&inst.name, inst.get("dir"))?;
-        ctx.out
-            .line(&format!("{}: {}", inst.name, files.join(", ")));
+        ctx.out.line(&format!("{}: {}", inst.name, files.join(", ")));
     }
     ctx.out.line("");
     ctx.out
@@ -311,8 +312,7 @@ pub fn rebuild(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
     } else {
         res.removed.join(", ")
     };
-    ctx.out
-        .line(&format!("Rebuilt \"{name}\" — removed: {removed}"));
+    ctx.out.line(&format!("Rebuilt \"{name}\" — removed: {removed}"));
     ctx.out.line(if res.kept_plugins {
         "Plugins kept."
     } else {

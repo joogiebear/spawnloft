@@ -62,6 +62,7 @@ a scratch folder.
     { "write": "data/x.txt", "text": "...", "mode": "600", "mtime": "2026-11-01T10:00:00Z" },
     { "mkdir": "data/instances/alpha" },
     { "remove": "data/x.txt" },
+    { "hardlink": "data/y.txt", "to": "data/x.txt" },
     { "run": ["list", "--json"], "stdin": "", "env": {}, "timeoutMs": 120000,
       "expect": { "code": 0, "stdoutIncludes": "alpha" }, "golden": true }
   ]

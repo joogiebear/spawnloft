@@ -707,7 +707,10 @@ mod tests {
             &["new", "a", "--fabric", "1.21", "--jar", "x.jar"],
             &["new", "a", "--spigot", "1.21"],
         ] {
-            assert!(forwards_with(&os(line), false, PORTED), "{line:?} stays with Node");
+            assert!(
+                forwards_with(&os(line), false, PORTED),
+                "{line:?} stays with Node"
+            );
         }
     }
 
