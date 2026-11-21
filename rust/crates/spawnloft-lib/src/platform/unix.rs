@@ -21,6 +21,48 @@ unsafe extern "C" {
     fn access(path: *const std::ffi::c_char, mode: i32) -> i32;
     #[cfg(target_os = "linux")]
     fn sysconf(name: i32) -> i64;
+    #[cfg(target_os = "macos")]
+    fn sysctlbyname(
+        name: *const std::ffi::c_char,
+        oldp: *mut std::ffi::c_void,
+        oldlenp: *mut usize,
+        newp: *mut std::ffi::c_void,
+        newlen: usize,
+    ) -> i32;
+}
+
+/// `os.release()`: the kernel's release (Linux `6.8.0-45-generic`, the Darwin version on a
+/// Mac), or `""` when it cannot be read.
+pub fn os_release() -> String {
+    #[cfg(target_os = "macos")]
+    {
+        let mut buf = [0u8; 256];
+        let mut len = buf.len();
+        // SAFETY: the name is NUL-terminated and buf/len describe a writable buffer.
+        let rc = unsafe {
+            sysctlbyname(
+                c"kern.osrelease".as_ptr(),
+                buf.as_mut_ptr().cast(),
+                &mut len,
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if rc != 0 {
+            return String::new();
+        }
+        let end = buf[..len.min(buf.len())]
+            .iter()
+            .position(|b| *b == 0)
+            .unwrap_or(len.min(buf.len()));
+        String::from_utf8_lossy(&buf[..end]).into_owned()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        std::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .map(|s| s.trim_end().to_string())
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
