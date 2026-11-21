@@ -713,17 +713,24 @@ fn fetch_pack_archive(pack_file: &Value, on_progress: OnProgress<'_>) -> Result<
 }
 
 /// Fetching the loader caches it in the jar store, so the install after it is a cache hit.
-fn cache_loader(layout: &Layout, index: &Index, on_progress: OnProgress<'_>) -> Result<(), Failure> {
+/// The loader fetched into the jars store before anything changes. A Fabric launcher's name
+/// comes back: the instance names it from the start, as a create with no jar is refused.
+fn cache_loader(
+    layout: &Layout,
+    index: &Index,
+    on_progress: OnProgress<'_>,
+) -> Result<Option<String>, Failure> {
     if index.loader.kind == "fabric" {
         on_progress(&format!(
             "Fetching Fabric {} for {}",
             index.loader.text, index.mc_text
         ));
-        sources::fabric_fetch(&layout.jars_dir, &index.mc_text, Some(&index.loader.text), false)?;
-    } else {
-        sources::neo_fetch_installer(&layout.jars_dir, &index.loader.text, on_progress)?;
+        let launcher =
+            sources::fabric_fetch(&layout.jars_dir, &index.mc_text, Some(&index.loader.text), false)?;
+        return Ok(Some(launcher.name));
     }
-    Ok(())
+    sources::neo_fetch_installer(&layout.jars_dir, &index.loader.text, on_progress)?;
+    Ok(None)
 }
 
 /// `installLoader(inst, index)`: Fabric's launcher placed in the folder; NeoForge's installer run
@@ -827,7 +834,7 @@ pub fn create_from_modpack(
     let Archive { tmp, mrpack, index } = fetch_pack_archive(&pack_file, on_progress)?;
 
     let before = (|| -> Result<(Vec<Staged>, crate::create::Made), Failure> {
-        cache_loader(layout, &index, on_progress)?;
+        let jar = cache_loader(layout, &index, on_progress)?;
         let staged = stage_pack_files(&index, &tmp, on_progress, &mut modrinth::send)?;
         // the last point where stopping leaves nothing behind but the scratch folder
         cancel::check_cancelled()?;
@@ -837,7 +844,7 @@ pub fn create_from_modpack(
             by,
             name,
             crate::create::NewOptions {
-                jar: Value::Null,
+                jar: jar.map_or(Value::Null, Value::from),
                 loader: index.loader.kind.into(),
                 mc_version: Some(index.mc_text.clone()),
                 memory: Some(o.memory.clone()),

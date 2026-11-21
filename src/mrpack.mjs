@@ -306,10 +306,13 @@ export async function createFromModpack(name, projectId, {
   // Fetching the loader here caches it in the jars store, so the later install is a cache hit.
   let staged
   let inst
+  // A Fabric server starts as its launcher, which the instance must name from the start (a
+  // create with no jar is refused); NeoForge's starter is made by its installer afterwards.
+  let jar = null
   try {
     if (index.loader.kind === 'fabric') {
       onProgress({ message: `Fetching Fabric ${index.loader.version} for ${index.mc}`, percent: null })
-      await fabric.fetchLauncher(index.mc, { loader: index.loader.version })
+      jar = (await fabric.fetchLauncher(index.mc, { loader: index.loader.version })).name
     } else {
       await neoforge.fetchInstaller(index.loader.version, { onProgress })
     }
@@ -320,7 +323,7 @@ export async function createFromModpack(name, projectId, {
     checkCancelled()
     onProgress({ message: 'Creating the server', percent: null })
     inst = await create.newInstance(name, {
-      jar: null,
+      jar,
       loader: index.loader.kind,
       mcVersion: index.mc,
       memory,
