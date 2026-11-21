@@ -250,7 +250,7 @@ jobs:
         working-directory: rust
         run: |
           cargo build --locked -p spawnloft-core --features test-hooks
-          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe --bin zip-probe
+          cargo build --locked -p spawnloft-fakes --bin lock-probe --bin registry-probe --bin zip-probe --bin fake-scheduler
           exe=; [ "$RUNNER_OS" = Windows ] && exe=.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/debug/spawnloft-core$exe" >> "$GITHUB_ENV"
           echo "SPAWNLOFT_LOCK_PROBE=$GITHUB_WORKSPACE/rust/target/debug/lock-probe$exe" >> "$GITHUB_ENV"

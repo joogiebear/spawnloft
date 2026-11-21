@@ -11,6 +11,9 @@
 // in a `test-hooks` build only (spawnloft-lib test_origins.rs); test/fixtures/contracts/test-origins.json
 // holds both to them.
 
+import { createRequire, syncBuiltinESMExports } from 'node:module'
+import path from 'node:path'
+
 export const ORIGINS_ENV = 'SPAWNLOFT_TEST_ORIGINS'
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
@@ -90,4 +93,32 @@ export function install(env = process.env) {
   return true
 }
 
+// SPAWNLOFT_TEST_SCHEDULER names a stand-in program for the system scheduler's tools (C6 of
+// rust/PLAN-CORE-PORT.md): with NODE_ENV=test, every run of `schtasks`, `powershell`,
+// `/bin/launchctl`, `systemctl` or `loginctl` runs `<stand-in> <tool> <args...>` instead, so the
+// parity rig can create, list and remove scheduled tasks without touching the machine's own
+// scheduler. The Rust core does the same in a `test-hooks` build only
+// (spawnloft-lib test_origins.rs, `scheduler_command`).
+export const SCHEDULER_ENV = 'SPAWNLOFT_TEST_SCHEDULER'
+export const SCHEDULER_TOOLS = ['schtasks', 'powershell', '/bin/launchctl', 'systemctl', 'loginctl']
+
+export function installScheduler(env = process.env) {
+  if (env.NODE_ENV !== 'test' || !env[SCHEDULER_ENV]) return false
+  const fake = env[SCHEDULER_ENV]
+  const cp = createRequire(import.meta.url)('node:child_process')
+  for (const name of ['spawnSync', 'spawn', 'execFile', 'execFileSync']) {
+    const real = cp[name]
+    cp[name] = function (file, args, ...rest) {
+      if (!SCHEDULER_TOOLS.includes(file)) return real.call(this, file, args, ...rest)
+      const list = Array.isArray(args) ? args : []
+      const tail = Array.isArray(args) ? rest : [args, ...rest]
+      return real.call(this, fake, [path.posix.basename(file), ...list], ...tail)
+    }
+  }
+  // the ES module bindings (`import { spawnSync } from 'node:child_process'`) follow the change
+  syncBuiltinESMExports()
+  return true
+}
+
 install()
+installScheduler()

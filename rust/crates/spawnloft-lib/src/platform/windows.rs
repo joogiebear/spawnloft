@@ -1474,6 +1474,28 @@ pub fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
     matches!((id(a), id(b)), (Some(x), Some(y)) if x == y)
 }
 
+/// `sameEntry(a, b)` (manage.mjs): two names for one file or folder (the volume and the file
+/// index, as Node's `statSync` reports `dev` and `ino`); a folder is opened with backup
+/// semantics, which a plain open refuses.
+pub fn same_entry(a: &std::path::Path, b: &std::path::Path) -> bool {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, GetFileInformationByHandle,
+    };
+    let id = |p: &std::path::Path| -> Option<(u32, u32, u32)> {
+        let f = std::fs::OpenOptions::new()
+            .access_mode(0)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(p)
+            .ok()?;
+        // SAFETY: a plain-data struct the call fills, for a handle that stays open meanwhile
+        let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
+        let ok = unsafe { GetFileInformationByHandle(f.as_raw_handle() as _, &mut info) };
+        (ok != 0).then_some((info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow))
+    };
+    matches!((id(a), id(b)), (Some(x), Some(y)) if x == y && (x.1, x.2) != (0, 0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

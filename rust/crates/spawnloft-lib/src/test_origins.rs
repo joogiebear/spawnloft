@@ -152,6 +152,34 @@ pub fn rewrite(url: &str) -> Result<String, String> {
     Ok(url.to_string())
 }
 
+/// `SPAWNLOFT_TEST_SCHEDULER`: a stand-in for the system scheduler's programs (C6), so the
+/// parity rig can make and remove scheduled tasks without the machine's own scheduler. The Node
+/// core honours it with NODE_ENV=test (`installScheduler` in src/test-origins.mjs).
+pub const SCHEDULER_ENV: &str = "SPAWNLOFT_TEST_SCHEDULER";
+
+/// The programs [`SCHEDULER_ENV`] stands in for, as the Node core names them.
+pub const SCHEDULER_TOOLS: [&str; 5] = [
+    "schtasks",
+    "powershell",
+    "/bin/launchctl",
+    "systemctl",
+    "loginctl",
+];
+
+/// A command for one of [`SCHEDULER_TOOLS`]: in a `test-hooks` build with the variable set,
+/// `<stand-in> <tool>` (the arguments follow); otherwise the program itself.
+pub fn scheduler_command(program: &str) -> std::process::Command {
+    #[cfg(feature = "test-hooks")]
+    if SCHEDULER_TOOLS.contains(&program)
+        && let Some(fake) = std::env::var_os(SCHEDULER_ENV).filter(|v| !v.is_empty())
+    {
+        let mut cmd = std::process::Command::new(fake);
+        cmd.arg(program.rsplit('/').next().unwrap_or(program));
+        return cmd;
+    }
+    std::process::Command::new(program)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

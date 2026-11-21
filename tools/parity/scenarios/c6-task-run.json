@@ -1,0 +1,734 @@
+{
+ "about": "C6's `task run` (what the scheduler starts) over the JVM stand-in answering RCON: each single-action task skipped, done and failed (a command or stop with the server down, a verify with no backups and with a damaged one, a backup), then against a running server start, command, restart and stop. Every run is one line in the server's tasks.log and on stdout. Then `steps` tasks written into schedules.json as the panel writes them: a chain over a stopped server (steps with nothing to act on skipped), one only for a running server, a failed step ending the chain and one with keepGoing, a chain over the running server, a backup task pruning its own, and a failed check posted to the server's webhook (faked).",
+ "env": {
+  "FAKE_JAVA_RCON": "1"
+ },
+ "ignore": [
+  "data/run/run1/console.log",
+  "data/run/run1/daemon.log",
+  "data/run/run1/state.json",
+  "data/run/run1/metrics*",
+  "data/instances/run1/logs/**"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\"(size|sizeBytes)\"(\\s*):(\\s*)\\d+",
+   "replace": "\"$1\"$2:$3<n>"
+  },
+  {
+   "pattern": "done in \\d+s",
+   "replace": "done in <n>s"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "motd=run1\nserver-port=47861\nenable-rcon=true\nrcon.port=47871\nrcon.password=test\n"
+  },
+  {
+   "write": "data/instances/run1/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances/idle/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/idle/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/idle/server.properties",
+   "text": "motd=idle\nserver-port=47862\nenable-rcon=true\nrcon.port=47872\nrcon.password=test\n"
+  },
+  {
+   "write": "data/instances/idle/world/level.dat",
+   "text": "w"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47861,
+      "rcon": {
+       "port": 47871,
+       "password": "test"
+      },
+      "webhook": "https://discord.com/api/webhooks/1/abc"
+     },
+     "idle": {
+      "dir": "{data}/instances/idle",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47862,
+      "rcon": {
+       "port": 47872,
+       "password": "test"
+      }
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "command",
+    "--line",
+    "say hi",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "stop",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "verify",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "idle",
+    "--do",
+    "backup",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-command"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "skipped"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-stop"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "already stopped"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "no backups to check yet"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-backup"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "done in"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "all 1 backups read back whole"
+   }
+  },
+  {
+   "write": "data/backups/idle/standard_2026-11-01_100000.tar.gz",
+   "text": "not a tar"
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-verify"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "FAILED"
+   }
+  },
+  {
+   "remove": "data/backups/idle/standard_2026-11-01_100000.tar.gz"
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "start",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-start"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\tok\tstart\tstarted"
+   },
+   "timeoutMs": 60000
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-start"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "already running"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "command",
+    "--line",
+    "list",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-command"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\tok\tcommand\tlist"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "restart",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-restart"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "restarted"
+   },
+   "timeoutMs": 60000
+  },
+  {
+   "run": [
+    "task",
+    "add",
+    "run1",
+    "--do",
+    "stop",
+    "--hourly"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-stop"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "\tok\tstop\tstopped"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-stop"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "already stopped"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "run1-start"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "run1-command"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "run1-restart"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "run1-stop"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "idle-backup"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "idle-verify"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "idle-command"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "rm",
+    "idle-stop"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/schedules.json",
+   "json": {
+    "version": 1,
+    "tasks": {
+     "idle-steps": {
+      "instance": "idle",
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "say",
+         "text": "hello"
+        },
+        {
+         "do": "command",
+         "line": "save-all"
+        },
+        {
+         "do": "countdown",
+         "minutes": 1,
+         "message": "Restart"
+        },
+        {
+         "do": "stop"
+        },
+        {
+         "do": "backup",
+         "keep": 1
+        },
+        {
+         "do": "backup",
+         "keep": null
+        },
+        {
+         "do": "verify"
+        }
+       ],
+       "onlyWhenRunning": false,
+       "keepGoing": false
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 1
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "idle-steps-2": {
+      "instance": "idle",
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "verify"
+        },
+        {
+         "do": "say",
+         "text": "after"
+        },
+        {
+         "do": "stop"
+        }
+       ],
+       "onlyWhenRunning": false,
+       "keepGoing": false
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 1
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "idle-steps-3": {
+      "instance": "idle",
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "verify"
+        },
+        {
+         "do": "stop"
+        }
+       ],
+       "onlyWhenRunning": false,
+       "keepGoing": true
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 1
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "idle-steps-4": {
+      "instance": "idle",
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "say",
+         "text": "x"
+        }
+       ],
+       "onlyWhenRunning": true,
+       "keepGoing": false
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 1
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "run1-steps": {
+      "instance": "run1",
+      "name": "Chain",
+      "action": {
+       "type": "steps",
+       "steps": [
+        {
+         "do": "say",
+         "text": "hello"
+        },
+        {
+         "do": "command",
+         "line": "list"
+        },
+        {
+         "do": "backup",
+         "keep": 2
+        },
+        {
+         "do": "restart"
+        },
+        {
+         "do": "stop"
+        },
+        {
+         "do": "start"
+        },
+        {
+         "do": "stop"
+        }
+       ],
+       "onlyWhenRunning": false,
+       "keepGoing": false
+      },
+      "schedule": {
+       "kind": "hourly",
+       "every": 1
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "run1-verify": {
+      "instance": "run1",
+      "name": "Check",
+      "action": {
+       "type": "verify"
+      },
+      "schedule": {
+       "kind": "daily",
+       "at": "03:00"
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     },
+     "run1-backup": {
+      "instance": "run1",
+      "name": "Copy",
+      "action": {
+       "type": "backup",
+       "keep": 1
+      },
+      "schedule": {
+       "kind": "daily",
+       "at": "03:00"
+      },
+      "enabled": true,
+      "owner": null,
+      "createdAt": "2026-11-01T10:00:00.000Z"
+     }
+    }
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-steps"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-steps-4"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "only runs while it is"
+   }
+  },
+  {
+   "write": "data/backups/idle/standard_2026-11-01_100000.tar.gz",
+   "text": "not a tar"
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-steps-2"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "stopped there, 2 steps not run"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "idle-steps-3"
+   ],
+   "expect": {
+    "code": 1
+   }
+  },
+  {
+   "remove": "data/backups/idle/standard_2026-11-01_100000.tar.gz"
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-steps"
+   ],
+   "expect": {
+    "code": 0
+   },
+   "timeoutMs": 90000
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-backup"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-backup"
+   ],
+   "expect": {
+    "code": 0,
+    "stdoutIncludes": "pruned 1 over the limit of 1"
+   }
+  },
+  {
+   "write": "data/backups/run1/standard_2026-11-01_100000.tar.gz",
+   "text": "not a tar"
+  },
+  {
+   "run": [
+    "task",
+    "run",
+    "run1-verify"
+   ],
+   "expect": {
+    "code": 1,
+    "stdoutIncludes": "FAILED"
+   }
+  },
+  {
+   "run": [
+    "task",
+    "list"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ],
+ "hosts": {
+  "https://discord.com": {
+   "routes": {
+    "POST /api/webhooks/1/abc": {
+     "status": 204,
+     "text": ""
+    }
+   }
+  }
+ }
+}

@@ -55,6 +55,7 @@ pub mod rcon;
 pub mod registry;
 pub mod resp;
 pub mod runtime;
+pub mod schedule;
 pub mod services;
 pub mod settings;
 pub mod sha1;

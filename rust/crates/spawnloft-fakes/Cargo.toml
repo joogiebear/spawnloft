@@ -40,3 +40,9 @@ path = "src/bin/zip-probe.rs"
 [[bin]]
 name = "net-probe"
 path = "src/bin/net-probe.rs"
+
+# Test-only: plays schtasks, powershell, launchctl, systemctl and loginctl for the parity rig's
+# scheduled-task scenarios (SPAWNLOFT_TEST_SCHEDULER, C6).
+[[bin]]
+name = "fake-scheduler"
+path = "src/bin/fake-scheduler.rs"

@@ -39,12 +39,24 @@ so absolute paths in shims and records compare exactly. The machine's own `SPAWN
 `TZ=UTC`, `LANG=LC_ALL=en_US.UTF-8` and the bundled-runtime stand-ins `SPAWNLOFT_NODE` and
 `SPAWNLOFT_CORE_DIR`. `SPAWNLOFT_TEST_ORIGINS` is always set: it holds the scenario's fake
 hosts, and with none it is `{}`. That refuses every host that is not on this machine, so no
-scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL` or
-`SPAWNLOFT_TEST_ORIGINS` itself, in its own `env` or a step's: the rig refuses it.
+scenario ever downloads anything real. A scenario may not set `SPAWNLOFT_CORE_IMPL`,
+`SPAWNLOFT_TEST_ORIGINS`, `SPAWNLOFT_TEST_SCHEDULER` or `FAKE_SCHEDULER_DIR` itself, in its own `env` or a
+step's: the rig refuses it.
 
-Not isolated: the system's scheduler (`schtasks`, `launchctl`, `systemctl --user`) and the
-Windows user PATH. Scenarios do not create tasks until C6 brings a way to point the scheduler at
-a scratch folder.
+The system's scheduler is played by `fake-scheduler` (spawnloft-fakes, built beside the core,
+or `SPAWNLOFT_FAKE_SCHEDULER`): each side gets `SPAWNLOFT_TEST_SCHEDULER` naming it and
+`FAKE_SCHEDULER_DIR=run/scheduler`, so every run of `schtasks`, `powershell`, `launchctl`,
+`systemctl` or `loginctl` runs `fake-scheduler <tool> <args...>` instead (the Node core with
+NODE_ENV=test, `installScheduler` in `src/test-origins.mjs`; the Rust core in a `test-hooks`
+build, `test_origins::scheduler_command`). Without the fake the variable names a file that is not
+there, so a side fails to start the tool rather than reaching the machine's own scheduler. The fake
+keeps its state in `run/scheduler/state.json` and appends every call that changes something to
+`run/scheduler/calls.log`, so the two sides' calls are compared in order. A scenario can seed
+`state.json` with failures to inject (`"fail": [{ "tool", "args", "status", "stderr", "times" }]`),
+tasks shown as running (`"running"`) and `"linger"`; see the top of
+`rust/crates/spawnloft-fakes/src/bin/fake-scheduler.rs`.
+
+Not isolated: the Windows user PATH.
 
 ## Scenario format
 
@@ -138,6 +150,8 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c4-running` | the same against a running server: `rebuild` refused, a template and a clone made from it anyway, `rebuild` once it stopped |
 | `c4-reveal` | `reveal` and `open` on Linux: no display, a stand-in `xdg-open` on PATH, and no file manager at all. Linux only, so nothing opens on a desktop runner |
 | `c4-fetch` | `new` with every software flag against faked Paper, Folia, Purpur, Mojang, InfernalSuite, Fabric, NeoForge and SpigotMC hosts (sha256, sha1 and md5 checks, size floors, missing versions and builds), Java picked or refused before a download, BuildTools and the NeoForge installer played by a stand-in `java` (a failed install removes the server), `upgrade` with `--check`, `--build` and `--version --yes`, and `paper`'s listing flags. Linux and macOS (the stand-in is a shell script) |
+| `c6-tasks` | C6's `task` against the fake scheduler on each system: `add` with every schedule kind and its refusals, a registration the scheduler refuses taken back, `list`, `enable`, `disable`, `rm`, `linger`, then `rename` (its refusals, the snapshots, run folder and tasks moving with the server, a capitals-only rename, #233) and `rm` with and without `--purge` dropping the server's tasks |
+| `c6-task-run` | `task run`, what the scheduler starts: each single action skipped, done and failed over the JVM stand-in, `steps` chains written as the panel writes them (skipped steps, a failed step ending the chain, `keepGoing`, `onlyWhenRunning`), a backup task pruning its own, and a failed check posted to the server's webhook (faked) |
 | `c7-client-store` | C7's client subcommands that need no network: `client list`, `status`, `logs` (the capture's log4j events turned into plain lines, `--latest`, `-n` and its refusals), `accounts`, `logout`, `remove` with and without `--purge` and `stop`, over damaged and hand-made profile, account and state files, then around a game the Node core launches (the fake client, `MCCTL_FAKE_CLIENT`) |
 | `c7-client-edges` | damaged accounts files for those subcommands: `accounts` that is not a list, null and nameless entries, an empty default account, a world-readable file that `logout` rewrites owner-only, and `-n 0x2` and an empty `--n=` |
 | `c7-client-versions` | `client versions`, `new` and `set` over faked Mojang, Fabric, Quilt, Forge and NeoForge lists: the table and its filters, versions on disk, each loader's refusals, near ids for a typo, every field check of a new profile, `set`'s value rules and its re-check when the version or loader changes, and the cache each list leaves |

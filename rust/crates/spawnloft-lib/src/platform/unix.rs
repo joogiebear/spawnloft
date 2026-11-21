@@ -60,6 +60,15 @@ pub fn writable(path: &std::path::Path) -> bool {
     unsafe { access(c.as_ptr(), W_OK) == 0 }
 }
 
+/// `sameEntry(a, b)` (manage.mjs): two names for one file or folder, by device and inode.
+pub fn same_entry(a: &std::path::Path, b: &std::path::Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    matches!(
+        (std::fs::metadata(a), std::fs::metadata(b)),
+        (Ok(x), Ok(y)) if x.dev() == y.dev() && x.ino() == y.ino() && x.ino() != 0
+    )
+}
+
 /// This process's user id.
 pub fn uid() -> u32 {
     // SAFETY: getuid has no preconditions and cannot fail.
