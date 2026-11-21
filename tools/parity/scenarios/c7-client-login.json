@@ -1,0 +1,561 @@
+{
+  "about": "C7 part 3a: client login, the Microsoft device code and the Xbox Live, XSTS and Minecraft chain after it, over fakes of all four services answering in turn: each refusal and hiccup Node turns into a sentence, the stale entry a fresh sign-in replaces, and accounts files that are not a list.",
+  "hosts": {
+    "https://login.microsoftonline.com": {
+      "routes": {
+        "POST /consumers/oauth2/v2.0/devicecode": {
+          "sequence": [
+            {
+              "status": 500,
+              "text": "<html>oops</html>"
+            },
+            {
+              "json": {
+                "user_code": "X"
+              }
+            },
+            {
+              "json": {
+                "device_code": "DEVICE",
+                "user_code": "ABCD-EFGH",
+                "verification_uri": "https://www.microsoft.com/link",
+                "expires_in": 900,
+                "interval": 0,
+                "message": "x"
+              }
+            }
+          ]
+        },
+        "POST /consumers/oauth2/v2.0/token": {
+          "sequence": [
+            {
+              "status": 400,
+              "json": {
+                "error": "authorization_declined"
+              }
+            },
+            {
+              "status": 400,
+              "json": {
+                "error": "expired_token"
+              }
+            },
+            {
+              "status": 400,
+              "json": {
+                "error": "invalid_client",
+                "error_description": "AADSTS7000218: bad client"
+              }
+            },
+            {
+              "status": 503,
+              "text": "<html>busy</html>"
+            },
+            {
+              "status": 503,
+              "text": "<html>busy</html>"
+            },
+            {
+              "status": 503,
+              "text": "<html>busy</html>"
+            },
+            {
+              "status": 503,
+              "text": "<html>busy</html>"
+            },
+            {
+              "status": 503,
+              "text": "<html>busy</html>"
+            },
+            {
+              "status": 400,
+              "json": {
+                "error": "authorization_pending"
+              }
+            },
+            {
+              "status": 400,
+              "json": {
+                "error": "temporarily_unavailable"
+              }
+            },
+            {
+              "json": {
+                "token_type": "Bearer",
+                "access_token": "ms-access",
+                "refresh_token": "ms-refresh",
+                "expires_in": 3600
+              }
+            }
+          ]
+        }
+      }
+    },
+    "https://user.auth.xboxlive.com": {
+      "routes": {
+        "POST /user/authenticate": {
+          "sequence": [
+            {
+              "status": 503,
+              "text": "down"
+            },
+            {
+              "json": {
+                "Token": "xbl-token",
+                "DisplayClaims": {
+                  "xui": {
+                    "0": {
+                      "uhs": "UHS1"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "json": {
+                "Token": "xbl-token"
+              }
+            },
+            {
+              "json": {
+                "Token": "xbl-token",
+                "DisplayClaims": {
+                  "xui": [
+                    {
+                      "uhs": "UHS1"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "https://xsts.auth.xboxlive.com": {
+      "routes": {
+        "POST /xsts/authorize": {
+          "sequence": [
+            {
+              "status": 401,
+              "json": {
+                "XErr": 2148916238,
+                "Message": ""
+              }
+            },
+            {
+              "status": 401,
+              "json": {
+                "XErr": 123
+              }
+            },
+            {
+              "status": 400,
+              "text": "nope"
+            },
+            {
+              "json": {
+                "Token": "xsts-token",
+                "DisplayClaims": {
+                  "xui": [
+                    {
+                      "uhs": "UHS1",
+                      "xid": "2535"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "https://api.minecraftservices.com": {
+      "routes": {
+        "POST /authentication/login_with_xbox": {
+          "sequence": [
+            {
+              "status": 403,
+              "json": {
+                "errorMessage": "Invalid app registration, see https://aka.ms/AppRegInfo for more information"
+              }
+            },
+            {
+              "status": 403,
+              "text": "<html>"
+            },
+            {
+              "status": 429,
+              "json": {}
+            },
+            {
+              "json": {
+                "username": "x",
+                "access_token": "mc-access",
+                "expires_in": 86400,
+                "token_type": "Bearer"
+              }
+            }
+          ]
+        },
+        "GET /minecraft/profile": {
+          "sequence": [
+            {
+              "status": 404,
+              "json": {
+                "error": "NOT_FOUND"
+              }
+            },
+            {
+              "json": {
+                "id": "not-hex",
+                "name": "Steve"
+              }
+            },
+            {
+              "status": 500,
+              "json": {}
+            },
+            {
+              "json": {
+                "id": "AAAAAAAA111122223333444444444444",
+                "name": "Steve",
+                "skins": []
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "normalize": [
+    {
+      "pattern": "\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z",
+      "replace": "<time>"
+    }
+  ],
+  "steps": [
+    {
+      "run": [
+        "client",
+        "login",
+        "extra"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login",
+        "--bogus"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "HTTP 500"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "did not start the sign-in;"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "declined"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "AADSTS7000218"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "stopped answering (HTTP 503)"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "Xbox Live sign-in failed (HTTP 503)"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "child account"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "answered without a token"
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": [
+          {
+            "type": "offline",
+            "name": "Alex",
+            "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "XErr 123"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "HTTP 400"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "client id test-client-id"
+      },
+      "env": {
+        "SPAWNLOFT_MSA_CLIENT_ID": "test-client-id"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "HTTP 403) for client id 946097b5"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login",
+        "--json"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "owns no Minecraft"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "without a profile"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "could not read the Minecraft profile (HTTP 500)"
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": [
+          {
+            "type": "offline",
+            "name": "Alex",
+            "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+          },
+          {
+            "type": "microsoft",
+            "name": "STEVE",
+            "uuid": "dddddddd-1111-2222-3333-444444444444",
+            "accessToken": "old"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Signed in as Steve.",
+        "stderrIncludes": "Open https://www.microsoft.com/link and enter the code ABCD-EFGH (valid 15 minutes). Waiting..."
+      }
+    },
+    {
+      "run": [
+        "client",
+        "accounts",
+        "--json"
+      ],
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login",
+        "--json"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "\"uuid\":\"AAAAAAAA-1111-2222-3333-444444444444\""
+      }
+    },
+    {
+      "run": [
+        "client",
+        "accounts"
+      ],
+      "expect": {
+        "code": 0,
+        "stdoutIncludes": "Steve  AAAAAAAA-1111-2222-3333-444444444444  token until"
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": {
+          "not": "a list"
+        }
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": "ab"
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 1
+      }
+    },
+    {
+      "write": "data/client/accounts.json",
+      "mode": "600",
+      "json": {
+        "version": 1,
+        "accounts": ""
+      }
+    },
+    {
+      "run": [
+        "client",
+        "login"
+      ],
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

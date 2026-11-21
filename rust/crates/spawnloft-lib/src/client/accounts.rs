@@ -102,6 +102,12 @@ pub fn same_uuid(a: Option<&Value>, b: Option<&Value>) -> bool {
 
 /// `a.name.toLowerCase()`, which throws for an entry whose name is not text.
 fn name_lower(a: &Value) -> Result<String, Failure> {
+    name_lower_as(a, "a")
+}
+
+/// `<var>.name.toLowerCase()`; `var` is the variable's name in the Node source, which the
+/// TypeError for a name that is not text carries.
+fn name_lower_as(a: &Value, var: &str) -> Result<String, Failure> {
     match field(a, "name")? {
         Some(Value::String(s)) => Ok(s.to_lowercase()),
         None => Err(Failure::type_error(
@@ -110,7 +116,9 @@ fn name_lower(a: &Value) -> Result<String, Failure> {
         Some(Value::Null) => Err(Failure::type_error(
             "Cannot read properties of null (reading 'toLowerCase')",
         )),
-        _ => Err(Failure::type_error("a.name.toLowerCase is not a function")),
+        _ => Err(Failure::type_error(format!(
+            "{var}.name.toLowerCase is not a function"
+        ))),
     }
 }
 
@@ -163,6 +171,24 @@ pub fn update(
     Ok(next)
 }
 
+/// `updateAccounts(change)` for a `change` that walks the list with `for...of`: a list that is
+/// text is walked character by character, and anything else that is not an array throws.
+pub fn update_iterating(
+    paths: &Paths,
+    change: impl FnOnce(Vec<Value>) -> Result<Vec<Value>, Failure>,
+) -> Result<Vec<Value>, Failure> {
+    let data = read_json(&paths.accounts_file())?;
+    let list = match prop(data.as_ref(), "accounts") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::Array(items)) => items.clone(),
+        Some(Value::String(s)) => s.chars().map(|c| json!(c.to_string())).collect(),
+        Some(_) => return Err(Failure::type_error("list is not iterable")),
+    };
+    let next = change(list)?;
+    save(paths, &next)?;
+    Ok(next)
+}
+
 /// `removeAccount(uuid)`: by uuid, whatever else changed meanwhile. The removed entry, without
 /// tokens, or `None`.
 pub fn remove(paths: &Paths, uuid: Option<&Value>) -> Result<Option<Value>, Failure> {
@@ -186,16 +212,24 @@ pub fn remove(paths: &Paths, uuid: Option<&Value>) -> Result<Option<Value>, Fail
 pub fn upsert(list: Vec<Value>, account: Value, uuid: Option<&Value>) -> Result<Vec<Value>, Failure> {
     let own = prop(Some(&account), "uuid").cloned();
     let uuid = uuid.cloned().or_else(|| own.clone());
-    let name = name_lower(&account)?;
+    // `account.name.toLowerCase()` runs only when an entry with another uuid is reached
+    let mut name: Option<String> = None;
     let mut out = Vec::new();
     let mut placed = false;
     for a in list {
-        if super::strict_eq(prop(Some(&a), "uuid"), uuid.as_ref()) {
+        if super::strict_eq(field(&a, "uuid")?, uuid.as_ref()) {
             if !placed {
                 out.push(account.clone());
             }
             placed = true;
-        } else if !super::strict_eq(prop(Some(&a), "uuid"), own.as_ref()) && name_lower(&a)? != name {
+        } else if !super::strict_eq(prop(Some(&a), "uuid"), own.as_ref()) && {
+            let theirs = name_lower(&a)?;
+            let ours = match &name {
+                Some(n) => n.clone(),
+                None => name.insert(name_lower_as(&account, "account")?).clone(),
+            };
+            theirs != ours
+        } {
             out.push(a);
         }
     }
