@@ -183,6 +183,7 @@ The only ways a ported command may differ from its Node twin (plan section 6.1).
 | Where | Node | Rust | How the rig holds it |
 | --- | --- | --- | --- |
 | `doctor`, the diagnostics bundle, the panel's diagnostics | a `node: <version>` line and the code `root`; the bundle's `node` fact, and `spawnloft` from package.json | a `core: spawnloft-core <version> (<target>)` line, no `root`; no `node` fact, and `spawnloft` is the core's own version | evened out (`doctor-node-line`) |
+| `doctor` on Windows, a secrets file whose access list is all inherited | no problem when icacls prints the inherited entries without "(I)" (seen on the GitHub Windows runner's temp folder) | "other users on this computer can read ... (it inherits its folder's permissions ...)", read from the access list itself, and the text form makes the file owner-only | evened out (`windows-inherited-acl`): those lines and strings go, and on Windows the problem counts |
 | `repair` text and `--json` | `runtime: <node path>` | the core's own path | evened out (`repair-runtime`) |
 | free-text sort order outside ASCII | ICU collation | the port's comparison function (spawnloft-lib collate.rs) | scenarios sort ASCII names only; test/fixtures/contracts/ordering.json pins the ASCII order on both sides |
 | sort order on a machine whose locale tailors ASCII letters (da, nb, lt, et, ...) | that locale's order | the root order (what an en-US machine shows) | the rig runs both sides with LANG and LC_ALL set to en_US.UTF-8 |

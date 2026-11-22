@@ -216,7 +216,7 @@ test('a step for one side only is refused outside a self-test', async () => {
 })
 
 test('the declared differences are the plan\'s six rows, the locale row, C1\'s eight, C2\'s two and C5\'s three, each with a way it is held', () => {
-  assert.equal(DECLARED.length, 20)
+  assert.equal(DECLARED.length, 21)
   for (const row of DECLARED) assert.ok(row.apply || row.held, row.id)
   // doctor's node line and root go; everything else stays
   const doctor = '{"notes":["java: 21","node: v22.1.0","root: /x","data root: /d"]}'
@@ -227,6 +227,9 @@ test('the declared differences are the plan\'s six rows, the locale row, C1\'s e
   assert.equal(applyDeclared('{"facts":{"spawnloft":"1.6.0","os":"linux","arch":"x64","node":"v22.1.0","server":null}}', 'diag'), '{"facts":{"spawnloft":"<version>","os":"linux","arch":"x64","server":null}}')
   assert.equal(applyDeclared('spawnloft: 2.0.0\nos: linux\nnode: v22.1.0\narch: x64', 'diag'), 'spawnloft: <version>\nos: linux\narch: x64')
   assert.equal(applyDeclared('{"runtime":"/usr/bin/node"}', 'repair'), '{"runtime":"<runtime>"}')
+  // a Windows secrets file the core sees inheriting its folder's entries and Node's icacls does not
+  assert.equal(applyDeclared('{"problems":["a: x","registry (y): other users on this computer can read C:\\\\d\\\\r.json (it inherits its folder\'s permissions (BUILTIN\\\\Users)); run doctor"]}', 'doctor'), '{"problems":["a: x"]}')
+  assert.equal(applyDeclared('  - a: x\n  registry: made owner-only (it inherits its folder\'s permissions (U))\n', 'doctor'), '  - a: x\n')
   assert.match(declaredTable(), /^\| Where \| Node \| Rust \|/)
   // a stack goes, the error line stays
   assert.equal(applyDeclared('SyntaxError: x\n    at JSON.parse (<anonymous>)\n    at f (file:///a.mjs:1:2)\n', 'list'), 'SyntaxError: x\n')

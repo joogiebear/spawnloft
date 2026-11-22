@@ -25,6 +25,28 @@ export const DECLARED = [
       .replace(/,\]/g, ']'),
   },
   {
+    // found by C6b's Windows parity run: on a file whose entries all come from its folder (SDDL
+    // `ID` flags, Get-Acl IsInherited), icacls can print them without "(I)", so Node's
+    // icacls-based check calls the file private; the core reads the access list itself and sees
+    // the inheritance. The text form's repair follows, with its "made owner-only" note.
+    id: 'windows-inherited-acl',
+    where: '`doctor` on Windows, a secrets file whose access list is all inherited',
+    node: 'no problem when icacls prints the inherited entries without "(I)"',
+    rust: '"other users on this computer can read ... (it inherits its folder\'s permissions ...)", and the text form makes it owner-only',
+    commands: ['doctor'],
+    // the line or JSON string that says so, and on Windows the problem counts it adds to
+    apply: (text) => {
+      // text lines only: a --json answer is one line, and only its string goes
+      const out = dropLines(/^(?!\s*\{).*it inherits its folder's permissions/)(text)
+        .replace(/"(?:[^"\\]|\\.)*it inherits its folder's permissions(?:[^"\\]|\\.)*",?/g, '')
+        .replace(/,\]/g, ']')
+      if (process.platform !== 'win32') return out
+      return out
+        .replace(/\b\d+ environment problem\(s\) found/g, '<n> environment problem(s) found')
+        .replace(/^\d+ problem\(s\):$/gm, '<n> problem(s):')
+    },
+  },
+  {
     id: 'repair-runtime',
     where: '`repair` text and `--json`',
     node: '`runtime: <node path>`',
