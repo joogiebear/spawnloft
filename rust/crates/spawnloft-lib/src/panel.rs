@@ -58,6 +58,10 @@ struct Panel {
     shell: bool,
     /// The long jobs this panel started, for the pages that watch them.
     jobs: Arc<jobs::Jobs>,
+    /// The port this panel listens on: what a browser sent to it must come back to (the
+    /// Microsoft sign-in's redirect address).
+    #[allow(dead_code)] // read by the launcher's routes when they move
+    port: u16,
 }
 
 impl Panel {
@@ -67,11 +71,12 @@ impl Panel {
         crate::activity::Actor::new("panel", None)
     }
 
-    fn of_this_process() -> Panel {
+    fn of_this_process(port: u16) -> Panel {
         Panel {
             layout: Layout::resolve(&settings::load().0).ok(),
             shell: behind_window(),
             jobs: Arc::default(),
+            port,
         }
     }
 }
@@ -173,7 +178,7 @@ pub fn run(opts: Options) -> i32 {
     let _ = std::io::stdout().flush();
 
     let upstream = Arc::new(upstream);
-    let panel = Arc::new(Panel::of_this_process());
+    let panel = Arc::new(Panel::of_this_process(local.port()));
     for conn in listener.incoming() {
         let Ok(conn) = conn else { continue };
         let upstream = Arc::clone(&upstream);
@@ -877,6 +882,7 @@ mod tests {
             layout: None,
             shell: false,
             jobs: Arc::default(),
+            port: 0,
         };
         front_of(panel, upstream, requests)
     }
@@ -918,6 +924,7 @@ mod tests {
             }),
             shell,
             jobs: Arc::default(),
+            port: 0,
         }
     }
 
