@@ -1,5 +1,5 @@
 {
- "about": "C8's launcher routes (handleClient and handleAccounts), answered by the Rust panel itself: the version picker and one version described over faked Mojang and loader lists, one loader's builds, the launcher's poll, a Java checked by its path, every profile route with its refusals (create, change, remove, status, the log with its redaction, stop, exit-seen, copy and rename), the accounts (offline, the default, sign-out) and the sign-in's refusals and its callback page.",
+ "about": "C8's launcher routes (handleClient and handleAccounts), answered by the Rust panel itself: the version picker and one version described over faked Mojang and loader lists, one loader's builds, the launcher's poll, a Java checked by its path, every profile route with its refusals (create, change, remove, status, the log with its redaction, stop, exit-seen, copy and rename), the accounts (offline, the default, sign-out) and the Microsoft sign-in: its refusals, its stream, a cancel, and the callback page for a refusal on Microsoft's page, a missing code, a replay and a wrong, longer or non-ASCII state (an exchange with a code is left to the unit tests: the fake hosts' request log would hold each side's own random PKCE verifier); and launches with the fake game, as a request and as a job on the job stream, with their refusals, an address and the title screen, and a game that exits at once and leaves its exit record.",
  "env": {
   "NODE_ENV": "test"
  },
@@ -1216,6 +1216,146 @@
     "client",
     "status",
     "p1",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  },
+  {
+   "write": "data/client/accounts.json",
+   "mode": "600",
+   "json": {
+    "version": 1,
+    "accounts": [
+     {
+      "type": "microsoft",
+      "name": "Mia",
+      "uuid": "aaaaaaaa-1111-2222-3333-444444444444",
+      "accessToken": "mia-token",
+      "refreshToken": "mia-refresh",
+      "expiresAt": "2099-01-01T00:00:00.000Z",
+      "xuid": "123",
+      "clientId": "cid"
+     },
+     {
+      "type": "offline",
+      "name": "Alex",
+      "uuid": "bbbbbbbb-1111-2222-3333-444444444444"
+     }
+    ]
+   }
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "aid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "astate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/{aid}/stream",
+     "stream": {
+      "events": 1,
+      "ms": 3000
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?error=access_denied&state={astate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?error=access_denied&state={astate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{aid}/stream"
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "bid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "bstate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={bstate}&error=invalid_scope&error_description=AADSTS70011%3A+bad+scope%0Amore",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{bid}/stream"
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "cid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "cstate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={cstate}x",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state=%C3%A9{cstate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/{cid}/stream",
+     "stream": {
+      "events": 1,
+      "ms": 3000
+     }
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "did": "\"loginId\":\"([0-9a-f]{32})\"",
+      "dstate": "[?&]state=([A-Za-z0-9_-]+)"
+     },
+     "waitMs": 1500
+    },
+    {
+     "delete": "/api/client/accounts/login/{did}"
+    },
+    {
+     "delete": "/api/client/accounts/login/{did}"
+    },
+    {
+     "get": "/api/client/accounts/login/{did}/stream"
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={dstate}&code=x",
+     "anonymous": true
+    },
+    {
+     "post": "/api/client/accounts/login",
+     "keep": {
+      "eid": "\"loginId\":\"([0-9a-f]{32})\"",
+      "estate": "[?&]state=([A-Za-z0-9_-]+)"
+     }
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={estate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts/login/callback?state={estate}",
+     "anonymous": true
+    },
+    {
+     "get": "/api/client/accounts",
+     "waitMs": 1500
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "client",
+    "accounts",
     "--json"
    ],
    "expect": {
