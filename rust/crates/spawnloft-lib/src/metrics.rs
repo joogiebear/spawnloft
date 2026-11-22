@@ -284,6 +284,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rows_for_the_panel() {
+        let dir = std::env::temp_dir().join(format!("sl-metrics-rows-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("metrics.log");
+        assert!(read_rows(&file).is_empty());
+        assert_eq!(latest_sample(&file, 0.0), None);
+        std::fs::write(
+            &file,
+            "100 12.5 2048 19.9 2 20\nnot a sample\n0 1 1\n110 101 1\n120 3.0 4096 - - -\n\n130 0.4 8192\n",
+        )
+        .unwrap();
+        let rows: Vec<String> = read_rows(&file)
+            .into_iter()
+            .map(|r| crate::jsjson::stringify(&serde_json::Value::Object(r)))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                r#"{"at":100,"cpu":12.5,"rss":2048,"tps":19.9,"players":2,"maxPlayers":20}"#,
+                r#"{"at":120,"cpu":3,"rss":4096}"#,
+                r#"{"at":130,"cpu":0.4,"rss":8192}"#,
+            ]
+        );
+        // the newest line, while it is no older than three intervals
+        let fresh = (130 + INTERVAL_SEC * 3) as f64 * 1000.0;
+        assert_eq!(
+            latest_sample(&file, fresh).map(|r| crate::jsjson::stringify(&serde_json::Value::Object(r))),
+            Some(r#"{"at":130,"cpu":0.4,"rss":8192}"#.to_string())
+        );
+        assert_eq!(latest_sample(&file, fresh + 1000.0), None);
+        std::fs::write(&file, "\n").unwrap();
+        assert_eq!(latest_sample(&file, fresh), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn recorder_like_sample_recorder() {
         let mut r = Recorder::new(4);
         assert_eq!(r.record(100.0, 10.0, 1048576.0 * 512.0), None);
@@ -395,6 +431,78 @@ pub struct Row {
     pub at: f64,
     pub cpu: f64,
     pub rss: f64,
+}
+
+/// `figure(text)`: a column the server answered, or nothing for `-`, a blank or a non-number.
+fn figure(text: Option<&str>) -> Option<f64> {
+    let text = text.filter(|t| !t.is_empty() && *t != "-")?;
+    let n = crate::js::string_to_number(text);
+    (n.is_finite() && n >= 0.0).then_some(n)
+}
+
+/// One line of `metrics.log` as the panel sends it: `at`, `cpu` and `rss`, then `tps`, `players`
+/// and `maxPlayers` where the server answered. `None` for a line that is not whole; `ranged`
+/// also refuses one out of range (`readSamples` does, `latestSample` does not).
+fn row_json(line: &str, ranged: bool) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let mut parts = line.split(' ');
+    let mut number = || parts.next().map_or(f64::NAN, crate::js::string_to_number);
+    let (at, cpu, rss) = (number(), number(), number());
+    if !(at.is_finite() && cpu.is_finite() && rss.is_finite()) {
+        return None;
+    }
+    if ranged && (at <= 0.0 || !(0.0..=100.0).contains(&cpu) || rss < 0.0) {
+        return None;
+    }
+    let mut row = serde_json::Map::new();
+    for (key, value) in [("at", at), ("cpu", cpu), ("rss", rss)] {
+        row.insert(key.into(), crate::jsjson::num(value));
+    }
+    for key in ["tps", "players", "maxPlayers"] {
+        if let Some(n) = figure(parts.next()) {
+            row.insert(key.into(), crate::jsjson::num(n));
+        }
+    }
+    Some(row)
+}
+
+/// `readSamples(name)` as the rows the panel's chart gets, oldest first and unfiltered: the
+/// caller windows it, and needs to tell "nothing recorded" from "nothing in this range".
+pub fn read_rows(file: &Path) -> Vec<serde_json::Map<String, serde_json::Value>> {
+    let Ok(bytes) = std::fs::read(file) else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&bytes)
+        .split('\n')
+        .filter(|l| !l.is_empty())
+        .filter_map(|l| row_json(l, true))
+        .collect()
+}
+
+/// `latestSample(name, { now })`: the newest sample, read from the end of the file (the panel
+/// asks for every running server every few seconds). Nothing when it is older than three
+/// intervals.
+pub fn latest_sample(file: &Path, now_ms: f64) -> Option<serde_json::Map<String, serde_json::Value>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(file).ok()?;
+    let size = f.metadata().ok()?.len();
+    let length = size.min(512);
+    if length == 0 {
+        return None;
+    }
+    f.seek(SeekFrom::Start(size - length)).ok()?;
+    let mut buf = Vec::with_capacity(length as usize);
+    f.take(length).read_to_end(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf);
+    let last = text.split('\n').rfind(|l| !l.is_empty())?;
+    // judged on the time alone first, as Node does: a stale line is nothing whatever else it holds
+    let at = last
+        .split(' ')
+        .next()
+        .map_or(f64::NAN, crate::js::string_to_number);
+    if !at.is_finite() || now_ms / 1000.0 - at > (INTERVAL_SEC * 3) as f64 {
+        return None;
+    }
+    row_json(last, false)
 }
 
 /// `readSamples(name, { strict })`: rows that are whole and in range, in file order. `strict`
