@@ -206,11 +206,12 @@ jobs:
 
   parity:
     # The core port's parity rig (tools/parity/, rust/PLAN-CORE-PORT.md section 6): every scenario
-    # run twice, on the Node core (SPAWNLOFT_CORE_IMPL=node) and as the ownership table in cli.rs
-    # decides, outputs, exit codes, fake-host requests and data trees compared; the self-tests must
-    # find the differences they seed; the golden --json and MCP files must still match. Plus the
-    # lock contract across a Node and a Rust process. On every pull request, on the three
-    # platforms and on Linux arm64.
+    # run on the Rust core and compared with what the Node core did, frozen per platform before
+    # it left (tools/parity/frozen/): outputs, exit codes, fake-host requests and data trees; the
+    # self-tests must find the differences they seed; the golden --json and MCP files must still
+    # match. Plus the lock, registry and zip contracts across a Node and a Rust process, while the
+    # Node modules they read exist. On every pull request, on the three platforms and on Linux
+    # arm64.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -266,7 +267,7 @@ jobs:
       - name: The rig's own tests, the cross-process lock, registry, zip and backup tests, and the MCP tests on the Rust core
         env:
           TMPDIR: ${{ runner.temp }}
-        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs test/zip-cross-process.test.mjs test/backup-cross-process.test.mjs test/mcp.test.mjs test/mcp-client.test.mjs
+        run: node --test --test-concurrency=1 test/parity-rig.test.mjs test/c1-fixtures.test.mjs test/test-origins.test.mjs test/contracts-locks.test.mjs test/lock-cross-process.test.mjs test/registry-cross-process.test.mjs test/zip-cross-process.test.mjs test/parity-frozen.test.mjs test/mcp.test.mjs test/mcp-client.test.mjs
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
