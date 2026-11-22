@@ -450,6 +450,16 @@ export function recordOf(side, neutral) {
   }
 }
 
+// A record with the scenario's normalize rules run over its text again.
+function renormalized(record, extra) {
+  const even = (t) => typeof t === 'string' ? normalizeText(t, extra) : t
+  return {
+    ...record,
+    steps: record.steps.map(s => ({ ...s, stdout: even(s.stdout), stderr: even(s.stderr) })),
+    tree: Object.fromEntries(Object.entries(record.tree).map(([p, e]) => [p, e && typeof e.text === 'string' ? { ...e, text: even(e.text) } : e])),
+  }
+}
+
 // A frozen record read back as a side compareSides takes.
 export function sideOfRecord(record) {
   return { steps: record.steps, requests: record.requests, tree: new Map(Object.entries(record.tree)) }
@@ -511,6 +521,9 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   } else if (frozen === 'record') {
     if (!results[recordFrom]) {
       problems.push(`cannot record: the ${recordFrom} side did not run`)
+    } else if (expect === 'differ' && recordFrom !== 'node') {
+      // the seeded side is the Rust one, so its record would hold the seeded difference
+      problems.push('a self-test is recorded from the Node side only')
     } else if (!problems.length && (expect === 'differ' || !diffs.length)) {
       // only a clean run is frozen: a problem or a difference between the sides may be a flake
       fs.mkdirSync(path.dirname(recordPath), { recursive: true })
@@ -521,7 +534,9 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
       const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'))
       // a self-test's record is the unseeded run: with a Node side its seeded difference is
       // already found between the sides
-      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(sideOfRecord(record), sideOfRecord(recordOf(results.rust, neutral)), ['frozen', 'rust'])
+      // the scenario's normalize rules run over the record too, so a rule added after it was
+      // frozen (a runner's tool version, say) holds without recording it again
+      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(sideOfRecord(renormalized(record, scenario.normalize ?? [])), sideOfRecord(recordOf(results.rust, neutral)), ['frozen', 'rust'])
     } else if (!results.node) {
       problems.push(`no frozen record for ${platformKey()}: ${path.relative(repo, recordPath)}`)
     }

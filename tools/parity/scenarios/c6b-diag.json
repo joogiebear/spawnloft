@@ -13,6 +13,14 @@
     {
       "pattern": "\"at\":\"<time>\",\"source\":\"client-process\"",
       "replace": "\"at\":\"<now>\",\"source\":\"client-process\""
+    },
+    {
+      "pattern": "((?:openjdk|java) version \\\\?\")[^\"\\\\]+",
+      "replace": "$1<java version>"
+    },
+    {
+      "pattern": "(tar: )[^\"\\\\\\n]+",
+      "replace": "$1<tar version>"
     }
   ],
   "steps": [
