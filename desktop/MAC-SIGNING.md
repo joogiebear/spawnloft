@@ -53,31 +53,25 @@ The last four commands prompt for their values. Do not put passwords in command 
 Apple's [notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
 describes this authentication method. API-key authentication can be added separately if needed.
 
-## 3. Enable signed development builds
+## 3. Where the secrets are used
 
-After the signing changes are reviewed/merged into `dev` and all five secrets are present,
-set the repository Actions **variable** `MAC_SIGNING_ENABLED` to `true`. Dispatch
-`desktop-preview` on `dev` to build a new numbered beta. Never replace a published release.
+The `installer-mac` workflow (`.github/workflows/installer-mac.yml`) imports the Developer ID
+identity into a temporary keychain, and `tauri build` signs, notarizes and staples the app with
+it; the release job also signs, notarizes and staples the `.dmg`. Pull requests receive no
+Apple signing credentials. Missing credentials or failed notarization fail the build; they do
+not fall back to an unsigned release. The signing checks themselves are in
+`desktop/mac-signing.cjs`, used by `rust/crates/spawnloft-shell/installer/verify-mac-build.cjs`.
 
-The workflow resolves the signing policy once per run. Only `dev` pushes and manual `dev`
-runs can use signed mode. Pull requests and other branches remain ad-hoc and receive no
-Apple signing credentials. Missing credentials or failed notarization fail the signed build;
-they do not fall back to an unsigned release.
-
-The app and helpers use hardened runtime with the V8 JIT entitlement. The workflow verifies
-the signature, expected Team ID, secure timestamp, hardened runtime, stapled notarization
-ticket, and Gatekeeper acceptance before the packaged app smoke tests. Both Mac architectures
-must report the same signing mode before publishing. Release notes use the verified mode.
-
-Signed releases publish combined `beta-mac.yml` and `latest-mac.yml` feeds only after
-both native ZIPs pass verification. Ad-hoc builds do not publish Mac feeds. The
-existing Windows updater and stable release channel are preserved. Beta.25 and older
-need one manual replacement to enable automatic updates.
+The app runs no JavaScript engine of its own (no Node, no Electron), so it is signed with
+hardened runtime and without JIT entitlements. The job verifies the signature, expected Team ID,
+secure timestamp, hardened runtime, stapled notarization ticket and Gatekeeper acceptance before
+the build is uploaded. Publishing is a separate step ([`rust/RELEASE.md`](../rust/RELEASE.md));
+nothing in the workflow publishes.
 
 ## 4. Test the downloaded release
 
-Download the appropriate DMG from the new beta release using a browser on a Mac, replace
-the previous app, and launch normally. Test the GUI, bundled CLI, server startup, console,
+Download the DMG from the new release using a browser on a Mac, replace the previous app,
+and launch normally. Test the GUI, bundled CLI, server startup, console,
 backups/restore, and managed MySQL. Apple Silicon needs its own native checks.
 This first signed run is needed to validate the real credentials and entitlements; local
 unit tests cannot prove notarization or Gatekeeper behavior.

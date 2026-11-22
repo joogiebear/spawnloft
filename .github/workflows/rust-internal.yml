@@ -9,10 +9,6 @@ name: rust-internal
 # It packages nothing and publishes nothing; the 2.0 packages are built by installer.yml,
 # installer-mac.yml and installer-linux.yml.
 #
-# The Electron internal package job that used to end this workflow is gone (panel sign-in design,
-# decision 5): 2.0 does not ship Electron, and the panel checks its smoke ran moved to the
-# panel-smoke job.
-#
 # desktop-preview.yml and desktop-stable.yml (the Electron beta and stable pipelines) are retired
 # on v2, so merging v2 into dev or main publishes nothing by itself
 # (test/no-electron-publish.test.mjs).
@@ -373,8 +369,7 @@ jobs:
     # The panel in a real browser on each platform (desktop/smoke-panel.cjs): signing in through
     # `spawnloft ui`, the console, live performance charts, backups, the file editor, the console
     # window, managed MySQL and Redis, the scheduler on macOS, a restart that ends the old tab's
-    # session, and `spawnloft ui --link`, all on spawnloft-core. It took these checks over from the
-    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship. The core is
+    # session, and `spawnloft ui --link`, all on spawnloft-core. The core is
     # built with the test hooks, so the server's java can be the .mjs stand-in.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:

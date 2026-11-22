@@ -18,9 +18,8 @@ an AND mask, which is what every Windows shell code path has always understood; 
 the only way it is allowed to be. An all-PNG icon usually works and occasionally does not, and
 "occasionally" is not a property you want in the first thing a stranger sees.
 
-electron-builder picks this up automatically from `build/icon.ico` for the executable, the installer,
-the uninstaller and the Start Menu entry. `main.js` points `BrowserWindow` at it explicitly as well,
-because an unpackaged `npm start` does not get it for free.
+`rust/crates/spawnloft-shell/tauri.conf.json` names it for the executable and the installer, which
+also uses it for the uninstaller and the Start Menu entry.
 
 ### Regenerating
 
@@ -31,10 +30,11 @@ to 16px; the vent turns to mush.
 
 ## `icon.png`
 
-The 256px raster, kept alongside for documentation and release notes.
+The 256px raster. The Tauri bundle and the Linux packages
+(`rust/crates/spawnloft-shell/installer/linux-package.mjs`) use it as the window and desktop icon.
 
 ## `icon-mac.png`
 
 The same SVG rasterized at 1024px for the Mac app bundle. macOS packaging requires
 at least 512px; regenerate this from `icon.svg` instead of enlarging the 256px image.
-The Mac preview configuration converts it to the bundle's ICNS icon during packaging.
+The `installer-mac` workflow converts it to the bundle's ICNS icon with `tauri icon` during packaging.

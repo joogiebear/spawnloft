@@ -1,7 +1,9 @@
 {
   "about": "What the C1 review found: registries holding half an emoji or a record's own name, pids as Node's process.kill coerces them and an image the process table contradicts, crash reports with equal times, case-insensitive patterns beyond ASCII and Annex B escapes, a console larger than -n's read with a count that is not whole, and a sample time past 9999.",
   "normalize": [
-    { "pattern": "\\b\\d{4}d \\d{1,2}h(?= )", "replace": "<uptime>" }
+    { "pattern": "\\b\\d{4}d \\d{1,2}h(?= )", "replace": "<uptime>" },
+    { "pattern": "UPTIME +DIR", "replace": "UPTIME <pad>DIR", "flags": "g" },
+    { "pattern": "<uptime> +", "replace": "<uptime><pad>", "flags": "g" }
   ],
   "steps": [
     { "write": "data/instances.json", "json": { "version": 1, "instances": { "a": { "dir": "{run}/a", "label": "aaaa\ud83d", "port": 25565, "memory": "2G" }, "c": { "dir": "{run}/c", "label": "\ud83d\ude00 ok \udc00", "port": 25567 } } } },

@@ -8,13 +8,16 @@ import { createRequire } from 'node:module'
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dir = path.join(root, '.github', 'workflows')
 
-// A YAML parser is only to hand where the desktop toolchain has been installed (electron-builder
-// brings one); the core has no dependencies to take one from. CI installs it before the desktop
-// previews and not before the plain test jobs, so this runs where it can.
+// A YAML parser: the core has no dependencies to take one from, so the Linux CI job installs a
+// pinned js-yaml outside the repository and names it in SPAWNLOFT_YAML_DIR. In CI a missing parser
+// is a failure; on a machine without one the test is skipped.
 let yaml = null
-try { yaml = createRequire(path.join(root, 'desktop', 'package.json'))('js-yaml') } catch { /* not installed here */ }
+for (const base of [process.env.SPAWNLOFT_YAML_DIR, root].filter(Boolean)) {
+  try { yaml = createRequire(path.join(base, 'package.json'))('js-yaml'); break } catch { /* not there */ }
+}
+if (!yaml && process.env.SPAWNLOFT_YAML_DIR) throw new Error(`js-yaml is not in ${process.env.SPAWNLOFT_YAML_DIR}`)
 
-test('every workflow file is valid YAML with jobs in it', { skip: yaml ? false : 'js-yaml is not installed (run npm ci in desktop/)' }, () => {
+test('every workflow file is valid YAML with jobs in it', { skip: yaml ? false : 'js-yaml is not installed (set SPAWNLOFT_YAML_DIR to a folder with node_modules/js-yaml)' }, () => {
   // GitHub does not fail a workflow it cannot parse: it lists it under its file path, runs nothing,
   // and the pull request shows green. A colon followed by a space inside a one-line run: starts a key.
   for (const file of fs.readdirSync(dir).filter(name => /\.ya?ml$/.test(name))) {

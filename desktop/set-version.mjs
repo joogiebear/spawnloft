@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Sets the version in the core's package.json, the desktop's, and the desktop lockfile, which must
-// agree (publish-stable.mjs refuses a release where they don't). `npm version` only handles its
+// Sets the version in the core's package.json and the desktop's, which must agree (CI's
+// version-policy job refuses a pull request where they don't). `npm version` only handles its
 // own folder. Text is edited rather than re-serialised so line endings and layout stay put.
 //
 //   node desktop/set-version.mjs 1.3.0-beta.1     # the start of a month's work on dev
@@ -17,19 +17,6 @@ export function setPackageVersion(text, version) {
   return { text: text.slice(0, found.index) + found[1] + version + found[3] + text.slice(found.index + found[0].length), from: found[2] }
 }
 
-// the package's own version appears twice, first in the file (top level and packages[""]),
-// followed by every dependency's
-export function setLockVersion(text, version) {
-  const own = JSON.parse(text)
-  if (own.version !== own.packages?.['']?.version) throw new Error('the lockfile disagrees with itself about the version')
-  let seen = 0
-  const next = text.replace(/("version":\s*")([^"]+)(")/g, (whole, open, current, close) =>
-    current === own.version && seen++ < 2 ? open + version + close : whole)
-  const check = JSON.parse(next)
-  if (check.version !== version || check.packages[''].version !== version) throw new Error('the lockfile version could not be set')
-  return { text: next, from: own.version }
-}
-
 const here = path.dirname(fileURLToPath(import.meta.url))
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const version = process.argv[2]
@@ -40,7 +27,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const files = [
     [path.join(here, '..', 'package.json'), setPackageVersion],
     [path.join(here, 'package.json'), setPackageVersion],
-    [path.join(here, 'package-lock.json'), setLockVersion],
   ]
   // compute every edit before writing any, so a failure can't leave the files disagreeing
   const edits = files.map(([file, set]) => ({ file, ...set(fs.readFileSync(file, 'utf8'), version) }))

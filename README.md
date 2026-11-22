@@ -478,7 +478,7 @@ the panel that ships is the file in `src/ui.html`, compiled into the binary, and
 because nothing is fetched from anywhere.
 
 The same page runs in a browser tab and inside the desktop app. `window.spawnloftDesktop` exists only in
-Electron, and everything that depends on it is additive: a Browse button beside a path field, a
+the desktop app, and everything that depends on it is additive: a Browse button beside a path field, a
 Settings screen that can move the data folder, update checking. In a browser those simply are not
 there, and nothing else changes.
 
@@ -678,8 +678,8 @@ cargo build -p spawnloft-core -p spawnloft-shell
 SPAWNLOFT_CORE_BIN=target/debug/spawnloft-core SPAWNLOFT_CORE_DIR=.. ./target/debug/SpawnLoft
 ```
 
-The `desktop/` folder holds the release and packaging scripts and the 1.x Electron main process,
-which the 2.0 line no longer builds.
+The `desktop/` folder holds the release, packaging and smoke scripts the 2.0 builds use, and the
+icons; the app itself is the Tauri shell in `rust/crates/spawnloft-shell`.
 
 Closing the window does **not** stop your servers. They are detached daemons that do not belong to
 the app.
@@ -689,29 +689,18 @@ the app.
 Installers and the update feeds live on **this repository's releases**. Windows, macOS and
 Linux are always one release, built from one commit.
 
-**On the 2.0 line (`v2`) the Electron pipelines below are retired:** nothing is published by a
-push, and 2.x releases go out only from the Tauri release workflow on the maintainer's word.
-
-**Betas are published by CI (1.x).** `dev` carries a prerelease version. Every push to it builds
-Windows x64, Apple Silicon Mac, Linux x64 and Linux arm64, opens each packaged app and runs the same
-smoke test against it - on Linux the `.deb` is installed with apt on Ubuntu 24.04 first - and
-publishes one release, numbered from the workflow run, only if all four pass. A pull request
-into `dev` runs the same builds and tests without publishing. See
-[`desktop/PREVIEW.md`](desktop/PREVIEW.md), which is also the text of each beta.
-
-**Stable releases are verified together, then published.** A release branch sets a stable
-version and is merged to `main`. The `desktop-stable` workflow signs and notarizes both Mac
-apps, checks an installed beta-to-stable upgrade, and builds, installs and exercises the Linux
-package. The Windows installer is built and signed on the Azure signing machine. Then
-`publish-stable.mjs` checks every package's bytes against its manifest, the Windows signature,
-that all four were built from the same clean commit, and the uploaded digests, and only then
-makes the release public; anything it cannot vouch for is left as a draft. The procedure is in
-[`desktop/STABLE.md`](desktop/STABLE.md), which is also the text of the stable release.
+Nothing is published by a push. A 2.x release is built by the `installer-mac` and
+`installer-linux` workflows and on the Windows signing machine, assembled into one folder, put
+through the release gate, and published only on the maintainer's word; the procedure is in
+[`rust/RELEASE.md`](rust/RELEASE.md). Release notes are written in
+[`desktop/STABLE.md`](desktop/STABLE.md) (stable) and [`desktop/PREVIEW.md`](desktop/PREVIEW.md)
+(betas), and the update signing keys are described in
+[`desktop/UPDATER-KEYS.md`](desktop/UPDATER-KEYS.md).
 
 Nothing is ever published half-uploaded. That rule has a history: an early release went live
 with its blockmap uploaded and its 111 MB installer not, and a client checking for updates in
 that window got a 404. A draft left unpublished is the opposite failure - it looks released on
-GitHub while `electron-updater` cannot see it at all. Both are why publication is a separate
+GitHub while an installed copy cannot see it at all. Both are why publication is a separate
 step that verifies first.
 
 Every published release names the commit it was built from, captured at build time rather than
@@ -719,8 +708,9 @@ publish time. Same information under **Settings → About** in the app, so a bug
 the exact build rather than a version several builds could share.
 
 Builds are signed through **Azure Artifact Signing** (formerly Trusted Signing), configured under
-`win.azureSignOptions`. That publishes under a validated individual identity, which is what turns
-"Unknown publisher" into a name.
+`build.win.azureSignOptions` in `desktop/package.json` (read by
+`rust/crates/spawnloft-shell/installer/release-windows.mjs` and the release gate). That publishes
+under a validated individual identity, which is what turns "Unknown publisher" into a name.
 
 It does **not** make SmartScreen go away immediately. SmartScreen is a reputation system, not a
 signature check, and reputation accrues to the publisher identity through real installs — so a new
@@ -730,8 +720,8 @@ builds.
 
 Signing needs, on the build machine:
 
-- the **.NET SDK** — electron-builder installs a `dotnet` tool to do the signing, and fails with
-  "No .NET SDKs were found" if only the runtime is present
+- the **TrustedSigning** PowerShell module (`Install-Module -Name TrustedSigning -Scope CurrentUser`),
+  which `release-windows.mjs` signs through
 - **`az login`**, against the tenant holding the signing account. Note that MFA is enforced for
   Azure Resource Manager, and a bare `az login` fails against such a tenant because it tries to
   acquire tokens silently — use `az login --tenant <id>`, which authenticates interactively.
@@ -741,38 +731,20 @@ Signing needs, on the build machine:
 
 Certificates live about **three days** and rotate automatically, which is why every signature is
 timestamped — without one, everything already shipped would stop validating within the week rather
-than staying valid for the moment it was signed in. `npm run verify` treats a missing timestamp as
+than staying valid for the moment it was signed in. The release gate treats a missing timestamp as
 a failure for exactly that reason.
 
 ### Tests
 
 ```bash
-cd desktop
-npm test
+npm test                  # the Node tests under test/
+npm --prefix desktop test # the release and packaging tooling in desktop/
 ```
 
-Covers window-state.js, which decides whether a remembered window position is still somewhere a
-person can reach. That decision depends on which monitors are attached — the thing you cannot
-arrange on the machine running the test — so the module takes the display list as an argument and
-the test passes it fictional ones, including the case that matters: a window last seen on a second
-monitor that is no longer plugged in.
-
-### Checking a build before shipping it
-
-CI runs the test suite and a CLI smoke check on every push, but it cannot build,
-sign or publish - the signing profile lives on the release machine - so the
-build checks itself:
-
-```bash
-cd desktop
-npm run pack      # builds; afterPack fails it if the result is wrong
-npm run verify    # re-checks a build that already exists, icon included
-```
-
-The check covers the things that have gone wrong silently before — the app icon not reaching the
-executable, the core not being copied into `resources`, a file added to `desktop/` and forgotten in
-the `files` allowlist, and a signature that is missing, invalid or untimestamped. `afterPack` runs during the build itself, so a bad build throws before an
-installer is made and long before anything is published.
+CI runs these on every pull request, but it cannot sign or publish - the signing profile lives
+on the release machine. A build is checked by the release gate (`desktop/release-gate.mjs`)
+before anything is published: the versions in each binary, what the shell and core trust, the
+Authenticode signatures and their timestamps, and that no Node runtime is in the payload.
 
 ### How updates behave
 

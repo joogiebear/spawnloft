@@ -1,4 +1,5 @@
-; Included by electron-builder into the installer and the uninstaller (nsis.include in package.json).
+; The 1.x (electron-builder) installer hooks, kept as the reference for what the 2.0 installer
+; (rust/crates/spawnloft-shell/windows/installer.nsi) does the same way. Nothing includes it now.
 ;
 ; The uninstaller removes the program folder and nothing else, on purpose. Two leftovers are never
 ; wanted though: scheduled tasks that would keep firing at a program that is gone, and servers left

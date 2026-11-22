@@ -2,137 +2,18 @@
   "name": "spawnloft-desktop",
   "version": "1.6.0-beta.2",
   "private": true,
-  "description": "SpawnLoft desktop app - Minecraft servers on your own PC, without the terminal",
-  "productName": "SpawnLoft",
-  "desktopName": "spawnloft-desktop.desktop",
-  "main": "main.js",
+  "description": "SpawnLoft's release, packaging and smoke tooling for the 2.0 desktop app (the Tauri shell in rust/crates/spawnloft-shell)",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --core ..",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "release": "node release.mjs",
-    "verify": "node verify-build.mjs",
-    "test": "node window-state.test.js && node ui-zoom.test.js && node --test update-channel.test.js major-update.test.js launcher-window.test.js login-window.test.js core-binary.test.mjs update-envelope.test.mjs release-feed.test.mjs version-stamp.test.mjs linux-package.test.mjs",
-    "release:publish": "node finish-release.mjs",
-    "release:stable": "node release-stable.mjs"
-  },
-  "devDependencies": {
-    "electron": "^44.9.1",
-    "electron-builder": "^26.15.3"
+    "test": "node --test update-envelope.test.mjs release-feed.test.mjs version-stamp.test.mjs linux-package.test.mjs payload-gate.test.mjs"
   },
   "build": {
-    "appId": "io.github.joogiebear.mcctl",
-    "productName": "SpawnLoft",
-    "files": [
-      "main.js",
-      "preload.js",
-      "window-state.js",
-      "ui-zoom.js",
-      "update-channel.js",
-      "major-update.js",
-      "launcher-window.js",
-      "login-window.js",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "..",
-        "to": "core",
-        "filter": [
-          "mcctl.mjs",
-          "spawnloft.mjs",
-          "src/**",
-          "package.json",
-          "!**/node_modules",
-          "!instances/**",
-          "!jars/**",
-          "!backups/**",
-          "!run/**",
-          "!desktop/**",
-          "!.git/**"
-        ]
-      }
-    ],
     "win": {
-      "target": [
-        "nsis"
-      ],
-      "icon": "build/icon.ico",
       "azureSignOptions": {
         "publisherName": "victor zemeckis",
         "endpoint": "https://eus.codesigning.azure.net/",
         "codeSigningAccountName": "Mcctl",
         "certificateProfileName": "MCCTL"
       }
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": false,
-      "perMachine": false,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "SpawnLoft",
-      "artifactName": "SpawnLoft-Setup-${version}.${ext}",
-      "allowElevation": false,
-      "include": "build/installer.nsh"
-    },
-    "linux": {
-      "target": [
-        "deb",
-        "rpm"
-      ],
-      "icon": "build/icon.png",
-      "category": "Utility",
-      "executableName": "spawnloft-desktop",
-      "synopsis": "Minecraft servers on your own PC, without the terminal",
-      "maintainer": "joogiebear <joogiebear@protonmail.com>",
-      "artifactName": "SpawnLoft-${version}-linux-${arch}.${ext}",
-      "extraResources": [
-        {
-          "from": "build/icon.png",
-          "to": "icon.png"
-        }
-      ],
-      "desktop": {
-        "entry": {
-          "Name": "SpawnLoft",
-          "Keywords": "minecraft;server;paper;spigot;"
-        }
-      }
-    },
-    "deb": {
-      "packageName": "spawnloft",
-      "packageCategory": "utils",
-      "fpm": [
-        "./build/linux/spawnloft=/usr/bin/spawnloft"
-      ]
-    },
-    "rpm": {
-      "packageName": "spawnloft",
-      "fpm": [
-        "./build/linux/spawnloft=/usr/bin/spawnloft"
-      ]
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "joogiebear",
-        "repo": "spawnloft",
-        "releaseType": "draft"
-      }
-    ],
-    "afterPack": "./after-pack.js"
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.9"
-  },
-  "homepage": "https://github.com/joogiebear/spawnloft",
-  "author": {
-    "name": "joogiebear",
-    "email": "joogiebear@protonmail.com"
+    }
   }
 }
