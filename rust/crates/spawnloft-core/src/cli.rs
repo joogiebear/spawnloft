@@ -308,6 +308,11 @@ pub const PORTED: &[Row] = &[
         names: &["bot"],
         when: When::Always,
     },
+    // C9: the MCP server an AI client launches
+    Row {
+        names: &["mcp"],
+        when: When::Always,
+    },
 ];
 
 /// The CI and support switch (plan section 3.1): `SPAWNLOFT_CORE_IMPL=node` forwards every
@@ -724,7 +729,7 @@ mod tests {
             assert!(is_ported(&strings), "{line:?}");
         }
         assert!(!is_ported(&["--version".to_string()]));
-        assert!(!is_ported(&["mcp".to_string()]));
+        assert!(is_ported(&["mcp".to_string()]));
     }
 
     #[test]
@@ -804,13 +809,15 @@ mod tests {
     }
 
     #[test]
-    fn bot_is_ported() {
+    fn bot_and_mcp_are_ported() {
         for line in [
             &["bot"][..],
             &["bot", "check"],
             &["bot", "check", "alpha", "--json"],
             &["bot", "setup", "--force"],
             &["bot", "run", "s.json", "--instance", "alpha"],
+            &["mcp"],
+            &["mcp", "--allow-destructive", "--show-ips"],
         ] {
             assert!(!forwards_with(&os(line), false, PORTED), "{line:?} is ported");
             assert!(forwards_with(&os(line), true, PORTED), "{line:?} with the switch");
@@ -831,7 +838,7 @@ mod tests {
 
     #[test]
     fn what_is_forwarded_to_the_node_core() {
-        for line in [&["mcp"][..], &["frobnicate"]] {
+        for line in [&["frobnicate"][..], &["frobnicate", "--json"]] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
                 "{line:?} should be forwarded"

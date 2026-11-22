@@ -1,0 +1,69 @@
+{
+  "about": "C9: the MCP protocol edges, on both eras. Handshake versions (a known one, an unknown one, none), a modern request with its version in _meta and one without client capabilities, an unsupported version, ping, unknown methods, requests that are not requests (no method, a bad jsonrpc, an array, a number), notifications that need no answer (cancelled, an unknown one), tools/call with no name, an unknown tool, arguments that are not an object, a missing required argument, wrong types, enum and integer checks, the Object.prototype names that pass unchecked, and the usage errors of the mcp command itself.",
+  "steps": [
+    {
+      "run": [
+        "mcp",
+        "extra"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "mcp",
+        "--bogus"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "mcp",
+        "--json"
+      ],
+      "expect": {
+        "code": 2
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"1999-01-01\",\"capabilities\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"initialize\",\"params\":{}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"initialize\"}\n{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"ping\"}\n{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"ping\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}\n{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"ping\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"ping\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2030-01-01\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}\n{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/list\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{},\"io.modelcontextprotocol/clientInfo\":{\"name\":\"modern-rig\"}}}}\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"server/discover\",\"params\":{\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}\n{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"resources/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"prompts/list\"}\n{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"no/such\"}\n{\"jsonrpc\":\"2.0\",\"id\":13}\n{\"jsonrpc\":\"1.0\",\"id\":900,\"method\":\"ping\"}\n{\"id\":901,\"method\":\"ping\"}\n[1,2,3]\n42\n\"text\"\nnull\n{\"jsonrpc\":\"2.0\",\"id\":902,\"method\":5}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\",\"params\":{\"requestId\":12345}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/whatever\"}\n{\"jsonrpc\":\"2.0\",\"id\":14,\"method\":\"tools/call\",\"params\":{}}\n{\"jsonrpc\":\"2.0\",\"id\":15,\"method\":\"tools/call\"}\n{\"jsonrpc\":\"2.0\",\"id\":16,\"method\":\"tools/call\",\"params\":{\"name\":\"no_such_tool\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":17,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":\"nope\"}}\n{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":[]}}\n{\"jsonrpc\":\"2.0\",\"id\":19,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\"}}\n{\"jsonrpc\":\"2.0\",\"id\":20,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":5}}}\n{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"nope\",\"lines\":2.5}}}\n{\"jsonrpc\":\"2.0\",\"id\":23,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"nope\",\"lines\":\"10\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"nope\",\"level\":\"info\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\",\"params\":{\"name\":\"diagnostics\",\"arguments\":{\"name\":\"nope\",\"bundle\":\"yes\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":26,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_run_scenario\",\"arguments\":{\"scenario\":[]}}}\n{\"jsonrpc\":\"2.0\",\"id\":27,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_run_scenario\",\"arguments\":{\"scenario\":\"x\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":28,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\",\"constructor\":5}}}\n{\"jsonrpc\":\"2.0\",\"id\":29,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\",\"toString\":1,\"extra\":true}}}\n{\"jsonrpc\":\"2.0\",\"id\":30,\"method\":\"tools/call\",\"params\":{\"name\":\"list_servers\",\"arguments\":{\"anything\":1}}}\n{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":\"tools/call\",\"params\":{\"name\":\"list_servers\",\"arguments\":{},\"_meta\":{\"progressToken\":\"p1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":32,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\"},\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}\n\n   \n{\"jsonrpc\":\"2.0\",\n{\"jsonrpc\":\"2.0\",\"id\":33,\"method\":\"ping\"}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp",
+        "--allow-destructive"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":34,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"second\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":35,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\"}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    }
+  ],
+  "normalize": [
+    {
+      "pattern": "(\"name\":\"spawnloft\",\"title\":\"SpawnLoft\",\"version\":)\"[^\"]*\"",
+      "replace": "$1\"<version>\""
+    }
+  ]
+}

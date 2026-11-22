@@ -780,6 +780,9 @@ pub struct Stopped {
     pub forced: bool,
     /// the daemon's answer (`code`, `forced`, ...), when it gave one
     pub reply: Option<Map<String, Value>>,
+    /// what `stop` and `kill` return in the Node core, as the MCP tools spread it: the daemon's
+    /// answer, `{ alreadyStopped: true }`, or `{ forced: true, orphan | viaPid: true }`
+    pub detail: Map<String, Value>,
 }
 
 impl Stopped {
@@ -788,15 +791,29 @@ impl Stopped {
             already_stopped: true,
             forced: false,
             reply: None,
+            detail: one(&[("alreadyStopped", true)]),
         }
     }
     fn of_reply(reply: Map<String, Value>) -> Stopped {
         Stopped {
             already_stopped: false,
             forced: js::truthy(reply.get("forced")),
+            detail: reply.clone(),
             reply: Some(reply),
         }
     }
+    fn forced(how: &str) -> Stopped {
+        Stopped {
+            already_stopped: false,
+            forced: true,
+            reply: None,
+            detail: one(&[("forced", true), (how, true)]),
+        }
+    }
+}
+
+fn one(pairs: &[(&str, bool)]) -> Map<String, Value> {
+    pairs.iter().map(|(k, v)| ((*k).to_string(), json!(v))).collect()
 }
 
 /// `stop(name, { timeout })`.
@@ -854,16 +871,11 @@ fn force_stop(layout: &Layout, name: &str) -> Result<Stopped, Failure> {
         return Ok(Stopped::already());
     }
     let state = state.unwrap_or_default();
-    let forced = Stopped {
-        already_stopped: false,
-        forced: true,
-        reply: None,
-    };
     if status == Status::Orphaned {
         kill_tree(state.get("javaPid"));
         wait_for_pid_exit(state.get("javaPid"), 15000.0);
         control::clear_state(&sp);
-        return Ok(forced);
+        return Ok(Stopped::forced("orphan"));
     }
     // the daemon first, so it can clean up; the pids when the channel cannot be reached
     if let Ok(addr) = control_addr(layout, name)
@@ -879,7 +891,7 @@ fn force_stop(layout: &Layout, name: &str) -> Result<Stopped, Failure> {
     wait_for_pid_exit(state.get("javaPid"), 15000.0);
     wait_for_pid_exit(state.get("daemonPid"), 15000.0);
     control::clear_state(&sp);
-    Ok(forced)
+    Ok(Stopped::forced("viaPid"))
 }
 
 /// `sendConsole(name, line)`.

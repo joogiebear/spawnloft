@@ -123,6 +123,7 @@ fn run(layout: &Layout, paths: &Paths, name: &str, asked: &Asked, hear: &Hear<'_
             server: asked.server.clone(),
             on_progress: hear.on_progress,
             on_warning: &|_| {},
+            assistant: false,
             fake_java: launch::fake_client_java(),
         },
         &PanelOpts {

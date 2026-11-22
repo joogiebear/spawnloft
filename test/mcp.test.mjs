@@ -9,6 +9,12 @@ import { hideIps } from '../src/mcp-tools.mjs'
 import { validate } from '../src/mcp.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// The Node core by default; the Rust core when SPAWNLOFT_CORE_BIN names a built spawnloft-core
+// (rust-internal.yml's parity job), so the same cases hold whichever core serves MCP (C9):
+//   (cd rust && cargo build -p spawnloft-core --features test-hooks)
+//   SPAWNLOFT_CORE_BIN=$PWD/rust/target/debug/spawnloft-core node --test test/mcp.test.mjs
+const CORE = process.env.SPAWNLOFT_CORE_BIN
+const mcpCommand = (args) => CORE ? [CORE, ['mcp', ...args]] : [process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp', ...args]]
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'sl-mcp-'))
 const data = path.join(scratch, 'data')
 const instance = path.join(data, 'instances', 'royalplugins')
@@ -44,7 +50,7 @@ const meta = (extra = {}) => ({ 'io.modelcontextprotocol/protocolVersion': '2026
 
 function session(messages, args = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(root, 'spawnloft.mjs'), 'mcp', ...args],
+    const child = spawn(...mcpCommand(args),
       { env, stdio: ['pipe', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''

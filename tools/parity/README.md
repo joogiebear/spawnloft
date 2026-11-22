@@ -87,6 +87,9 @@ Not isolated: the Windows user PATH.
 ```
 
 - `{run}`, `{data}`, `{home}` and `{repo}` in any string are this side's paths.
+- `rpc: true` writes `stdin` one line at a time: a JSON-RPC request waits for the reply with its
+  id, a notification for nothing, and any other line for one more line of output. A server that
+  answers requests side by side (the MCP server) is then compared in the order of the requests.
 - A value that is exactly `"{rig-pid}"` becomes the number of the rig's own process: one that is alive on every system while the scenario runs.
 - `expect` is checked on both sides. It stops a scenario from passing only because both sides
   failed the same way, for example when a host was not faked.
@@ -152,7 +155,7 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `basics` | usage, help, an unknown command, empty lists, usage errors with and without `--json` |
 | `registry-read` | C1's read-only commands over two stopped servers, text and `--json`, with the failure paths |
 | `downloads-paper` | faked downloads: Paper's fill API and data host, the jar store, checksum mismatch, HTTP 503, the cache, `jars` |
-| `mcp` | the MCP server over stdio. Golden: `test/fixtures/contracts/cli/mcp-tools.json` (the tool list C9 must equal) |
+| `mcp` | the MCP server over stdio, as `rpc` steps. Golden: `test/fixtures/contracts/cli/mcp-tools.json` (the tool list the Rust server equals byte for byte) |
 | `network-refused` | a host with no fake is refused on both sides, with the same message, and nothing is sent |
 | `cli-json` | all 61 command names with `--json`, then the forms that answer with data. Golden: `test/fixtures/contracts/cli/cli-json.json` |
 | `c1-edges` | C1's commands (`help`, `list`, `status`, `logs`, `why`, `metrics`) over damaged registries, state files, logs, metrics and crash reports, every flag and its usage errors |
@@ -204,6 +207,9 @@ self-tests end to end when `SPAWNLOFT_CORE_BIN` is set.
 | `c8-panel-client` | the launcher's routes over HTTP with Mojang and the loader hosts faked: the version picker and one version described, loader builds, Java found and checked, profiles made, changed, renamed, duplicated and removed with their refusals, the log and its redaction, offline accounts, the default and sign-out, the Microsoft sign-in (its stream, a cancel, Microsoft's refusal, a missing code, a replayed or wrong `state`), and the fake game launched as a request and as a job, with a crash that leaves its exit record |
 | `c9-bot` | C9's `bot`: usage errors; `bot check` on a missing server, a bad name, a database, a record with no folder, an online-mode server, stopped servers on loopback, a LAN address and every interface, and a running one with and without a stand-in mineflayer in the host folder, text and `--json`; `bot run` on a missing file, a folder, bad JSON and every refusal of the scenario check; then end to end over the JVM stand-in answering RCON, with the real `bot-host.cjs` driving a stand-in mineflayer: a passing run, setup over RCON (one that fails and aborts the host), a failing step, and a mineflayer that cannot load. Step and run times evened out |
 | `c9-bot-setup` | `bot setup` with no npm on PATH: the pinned files copied first, the refusal, an install without this lockfile's marker (or with another) replaced, and a marker equal to the shipped stamp accepted unless `--force`. Linux and macOS only (a step's `PATH` would sit beside Windows' inherited `Path`) |
+| `c9-mcp-protocol` | C9's MCP protocol edges on both eras, made by `make-c9-mcp-scenarios.mjs`: handshake versions, modern `_meta` with and without client capabilities, an unsupported version, ping, unknown methods, messages that are not requests, notifications, tools/call without a name or with an unknown tool, argument validation (types, enum, integers, required, Object.prototype names) and the `mcp` command's usage errors |
+| `c9-mcp-tools` | the first session of `c9-mcp-running` alone, on every platform: the read tools, the config file tools and their path refusals, and the client and bot tools on a stopped server |
+| `c9-mcp-running` | the MCP tools on a stopped and then a running server (the JVM stand-in answering RCON), made by `make-c9-mcp-scenarios.mjs`: every read tool, start with progress, run_command and its refusals, backup, write_config_file, stop and restart, the destructive previews and their absence without `--allow-destructive`, the download tools with every host refused, the client and bot tools with nothing to drive, the RCON password scrubbed and the activity left under the client's name. Linux and macOS only: on Windows the Node core's MCP server leaves the daemon it started holding its stdout, so the rig finds the pipe held after it exits (the Rust core's does not) |
 
 Each phase adds its own scenarios before it flips its commands, failure paths included (plan
 rule 5).

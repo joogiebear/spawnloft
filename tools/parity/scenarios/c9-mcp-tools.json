@@ -1,0 +1,115 @@
+{
+  "about": "C9: the MCP tools over stdio on a stopped server, the first session of c9-mcp-running (which see), on every platform.",
+  "env": {
+    "FAKE_JAVA_RCON": "1",
+    "SPAWNLOFT_RCON_TIMEOUT_MS": "3000"
+  },
+  "normalize": [
+    {
+      "pattern": "(\"name\":\"spawnloft\",\"title\":\"SpawnLoft\",\"version\":)\"[^\"]*\"",
+      "replace": "$1\"<version>\""
+    },
+    {
+      "pattern": "\\(build [^)]*\\)",
+      "replace": "(build)"
+    },
+    {
+      "pattern": "size=\\d+ csize=\\d+ crc=[0-9a-f]+",
+      "replace": "size=<n> csize=<n> crc=<crc>"
+    },
+    {
+      "pattern": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z",
+      "replace": "<time>"
+    },
+    {
+      "pattern": "\\b\\d+(?:\\.\\d+)? (?:B|KB|KiB|MiB)\\b",
+      "replace": "<size>"
+    },
+    {
+      "pattern": "\"(size|sizeBytes|bytes)\"(\\s*):(\\s*)\\d+",
+      "replace": "\"$1\"$2:$3<n>"
+    },
+    {
+      "pattern": "\"(?:uptimeMs)\":\\d+",
+      "replace": "\"uptimeMs\":<ms>"
+    },
+    {
+      "pattern": "\"(javaPid|pid|daemonPid)\":\\d+",
+      "replace": "\"$1\":<pid>"
+    },
+    {
+      "pattern": "\"runId\":\"run1:\\d+\"",
+      "replace": "\"runId\":\"run1:<epoch-ms>\""
+    },
+    {
+      "pattern": "\"samples\":\\[[^\\]]*\\]",
+      "replace": "\"samples\":<samples>"
+    },
+    {
+      "pattern": "\\b\\d+s\\b *",
+      "replace": "<secs> "
+    },
+    {
+      "pattern": "<stamp>_\\d+\\b",
+      "replace": "<stamp>"
+    }
+  ],
+  "ignore": [
+    "data/run/**",
+    "data/instances/run1/logs/**"
+  ],
+  "steps": [
+    {
+      "write": "data/instances/run1/server.jar",
+      "text": ""
+    },
+    {
+      "write": "data/instances/run1/eula.txt",
+      "text": "eula=true\n"
+    },
+    {
+      "write": "data/instances/run1/server.properties",
+      "text": "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\nserver-ip=127.0.0.1\nmax-players=20\n"
+    },
+    {
+      "write": "data/instances/run1/plugins/Greeter/config.yml",
+      "text": "greeting: hello\nlimit: 3\n"
+    },
+    {
+      "write": "data/instances/run1/plugins/Greeter/messages.properties",
+      "text": "welcome=Welcome!\n"
+    },
+    {
+      "write": "data/instances.json",
+      "json": {
+        "version": 1,
+        "instances": {
+          "run1": {
+            "dir": "{data}/instances/run1",
+            "jar": "server.jar",
+            "java": "{repo}/test/fixtures/fake-java.mjs",
+            "memory": "1G",
+            "port": 47861,
+            "rcon": {
+              "port": 47871,
+              "password": "hunter22secret"
+            },
+            "type": "paper",
+            "mcVersion": "1.21.4"
+          }
+        },
+        "databases": {}
+      }
+    },
+    {
+      "run": [
+        "mcp"
+      ],
+      "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_servers\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"server_status\",\"arguments\":{\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"get_logs\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"diagnostics\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\",\"params\":{\"name\":\"players\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"performance\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"list_snapshots\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":10,\"method\":\"tools/call\",\"params\":{\"name\":\"get_activity\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"tools/call\",\"params\":{\"name\":\"verify_snapshot\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"verify_snapshot\",\"arguments\":{\"name\":\"run1\",\"snapshot\":\"missing.tar.gz\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"list_plugins\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":14,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":15,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\",\"folder\":\"plugins/Greeter\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":16,\"method\":\"tools/call\",\"params\":{\"name\":\"list_config_files\",\"arguments\":{\"name\":\"run1\",\"folder\":\"../..\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":17,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"server.properties\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":19,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"../instances.json\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":20,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/none.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":21,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_check\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"tools/call\",\"params\":{\"name\":\"bot_check\",\"arguments\":{\"name\":\"nope\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":23,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"run1\",\"command\":\"list\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":24,\"method\":\"tools/call\",\"params\":{\"name\":\"stop\",\"arguments\":{\"name\":\"run1\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":25,\"method\":\"tools/call\",\"params\":{\"name\":\"client_profiles\",\"arguments\":{}}}\n{\"jsonrpc\":\"2.0\",\"id\":26,\"method\":\"tools/call\",\"params\":{\"name\":\"client_status\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":27,\"method\":\"tools/call\",\"params\":{\"name\":\"client_messages\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":28,\"method\":\"tools/call\",\"params\":{\"name\":\"client_logs\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":29,\"method\":\"tools/call\",\"params\":{\"name\":\"client_quit\",\"arguments\":{\"profile\":\"nobody\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":30,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"old_text\":\"limit: 3\",\"new_text\":\"limit: 5\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\",\"old_text\":\"absent text\",\"new_text\":\"x\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":32,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":33,\"method\":\"tools/call\",\"params\":{\"name\":\"write_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/messages.properties\",\"content\":\"welcome=Hi!\\n\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":34,\"method\":\"tools/call\",\"params\":{\"name\":\"read_config_file\",\"arguments\":{\"name\":\"run1\",\"path\":\"plugins/Greeter/config.yml\"}}}\n{\"jsonrpc\":\"2.0\",\"id\":35,\"method\":\"tools/call\",\"params\":{\"name\":\"get_activity\",\"arguments\":{\"name\":\"run1\",\"limit\":5}}}\n",
+      "rpc": true,
+      "expect": {
+        "code": 0
+      }
+    }
+  ]
+}

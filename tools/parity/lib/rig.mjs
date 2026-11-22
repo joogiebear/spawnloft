@@ -93,7 +93,48 @@ export function sideEnv(ctx, side, { origins, extra = {} } = {}) {
   return env
 }
 
-function runProcess(bin, args, { cwd, env, stdin, timeoutMs }) {
+// For a step with `rpc: true`: what must come back before the next line of stdin is written,
+// by the rules of `handle` in src/mcp.mjs. A request waits for the reply with its id; a
+// notification (no id) and a message whose method is not a string (a response) for nothing;
+// a bad line, a batch, a non-2.0 object or a bad id for one more line of output (an error with a
+// null id). So a core that answers requests side by side is compared in the order of the
+// requests, not the order they finish.
+export function awaitedReply(line) {
+  if (!line.trim()) return null
+  let message
+  try { message = JSON.parse(line) } catch { return { anyLine: true } }
+  if (!message || typeof message !== 'object' || Array.isArray(message) || message.jsonrpc !== '2.0') return { anyLine: true }
+  if (typeof message.method !== 'string' || message.id === undefined) return null
+  if (!['string', 'number'].includes(typeof message.id)) return { anyLine: true }
+  return { id: message.id }
+}
+
+// The stdin of an `rpc` step, one line at a time, each after the reply it waits for (or
+// RPC_REPLY_MS, so a reply that never comes shows as a difference, not a hang).
+const RPC_REPLY_MS = 30000
+async function writeRpc(child, stdin, out, timeoutMs) {
+  const seen = () => Buffer.concat(out).toString('utf8').split('\n').slice(0, -1)
+  const lines = stdin.split(/\r\n|\r|\n/)
+  if (lines.at(-1) === '') lines.pop()
+  for (const line of lines) {
+    const before = seen().length
+    const wait = awaitedReply(line)
+    child.stdin.write(`${line}\n`)
+    if (!wait) continue
+    const deadline = Date.now() + Math.min(timeoutMs, RPC_REPLY_MS)
+    for (;;) {
+      const got = seen().slice(before)
+      const answered = wait.anyLine ? got.length > 0 : got.some((l) => {
+        try { return JSON.parse(l).id === wait.id } catch { return false }
+      })
+      if (answered || child.exitCode !== null || Date.now() > deadline) break
+      await new Promise((r) => setTimeout(r, 10))
+    }
+  }
+  child.stdin.end()
+}
+
+function runProcess(bin, args, { cwd, env, stdin, rpc, timeoutMs }) {
   return new Promise((resolve) => {
     const child = spawn(bin, args, { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
     const out = []
@@ -104,7 +145,8 @@ function runProcess(bin, args, { cwd, env, stdin, timeoutMs }) {
     child.stderr.on('data', c => err.push(c))
     child.on('error', (e) => err.push(Buffer.from(`spawn failed: ${e.message}\n`)))
     child.stdin.on('error', () => {})
-    child.stdin.end(stdin ?? '')
+    if (rpc) writeRpc(child, stdin ?? '', out, timeoutMs)
+    else child.stdin.end(stdin ?? '')
     let done = false
     const finish = (code, signal, held = false) => {
       if (done) return
@@ -219,7 +261,7 @@ async function runSide(scenario, side, o) {
     const command = step.run[0]
     commands.add(command)
     const env = sideEnv(ctx, side, { origins: o.origins, extra: { ...scenario.env, ...step.env } })
-    const res = await runProcess(o.core, step.run, { cwd: ctx.run, env, stdin: step.stdin, timeoutMs: step.timeoutMs ?? STEP_TIMEOUT_MS })
+    const res = await runProcess(o.core, step.run, { cwd: ctx.run, env, stdin: step.stdin, rpc: step.rpc === true, timeoutMs: step.timeoutMs ?? STEP_TIMEOUT_MS })
     const label = stepLabel(i, raw)
     if (res.timedOut) problems.push(`${side}: ${label} did not finish in ${step.timeoutMs ?? STEP_TIMEOUT_MS} ms`)
     problems.push(...checkExpect(step, res, side, label))
