@@ -388,10 +388,15 @@ fn split_pattern(pattern: &str) -> Option<(&str, &str)> {
     (!source.is_empty() && flags.bytes().all(|b| b.is_ascii_lowercase())).then_some((source, flags))
 }
 
-/// `new RegExp(source, flags)`'s refusal, if it refuses. The flags are V8's; the source is
-/// checked by `jsregex` in JavaScript's non-Unicode dialect (the declared differences
-/// `invalid-pattern-text`, `runtime-pattern-syntax` and `bot-pattern-unicode-mode`).
+/// `new RegExp(source, flags)`'s refusal, if it refuses. The host that runs the scenario
+/// matches in JavaScript on Node, so the same Node decides: V8 itself checks the pattern, with
+/// its own dialects (`u`, `v`, the syntax of that Node's version) and its own words. Without a
+/// Node to ask (the host could not run either), `jsregex` checks it in JavaScript's non-Unicode
+/// dialect, and what it cannot run (lookaround, a backreference) is left to the host.
 fn regexp_error(source: &str, flags: &str) -> Option<String> {
+    if let Some(answer) = v8_check(source, flags) {
+        return answer;
+    }
     let mut seen = String::new();
     for c in flags.chars() {
         if !"dgimsuvy".contains(c) || seen.contains(c) {
@@ -407,10 +412,69 @@ fn regexp_error(source: &str, flags: &str) -> Option<String> {
         Err(jsregex::PatternError::Invalid(why)) => Some(format!(
             "Invalid regular expression: /{source}/{flags}: regex parse error: {why}"
         )),
-        // valid JavaScript the core's matcher cannot run (lookaround, a backreference): the
-        // host matches in JavaScript, so it is accepted as Node accepts it
         Err(jsregex::PatternError::Unsupported(_)) => None,
     }
+}
+
+/// Answers `[source, flags]` lines with V8's refusal (or null), one JSON line each.
+const CHECKER: &str = "require('readline').createInterface({ input: process.stdin }).on('line', (l) => { let r = null; try { const [s, f] = JSON.parse(l); new RegExp(s, f) } catch (e) { r = String(e && e.message) } process.stdout.write(JSON.stringify(r) + '\\n') })";
+
+struct Checker {
+    child: std::process::Child,
+    stdin: std::process::ChildStdin,
+    stdout: std::io::BufReader<std::process::ChildStdout>,
+}
+
+impl Drop for Checker {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// One Node, started on the first pattern and kept for the process.
+static CHECKER_NODE: std::sync::Mutex<Option<Checker>> = std::sync::Mutex::new(None);
+
+/// V8's answer for one pattern: `Some(None)` valid, `Some(Some(why))` refused, `None` when no
+/// Node could be asked.
+fn v8_check(source: &str, flags: &str) -> Option<Option<String>> {
+    use std::io::{BufRead, Write};
+    let mut slot = CHECKER_NODE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    for _ in 0..2 {
+        if slot.is_none() {
+            let node = crate::runtime::node().ok()?;
+            let mut cmd = Command::new(node);
+            cmd.args(["-e", CHECKER])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null());
+            crate::runtime::prepare(&mut cmd);
+            hide_window(&mut cmd);
+            let mut child = cmd.spawn().ok()?;
+            let stdin = child.stdin.take()?;
+            let stdout = std::io::BufReader::new(child.stdout.take()?);
+            *slot = Some(Checker { child, stdin, stdout });
+        }
+        let c = slot.as_mut()?;
+        let line = format!(
+            "{}\n",
+            serde_json::Value::Array(vec![source.into(), flags.into()])
+        );
+        let mut reply = String::new();
+        let asked = c.stdin.write_all(line.as_bytes()).and_then(|()| c.stdin.flush());
+        if asked.is_ok() && c.stdout.read_line(&mut reply).is_ok_and(|n| n > 0) {
+            return match serde_json::from_str::<Value>(&reply) {
+                Ok(Value::String(why)) => Some(Some(why)),
+                Ok(Value::Null) => Some(None),
+                _ => None,
+            };
+        }
+        // a Node that went away is started again, once
+        *slot = None;
+    }
+    None
 }
 
 /// `checkPattern(where, field, pattern)`: plain text, or `/.../flags` for a regular expression;
@@ -647,8 +711,17 @@ pub fn run_scenario(
     let script = PathBuf::from(jspath::join(&[&host_dir(layout), HOST_SCRIPT_NAME]));
     run_scenario_with(layout, scenario, instance, on_progress, &|| {
         let node = host_node()?;
-        // the core's own copy, so the host always matches the core that drives it
-        std::fs::write(&script, HOST_SCRIPT).map_err(|e| Failure::io(&e, "open", Some(&script)))?;
+        // the core's own copy, so the host always matches the core that drives it; written
+        // only when it differs, and by rename, so a run starting beside this one never reads
+        // half a script
+        if std::fs::read(&script).ok().as_deref() != Some(HOST_SCRIPT.as_bytes()) {
+            let tmp = script.with_extension(format!("cjs.{}.tmp", std::process::id()));
+            std::fs::write(&tmp, HOST_SCRIPT).map_err(|e| Failure::io(&e, "open", Some(&tmp)))?;
+            std::fs::rename(&tmp, &script).map_err(|e| {
+                let _ = std::fs::remove_file(&tmp);
+                Failure::io(&e, "rename", Some(&script))
+            })?;
+        }
         Ok((node, script.clone()))
     })
 }
@@ -718,7 +791,7 @@ fn run_scenario_with(
         }))
     };
 
-    let job = json!({
+    let mut job = json!({
         "name": scenario.name,
         "hostDir": host.dir,
         "host": check.host,
@@ -730,6 +803,12 @@ fn run_scenario_with(
         "logOffset": log_offset,
         "waitForSetup": true,
     });
+    // `port: inst.port` is left out of the file when the record has none
+    if inst.get("port").is_none()
+        && let Value::Object(m) = &mut job
+    {
+        m.shift_remove("port");
+    }
     let job_file = jspath::join(&[
         &dir,
         &format!(
@@ -1295,6 +1374,33 @@ mod tests {
                 "step 1: \"present\" is not a valid regular expression: Invalid regular expression: /[/: "
             )
         );
+        // with a Node to ask, V8 decides, in its own dialects (review of C9)
+        if crate::runtime::node().is_ok() {
+            for bad in [
+                "/(?=a)(/",
+                "/(a)\\1**/",
+                "/(?<=x)*/",
+                "/(?<a>x)\\k<b>/",
+                "/a(/u",
+                "/\\a/u",
+            ] {
+                assert!(
+                    step_refusal(json!([{ "bot": "alice", "expectMessage": bad }]))
+                        .contains("is not a valid regular expression: Invalid regular expression:"),
+                    "{bad}"
+                );
+            }
+            for good in ["/[\\u{1F600}-\\u{1F64F}]/u", "/[\\p{L}--\\p{N}]/v"] {
+                assert!(
+                    validate_scenario(
+                        &with(json!({ "steps": [{ "bot": "alice", "expectMessage": good }] })),
+                        None
+                    )
+                    .is_ok(),
+                    "{good}"
+                );
+            }
+        }
         // lookaround and backreferences pass the check: the host matches in JavaScript
         for pattern in ["/a(?=b)/", "/(?<!x)y/", "/(a)\\1/"] {
             assert!(

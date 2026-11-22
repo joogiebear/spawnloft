@@ -1,5 +1,5 @@
 {
-  "about": "C9's `bot`: its usage errors; `bot check` on a missing server, a bad name, a database, a record with no folder, an online-mode server, stopped servers bound to loopback, a LAN address and every interface, and a running one before and after a stand-in mineflayer is in the host folder, text and --json; `bot run` on a missing file, a folder, bad JSON and every refusal of validateScenario, a scenario naming no server, a refused or stopped one, no mineflayer; then end to end over the JVM stand-in answering RCON and the real bot-host.cjs driving a stand-in mineflayer: a passing run, setup over RCON (one that fails and aborts the host), a failing step, and a mineflayer that cannot load. `bot setup` is c9-bot-setup.",
+  "about": "C9's `bot`: its usage errors; `bot check` on a missing server, a bad name, a database, a record with no folder, an online-mode server, stopped servers bound to loopback, a LAN address and every interface, and a running one before and after a stand-in mineflayer is in the host folder, text and --json; `bot run` on a missing file, a folder, bad JSON and every refusal of validateScenario, a scenario naming no server, a refused or stopped one, no mineflayer; then end to end over the JVM stand-in answering RCON and the real bot-host.cjs driving a stand-in mineflayer: a passing run, setup over RCON (one that fails and aborts the host), a failing step, and a mineflayer that cannot load. `bot setup` is c9-bot-setup. Patterns are checked by V8 itself (the Node the host runs on): refusals after a lookaround, Unicode-mode refusals, a surrogate-pair range without u, and lookaround, backreferences and u and v classes accepted.",
   "env": {
     "FAKE_JAVA_RCON": "1",
     "FAKE_JAVA_RCON_OPTS": "{\"replies\":{\"op alice\":\"Made alice a server operator\",\"gamemode creative bob_2\":\"§eSet bob_2's game mode to §aCreative\",\"gamemode creative nobody\":\"No player was found\"}}"
@@ -1988,6 +1988,265 @@
       "expect": {
         "code": 1
       }
+    },
+    {
+      "write": "scenarios/v8-0.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?=a)(/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-0.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-1.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(a)\\1**/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-1.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-2.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?<=x)*/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-2.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-3.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?<a>x)\\k<b>/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-3.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-4.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(?!x)x)/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-4.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-5.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/\\a/u"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-5.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-6.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[😀-🙏]/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-6.json"
+      ],
+      "expect": {
+        "code": 1,
+        "stderrIncludes": "not a valid regular expression"
+      }
+    },
+    {
+      "write": "scenarios/v8-7.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/a(?=b)/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-7.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-8.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/(a)\\1/"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-8.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-9.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[\\u{1F600}-\\u{1F64F}]/u"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-9.json"
+      ]
+    },
+    {
+      "write": "scenarios/v8-10.json",
+      "json": {
+        "bots": [
+          "alice"
+        ],
+        "steps": [
+          {
+            "bot": "alice",
+            "expectMessage": "/[\\p{L}--\\p{N}]/v"
+          }
+        ]
+      }
+    },
+    {
+      "run": [
+        "bot",
+        "run",
+        "{run}/scenarios/v8-10.json"
+      ]
     },
     {
       "write": "scenarios/bad-51.json",

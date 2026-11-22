@@ -246,16 +246,6 @@ export const DECLARED = [
     apply: null,
     held: 'c9-bot ignores data/bot-host/bot-host.cjs; nothing but the host run reads it, and both sides run the same script on the same Node in the rig',
   },
-  {
-    // C9: the bot host matches patterns in JavaScript; the core only checks them, in jsregex's
-    // non-Unicode dialect, which is what the existing run-time patterns use
-    id: 'bot-pattern-unicode-mode',
-    where: 'a bot scenario pattern with the `u` or `v` flag whose source is valid without it but not with it (`/\\a/u`, `/a{/u`)',
-    node: 'refused when the scenario is checked',
-    rust: 'accepted when the scenario is checked; the host, which matches in JavaScript, fails that step',
-    apply: null,
-    held: 'scenarios give `u` or `v` only with patterns valid in both dialects',
-  },
 ]
 
 // Both sides' text for one step, evened out by every row that applies to it.
