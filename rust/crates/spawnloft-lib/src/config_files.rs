@@ -361,6 +361,19 @@ pub(crate) fn has_drive(s: &str) -> bool {
     b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':'
 }
 
+/// A path's first folder as the exclusions compare it. Windows drops a trailing dot or space
+/// from a name it is given (`logs.` opens `logs`), and Rust's file calls go through that
+/// normalisation where Node's (`\\?\` paths) do not, so the folder it would open is the one
+/// compared; otherwise `crash-reports./x.txt` would reach a folder the exclusions keep out.
+fn top_key(segment: &str) -> String {
+    let lower = segment.to_lowercase();
+    if cfg!(windows) {
+        lower.trim_end_matches(['.', ' ']).to_string()
+    } else {
+        lower
+    }
+}
+
 /// What `resolveConfigPath` answers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConfigPath {
@@ -400,7 +413,7 @@ pub fn resolve_config_path(
     let base = real_dir(inst)?;
     let full = jspath::join_path(&base, &parts);
     let shown = parts.join("/");
-    if excluded_tops(inst)?.contains(&parts[0].to_lowercase()) {
+    if excluded_tops(inst)?.contains(&top_key(parts[0])) {
         return Err(Failure::user(format!(
             "{shown} is in {}/, which holds worlds, logs or downloads rather than configuration",
             parts[0]
@@ -491,7 +504,7 @@ pub fn list_config_files(inst: &Instance, folder: &str) -> Result<(Vec<ListedFil
                 "Cannot read properties of undefined (reading 'toLowerCase')",
             ));
         };
-        if excluded_tops(inst)?.contains(&first.to_lowercase()) {
+        if excluded_tops(inst)?.contains(&top_key(first)) {
             return Err(Failure::user(format!(
                 "{clean}/ holds worlds, logs or downloads rather than configuration"
             )));

@@ -82,11 +82,15 @@ pub struct Bundle {
     pub files: Vec<File>,
 }
 
-struct Collected {
-    facts: Facts,
-    timeline: Vec<Entry>,
-    findings: Vec<Finding>,
-    files: Vec<File>,
+/// What `collectServer` and `collectClient` gather. `crashes` is what `collectClient` also
+/// answers (`{ file, description }` of each crash report), for the MCP `diagnostics` tool.
+#[derive(Debug)]
+pub struct Collected {
+    pub facts: Facts,
+    pub timeline: Vec<Entry>,
+    pub findings: Vec<Finding>,
+    pub crashes: Vec<Value>,
+    pub files: Vec<File>,
 }
 
 fn read_text(file: &str) -> Option<String> {
@@ -288,12 +292,13 @@ fn collect_server(layout: &Layout, name: &str, lines: usize, now: f64) -> Result
         facts,
         timeline,
         findings,
+        crashes: Vec::new(),
         files,
     })
 }
 
 /// `collectClient(name, { lines })`.
-fn collect_client(layout: &Layout, name: &str, lines: usize, now: f64) -> Result<Collected, Failure> {
+pub fn collect_client(layout: &Layout, name: &str, lines: usize, now: f64) -> Result<Collected, Failure> {
     let paths = ClientPaths::new(layout);
     let profile = profiles::get(&paths, name)?;
     let st = client_state::status(&paths, name)?;
@@ -400,10 +405,15 @@ fn collect_client(layout: &Layout, name: &str, lines: usize, now: f64) -> Result
             });
         }
     }
+    let crashes = crashes
+        .iter()
+        .map(|r| json!({ "file": r.file, "description": r.description }))
+        .collect();
     Ok(Collected {
         facts,
         timeline,
         findings,
+        crashes,
         files,
     })
 }

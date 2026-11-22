@@ -25,6 +25,7 @@ pub mod profiles;
 pub mod rules;
 pub mod runtime;
 pub mod server_list;
+pub mod session;
 pub mod state;
 pub mod version;
 pub mod versions;

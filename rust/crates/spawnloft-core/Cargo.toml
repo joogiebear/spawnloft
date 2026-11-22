@@ -18,6 +18,7 @@ test-hooks = ["spawnloft-lib/test-hooks"]
 
 [dependencies]
 spawnloft-lib.workspace = true
+regex = "1.13.1"
 semver = "1.0.28"
 serde_json = "1.0.154"
 

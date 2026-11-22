@@ -448,6 +448,7 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                     on_progress: &on_progress,
                     on_warning: &on_warning,
                     fake_java: launch::fake_client_java(),
+                    assistant: false,
                 },
             )?;
             if wait {

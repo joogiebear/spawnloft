@@ -31,6 +31,25 @@ fn round2(n: f64) -> f64 {
     (n * 100.0).round() / 100.0
 }
 
+/// `readTick(send).replies`: each tick command's answer, in the order asked, leaving out a
+/// command that failed, answered nothing or was refused. Stops at the first family that answers,
+/// so Paper is not also asked `tick query`. The MCP `performance` tool shows these.
+pub fn read_replies<E>(mut send: impl FnMut(&str) -> Result<String, E>) -> Vec<(&'static str, String)> {
+    let mut replies: Vec<(&'static str, String)> = Vec::new();
+    for cmd in TICK_COMMANDS {
+        if let Ok(raw) = send(cmd) {
+            let text = crate::js::trim(&strip_colors(&raw)).to_string();
+            if !text.is_empty() && !REFUSED.is_match(&text) {
+                replies.push((cmd, text));
+            }
+        }
+        if cmd == "mspt" && replies.iter().any(|(c, _)| *c == "tps") {
+            break;
+        }
+    }
+    replies
+}
+
 /// Asks the tick commands in order, stopping at the first family that answers.
 pub fn read_tick(mut send: impl FnMut(&str) -> Result<String, RconError>) -> Option<f64> {
     let mut tps_reply: Option<String> = None;

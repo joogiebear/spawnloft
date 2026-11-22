@@ -1,5 +1,5 @@
 {
-  "about": "The MCP server over stdio (C9's contract, recorded now): the initialize answer, the tool list with and without --allow-destructive, a read-only call, an unknown method and a bad line. The golden file test/fixtures/contracts/cli/mcp-tools.json is the tool list the Rust MCP server must equal. The list_servers call prints this machine's data path, so it is compared between the sides but kept out of the golden file.",
+  "about": "The MCP server over stdio (C9's contract, recorded now): the initialize answer, the tool list with and without --allow-destructive, a read-only call, an unknown method and a bad line. Each step is an rpc step: a line is written once the line before it is answered, since the Rust server answers requests side by side. The golden file test/fixtures/contracts/cli/mcp-tools.json is the tool list the Rust MCP server must equal. The list_servers call prints this machine's data path, so it is compared between the sides but kept out of the golden file.",
   "golden": "test/fixtures/contracts/cli/mcp-tools.json",
   "goldenAbout": "The MCP server's answers as the Node core gives them (tools/parity/scenarios/mcp.json): initialize, tools/list (default and --allow-destructive), a list_servers call, an unknown method and a malformed line. The Rust MCP server (C9) must give the same tool list byte for byte. Regenerate with node tools/parity/run.mjs tools/parity/scenarios/mcp.json --update-golden; a change here changes the MCP contract.",
   "normalize": [
@@ -17,7 +17,8 @@
       "expect": {
         "code": 0,
         "stdoutIncludes": "\"tools\":["
-      }
+      },
+      "rpc": true
     },
     {
       "run": [
@@ -27,7 +28,8 @@
       "stdin": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"parity-rig\",\"version\":\"0\"}}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n",
       "expect": {
         "code": 0
-      }
+      },
+      "rpc": true
     },
     {
       "run": [
@@ -38,7 +40,8 @@
       "expect": {
         "code": 0
       },
-      "golden": false
+      "golden": false,
+      "rpc": true
     },
     {
       "run": [
@@ -47,7 +50,8 @@
       ],
       "expect": {
         "code": 2
-      }
+      },
+      "rpc": true
     },
     {
       "run": [
@@ -56,7 +60,8 @@
       ],
       "expect": {
         "code": 2
-      }
+      },
+      "rpc": true
     }
   ]
 }

@@ -13,6 +13,7 @@
 //! tasks and what moves or drops a server with them: `task`, `rm` (and `remove`) and `rename`. C7
 //! moves the client launcher, `client`, whole. C6b moves the diagnostics: `doctor` and `diag`.
 //! C9 moves the bot harness, `bot` (the Mineflayer host it drives stays JavaScript).
+//! C9 also moves the MCP server, `mcp`.
 
 pub mod args;
 mod backup;
@@ -29,6 +30,7 @@ mod lifecycle;
 mod list;
 mod logs;
 mod maintenance;
+mod mcp;
 mod metrics;
 mod output;
 mod pack;
@@ -213,6 +215,7 @@ fn dispatch(
         "doctor" => doctor::doctor(&mut ctx),
         "diag" => doctor::diag(&mut ctx),
         "bot" => bot::bot(&mut ctx),
+        "mcp" => mcp::mcp(&mut ctx),
         other => Err(Failure::usage(format!(
             "Unknown command \"{other}\". Run \"spawnloft help\" for usage."
         ))),

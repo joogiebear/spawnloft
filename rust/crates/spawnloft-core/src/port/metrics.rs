@@ -16,27 +16,27 @@ const CSV_HEADER: &str = "instance,run_id,timestamp,cpu_percent,rss_mib,cores\n"
 
 /// One measurement as `readMetrics` gives it.
 #[derive(Debug, Clone)]
-struct Sample {
+pub(crate) struct Sample {
     timestamp: String,
     at: f64,
-    cpu: f64,
-    rss: f64,
+    pub(crate) cpu: f64,
+    pub(crate) rss: f64,
 }
 
 impl Sample {
-    fn to_json(&self) -> Value {
+    pub(crate) fn to_json(&self) -> Value {
         json!({ "timestamp": self.timestamp, "at": jsjson::num(self.at), "cpuPercent": jsjson::num(self.cpu), "rssMiB": jsjson::num(self.rss) })
     }
 }
 
 #[derive(Debug, Clone)]
-struct Data {
+pub(crate) struct Data {
     instance: String,
     run_id: Value,
     started_at: Value,
-    running: bool,
-    cores: usize,
-    samples: Vec<Sample>,
+    pub(crate) running: bool,
+    pub(crate) cores: usize,
+    pub(crate) samples: Vec<Sample>,
 }
 
 impl Data {
@@ -70,11 +70,20 @@ fn iso_of(at: f64) -> Result<String, Failure> {
 
 /// `readMetrics(name, seconds)`.
 fn read(ctx: &Ctx<'_>, name: &str, seconds: Option<f64>) -> Result<Data, Failure> {
-    let (st, status) = supervisor::status_of(ctx.layout, name)?;
+    read_metrics(ctx.layout, name, seconds)
+}
+
+/// `readMetrics(name, seconds)`, for the MCP `performance` tool too.
+pub(crate) fn read_metrics(
+    layout: &spawnloft_lib::settings::Layout,
+    name: &str,
+    seconds: Option<f64>,
+) -> Result<Data, Failure> {
+    let (st, status) = supervisor::status_of(layout, name)?;
     let started = st.get("startedAt").cloned().unwrap_or(Value::Null);
     let cutoff = seconds.map_or(0.0, |s| time::now_ms() as f64 / 1000.0 - s);
     let mut samples = Vec::new();
-    for row in metrics::read_samples(Path::new(&ctx.layout.metrics_file(name)), true)? {
+    for row in metrics::read_samples(Path::new(&layout.metrics_file(name)), true)? {
         if row.at >= cutoff {
             samples.push(Sample {
                 timestamp: iso_of(row.at)?,

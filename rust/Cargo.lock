@@ -3662,6 +3662,7 @@ dependencies = [
 name = "spawnloft-core"
 version = "2.0.0-internal.0"
 dependencies = [
+ "regex",
  "semver",
  "serde_json",
  "spawnloft-fakes",

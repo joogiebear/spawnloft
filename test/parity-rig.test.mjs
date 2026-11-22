@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { normalizeText, machineNeutral } from '../tools/parity/lib/normalize.mjs'
-import { textDiff, compareSides, runScenario, sideEnv, findCore } from '../tools/parity/lib/rig.mjs'
+import { textDiff, compareSides, runScenario, sideEnv, findCore, awaitedReply } from '../tools/parity/lib/rig.mjs'
 import { snapshot, zipListing, tarListing, globToRegExp } from '../tools/parity/lib/tree.mjs'
 import { startHosts } from '../tools/parity/lib/fake-host.mjs'
 import { DECLARED, applyDeclared, declaredTable } from '../tools/parity/declared-differences.mjs'
@@ -277,4 +277,19 @@ test('end to end: the self-tests find their seeded differences and the basics ag
     const r = await runScenario(s, { core, repo, scratch: tmp(s.name), baseDir: path.dirname(s.file) })
     assert.ok(r.ok, `${s.name}: ${JSON.stringify({ problems: r.problems, diffs: r.diffs.map(d => d.what) })}`)
   }
+})
+
+test('an rpc step waits for the reply each line asks for', () => {
+  assert.deepEqual(awaitedReply('{"jsonrpc":"2.0","id":3,"method":"ping"}'), { id: 3 })
+  assert.deepEqual(awaitedReply('{"jsonrpc":"2.0","id":"a","method":"ping"}'), { id: 'a' })
+  assert.equal(awaitedReply('{"jsonrpc":"2.0","method":"notifications/initialized"}'), null)
+  assert.equal(awaitedReply('   '), null)
+  assert.deepEqual(awaitedReply('this is not json'), { anyLine: true })
+  assert.deepEqual(awaitedReply('[1,2]'), { anyLine: true })
+  assert.equal(awaitedReply('{"jsonrpc":"2.0","id":5}'), null)
+  assert.equal(awaitedReply('{"jsonrpc":"2.0","id":5,"method":5}'), null)
+  assert.deepEqual(awaitedReply('{"jsonrpc":"1.0","id":5,"method":"ping"}'), { anyLine: true })
+  assert.deepEqual(awaitedReply('{"jsonrpc":"2.0","id":null,"method":"ping"}'), { anyLine: true })
+  assert.deepEqual(awaitedReply('{"jsonrpc":"2.0","id":{},"method":"ping"}'), { anyLine: true })
+  assert.deepEqual(awaitedReply('null'), { anyLine: true })
 })

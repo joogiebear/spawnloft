@@ -1020,6 +1020,13 @@ fn loader_of(profile: &Profile) -> Option<String> {
     }
 }
 
+/// `assistantAccountRefusal(name)`.
+pub fn assistant_account_refusal(name: &str) -> String {
+    format!(
+        "profile \"{name}\" plays as a Microsoft account; allow an assistant to launch it with: spawnloft client set {name} assistantAccount=true"
+    )
+}
+
 /// How a launch was asked for (`client launch`'s flags).
 #[allow(missing_debug_implementations)]
 pub struct LaunchOpts<'a> {
@@ -1029,6 +1036,10 @@ pub struct LaunchOpts<'a> {
     pub on_progress: OnProgress<'a>,
     pub on_warning: &'a (dyn Fn(&str) + Sync),
     pub fake_java: Option<String>,
+    /// A launch asked for by an AI assistant (the MCP tool): playing as a Microsoft account is
+    /// then allowed only on a profile whose `assistantAccount` key says so, the launcher's
+    /// default account never applies, and the state records `launchedBy: "assistant"`.
+    pub assistant: bool,
 }
 
 /// What `launch` answers: `{ pid, profile, version, account, warnings }`, and the game itself.
@@ -1080,7 +1091,7 @@ fn check_instance(layout: &Layout, server: &str) -> Option<(bool, bool)> {
     Some((online, running))
 }
 
-fn online_mode_refusal(server: &str, player: &str) -> String {
+pub fn online_mode_refusal(server: &str, player: &str) -> String {
     format!(
         "server \"{server}\" runs in online mode and {player} is an offline player, so the server would refuse the join; sign in (spawnloft client login) and play as that account (--account <name>, or account=<name> on the profile), or set online-mode=false on a test server"
     )
@@ -1531,7 +1542,7 @@ fn launch_locked(
     }
     let selector: Option<Value> = match named {
         Some(v) => Some(v),
-        None if opts.player_name.as_deref().is_some_and(|p| !p.is_empty()) => None,
+        None if opts.assistant || opts.player_name.as_deref().is_some_and(|p| !p.is_empty()) => None,
         None => profiles::default_account(paths)?.map(Value::String),
     };
     let selector = selector.filter(|s| js::truthy(Some(s)));
@@ -1551,6 +1562,9 @@ fn launch_locked(
             },
         ),
     };
+    if opts.assistant && provisional.0 != "offline" && !js::truthy(profile.get("assistantAccount")) {
+        return Err(user(assistant_account_refusal(name)));
+    }
     let mut warnings: Vec<String> = Vec::new();
     let warn = |warnings: &mut Vec<String>, w: String| {
         (opts.on_warning)(&w);
@@ -1810,7 +1824,7 @@ fn launch_locked(
             account: account_short.clone(),
             server: target.clone(),
             address: None,
-            launched_by: "cli",
+            launched_by: if opts.assistant { "assistant" } else { "cli" },
             harness: harness_token
                 .as_ref()
                 .map(|t| json!({ "token": t, "port": null })),

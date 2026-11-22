@@ -61,6 +61,35 @@ pub struct PrivateCopy {
     pub settings: &'static str,
 }
 
+impl PrivateCopy {
+    /// The copy as `findPrivateCopies` returns it (`runDoctor`'s `privateCopies`, which the MCP
+    /// `doctor` tool sends): `registry` keeps the key order of each way it is built.
+    pub fn to_json(&self) -> serde_json::Value {
+        use serde_json::{Map, Value, json};
+        let r = &self.registry;
+        let mut reg = Map::new();
+        if r.state == "absent" {
+            reg.insert("state".into(), json!(r.state));
+        }
+        reg.insert("file".into(), json!(r.file));
+        reg.insert("onlyInCopy".into(), json!(r.only_in_copy));
+        reg.insert("onlyInRegistry".into(), json!(r.only_in_registry));
+        reg.insert("changed".into(), json!(r.changed));
+        reg.insert("realMissing".into(), json!(r.real_missing));
+        reg.insert("state".into(), json!(r.state));
+        json!({
+            "package": self.package,
+            "dir": self.dir,
+            "registry": Value::Object(reg),
+            "backups": { "dir": self.backups.dir, "archives": self.backups.archives, "bytes": self.backups.bytes },
+            "activity": { "entries": self.activity_entries },
+            "instances": { "files": self.instance_files },
+            "settingsFile": self.settings_file,
+            "settings": self.settings,
+        })
+    }
+}
+
 /// Where to look; [`Where::here`] is this process's.
 #[derive(Debug, Clone)]
 pub struct Where {
