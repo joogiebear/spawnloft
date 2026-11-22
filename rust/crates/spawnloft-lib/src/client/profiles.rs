@@ -527,6 +527,17 @@ pub fn create(paths: &Paths, name: &str, o: NewProfile) -> Result<Profile, Failu
 
 /// `updateProfile(name, patch)`, as `client set` calls it (not a launch's own write).
 pub fn update(paths: &Paths, name: &str, patch: Vec<(String, Value)>) -> Result<Profile, Failure> {
+    update_with(paths, name, patch, false)
+}
+
+/// `updateProfile(name, patch, { launching })`: a launch holding the profile's launch lock may
+/// change it (the loader build its first Play picks).
+pub fn update_with(
+    paths: &Paths,
+    name: &str,
+    patch: Vec<(String, Value)>,
+    launching: bool,
+) -> Result<Profile, Failure> {
     validate_name(name)?;
     for (key, _) in &patch {
         if !PROFILE_KEYS.contains(&key.as_str()) {
@@ -557,7 +568,10 @@ pub fn update(paths: &Paths, name: &str, patch: Vec<(String, Value)>) -> Result<
         ));
     }
     // a launch under way read the profile at its start and reads it again while it downloads
-    if !changing.is_empty() && crate::lock::holder(std::path::Path::new(&paths.launch_lock(name))).is_some() {
+    if !changing.is_empty()
+        && !launching
+        && crate::lock::holder(std::path::Path::new(&paths.launch_lock(name))).is_some()
+    {
         return Err(coded(
             format!(
                 "profile \"{name}\" is being launched (pid {}); wait for it before changing {}",

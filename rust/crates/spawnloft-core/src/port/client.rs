@@ -59,13 +59,14 @@ const SET_KEYS: &[&str] = &[
     "serverList",
 ];
 
+/// A loader the Node core still sets up (Forge and NeoForge).
 fn uses_loader(profile: &profiles::Profile) -> bool {
-    !matches!(profile.get("loader"), None | Some(Value::Null)) && profile.text("loader") != Some("vanilla")
+    launch::node_installs(profile)
 }
 
 /// Whether this `client` line is one the Node core still answers although its subcommand is
-/// ported: `install` of a mod loader's profile, set up by the Node core until the loaders move
-/// (part 4). Decided before the Rust side prints anything, so a settings warning is not printed
+/// ported: `install` of a Forge or NeoForge profile and `launch` of one (or of a harness profile),
+/// set up by the Node core until their installers move (part 4b). Decided before the Rust side prints anything, so a settings warning is not printed
 /// twice. Anything that fails here is left to the Rust side, which reports it as Node would.
 pub fn hands_to_node(args: &super::args::Parsed, layout: &spawnloft_lib::settings::Layout) -> bool {
     let pos = &args.positional;
@@ -372,19 +373,17 @@ pub fn client(ctx: &mut Ctx<'_>) -> Result<(), Failure> {
                 });
             }
             let verify = ctx.args.get("verify") == Some(&Flag::Bool(true));
-            let mc = js::string(profile.get("mc"));
             let out = std::sync::Mutex::new(&mut *ctx.out);
             let say = |text: &str| out.lock().unwrap_or_else(|p| p.into_inner()).err(text);
-            let id = install::prepare_vanilla(
+            let id = spawnloft_lib::client::fabric::prepare_version(
                 &paths,
-                &mc,
+                name,
                 &mut |message| {
                     if !quiet {
                         say(&format!("{message}\n"));
                     }
                 },
-                &meta::default_fetch,
-                &install::default_fetch,
+                &spawnloft_lib::client::fabric::Fetchers::real(),
             )?;
             // only a phase that fetched something is worth a line
             let on_progress = |p: &install::Progress| {

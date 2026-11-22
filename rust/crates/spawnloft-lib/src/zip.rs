@@ -1360,4 +1360,4 @@ impl Write for Capped {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
