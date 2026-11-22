@@ -181,10 +181,23 @@ pub fn tail_log(file: &Path, count: f64) -> Result<Vec<String>, Failure> {
 /// `followLog(name, onLine)`: polls the console every 250 ms from its current end (or the start
 /// after a restart truncated it) and hands each whole new line to `on_line`. Returns when
 /// `on_line` says to stop (`false`); read errors are retried at the next poll.
-pub fn follow_log(file: &Path, mut on_line: impl FnMut(&str) -> bool) {
+pub fn follow_log(file: &Path, on_line: impl FnMut(&str) -> bool) {
+    follow_log_while(file, || true, on_line);
+}
+
+/// [`follow_log`] that also ends when `wanted` says so, asked at every poll: for a follower whose
+/// reader can go away while the console is quiet (a page that closed its stream).
+pub fn follow_log_while(
+    file: &Path,
+    mut wanted: impl FnMut() -> bool,
+    mut on_line: impl FnMut(&str) -> bool,
+) {
     let mut offset = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0);
     let mut carry = String::new();
     loop {
+        if !wanted() {
+            return;
+        }
         let size = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0);
         if size < offset {
             offset = 0;

@@ -1,0 +1,623 @@
+{
+ "about": "C8's server routes that start no job, answered by the Rust panel itself (every step is own): the list, history, the overview, linger, where a server is joined from, diagnose, metrics, attached databases without their passwords, console export, the diagnostics bundle's download refusals, settings with each refusal, then a running server over the JVM stand-in (start, a second start, a command, the console stream, restart, stop), and rebuild, rename and delete.",
+ "env": {
+  "FAKE_JAVA_RCON": "1"
+ },
+ "ignore": [
+  "home/**/panel.key",
+  "data/run/run1/**",
+  "data/instances/run1/logs/**"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "\\(build [^)]*\\)",
+   "replace": "(build)"
+  },
+  {
+   "pattern": "x-spawnloft-proof: [A-Za-z0-9_-]{43}$",
+   "flags": "gm",
+   "replace": "x-spawnloft-proof: <proof>"
+  },
+  {
+   "pattern": "\"staleSeconds\": \\d+",
+   "replace": "\"staleSeconds\": <n>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "#Minecraft server properties\nmotd=A Minecraft Server\nserver-port=47861\nenable-rcon=true\nrcon.port=47871\nrcon.password=test\n"
+  },
+  {
+   "write": "data/instances/noeula/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/gone1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/gone1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/jars/paper-1.21.4-100.jar",
+   "text": "new jar"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47861,
+      "rcon": {
+       "port": 47871,
+       "password": "test"
+      },
+      "label": "Run One",
+      "webhook": "https://discord.com/api/webhooks/1/abc"
+     },
+     "noeula": {
+      "dir": "{data}/instances/noeula",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47862,
+      "rcon": {
+       "port": 47872,
+       "password": "test"
+      }
+     },
+     "gone1": {
+      "dir": "{data}/instances/gone1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47863,
+      "rcon": {
+       "port": 47873,
+       "password": "test"
+      }
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "11.4.5",
+      "dir": "{data}/services/db1",
+      "port": 47881,
+      "root": {
+       "user": "root",
+       "password": "pw-root"
+      },
+      "attachments": {
+       "run1": {
+        "database": "shop",
+        "user": "run1",
+        "password": "pw-run1",
+        "createdAt": "2026-11-01T00:00:00.000Z"
+       }
+      }
+     },
+     "kv1": {
+      "kind": "database",
+      "engine": "garnet",
+      "version": "1.0.0",
+      "dir": "{data}/services/kv1",
+      "port": 47882,
+      "label": "Cache",
+      "attachments": {
+       "run1": {
+        "database": "0"
+       },
+       "noeula": null
+      }
+     },
+     "ext1": {
+      "kind": "database",
+      "engine": "mysql",
+      "external": true,
+      "host": "db.example",
+      "port": 3306,
+      "root": {
+       "user": "admin",
+       "password": "pw-ext"
+      },
+      "attachments": {
+       "run1": {
+        "database": "web",
+        "user": "web",
+        "password": "pw-web"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "write": "data/run/run1/console.log",
+   "text": "[12:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.4\n[12:00:02] [Server thread/INFO]: Wunga_[/203.0.113.5:51234] logged in\n[12:00:05] [Server thread/WARN]: **** FAILED TO BIND TO PORT!\n"
+  },
+  {
+   "write": "data/run/run1/metrics.log",
+   "text": "1763800000 12.5 536870912 19.9 2 20\nnot a sample\n1763800010 3.0 536870912 - - -\n1763800020 0.4 1073741824\n"
+  },
+  {
+   "write": "java-ok",
+   "text": "#!/bin/sh\necho 'openjdk version \"21.0.5\" 2024-10-15' >&2\n",
+   "mode": "755"
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances"
+    },
+    {
+     "get": "/api/instances/"
+    },
+    {
+     "post": "/api/instances/nope/start"
+    },
+    {
+     "get": "/api/instances/nope"
+    },
+    {
+     "get": "/api/instances/nope/join"
+    },
+    {
+     "get": "/api/activity"
+    },
+    {
+     "get": "/api/activity?limit=2&kind=settings"
+    },
+    {
+     "get": "/api/activity/more"
+    },
+    {
+     "post": "/api/activity"
+    },
+    {
+     "get": "/api/overview/more"
+    },
+    {
+     "post": "/api/overview"
+    },
+    {
+     "get": "/api/scheduler/linger"
+    },
+    {
+     "post": "/api/scheduler/linger"
+    },
+    {
+     "post": "/api/scheduler/linger",
+     "json": {
+      "enable": true
+     }
+    },
+    {
+     "get": "/api/scheduler/linger/more"
+    },
+    {
+     "get": "/api/instances/run1/join"
+    },
+    {
+     "post": "/api/instances/run1/join"
+    },
+    {
+     "get": "/api/instances/run1/join/more"
+    },
+    {
+     "get": "/api/instances/db1/join"
+    },
+    {
+     "get": "/api/instances/run1/diagnose"
+    },
+    {
+     "get": "/api/instances/run1/diagnose/more"
+    },
+    {
+     "get": "/api/instances/noeula/diagnose"
+    },
+    {
+     "get": "/api/instances/db1/diagnose"
+    },
+    {
+     "get": "/api/instances/run1/metrics"
+    },
+    {
+     "get": "/api/instances/run1/metrics?seconds=60"
+    },
+    {
+     "get": "/api/instances/run1/metrics?seconds=abc"
+    },
+    {
+     "get": "/api/instances/run1/metrics?seconds=99999999999"
+    },
+    {
+     "post": "/api/instances/run1/metrics"
+    },
+    {
+     "get": "/api/instances/noeula/metrics"
+    },
+    {
+     "get": "/api/instances/run1/databases"
+    },
+    {
+     "get": "/api/instances/run1/databases/more"
+    },
+    {
+     "get": "/api/instances/noeula/databases"
+    },
+    {
+     "get": "/api/instances/db1/databases"
+    },
+    {
+     "get": "/api/instances/run1/activity"
+    },
+    {
+     "get": "/api/instances/run1/activity?limit=1"
+    },
+    {
+     "get": "/api/instances/run1/activity/more"
+    },
+    {
+     "post": "/api/instances/run1/activity/undo",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/activity/undo",
+     "json": {
+      "snapshot": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/run1/activity/nope"
+    },
+    {
+     "get": "/api/instances/run1/console"
+    },
+    {
+     "post": "/api/instances/run1/console"
+    },
+    {
+     "post": "/api/instances/run1/console/nope"
+    },
+    {
+     "post": "/api/instances/run1/console/export"
+    },
+    {
+     "post": "/api/instances/noeula/console/export"
+    },
+    {
+     "get": "/api/instances/run1/diag"
+    },
+    {
+     "get": "/api/instances/run1/diag/download"
+    },
+    {
+     "get": "/api/instances/run1/diag/download?file=../x.zip"
+    },
+    {
+     "get": "/api/instances/run1/diag/download?file=a/b.zip"
+    },
+    {
+     "get": "/api/instances/run1/diag/download?file=x.txt"
+    },
+    {
+     "get": "/api/instances/run1/diag/download?file=none.zip"
+    },
+    {
+     "post": "/api/instances/run1/diag/more"
+    },
+    {
+     "get": "/api/instances/run1"
+    },
+    {
+     "get": "/api/instances/run1/start"
+    },
+    {
+     "delete": "/api/instances/run1"
+    },
+    {
+     "post": "/api/instances/run1"
+    },
+    {
+     "post": "/api/instances/run1/nope"
+    },
+    {
+     "post": "/api/instances/noeula/start"
+    },
+    {
+     "post": "/api/instances/db1/command",
+     "json": {
+      "line": "x"
+     }
+    },
+    {
+     "post": "/api/instances/run1/stop"
+    },
+    {
+     "post": "/api/instances/run1/kill"
+    },
+    {
+     "post": "/api/instances/run1/command"
+    },
+    {
+     "post": "/api/instances/run1/command",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/command",
+     "json": {
+      "line": "  "
+     }
+    },
+    {
+     "post": "/api/instances/run1/command",
+     "json": {
+      "line": "say hi"
+     }
+    },
+    {
+     "post": "/api/instances/run1/command",
+     "text": "{",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/run1/rename",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/rename",
+     "json": {
+      "to": "db1"
+     }
+    },
+    {
+     "post": "/api/instances/run1/rename",
+     "json": {
+      "to": "bad name"
+     }
+    },
+    {
+     "post": "/api/instances/run1/reveal",
+     "json": {
+      "sub": "../.."
+     }
+    },
+    {
+     "post": "/api/instances/run1/reveal",
+     "json": {
+      "folder": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "memory": "lots"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "port": 47881
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "port": "abc"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "jar": "missing.jar"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "java": "{run}/no-such-java"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "webhook": "ftp://example.com/x"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "jvmFlags": "-Xmx9G"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "memory": " 2G ",
+      "port": "47861",
+      "autoRestart": true,
+      "label": "  My \t Server  ",
+      "webhook": "https://discord.com/api/webhooks/2/def",
+      "jvmFlags": [
+       "-XX:+UseG1GC",
+       "-Dx=1"
+      ],
+      "java": "{run}/java-ok",
+      "colour": "red"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "autoRestart": "yes",
+      "label": "",
+      "webhook": null,
+      "jvmFlags": null
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "jar": "paper-1.21.4-100.jar"
+     }
+    },
+    {
+     "post": "/api/instances/run1/settings",
+     "json": {
+      "jar": "server.jar"
+     }
+    },
+    {
+     "get": "/api/instances/run1/activity"
+    },
+    {
+     "get": "/api/activity?limit=3"
+    },
+    {
+     "get": "/api/instances"
+    }
+   ],
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/run1/start",
+     "timeoutMs": 90000
+    },
+    {
+     "post": "/api/instances/run1/start"
+    },
+    {
+     "get": "/api/instances",
+     "body": "skip"
+    },
+    {
+     "post": "/api/instances/run1/command",
+     "json": {
+      "line": "say hi"
+     }
+    },
+    {
+     "post": "/api/instances/run1/kill"
+    },
+    {
+     "get": "/api/instances/run1/stream",
+     "stream": {
+      "events": 3,
+      "ms": 8000
+     }
+    },
+    {
+     "get": "/api/instances/run1/activity?limit=1"
+    },
+    {
+     "get": "/api/instances/run1/join"
+    },
+    {
+     "post": "/api/instances/run1/rename",
+     "json": {
+      "to": "run2"
+     }
+    },
+    {
+     "post": "/api/instances/run1/rebuild",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/restart",
+     "timeoutMs": 180000
+    },
+    {
+     "post": "/api/instances/run1/stop",
+     "timeoutMs": 90000
+    },
+    {
+     "post": "/api/instances/run1/stop"
+    }
+   ],
+   "own": true,
+   "timeoutMs": 400000
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/gone1/rebuild",
+     "json": {
+      "snapshot": false,
+      "keepPlugins": false
+     }
+    },
+    {
+     "post": "/api/instances/gone1/rename",
+     "json": {
+      "to": "gone2"
+     }
+    },
+    {
+     "get": "/api/instances/gone1/join"
+    },
+    {
+     "post": "/api/instances/gone2/delete",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/noeula/delete",
+     "json": {
+      "purge": true
+     }
+    },
+    {
+     "post": "/api/instances/noeula/delete",
+     "json": {}
+    },
+    {
+     "get": "/api/instances"
+    },
+    {
+     "get": "/api/overview"
+    },
+    {
+     "get": "/api/activity"
+    }
+   ],
+   "own": true
+  },
+  {
+   "run": [
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

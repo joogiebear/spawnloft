@@ -3,6 +3,7 @@
 //! Internal phase: the build identity and the per-server daemon (R1) with what it needs.
 
 pub mod activity;
+pub mod appearance;
 pub mod backup;
 pub mod build;
 pub mod cancel;
@@ -25,6 +26,7 @@ pub mod entry;
 pub mod exposure;
 pub mod failure;
 pub mod files;
+pub mod first_run;
 pub mod fsx;
 pub mod garnet;
 pub mod handover;
@@ -49,6 +51,7 @@ pub mod nodecore;
 pub mod notify;
 pub mod panel;
 pub mod panel_auth;
+pub mod panel_open;
 pub mod paths;
 pub mod patterns;
 pub mod platform;

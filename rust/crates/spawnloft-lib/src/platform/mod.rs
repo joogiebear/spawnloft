@@ -143,3 +143,16 @@ pub fn node_arch() -> &'static str {
         other => other,
     }
 }
+
+/// `platformCapabilities()`: what this build can do here. Every platform SpawnLoft is built for
+/// has all three; the table is kept because the panel's pages ask it.
+pub fn capabilities() -> serde_json::Value {
+    serde_json::json!({ "scheduler": true, "performance": true, "managedDatabases": true })
+}
+
+/// `PREVIEW_LIMITS`: what a page says where a capability is missing.
+pub mod preview_limits {
+    pub const SCHEDULER: &str = "Scheduled tasks and automatic backups are not available in this preview on this platform. You can still start, stop, and back up servers manually.";
+    pub const PERFORMANCE: &str = "CPU and memory charts are not available in this preview on this platform. Server controls and the live console still work.";
+    pub const MANAGED_DATABASES: &str = "Automatic database installation is not available in this preview on this platform. Connect to an existing MySQL or Redis database instead.";
+}

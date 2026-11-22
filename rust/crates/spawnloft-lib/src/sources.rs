@@ -218,6 +218,7 @@ fn stream_to_part(
     a: Answer,
     dest: &Path,
     hash: Option<Hash>,
+    total: u64,
 ) -> Result<(PathBuf, u64, Option<String>), Failure> {
     use std::io::Write;
     let tmp = download::part_path(dest);
@@ -251,6 +252,7 @@ fn stream_to_part(
             return Err(Failure::io(&e, "write", None));
         }
         size += n as u64;
+        report_bytes(size, total);
     }
     drop(file);
     Ok((tmp, size, digest.map(download::Hasher::hex)))
@@ -429,7 +431,14 @@ pub fn paper_fetch(
     if !a.ok_with_body() {
         return Err(Failure::user(format!("download failed ({}) for {url}", a.status)));
     }
-    let (tmp, _, got) = stream_to_part(a, Path::new(&dest), Some(Hash::Sha256))?;
+    // `Number(content-length) || build.size || 0`
+    let total = match a.length {
+        n if n > 0 => n,
+        _ => Some(js::number(Some(&build.size)))
+            .filter(|n| n.is_finite() && *n > 0.0)
+            .map_or(0, |n| n as u64),
+    };
+    let (tmp, _, got) = stream_to_part(a, Path::new(&dest), Some(Hash::Sha256), total)?;
     let got = got.unwrap_or_default();
     if js::truthy(Some(&build.sha256)) {
         let want = js::string(Some(&build.sha256));
@@ -520,6 +529,7 @@ pub fn purpur_fetch(
             expected: expected_of(detail.get("md5")),
             min_bytes: 1024 * 1024,
             label: Some(name),
+            on_progress: Some(&mut report_bytes),
             ..download::Options::default()
         },
     )?;
@@ -599,6 +609,7 @@ pub fn vanilla_fetch(jars_dir: &str, id: &str, force: bool) -> Result<(Fetched, 
             expected: expected_of(dl.and_then(|d| d.get("sha1"))),
             min_bytes: 1024 * 1024,
             label: Some(name),
+            on_progress: Some(&mut report_bytes),
             ..download::Options::default()
         },
     )?;
@@ -761,6 +772,7 @@ pub fn asp_fetch(jars_dir: &str, mc: &str, force: bool) -> Result<Fetched, Failu
             expected: expected_of(file.get("sha256Hash")),
             min_bytes: 1024 * 1024,
             label: Some(name),
+            on_progress: Some(&mut report_bytes),
             ..download::Options::default()
         },
     )?;
@@ -1205,8 +1217,8 @@ pub fn fabric_fetch(
             format!("download failed ({}) for {url}", a.status)
         }));
     }
-    let _ = a.length;
-    let (tmp, size, _) = stream_to_part(a, Path::new(&dest), None)?;
+    let total = a.length;
+    let (tmp, size, _) = stream_to_part(a, Path::new(&dest), None, total)?;
     // no published checksum: an HTML error page saved as a jar would be tiny
     if size < 100 * 1024 {
         let _ = std::fs::remove_file(&tmp);
@@ -1493,6 +1505,104 @@ pub const JAR_IDS: [&str; 8] = [
     "vanilla",
     "fabric",
 ];
+
+/// `isJarSource(id)`.
+pub fn is_jar_source(id: &str) -> bool {
+    JAR_IDS.contains(&id)
+}
+
+/// `sources.versionsFor(id)`: the versions a kind of server can be made for, newest first.
+pub fn versions_for(id: &str) -> Result<Vec<String>, Failure> {
+    match id {
+        "neoforge" => neo_versions(),
+        "paper" | "folia" => paper_versions(id, false),
+        "purpur" => purpur_versions(),
+        "asp" => Ok(asp_versions_of(&asp_builds()?)),
+        "vanilla" => vanilla_versions(false),
+        "spigot" | "craftbukkit" => spigot_versions(),
+        "fabric" => fabric_versions(),
+        other => Err(Failure::Internal {
+            head: "Error".into(),
+            message: format!("no version list for \"{other}\""),
+            code: None,
+        }),
+    }
+}
+
+/// `sources.labelFor(id)`: what a kind of server is called.
+pub fn label_for(id: &str) -> &'static str {
+    match id {
+        "paper" => "Paper",
+        "purpur" => "Purpur",
+        "folia" => "Folia",
+        "asp" => "Advanced Slime Paper",
+        "spigot" => "Spigot",
+        "craftbukkit" => "CraftBukkit",
+        "vanilla" => "Vanilla",
+        "fabric" => "Fabric",
+        _ => "NeoForge",
+    }
+}
+
+/// What a jar fetch says while it runs: `onProgress` of `sources.fetchJar`, which is byte counts
+/// for a download, a line of text for a build, and `cached` when the jar was already stored.
+#[derive(Debug, Clone, PartialEq)]
+pub enum JarProgress {
+    /// `{ cached: true }`, with the message a build gives it
+    Cached(Option<String>),
+    /// `{ message }`
+    Message(String),
+    /// `{ received, total }`; a total of 0 is unknown
+    Bytes { received: u64, total: u64 },
+}
+
+/// Who hears a download's progress.
+type Hears = std::rc::Rc<dyn Fn(JarProgress)>;
+
+thread_local! {
+    /// Who hears the bytes of the download this thread is in ([`fetch_jar_reporting`]).
+    static BYTES: std::cell::RefCell<Option<Hears>> = const { std::cell::RefCell::new(None) };
+}
+
+fn report_bytes(received: u64, total: u64) {
+    let hears = BYTES.with(|b| b.borrow().clone());
+    if let Some(f) = hears {
+        f(JarProgress::Bytes { received, total });
+    }
+}
+
+/// [`fetch_jar`] with everything `onProgress` is told, for a caller that shows a progress bar.
+pub fn fetch_jar_reporting(
+    jars_dir: &str,
+    id: &str,
+    version: &str,
+    build: Option<&str>,
+    java: &str,
+    report: std::rc::Rc<dyn Fn(JarProgress)>,
+) -> Result<Fetched, Failure> {
+    // put back however the fetch ends
+    struct Heard(Option<std::rc::Rc<dyn Fn(JarProgress)>>);
+    impl Drop for Heard {
+        fn drop(&mut self) {
+            BYTES.with(|b| *b.borrow_mut() = self.0.take());
+        }
+    }
+    let _heard = Heard(BYTES.with(|b| b.borrow_mut().replace(report.clone())));
+    let built = id == "spigot" || id == "craftbukkit";
+    let mut said = |m: &str| {
+        // BuildTools says so itself when the jar is already built
+        if m.starts_with("Using the ") && m.ends_with(" already built") {
+            report(JarProgress::Cached(Some(m.to_string())));
+        } else {
+            report(JarProgress::Message(m.to_string()));
+        }
+    };
+    let out = fetch_jar(jars_dir, id, version, build, java, Some(&mut said))?;
+    if out.cached && !built {
+        report(JarProgress::Cached(None));
+    }
+    Ok(out)
+}
 
 /// `sources.fetchJar(id, version, { build, java, onProgress })`.
 pub fn fetch_jar(

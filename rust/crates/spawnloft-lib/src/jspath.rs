@@ -271,13 +271,20 @@ pub fn join_path(base: &str, names: &[&str]) -> PathBuf {
 pub fn node_error(e: &std::io::Error, syscall: &str, path: Option<&Path>) -> String {
     let (code, text) = error_code(e);
     match path {
-        // Node on Windows names an absolute path as the system was given it, with backslashes
-        // (seen on CI; a relative one is not known to change, so it is left as given)
-        Some(p) if cfg!(windows) && split_root(&p.to_string_lossy()).1 => {
-            format!("{code}: {text}, {syscall} '{}'", resolve(&p.to_string_lossy()))
-        }
-        Some(p) => format!("{code}: {text}, {syscall} '{}'", p.display()),
+        Some(p) => format!("{code}: {text}, {syscall} '{}'", named(p)),
         None => format!("{code}: {text}, {syscall}"),
+    }
+}
+
+/// A path as a Node error names it. On Windows an absolute path is named as the system was given
+/// it, with backslashes (seen on CI; a relative one is not known to change, so it is left as
+/// given).
+pub fn named(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if cfg!(windows) && split_root(&text).1 {
+        resolve(&text)
+    } else {
+        text.into_owned()
     }
 }
 

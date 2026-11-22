@@ -1,0 +1,1771 @@
+{
+ "about": "C8's routes that make a server, answered by the Rust panel itself (every step is own): POST /api/instances with each refusal, a name made from a label, Java picked and refused before any download, Paper, Purpur and vanilla jars fetched from faked hosts and found already stored, Spigot built by a stand-in BuildTools, a NeoForge server laid by a stand-in installer, a server made from a modpack and one that fails, each job's last word read from its stream, a cancel with nothing running, and POST /api/instances/adopt for a folder that is already a server.",
+ "platforms": [
+  "linux",
+  "darwin"
+ ],
+ "hosts": {
+  "https://fill.papermc.io": {
+   "routes": {
+    "GET /v3/projects/paper": {
+     "json": {
+      "project": {
+       "id": "paper"
+      },
+      "versions": {
+       "1.21": [
+        "1.21.5",
+        "1.21.4",
+        "1.21.4-rc1"
+       ],
+       "1.20": [
+        "1.20.6"
+       ]
+      }
+     }
+    },
+    "GET /v3/projects/paper/versions/1.21.4/builds": {
+     "json": [
+      {
+       "id": 16,
+       "time": "2026-11-03T10:00:00Z",
+       "channel": "EXPERIMENTAL",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.4-16.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/16/paper-1.21.4-16.jar}"
+         },
+         "size": 3000
+        }
+       }
+      },
+      {
+       "id": 15,
+       "time": "2026-11-02T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.4-15.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/15/paper-1.21.4-15.jar}"
+         },
+         "size": 2048
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/paper/versions/1.21.5/builds": {
+     "json": [
+      {
+       "id": 3,
+       "time": "2026-11-10T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.21.5-3.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/3/paper-1.21.5-3.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/3/paper-1.21.5-3.jar}"
+         },
+         "size": 2500
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/folia": {
+     "json": {
+      "project": {
+       "id": "folia"
+      },
+      "versions": {
+       "1.21": [
+        "1.21.4"
+       ]
+      }
+     }
+    },
+    "GET /v3/projects/folia/versions/1.21.4/builds": {
+     "json": [
+      {
+       "id": 7,
+       "time": "2026-11-01T10:00:00Z",
+       "channel": "STABLE",
+       "downloads": {
+        "server:default": {
+         "name": "folia-1.21.4-7.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/7/folia-1.21.4-7.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/7/folia-1.21.4-7.jar}"
+         },
+         "size": 2200
+        }
+       }
+      }
+     ]
+    },
+    "GET /v3/projects/paper/versions/1.20.6/builds": {
+     "json": [
+      {
+       "id": 5,
+       "time": "2026-09-01T10:00:00Z",
+       "channel": null,
+       "downloads": {
+        "server:default": {
+         "name": "paper-1.20.6-5.jar",
+         "url": "https://fill-data.papermc.io/v1/objects/y/../a b.jar",
+         "checksums": {
+          "sha256": "${sha256:https://fill-data.papermc.io/v1/objects/a%20b.jar}"
+         },
+         "size": 1000
+        }
+       }
+      }
+     ]
+    }
+   }
+  },
+  "https://fill-data.papermc.io": {
+   "routes": {
+    "GET /v1/objects/a%20b.jar": {
+     "bytes": {
+      "size": 1000,
+      "seed": "spaced"
+     }
+    },
+    "GET /v1/objects/16/paper-1.21.4-16.jar": {
+     "bytes": {
+      "size": 3000,
+      "seed": "paper-16"
+     }
+    },
+    "GET /v1/objects/15/paper-1.21.4-15.jar": {
+     "bytes": {
+      "size": 2048,
+      "seed": "paper-15"
+     }
+    },
+    "GET /v1/objects/3/paper-1.21.5-3.jar": {
+     "bytes": {
+      "size": 2500,
+      "seed": "paper-3"
+     }
+    },
+    "GET /v1/objects/7/folia-1.21.4-7.jar": {
+     "bytes": {
+      "size": 2200,
+      "seed": "folia-7"
+     }
+    }
+   }
+  },
+  "https://api.purpurmc.org": {
+   "routes": {
+    "GET /v2/purpur": {
+     "json": {
+      "project": "purpur",
+      "versions": [
+       "1.21.3",
+       "1.21.4"
+      ]
+     }
+    },
+    "GET /v2/purpur/1.21.4": {
+     "json": {
+      "builds": {
+       "latest": "2400",
+       "all": [
+        "2399",
+        "2400"
+       ]
+      }
+     }
+    },
+    "GET /v2/purpur/1.21.4/2400": {
+     "json": {
+      "build": "2400",
+      "md5": "${md5:https://api.purpurmc.org/v2/purpur/1.21.4/2400/download}"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2400/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-2400"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2399": {
+     "json": {
+      "build": "2399",
+      "md5": "00000000000000000000000000000000"
+     }
+    },
+    "GET /v2/purpur/1.21.3": {
+     "text": "\ufeff{\"builds\":{\"latest\":\"7\",\"all\":[\"7\"]}}"
+    },
+    "GET /v2/purpur/1.21.3/7": {
+     "text": "\ufeff{\"md5\":\"${md5:https://api.purpurmc.org/v2/purpur/1.21.3/7/download}\"}"
+    },
+    "GET /v2/purpur/1.21.3/7/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-7"
+     }
+    },
+    "GET /v2/purpur/1.21.4/2399/download": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "purpur-2399"
+     }
+    }
+   }
+  },
+  "https://piston-meta.mojang.com": {
+   "routes": {
+    "GET /mc/game/version_manifest_v2.json": {
+     "json": {
+      "latest": {
+       "release": "1.21.4"
+      },
+      "versions": [
+       {
+        "id": "25w14a",
+        "type": "snapshot",
+        "url": "https://piston-meta.mojang.com/v1/packages/s/25w14a.json"
+       },
+       {
+        "id": "1.21.4",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/r/1.21.4.json"
+       },
+       {
+        "id": "1.0",
+        "type": "release",
+        "url": "https://piston-meta.mojang.com/v1/packages/r/1.0.json"
+       }
+      ]
+     }
+    },
+    "GET /v1/packages/r/1.21.4.json": {
+     "json": {
+      "javaVersion": {
+       "majorVersion": 21
+      },
+      "downloads": {
+       "server": {
+        "url": "https://piston-data.mojang.com/v1/objects/aaa/server.jar",
+        "sha1": "${sha1:https://piston-data.mojang.com/v1/objects/aaa/server.jar}",
+        "size": 1126400
+       }
+      }
+     }
+    },
+    "GET /v1/packages/r/1.0.json": {
+     "json": {
+      "javaVersion": {
+       "majorVersion": 8
+      },
+      "downloads": {}
+     }
+    },
+    "GET /v1/packages/s/25w14a.json": {
+     "json": {
+      "downloads": {
+       "server": {
+        "url": "https://piston-data.mojang.com/v1/objects/bbb/server.jar",
+        "sha1": "0000"
+       }
+      }
+     }
+    }
+   }
+  },
+  "https://piston-data.mojang.com": {
+   "routes": {
+    "GET /v1/objects/aaa/server.jar": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "vanilla"
+     }
+    },
+    "GET /v1/objects/bbb/server.jar": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "snap"
+     }
+    }
+   }
+  },
+  "https://api.infernalsuite.com": {
+   "routes": {
+    "GET /v1/projects/asp": {
+     "json": [
+      {
+       "id": "a1111111c0ffee0000000000",
+       "date": 1730000000000,
+       "mcVersion": [
+        "1.21.4",
+        "1.21.5-pre1"
+       ],
+       "files": [
+        {
+         "id": "f0",
+         "fileName": "asp-server.jar",
+         "sha256Hash": "x"
+        }
+       ]
+      },
+      {
+       "id": "b77d5e97c0ffee0000000000",
+       "date": 1731000000000,
+       "mcVersion": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "id": "f9",
+         "fileName": "api.jar"
+        },
+        {
+         "id": "f1",
+         "fileName": "asp-server.jar",
+         "sha256Hash": "${sha256:https://api.infernalsuite.com/v1/projects/asp/b77d5e97c0ffee0000000000/download/f1}"
+        }
+       ]
+      },
+      {
+       "id": "c2222222",
+       "date": 1729000000000,
+       "mcVersion": [
+        "1.21.3"
+       ],
+       "files": [
+        {
+         "id": "f2",
+         "fileName": "plugin.jar"
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v1/projects/asp/b77d5e97c0ffee0000000000/download/f1": {
+     "bytes": {
+      "size": 1126400,
+      "seed": "asp"
+     }
+    }
+   }
+  },
+  "https://meta.fabricmc.net": {
+   "routes": {
+    "GET /v2/versions/game": {
+     "json": [
+      {
+       "version": "25w14a",
+       "stable": false
+      },
+      {
+       "version": "1.21.4",
+       "stable": true
+      },
+      {
+       "version": "1.99",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader": {
+     "json": [
+      {
+       "version": "0.17.0-beta",
+       "stable": false
+      },
+      {
+       "version": "0.16.10",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/installer": {
+     "json": [
+      {
+       "version": "1.0.1",
+       "stable": true
+      }
+     ]
+    },
+    "GET /v2/versions/loader/1.21.4/0.16.10/1.0.1/server/jar": {
+     "bytes": {
+      "size": 204800,
+      "seed": "fabric"
+     }
+    },
+    "GET /v2/versions/loader/1.99/0.16.10/1.0.1/server/jar": {
+     "status": 400,
+     "json": {
+      "error": "no"
+     }
+    },
+    "GET /v2/versions/loader/1.98/0.16.10/1.0.1/server/jar": {
+     "bytes": {
+      "size": 1000,
+      "seed": "tiny"
+     }
+    },
+    "GET /v2/versions/loader/1.21.5/0.16.10/1.0.1/server/jar": {
+     "bytes": {
+      "size": 204800,
+      "seed": "fabric-1215"
+     }
+    }
+   }
+  },
+  "https://maven.neoforged.net": {
+   "routes": {
+    "GET /api/maven/versions/releases/net/neoforged/neoforge": {
+     "json": {
+      "isSnapshot": false,
+      "versions": [
+       "26.1.0.5",
+       "26.1.0.6",
+       "26.1.0.7-beta",
+       "26.2.0.1-beta",
+       "26.3.0.9",
+       "26.4.0.1"
+      ]
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.1.0.6"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.1.0.6/neoforge-26.1.0.6-installer.jar}  neoforge-26.1.0.6-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.2.0.1-beta"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.2.0.1-beta/neoforge-26.2.0.1-beta-installer.jar}  neoforge-26.2.0.1-beta-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.3.0.9"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar.sha256": {
+     "text": "${sha256:https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.9/neoforge-26.3.0.9-installer.jar}  neoforge-26.3.0.9-installer.jar\n"
+    },
+    "GET /releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar": {
+     "bytes": {
+      "size": 5000,
+      "seed": "neo-26.4.0.1"
+     }
+    },
+    "GET /releases/net/neoforged/neoforge/26.4.0.1/neoforge-26.4.0.1-installer.jar.sha256": {
+     "text": "deadbeef  neoforge-26.4.0.1-installer.jar\n"
+    }
+   }
+  },
+  "https://hub.spigotmc.org": {
+   "routes": {
+    "GET /versions/": {
+     "text": "<a href=\"1.21.3.json\">1.21.3.json</a> <a href=\"1.21.4.json\">1.21.4.json</a> <a href=\"4647.json\">4647.json</a> <a href=\"latest.json\">latest.json</a>"
+    },
+    "GET /jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar": {
+     "bytes": {
+      "size": 204800,
+      "seed": "buildtools"
+     }
+    }
+   }
+  },
+  "https://api.modrinth.com": {
+   "routes": {
+    "GET /v2/project/alpha/version": {
+     "json": [
+      {
+       "id": "valpha21-beta",
+       "version_number": "2.1-beta",
+       "version_type": "beta",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/alpha/2.1-beta.mrpack",
+         "filename": "alpha-2.1-beta.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "1eed5b6eb0ffa6d8ff8a37c3278225e4670c3709"
+         }
+        }
+       ]
+      },
+      {
+       "id": "valpha20",
+       "version_number": "2.0",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/alpha/2.0.mrpack",
+         "filename": "alpha-2.0.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "1eed5b6eb0ffa6d8ff8a37c3278225e4670c3709"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/neo/version": {
+     "json": [
+      {
+       "id": "vneo100",
+       "version_number": "1.0.0",
+       "version_type": "release",
+       "loaders": [
+        "neoforge"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/neo/1.0.0.mrpack",
+         "filename": "neo-1.0.0.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "235a084ee267f32cb8ec82060e9981867d0eaa6c"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/empty/version": {
+     "json": []
+    },
+    "GET /v2/project/quiltonly/version": {
+     "json": [
+      {
+       "id": "vquiltonly1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "quilt"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/quiltonly/1.mrpack",
+         "filename": "quiltonly-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "1eed5b6eb0ffa6d8ff8a37c3278225e4670c3709"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/nofile/version": {
+     "json": [
+      {
+       "id": "vnofile1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": []
+      }
+     ]
+    },
+    "GET /v2/project/badsum/version": {
+     "json": [
+      {
+       "id": "vbadsum1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/badsum/1.mrpack",
+         "filename": "badsum-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "ffffffffffffffffffffffffffffffffffffffff"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/notpack/version": {
+     "json": [
+      {
+       "id": "vnotpack1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/notpack/1.mrpack",
+         "filename": "notpack-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "f4dfab1180de5cab60841e96ae741e0f05a2d935"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/notjson/version": {
+     "json": [
+      {
+       "id": "vnotjson1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/notjson/1.mrpack",
+         "filename": "notjson-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "0aeb1a9457c2976507fcd6c94d8d62ae384d1769"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/forge/version": {
+     "json": [
+      {
+       "id": "vforge1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/forge/1.mrpack",
+         "filename": "forge-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "3d911045bd99f351b67f5b26961bcdb02baf9497"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/quilt/version": {
+     "json": [
+      {
+       "id": "vquilt1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/quilt/1.mrpack",
+         "filename": "quilt-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "cbd561b862e616c8fa483d008875fe2f400cce24"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/nomc/version": {
+     "json": [
+      {
+       "id": "vnomc1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/nomc/1.mrpack",
+         "filename": "nomc-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "b7a4d76beef467fd6aa6cb4e30327e94a421a0ce"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/noloader/version": {
+     "json": [
+      {
+       "id": "vnoloader1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/noloader/1.mrpack",
+         "filename": "noloader-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "7920d5d663de1e35b278fbfed8c2ce5322c1aff9"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/badmc/version": {
+     "json": [
+      {
+       "id": "vbadmc1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/badmc/1.mrpack",
+         "filename": "badmc-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "77f1c6889987afb7ee0d376f59dd07b376432703"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/notmc/version": {
+     "json": [
+      {
+       "id": "vnotmc1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/notmc/1.mrpack",
+         "filename": "notmc-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "76d92c987d652cbd3caee9f3f100cf5d5280895d"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/escape/version": {
+     "json": [
+      {
+       "id": "vescape1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/escape/1.mrpack",
+         "filename": "escape-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "80e4c0cafe97ea218934e38dde3def3dbbb121b9"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/nodl/version": {
+     "json": [
+      {
+       "id": "vnodl1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/nodl/1.mrpack",
+         "filename": "nodl-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "a40c06a4fa877da693e3dcae8956344bf34951cf"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/evilhost/version": {
+     "json": [
+      {
+       "id": "vevilhost1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/evilhost/1.mrpack",
+         "filename": "evilhost-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "44df914c3a0fa54dcf37e95afb6d2fc5d09dd881"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/httphost/version": {
+     "json": [
+      {
+       "id": "vhttphost1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/httphost/1.mrpack",
+         "filename": "httphost-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "9772af7266780584050da4cb7fdb2f059bf98949"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/nohash/version": {
+     "json": [
+      {
+       "id": "vnohash1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/nohash/1.mrpack",
+         "filename": "nohash-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "4f324968dec5e6602c42cd8df6c008a9ddd25502"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/oddhash/version": {
+     "json": [
+      {
+       "id": "voddhash1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/oddhash/1.mrpack",
+         "filename": "oddhash-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "4ca265b40e2537593ef986fd54dccf75b39f76b1"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/oddsize/version": {
+     "json": [
+      {
+       "id": "voddsize1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/oddsize/1.mrpack",
+         "filename": "oddsize-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "db0eb65c2b01e2a186eced5fbcd6b07c1248e84c"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/filesum/version": {
+     "json": [
+      {
+       "id": "vfilesum1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/filesum/1.mrpack",
+         "filename": "filesum-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "14571c55f7a55b61190205ab9ed24089fb7d6eaf"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/short/version": {
+     "json": [
+      {
+       "id": "vshort1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/short/1.mrpack",
+         "filename": "short-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "663bb37b64ebed44a9f940a598d05c39b3973955"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/gone/version": {
+     "json": [
+      {
+       "id": "vgone1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/gone/1.mrpack",
+         "filename": "gone-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "23257232b568113ccc8aebffa61c7c4cf472a705"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/nofabric/version": {
+     "json": [
+      {
+       "id": "vnofabric1",
+       "version_number": "1",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/nofabric/1.mrpack",
+         "filename": "nofabric-1.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "444b74c1b050971299252adaa8a5ce3db9ea3362"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/broken/version": {
+     "status": 500,
+     "text": "oops"
+    },
+    "GET /v2/project/beta1/version": {
+     "json": [
+      {
+       "id": "vbeta110",
+       "version_number": "1.0",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/beta1/1.0.mrpack",
+         "filename": "beta1-1.0.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "baef14e86a36e2478a92e14d5b120fb4fcc435cf"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    "GET /v2/project/beta/version": {
+     "json": [
+      {
+       "id": "vbeta20",
+       "version_number": "2.0",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/beta/2.0.mrpack",
+         "filename": "beta-2.0.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "4dad8e55e24103277a1e5c999c7678c07b3e728d"
+         }
+        }
+       ]
+      },
+      {
+       "id": "vbeta10",
+       "version_number": "1.0",
+       "version_type": "release",
+       "loaders": [
+        "fabric"
+       ],
+       "game_versions": [
+        "1.21.4"
+       ],
+       "files": [
+        {
+         "url": "https://cdn.modrinth.com/data/beta/1.0.mrpack",
+         "filename": "beta-1.0.mrpack",
+         "primary": true,
+         "hashes": {
+          "sha1": "baef14e86a36e2478a92e14d5b120fb4fcc435cf"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  "https://cdn.modrinth.com": {
+   "routes": {
+    "GET /data/files/mods_lithium.jar": {
+     "base64": "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"
+    },
+    "GET /data/files/mods_sodium.jar": {
+     "base64": "lI/mA/YdwDa1xZbcCf484/PTDckPAkyF88gtssyrZ51SBHSV1ZIaQboeuJg5yI7WlfHTTS1Tge2MPbWbPxUhjxzEG+8OnSSEffaw1Kz7s/Bh14f3tMLR+wgnAa2IKq7rs8JSYxZ/AHMg5S+D319b8CLAC94N2CHnPR7uaGw4m4YG6OyAnRYXv6MvasisV8/1RmTE8eKI81jj7mdjQITOZvxi+T+68DGGSoSo2QDL1B20Ddl2tZ7d6fDl4q5N5XClNW/b5vyaLx4Tz29TUa99kwtOGejVlqlBPyv1NanJVmY8qTWXP/GD7i/g5SKqe2Qjrn1ss6+gaN331jnNKVmoZSjNd2jVCu7bkxSMgIEnlmFM2/SJ+ddf781JcUVKNlpFhZb+lFTZV3QPG4gqPntCDeYeAqCbeeucAdCHE1zXpsYolBbRZfdUHNlUpKyko3l2qflxixqkvb442H5kcocB+jhR11+4Q1VSssh+eU58FBBsofMbnrzUQ6Z19T/zgGNLQR/iVWqDxoREWvpjWWnTDm/FVXV6aaV1bmng8xjnncETyceHXFArM2ALhCMZRz0EhUmkf3j9O1nICT/GV3tHbDwnfk/XOhVy1R3ZoRay5oyBT6Yg/Gl+VCCRXzRPt862eYUqcww/vsA9DL8YxzJqxgzjMHk="
+    },
+    "GET /data/files/config_lithium.properties": {
+     "base64": "IyBsaXRoaXVtIGNvbmZpZwptaXhpbi5haT1mYWxzZQo="
+    },
+    "GET /data/files/mods_nested_deep.jar": {
+     "base64": "dGEcHWRVtTQyOiH4EzpvQ9w6gYjnuUb5bcwo3eky/LKwq8E2Q+Ueb9PmzAkIVg8jWyGVQzaG5RrdNsPVKwh8sS4JIP9bXSASz5ytdMXQrh61sRWhrx8qScBSLTQ4PNkjSJ+hjpDjt5TQZ5nDy7JvGpi/+8WFXMs/t810NiNmchuQMoDaY2mwK8TufKczZYeJ90/nLWo/zCTwnKnDy1+XAXmB0U2EBrJ3nOMqDmyV4VBWobMPne98p9Csh3LS75odAcBMBTQqXjO+oGykE1hrD60Lh+w00ztGB2vT3Cz00t/HmR0Ic+YCEqb9NJKuLTJHL2rXXZDnorXoQuhAA+9INIvsIUGfdV8T7v8Mpnwq4faPwM1jqDnnFrz5d0WQLFuBo7+/YS4VdLsCssQG2lexIYIAWQMuo6BtKruqUsnPlXsXW3+Y/w4kenuZ4QnJe1WNPfEoLXWo8Za8W7AsQwj2wyWOPhgqItUnjzsx2YrOc8TPbr/zkrKw07In9GjRmDp2c40rCuTt0t3kAX1VJvbmrCuv4p5as0mDBt6uh/Flw49ZMjKW2vcdC1xrH/mLShgnH+q4a3CwQ8GrMo1ZRDjh6H05Pij1JxlxDLOKE/XJTkyG/9bV3rYVaxSmVkJjyMVhtWbD6jRpozQR+9VvZ+YOTTRi34cBu/5urdEtwRtVywIARViSd8b6UjbYamUzbJyz9DNsZQ7pcaXIA/xwIWUKrZk27RNz2suaoFxJxiNflbDCCZ6BCBaX9VDfj6AX8HfF/sJm+avVWOSV1qZYr/gJcNpCtJ6rX1Y7i10kt0oPNldw2U43vocdax4i12IK6IT12XnBvks+E8XG7wTyKZ2PIx/OuScDM77Sue6xbUyhRpftCkjNVYp0kpQu8zwo0Z+TDgVV3eEPP61/JG1hMcKvOK5E12TB6/htvBm3Pw=="
+    },
+    "GET /data/alpha/2.1-beta.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1vLBq5iAIAAEUFAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUy47cNhBFf2XQ67ibVRQf8i7L7AIEyMYIBvV0y+6WFEljAxn430P1DBx7Msgi3gmXRaruqUs+HnxarrT9bss6TOPh7R38dHd4T1drn4frMJos5NuhiZ+eSn7RfYUu85ne4K6Pz8U/79LdryQfd9WHi61Nfvd4mGk7306bdD1dhu08PFyPH2jZy860nm91j4f1TLCXBfLorCxWuHfPvRfLkdC6IKFiqtCBsfT79rYnAe67IgXiHIpkRKpVBQywSz26UeekiJGxa6vOlajUHLhj7DPn9pOcehOKEUkNemZHLzUZmFtVZvUUA0WpmZJbwFhakeY+dITCoVCoevjS2tHp83iZSG/GD+dtm9e3p5PoeGzel2HczkeZrieljU43QKedyf23TP54Zvfb8NdOFUMI7eQXENdJ/5uhx8w1mwuxA2Nrt4/BSs5dgOjiSETcUH7PUGNVcI3MhtTVhkWBuBd1sMYMgKtEjaQVg7KJ5RQCJm/Ik3Y1NohQiqLUIMUwUZYsULmrRdVLavQTeM1tLoUAue54KROWGiFo/RGG3yB5gbD12AQbP90IyWWwcdvdLvbnw7CY3hjY0uK9qw/j+jDP07K1hS/fkZdp9OH91wDPyzTbsg2N/OszAEXQhH3kyk5QvCVNQQQLWEhcmBASdP83OU/t3L/Szgv/Ef8doNHWZvCkZvPrKXpORE3ISgHVuev6vo2tTTYBS8zRY6xmJSBHDcUlBJc2amAtfUtZjtGhb7dPtABVcYkhqCilkk00ObW7HGsMkHPt+pSkdJis9sDFtI/7v34oEU8e7796fIGltIu1S2qzjWqjDM/u/3n09iEeEY7d7UEjXgZ5szfylJRwhHyE0FLyN1BLAwQUAAAACADynnVdqku0/A0AAAALAAAAHAAAAG92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw5AIAUEsDBBQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAb3ZlcnJpZGVzL3NlcnZlci5wcm9wZXJ0aWVzy80vSbFNK8rPVSjJSFUoSEzO5gIAUEsDBBQAAAAIAPKedV1pGJnXDQAAAAsAAAAjAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw4gIAUEsDBBQAAAAIAPKedV3q+qidBgAAAAQAAAAnAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0q0wt5gIAUEsBAhQDFAAAAAgA8p51XW8sGrmIAgAARQUAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwECFAMUAAAACADynnVdqku0/A0AAAALAAAAHAAAAAAAAAAAAAAAgAG5AgAAb3ZlcnJpZGVzL2NvbmZpZy9zaGFyZWQudG9tbFBLAQIUAxQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAAAAAAAAAAACAAQADAABvdmVycmlkZXMvc2VydmVyLnByb3BlcnRpZXNQSwECFAMUAAAACADynnVdaRiZ1w0AAAALAAAAIwAAAAAAAAAAAAAAgAFOAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWxQSwECFAMUAAAACADynnVd6vqonQYAAAAEAAAAJwAAAAAAAAAAAAAAgAGcAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0UEsFBgAAAAAFAAUAegEAAOcDAAAAAA=="
+    },
+    "GET /data/alpha/2.0.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1vLBq5iAIAAEUFAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUy47cNhBFf2XQ67ibVRQf8i7L7AIEyMYIBvV0y+6WFEljAxn430P1DBx7Msgi3gmXRaruqUs+HnxarrT9bss6TOPh7R38dHd4T1drn4frMJos5NuhiZ+eSn7RfYUu85ne4K6Pz8U/79LdryQfd9WHi61Nfvd4mGk7306bdD1dhu08PFyPH2jZy860nm91j4f1TLCXBfLorCxWuHfPvRfLkdC6IKFiqtCBsfT79rYnAe67IgXiHIpkRKpVBQywSz26UeekiJGxa6vOlajUHLhj7DPn9pOcehOKEUkNemZHLzUZmFtVZvUUA0WpmZJbwFhakeY+dITCoVCoevjS2tHp83iZSG/GD+dtm9e3p5PoeGzel2HczkeZrieljU43QKedyf23TP54Zvfb8NdOFUMI7eQXENdJ/5uhx8w1mwuxA2Nrt4/BSs5dgOjiSETcUH7PUGNVcI3MhtTVhkWBuBd1sMYMgKtEjaQVg7KJ5RQCJm/Ik3Y1NohQiqLUIMUwUZYsULmrRdVLavQTeM1tLoUAue54KROWGiFo/RGG3yB5gbD12AQbP90IyWWwcdvdLvbnw7CY3hjY0uK9qw/j+jDP07K1hS/fkZdp9OH91wDPyzTbsg2N/OszAEXQhH3kyk5QvCVNQQQLWEhcmBASdP83OU/t3L/Szgv/Ef8doNHWZvCkZvPrKXpORE3ISgHVuev6vo2tTTYBS8zRY6xmJSBHDcUlBJc2amAtfUtZjtGhb7dPtABVcYkhqCilkk00ObW7HGsMkHPt+pSkdJis9sDFtI/7v34oEU8e7796fIGltIu1S2qzjWqjDM/u/3n09iEeEY7d7UEjXgZ5szfylJRwhHyE0FLyN1BLAwQUAAAACADynnVdqku0/A0AAAALAAAAHAAAAG92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw5AIAUEsDBBQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAb3ZlcnJpZGVzL3NlcnZlci5wcm9wZXJ0aWVzy80vSbFNK8rPVSjJSFUoSEzO5gIAUEsDBBQAAAAIAPKedV1pGJnXDQAAAAsAAAAjAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw4gIAUEsDBBQAAAAIAPKedV3q+qidBgAAAAQAAAAnAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0q0wt5gIAUEsBAhQDFAAAAAgA8p51XW8sGrmIAgAARQUAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwECFAMUAAAACADynnVdqku0/A0AAAALAAAAHAAAAAAAAAAAAAAAgAG5AgAAb3ZlcnJpZGVzL2NvbmZpZy9zaGFyZWQudG9tbFBLAQIUAxQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAAAAAAAAAAACAAQADAABvdmVycmlkZXMvc2VydmVyLnByb3BlcnRpZXNQSwECFAMUAAAACADynnVdaRiZ1w0AAAALAAAAIwAAAAAAAAAAAAAAgAFOAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWxQSwECFAMUAAAACADynnVd6vqonQYAAAAEAAAAJwAAAAAAAAAAAAAAgAGcAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0UEsFBgAAAAAFAAUAegEAAOcDAAAAAA=="
+    },
+    "GET /data/files/mods_neo-mod.jar": {
+     "base64": "1mOtzhsIxmof5/fHDDL9dfZmYVXrQfP7idZdk1fAsJl/KsNr1eDuALIZz0gAbuI2Iap6vZCcgMvy9Oe9yKN86FO7WvNEh54KkcfCts3QMjop86K2wriZ6bHIWOKZrG7sOgRRrbxN4uImyHZ7PUQdWFGxWSljBOwSsq+phAE86mgBB3L1SXrFJfjC8K8RMmKAgT+3AUrY/jFqrdr4AiMUmoWIbleBJe6XzSYc2qZR41eBFELR7SDN37G/IK00tc1Q3DD+QwwnhqPEEWL1VyUcdUjmVD7Fek9Mdpf2qvSXZRpDajbySP6lZwqC7t5OiHuLWp2YSuSloJUxAIF8VmmWdyWr90XE8Yn3qzV+h4+ijfZiIGRqT8fo1qrNSpbFHnOrwd3HU7MkUmjihjtJgCaFq0BYMq6wnakCCmC4I0C56awO+JeB73ck64twPO1RjfIo5TdYDkXhFoMF2I7meQecJJJKk2xHMvqTTo9mRmka+YDpadfJwEKmioSc5F4IWBxiiFXVQMOt6TgtlRDSIFW84DL25lVeB1pG1wTG4jrMbPPG/XUVeWSiFyAql59+HBSk9nW6+Bw2vQPpSQAlAVo1hSTR9Stmc9JpomF92TolMY0/fyO3Nx5Js8HWT4MxpMeJ4u3RuAvKyFNBRmEeieddnZQJuvaQgD8/QJF9SJu+iF0xUOC7Cm0R2aU41aDLwwk1CXaOllWR3LqYVXiOEmS7xg4DX/QumRqUZhwKvWz+A8yREMfWpTbFwyQIxZdbRsaJCALw1x0Rlhg66rVPsoYSE87gPPeqB59aonL5cyvSFgHMTc3Q4ic/ivArCSiDgl9dwKFLWkhq1P4xevnznHZEiiVbtW5RZbPSBnkQQHOSsfalt3PMuU95RTkYXutKj2sk/D6xm8nm0US5bHe9PfQTwJdT8N3prntBZ/gNtT131ds174yPHrE/MhCKEzLI+HMe4kGyWzM2JtUyX4fYN7pie09kaH62xkQJLvpvghLatL6hVeI6AUVWIlX7vGuXuoqzJydWNzRylyYlX+nwmz1MbFFul66aXa35c+GpWkBTCKRVHXJkIcgED4rKAQb6eVSgsW7x7GY+KrbuYqlxHIy2ZQ/Bm6n40NPxtkbpmgd18QTrBBno5OjmddjOt3v2QdNeLg2twxUeZ6Z5+4mPjbispz2YWcpHPbo0LOTsaIvrk1mOkYdQKrtSB6S3HQQ5vYjhOzXOHnTBbh1wi6o7he4xnCLS7gycOR1ZoxJOR5HvVf6oRF+gNmja06C1SQsy5W+BEc5DcF0+4gjqZ8zCYlb6O9VvAt5mZfS2blSJAVZD/zg2jh9jlmX2uH5BsacSdCmCwGVPXYxjgRUZ2pny/zTu5mqiU9Lk1sH0QAIH6kLiwBo4nJAC/cvtoj2KDYHY08gbMOyAArGOLeGWK7ifan77Y7YJH7ymahB6cw+uO3S8mTTdVdM7Ie/JyZc8EE2+FxEvqF+Hb5g88e4lIJRysJPUoRvwLURXextUrfDIu7ij0K/tewXTKmqWsW6UmQLN4u/r/QexIOgOmbMmx3g1rrtpDmDAR6Rn5qL12Sfsh3OKeoyX3J4Mh7nztTntvVPKuklc"
+    },
+    "GET /data/neo/1.0.0.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0YHxyPPQEAAOEBAAATAAAAbW9kcmludGguaW5kZXguanNvbk1RQU7DMBD8SuUzJGsnsZ3+gAtCQuKCEFp7102gtaskAkTVv2OnRXBbj2e8npmTCGk64PLE0zymKLYbebMROzxwHsVhjOwnDIvI4MeFckflZqQvWcB4Zd5z2jygfy9YGPc8Z/D5JI64DOtDieY6crrNQ/WGU6ENOA8r7yTmAWWhsVOkbeCWGxeMlMzQ9sFjaMGbnlXvFfTarZuzppOqqJxqDYAzUkFrWuoZTWu8kjIfNJAm5R1LS511jZGBvAquQ2edaawKnmXTKUuOQWaJ1mxAgWkbNH2WK5QQGktgle2sMT14jz1ZpdmC9QBE4py/Q+kz7hPSalwMy3Kct3XtKVbZ8jTGZah8OtSEC9ZrQHXJ5PV/Ji/X7B7H75JptgPnghEfORJHP17j+qslu1e6ujTBKVe541+sgkqL8/kHUEsBAhQDFAAAAAgA8p51XRgfHI89AQAA4QEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAbgEAAAAA"
+    },
+    "GET /data/quiltonly/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1vLBq5iAIAAEUFAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUy47cNhBFf2XQ67ibVRQf8i7L7AIEyMYIBvV0y+6WFEljAxn430P1DBx7Msgi3gmXRaruqUs+HnxarrT9bss6TOPh7R38dHd4T1drn4frMJos5NuhiZ+eSn7RfYUu85ne4K6Pz8U/79LdryQfd9WHi61Nfvd4mGk7306bdD1dhu08PFyPH2jZy860nm91j4f1TLCXBfLorCxWuHfPvRfLkdC6IKFiqtCBsfT79rYnAe67IgXiHIpkRKpVBQywSz26UeekiJGxa6vOlajUHLhj7DPn9pOcehOKEUkNemZHLzUZmFtVZvUUA0WpmZJbwFhakeY+dITCoVCoevjS2tHp83iZSG/GD+dtm9e3p5PoeGzel2HczkeZrieljU43QKedyf23TP54Zvfb8NdOFUMI7eQXENdJ/5uhx8w1mwuxA2Nrt4/BSs5dgOjiSETcUH7PUGNVcI3MhtTVhkWBuBd1sMYMgKtEjaQVg7KJ5RQCJm/Ik3Y1NohQiqLUIMUwUZYsULmrRdVLavQTeM1tLoUAue54KROWGiFo/RGG3yB5gbD12AQbP90IyWWwcdvdLvbnw7CY3hjY0uK9qw/j+jDP07K1hS/fkZdp9OH91wDPyzTbsg2N/OszAEXQhH3kyk5QvCVNQQQLWEhcmBASdP83OU/t3L/Szgv/Ef8doNHWZvCkZvPrKXpORE3ISgHVuev6vo2tTTYBS8zRY6xmJSBHDcUlBJc2amAtfUtZjtGhb7dPtABVcYkhqCilkk00ObW7HGsMkHPt+pSkdJis9sDFtI/7v34oEU8e7796fIGltIu1S2qzjWqjDM/u/3n09iEeEY7d7UEjXgZ5szfylJRwhHyE0FLyN1BLAwQUAAAACADynnVdqku0/A0AAAALAAAAHAAAAG92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw5AIAUEsDBBQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAb3ZlcnJpZGVzL3NlcnZlci5wcm9wZXJ0aWVzy80vSbFNK8rPVSjJSFUoSEzO5gIAUEsDBBQAAAAIAPKedV1pGJnXDQAAAAsAAAAjAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw4gIAUEsDBBQAAAAIAPKedV3q+qidBgAAAAQAAAAnAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0q0wt5gIAUEsBAhQDFAAAAAgA8p51XW8sGrmIAgAARQUAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwECFAMUAAAACADynnVdqku0/A0AAAALAAAAHAAAAAAAAAAAAAAAgAG5AgAAb3ZlcnJpZGVzL2NvbmZpZy9zaGFyZWQudG9tbFBLAQIUAxQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAAAAAAAAAAACAAQADAABvdmVycmlkZXMvc2VydmVyLnByb3BlcnRpZXNQSwECFAMUAAAACADynnVdaRiZ1w0AAAALAAAAIwAAAAAAAAAAAAAAgAFOAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWxQSwECFAMUAAAACADynnVd6vqonQYAAAAEAAAAJwAAAAAAAAAAAAAAgAGcAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0UEsFBgAAAAAFAAUAegEAAOcDAAAAAA=="
+    },
+    "GET /data/nofile/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1vLBq5iAIAAEUFAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUy47cNhBFf2XQ67ibVRQf8i7L7AIEyMYIBvV0y+6WFEljAxn430P1DBx7Msgi3gmXRaruqUs+HnxarrT9bss6TOPh7R38dHd4T1drn4frMJos5NuhiZ+eSn7RfYUu85ne4K6Pz8U/79LdryQfd9WHi61Nfvd4mGk7306bdD1dhu08PFyPH2jZy860nm91j4f1TLCXBfLorCxWuHfPvRfLkdC6IKFiqtCBsfT79rYnAe67IgXiHIpkRKpVBQywSz26UeekiJGxa6vOlajUHLhj7DPn9pOcehOKEUkNemZHLzUZmFtVZvUUA0WpmZJbwFhakeY+dITCoVCoevjS2tHp83iZSG/GD+dtm9e3p5PoeGzel2HczkeZrieljU43QKedyf23TP54Zvfb8NdOFUMI7eQXENdJ/5uhx8w1mwuxA2Nrt4/BSs5dgOjiSETcUH7PUGNVcI3MhtTVhkWBuBd1sMYMgKtEjaQVg7KJ5RQCJm/Ik3Y1NohQiqLUIMUwUZYsULmrRdVLavQTeM1tLoUAue54KROWGiFo/RGG3yB5gbD12AQbP90IyWWwcdvdLvbnw7CY3hjY0uK9qw/j+jDP07K1hS/fkZdp9OH91wDPyzTbsg2N/OszAEXQhH3kyk5QvCVNQQQLWEhcmBASdP83OU/t3L/Szgv/Ef8doNHWZvCkZvPrKXpORE3ISgHVuev6vo2tTTYBS8zRY6xmJSBHDcUlBJc2amAtfUtZjtGhb7dPtABVcYkhqCilkk00ObW7HGsMkHPt+pSkdJis9sDFtI/7v34oEU8e7796fIGltIu1S2qzjWqjDM/u/3n09iEeEY7d7UEjXgZ5szfylJRwhHyE0FLyN1BLAwQUAAAACADynnVdqku0/A0AAAALAAAAHAAAAG92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw5AIAUEsDBBQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAb3ZlcnJpZGVzL3NlcnZlci5wcm9wZXJ0aWVzy80vSbFNK8rPVSjJSFUoSEzO5gIAUEsDBBQAAAAIAPKedV1pGJnXDQAAAAsAAAAjAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw4gIAUEsDBBQAAAAIAPKedV3q+qidBgAAAAQAAAAnAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0q0wt5gIAUEsBAhQDFAAAAAgA8p51XW8sGrmIAgAARQUAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwECFAMUAAAACADynnVdqku0/A0AAAALAAAAHAAAAAAAAAAAAAAAgAG5AgAAb3ZlcnJpZGVzL2NvbmZpZy9zaGFyZWQudG9tbFBLAQIUAxQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAAAAAAAAAAACAAQADAABvdmVycmlkZXMvc2VydmVyLnByb3BlcnRpZXNQSwECFAMUAAAACADynnVdaRiZ1w0AAAALAAAAIwAAAAAAAAAAAAAAgAFOAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWxQSwECFAMUAAAACADynnVd6vqonQYAAAAEAAAAJwAAAAAAAAAAAAAAgAGcAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0UEsFBgAAAAAFAAUAegEAAOcDAAAAAA=="
+    },
+    "GET /data/badsum/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1vLBq5iAIAAEUFAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUy47cNhBFf2XQ67ibVRQf8i7L7AIEyMYIBvV0y+6WFEljAxn430P1DBx7Msgi3gmXRaruqUs+HnxarrT9bss6TOPh7R38dHd4T1drn4frMJos5NuhiZ+eSn7RfYUu85ne4K6Pz8U/79LdryQfd9WHi61Nfvd4mGk7306bdD1dhu08PFyPH2jZy860nm91j4f1TLCXBfLorCxWuHfPvRfLkdC6IKFiqtCBsfT79rYnAe67IgXiHIpkRKpVBQywSz26UeekiJGxa6vOlajUHLhj7DPn9pOcehOKEUkNemZHLzUZmFtVZvUUA0WpmZJbwFhakeY+dITCoVCoevjS2tHp83iZSG/GD+dtm9e3p5PoeGzel2HczkeZrieljU43QKedyf23TP54Zvfb8NdOFUMI7eQXENdJ/5uhx8w1mwuxA2Nrt4/BSs5dgOjiSETcUH7PUGNVcI3MhtTVhkWBuBd1sMYMgKtEjaQVg7KJ5RQCJm/Ik3Y1NohQiqLUIMUwUZYsULmrRdVLavQTeM1tLoUAue54KROWGiFo/RGG3yB5gbD12AQbP90IyWWwcdvdLvbnw7CY3hjY0uK9qw/j+jDP07K1hS/fkZdp9OH91wDPyzTbsg2N/OszAEXQhH3kyk5QvCVNQQQLWEhcmBASdP83OU/t3L/Szgv/Ef8doNHWZvCkZvPrKXpORE3ISgHVuev6vo2tTTYBS8zRY6xmJSBHDcUlBJc2amAtfUtZjtGhb7dPtABVcYkhqCilkk00ObW7HGsMkHPt+pSkdJis9sDFtI/7v34oEU8e7796fIGltIu1S2qzjWqjDM/u/3n09iEeEY7d7UEjXgZ5szfylJRwhHyE0FLyN1BLAwQUAAAACADynnVdqku0/A0AAAALAAAAHAAAAG92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw5AIAUEsDBBQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAb3ZlcnJpZGVzL3NlcnZlci5wcm9wZXJ0aWVzy80vSbFNK8rPVSjJSFUoSEzO5gIAUEsDBBQAAAAIAPKedV1pGJnXDQAAAAsAAAAjAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWwrzkgsSk1RsFUw4gIAUEsDBBQAAAAIAPKedV3q+qidBgAAAAQAAAAnAAAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0q0wt5gIAUEsBAhQDFAAAAAgA8p51XW8sGrmIAgAARQUAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwECFAMUAAAACADynnVdqku0/A0AAAALAAAAHAAAAAAAAAAAAAAAgAG5AgAAb3ZlcnJpZGVzL2NvbmZpZy9zaGFyZWQudG9tbFBLAQIUAxQAAAAIAPKedV3yY3RbFQAAABMAAAAbAAAAAAAAAAAAAACAAQADAABvdmVycmlkZXMvc2VydmVyLnByb3BlcnRpZXNQSwECFAMUAAAACADynnVdaRiZ1w0AAAALAAAAIwAAAAAAAAAAAAAAgAFOAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2hhcmVkLnRvbWxQSwECFAMUAAAACADynnVd6vqonQYAAAAEAAAAJwAAAAAAAAAAAAAAgAGcAwAAc2VydmVyLW92ZXJyaWRlcy9jb25maWcvc2VydmVyLW9ubHkudHh0UEsFBgAAAAAFAAUAegEAAOcDAAAAAA=="
+    },
+    "GET /data/notpack/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2DFtyMAwAAAAEAAAAPAAAAb3ZlcnJpZGVzL2EudHh0qwAAUEsBAhQDFAAAAAgA8p51XYMW3IwDAAAAAQAAAA8AAAAAAAAAAAAAAIABAAAAAG92ZXJyaWRlcy9hLnR4dFBLBQYAAAAAAQABAD0AAAAwAAAAAAA="
+    },
+    "GET /data/notjson/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2ConebCgAAAAgAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSk/MTVWyAgBQSwECFAMUAAAACADynnVdgqJ3mwoAAAAIAAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAAA7AAAAAAA="
+    },
+    "GET /data/forge/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV3PQkofbgAAAJQAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSssvyk0sCUstKs7Mz1OyUjDUUVBKT8xNBTKVcjPzUpOLEtNKlICCZRAlnikgmcyUCkOQYB5UpRuIk5aZk1oM5EXHAjkpqQWpeSmpecmZYLFqJMOA6g31jAz0wCYA7U8HG2FirmeoZ6BUWwsAUEsBAhQDFAAAAAgA8p51Xc9CSh9uAAAAlAAAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAnwAAAAAA"
+    },
+    "GET /data/quilt/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0Jb9afcwAAAJkAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSssvyk0sCUstKs7Mz1OyUjDUUVBKT8xNBTKVcjPzUpOLEtNKlICCZRAlnikgmcyUCkOQYB5UZSCIk5aZk1oM5EXHAjkpqQWpeSmpecmZYLFqJMOA6g31jAz0wCYUlmbmlOjm5CempBaBZAyAMkq1tQBQSwECFAMUAAAACADynnVdCW/Wn3MAAACZAAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAACkAAAAAAA="
+    },
+    "GET /data/nomc/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0GBu12bgAAAIYAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSssvyk0sCUstKs7Mz1OyUjDUUVBKT8xNBTKVcjPzUpOLEtNKlICCZRAlnikgmcyUCkOQYB5UpR+Ik5aZk1oM5EXHAjkpqQWpeSmpecmZYLFqpbTEpKLMZN2c/MSU1CKQHgM9QzM9QwOl2loAUEsBAhQDFAAAAAgA8p51XQYG7XZuAAAAhgAAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAnwAAAAAA"
+    },
+    "GET /data/noloader/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2ViUSRYQAAAIEAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSssvyk0sCUstKs7Mz1OyUjDUUVBKT8xNBTKVcjPzUpOLEtNKlICCZRAlnikgmcyUCkOQYB5UpR+Ik5aZk1oM5EXHAjkpqQWpeSmpecmZYLFqJMOA6g31jAz1TJRqawFQSwECFAMUAAAACADynnVdlYlEkWEAAACBAAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAACSAAAAAAA="
+    },
+    "GET /data/badmc/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1Rd4q2eAAAAJ4AAAATAAAAbW9kcmludGguaW5kZXguanNvbk2MsQ7CMAxEf6XyDKZmYOAPWBhZEEOIHWSpcVBaIaSq/45TGNju3T3dDKnUHKaL1FGLwbGjTQePkMUjZDWJNaQJvHx9lRO3RflNrbSfeW6QdJDR6XpzYHmKsVjUtZv/ztxH3BHu14sU7lXjdiiBpbatRzog9bAsH1BLAQIUAxQAAAAIAPKedV1Rd4q2eAAAAJ4AAAATAAAAAAAAAAAAAACAAQAAAABtb2RyaW50aC5pbmRleC5qc29uUEsFBgAAAAABAAEAQQAAAKkAAAAAAA=="
+    },
+    "GET /data/notmc/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV3t4MUReQAAAJwAAAATAAAAbW9kcmludGguaW5kZXguanNvbi2LMQ7CMAxFr1J5hqhGqAM3YGFkQQwmcZClxkFuVCFVvTtJ6eb3/vMCMVuicmebJCtcOjx08KbE9YTCZmRCUN38L66hDRK+2KTu4a1BlJGnSo9nhcAf1sDqZXMLJFH2RrG0Ht0J3Xl7opeJP46ZAlubeoeDwx7W9QdQSwECFAMUAAAACADynnVd7eDFEXkAAACcAAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAACqAAAAAAA="
+    },
+    "GET /data/files/.._evil.jar": {
+     "base64": "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"
+    },
+    "GET /data/escape/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1a2ReDOgEAANYBAAATAAAAbW9kcmludGguaW5kZXguanNvbkWRQU/DMAyF/8qUM6SJ06bp7hw4I3FBCDmxQ4PWdmqrgZj630nKBLf4+T3F/nwVcZoHXJ95XtI0iuNB3x3EOw6cn2JII4cZ4yqyePm1PFLpJPrSRRxvzodSxHTiJVcvV3HGtS+6lBVf0kl+4FwcPS79brmKpUddHAqjiZ584NZ3MdoutmwNAtcqKAeN07VmH7oSz5lGQ0kZVOitaoMFQOcoaNZQNx1ExjoiARgPde5G7xBbZ5WvPXTW2/yJbToOaAwgse68jxBb17DmyI68p9gYhSY4i01kBabNJrKdqhGCVy0qR2LL49D0OZ4mpH1n0a/reTlWVaBRDhPNaVx7GaahIlyx2tlUUr794Xi9EXtK3wUhKKW2ohGfeSQeQ7qR+r9CXlxL0LLeaaOfU7gvA/C8k5TaSq3Etv0AUEsBAhQDFAAAAAgA8p51XVrZF4M6AQAA1gEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAawEAAAAA"
+    },
+    "GET /data/nodl/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2DchgFngAAAAQBAAATAAAAbW9kcmludGguaW5kZXguanNvbo2OMQ7CMAxFr1J5hlAjxMDOwAVYUAfTuCSoTaqkgkpV7k4cKrHiyf5+/v4LdD4MNF05ROsdnCrcVPCggXMLg3XcBuomyOLri1y0bKyeUUS3kmcZOttzzNNtgZEmUxy8jrtZPSkIYCiaQiwQDaEA9GdByvfav13vSZcnTWpE4pGdZtfa1fiXObuj2qM6lGx0D7bdyjUHWdUKjwprSOkDUEsBAhQDFAAAAAgA8p51XYNyGAWeAAAABAEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAzwAAAAAA"
+    },
+    "GET /data/evilhost/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0F9PLdLAEAAMABAAATAAAAbW9kcmludGguaW5kZXguanNvbkWQzU7EMAyEXwXlDN3EadNk7xw4I3FBHJzEpkH9U1stK1Z9d5KyErfYnok9303wtAy4vdGypmkU5wf1+CA+caD8FEMaKSzIm8jNy5/kJZZJildVmuNd+VwKTj2tuXq/iRm37vhhiuvpWn3hUgQdrt2huIm1Q1UEElmzjz5Q6x2zcdyS0QhUyyAtNFbVinxwxZ49jYLi0ijRG9kGA4DWxqBIQd04YMKaMQJoD3WesreIrTXS1x6c8SYvMY2jgFoDRlLOewZubUOKmGz0PnKjJepgDTZMEnSbRdE4WSMEL1uUNoo9nxOn77GfMB6RRbdt83o+neiS+oquOMw93ZN/3Nm8pp8CC6SUe+lFmmmMNIZ0h/LPO2dUFaiqPriiX1J4KrtoOaBVylRKin3/BVBLAQIUAxQAAAAIAPKedV0F9PLdLAEAAMABAAATAAAAAAAAAAAAAACAAQAAAABtb2RyaW50aC5pbmRleC5qc29uUEsFBgAAAAABAAEAQQAAAF0BAAAAAA=="
+    },
+    "GET /data/httphost/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV3pwNsZLgEAAMMBAAATAAAAbW9kcmludGguaW5kZXguanNvbkWQQU/DMAyF/8qUM3SJk6bJ7hw4I3FBHJzEpkVrOrUVTEz97yRlErfY/l7s926Cp3nE9ZXmZZiyOB3Uw0F84EjlKcYhU5yRV1GaX3/Ic6qTIV1VbeY7+VQLHs60lOrtJi649vsPU1qO1+YT5wr0uPQ7cRNLj6oCEllzSCFSFzyz9dyR1QhkZJQOWqeMohB9lRdNq6CqNEoMVnbRAqBzKSpSYFoPTGgYE4AOYMqUg0PsnJXBBPA22LLEtp4iag2YSPkQGLhzLSlicimExK2WqKOz2DJJ0F2BkvXSIMQgO5Quia2ck6bvfJ4w7ZZFv66X0/EYU26K6XnIa9/Eabybf7/H8zL81LxASrnVXqIL5UQ5Dvdc/iMvNlUDqjF7tBjmIT7WdTTvuTXKNkqKbfsFUEsBAhQDFAAAAAgA8p51XenA2xkuAQAAwwEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAXwEAAAAA"
+    },
+    "GET /data/files/mods_x.jar": {
+     "base64": "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"
+    },
+    "GET /data/nohash/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV3ZEL7suQAAABQBAAATAAAAbW9kcmludGguaW5kZXguanNvbk1Puw7CMAz8FZQZ8qgQAzsDMxILQsjEKQmiSZVEUFH134nTDmy+8/nuPLI2xA7y2cTkgmf7lVqv2AM6U0bWOW90hDazQr5nyRFp43BQRPpFeSDQupdJBV1G1kO21SFgEgN/QiSBhWSrYpwKwvDxrwBYT5jNuU97ITR6Xq6i89lyHTqBkEFUa0Fut9ntuuSd3JcKNFLKiTg0vfFovHZz0N8PpY7ijeLb2hXu0ekN5ZtIK8nVjivJpukHUEsBAhQDFAAAAAgA8p51XdkQvuy5AAAAFAEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAA6gAAAAAA"
+    },
+    "GET /data/oddhash/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0KYqUlxAAAACEBAAATAAAAbW9kcmludGguaW5kZXguanNvbkWPzW7CMBCEXwXtmfonQj1w76FnJC4IVYvXqV0RO7ItCER5d7wmUm/emfF8uzP0MQ1YjjZlHwPsN3q7gV8cbH3C4IM1CfsCVby9I9/EjqdJsxjW5BcPvb/aXKfTDCMW1xoiZTmJP0wccJhdS8yQHWoOTI8nLNWieA/XiNT+gytlzHspDQVRK5IPxQkTB0lYUDaO5Oqfd/V5hR/8k7fplFILa2RHG8gG41fq/0EVrUWnxa4tjpfkzQfzbWJLCf0ptIJleQFQSwECFAMUAAAACADynnVdCmKlJcQAAAAhAQAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAAD1AAAAAAA="
+    },
+    "GET /data/oddsize/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1pZSlJOAEAANIBAAATAAAAbW9kcmludGguaW5kZXguanNvbkWRT0/EIBDFv4rh7Lb8K4W9e/Bs4sUYMzCDxWzppm1046bfXehu4o2ZeY/h/biyOM0jrK80L2nK7PggHh/YJ4xUjmxMmcIMcWWl+X2TPGOdJLyI2sx35VMtYjrRUqq3KzvDOuw3TLi0l+YL5ioYYBl2xZUtA4gq4BBV9OgD9d7FaFzsySiQpHngVnZWaEE+uGovnk7I6lLAwRveByMlWItBkJC6czIS6AgopfJSl2n0FqC3hnvtpTPelCWmcxRAKQlIwnkfZextR4IiWfQeY6c4qGANdJG4VH0RoXFcgwye98Atsq08B6effJoA98hsWNfzcmzbgLkpqeeU16EJ09girNDuaNpK4+NG4/3O6yX9VoAHsdUO0pkyUg7pjun/B0pq0UjR6J00+DmFQ91O846xEaYRnG3bH1BLAQIUAxQAAAAIAPKedV1pZSlJOAEAANIBAAATAAAAAAAAAAAAAACAAQAAAABtb2RyaW50aC5pbmRleC5qc29uUEsFBgAAAAABAAEAQQAAAGkBAAAAAA=="
+    },
+    "GET /data/filesum/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV0QY6+jJAEAANQBAAATAAAAbW9kcmludGguaW5kZXguanNvbo2RQU/EIBCF/4rhrBSmLaV79+DZxIsxZmAGi9nSTdvoxk3/u9DdxKucmDdvgPdxEWGaR1xfeF7ilMThTt/fiQ8cOW/FGBP7GcMqsvh1tTxR6UQ66yKmm/OxFCEeecnV60WccB32EyZaqrP8xLkYBlyG3XERy4C6GNQ/VxnPM62GMlWjQmdU5w0AWktes4am7SEwNgEJoHbQ5G5wFrGzRrnGQW+ccX0wbc8e6xqQWPfOBQidbVlzYEvOUWhrhbW3BtvACuoum8j0qkHwTnWoLIktP4em73SckPbIYljX03KoKk9J5tRzTOsg/TRWhCtWO5qq0Hi/0ni78XqOPwUg5Ihb0YhPnIiTjzdQf3+Qc2sJWjY7a3Rz9A/lfp53kFIbqZXYtl9QSwECFAMUAAAACADynnVdEGOvoyQBAADUAQAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAABVAQAAAAA="
+    },
+    "GET /data/files/mods_y.jar": {
+     "base64": "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"
+    },
+    "GET /data/short/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV04+/1ZOQEAANQBAAATAAAAbW9kcmludGguaW5kZXguanNvbkWRzW7EIAyEX2XFuU3AEEL23kPPlXqpqspg06TakFUS9W+Vdy9kV+oN2zOY+biIOM0jrs88L8OUxPGg7g7iHUfORzEOicOMcRW5+XmVPFKZDPStSjPdlA+liMOJl1y9XMQZ136/YaKl/qk+cC6CHpd+V1zE0qMqAolRR08+cOu7GG0XW7YagY0M0kHjlFHsQ1fs2dMoKC6NEr2VbbAA6BwFxQpM00FkNBEJQHsweRq9Q2ydld546Ky3eYltOg6oNSCx6ryPEFvXsOLIjryn2GiJOjiLTWQJus0isp00CMHLFqUjseXn0PSVThPSHln063pejnUdKFU59Tykta/CNNaEK9Y7mrrQeLvSeL3xehp+C0CQSm6lR3zmRJzCcAP1/wc5t6pAVWZnjX4ewn3Zz/MOslK2UlJs2x9QSwECFAMUAAAACADynnVdOPv9WTkBAADUAQAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAABqAQAAAAA="
+    },
+    "GET /data/gone/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV15maDUNwEAAM8BAAATAAAAbW9kcmludGguaW5kZXguanNvbkWQQU/DMAyF/8qUM7SJ06bJ7hw4I3FBHJzYoUFrOrUVoE377yRlErfYfi/2+64izsuE2ysva5qzOB7Uw0F84MTlKaaUOSwYN1GaX3+SZ6qTRD+qNvNd+VSLmE68lurtKs64jfsPM63tpfnEpQpGXMddcRXriKoKJEYdPfnAg3cxGhcHNhqBOxmkhd6qTrEPrtqLp1dQXRoleiOHYADQWgqKFXS9g8jYRSQA7aEr0+gt4mCN9J0HZ7wpS0zvOKDWgMTKeR8hDrZnxZEteU+x1xJ1sAb7yBL0UERknOwQgpcDSkviVs6h+TufZqQ9shi37bwe2zZQbkrqJeVtbMI8tYQbtlNa15Q/dhDvd1Qv6VLZgZTyVnvEZ87EOaQ7o3/8JbJqQDXdjhn9ksJjXc3LzrBRplFS3G6/UEsBAhQDFAAAAAgA8p51XXmZoNQ3AQAAzwEAABMAAAAAAAAAAAAAAIABAAAAAG1vZHJpbnRoLmluZGV4Lmpzb25QSwUGAAAAAAEAAQBBAAAAaAEAAAAA"
+    },
+    "GET /data/missing.jar": {
+     "status": 404,
+     "text": "not found"
+    },
+    "GET /data/nofabric/1.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV1+/mgWdgAAAJsAAAATAAAAbW9kcmludGguaW5kZXguanNvbqtWSssvyk0sCUstKs7Mz1OyUjDUUVBKT8xNBTKVcjPzUpOLEtNKlICCZRAlnikgmcyUCkOQYB5UpSuIk5aZk1oM5EXHAjkpqQWpeSmpecmZYLFqJMOA6g31LC3BWhKTijKTdXPyE1NSi0ASBnqGZnqGBkq1tQBQSwECFAMUAAAACADynnVdfv5oFnYAAACbAAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLBQYAAAAAAQABAEEAAACnAAAAAAA="
+    },
+    "GET /data/files/mods_old.jar": {
+     "base64": "y6BrVzb69n5UsHtWHq6UOV53TFF6fZEKVDaeEmPM+9S1+nF/xPeya2DQOZYhz+d2Y40xoFT9pAJGt4cqGxL4l9c92OM9+6p3fKcrkJkhwx+mcchcV9LgNLCLowSxFbFmzRTJoS1gVjx9u7wCrTQ6IH2TXt7fQOC7+XHCpz6IXOMsKbuEfxeaPsbAXadEyhQKH2H/7Vylr2+lZHHkxDcyOQzRv7UBiZL2eZ30ciuGO5wzyPiDTIg9lEuh6XCYLfW1ofse9rEAivC4uJM8xg7e7+a5XwM6ukmzoM4Ko8SgG4DNqPgXcEObMGPiIXmHrnNrNaOk7t/Yup7mEgDPSlueOAE0DB8mo/U6f0rnckRzdH1Xeagu3NrXsCtAhSkVuGeyteo5hZkwNbqVbnABwmCqiVeqic4xKlXk2wQyytw99QdH68fICTRvS5/3A1bXcYN0KCqFSb11hau0BgiW38bGtDPfaFnJcb7qfrumclh+c/RCBkv+Esa7EArlzYcEPMFEqSl5VIZmBLDT86I2jH/ucVmQz6FDOYpYMKUGfXFNsF5SEdwTWTL0ySDBSqjOFiF/bJm4TLYDXqlQrXbYvJ/peZconv+GZDaBUc6g8ZYVW30s/bybQigQ6Gk4R3x9PqBZCGwM6jmXmLNSJYXiUl8fcYKPcv43o8fRg0KbLIq2as12lY4Ckle++qfKPZZphnRX1SWNanqRo5219XCnLBP5cZu7tZEDasn6wn4X5ySL0exNS3oXQVNiL1BErVuv2or0Jo14M55XtmEXW/8Cj92AgUR60ysEeaVBLK8OQW+wWC1gg9BoJzq/BBhAHkijcPijqbBBJQVU8XVOENBOT1+FGf0T86rTDv/vGCSrv6eTtRrk+43kzNhd2NbO8OdFienVeDLggXprM8F0+z8NEtQSZcW9vXrkWrsfG9/cHQs1W6QbuuIaIChEnhDTd4G1Le7/w/xEHh9g4Uqr8S+eP+IfSbad4kfAy8EQwJzf59NYtOv6DILZpUV6NhQTu7E5kzqLWKbBUaT6yEQTqN0Fm8a5ISHSVtUXDpatN+TVhqfL4A7g+Gab8MOt6zwEETgqeZIvmMIutiEO2h5Y/Q+LQBLzXxppzQkVlsav+xfr5xOqVadhJC01vz4Za+4gkinvoN1y+atwhDPr+uXs4ArW0v30tak/4CXYW0lM3JXXshIXbCA2Y6Y0"
+    },
+    "GET /data/files/mods_keep.jar": {
+     "base64": "bKfqL+78iOy17WNW7ZY/R9yRN/glJv3SXWGOpibQgD8Io/oVI06pplQ58vWaECmoLWiqHBGVXtOUoG+89sR/6FTkZkWg6cTSXou4NX/1DCznGhrL12Ytxi8Mj16GC291OfKp4zeYVXn+CPdVuC1RHBsmawfwbqjYOd51d04o5sAVqzvQ669ur8wYuTQ+AgrSfwS5EODaS59/B+tqO9QRUPenBhhd6rwfWuvv5UHcffuFGiLnL2eccBig8aL5DMH5of3qbdKEs392qjcA//KP8bbbQeXNMXs8u22xoduPGJ3Jo6r56fL9XBPTp+duey15j69xDv7DTzMk96E+jkP2s2JLrgWY6RB/hqb/kUpDZ4Hj1YetVvuz3QOMCFboOzl53/mEgoZzotwPUDkkPkNbELlxzycf9DGJ12alI5RTyl0zdtLDon0cA0ricjjFIkbt3nRzK3YG7bUgY5bBqA2Fqv5u3t94rIytHBBsOpesK1BYpd55gaFlFMcJOQ2iJrRNEJGhbk/MqWBmQcEE3XdjuDcZYvmK0xJ/S/7k/IVo2nCo06rJjKy6mDcKH9M+mtMT4tfLJsxS3nwHMv7Pbn78tnujn1nuf6SWxbdKGpdIlG9PG/EvuFRO2ofwMesJgM7xXnt6iZhlbloun4BRjgzAqaMVSRQ4GKtG9yT1fErYVuwlKYCc3rm0lCVVh8HXiXcOab+u/IwBmMd9qXPC8tMlwWwPWOGuH821KELr52Dc8BXaBqlxFOwv1frP0ay2lm57t2WkHtSCI3qFqSAUbYU+MppTmq64/mYr1gcDgw0++/u2pdF8wqlD5f/1NWr67W+aLQzSUPGQerrtQVVbpoc470jQhT/u71ItTSb4xoDkgaSi8JODMdo5mqTttrE1I1HNT53sNt8A6oMDYPI31bSfRXqByUUzyqaJyWB+OD5Mvu3ht+IIvghpcV+kJz9jf4YqQ+bUcjBse2ETLvX5225e59adl4OTKcHdEZpa1Z2gqrDvMB5mQcvLz0rzDiKQZ3ZuNlHMX2y5ztQ4jLfLg0rkb5Z0ayJj2hVQ5KG15ui9/wc="
+    },
+    "GET /data/files/config_gone.cfg": {
+     "base64": "Z29uZQo="
+    },
+    "GET /data/files/mods_new.jar": {
+     "base64": "EVB6Di9eadXfpApiob17buV+a82FxnybhDGzb/8hxDepVLtAci0g6mD7HTWB4ZdliSZfOGQvQxHvI0glkfv/Pa3NAey9QzK4IpjQ8ryU37YbJdsDpjGaBUpLB1FgxR7i1oOpdd+auwmFvLYGiiN0WJJZnytzN7CYQvEQtA+B5faQ4JAB0WfOo41aaMSswMAdOlDGDMPgPSU+GKT6JT2o8EOFJ4CMAb5ulol5VdBFks+v1dJlZ0YamY5C3BUjJzzEVZFsfiwLLfz+n1mmRvtiA0+FFlnp77FbBXS2iuOguNWgHZe4cJSerC4ETQlHFyv+pR4DjmI1CsezZFJ7dcp/cVl5pPdeavQVyIxxy1rxN15n9obydecnkMEwI4JLsTyJO/BSQqGnNgcyhxZz3jWcd7gRDU2NNeJnBz4Eu1243HUkBDnRXNp48yAWN4wGhnLP1Dy8KadAan1MDJsgUFp7iB6AOdCPYSYJEynXANtq0RdyWitmKxJvAvKrVtax0/9da/aJton8uxWQQyb3KBfGCjk/GPUj+TEDjNdhjzmmtw9AyE5/5pGJO5KhdSX2wwHwdTW8t15/d+iCN4HCWbp1JSJuVhqoWeDKG25FrUSoNXkKSpoG7j9zUXrAhFYiwQJ32D70Z4/9fQ2RmcGgxsSHtD9/okEU2eTJJpOTUB1aZ3dHTDIQyOSZoTTLkbD9+Z+t+S5Z88IJZqLjhpstu5QILIkt9k7tKivR2YRZt4R0t06W0cEWrhLRn+v+euntKh5MUvAsCpnVyIA0EPyDYxNQrW8izF4CtZaHzUIZ3mQPZHBVYJfp59GCAIWJgvIecE/vn2TceehTzwPjT2rleOrmlfRiiy/UJBfiLo0C4Yiww6sGZHA1RdmtYVA4Yw1S1+J2KZFcHU0pFNZbvtt/brm/fY1eqYKndru1DrL6Dun7xTPOnfDgfZLDSbGNdh5qMCoftI/+hCwCjXSYexljFp0eHPRBOh/sHwX+FyG9VVuPbONMpf2wQX1M6Ex0nmsfV8AHxyB4PIej9HwYgxSemnlgvqoR7hRmppGyarxuevClzT3x8s11imoN4TwOqFRLvhDBIIcE3p4QQH+vlc39ANE6Ds8vzpsQ4kpfRJ6xmQu81FnLHWBoMsCin44/dsR5mWp2FnmU/p5tbXyUv9d5LPgPrCoLaCPhFFt6g5+QC/gPctkaYl5KB0VHPby2sqpW5UVmbxBm5I1O0LDM68/keRdBnpMGczZD30sgHprYAHVcYUtyQNOdejVl/cxlcn9kXNdnUyf9VuyaW7oxDyCuNfjuaGSX1hPeby39FAyY24y1kjIr9BumuQdIM2rRjhGTqMqaV9da1WI+3vhPPCniHAXFKTdsYgw1UHEsjIYX0F6H/5r3xd5aH2t41bcCe4t8JSLXCKpopiozmF43m+ksK3hmAbjoAklGoE61EgOcW5RJ0Ww+oUDiXngiw/cnZXM="
+    },
+    "GET /data/files/config_new.cfg": {
+     "base64": "bmV3Cg=="
+    },
+    "GET /data/beta1/1.0.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2uBwftQAIAAF8EAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUTW/UQAyG/0qVM90dez7s4ciNGxISF4Qqj8fTXWiTancFElX/O862FFEJDpBLonfsd+zHVu6nsRxu5fTBDsf9Mk+vL+DVxXQtt+af0+1+Nj3IOE0ufn0MedvXk2YnuYRVnp9i37hy8U70yyqO/Y0dXf14P93JaXf2Wvpxu9z0zWc5rCE7Oe7OMffTcSewhgykXDD2HHIaAUq1PlqMIoOVsYl0SohR13TPyYBrFpUmlawxF8YeZGQMLAEy5hZbBKOeBYmNo8VGAakDFEIuNQ4FwEDMtfbWoWYJzfWkVQJXAYJEpbop1dwTdE5ozW2YmnIeyKmN6cHL6cu3+WaRfm562p1Od8fX2632eeN9H/bzabfR5Xbb5STbM5ztyuPqJ49PT8ze77+vMGsIbvqC3Rezu7/Bo1iD5FFaIk7RcvG+ABMgYxlerAaIvaff4bFRynEQ5tpKbppSC9ZKqBo8QzskC4zQWjOnlaHygObGqEqIzKEbOYucuw8qZ8qmGhNYMiDCXhRrjqkJdQwFMxV0E85VYvfJdPsfeM9AXtDjF/R0mcf+enu9zLbRcf0HfllGAdIWmKWlwBStimRvFBOhE0GtCZP9zg+UfdEwJO0qoxVE9C2MVTp3EsjQRDOH6i8wh8QQffVcy1HItICNoKNyymJBKVUfohMMGKn4FdW9tTEN8nQOlkiEvKZQFFL05x/5PSK5ekbygmB+WIVudzZ3m3X/hOrX72DtfIOwOW/TkHbY6+VagR3Wo7CBsoEwPTz8AFBLAwQUAAAACADynnVdn6gX+AYAAAAEAAAAGQAAAG92ZXJyaWRlcy9jb25maWcvb3Zlci50eHTLz0vlAgBQSwECFAMUAAAACADynnVdrgcH7UACAABfBAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLAQIUAxQAAAAIAPKedV2fqBf4BgAAAAQAAAAZAAAAAAAAAAAAAACAAXECAABvdmVycmlkZXMvY29uZmlnL292ZXIudHh0UEsFBgAAAAACAAIAiAAAAK4CAAAAAA=="
+    },
+    "GET /data/beta/2.0.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV3Tb34jPwIAAF4EAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUTW8TMRCG/0q1Z5p47Bl/9MiNGxISF4Sq+XIT2m6qJKISVf873rSAiAQHOOxq9fp9Zz3Pzvpp6rv9PR8/+v6w3c3T1QW8uZhu+N7H43S/nV333I/TEL++WN7ZsiJ+5Mu4yPOr9+1QLt6z3i5i3975YaifnqYHPm5OtXZ2WN+6P6y+8H7xbPiwOZmepsOGYfH0klpg6lmwVExOOZQKESHWmHulrgGSGS7xkSGIS6p6QUq9RGqSSRRRgksOTcNIqAF6qBFExFvqBK12kFE4qpYYaw3mpYgSmaREVMhVE4KjQynRssZGCYWLxZAjlRxHkUqNkyVw8+l5bMd2j/Pdju3U9bQ5Hh8OV+u12rwaje+383Gz0t392vjI6xOd9QLk+ieQz6/UPmy/LThrCKPqGb3ZH/8CT4Ezlm5j51xK9tQ9B4nog5uRFDcJYCX8Dm8AAmPj7oJisQWkXhRLAIbBZxAYGeXGND4ASBTTJG0QGq/rCd1Ty5ZEG3GsKYF4GKHcs40LGrkYxRBQGXsI3qDgQNg8cWrSev8feD94nLEDOIOnu7lvb074tN/8AV+qTTVLYSfO1FJNzkLWNVIqGUfHvWJJ8Wz2GhesmVEyewGM3IPnjIkdY+21c02NCIajVg1JIaGSpC4abMw0imDwQoURasNxL8CjCA9wQxHp0QQ0Fw5jqkuPgUIoKs1qbNb/dfZeiFz/IHIGEJ8XwfzBZ/NZt6+kfp0Go3FYRVjR6V9n2W/1ctmA75elsIK8gjA9P38HUEsDBBQAAAAIAPKedV10CBeWBgAAAAQAAAAZAAAAb3ZlcnJpZGVzL2NvbmZpZy9vdmVyLnR4dCspz+cCAFBLAQIUAxQAAAAIAPKedV3Tb34jPwIAAF4EAAATAAAAAAAAAAAAAACAAQAAAABtb2RyaW50aC5pbmRleC5qc29uUEsBAhQDFAAAAAgA8p51XXQIF5YGAAAABAAAABkAAAAAAAAAAAAAAIABcAIAAG92ZXJyaWRlcy9jb25maWcvb3Zlci50eHRQSwUGAAAAAAIAAgCIAAAArQIAAAAA"
+    },
+    "GET /data/beta/1.0.mrpack": {
+     "base64": "UEsDBBQAAAAIAPKedV2uBwftQAIAAF8EAAATAAAAbW9kcmludGguaW5kZXguanNvbqWUTW/UQAyG/0qVM90dez7s4ciNGxISF4Qqj8fTXWiTancFElX/O862FFEJDpBLonfsd+zHVu6nsRxu5fTBDsf9Mk+vL+DVxXQtt+af0+1+Nj3IOE0ufn0MedvXk2YnuYRVnp9i37hy8U70yyqO/Y0dXf14P93JaXf2Wvpxu9z0zWc5rCE7Oe7OMffTcSewhgykXDD2HHIaAUq1PlqMIoOVsYl0SohR13TPyYBrFpUmlawxF8YeZGQMLAEy5hZbBKOeBYmNo8VGAakDFEIuNQ4FwEDMtfbWoWYJzfWkVQJXAYJEpbop1dwTdE5ozW2YmnIeyKmN6cHL6cu3+WaRfm562p1Od8fX2632eeN9H/bzabfR5Xbb5STbM5ztyuPqJ49PT8ze77+vMGsIbvqC3Rezu7/Bo1iD5FFaIk7RcvG+ABMgYxlerAaIvaff4bFRynEQ5tpKbppSC9ZKqBo8QzskC4zQWjOnlaHygObGqEqIzKEbOYucuw8qZ8qmGhNYMiDCXhRrjqkJdQwFMxV0E85VYvfJdPsfeM9AXtDjF/R0mcf+enu9zLbRcf0HfllGAdIWmKWlwBStimRvFBOhE0GtCZP9zg+UfdEwJO0qoxVE9C2MVTp3EsjQRDOH6i8wh8QQffVcy1HItICNoKNyymJBKVUfohMMGKn4FdW9tTEN8nQOlkiEvKZQFFL05x/5PSK5ekbygmB+WIVudzZ3m3X/hOrX72DtfIOwOW/TkHbY6+VagR3Wo7CBsoEwPTz8AFBLAwQUAAAACADynnVdn6gX+AYAAAAEAAAAGQAAAG92ZXJyaWRlcy9jb25maWcvb3Zlci50eHTLz0vlAgBQSwECFAMUAAAACADynnVdrgcH7UACAABfBAAAEwAAAAAAAAAAAAAAgAEAAAAAbW9kcmludGguaW5kZXguanNvblBLAQIUAxQAAAAIAPKedV2fqBf4BgAAAAQAAAAZAAAAAAAAAAAAAACAAXECAABvdmVycmlkZXMvY29uZmlnL292ZXIudHh0UEsFBgAAAAACAAIAiAAAAK4CAAAAAA=="
+    }
+   }
+  }
+ },
+ "ignore": [
+  "home/**/panel.key"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "\\b[A-HJ-NP-Za-km-z2-9]{20}\\b",
+   "replace": "<password>"
+  },
+  {
+   "pattern": "\"size\"(\\s*):(\\s*)\\d+(,\\s*\"serverWasRunning)",
+   "replace": "\"size\"$1:$2<n>$3"
+  },
+  {
+   "pattern": "\\b\\d+(?:\\.\\d)? (?:B|KB)\\b",
+   "replace": "<size>"
+  },
+  {
+   "pattern": "\\(build [^)]*\\)",
+   "replace": "(build)"
+  }
+ ],
+ "steps": [
+  {
+   "write": "bin/java",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 25, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"25.0.1\" 2025-10-21' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n",
+   "mode": "755"
+  },
+  {
+   "write": "bin/javac",
+   "text": "#!/bin/sh\necho 'javac 25.0.1'\n",
+   "mode": "755"
+  },
+  {
+   "write": "old/java",
+   "text": "#!/bin/sh\n# a stand-in Java: answers the version probe as Java 17, runs \"BuildTools\" and the NeoForge installer\ncase \"$1\" in\n  -XshowSettings:properties|-version)\n    echo 'openjdk version \"17.0.1\" 2025-10-21' >&2\n    echo '    os.arch = amd64' >&2\n    exit 0 ;;\nesac\nif [ \"$1\" = \"-jar\" ]; then\n  jar=$2; shift 2\n  case \"$jar\" in\n    BuildTools.jar)\n      while [ $# -gt 0 ]; do\n        case \"$1\" in --rev) rev=$2; shift ;; --output-dir) out=$2; shift ;; --final-name) fn=$2; shift ;; esac\n        shift\n      done\n      echo \"Loading BuildTools version: stand-in\"\n      echo \"   Attempting to build version: '$rev'   \"\n      echo \"\"\n      echo \"Attempting to build version: '$rev'\"\n      if [ \"$rev\" = \"9.9\" ]; then echo \"Could not get version $rev\"; echo \"it does not exist\"; exit 3; fi\n      head -c 4096 /dev/zero > \"$out/$fn\"\n      echo \"Success! Everything completed successfully.\"\n      exit 0 ;;\n    *installer.jar)\n      dir=$2\n      echo \"installing into the server folder\"\n      echo \"fake log\" > \"$dir/$(basename \"$jar\").log\"\n      case \"$jar\" in\n        *26.3.0.9*) echo \"Downloading libraries\"; echo \"ERROR: a library failed its checksum\"; exit 1 ;;\n      esac\n      head -c 2048 /dev/zero > \"$dir/server.jar\"\n      mkdir -p \"$dir/libraries/net/neoforged\"\n      echo \"The server installed successfully\"\n      exit 0 ;;\n  esac\nfi\necho \"stand-in java: unexpected $*\" >&2\nexit 9\n",
+   "mode": "755"
+  },
+  {
+   "write": "found/server.jar",
+   "text": "jar"
+  },
+  {
+   "write": "found/server.properties",
+   "text": "server-port=26500\nmotd=found\n"
+  },
+  {
+   "write": "found/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "found2/paper-1.20.jar",
+   "text": "jar"
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances",
+     "json": {}
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "label": "  "
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "bad name"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "x",
+      "jobId": "bad id"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "x",
+      "loader": "neoforge",
+      "jobId": "j0"
+     }
+    },
+    {
+     "get": "/api/jobs/j0/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "x",
+      "loader": "purpur",
+      "java": "{run}/bin/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "x",
+      "loader": "nope",
+      "version": "1.21.4",
+      "java": "{run}/nope/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "x",
+      "version": "1.21.4",
+      "java": "{run}/old/java",
+      "jobId": "j1"
+     }
+    },
+    {
+     "get": "/api/jobs/j1/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "label": "My Server!",
+      "version": "1.21.4",
+      "java": "{run}/bin/java",
+      "jobId": "j2",
+      "memory": "2G",
+      "port": "26400",
+      "motd": "Hi",
+      "onlineMode": false
+     }
+    },
+    {
+     "get": "/api/jobs/j2/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "label": "My Server!",
+      "paperVersion": "1.21.4",
+      "java": "{run}/bin/java",
+      "jobId": "j3"
+     }
+    },
+    {
+     "get": "/api/jobs/j3/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "old",
+      "version": "1.21.4",
+      "java": "{run}/old/java",
+      "force": true
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "pu",
+      "loader": "purpur",
+      "purpurVersion": "1.21.4",
+      "java": "{run}/bin/java",
+      "jobId": "j4"
+     }
+    },
+    {
+     "get": "/api/jobs/j4/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "pu2",
+      "loader": "purpur",
+      "version": "9.9.9",
+      "java": "{run}/bin/java",
+      "jobId": "j5"
+     }
+    },
+    {
+     "get": "/api/jobs/j5/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "va",
+      "loader": "vanilla",
+      "version": "1.21.4",
+      "java": "{run}/bin/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "sp",
+      "loader": "spigot",
+      "version": "1.21.4",
+      "java": "{run}/bin/java",
+      "jobId": "j6"
+     },
+     "timeoutMs": 120000
+    },
+    {
+     "get": "/api/jobs/j6/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "sp2",
+      "loader": "spigot",
+      "version": "1.21.4",
+      "java": "{run}/bin/java",
+      "jobId": "j7"
+     }
+    },
+    {
+     "get": "/api/jobs/j7/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "pu",
+      "loader": "purpur",
+      "version": "1.21.4",
+      "java": "{run}/bin/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "jarless",
+      "java": "{run}/bin/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "withjar",
+      "jar": "paper-1.21.4-15.jar",
+      "java": "{run}/bin/java",
+      "port": 26401
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "nojar",
+      "jar": "missing.jar",
+      "java": "{run}/bin/java"
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "nf",
+      "loader": "neoforge",
+      "neoforgeVersion": "26.1",
+      "java": "{run}/bin/java",
+      "jobId": "j8"
+     },
+     "timeoutMs": 120000
+    },
+    {
+     "get": "/api/jobs/j8/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "mp",
+      "modpack": "alpha",
+      "jobId": "j9",
+      "label": "Alpha"
+     },
+     "timeoutMs": 120000
+    },
+    {
+     "get": "/api/jobs/j9/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "mp",
+      "modpack": "alpha",
+      "jobId": "j9"
+     }
+    },
+    {
+     "get": "/api/jobs/j9/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/instances",
+     "json": {
+      "name": "mpx",
+      "modpack": "empty",
+      "jobId": "j10"
+     }
+    },
+    {
+     "get": "/api/jobs/j10/stream",
+     "stream": {
+      "events": 1,
+      "ms": 4000
+     }
+    },
+    {
+     "post": "/api/jobs/j9/cancel"
+    },
+    {
+     "post": "/api/jobs/nope/cancel"
+    },
+    {
+     "get": "/api/jobs/never/stream",
+     "stream": {
+      "events": 1,
+      "ms": 1500
+     }
+    },
+    {
+     "get": "/api/jobs/bad%20id/stream",
+     "stream": {
+      "events": 1,
+      "ms": 1500
+     }
+    },
+    {
+     "get": "/api/jobs/j9"
+    },
+    {
+     "post": "/api/instances/adopt",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "name": "ad"
+     }
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "name": "ad",
+      "dir": "{run}/nowhere"
+     }
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "name": "ad",
+      "dir": "{run}/found",
+      "memory": "lots"
+     }
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "label": "Found one",
+      "dir": "{run}/found",
+      "memory": "3G",
+      "jar": "server.jar"
+     }
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "label": "Found one",
+      "dir": "{run}/found2"
+     }
+    },
+    {
+     "post": "/api/instances/adopt",
+     "json": {
+      "name": "pu",
+      "dir": "{run}/found2"
+     }
+    },
+    {
+     "get": "/api/instances",
+     "body": "skip"
+    },
+    {
+     "get": "/api/activity"
+    }
+   ],
+   "own": true,
+   "timeoutMs": 600000
+  },
+  {
+   "run": [
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

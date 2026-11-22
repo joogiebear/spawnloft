@@ -125,7 +125,7 @@ pub fn mkdir_all(dir: &Path) -> Result<(), crate::failure::Failure> {
         if blocked {
             crate::failure::Failure::Internal {
                 head: "Error".into(),
-                message: format!("ENOTDIR: not a directory, mkdir '{}'", dir.display()),
+                message: format!("ENOTDIR: not a directory, mkdir '{}'", crate::jspath::named(dir)),
                 code: Some("ENOTDIR".into()),
             }
         } else {

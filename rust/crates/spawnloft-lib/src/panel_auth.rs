@@ -285,6 +285,45 @@ pub fn make_token(key: &Key, purpose: Purpose, port: u16, issued: u64, nonce: &s
     format!("{body}.{mac}")
 }
 
+/// The header a caller with the key asks "is this my own panel?" in, and the one the answer
+/// comes back in (`PROBE_HEADER`, `PROOF_HEADER` in panel-auth.mjs). A token alone proves the
+/// caller to the panel, not the panel to the caller.
+pub const PROBE_HEADER: &str = "x-spawnloft-probe";
+pub const PROOF_HEADER: &str = "x-spawnloft-proof";
+
+/// `probeProof(key, nonce)`: `None` unless `nonce` is one well-formed nonce. The text signed
+/// cannot be a token's.
+pub fn probe_proof(key: &Key, nonce: &str) -> Option<String> {
+    if nonce.len() != 22
+        || !nonce
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return None;
+    }
+    Some(b64url_encode(
+        &signer(key, &format!("probe.v1.{nonce}")).finalize().into_bytes(),
+    ))
+}
+
+/// A fresh nonce for a probe (`probeNonce`).
+pub fn probe_nonce() -> Result<String, String> {
+    Ok(b64url_encode(&random::<16>()?))
+}
+
+/// `proofMatches(key, nonce, proof)`, compared without telling where the first difference is.
+pub fn proof_matches(key: &Key, nonce: &str, proof: &str) -> bool {
+    let Some(want) = probe_proof(key, nonce) else {
+        return false;
+    };
+    want.len() == proof.len()
+        && want
+            .bytes()
+            .zip(proof.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0
+}
+
 /// A fresh `api` token for the panel on `port`.
 pub fn api_token(key: &Key, port: u16) -> String {
     make_token(key, Purpose::Api, port, now_ms(), "")
@@ -309,6 +348,18 @@ pub fn login_path(key: &Key, port: u16, to: Option<&str>) -> Result<String, Stri
         Some(to) => format!("/auth?t={token}&to={to}"),
         None => format!("/auth?t={token}"),
     })
+}
+
+/// `loginLink(key, port, to)`: a one-use link that signs a browser in at the panel on `port`,
+/// and the link's nonce, which names the page that carries it (`panel_open`).
+pub fn login_link(key: &Key, port: u16, to: Option<&str>) -> Result<(String, String), String> {
+    let nonce = b64url_encode(&random::<16>()?);
+    let token = make_token(key, Purpose::Login, port, now_ms(), &nonce);
+    let to = match to.filter(|t| LOGIN_TARGETS.contains(t)) {
+        Some(to) => format!("&to={to}"),
+        None => String::new(),
+    };
+    Ok((format!("http://127.0.0.1:{port}/auth?t={token}{to}"), nonce))
 }
 
 /// A decimal number as these tokens write one: digits only, no leading zero, at most `digits`.
@@ -396,7 +447,12 @@ pub enum Verdict {
     /// A route that carries its own proof; route it.
     Open,
     /// `/auth` with a good token: set the cookie to `session`, go to `to`.
-    Login { session: String, to: &'static str },
+    /// `nonce` is the link's own: the page that carried it can go
+    Login {
+        session: String,
+        to: &'static str,
+        nonce: String,
+    },
     /// `/auth` with a bad, used or expired token (the 401 page).
     LoginRefused,
     /// Route it. `session` goes to [`PanelAuth::release`] when the request ends.
@@ -446,6 +502,24 @@ impl PanelAuth {
 
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// The answer to a caller's probe on an allowed request: `Some` only when the request has
+    /// exactly one probe header and it holds a well-formed nonce.
+    pub fn proof_for(&self, headers: &[(String, String)]) -> Option<String> {
+        let mut probes = headers
+            .iter()
+            .filter(|(k, _)| k.eq_ignore_ascii_case(PROBE_HEADER));
+        let (_, nonce) = probes.next()?;
+        if probes.next().is_some() {
+            return None;
+        }
+        probe_proof(&self.key, nonce.trim())
+    }
+
+    /// This listener's key, for a caller in this process that signs a request to it.
+    pub fn key(&self) -> &Key {
+        &self.key
     }
 
     /// `Authorization` for the panel this listener forwards to, on `port`.
@@ -567,7 +641,9 @@ impl PanelAuth {
         let Ok(id) = random::<32>() else {
             return Verdict::LoginRefused;
         };
-        state.used.insert(checked.nonce, (checked.issued, idle_now));
+        state
+            .used
+            .insert(checked.nonce.clone(), (checked.issued, idle_now));
         let session = b64url_encode(&id);
         state.sessions.insert(
             session_key(&session),
@@ -581,7 +657,11 @@ impl PanelAuth {
             .find(|t| Some(**t) == to)
             .copied()
             .unwrap_or("/");
-        Verdict::Login { session, to }
+        Verdict::Login {
+            session,
+            to,
+            nonce: checked.nonce,
+        }
     }
 
     /// The request `decide` allowed on `session` has ended (its connection closed).
@@ -897,7 +977,7 @@ mod tests {
                 };
                 assert_eq!(said, step["expect"].as_str().unwrap(), "{what}");
                 match got {
-                    Verdict::Login { session, to } => {
+                    Verdict::Login { session, to, .. } => {
                         assert_eq!(to, step["to"].as_str().unwrap(), "{what}");
                         assert_eq!(session.len(), 43, "{what}");
                         sessions.insert(step["save"].as_str().unwrap().to_string(), session);
@@ -927,7 +1007,7 @@ mod tests {
             "/auth?t={}",
             make_token(&key, Purpose::Login, 9, 1, &"A".repeat(22))
         );
-        let Verdict::Login { session, to } = request(&rule, &link, None, 1, 0) else {
+        let Verdict::Login { session, to, .. } = request(&rule, &link, None, 1, 0) else {
             panic!("no login");
         };
         assert_eq!(to, "/");

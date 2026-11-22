@@ -1,21 +1,24 @@
 //! `spawnloft-core ui`: the panel's HTTP endpoint on 127.0.0.1 (Phase 0 spike, P0-F).
 //!
-//! The panel API is still Node (`src/ui.mjs`) until R6 ports it. Until then this is a small
-//! reverse proxy: it starts the Node panel on a port of its own (`node spawnloft.mjs ui --port 0
-//! --no-open`) and forwards every request to it, so a window (the Tauri shell, later the Electron
-//! window of step 2) is pointed at the address and port that will stay the same when the routes
-//! move to Rust. With no Node found it answers with a page that says so.
+//! The routes are moving here from the Node panel (`src/ui.mjs`), a group at a time
+//! (rust/PLAN-CORE-PORT.md C8): `panel/routes.rs` says which have moved, and those are answered
+//! in this process. For the rest this is still a small reverse proxy: it starts the Node panel on
+//! a port of its own (`node spawnloft.mjs ui --port 0 --no-open`) and forwards the request to it,
+//! so a window is pointed at the one address and port that stay the same throughout. With no
+//! Node found, a route that has not moved answers with a page that says so.
 //!
 //! One request per connection (`Connection: close` both ways), std threads and blocking I/O: the
 //! panel opens a handful of connections, three of them long-lived event streams, which is a thread
-//! each. Request and response bodies are copied byte for byte after the head, so event streams,
-//! uploads and chunked bodies need nothing special.
+//! each. For a forwarded request, the request and response bodies are copied byte for byte after
+//! the head, so event streams, uploads and chunked bodies need nothing special there; a route
+//! answered here reads its body through `panel/http.rs`, which ends it where the head says.
 //!
-//! Who may call is decided here, before anything is forwarded (`panel_auth`, the same rule the
-//! Node panel applies to itself): the request must be addressed to this panel from this panel,
-//! and carry a session cookie or a signed token. What is forwarded gets a fresh token for the
-//! upstream's own port in place of the caller's credential, so the Node panel checks every
-//! request as it would standing alone; there is no "trust the proxy" mode.
+//! Who may call is decided here, before a route is looked at or anything is forwarded
+//! (`panel_auth`, the same rule the Node panel applies to itself): the request must be addressed
+//! to this panel from this panel, and carry a session cookie or a signed token. What is forwarded
+//! gets a fresh token for the upstream's own port in place of the caller's credential, so the
+//! Node panel checks every request as it would standing alone; there is no "trust the proxy"
+//! mode.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
@@ -25,6 +28,62 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::panel_auth::{self, PanelAuth, Verdict};
+use crate::settings::{self, Layout};
+
+mod backups;
+mod basics;
+mod client;
+mod creates;
+mod databases;
+mod http;
+mod jobs;
+mod pages;
+mod players;
+mod plugins;
+mod routes;
+mod schedules;
+mod server_files;
+mod server_props;
+mod servers;
+mod shared;
+mod sse;
+mod worlds;
+
+/// What the routes answered in this process know about the panel they run in.
+struct Panel {
+    /// Where the data is, resolved once when the panel starts (`LAYOUT` in `ui.mjs`): a change
+    /// to the settings applies at the next start. `None` when it could not be resolved.
+    layout: Option<Layout>,
+    /// Behind the desktop window (`behindWindow()`): it sets `SPAWNLOFT_SHELL` for the core.
+    shell: bool,
+    /// The long jobs this panel started, for the pages that watch them.
+    jobs: Arc<jobs::Jobs>,
+    /// The port this panel listens on: what a browser sent to it must come back to (the
+    /// Microsoft sign-in's redirect address).
+    #[allow(dead_code)] // read by the launcher's routes when they move
+    port: u16,
+}
+
+impl Panel {
+    /// Who the history says did what a route does (`asActor({ kind: 'panel' })`).
+    #[allow(dead_code)] // used by the route families as they move
+    fn actor() -> crate::activity::Actor {
+        crate::activity::Actor::new("panel", None)
+    }
+
+    fn of_this_process(port: u16) -> Panel {
+        Panel {
+            layout: Layout::resolve(&settings::load().0).ok(),
+            shell: behind_window(),
+            jobs: Arc::default(),
+            port,
+        }
+    }
+}
+
+fn behind_window() -> bool {
+    std::env::var_os("SPAWNLOFT_SHELL").is_some_and(|s| s == "tauri")
+}
 
 /// What `ui` was asked to do.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -51,6 +110,8 @@ const UPSTREAM_START_TIMEOUT: Duration = Duration::from_secs(60);
 /// finishes one would otherwise hold a thread for ever. Bodies and responses have no limit, since
 /// uploads are slow and the panel's event streams stay open for hours.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long one write of an answer made here may wait on a client that is not reading.
+const WRITE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Runs until killed (or stdin closes with `exit_with_stdin`). Returns an exit code only when it
 /// could not start.
@@ -117,12 +178,14 @@ pub fn run(opts: Options) -> i32 {
     let _ = std::io::stdout().flush();
 
     let upstream = Arc::new(upstream);
+    let panel = Arc::new(Panel::of_this_process(local.port()));
     for conn in listener.incoming() {
         let Ok(conn) = conn else { continue };
         let upstream = Arc::clone(&upstream);
         let auth = Arc::clone(&auth);
+        let panel = Arc::clone(&panel);
         std::thread::spawn(move || {
-            let _ = handle(conn, &auth, &upstream);
+            let _ = handle(conn, &auth, &upstream, &panel);
         });
     }
     stop_child(&child);
@@ -408,7 +471,7 @@ impl Drop for InUse<'_> {
     }
 }
 
-fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io::Result<()> {
+fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream, panel: &Panel) -> std::io::Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
     // one deadline for the whole head, not per read: a byte every 29 s would otherwise hold on
@@ -431,6 +494,11 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
             return respond(&mut conn, 400, "text/plain", b"bad request\n");
         }
     };
+    // One reading of where the body ends, for the routes answered here and for the Node panel
+    // alike: a request whose length can be read two ways is not sent on to be read the other way.
+    let Ok(framing) = http::framing(&head.headers) else {
+        return respond(&mut conn, 400, "text/plain", b"bad request\n");
+    };
     let verdict = auth.decide(
         head.method(),
         head.path(),
@@ -438,6 +506,11 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         panel_auth::now_ms(),
         panel_auth::idle_now(),
     );
+    // a caller with the key asks whether this is its own panel (see panel_auth)
+    let proof = match &verdict {
+        Verdict::Allow { .. } => auth.proof_for(&head.headers),
+        _ => None,
+    };
     let _in_use = match verdict {
         Verdict::Forbidden => {
             return respond(
@@ -447,7 +520,9 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
                 br#"{"error":"this panel only answers requests addressed to localhost"}"#,
             );
         }
-        Verdict::Login { session, to } => {
+        Verdict::Login { session, to, nonce } => {
+            // the page that carried this link (`spawnloft ui`) has done its job
+            crate::panel_open::remove_open_file(&nonce);
             let cookie = panel_auth::session_cookie(auth.port(), &session);
             return respond_with(
                 &mut conn,
@@ -464,7 +539,7 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         }
         v @ (Verdict::LoginRefused | Verdict::Unauthorized { api: false }) => {
             // under the desktop window, the page asks the window to sign it in again
-            let shell = std::env::var_os("SPAWNLOFT_SHELL").is_some_and(|s| s == "tauri");
+            let shell = behind_window();
             let refused = matches!(v, Verdict::LoginRefused);
             return respond_with(
                 &mut conn,
@@ -517,9 +592,60 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
         } else {
             crate::update::api::handle(head.method(), head.path(), &body)
         };
-        return respond(&mut conn, status, "application/json", json.to_string().as_bytes());
+        let proved: Vec<(&str, &str)> = proof
+            .iter()
+            .map(|p| (panel_auth::PROOF_HEADER, p.as_str()))
+            .collect();
+        return respond_with(
+            &mut conn,
+            status,
+            "application/json",
+            &proved,
+            json.to_string().as_bytes(),
+        );
     }
     conn.set_read_timeout(None)?;
+    // The routes that have moved (rust/PLAN-CORE-PORT.md C8) are answered here; the rest still go
+    // to the Node panel. A target that is not a path (`x:api/settings`, CONNECT's host and port)
+    // or that Node's URL would refuse goes there too, to be refused as it always was.
+    if head.path().starts_with('/')
+        && let Some((path, query)) = http::parse_target(head.path())
+    {
+        let expects_continue = head
+            .header("expect")
+            .is_some_and(|v| v.eq_ignore_ascii_case("100-continue"));
+        let mut req = http::Request {
+            method: head.method().to_string(),
+            seg: path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect(),
+            path,
+            query,
+            headers: head.headers.clone(),
+            body: http::Body::new(&mut conn, buf[used..].to_vec(), framing, expects_continue),
+        };
+        if let routes::Routed::Reply(reply) = routes::route(panel, &mut req) {
+            let head_only = req.method == "HEAD";
+            let conn = req.body.into_conn();
+            // a client that stops reading does not hold the thread: each write has this long
+            conn.set_write_timeout(Some(WRITE_TIMEOUT))?;
+            let sent = http::send(conn, reply, proof.as_deref(), head_only);
+            linger(conn);
+            return sent;
+        }
+    }
+    // the parity rig's check that a route it replays has moved: nothing is handed on
+    #[cfg(feature = "test-hooks")]
+    if std::env::var_os("SPAWNLOFT_TEST_PANEL_OWN").is_some() {
+        return respond(
+            &mut conn,
+            502,
+            "application/json",
+            br#"{"error":"this route has not moved to the Rust panel"}"#,
+        );
+    }
     let addr = match upstream {
         Upstream::Node(addr) => *addr,
         Upstream::Missing(why) => return missing(&mut conn, &head, why),
@@ -546,6 +672,28 @@ fn handle(mut conn: TcpStream, auth: &PanelAuth, upstream: &Upstream) -> std::io
     let _ = up_reader.shutdown(Shutdown::Both);
     let _ = pump.join();
     Ok(())
+}
+
+/// Ends a connection whose request may not have been read to its end (a refused upload): the
+/// answer is on its way, and closing with bytes unread would have the system reset the
+/// connection and the client lose the answer. So: no more from this side, then what is still
+/// coming is read and dropped, for a short while and up to a size.
+fn linger(conn: &mut TcpStream) {
+    let _ = conn.shutdown(Shutdown::Write);
+    // two seconds in all, not per read
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    let mut sink = [0u8; 16 * 1024];
+    let mut dropped = 0usize;
+    while dropped < 4 * 1024 * 1024 {
+        let left = until.saturating_duration_since(std::time::Instant::now());
+        if left.is_zero() || conn.set_read_timeout(Some(left)).is_err() {
+            break;
+        }
+        match conn.read(&mut sink) {
+            Ok(n) if n > 0 => dropped += n,
+            _ => break,
+        }
+    }
 }
 
 fn missing(conn: &mut TcpStream, head: &Head, why: &str) -> std::io::Result<()> {
@@ -731,16 +879,240 @@ mod tests {
 
     /// A listener that answers `requests` connections through `handle`, and its address.
     fn front(upstream: Upstream, requests: usize) -> SocketAddr {
+        // no layout: every route goes to the upstream, as before any of them moved
+        let panel = Panel {
+            layout: None,
+            shell: false,
+            jobs: Arc::default(),
+            port: 0,
+        };
+        front_of(panel, upstream, requests)
+    }
+
+    fn front_of(panel: Panel, upstream: Upstream, requests: usize) -> SocketAddr {
         let front = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = front.local_addr().unwrap();
         let auth = PanelAuth::new(panel_auth::Key::from_bytes(TEST_KEY), addr.port(), 0);
         std::thread::spawn(move || {
             for _ in 0..requests {
                 let (c, _) = front.accept().unwrap();
-                handle(c, &auth, &upstream).unwrap();
+                // a client that hangs up early is not this listener's failure
+                let _ = handle(c, &auth, &upstream, &panel);
             }
         });
         addr
+    }
+
+    /// A panel whose data would be in a folder nothing is in; `shell` as behind the window.
+    fn panel_in(name: &str, shell: bool) -> Panel {
+        let root = std::env::temp_dir()
+            .join(format!("sl-panel-{name}-{}", std::process::id()))
+            .to_string_lossy()
+            .into_owned();
+        let at = |leaf: &str| crate::jspath::join(&[&root, leaf]);
+        Panel {
+            layout: Some(Layout {
+                instances_dir: at("instances"),
+                separate_instances: false,
+                registry_file: at("instances.json"),
+                templates_dir: at("templates"),
+                jars_dir: at("jars"),
+                backups_dir: at("backups"),
+                run_dir: at("run"),
+                engines_dir: at("engines"),
+                services_dir: at("services"),
+                settings_file: at("settings.json"),
+                data_root: root,
+            }),
+            shell,
+            jobs: Arc::default(),
+            port: 0,
+        }
+    }
+
+    /// An upstream that must never be asked: a request sent on would be a 502.
+    fn nowhere() -> Upstream {
+        Upstream::Node(SocketAddr::from(([127, 0, 0, 1], 9)))
+    }
+
+    fn body_of(response: &str) -> &str {
+        response.split_once("\r\n\r\n").map_or("", |(_, b)| b)
+    }
+
+    #[test]
+    fn a_moved_route_is_answered_here_and_only_to_a_caller_with_a_credential() {
+        let addr = front_of(panel_in("moved", false), nowhere(), 4);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 200 OK\r\n"), "{out}");
+        assert!(out.contains("Content-Type: application/json\r\n"), "{out}");
+        assert!(out.contains("Cache-Control: no-store\r\n"), "{out}");
+        assert!(body_of(&out).starts_with("[{\"id\":\"paper\""), "{out}");
+        // the same rule as for a forwarded route, decided before the route is looked at
+        let out = exchange(
+            addr,
+            &format!("GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n\r\n"),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
+        assert!(!out.contains("paper"), "{out}");
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: evil.example\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 403"), "{out}");
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nOrigin: http://evil.example\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 403"), "{out}");
+    }
+
+    #[test]
+    fn a_probe_is_answered_on_routes_answered_here_and_only_for_an_allowed_request() {
+        let key = panel_auth::Key::from_bytes(TEST_KEY);
+        let nonce = "abcdefghijklmnopqrstuv";
+        let addr = front_of(panel_in("probe", false), Upstream::Missing("no node".into()), 4);
+        let p = addr.port();
+        let proof_in = |out: &str| {
+            out.lines()
+                .find_map(|l| l.strip_prefix("x-spawnloft-proof: "))
+                .map(str::to_string)
+        };
+        // a moved route and the updater's, which never went to the Node panel
+        for path in ["/api/software", "/api/update"] {
+            let out = exchange(
+                addr,
+                &format!(
+                    "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\n{}\r\n",
+                    api_header(p)
+                ),
+            );
+            assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+            let proof = proof_in(&out).unwrap_or_else(|| panic!("no proof: {out}"));
+            assert!(panel_auth::proof_matches(&key, nonce, &proof), "{out}");
+        }
+        // no credential: nothing signed with the key goes out
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\n\r\n"
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
+        assert_eq!(proof_in(&out), None, "{out}");
+        // two probes are not one question
+        let out = exchange(
+            addr,
+            &format!(
+                "GET /api/software HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nX-SpawnLoft-Probe: {nonce}\r\nx-spawnloft-probe: {nonce}\r\n{}\r\n",
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 200"), "{out}");
+        assert_eq!(proof_in(&out), None, "{out}");
+    }
+
+    #[test]
+    fn a_request_whose_length_reads_two_ways_is_refused_before_anything() {
+        let addr = front_of(panel_in("framing", false), nowhere(), 5);
+        let p = addr.port();
+        for lines in [
+            "Content-Length: 2\r\nTransfer-Encoding: chunked\r\n",
+            "Content-Length: 2\r\nContent-Length: 3\r\n",
+            "Content-Length: 2\r\ncontent-length: 2\r\n",
+            "Content-Length: two\r\n",
+            "Transfer-Encoding: gzip\r\n",
+        ] {
+            let out = exchange(
+                addr,
+                &format!(
+                    "POST /api/appearance HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{lines}{}\r\n{{}}",
+                    api_header(p)
+                ),
+            );
+            assert!(out.starts_with("HTTP/1.1 400"), "{lines}: {out}");
+        }
+    }
+
+    #[test]
+    fn a_target_that_is_not_a_path_is_never_routed_here() {
+        // WHATWG reads `x:api/software` against a base as the path `api/software`; Node's parser
+        // never let such a request line reach a route, so it goes on to be refused there
+        let addr = front_of(panel_in("target", false), Upstream::Missing("no node".into()), 2);
+        let p = addr.port();
+        for line in ["GET x:api/software", "CONNECT 127.0.0.1:443"] {
+            let out = exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            );
+            assert!(out.starts_with("HTTP/1.1 503"), "{line}: {out}");
+        }
+    }
+
+    #[test]
+    fn a_body_larger_than_a_route_reads_is_refused_without_being_read() {
+        let addr = front_of(panel_in("large", false), nowhere(), 1);
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!(
+                "POST /api/settings HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: {}\r\n{}\r\n",
+                http::BODY_LIMIT + 1,
+                api_header(p)
+            ),
+        );
+        assert!(out.starts_with("HTTP/1.1 413"), "{out}");
+        assert_eq!(body_of(&out), r#"{"error":"request body too large"}"#, "{out}");
+    }
+
+    #[test]
+    fn head_gets_the_head_alone_and_the_setup_page_is_only_behind_the_window() {
+        let addr = front_of(panel_in("pages", false), nowhere(), 3);
+        let p = addr.port();
+        let ask = |addr: SocketAddr, line: &str| {
+            let p = addr.port();
+            exchange(
+                addr,
+                &format!("{line} HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\n{}\r\n", api_header(p)),
+            )
+        };
+        let got = ask(addr, "GET /launcher");
+        assert!(got.starts_with("HTTP/1.1 200"), "{got}");
+        assert!(got.contains("X-Frame-Options: SAMEORIGIN\r\n"), "{got}");
+        assert!(
+            got.contains("Content-Security-Policy: frame-ancestors 'self'\r\n"),
+            "{got}"
+        );
+        assert!(body_of(&got).contains("<html"), "{got}");
+        let head = ask(addr, "HEAD /launcher");
+        assert!(head.starts_with("HTTP/1.1 200"), "{head}");
+        assert_eq!(body_of(&head), "", "{head}");
+        let _ = p;
+        assert!(ask(addr, "GET /setup").starts_with("HTTP/1.1 404"));
+
+        let addr = front_of(panel_in("pages-window", true), nowhere(), 2);
+        let got = ask(addr, "GET /setup");
+        assert!(got.starts_with("HTTP/1.1 200"), "{got}");
+        assert!(got.contains("X-Frame-Options: DENY\r\n"), "{got}");
+        // the window alone may move the data, and only with a credential like any other call
+        let p = addr.port();
+        let out = exchange(
+            addr,
+            &format!("POST /api/setup HTTP/1.1\r\nHost: 127.0.0.1:{p}\r\nContent-Length: 2\r\n\r\n{{}}"),
+        );
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
     }
 
     fn exchange(addr: SocketAddr, request: &str) -> String {

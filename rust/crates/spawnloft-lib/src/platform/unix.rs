@@ -31,6 +31,73 @@ unsafe extern "C" {
     ) -> i32;
 }
 
+/// `os.totalmem()`: the machine's memory in bytes (0 when it cannot be read).
+pub fn total_memory() -> u64 {
+    #[cfg(target_os = "macos")]
+    {
+        let mut value: u64 = 0;
+        let mut len = std::mem::size_of::<u64>();
+        // SAFETY: the name is NUL-terminated and value/len describe a writable u64.
+        let rc = unsafe {
+            sysctlbyname(
+                c"hw.memsize".as_ptr(),
+                (&raw mut value).cast(),
+                &mut len,
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if rc == 0 { value } else { 0 }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        meminfo_kb("MemTotal:").map_or(0, |kb| kb * 1024)
+    }
+}
+
+/// `os.freemem()`: memory a new program could have, in bytes (0 when it cannot be read). libuv
+/// reads `MemAvailable` on Linux and the free page count on a Mac.
+pub fn free_memory() -> u64 {
+    #[cfg(target_os = "macos")]
+    {
+        // vm_statistics (host_statistics, HOST_VM_INFO): natural_t counters, free_count first
+        const HOST_VM_INFO: i32 = 2;
+        const COUNT: u32 = 15;
+        unsafe extern "C" {
+            fn mach_host_self() -> u32;
+            fn host_statistics(host: u32, flavor: i32, info: *mut i32, count: *mut u32) -> i32;
+            fn getpagesize() -> i32;
+        }
+        let mut info = [0i32; COUNT as usize];
+        let mut count = COUNT;
+        // SAFETY: info holds `count` integers, which is what the call may write.
+        let rc = unsafe { host_statistics(mach_host_self(), HOST_VM_INFO, info.as_mut_ptr(), &mut count) };
+        if rc != 0 {
+            return 0;
+        }
+        // SAFETY: no arguments, no state.
+        let page = unsafe { getpagesize() };
+        u64::from(info[0].cast_unsigned()) * u64::try_from(page).unwrap_or(4096)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        meminfo_kb("MemAvailable:")
+            .or_else(|| meminfo_kb("MemFree:"))
+            .map_or(0, |kb| kb * 1024)
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn meminfo_kb(key: &str) -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    text.lines()
+        .find_map(|l| l.strip_prefix(key))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+}
+
 /// `os.release()`: the kernel's release (Linux `6.8.0-45-generic`, the Darwin version on a
 /// Mac), or `""` when it cannot be read.
 pub fn os_release() -> String {

@@ -1,0 +1,452 @@
+{
+ "about": "C8's players routes, answered by the Rust panel itself (every step is own): the list from ops, bans, the whitelist, the name cache and the world's player files; each change to a stopped server written to its files (the whitelist switch, adding by name with Mojang asked, ops, bans, the whitelist, forgetting a player) with every refusal, and the same against a running server over the JVM stand-in, where changes go down the console and are believed only when the lists agree.",
+ "env": {
+  "FAKE_JAVA_RCON": "1",
+  "FAKE_JAVA_RCON_OPTS": "{\"replies\": {\"list\": \"There are 1 of a max of 20 players online: \\u00a76Wunga_\", \"whitelist on\": \"Whitelist is now turned on\", \"whitelist off\": \"Nothing changed\", \"whitelist add Steve\": \"Added Steve to the whitelist\", \"op Alex\": \"Made Alex a server operator\", \"op Wunga_\": \"Made Wunga_ a server operator\"}}"
+ },
+ "hosts": {
+  "https://api.mojang.com": {
+   "routes": {
+    "GET /users/profiles/minecraft/Notch": {
+     "json": {
+      "id": "069a79f444e94726a5befca90e38aaf6",
+      "name": "Notch"
+     }
+    },
+    "GET /users/profiles/minecraft/nobody_here": {
+     "status": 404,
+     "json": {
+      "errorMessage": "Couldn't find any profile with name nobody_here"
+     }
+    },
+    "GET /users/profiles/minecraft/Jeb_": {
+     "status": 204,
+     "text": ""
+    },
+    "GET /users/profiles/minecraft/Broken": {
+     "status": 500,
+     "text": "down"
+    }
+   }
+  }
+ },
+ "ignore": [
+  "home/**/panel.key",
+  "data/run/run1/**",
+  "data/instances/run1/logs/**"
+ ],
+ "normalize": [
+  {
+   "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
+   "replace": ""
+  },
+  {
+   "pattern": "\\(build [^)]*\\)",
+   "replace": "(build)"
+  },
+  {
+   "pattern": "\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\d [+-]\\d{4}",
+   "replace": "<ban-time>"
+  }
+ ],
+ "steps": [
+  {
+   "write": "data/instances/run1/server.jar",
+   "text": ""
+  },
+  {
+   "write": "data/instances/run1/eula.txt",
+   "text": "eula=true\n"
+  },
+  {
+   "write": "data/instances/run1/server.properties",
+   "text": "#Minecraft server properties\nserver-port=47891\nenable-rcon=true\nrcon.port=47892\nrcon.password=test\nlevel-name=world\nwhite-list=false\n"
+  },
+  {
+   "write": "data/instances/run1/ops.json",
+   "json": [
+    {
+     "uuid": "11111111-2222-4333-8444-555555555555",
+     "name": "Admin",
+     "level": 4,
+     "bypassesPlayerLimit": false
+    }
+   ]
+  },
+  {
+   "write": "data/instances/run1/banned-players.json",
+   "json": [
+    {
+     "uuid": "aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee",
+     "name": "Griefer",
+     "created": "2026-01-01 00:00:00 +0000",
+     "source": "Server",
+     "expires": "forever",
+     "reason": "Banned by an operator."
+    }
+   ]
+  },
+  {
+   "write": "data/instances/run1/whitelist.json",
+   "text": "[]"
+  },
+  {
+   "write": "data/instances/run1/usercache.json",
+   "json": [
+    {
+     "name": "Wunga_",
+     "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+     "expiresOn": "2026-12-01 00:00:00 +0000"
+    }
+   ]
+  },
+  {
+   "write": "data/instances/run1/world/playerdata/069a79f4-44e9-4726-a5be-fca90e38aaf5.dat",
+   "text": "dat"
+  },
+  {
+   "write": "data/instances/run1/world/playerdata/069a79f4-44e9-4726-a5be-fca90e38aaf5.dat_old",
+   "text": "dat"
+  },
+  {
+   "write": "data/instances/run1/world/stats/069a79f4-44e9-4726-a5be-fca90e38aaf5.json",
+   "text": "{}"
+  },
+  {
+   "write": "data/instances/run1/world/playerdata/11111111-2222-4333-8444-555555555555.dat",
+   "text": "dat"
+  },
+  {
+   "write": "data/instances.json",
+   "json": {
+    "version": 1,
+    "instances": {
+     "run1": {
+      "dir": "{data}/instances/run1",
+      "jar": "server.jar",
+      "java": "{repo}/test/fixtures/fake-java.mjs",
+      "memory": "1G",
+      "port": 47891,
+      "rcon": {
+       "port": 47892,
+       "password": "test"
+      }
+     },
+     "db1": {
+      "kind": "database",
+      "engine": "mariadb",
+      "version": "11.4.5",
+      "dir": "{data}/services/db1",
+      "port": 47893
+     }
+    }
+   }
+  },
+  {
+   "panel": [
+    {
+     "get": "/api/instances/run1/players"
+    },
+    {
+     "get": "/api/instances/run1/players/more"
+    },
+    {
+     "delete": "/api/instances/run1/players"
+    },
+    {
+     "get": "/api/instances/db1/players"
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {
+      "on": "yes"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {
+      "on": true
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "text": "null",
+     "type": "application/json"
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "bad name",
+      "as": "op"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Notch",
+      "as": "king"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": 5,
+      "as": "op"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": " Notch ",
+      "as": "whitelist"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "nobody_here",
+      "as": "op"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Broken",
+      "as": "op"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "wunga_",
+      "as": "ban",
+      "reason": "  being \t rude  "
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Jeb_",
+      "as": "ban"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {}
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "069A79F4-44E9-4726-A5BE-FCA90E38AAF5",
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "11111111-2222-4333-8444-555555555555",
+      "on": 0
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/ban",
+     "json": {
+      "uuid": "11111111-2222-4333-8444-555555555555",
+      "reason": "griefing"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/ban",
+     "json": {
+      "uuid": "11111111-2222-4333-8444-555555555555",
+      "on": false,
+      "reason": "sorry"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/ban",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist",
+     "json": {
+      "uuid": "aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist",
+     "json": {
+      "uuid": "aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee",
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/nope",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/forget",
+     "json": {
+      "uuid": "nope"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/forget",
+     "json": {
+      "uuid": "11111111-2222-4333-8444-555555555555"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/forget",
+     "json": {
+      "uuid": "aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee"
+     }
+    },
+    {
+     "get": "/api/instances/run1/players"
+    },
+    {
+     "get": "/api/instances/run1/activity"
+    }
+   ],
+   "own": true
+  },
+  {
+   "panel": [
+    {
+     "post": "/api/instances/run1/start",
+     "timeoutMs": 90000,
+     "body": "skip"
+    },
+    {
+     "get": "/api/instances/run1/players"
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {
+      "on": true
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist-mode",
+     "json": {
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Steve",
+      "as": "whitelist"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Alex",
+      "as": "op"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/add",
+     "json": {
+      "name": "Herobrine",
+      "as": "ban",
+      "reason": "spooky"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/op",
+     "json": {
+      "uuid": "aaaaaaaa-bbbb-3ccc-8ddd-eeeeeeeeeeee"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/ban",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+      "reason": "x"
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/whitelist",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+      "on": false
+     }
+    },
+    {
+     "post": "/api/instances/run1/players/forget",
+     "json": {
+      "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+     }
+    },
+    {
+     "get": "/api/instances/run1/players"
+    },
+    {
+     "get": "/api/instances/run1/activity?limit=4"
+    },
+    {
+     "post": "/api/instances/run1/stop",
+     "timeoutMs": 90000,
+     "body": "skip"
+    }
+   ],
+   "own": true,
+   "timeoutMs": 300000
+  },
+  {
+   "run": [
+    "list",
+    "--json"
+   ],
+   "expect": {
+    "code": 0
+   }
+  }
+ ]
+}

@@ -12,6 +12,7 @@ import { startHosts } from './fake-host.mjs'
 import { snapshot } from './tree.mjs'
 import { normalizeText, machineNeutral } from './normalize.mjs'
 import { applyDeclared } from '../declared-differences.mjs'
+import { replay } from './panel.mjs'
 
 export const SIDES = ['node', 'rust']
 export const IMPL_ENV = 'SPAWNLOFT_CORE_IMPL'
@@ -37,6 +38,8 @@ export function findFakeScheduler(core, env = process.env) {
 
 // {run}, {data}, {home}, {repo} in a step's strings, as this side's real paths.
 function expand(value, ctx) {
+  // a process that is alive on every system for as long as the scenario runs: this one
+  if (value === '{rig-pid}') return process.pid
   if (typeof value === 'string') return value.replace(/\{(run|data|home|repo)\}/g, (_, k) => ctx[k])
   if (Array.isArray(value)) return value.map(v => expand(v, ctx))
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, expand(v, ctx)]))
@@ -159,7 +162,22 @@ function applySetup(step, ctx, baseDir) {
 }
 
 function stepLabel(i, step) {
+  if (step.panel) return `step ${i + 1} (panel, ${step.panel.length} requests)`
   return `step ${i + 1} (${step.run.join(' ')})`
+}
+
+// How each side's panel is started for a `panel` step. The Node side is `spawnloft ui` as a
+// terminal runs it. Until `ui` itself moves (the last C8 pull request), the Rust side is the
+// window's form of the command: the Rust panel, which answers the routes it has and hands the
+// rest to a Node panel it starts. `"window": true` gives both sides what the desktop window gives
+// its panel (SPAWNLOFT_SHELL), which is what serves /setup.
+// `"own": true` says every request of the step is one the Rust panel answers itself: its side
+// is told (SPAWNLOFT_TEST_PANEL_OWN, a test-hooks build only) to answer 502 where it would hand a
+// request to the Node panel, so a request that fell through, and would agree with the Node side
+// by being it, is a difference instead.
+function panelArgs(step, side, ctx) {
+  if (side === 'rust') return ['ui', '--port', '0', '--exit-with-stdin', '--core-dir', ctx.repo]
+  return ['ui', '--port', '0', '--no-open']
 }
 
 // What a step's output must show on both sides: a guard against a scenario that "passes" only
@@ -189,6 +207,20 @@ async function runSide(scenario, side, o) {
   const problems = []
   for (const [i, raw] of scenario.steps.entries()) {
     if (raw.side && raw.side !== side) continue
+    if (raw.panel) {
+      const step = expand(raw, ctx)
+      commands.add('ui')
+      const env = sideEnv(ctx, side, { origins: o.origins, extra: { ...scenario.env, ...(step.window ? { SPAWNLOFT_SHELL: 'tauri' } : {}), ...(step.own && side === 'rust' ? { SPAWNLOFT_TEST_PANEL_OWN: '1' } : {}), ...step.env } })
+      const label = stepLabel(i, raw)
+      const res = await replay(o.core, panelArgs(step, side, ctx), step.panel, { cwd: ctx.run, env, ctx })
+      if (res.problem) problems.push(`${side}: ${label}: ${res.problem}`)
+      for (const want of [].concat(step.expect?.includes ?? [])) {
+        if (!res.text.includes(want)) problems.push(`${side}: ${label} answers do not include ${JSON.stringify(want)}`)
+      }
+      const text = applyDeclared(normalizeText(res.text.replace(/\r\n/g, '\n'), extra), 'ui')
+      steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
+      continue
+    }
     if (!raw.run) { applySetup(raw, ctx, o.baseDir); continue }
     const step = expand(raw, ctx)
     const command = step.run[0]
@@ -314,7 +346,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   const expect = scenario.expect ?? 'same'
   if (!['same', 'differ'].includes(expect)) throw new Error(`${scenario.name}: expect is "same" or "differ"`)
   if (expect !== 'differ' && scenario.steps.some(s => s.side)) throw new Error(`${scenario.name}: a step for one side only is allowed only in a self-test (expect: "differ")`)
-  if (!scenario.steps.some(s => s.run)) throw new Error(`${scenario.name}: no step runs a command`)
+  if (!scenario.steps.some(s => s.run || s.panel)) throw new Error(`${scenario.name}: no step runs a command`)
   // the switch and the host map are the rig's to set: a scenario that set them could make both
   // sides the same core, or let one side reach the network
   for (const env of [scenario.env, ...scenario.steps.map(s => s.env)]) {
