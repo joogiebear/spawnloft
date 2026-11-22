@@ -86,19 +86,12 @@ const jsAsync = (script, ...args) => wd('POST', '/execute/async', { script, args
 const url = () => wd('GET', '/url')
 // the status of a GET made by the page itself, with whatever credential the window holds
 const pageGet = (route) => jsAsync(`const done = arguments[arguments.length - 1]; fetch(${JSON.stringify(route)}).then((r) => done(r.status), (e) => done(String(e)))`)
-// the port a process listens on (Linux), to reach the Node panel behind the core directly
-function listeningPort(pid) {
-  try {
-    const line = execFileSync('ss', ['-Hltnp']).toString().split('\n').find((l) => l.includes(`pid=${pid},`))
-    return line ? Number(/:(\d+)\s/.exec(line)?.[1]) : null
-  } catch { return null }
-}
 // a bridge call from the page, awaited
 const bridge = (expr) => jsAsync(`const done = arguments[arguments.length - 1]; Promise.resolve().then(() => ${expr}).then((v) => done({ v }), (e) => done({ e: String(e && e.message || e) }))`)
 
 // whole argument runs, so a shell that only mentions them (a wrapper script) does not match
 const CORE_UI = 'spawnloft-core ui --port 0 --exit-with-stdin'
-const NODE_PANEL = 'spawnloft.mjs ui --port 0 --no-open --exit-with-stdin'
+const NODE_PANEL = 'spawnloft.mjs ui'
 function pids(pattern) {
   if (isWin) {
     const out = execFileSync('powershell', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*${pattern}*' -and $_.Name -ne 'powershell.exe' } | ForEach-Object { $_.ProcessId }`]).toString()
@@ -155,7 +148,7 @@ async function main() {
     await until(() => js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel page')
 
     // 1b. the lock. The window came in through /auth and holds a session the page cannot read;
-    // nobody without a credential gets an answer, from the core or from the Node panel behind it
+    // nobody without a credential gets an answer
     assert.equal(await pageGet('/api/setup'), 200, 'the window is signed in')
     assert.equal(await js('return document.cookie'), '', 'the session cookie is HttpOnly')
     for (const route of ['/api/instances', '/api/setup', '/api/update', '/api/client/launcher']) {
@@ -169,17 +162,9 @@ async function main() {
     assert.equal((await fetch(`http://127.0.0.1:${panel.port}/api/setup`, { headers: { authorization: authorization(configDir, panel.port), 'sec-fetch-site': 'same-site' } })).status, 403)
     // through the proxy too, the panel proves it holds the key to a caller that asks
     assert.ok(await provesItself(configDir, `http://127.0.0.1:${panel.port}/api/client/launcher`), 'the panel proves itself')
-    const nodePort = isWin ? null : listeningPort(pids(NODE_PANEL)[0])
-    if (nodePort) {
-      assert.notEqual(nodePort, Number(panel.port))
-      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`)).status, 401, 'the Node panel, called directly')
-      // the window's token is for the core's port, not this one
-      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`, { headers: { authorization: authorization(configDir, panel.port) } })).status, 401)
-      assert.equal((await fetch(`http://127.0.0.1:${nodePort}/api/instances`, { headers: { authorization: authorization(configDir, nodePort) } })).status, 200)
-      record(`lock: no credential, no answer, on the core (${panel.port}) and on the Node panel behind it (${nodePort})`)
-    } else {
-      record(`lock: no credential, no answer, on the core (${panel.port}); the Node panel's port was not found, so it was not called directly`)
-    }
+    // the panel is the core itself: nothing of Node's runs behind it
+    assert.deepEqual(pids(NODE_PANEL), [], 'no Node panel behind the core')
+    record(`lock: no credential, no answer, on the core (${panel.port}); no Node panel runs behind it`)
 
     // 1c. a window whose sign-in ran out. The cookie is taken away (what the panel's idle time
     // does on its side); the page's next request is refused and it says its session has ended,
@@ -303,30 +288,22 @@ async function main() {
     await wd('POST', '/window/rect', { width: 1111, height: 777 }).catch(() => {})
     await sleep(1200)
 
-    // 9. a killed core takes its Node panel with it
+    // 9. a killed core
     const cores = pids(CORE_UI)
-    const nodes = pids(NODE_PANEL)
-    assert.ok(cores.length >= 1 && nodes.length >= 1, `a core (${cores}) and a Node panel (${nodes}) are running`)
+    assert.ok(cores.length >= 1, `a core (${cores}) is running`)
+    assert.deepEqual(pids(NODE_PANEL), [], 'no Node panel behind the core')
     for (const p of cores) process.kill(p, 'SIGKILL')
-    await until(() => !pids(NODE_PANEL).some((p) => nodes.includes(p)), 'the Node panel to end with its core', 15000)
-    record('orphans: the Node panel ended with its killed core')
     // and the window starts the core again and shows the panel on its new port
     await until(async () => { const u = new URL(await url()); return u.port !== panel.port && u.pathname === '/' }, 'the panel again after the core was killed', 60000)
     record(`restart: the window started the core again (port ${new URL(await url()).port})`)
     // a new port is a new listener: the window was signed in there again, the old session is gone
     await until(() => js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'), 'the panel page after the restart')
     assert.equal(await pageGet('/api/setup'), 200, 'the window is signed in to the restarted core')
-    // a Node panel that dies takes its core along, and the window brings both back
-    const second = new URL(await url())
-    const node2 = await until(() => { const n = pids(NODE_PANEL); return n.length && n }, 'the new Node panel')
-    for (const p of node2) process.kill(p, 'SIGKILL')
-    await until(async () => { const u = new URL(await url()); return u.port !== second.port && u.pathname === '/' }, 'the panel again after the Node panel was killed', 60000)
-    record(`restart: a killed Node panel brought the core down and the window started both again (port ${new URL(await url()).port})`)
 
     // 10. a core that keeps stopping: the window says so itself, in words for a person, and
-    // Try again starts it. (Killed four times in all by now, one more than the window retries.)
+    // Try again starts it. (Killed four times in all by then, one more than the window retries.)
     for (let i = 0; i < 4; i++) {
-      // each core is killed once it serves the window, as the two above were: one killed before
+      // each core is killed once it serves the window, as the one above was: one killed before
       // it printed its address is a start that failed, which is said differently
       const at = await until(async () => { const u = await url(); return (/[?&]failed=/.test(u) || (/^http:\/\/127\.0\.0\.1:\d+\/$/.test(u) && await js('return document.readyState === "complete" && !!document.querySelector("#uiSize")'))) && u }, 'the panel, or the failure state', 60000)
       if (/[?&]failed=/.test(at)) break

@@ -114,8 +114,20 @@ fn write_managed(inst: &Instance, store: &Value) -> Result<(), Failure> {
     crate::client::write_json(&file, store)
 }
 
+/// Held while the store is read, changed and written. Node does each of those in one turn of its
+/// event loop; the panel here runs requests on threads, and two installs at once would otherwise
+/// each write the store without the other's record.
+static STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn store_lock() -> std::sync::MutexGuard<'static, ()> {
+    STORE_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// `recordManaged(inst, file, meta)`.
 pub fn record_managed(inst: &Instance, file: &str, meta: Value) -> Result<(), Failure> {
+    let _held = store_lock();
     let mut store = read_managed(inst)?;
     if let Some(Value::Object(m)) = store.get_mut("managed") {
         m.insert(file.to_string(), meta);
@@ -125,6 +137,7 @@ pub fn record_managed(inst: &Instance, file: &str, meta: Value) -> Result<(), Fa
 
 /// `forgetManaged(inst, file)`.
 pub fn forget_managed(inst: &Instance, file: &str) -> Result<(), Failure> {
+    let _held = store_lock();
     let mut store = read_managed(inst)?;
     let removed = match store.get_mut("managed") {
         Some(Value::Object(m)) => m.shift_remove(file).is_some(),
@@ -147,6 +160,7 @@ pub fn forget_managed(inst: &Instance, file: &str) -> Result<(), Failure> {
 /// `moveManaged(inst, from, to)`: the record follows a rename (to the end of the list, as a new
 /// key goes in JavaScript).
 fn move_managed(inst: &Instance, from: &str, to: &str) -> Result<(), Failure> {
+    let _held = store_lock();
     let mut store = read_managed(inst)?;
     let moved = match store.get_mut("managed") {
         Some(Value::Object(m)) => match m.get(from).cloned() {

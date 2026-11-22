@@ -61,8 +61,7 @@ pub struct Row {
     pub when: When,
 }
 
-/// This binary's own commands, which the Node core has no twin for (or, for `ui`, only the
-/// window's forms, which keep their own exit codes). They are answered here whatever
+/// This binary's own commands, which the Node core has no twin for. They are answered here whatever
 /// `SPAWNLOFT_CORE_IMPL` says. `repair` and `uninstall`, the installer's and uninstaller's
 /// commands, moved to [`PORTED`] in C6; their installer forms stay native
 /// through [`INSTALLER_FORMS`].
@@ -95,11 +94,16 @@ pub const CORE_OWN: &[Row] = &[
         names: &["user-path"],
         when: When::Always,
     },
-    Row {
-        names: &["ui"],
-        when: When::AnyFlag(&["--exit-with-stdin", "--core-dir", "--upstream", "--node"]),
-    },
 ];
+
+/// The window's form of `ui`, which the desktop shell starts: answered by [`run`] rather than as
+/// the ported command, whatever `SPAWNLOFT_CORE_IMPL` says. It keeps its own exit codes, signs
+/// nobody in, and still listens when the data cannot be found, so that the window can say why
+/// and the updater still answers.
+pub const WINDOW_FORMS: &[Row] = &[Row {
+    names: &["ui"],
+    when: When::AnyFlag(&["--exit-with-stdin"]),
+}];
 
 /// SpawnLoft CLI commands the core port has moved from the Node core to this binary
 /// (rust/PLAN-CORE-PORT.md section 4), answered by `crate::port`. A phase adds its commands here
@@ -294,6 +298,11 @@ pub const PORTED: &[Row] = &[
         names: &["diag"],
         when: When::Always,
     },
+    // C8: the panel, from a terminal (the window's form is this binary's own, above)
+    Row {
+        names: &["ui", "panel"],
+        when: When::Always,
+    },
     // C9: the bot harness (the Mineflayer host it drives stays JavaScript)
     Row {
         names: &["bot"],
@@ -329,6 +338,7 @@ pub fn is_ported(args: &[String]) -> bool {
         Some((command, rest)) => {
             let rest: Vec<std::ffi::OsString> = rest.iter().map(Into::into).collect();
             !CORE_OWN.iter().any(|r| row_matches(r, command, &rest))
+                && !WINDOW_FORMS.iter().any(|r| row_matches(r, command, &rest))
                 && PORTED.iter().any(|r| row_matches(r, command, &rest))
         }
     }
@@ -359,6 +369,7 @@ pub fn forwards_with(args: &[std::ffi::OsString], force_node: bool, ported: &[Ro
     };
     if CORE_OWN.iter().any(|r| row_matches(r, command, rest))
         || INSTALLER_FORMS.iter().any(|r| row_matches(r, command, rest))
+        || WINDOW_FORMS.iter().any(|r| row_matches(r, command, rest))
     {
         return false;
     }
@@ -376,7 +387,7 @@ pub fn help() -> String {
          Usage:\n  \
            {name} --version [--json]   print this build's version, commit and target\n  \
            {name} daemon <name>        supervise one server (spawned by the supervisor)\n  \
-           {name} ui --exit-with-stdin [--port n] [--core-dir d]  the window's panel on 127.0.0.1\n  \
+           {name} ui --exit-with-stdin [--port n]  the window's panel on 127.0.0.1\n  \
            {name} handover stop|resume  the 1.x to 2.0 handover (run by the installer)\n  \
            {name} repair --quiet        rewrite task shims and server launchers (run by the installer)\n  \
            {name} uninstall --yes [--data]  stop servers and remove tasks (run by the uninstaller)\n  \
@@ -482,7 +493,8 @@ fn daemon(rest: &[String]) -> Outcome {
     }
 }
 
-/// `ui [--port <n>] [--core-dir <dir>] [--node <path>] [--upstream <url>] [--exit-with-stdin]`.
+/// `ui --exit-with-stdin [--port <n>]`: the window's form. `--core-dir` and `--node` named the
+/// Node core while it answered part of the panel; a window that still passes them is not refused.
 pub fn parse_ui(rest: &[String]) -> Result<spawnloft_lib::panel::Options, Outcome> {
     let mut out = spawnloft_lib::panel::Options::default();
     let mut it = rest.iter();
@@ -499,11 +511,11 @@ pub fn parse_ui(rest: &[String]) -> Result<spawnloft_lib::panel::Options, Outcom
                     .parse()
                     .map_err(|_| usage_error(&format!("`{v}` is not a port")))?;
             }
-            "--core-dir" => out.core_dir = Some(value()?.into()),
-            "--node" => out.node = Some(value()?.into()),
-            "--upstream" => out.upstream = Some(value()?),
+            "--core-dir" | "--node" => {
+                value()?;
+            }
             "--exit-with-stdin" => out.exit_with_stdin = true,
-            // what `spawnloft ui` takes today; this binary never opens a browser itself
+            // this form never opens a browser itself
             "--no-open" => {}
             other => return Err(usage_error(&format!("unexpected argument `{other}`"))),
         }
@@ -629,7 +641,6 @@ mod tests {
     fn ui_arguments() {
         let o = parse_ui(&args(&["--port", "0", "--core-dir", "/c", "--exit-with-stdin"])).unwrap();
         assert_eq!(o.port, 0);
-        assert_eq!(o.core_dir, Some("/c".into()));
         assert!(o.exit_with_stdin);
         assert_eq!(parse_ui(&args(&["--port", "x"])).unwrap_err().code, EXIT_USAGE);
         assert_eq!(parse_ui(&args(&["--bogus"])).unwrap_err().code, EXIT_USAGE);
@@ -820,7 +831,7 @@ mod tests {
 
     #[test]
     fn what_is_forwarded_to_the_node_core() {
-        for line in [&["mcp"][..], &["ui"], &["ui", "--port", "8080"], &["frobnicate"]] {
+        for line in [&["mcp"][..], &["frobnicate"]] {
             assert!(
                 forwards_with(&os(line), false, PORTED),
                 "{line:?} should be forwarded"
@@ -836,8 +847,9 @@ mod tests {
             &["handover", "stop"],
             &["uninstall", "--yes"],
             &["update", "check"],
+            &["ui"],
+            &["panel", "--port", "8080", "--no-open"],
             &["ui", "--port", "0", "--exit-with-stdin", "--core-dir", "/c"],
-            &["ui", "--upstream", "http://127.0.0.1:1/"],
             &["repair", "--quiet"],
             &["user-path", "add"],
             &["start", "survival"],

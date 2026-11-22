@@ -67,6 +67,17 @@ pub fn read(file: &Path) -> Read {
     }
 }
 
+/// `inspect()`: whether the settings file is usable, for the first-run wizard (nobody sees
+/// stderr in the desktop app): `{ ok: true, exists }` or `{ ok: false, file, error }`.
+pub fn inspect() -> Value {
+    let file = paths::settings_file();
+    let found = read(&file);
+    match found.error {
+        Some(error) => serde_json::json!({ "ok": false, "file": settings_file_text(), "error": error }),
+        None => serde_json::json!({ "ok": true, "exists": found.exists }),
+    }
+}
+
 /// `load()`: the settings, with the warning line the Node core writes to stderr when the file is
 /// unusable (returned, so the caller prints it where the Node core would).
 pub fn load() -> (Map<String, Value>, Option<String>) {
@@ -97,6 +108,31 @@ fn link_target(file: &Path) -> PathBuf {
 /// (choosing the data folder on purpose) copies a file with damaged content aside and replaces
 /// it. Answers the merged settings and where a damaged file was kept.
 pub fn save(
+    patch: &[(&str, Value)],
+    replace_unreadable: bool,
+) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
+    save_then(patch, replace_unreadable, || ())
+}
+
+/// One save at a time in this process. The Node core saved on its one thread; the panel here
+/// answers each connection on its own, and two saves at once would read the same old file (the
+/// second losing the first's change) and write through the same temp file.
+static SAVING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// [`save`], then `after` before any other save in this process can start: for a caller that
+/// reads back what it wrote.
+pub fn save_then<T>(
+    patch: &[(&str, Value)],
+    replace_unreadable: bool,
+    after: impl FnOnce() -> T,
+) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
+    let _one = SAVING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let saved = save_unlocked(patch, replace_unreadable)?;
+    after();
+    Ok(saved)
+}
+
+fn save_unlocked(
     patch: &[(&str, Value)],
     replace_unreadable: bool,
 ) -> Result<(Map<String, Value>, Option<String>), crate::failure::Failure> {
@@ -288,6 +324,25 @@ impl Layout {
             services_dir: jspath::join(&[&data_root, "services"]),
             settings_file: settings_file_text(),
             data_root,
+        })
+    }
+
+    /// What `resolveRoots()` answers, in its key order. `usingLegacyLayout` is the Node core's
+    /// rule for running from a checkout, which this core does not have.
+    pub fn to_json(&self) -> Value {
+        serde_json::json!({
+            "dataRoot": self.data_root,
+            "instancesDir": self.instances_dir,
+            "separateInstances": self.separate_instances,
+            "registryFile": self.registry_file,
+            "templatesDir": self.templates_dir,
+            "jarsDir": self.jars_dir,
+            "backupsDir": self.backups_dir,
+            "runDir": self.run_dir,
+            "enginesDir": self.engines_dir,
+            "servicesDir": self.services_dir,
+            "usingLegacyLayout": false,
+            "settingsFile": self.settings_file,
         })
     }
 

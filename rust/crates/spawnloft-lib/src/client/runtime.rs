@@ -557,6 +557,7 @@ fn ensure_locked(
             done: 0,
             total,
             bytes: 0.0,
+            fetching: true,
         });
     }
     let next = AtomicUsize::new(0);
@@ -603,6 +604,7 @@ fn ensure_locked(
                             done: p.0,
                             total,
                             bytes: p.1,
+                            fetching: true,
                         });
                     }
                 });

@@ -185,6 +185,7 @@ pub fn versions() -> Result<Vec<crate::services::Release>, Failure> {
     archive_for(VERSION)?;
     Ok(vec![crate::services::Release {
         version: VERSION.into(),
+        series: None,
         status: "Stable".into(),
         support: Some("Verified native build".into()),
         date: None,
@@ -265,7 +266,7 @@ pub fn has_engine(layout: &Layout, version: &str) -> Result<bool, Failure> {
 pub fn fetch_engine(layout: &Layout, version: &str, progress: OnProgress) -> Result<(), Failure> {
     let dir = engine_dir(layout, version)?;
     if has_engine(layout, version)? {
-        progress(&Progress::say(format!("Garnet {version} is already here")));
+        progress(&Progress::cached(format!("Garnet {version} is already here")));
         return Ok(());
     }
     if !supports() {

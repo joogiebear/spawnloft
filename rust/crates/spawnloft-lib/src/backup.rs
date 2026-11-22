@@ -1843,6 +1843,64 @@ pub fn snapshot_names(layout: &Layout, name: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// What [`snapshot_summary`] answers: the newest archive's time, the newest one that holds the
+/// worlds (not a copy of part of a server), in epoch milliseconds, and how many could be read.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Summary {
+    pub newest_at: Option<f64>,
+    pub newest_backup_at: Option<f64>,
+    pub count: usize,
+}
+
+impl Summary {
+    pub fn to_json(&self) -> Value {
+        json!({
+            "newestAt": self.newest_at.map(jsjson::num),
+            "newestBackupAt": self.newest_backup_at.map(jsjson::num),
+            "count": self.count,
+        })
+    }
+}
+
+/// `snapshotSummary(name)`: the server list's backup column, from the folder alone (no
+/// manifest is read). An archive that cannot be read counts as time 0, as in Node.
+pub fn snapshot_summary(layout: &Layout, name: &str) -> Summary {
+    let dir = join(&layout.backups_dir, &[name]);
+    let Ok(names) = fsx::readdir_names(Path::new(&dir)) else {
+        return Summary {
+            newest_at: None,
+            newest_backup_at: None,
+            count: 0,
+        };
+    };
+    let mut newest = 0.0f64;
+    let mut newest_backup = 0.0f64;
+    let mut count = 0;
+    for f in names.iter().filter(|f| f.ends_with(".tar.gz")) {
+        // `st.mtimeMs`, unrounded: seconds * 1e3 + nanoseconds / 1e6, as Node makes it
+        let t = std::fs::metadata(join(&dir, &[f]))
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .map(|m| match m.duration_since(std::time::UNIX_EPOCH) {
+                Ok(d) => d.as_secs() as f64 * 1e3 + f64::from(d.subsec_nanos()) / 1e6,
+                Err(e) => -(e.duration().as_secs_f64() * 1e3),
+            })
+            .unwrap_or(0.0);
+        newest = newest.max(t);
+        if !is_partial_snapshot_name(f) {
+            newest_backup = newest_backup.max(t);
+        }
+        if t != 0.0 {
+            count += 1;
+        }
+    }
+    Summary {
+        newest_at: (newest != 0.0).then_some(newest),
+        newest_backup_at: (newest_backup != 0.0).then_some(newest_backup),
+        count,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1901,6 +1959,35 @@ mod tests {
         assert!(!is_change_copy(
             &json!({"scope": "files", "label": "world-delete"})
         ));
+    }
+
+    #[test]
+    fn a_summary_reads_the_folder_alone() {
+        let root = std::env::temp_dir().join(format!("sl-summary-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut layout = Layout::resolve(&Map::new()).unwrap();
+        layout.backups_dir = root.to_string_lossy().into_owned();
+        let none = snapshot_summary(&layout, "s");
+        assert_eq!(
+            (none.newest_at, none.newest_backup_at, none.count),
+            (None, None, 0)
+        );
+        assert_eq!(
+            none.to_json(),
+            json!({ "newestAt": null, "newestBackupAt": null, "count": 0 })
+        );
+        let dir = root.join("s");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("plugins_2026-01-01_10-00-00.tar.gz"), "p").unwrap();
+        std::fs::write(dir.join("notes.txt"), "n").unwrap();
+        let partial = snapshot_summary(&layout, "s");
+        assert!(partial.newest_at.is_some());
+        assert_eq!((partial.newest_backup_at, partial.count), (None, 1));
+        std::fs::write(dir.join("standard_2026-01-01_10-00-00.tar.gz"), "w").unwrap();
+        let both = snapshot_summary(&layout, "s");
+        assert!(both.newest_backup_at.is_some());
+        assert_eq!(both.count, 2);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

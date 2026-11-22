@@ -19,9 +19,30 @@ use crate::{garnet, js, mariadb, mysql, supervisor, util};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
     pub version: String,
+    /// MySQL names its release series; Garnet has none.
+    pub series: Option<String>,
     pub status: String,
     pub support: Option<String>,
     pub date: Option<String>,
+}
+
+impl Release {
+    /// The release as `versions()` gives it, a key left out where the engine has no value.
+    pub fn to_json(&self) -> Value {
+        let mut m = Map::new();
+        m.insert("version".into(), json!(self.version));
+        if let Some(series) = &self.series {
+            m.insert("series".into(), json!(series));
+        }
+        m.insert("status".into(), json!(self.status));
+        if let Some(support) = &self.support {
+            m.insert("support".into(), json!(support));
+        }
+        if let Some(date) = &self.date {
+            m.insert("date".into(), json!(date));
+        }
+        Value::Object(m)
+    }
 }
 
 /// An engine module.
@@ -178,6 +199,21 @@ pub fn assert_new_engine(engine: &str) -> Result<Engine, Failure> {
 }
 
 pub const DEFAULT_ENGINE: &str = "mysql";
+
+/// `canManage(engine)`: whether SpawnLoft can install and run this engine here. Windows and
+/// macOS always can; elsewhere only where the engine has a verified build.
+pub fn can_manage(engine: &str) -> bool {
+    if !NEW_ENGINES.contains(&engine) {
+        return false;
+    }
+    if cfg!(any(windows, target_os = "macos")) {
+        return true;
+    }
+    match engine {
+        mysql::ENGINE => mysql::supports(),
+        _ => garnet::supports(),
+    }
+}
 
 fn registry_file(layout: &Layout) -> &Path {
     Path::new(&layout.registry_file)
@@ -469,7 +505,7 @@ pub fn create_for_server(
             return Err(f);
         }
     };
-    progress(&Progress::say(format!("Created {name}")));
+    progress(&Progress::finished(format!("Created {name}")));
     Ok((get_database(layout, &name)?, credentials))
 }
 
@@ -964,6 +1000,429 @@ pub fn import_dumps(layout: &Layout, dumps: &[Value], base_dir: &str) -> Result<
     Ok(out)
 }
 
+/// `externalStatus(db)`: whether a database run elsewhere answers its probe now.
+pub fn external_status(layout: &Layout, db: &Instance) -> &'static str {
+    match engine_of(db).and_then(|e| e.probe(layout, db)) {
+        Ok(()) => "reachable",
+        Err(_) => "unreachable",
+    }
+}
+
+// A database's own backups live beside server snapshots, under the database's name (unique across
+// servers and databases): one plain .sql file per backup plus a small .json manifest.
+
+/// `databaseBackupsDir(name)`.
+pub fn database_backups_dir(layout: &Layout, name: &str) -> String {
+    crate::jspath::join(&[&layout.backups_dir, name])
+}
+
+/// `DUMP_NAME` (`/^[\w.-]+\.sql$/`): only names this module wrote, nothing that could reach
+/// outside the folder.
+fn is_dump_name(file: &str) -> bool {
+    file.len() > ".sql".len()
+        && file.ends_with(".sql")
+        && file
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'))
+}
+
+/// `dumpPath(name, file)`: a backup of `name` by its file name, which must be one this module
+/// could have written. A name that passes holds no separator, so it is its own `basename`.
+fn dump_path(layout: &Layout, name: &str, file: &str) -> Result<std::path::PathBuf, Failure> {
+    if !is_dump_name(file) {
+        return Err(Failure::user(format!("\"{file}\" is not a backup of \"{name}\"")));
+    }
+    let full = crate::jspath::join_path(&database_backups_dir(layout, name), &[file]);
+    if !full.exists() {
+        return Err(Failure::user(format!(
+            "there is no backup called \"{file}\" for \"{name}\""
+        )));
+    }
+    Ok(full)
+}
+
+/// The `.json` manifest beside a `.sql` backup (`${full.slice(0, -4)}.json`).
+fn manifest_of(full: &Path) -> std::path::PathBuf {
+    full.with_extension("json")
+}
+
+/// `attachedDatabases(db)`: the database of each attachment, each once, in order. One that names
+/// none is `null`; an attachment that is `null` is JavaScript's TypeError.
+fn attached_databases(db: &Instance) -> Result<Vec<Value>, Failure> {
+    let records: Vec<Value> = match db.get("attachments") {
+        None | Some(Value::Null) => Vec::new(),
+        Some(a) => registry::entries_of(a).into_iter().map(|(_, v)| v).collect(),
+    };
+    // `undefined` and `null` are two members of a Set, though both are written as null
+    let mut seen: Vec<Option<Value>> = Vec::new();
+    for a in records {
+        let database = match &a {
+            Value::Null => {
+                return Err(Failure::type_error(
+                    "Cannot read properties of null (reading 'database')",
+                ));
+            }
+            Value::Object(m) => m.get("database").cloned(),
+            _ => None,
+        };
+        // an object or a list is a new member each time, as `new Set` compares by identity
+        let compound = matches!(database, Some(Value::Object(_) | Value::Array(_)));
+        if compound || !seen.contains(&database) {
+            seen.push(database);
+        }
+    }
+    Ok(seen.into_iter().map(|d| d.unwrap_or(Value::Null)).collect())
+}
+
+/// `databases.join(', ')`: `null` reads as nothing.
+fn join_databases(databases: &[Value]) -> String {
+    databases
+        .iter()
+        .map(|d| match d {
+            Value::Null => String::new(),
+            d => js::string(Some(d)),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// `listDatabaseBackups(name)`: newest first. A missing folder is none.
+pub fn list_database_backups(layout: &Layout, name: &str) -> Result<Vec<Value>, Failure> {
+    get_database(layout, name)?;
+    let dir = database_backups_dir(layout, name);
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(Vec::new());
+    };
+    let mut files: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter_map(|e| e.file_name().to_str().map(str::to_string))
+        .filter(|f| is_dump_name(f))
+        .collect();
+    // by name first, so that backups of one time list the same way every time
+    files.sort();
+    let mut rows: Vec<(i64, Value)> = Vec::new();
+    for f in files {
+        let full = crate::jspath::join_path(&dir, &[&f]);
+        let st = std::fs::metadata(&full).map_err(|e| Failure::io(&e, "stat", Some(&full)))?;
+        // `new Date(mtimeMs)` keeps whole milliseconds
+        let mtime = st
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_millis() as i64);
+        let manifest = match std::fs::read(manifest_of(&full)) {
+            Err(_) => Value::Object(Map::new()),
+            // a manifest that is there but not JSON fails the listing, as `.then(JSON.parse)` does
+            Ok(b) => crate::jsjson::parse(&String::from_utf8_lossy(&b)).map_err(Failure::syntax)?,
+        };
+        let of = |key: &str| match &manifest {
+            Value::Null => Err(Failure::type_error(format!(
+                "Cannot read properties of null (reading '{key}')"
+            ))),
+            Value::Object(m) => Ok(m.get(key).filter(|v| !v.is_null()).cloned()),
+            _ => Ok(None),
+        };
+        let label = of("label")?.unwrap_or_else(|| json!(""));
+        let databases = of("databases")?.unwrap_or_else(|| json!([]));
+        let size = st.len();
+        rows.push((
+            mtime,
+            json!({
+                "name": f,
+                "size": size,
+                "sizeHuman": crate::text::human_bytes(Some(size as f64)),
+                "mtime": crate::time::iso(mtime),
+                "label": label,
+                "databases": databases,
+            }),
+        ));
+    }
+    // a stable sort, as Array.prototype.sort is
+    rows.sort_by_key(|r| std::cmp::Reverse(r.0));
+    Ok(rows.into_iter().map(|(_, r)| r).collect())
+}
+
+/// `databaseBackupStatus(name)`: what the backups page shows above the list.
+pub fn database_backup_status(layout: &Layout, name: &str) -> Result<Map<String, Value>, Failure> {
+    let db = get_database(layout, name)?;
+    let mut m = Map::new();
+    m.insert("canDump".into(), json!(engine_of(&db)?.can_dump()));
+    m.insert("running".into(), json!(is_up(layout, &db)?));
+    m.insert("databases".into(), Value::Array(attached_databases(&db)?));
+    m.insert("dir".into(), json!(database_backups_dir(layout, name)));
+    Ok(m)
+}
+
+/// What [`backup_database`] took.
+#[derive(Debug, Clone)]
+pub struct DatabaseBackup {
+    pub name: String,
+    pub file: String,
+    pub databases: Vec<Value>,
+    pub size: u64,
+}
+
+impl DatabaseBackup {
+    /// `{ name, file, databases, size, sizeHuman }`.
+    pub fn to_json(&self) -> Value {
+        json!({
+            "name": self.name,
+            "file": self.file,
+            "databases": self.databases,
+            "size": self.size,
+            "sizeHuman": crate::text::human_bytes(Some(self.size as f64)),
+        })
+    }
+}
+
+/// Two backups in this process could pick the same free name and dump into the same parts;
+/// Node's single thread interleaved them only at its awaits, and its `wx` refused the second.
+static BACKING_UP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// The file-name tag of a backup: `(cleanLabel(label) ?? 'manual').replace(/[^\w-]+/g, '-')`,
+/// cut at 40, `manual` when nothing is left.
+fn backup_tag(label: &str) -> String {
+    let clean = util::clean_label(label).unwrap_or_else(|| "manual".into());
+    let mut tag = String::new();
+    let mut in_run = false;
+    for c in clean.chars() {
+        if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+            tag.push(c);
+            in_run = false;
+        } else if !in_run {
+            tag.push('-');
+            in_run = true;
+        }
+    }
+    // only ASCII is left, so 40 characters are 40 UTF-16 units
+    let tag: String = tag.chars().take(40).collect();
+    if tag.is_empty() { "manual".into() } else { tag }
+}
+
+/// `backupDatabase(name, { label, quiet, duringRestore })`: one .sql file. Each database is dumped
+/// separately and joined in order (each part names its own database, so the file imports in one
+/// go), written as `.pending` and renamed into place, so a listing never offers half a dump.
+pub fn backup_database(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    label: &str,
+    quiet: bool,
+    during_restore: bool,
+) -> Result<DatabaseBackup, Failure> {
+    let state = layout.state_file(name);
+    if !during_restore
+        && let Some(why) = crate::control::restore_block(Path::new(&state), name, "taking a new one")
+    {
+        return Err(Failure::user(why));
+    }
+    let db = get_database(layout, name)?;
+    let engine = engine_of(&db)?;
+    if !engine.can_dump() {
+        return Err(Failure::user(format!(
+            "{} keeps its own checkpoints on disk; there is nothing here to dump",
+            engine.label()
+        )));
+    }
+    if !is_up(layout, &db)? {
+        return Err(Failure::user(format!(
+            "\"{name}\" is not running. A dump is read from the running database - start it first."
+        )));
+    }
+    let databases = attached_databases(&db)?;
+    if databases.is_empty() {
+        return Err(Failure::user(format!(
+            "nothing to back up yet: no server is attached to \"{name}\""
+        )));
+    }
+    let dir = database_backups_dir(layout, name);
+    crate::fsx::mkdir_all(Path::new(&dir))?;
+    let tag = backup_tag(label);
+    let _one = BACKING_UP
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let sql = |base: &str| crate::jspath::join_path(&dir, &[&format!("{base}.sql")]);
+    let mut base = format!("{tag}_{}", util::stamp());
+    let mut n = 2;
+    while sql(&base).exists() {
+        base = format!("{tag}_{}_{n}", util::stamp());
+        n += 1;
+    }
+    let file = sql(&base);
+    let pending = std::path::PathBuf::from(format!("{}.pending", file.display()));
+    let parts: Vec<std::path::PathBuf> = (0..databases.len())
+        .map(|i| std::path::PathBuf::from(format!("{}.{i}", pending.display())))
+        .collect();
+    let made = (|| -> Result<(), Failure> {
+        for (database, part) in databases.iter().zip(&parts) {
+            engine.dump(layout, &db, &js::string(Some(database)), part)?;
+        }
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pending)
+            .map_err(|e| Failure::io(&e, "open", Some(&pending)))?;
+        for part in &parts {
+            let mut from = std::fs::File::open(part).map_err(|e| Failure::io(&e, "open", Some(part)))?;
+            std::io::copy(&mut from, &mut out).map_err(|e| Failure::io(&e, "write", Some(&pending)))?;
+        }
+        drop(out);
+        let mut manifest = Map::new();
+        manifest.insert("database".into(), json!(name));
+        put(&mut manifest, "engine", db.get("engine"));
+        manifest.insert(
+            "version".into(),
+            db.get("version").cloned().unwrap_or(Value::Null),
+        );
+        manifest.insert("label".into(), json!(tag));
+        manifest.insert("databases".into(), Value::Array(databases.clone()));
+        manifest.insert("createdAt".into(), json!(crate::time::iso_now()));
+        let manifest_file = manifest_of(&file);
+        std::fs::write(
+            &manifest_file,
+            crate::jsjson::stringify_pretty(&Value::Object(manifest)),
+        )
+        .map_err(|e| Failure::io(&e, "open", Some(&manifest_file)))?;
+        std::fs::rename(&pending, &file).map_err(|e| Failure::io(&e, "rename", Some(&pending)))
+    })();
+    for p in std::iter::once(&pending).chain(&parts) {
+        let _ = std::fs::remove_file(p);
+    }
+    made?;
+    let size = std::fs::metadata(&file)
+        .map_err(|e| Failure::io(&e, "stat", Some(&file)))?
+        .len();
+    let taken = DatabaseBackup {
+        name: format!("{base}.sql"),
+        file: file.display().to_string(),
+        databases,
+        size,
+    };
+    if !quiet {
+        crate::activity::record_by(
+            &crate::paths::Roots::new(&layout.data_root),
+            by,
+            name,
+            "backup",
+            Some(&format!(
+                "{} as SQL, {}",
+                join_databases(&taken.databases),
+                crate::text::human_bytes(Some(size as f64))
+            )),
+            Some(&taken.name),
+            true,
+        );
+    }
+    Ok(taken)
+}
+
+/// The restore marker of a database (`beginRestore`); dropping it clears the mark.
+struct RestoreMark(std::path::PathBuf);
+
+impl Drop for RestoreMark {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// `beginRestore(name)`: marks the database for as long as the restore runs, so a second
+/// restore, a delete or a new dump refuses until it has finished, from any process.
+fn begin_restore(layout: &Layout, name: &str) -> Result<RestoreMark, Failure> {
+    // Node looked for a mark and wrote its own in one turn; two requests here are two threads
+    static MARKING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _marking = MARKING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let state = layout.state_file(name);
+    if let Some(why) = crate::control::restore_block(Path::new(&state), name, "restoring another") {
+        return Err(Failure::user(why));
+    }
+    let file = crate::control::restore_marker(Path::new(&state));
+    if let Some(dir) = file.parent() {
+        crate::fsx::mkdir_all(dir)?;
+    }
+    let mark = json!({ "pid": std::process::id(), "at": crate::time::iso_now() });
+    std::fs::write(&file, crate::jsjson::stringify(&mark))
+        .map_err(|e| Failure::io(&e, "open", Some(&file)))?;
+    Ok(RestoreMark(file))
+}
+
+/// `restoreDatabaseBackup(name, file)`: takes a `pre-restore` backup first, so putting back the
+/// wrong one can itself be undone. Returns the file put back and the safety backup's name.
+pub fn restore_database_backup(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    file: &str,
+) -> Result<(String, Option<String>), Failure> {
+    let db = get_database(layout, name)?;
+    let full = dump_path(layout, name, file)?;
+    if !is_up(layout, &db)? {
+        return Err(Failure::user(format!(
+            "\"{name}\" is not running. A backup is put back into the running database - start it first."
+        )));
+    }
+    let _mark = begin_restore(layout, name)?;
+    let safety = if attached_databases(&db)?.is_empty() {
+        None
+    } else {
+        Some(backup_database(layout, by, name, "pre-restore", true, true)?.name)
+    };
+    engine_of(&db)?.import_sql(layout, &db, &full)?;
+    let detail = match &safety {
+        Some(s) => format!("{file}; how it was is kept as {s}"),
+        None => file.to_string(),
+    };
+    crate::activity::record_by(
+        &crate::paths::Roots::new(&layout.data_root),
+        by,
+        name,
+        "restore",
+        Some(&detail),
+        None,
+        true,
+    );
+    Ok((file.to_string(), safety))
+}
+
+/// `deleteDatabaseBackup(name, file)`: the dump and its manifest. Returns the name deleted.
+pub fn delete_database_backup(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    file: &str,
+) -> Result<String, Failure> {
+    get_database(layout, name)?;
+    let state = layout.state_file(name);
+    if let Some(why) = crate::control::restore_block(Path::new(&state), name, "deleting a backup") {
+        return Err(Failure::user(why));
+    }
+    let full = dump_path(layout, name, file)?;
+    // `fs.promises.rm(p, { force: true })`: gone already is fine, a folder is not removed
+    for p in [full.clone(), manifest_of(&full)] {
+        match std::fs::remove_file(&p) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                return Err(Failure::io(&e, "rm", Some(&p)));
+            }
+            _ => {}
+        }
+    }
+    crate::activity::record_by(
+        &crate::paths::Roots::new(&layout.data_root),
+        by,
+        name,
+        "backup-delete",
+        Some(file),
+        None,
+        true,
+    );
+    Ok(file.to_string())
+}
+
+/// `databaseBackupFile(name, file)`: where a backup is, for a download.
+pub fn database_backup_file(layout: &Layout, name: &str, file: &str) -> Result<std::path::PathBuf, Failure> {
+    get_database(layout, name)?;
+    dump_path(layout, name, file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -977,5 +1436,153 @@ mod tests {
         assert_eq!(label_of(Some(&json!("garnet"))), "Redis (Garnet)");
         assert_eq!(label_of(Some(&json!("x"))), "x");
         assert_eq!(label_of(None), "undefined");
+    }
+
+    #[test]
+    fn a_release_is_written_with_the_keys_its_engine_gives() {
+        let r = Release {
+            version: "8.4.11".into(),
+            series: Some("8.4".into()),
+            status: "Stable".into(),
+            support: Some("Long Term Support".into()),
+            date: None,
+        };
+        assert_eq!(
+            crate::jsjson::stringify(&r.to_json()),
+            r#"{"version":"8.4.11","series":"8.4","status":"Stable","support":"Long Term Support"}"#
+        );
+    }
+
+    #[test]
+    fn only_names_a_backup_could_have_are_taken() {
+        for ok in ["a.sql", "manual_2026-01-02_030405.sql", "..sql", "a-b_c.d.sql"] {
+            assert!(is_dump_name(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            ".sql",
+            "a.SQL",
+            "a.sql.json",
+            "../a.sql",
+            "a/b.sql",
+            "a b.sql",
+            "a\\b.sql",
+            "é.sql",
+            "a.sql\n",
+        ] {
+            assert!(!is_dump_name(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_backup_is_tagged_by_its_label() {
+        assert_eq!(backup_tag("manual"), "manual");
+        assert_eq!(backup_tag("  Before   the update! "), "Before-the-update-");
+        assert_eq!(backup_tag("\u{1F600}"), "-");
+        assert_eq!(backup_tag("   "), "manual");
+        assert_eq!(backup_tag(&"x".repeat(60)), "x".repeat(40));
+    }
+
+    #[test]
+    fn the_attached_databases_are_named_once_each() {
+        let db = |a: Value| registry::spread("d", &json!({ "kind": "database", "attachments": a }));
+        let got = attached_databases(&db(json!({
+            "s1": { "database": "s1" },
+            "s2": { "database": "s1" },
+            "s3": {},
+            "s4": { "database": null },
+            "s5": "text",
+        })))
+        .unwrap();
+        assert_eq!(got, vec![json!("s1"), Value::Null, Value::Null]);
+        assert!(attached_databases(&db(json!({ "s1": null }))).is_err());
+        assert!(attached_databases(&db(Value::Null)).unwrap().is_empty());
+        assert_eq!(join_databases(&[json!("a"), Value::Null, json!("b")]), "a, , b");
+    }
+
+    #[test]
+    fn backups_are_listed_newest_first_with_their_manifests() {
+        let root = std::env::temp_dir()
+            .join(format!("sl-dbbackups-{}", std::process::id()))
+            .to_string_lossy()
+            .into_owned();
+        let _ = std::fs::remove_dir_all(&root);
+        let at = |leaf: &str| crate::jspath::join(&[&root, leaf]);
+        let layout = Layout {
+            instances_dir: at("instances"),
+            separate_instances: false,
+            registry_file: at("instances.json"),
+            templates_dir: at("templates"),
+            jars_dir: at("jars"),
+            backups_dir: at("backups"),
+            run_dir: at("run"),
+            engines_dir: at("engines"),
+            services_dir: at("services"),
+            settings_file: at("settings.json"),
+            data_root: root.clone(),
+        };
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            &layout.registry_file,
+            r#"{"version":1,"instances":{"d1":{"kind":"database","engine":"mariadb","port":1},"s1":{"dir":"x"}}}"#,
+        )
+        .unwrap();
+        assert!(
+            list_database_backups(&layout, "d1").unwrap().is_empty(),
+            "no folder yet"
+        );
+        assert!(list_database_backups(&layout, "s1").is_err(), "a server has none");
+        let dir = database_backups_dir(&layout, "d1");
+        std::fs::create_dir_all(&dir).unwrap();
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(60);
+        for (f, body) in [("old.sql", "x"), ("new.sql", "yy"), ("skip.txt", "z")] {
+            std::fs::write(crate::jspath::join(&[&dir, f]), body).unwrap();
+        }
+        std::fs::File::options()
+            .write(true)
+            .open(crate::jspath::join(&[&dir, "old.sql"]))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        std::fs::write(
+            crate::jspath::join(&[&dir, "new.json"]),
+            r#"{"label":"pre-restore","databases":["s1"]}"#,
+        )
+        .unwrap();
+        let rows = list_database_backups(&layout, "d1").unwrap();
+        let names: Vec<&str> = rows.iter().filter_map(|r| r["name"].as_str()).collect();
+        assert_eq!(names, ["new.sql", "old.sql"]);
+        assert_eq!(rows[0]["label"], "pre-restore");
+        assert_eq!(rows[0]["databases"], json!(["s1"]));
+        assert_eq!(rows[1]["label"], "");
+        assert_eq!(rows[1]["sizeHuman"], "1 B");
+        assert_eq!(
+            database_backup_file(&layout, "d1", "new.sql").unwrap(),
+            crate::jspath::join_path(&dir, &["new.sql"])
+        );
+        assert_eq!(
+            database_backup_file(&layout, "d1", "gone.sql")
+                .unwrap_err()
+                .message(),
+            "there is no backup called \"gone.sql\" for \"d1\""
+        );
+        assert_eq!(
+            database_backup_file(&layout, "d1", "../x.sql")
+                .unwrap_err()
+                .message(),
+            "\"../x.sql\" is not a backup of \"d1\""
+        );
+        let by = Actor::new("panel", None);
+        assert_eq!(
+            delete_database_backup(&layout, &by, "d1", "new.sql").unwrap(),
+            "new.sql"
+        );
+        assert!(!std::path::Path::new(&crate::jspath::join(&[&dir, "new.json"])).exists());
+        std::fs::write(crate::jspath::join(&[&dir, "old.json"]), "null").unwrap();
+        assert!(
+            list_database_backups(&layout, "d1").is_err(),
+            "a manifest of null is a TypeError"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

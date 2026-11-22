@@ -275,6 +275,31 @@ pub fn apply_upgrade(
     build: &Value,
     running: bool,
 ) -> Result<Applied, Failure> {
+    apply_upgrade_detail(layout, by, name, version, build, running).map(|u| u.applied)
+}
+
+/// [`apply_upgrade`] with the rest of what `applyUpgrade` answers, which the panel sends on.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Upgraded {
+    pub applied: Applied,
+    /// `source.label`: the software's name
+    pub label: &'static str,
+    /// the Minecraft version aimed at
+    pub version: String,
+    /// `fetched.build`
+    pub build: Value,
+    pub cross_version: bool,
+}
+
+/// `applyUpgrade(name, { version, build, running })`, all of its answer.
+pub fn apply_upgrade_detail(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    version: Option<&str>,
+    build: &Value,
+    running: bool,
+) -> Result<Upgraded, Failure> {
     let inst = registry::lookup(Path::new(&layout.registry_file), name)?;
     let current = parse_server_jar(inst.get("jar"));
     let Some(target) = version
@@ -308,8 +333,18 @@ pub fn apply_upgrade(
             sources::asp_fetch(jars, &target, false)?
         }
     };
+    let upgraded = |applied: Applied, build: Value| Upgraded {
+        applied,
+        label: label_of(software),
+        version: target.clone(),
+        build,
+        cross_version,
+    };
     if inst.get("jar").and_then(Value::as_str) == Some(fetched.name.as_str()) {
-        return Ok(Applied::AlreadyCurrent { jar: fetched.name });
+        return Ok(upgraded(
+            Applied::AlreadyCurrent { jar: fetched.name },
+            fetched.build,
+        ));
     }
 
     let mut snapshot = None;
@@ -349,13 +384,16 @@ pub fn apply_upgrade(
         .into_iter()
         .map(|(n, _)| n)
         .collect();
-    Ok(Applied::Done {
-        from: inst.get("jar").cloned().unwrap_or(Value::Null),
-        to: fetched.name,
-        channel: fetched.channel,
-        snapshot,
-        old_jars,
-    })
+    Ok(upgraded(
+        Applied::Done {
+            from: inst.get("jar").cloned().unwrap_or(Value::Null),
+            to: fetched.name,
+            channel: fetched.channel,
+            snapshot,
+            old_jars,
+        },
+        fetched.build,
+    ))
 }
 
 #[cfg(test)]

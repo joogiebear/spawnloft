@@ -252,6 +252,26 @@ pub fn interrupted() -> Option<u8> {
     }
 }
 
+fn memory_status() -> Option<windows_sys::Win32::System::SystemInformation::MEMORYSTATUSEX> {
+    use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+    // SAFETY: a zeroed MEMORYSTATUSEX with its length set is what the call asks for.
+    unsafe {
+        let mut status: MEMORYSTATUSEX = std::mem::zeroed();
+        status.dwLength = u32::try_from(std::mem::size_of::<MEMORYSTATUSEX>()).unwrap_or(0);
+        (GlobalMemoryStatusEx(&mut status) != 0).then_some(status)
+    }
+}
+
+/// `os.totalmem()`: the machine's memory in bytes (0 when it cannot be read).
+pub fn total_memory() -> u64 {
+    memory_status().map_or(0, |s| s.ullTotalPhys)
+}
+
+/// `os.freemem()`: memory a new program could have, in bytes (0 when it cannot be read).
+pub fn free_memory() -> u64 {
+    memory_status().map_or(0, |s| s.ullAvailPhys)
+}
+
 /// `os.release()`: `major.minor.build` as RtlGetVersion reports it (GetVersionEx would answer
 /// 6.2 to a process without a compatibility manifest).
 pub fn os_release() -> String {

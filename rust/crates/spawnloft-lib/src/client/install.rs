@@ -788,6 +788,8 @@ pub struct Progress {
     pub done: usize,
     pub total: usize,
     pub bytes: f64,
+    /// A step that only downloads (the Java runtime): "Downloading" before the first byte.
+    pub fetching: bool,
 }
 
 pub type OnProgress<'a> = &'a (dyn Fn(&Progress) + Sync);
@@ -840,6 +842,7 @@ impl Tally<'_> {
                 done,
                 total,
                 bytes,
+                fetching: false,
             });
         }
     }
@@ -850,6 +853,7 @@ impl Tally<'_> {
             done,
             total,
             bytes,
+            fetching: false,
         });
     }
 }
