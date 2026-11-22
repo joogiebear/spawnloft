@@ -371,6 +371,10 @@
        {
         "name": "org.evil:mod:1.0",
         "url": "https://evil.example.com/maven"
+       },
+       {
+        "name": "org.quiltmc:after:1.0",
+        "url": "https://maven.quiltmc.org/repository/release"
        }
       ]
      }
@@ -455,6 +459,12 @@
     },
     "GET /repository/release/org/quiltmc/quilt-loader/0.25.0/quilt-loader-0.25.0.jar.sha1": {
      "base64": "MDA5N2I4NDljOGI4NWFmMzZhMzhiODA0MzAyOGNiNDM2NWJlYmU4Zgo="
+    },
+    "GET /repository/release/org/quiltmc/after/1.0/after-1.0.jar": {
+     "base64": "HEFmi7DV+iRJbpO43QcsUXabwOUPNFl+o8jtFzxhhqvQ9R9EaY6z2AInTHGWu+AKL1R5nsPoEjdcgabL8Bo/ZImu0/giR2yRttsFKk90mb7jDTJXfKHG6xU6X4SpzvM="
+    },
+    "GET /repository/release/org/quiltmc/after/1.0/after-1.0.jar.sha1": {
+     "base64": "YTFiMjY1MDJhZDMxYTM0NzM3OWQzOTUxMDQxODhmMzA1ODUxM2UyYgo="
     },
     "GET /repository/release/org/quiltmc/nosum/1.0/nosum-1.0.jar": {
      "base64": "Gj9kia7T+CJHbJG22wUqT3SZvuMNMld8ocbrFTpfhKnO8x1CZ4yx1gAlSm+Uud4ILVJ3nMHmEDVaf6TJ7hg9Yoes0fYgRWqPtNkDKE1yl7zhCzBVep/E6RM4XYKnzPEbQGWKrw=="

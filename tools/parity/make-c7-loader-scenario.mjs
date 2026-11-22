@@ -121,7 +121,8 @@ qprofile('0.26.0', [
   qlib('net.fabricmc:intermediary:1.20.1', filler(400, 9), { base: `${FMAVEN}/` }),
   qlib('org.ow2.asm:asm:9.6', filler(150, 24), { base: `${LIBS}/` }),
 ])
-qprofile('0.25.0', [qlib('org.quiltmc:quilt-loader:0.25.0', filler(690, 25)), { name: 'org.evil:mod:1.0', url: 'https://evil.example.com/maven' }])
+// the libraries after the refused one are still checked, and their checksums asked for
+qprofile('0.25.0', [qlib('org.quiltmc:quilt-loader:0.25.0', filler(690, 25)), { name: 'org.evil:mod:1.0', url: 'https://evil.example.com/maven' }, qlib('org.quiltmc:after:1.0', filler(95, 28))])
 qprofile('0.24.0', [{ name: 'org.quiltmc:shaped:1.0', downloads: { artifact: {} } }])
 qprofile('0.26.0-beta.2', [qlib('org.quiltmc:nosum:1.0', filler(100, 26), { sumBody: 'not a checksum\n' })])
 qprofile('0.26.0-beta.10', [qlib('org.quiltmc:quilt-loader:0.26.0-beta.10', filler(100, 27))], '0.26.0-beta.9')

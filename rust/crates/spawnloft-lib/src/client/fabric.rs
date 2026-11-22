@@ -297,7 +297,7 @@ pub fn default_fetch_sha1(url: &str) -> Result<String, Failure> {
     let ends = t
         .chars()
         .nth(40)
-        .is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
+        .is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_'));
     if hex.len() == 40 && hex.bytes().all(|b| b.is_ascii_hexdigit()) && ends {
         return Ok(hex.to_ascii_lowercase());
     }
@@ -335,8 +335,12 @@ fn quilt_library_url(lib: &mut Map<String, Value>) -> Result<String, Failure> {
 /// One library of Quilt's profile: refused when its shape or host is wrong, else the address
 /// whose `.sha1` names its checksum, or None when the profile names one already.
 fn quilt_library_check(lib: &mut Value) -> Result<Option<String>, Failure> {
-    let Value::Object(m) = lib else {
-        return Err(no_props(Some(lib), "downloads"));
+    // `lib.downloads` throws only on null; any other value that is not an object reads as
+    // having none, and then has no proper name
+    let m = match lib {
+        Value::Null => return Err(no_props(Some(lib), "downloads")),
+        Value::Object(m) => m,
+        _ => return Err(user("Quilt's profile lists a library without a proper name")),
     };
     if js::truthy(m.get("downloads")) {
         let name = js::string(m.get("name"));
@@ -398,30 +402,41 @@ pub fn ensure_quilt_profile(
     let Some(Value::Array(libs)) = json.get_mut("libraries") else {
         return Err(user("Quilt's profile lists no libraries"));
     };
-    // `Promise.all` over the libraries: each is checked in turn and its checksum asked for at
-    // once, so the first library refused stops the checks, and the checksums of those before it
-    // are still fetched (then thrown away) before the refusal is told
+    // `Promise.all` over the libraries: every one is checked, and the checksum of each that
+    // passes is asked for, even when another was refused; the first refused (in list order, as
+    // a check fails before any fetch answers) is the one told
     let mut urls: Vec<Option<String>> = Vec::new();
     let mut refused: Option<Failure> = None;
     for lib in libs.iter_mut() {
         match quilt_library_check(lib) {
             Ok(url) => urls.push(url),
             Err(e) => {
-                refused = Some(e);
-                break;
+                urls.push(None);
+                refused.get_or_insert(e);
             }
         }
     }
-    let sums: Vec<Option<Result<String, Failure>>> = std::thread::scope(|s| {
-        let handles: Vec<_> = urls
-            .iter()
-            .map(|u| u.as_ref().map(|u| s.spawn(move || fetch_sha1(u))))
-            .collect();
-        handles
-            .into_iter()
-            .map(|h| h.map(|h| h.join().unwrap_or_else(|_| Err(user("a checksum fetch failed")))))
-            .collect()
-    });
+    // a few at a time, each on the job's cancel token (it is per thread)
+    let job = crate::cancel::current();
+    let mut sums: Vec<Option<Result<String, Failure>>> = Vec::with_capacity(urls.len());
+    for batch in urls.chunks(8) {
+        let got: Vec<Option<Result<String, Failure>>> = std::thread::scope(|s| {
+            let handles: Vec<_> = batch
+                .iter()
+                .map(|u| {
+                    u.as_ref().map(|u| {
+                        let job = job.clone();
+                        s.spawn(move || crate::cancel::with_cancel(job, || fetch_sha1(u)))
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.map(|h| h.join().unwrap_or_else(|_| Err(user("a checksum fetch failed")))))
+                .collect()
+        });
+        sums.extend(got);
+    }
     if let Some(e) = refused {
         return Err(e);
     }
@@ -493,11 +508,14 @@ pub fn prepare_version(
         .as_ref()
         .is_some_and(|b| Path::new(&paths.version_json(&version_id(&loader, &mc, b))).exists());
     if !installed {
-        let kind = read_json(&paths.version_json(&mc))
-            .ok()
-            .flatten()
-            .and_then(|v| prop(Some(&v), "type").and_then(Value::as_str).map(String::from));
-        let kind = super::version::version_kind(&mc, Some(kind.as_deref().unwrap_or("release")));
+        // `readJson(versionJson(mc), null)?.type ?? 'release'`: a damaged file throws
+        let vanilla = read_json(&paths.version_json(&mc))?;
+        let kind = match prop(vanilla.as_ref(), "type") {
+            None | Some(Value::Null) => Some("release".to_string()),
+            Some(Value::String(t)) => Some(t.clone()),
+            Some(_) => None,
+        };
+        let kind = super::version::version_kind(&mc, kind.as_deref());
         super::loaders::assert_available(paths, &loader, &mc, kind, f.json)?;
     }
     if build.is_none() {
@@ -582,6 +600,8 @@ pub fn ensure_fabric_api(
         Some(v) if !v.is_null() => v,
         _ => json!({ "version": 1, "managed": {} }),
     };
+    // the folder is read before the record's `managed` is
+    let present = fabric_api_jars(&mods_dir)?;
     let managed: Map<String, Value> = match get(Some(&record), "managed")? {
         Some(Value::Object(m)) => m.clone(),
         None | Some(Value::Null) => {
@@ -589,7 +609,6 @@ pub fn ensure_fabric_api(
         }
         Some(_) => Map::new(),
     };
-    let present = fabric_api_jars(&mods_dir)?;
     let hand: Vec<&String> = present.iter().filter(|n| !managed.contains_key(*n)).collect();
     if !hand.is_empty() && present.len() > 1 {
         return Err(user(format!(
@@ -602,7 +621,8 @@ pub fn ensure_fabric_api(
         return Ok(());
     }
     for (filename, meta) in &managed {
-        if prop(Some(meta), "project") == Some(&json!("fabric-api"))
+        // `meta.project` throws on a null entry
+        if get(Some(meta), "project")? == Some(&json!("fabric-api"))
             && prop(Some(meta), "mc") == Some(&json!(mc))
             && present.len() <= 1
             && Path::new(&jspath::join(&[&mods_dir, filename])).exists()
@@ -636,7 +656,8 @@ pub fn ensure_fabric_api(
     let dest = jspath::join(&[&mods_dir, &filename]);
     std::fs::create_dir_all(&mods_dir).map_err(|e| Failure::io(&e, "mkdir", Some(Path::new(&mods_dir))))?;
     let number = js::string(prop(Some(&version), "version_number"));
-    let sha1 = prop(prop(Some(&file), "hashes"), "sha1").map(|v| js::string(Some(v)));
+    // `file.hashes.sha1`: a file with no hashes throws
+    let sha1 = get(prop(Some(&file), "hashes"), "sha1")?.map(|v| js::string(Some(v)));
     download(
         &js::string(prop(Some(&file), "url")),
         Path::new(&dest),
@@ -644,22 +665,26 @@ pub fn ensure_fabric_api(
         &format!("Fabric API {number}"),
     )?;
     // recorded before the old copy goes, so a crash between leaves two managed jars
-    let old: Vec<String> = managed
-        .iter()
-        .filter(|(f, m)| prop(Some(m), "project") == Some(&json!("fabric-api")) && **f != filename)
-        .map(|(f, _)| f.clone())
-        .collect();
+    let mut old: Vec<String> = Vec::new();
+    for (f, m) in &managed {
+        if get(Some(m), "project")? == Some(&json!("fabric-api")) && *f != filename {
+            old.push(f.clone());
+        }
+    }
     let mut next = managed.clone();
-    next.insert(
-        filename.clone(),
-        json!({
-            "source": "modrinth",
-            "project": "fabric-api",
-            "version": prop(Some(&version), "version_number").cloned().unwrap_or(Value::Null),
-            "mc": mc,
-            "installedAt": crate::jsdate::to_iso(crate::util::now()).unwrap_or_default(),
-        }),
+    // an undefined version_number leaves the key out, as JSON.stringify does
+    let mut entry = Map::new();
+    entry.insert("source".into(), json!("modrinth"));
+    entry.insert("project".into(), json!("fabric-api"));
+    if let Some(v) = prop(Some(&version), "version_number") {
+        entry.insert("version".into(), v.clone());
+    }
+    entry.insert("mc".into(), json!(mc));
+    entry.insert(
+        "installedAt".into(),
+        json!(crate::jsdate::to_iso(crate::util::now()).unwrap_or_default()),
     );
+    next.insert(filename.clone(), Value::Object(entry));
     if let Value::Object(r) = &mut record {
         r.insert("managed".into(), Value::Object(next.clone()));
     }
@@ -777,6 +802,34 @@ mod tests {
         };
         let e = ensure_fabric_api(&paths, "p", "1.20.1", &|_| {}, &bad, &download).unwrap_err();
         assert!(e.message().contains("which is not a mod jar"), "{e:?}");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn quilt_checks_every_library_and_tells_the_first_refused() {
+        let d = std::env::temp_dir().join(format!("sl-quilt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let paths = Paths::under(&d.to_string_lossy());
+        let fetch = |_: &str, _: &str| -> Result<Value, Failure> {
+            Ok(
+                json!({ "id": "quilt-loader-0.26.0-1.20.1", "inheritsFrom": "1.20.1", "libraries": [
+                { "name": "org.evil:a:1.0", "url": "https://evil.example/" },
+                7,
+                { "name": "org.quiltmc:b:1.0", "url": "https://maven.quiltmc.org/repository/release" },
+            ] }),
+            )
+        };
+        let asked = std::sync::Mutex::new(Vec::<String>::new());
+        let sha1 = |u: &str| -> Result<String, Failure> {
+            asked.lock().unwrap().push(u.to_string());
+            Ok("a".repeat(40))
+        };
+        let e = ensure_quilt_profile(&paths, "1.20.1", "0.26.0", &fetch, &sha1).unwrap_err();
+        assert_eq!(code_of(&e), Some("loader-host-refused"));
+        assert_eq!(
+            *asked.lock().unwrap(),
+            ["https://maven.quiltmc.org/repository/release/org/quiltmc/b/1.0/b-1.0.jar"]
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 }
