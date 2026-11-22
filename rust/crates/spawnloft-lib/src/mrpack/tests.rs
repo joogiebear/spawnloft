@@ -927,6 +927,34 @@ fn a_pack_is_staged_to_files_on_disk_each_verified_ready_to_be_copied_into_place
 }
 
 #[test]
+fn the_panel_is_told_how_far_the_staging_has_got_as_node_rounds_it() {
+    let tmp = scratch("stage-percent");
+    let index = pack_of_files(&[
+        ("mods/a.jar", b"alpha"),
+        ("mods/b.jar", b"bravo"),
+        ("c.txt", b"c"),
+    ]);
+    let mut s = Scripted::new(vec![reply(b"alpha"), reply(b"bravo"), reply(b"c")]);
+    let mut progress = Vec::new();
+    stage_pack_files_with(
+        &index,
+        &tmp.to_string_lossy(),
+        &mut |m, p| progress.push((m.to_string(), p)),
+        &mut s.fetch(),
+    )
+    .unwrap();
+    // `Math.round((i / n) * 100)` before each file: 0, 33.3 and 66.7
+    assert_eq!(
+        progress,
+        [
+            ("Downloading a.jar (1 of 3)".to_string(), Some(0.0)),
+            ("Downloading b.jar (2 of 3)".to_string(), Some(33.0)),
+            ("Downloading c.txt (3 of 3)".to_string(), Some(67.0)),
+        ]
+    );
+}
+
+#[test]
 fn one_bad_file_in_a_pack_stops_the_staging_and_names_the_file() {
     let tmp = scratch("stage-bad");
     let index = pack_of_files(&[("mods/a.jar", b"alpha"), ("mods/b.jar", b"bravo")]);

@@ -559,13 +559,32 @@ pub fn stage_pack_files(
     on_progress: OnProgress<'_>,
     fetch: Fetch<'_>,
 ) -> Result<Vec<Staged>, Failure> {
+    stage_pack_files_with(index, tmp, &mut |m, _| on_progress(m), fetch)
+}
+
+/// What is progress to the panel: each `onProgress({ message, percent })`, the percent `None`
+/// where Node sends `null`.
+pub type OnStep<'a> = &'a mut dyn FnMut(&str, Option<f64>);
+
+/// [`stage_pack_files`] with the percent each file is sent with.
+fn stage_pack_files_with(
+    index: &Index,
+    tmp: &str,
+    on_step: OnStep<'_>,
+    fetch: Fetch<'_>,
+) -> Result<Vec<Staged>, Failure> {
     let dir = jspath::join(&[tmp, "staged"]);
     crate::fsx::mkdir_all(Path::new(&dir))?;
     let total = index.files.len();
     let mut staged = Vec::new();
     for (i, f) in index.files.iter().enumerate() {
         let base = f.path.rsplit('/').next().unwrap_or(&f.path);
-        on_progress(&format!("Downloading {base} ({} of {total})", i + 1));
+        // `Math.round((i / Math.max(1, n)) * 100)`: never negative, so `round` is the same
+        let percent = (i as f64 / total.max(1) as f64 * 100.0).round();
+        on_step(
+            &format!("Downloading {base} ({} of {total})", i + 1),
+            Some(percent),
+        );
         let file = jspath::join(&[&dir, &i.to_string()]);
         download_verified(
             &f.url,
@@ -1105,6 +1124,40 @@ pub fn check_pack_update(inst: &Instance) -> Result<Check, Failure> {
     })
 }
 
+/// `checkPackUpdate(inst)` as Node answers it: the pack as recorded, the newest release, and
+/// whether they differ. A field the record or Modrinth leaves out is left out.
+pub fn check_pack_update_report(inst: &Instance) -> Result<Value, Failure> {
+    let Some(pack) = pack_of(inst) else {
+        return Err(not_from_a_pack(&inst.name));
+    };
+    let (version, _) = resolve_pack_version(&js::string(field(Some(&pack), "project")))?;
+    let of = |v: &Value, key: &str| field(Some(v), key).cloned();
+    let latest = version_number(&version);
+    let current = field(Some(&pack), "versionNumber");
+    Ok(object(vec![
+        (
+            "pack",
+            Some(object(vec![
+                ("name", of(&pack, "name")),
+                ("version", of(&pack, "versionNumber")),
+                ("project", of(&pack, "project")),
+                ("mc", of(&pack, "mc")),
+            ])),
+        ),
+        (
+            "latest",
+            Some(object(vec![
+                ("version", latest.clone()),
+                ("id", of(&version, "id")),
+            ])),
+        ),
+        (
+            "updateAvailable",
+            Some(json!(!js::strict_equals(latest.as_ref(), current))),
+        ),
+    ]))
+}
+
 /// What `updatePack` answers.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Updated {
@@ -1128,6 +1181,50 @@ pub fn update_pack(
     name: &str,
     on_progress: OnProgress<'_>,
 ) -> Result<Updated, Failure> {
+    update_pack_steps(layout, by, name, &mut |m, _| on_progress(m)).map(|(u, _)| u)
+}
+
+/// `updatePack(name, { onProgress })` as the panel calls it: progress with its percent, and the
+/// answer as Node's object (`{ alreadyLatest, version }` or what changed, the loader included).
+pub fn update_pack_report(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    on_step: OnStep<'_>,
+) -> Result<Value, Failure> {
+    let (updated, loader) = update_pack_steps(layout, by, name, on_step)?;
+    Ok(match updated {
+        Updated::AlreadyLatest(version) => {
+            object(vec![("alreadyLatest", Some(json!(true))), ("version", version)])
+        }
+        Updated::Done {
+            from,
+            to,
+            mc,
+            mc_changed,
+            files,
+            removed,
+            snapshot,
+        } => object(vec![
+            ("from", from),
+            ("to", to),
+            ("mc", Some(mc)),
+            ("mcChanged", Some(json!(mc_changed))),
+            ("loader", loader),
+            ("files", Some(json!(files))),
+            ("removed", Some(json!(removed))),
+            ("snapshot", Some(json!(snapshot))),
+        ]),
+    })
+}
+
+/// `updatePack`, and the new pack's loader where it changed anything.
+fn update_pack_steps(
+    layout: &Layout,
+    by: &Actor,
+    name: &str,
+    on_step: OnStep<'_>,
+) -> Result<(Updated, Option<Value>), Failure> {
     let registry_file = Path::new(&layout.registry_file);
     let inst = registry::lookup(registry_file, name)?;
     let (status, _) = crate::control::read_state(Path::new(&layout.state_file(name)))?;
@@ -1142,22 +1239,22 @@ pub fn update_pack(
     let Some(pack) = pack_of(&inst) else {
         return Err(not_from_a_pack(name));
     };
-    on_progress("Finding the pack on Modrinth");
+    on_step("Finding the pack on Modrinth", None);
     let project = field(Some(&pack), "project").cloned();
     let (version, pack_file) = resolve_pack_version(&js::string(project.as_ref()))?;
     let old_number = field(Some(&pack), "versionNumber").cloned();
     let new_number = version_number(&version);
     if js::strict_equals(new_number.as_ref(), old_number.as_ref()) {
-        return Ok(Updated::AlreadyLatest(old_number));
+        return Ok((Updated::AlreadyLatest(old_number), None));
     }
 
-    let Archive { tmp, mrpack, index } = fetch_pack_archive(&pack_file, on_progress)?;
+    let Archive { tmp, mrpack, index } = fetch_pack_archive(&pack_file, &mut |m| on_step(m, None))?;
     let result = (|| -> Result<Updated, Failure> {
         // cache the loader now so the install after the snapshot cannot fail on a download
-        cache_loader(layout, &index, on_progress)?;
-        let staged = stage_pack_files(&index, &tmp, on_progress, &mut modrinth::send)?;
+        cache_loader(layout, &index, &mut |m| on_step(m, None))?;
+        let staged = stage_pack_files_with(&index, &tmp, &mut *on_step, &mut modrinth::send)?;
 
-        on_progress("Snapshotting before anything changes");
+        on_step("Snapshotting before anything changes", None);
         let snap = crate::backup::create_snapshot(
             layout,
             by,
@@ -1170,7 +1267,7 @@ pub fn update_pack(
             },
         )?;
 
-        on_progress("Applying the new pack");
+        on_step("Applying the new pack", None);
         let dir = crate::create::path_arg(inst.get("dir"), "path")?.to_string();
         copy_staged(&dir, &staged, &mut |_| Ok(()))?;
         let overrides = lay_overrides(&mrpack, &dir)?;
@@ -1217,7 +1314,7 @@ pub fn update_pack(
             }
         };
         if changed {
-            let jar = install_loader(layout, &inst, &index, on_progress)?;
+            let jar = install_loader(layout, &inst, &index, &mut |m| on_step(m, None))?;
             if inst.get("jar").and_then(Value::as_str) != Some(jar.as_str()) {
                 let mut patch = Map::new();
                 patch.insert("jar".into(), json!(jar));
@@ -1291,7 +1388,7 @@ pub fn update_pack(
         })
     })();
     remove_tree(&tmp);
-    result
+    Ok((result?, Some(index.loader.to_json())))
 }
 
 #[cfg(test)]
