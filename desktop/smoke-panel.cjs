@@ -1,15 +1,16 @@
 'use strict'
 
 // The panel in a real browser, signed in the way a person signs in without the app: `spawnloft
-// ui` opens its one-use link through a private page in the config folder (src/panel-open.mjs).
+// ui` opens its one-use link through a private page in the config folder.
 // Then the panel's regressions that only a page shows: console text and levels, live
 // performance charts, backups appearing while open, the file editor, the console window, managed
 // databases, the scheduler (macOS), a panel restart that ends the old tab's session, and
 // `spawnloft ui --link` for a second browser.
 //
-// It runs the checkout it sits in, with the Node that runs it. The daemon is the one the
-// environment picks: SPAWNLOFT_DAEMON=rust with SPAWNLOFT_CORE_BIN for the 2.0 one. Playwright
-// comes from NODE_PATH, so it is not a dependency of the app.
+// It runs spawnloft-core: SPAWNLOFT_CORE_BIN, else the newest build under rust/target. That has
+// to be a build with the test-hooks feature, since the server's java is the .mjs stand-in
+// (test/fixtures/fake-java.mjs), which such a build runs on Node. Playwright comes from
+// NODE_PATH, so it is not a dependency of the app.
 // Usage: node desktop/smoke-panel.cjs <artifacts>
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -20,6 +21,15 @@ const { spawn } = require('node:child_process')
 const { pathToFileURL } = require('node:url')
 const { chromium } = require('playwright')
 const { authorization } = require('./smoke-panel-auth.cjs')
+
+// spawnloft-core: SPAWNLOFT_CORE_BIN, else the newest of rust/target/{debug,release}
+function findCore(repo) {
+  if (process.env.SPAWNLOFT_CORE_BIN) return process.env.SPAWNLOFT_CORE_BIN
+  const exe = process.platform === 'win32' ? 'spawnloft-core.exe' : 'spawnloft-core'
+  return ['debug', 'release'].map((p) => path.join(repo, 'rust', 'target', p, exe))
+    .filter((p) => fs.existsSync(p))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0] ?? null
+}
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -39,9 +49,9 @@ async function main() {
   const isUnix = isMac || isLinux
   assert.ok(process.argv[2], 'Supply an artifact directory')
   const output = path.resolve(process.argv[2])
-  const core = path.resolve(__dirname, '..')
-  const executable = process.execPath
-  assert.ok(fs.existsSync(path.join(core, 'spawnloft.mjs')), 'Run this from a SpawnLoft checkout')
+  const repo = path.resolve(__dirname, '..')
+  const core = findCore(repo)
+  assert.ok(core && fs.existsSync(core), 'Build spawnloft-core first (cd rust && cargo build -p spawnloft-core --features test-hooks) or set SPAWNLOFT_CORE_BIN')
   fs.mkdirSync(output, { recursive: true })
 
   // unix-domain sockets have a short path limit; the runner's default temp path is too long
@@ -123,7 +133,7 @@ async function main() {
   // and must now say its session has ended.
   async function launch({ afterRestart = false } = {}) {
     const before = new Set(openPages())
-    const child = spawn(executable, [path.join(core, 'spawnloft.mjs'), 'ui', '--port', String(port)], {
+    const child = spawn(core, ['ui', '--port', String(port)], {
       env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     })
     panel = child
@@ -172,7 +182,7 @@ async function main() {
 
   async function cli(args, timeout = 20000) {
     return new Promise((resolve, reject) => {
-      const child = spawn(executable, [path.join(core, 'mcctl.mjs'), ...args], {
+      const child = spawn(core, args, {
         env,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -191,9 +201,10 @@ async function main() {
     })
   }
 
-  // the two command names a terminal has, with their stdout and stderr apart
+  // the command line as a terminal runs it (spawnloft and mcctl both forward to the core), with
+  // its stdout and stderr apart
   async function terminal(command, args, expectedCode = 0) {
-    const child = spawn(executable, [path.join(core, `${command}.mjs`), ...args], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(core, args, { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     return new Promise((resolve, reject) => {
       let stdout = ''
       let stderr = ''
@@ -238,7 +249,7 @@ async function main() {
 
     // nothing gets in without signing in
     {
-      const probe = spawn(executable, [path.join(core, 'spawnloft.mjs'), 'ui', '--port', String(port), '--no-open'], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      const probe = spawn(core, ['ui', '--port', String(port), '--no-open'], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
       let said = ''
       probe.stdout.on('data', (chunk) => { said += chunk })
       await until(() => /\/auth\?t=/.test(said), 'spawnloft ui --no-open prints a link', 60000)
@@ -326,7 +337,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
 
     // the MCP server, driven over piped stdin like an MCP client
     const mcp = await new Promise((resolve, reject) => {
-      const child = spawn(executable, [path.join(core, 'spawnloft.mjs'), 'mcp'], {
+      const child = spawn(core, ['mcp'], {
         env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
       })
       let stdout = ''
@@ -359,8 +370,8 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await launch()
     await page.locator('#bSettings').waitFor({ state: 'visible' })
     const mcpLaunch = await api('mcp')
-    assert.equal(fs.realpathSync(mcpLaunch.command), fs.realpathSync(executable), 'Settings must point AI apps at the Node that runs this panel')
-    assert.equal(fs.realpathSync(mcpLaunch.args[0]), fs.realpathSync(path.join(core, 'spawnloft.mjs')))
+    assert.equal(fs.realpathSync(mcpLaunch.command), fs.realpathSync(core), 'Settings must point AI apps at the core that runs this panel')
+    assert.deepEqual(mcpLaunch.args, ['mcp'])
     record('PASS: Settings gives AI apps a launch line that runs this core')
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'classic')
     await page.locator('#bSettings').click()
@@ -377,7 +388,7 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
     await api(`instances/${name}/command`, { line: 'packaged desktop console' })
     await until(() => fs.existsSync(consoleFile) && fs.readFileSync(consoleFile, 'utf8').includes('fake got: packaged desktop console'), 'Console input must reach the fixture through the packaged daemon')
     assert.match(fs.readFileSync(consoleFile, 'utf8'), /Done \(/)
-    record(`PASS: the ${process.env.SPAWNLOFT_DAEMON === 'rust' ? 'Rust' : 'Node'} daemon starts, reaches ready, and receives console input over its ${isUnix ? 'Unix socket' : 'named pipe'}`)
+    record(`PASS: the daemon starts, reaches ready, and receives console input over its ${isUnix ? 'Unix socket' : 'named pipe'}`)
     await page.locator('#bSetClose').click()
     await page.locator(`#list [data-name="${name}"]`).click()
     await openDatabaseSettings()
@@ -565,8 +576,8 @@ setInterval(() => { const end = performance.now() + 50; while (performance.now()
       assert.equal(await create.isEnabled(), false, 'Managed MySQL must not be offered where it cannot be installed')
       assert.match(await page.locator('#settingsBody').innerText(), /Managed MySQL is not available for this machine/)
       record('PASS: managed MySQL is not offered on this architecture, and the panel says why')
-    } else await require('./smoke-mysql.cjs')({ page, api, cli, core, executable, env, data, name, output, record, openDatabaseSettings })
-    if (process.env.SMOKE_PANEL_NO_DOWNLOADS !== '1') await require('./smoke-redis.cjs')({ page, api, cli, core, executable, env, data, name, output, record })
+    } else await require('./smoke-mysql.cjs')({ page, api, cli, env, data, name, output, record, openDatabaseSettings })
+    if (process.env.SMOKE_PANEL_NO_DOWNLOADS !== '1') await require('./smoke-redis.cjs')({ page, api, cli, env, data, name, output, record })
 
     // a second browser gets in with a fresh link from `spawnloft ui --link`, and nothing is started
     {

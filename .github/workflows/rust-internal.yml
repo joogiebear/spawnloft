@@ -373,8 +373,9 @@ jobs:
     # The panel in a real browser on each platform (desktop/smoke-panel.cjs): signing in through
     # `spawnloft ui`, the console, live performance charts, backups, the file editor, the console
     # window, managed MySQL and Redis, the scheduler on macOS, a restart that ends the old tab's
-    # session, and `spawnloft ui --link`, on the Rust daemon. It took these checks over from the
-    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship.
+    # session, and `spawnloft ui --link`, all on spawnloft-core. It took these checks over from the
+    # retired Electron package job (desktop/smoke-desktop.cjs), which 2.0 does not ship. The core is
+    # built with the test hooks, so the server's java can be the .mjs stand-in.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/v2'
     strategy:
       fail-fast: false
@@ -411,10 +412,10 @@ jobs:
             rust/target
           key: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ github.run_id }}
           restore-keys: rust-daemon-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
-      - name: Build spawnloft-core
+      - name: Build spawnloft-core with the test hooks
         working-directory: rust
         run: |
-          cargo build --release --locked -p spawnloft-core
+          cargo build --release --locked -p spawnloft-core --features test-hooks
           exe=spawnloft-core; [ "$RUNNER_OS" = Windows ] && exe=spawnloft-core.exe
           echo "SPAWNLOFT_CORE_BIN=$GITHUB_WORKSPACE/rust/target/release/$exe" >> "$GITHUB_ENV"
       - name: Install the isolated browser test tool and its Chromium
@@ -425,7 +426,6 @@ jobs:
       - name: The panel in a browser
         env:
           NODE_PATH: ${{ runner.temp }}/panel-smoke/node_modules
-          SPAWNLOFT_DAEMON: rust
         run: node desktop/smoke-panel.cjs "smoke-panel-${{ runner.os }}"
       - uses: actions/upload-artifact@v4
         if: always()
