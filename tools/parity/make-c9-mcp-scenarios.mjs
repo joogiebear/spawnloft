@@ -121,7 +121,10 @@ write('c9-mcp-tools.json', {
     { pattern: '"samples":\\[[^\\]]*\\]', replace: '"samples":<samples>' },
     { pattern: '\\b\\d+s\\b *', replace: '<secs> ' },
   ],
-  ignore: ['data/run/**', 'data/instances/run1/logs/**'],
+  // the two config edits snapshot within one second or not as the clock falls, and a second one
+  // in the same second is named <stamp>_2 (backup.mjs), so the tree leaves their files out; the
+  // tools' own answers (list_snapshots, the edit's reply) still name them on both sides
+  ignore: ['data/run/**', 'data/instances/run1/logs/**', 'data/backups/run1/before-edit_config_*'],
   steps: [
     { write: 'data/instances/run1/server.jar', text: '' },
     { write: 'data/instances/run1/eula.txt', text: 'eula=true\n' },

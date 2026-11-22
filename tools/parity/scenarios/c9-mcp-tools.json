@@ -52,7 +52,8 @@
   ],
   "ignore": [
     "data/run/**",
-    "data/instances/run1/logs/**"
+    "data/instances/run1/logs/**",
+    "data/backups/run1/before-edit_config_*"
   ],
   "steps": [
     {
