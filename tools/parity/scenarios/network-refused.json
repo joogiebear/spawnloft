@@ -1,5 +1,8 @@
 {
   "about": "Nothing reaches the network: with no host faked, a command the Rust core answers itself (the updater) and one the Node core answers (paper) both refuse the request before connecting. Guards SPAWNLOFT_TEST_ORIGINS on both sides, so a Rust-owned client that forgets test_origins::rewrite is caught.",
+  "normalize": [
+    { "pattern": "installed=\\S+", "replace": "installed=<version>" }
+  ],
   "steps": [
     { "run": ["update", "check"], "expect": { "code": 1, "stdoutIncludes": "SPAWNLOFT_TEST_ORIGINS has no fake for https://api.github.com; the request was not sent" } },
     { "run": ["paper", "versions"], "expect": { "code": 1, "stderrIncludes": "SPAWNLOFT_TEST_ORIGINS has no fake for https://fill.papermc.io" } }

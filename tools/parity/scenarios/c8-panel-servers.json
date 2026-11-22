@@ -10,6 +10,10 @@
  ],
  "normalize": [
   {
+   "pattern": "\"lan\": \\[[^\\]]*\\]",
+   "replace": "\"lan\": [<lan>]"
+  },
+  {
    "pattern": "\\[<time>\\] event loop held for \\d+ms\\n",
    "replace": ""
   },
