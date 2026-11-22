@@ -750,7 +750,8 @@ fn library_rows(paths: &Paths, list: Option<&Value>, who: &str) -> Result<Vec<Li
         }
         let a_path = prop(a, "path");
         let rel = if js::truthy(a_path) {
-            safe_relative_path(&js::string(a_path))
+            // safeRelativePath takes only a string: anything else is refused
+            a_path.and_then(Value::as_str).and_then(safe_relative_path)
         } else {
             artifact_path(name)
         };
@@ -1114,8 +1115,10 @@ fn lock_for(paths: &Paths, mc: &str) -> Result<crate::lock::Lock, Failure> {
     }
 }
 
+/// `fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })`, its
+/// failure ignored: a temporary folder left to the system.
 fn remove_folder(dir: &str) {
-    let _ = std::fs::remove_dir_all(dir);
+    let _ = super::rm_tree_retrying(dir);
 }
 
 /// What [`run_installer`] needs.
@@ -1381,16 +1384,19 @@ fn build_all(
 fn make_temp_dir() -> Result<String, Failure> {
     let base = crate::util::os_tmpdir();
     for _ in 0..16 {
-        let mut b = [0u8; 4];
-        let _ = getrandom::fill(&mut b);
-        const ABC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        let tag: String = b
-            .iter()
-            .chain(b[..2].iter())
-            .map(|x| ABC[*x as usize % ABC.len()] as char)
-            .collect();
+        let mut b = [0u8; 6];
+        getrandom::fill(&mut b).map_err(|e| user(format!("could not make a temporary folder: {e}")))?;
+        // 64 characters, so each byte's low six bits pick one evenly
+        const ABC: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        let tag: String = b.iter().map(|x| ABC[(*x & 63) as usize] as char).collect();
         let dir = jspath::join(&[&base, &format!("sl-loader-step-{tag}")]);
-        match std::fs::create_dir(&dir) {
+        // mkdtemp's folder is the owner's only
+        #[cfg(unix)]
+        let made =
+            std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700).create(&dir);
+        #[cfg(not(unix))]
+        let made = std::fs::create_dir(&dir);
+        match made {
             Ok(()) => return Ok(dir),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(Failure::io(&e, "mkdtemp", Some(Path::new(&dir)))),
@@ -1418,7 +1424,7 @@ pub fn legacy_base_url(url: Option<&Value>) -> String {
     if u.is_empty() {
         return "https://libraries.minecraft.net/".into();
     }
-    if u.len() >= 7 && u[..7].eq_ignore_ascii_case("http://") {
+    if u.get(..7).is_some_and(|h| h.eq_ignore_ascii_case("http://")) {
         u = format!("https://{}", &u[7..]);
     }
     let old = "https://files.minecraftforge.net/maven";
@@ -1701,4 +1707,29 @@ pub fn fill_legacy_checksums(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn a_legacy_base_url_is_moved_to_https_and_the_new_maven() {
+        assert_eq!(legacy_base_url(None), "https://libraries.minecraft.net/");
+        assert_eq!(
+            legacy_base_url(Some(&json!(" "))),
+            "https://libraries.minecraft.net/"
+        );
+        assert_eq!(
+            legacy_base_url(Some(&json!("HTTP://files.minecraftforge.net/maven/"))),
+            "https://maven.minecraftforge.net/"
+        );
+        assert_eq!(
+            legacy_base_url(Some(&json!("https://x.example/m"))),
+            "https://x.example/m/"
+        );
+        // a character of several bytes across the seventh byte is no scheme, and no panic
+        assert_eq!(legacy_base_url(Some(&json!("abcdefé/"))), "abcdefé/");
+    }
 }

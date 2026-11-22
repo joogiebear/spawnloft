@@ -68,22 +68,28 @@ fn cached<'a>(label: &'a str, fetch: FetchJson<'a>) -> Cached<'a> {
 /// `forgeLists()`: every build per Minecraft version, and the ones Forge recommends.
 fn forge_lists(paths: &Paths, fetch: FetchJson<'_>) -> Result<(Value, Map<String, Value>), Failure> {
     let dir = paths.cache_dir();
+    // both fetched at once, each under the launch's cancel (a thread starts with none)
+    let job = crate::cancel::current();
     let (meta, promos) = std::thread::scope(|s| {
         let m = s.spawn(|| {
-            cached_json(
-                &dir,
-                "forge-maven-metadata.json",
-                &format!("{FORGE_FILES}/maven-metadata.json"),
-                cached("Forge's version list", fetch),
-            )
+            crate::cancel::with_cancel(job.clone(), || {
+                cached_json(
+                    &dir,
+                    "forge-maven-metadata.json",
+                    &format!("{FORGE_FILES}/maven-metadata.json"),
+                    cached("Forge's version list", fetch),
+                )
+            })
         });
         let p = s.spawn(|| {
-            cached_json(
-                &dir,
-                "forge-promotions.json",
-                &format!("{FORGE_FILES}/promotions_slim.json"),
-                cached("Forge's recommended builds", fetch),
-            )
+            crate::cancel::with_cancel(job.clone(), || {
+                cached_json(
+                    &dir,
+                    "forge-promotions.json",
+                    &format!("{FORGE_FILES}/promotions_slim.json"),
+                    cached("Forge's recommended builds", fetch),
+                )
+            })
         });
         let meta = m
             .join()

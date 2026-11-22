@@ -1677,7 +1677,8 @@ fn launch_locked(
     // a loader's own build steps, on the Java just picked (the fake game has none to run)
     if fake.is_none() {
         let keep = versions_in_use(paths, name)?;
-        let mut notes: Vec<String> = Vec::new();
+        // each note is told as it is raised, as Node's onWarning is: before the steps' progress, and
+        // also when a step then fails
         finish_loader(
             paths,
             name,
@@ -1687,11 +1688,8 @@ fn launch_locked(
             &keep,
             &mut |_| {},
             opts.on_progress,
-            &mut |w| notes.push(w.to_string()),
+            &mut |w| warn(&mut warnings, w.to_string()),
         )?;
-        for w in notes {
-            warn(&mut warnings, w);
-        }
     }
 
     cancel::check_cancelled()?;
