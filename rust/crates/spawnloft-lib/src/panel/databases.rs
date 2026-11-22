@@ -24,29 +24,6 @@ fn reply(r: Reply) -> Result<Routed, Failure> {
     Ok(Routed::Reply(r))
 }
 
-/// `slugFor(label)`: a name suggested by a label. Characters a name cannot hold become dashes,
-/// cut at the name limit; a label of only symbols is `server`.
-fn slug_for(label: &str) -> String {
-    // each run of other characters is one dash, and dashes in a row are one
-    let mut squashed = String::new();
-    for c in label.chars() {
-        if c.is_ascii_alphanumeric() || c == '_' {
-            squashed.push(c);
-        } else if !squashed.ends_with('-') {
-            squashed.push('-');
-        }
-    }
-    let ends = |c: char| c == '-' || c == '_';
-    // only ASCII is left, so 32 characters are 32 UTF-16 units
-    let cut: String = squashed.trim_matches(ends).chars().take(32).collect();
-    let slug = cut.trim_end_matches(ends);
-    if slug.is_empty() {
-        "server".into()
-    } else {
-        slug.into()
-    }
-}
-
 /// `x ? String(x) : fallback`.
 fn text_or(v: Option<&Value>, fallback: &str) -> String {
     if js::truthy(v) {
@@ -81,7 +58,7 @@ fn name_of(layout: &Layout, body: &Value) -> Result<Option<String>, Failure> {
     if !js::truthy(label) {
         return Ok(None);
     }
-    let slug = slug_for(&js::string(label));
+    let slug = crate::util::slug_for(&js::string(label));
     Ok(Some(registry::free_name(
         std::path::Path::new(&layout.registry_file),
         &slug,
@@ -599,7 +576,7 @@ mod tests {
             (&"ab-".repeat(20), "ab-ab-ab-ab-ab-ab-ab-ab-ab-ab-ab"),
             ("x_-_y", "x_-_y"),
         ] {
-            assert_eq!(slug_for(label), want, "{label}");
+            assert_eq!(crate::util::slug_for(label), want, "{label}");
         }
     }
 
