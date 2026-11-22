@@ -253,7 +253,7 @@ async function runSide(scenario, side, o) {
         if (!res.text.includes(want)) problems.push(`${side}: ${label} answers do not include ${JSON.stringify(want)}`)
       }
       const text = applyDeclared(normalizeText(res.text.replace(/\r\n/g, '\n'), extra), 'ui')
-      steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
+      steps.push({ index: i, label, args: ['ui', 'replay'], golden: false, frozen: raw.frozen !== false, code: 0, signal: null, stdout: text, stderr: '', raw: { stdout: res.text, stderr: '' } })
       continue
     }
     if (!raw.run) { applySetup(raw, ctx, o.baseDir); continue }
@@ -266,7 +266,7 @@ async function runSide(scenario, side, o) {
     if (res.timedOut) problems.push(`${side}: ${label} did not finish in ${step.timeoutMs ?? STEP_TIMEOUT_MS} ms`)
     problems.push(...checkExpect(step, res, side, label))
     const even = (t) => applyDeclared(normalizeText(t.replace(/\r\n/g, '\n'), extra), command)
-    steps.push({ index: i, label, args: raw.run, golden: raw.golden !== false, code: res.code, signal: res.signal, stdout: even(res.stdout), stderr: even(res.stderr), raw: { stdout: res.stdout, stderr: res.stderr } })
+    steps.push({ index: i, label, args: raw.run, golden: raw.golden !== false, frozen: raw.frozen !== false, code: res.code, signal: res.signal, stdout: even(res.stdout), stderr: even(res.stderr), raw: { stdout: res.stdout, stderr: res.stderr } })
   }
   // as a sorted list: parallel downloads (a modpack, a client's libraries) arrive in any order,
   // and what matters is that both sides asked for the same things
@@ -373,11 +373,64 @@ function compareGolden(side, golden, paths) {
   return diffs
 }
 
+// ---------------------------------------------------------------------- frozen records
+//
+// Before the Node core leaves (C10, plan section 6), what its side does in every scenario is
+// frozen per platform under tools/parity/frozen/<platform>-<arch>/<scenario>.json: every step's
+// output and exit code, the fake-host requests and the whole data tree, with this machine's
+// paths, the fake hosts' loopback ports and the rig's own pid replaced by names. A Rust side is
+// then compared with the record exactly as it was compared with the Node side.
+
+export const FROZEN_DIR = path.join('tools', 'parity', 'frozen')
+
+export function platformKey(platform = process.platform, arch = process.arch) {
+  return `${platform}-${arch}`
+}
+
+export function frozenFile(repo, name, key = platformKey()) {
+  return path.join(repo, FROZEN_DIR, key, `${name}.json`)
+}
+
+// What differs between two machines (or two runs on one) but not between the sides of one run.
+export function neutralizer({ paths, hostMap = {}, rigPid = null }) {
+  const ports = Object.entries(hostMap).map(([origin, local]) => [local.replace(/^http:\/\//, ''), origin])
+    // longest first, so 127.0.0.1:4100 is not taken out of 127.0.0.1:41000
+    .sort((a, b) => b[0].length - a[0].length)
+  return (text) => {
+    if (typeof text !== 'string') return text
+    let out = machineNeutral(text, paths)
+    for (const [hostPort, origin] of ports) out = out.split(hostPort).join(`<fake ${origin}>`)
+    if (rigPid !== null) out = out.replace(new RegExp(`\\b${rigPid}\\b`, 'g'), '<rig-pid>')
+    return out
+  }
+}
+
+function neutralEntry(entry, neutral) {
+  return Object.fromEntries(Object.entries(entry).map(([k, v]) => [k, typeof v === 'string' ? neutral(v) : v]))
+}
+
+// A side as a frozen record: the steps compared by compareSides, the requests and the tree.
+export function recordOf(side, neutral) {
+  return {
+    steps: side.steps.filter(s => s.frozen !== false).map(s => ({ label: s.label, args: s.args, code: s.code, signal: s.signal, stdout: neutral(s.stdout), stderr: neutral(s.stderr) })),
+    requests: JSON.parse(neutral(JSON.stringify(side.requests))),
+    tree: Object.fromEntries([...side.tree].map(([p, e]) => [neutral(p), neutralEntry(e, neutral)])),
+  }
+}
+
+// A frozen record read back as a side compareSides takes.
+export function sideOfRecord(record) {
+  return { steps: record.steps, requests: record.requests, tree: new Map(Object.entries(record.tree)) }
+}
+
 // Runs one scenario on the given sides. Returns { name, ok, diffs, problems, sides }.
 //   expect: 'same' (the default) passes when the sides agree; 'differ' is a self-test of the rig
 //   and passes only when it finds a difference. Steps marked `side` (the seeded difference) are
 //   allowed only in a 'differ' scenario, so no real scenario can run different steps per side.
-export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check' }) {
+//   frozen: 'check' compares a Rust side with this platform's frozen record when there is one
+//   (and fails without one when no Node side ran); 'record' writes the record from the side
+//   `recordFrom` names; 'off' does neither.
+export async function runScenario(scenario, { core, repo, scratch, sides = SIDES, keep = false, baseDir = repo, golden = 'check', frozen = 'check', recordFrom = 'node' }) {
   const expect = scenario.expect ?? 'same'
   if (!['same', 'differ'].includes(expect)) throw new Error(`${scenario.name}: expect is "same" or "differ"`)
   if (expect !== 'differ' && scenario.steps.some(s => s.side)) throw new Error(`${scenario.name}: a step for one side only is allowed only in a self-test (expect: "differ")`)
@@ -390,6 +443,7 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   fs.mkdirSync(scratch, { recursive: true })
   const hosts = await startHosts(scenario.hosts ?? {}, { baseDir })
   const results = {}
+  const hostMap = hosts.map
   try {
     for (const side of sides) {
       results[side] = await runSide(scenario, side, { core, repo, scratch, keep, baseDir, origins: hosts.env, takeRequests: () => hosts.take() })
@@ -403,23 +457,49 @@ export async function runScenario(scenario, { core, repo, scratch, sides = SIDES
   let goldenDiffs = []
   const goldenFile = scenario.golden && path.resolve(repo, scenario.golden)
   const goldenHere = goldenFile && (!scenario.goldenPlatforms || scenario.goldenPlatforms.includes(process.platform))
-  if (goldenHere && results.node) {
+  // the contract fixtures are the Node side's while it runs, the Rust side's once it is gone
+  const goldenSide = results.node ?? results.rust
+  if (goldenHere && goldenSide) {
     if (golden === 'update') {
       fs.mkdirSync(path.dirname(goldenFile), { recursive: true })
-      fs.writeFileSync(goldenFile, JSON.stringify({ about: scenario.goldenAbout ?? `What the Node core prints for scenario ${scenario.name} (tools/parity/). Regenerate with node tools/parity/run.mjs --update-golden; a change here is a change to the CLI's contract.`, scenario: scenario.name, platform: process.platform, ...goldenOf(results.node, paths) }, null, 2) + '\n')
+      fs.writeFileSync(goldenFile, JSON.stringify({ about: scenario.goldenAbout ?? `What the Node core prints for scenario ${scenario.name} (tools/parity/). Regenerate with node tools/parity/run.mjs --update-golden; a change here is a change to the CLI's contract.`, scenario: scenario.name, platform: process.platform, ...goldenOf(goldenSide, paths) }, null, 2) + '\n')
     } else if (!fs.existsSync(goldenFile)) {
       problems.push(`golden file ${scenario.golden} is missing: run with --update-golden`)
     } else {
-      goldenDiffs = compareGolden(results.node, JSON.parse(fs.readFileSync(goldenFile, 'utf8')), paths)
+      goldenDiffs = compareGolden(goldenSide, JSON.parse(fs.readFileSync(goldenFile, 'utf8')), paths)
     }
   }
+  // the frozen record of this platform (C10)
+  const neutral = neutralizer({ paths, hostMap, rigPid: JSON.stringify(scenario).includes('{rig-pid}') ? process.pid : null })
+  const recordPath = frozenFile(repo, scenario.name)
+  let frozenDiffs = []
+  if (frozen === 'record') {
+    if (!results[recordFrom]) {
+      problems.push(`cannot record: the ${recordFrom} side did not run`)
+    } else if (!problems.length && (expect === 'differ' || !diffs.length)) {
+      // only a clean run is frozen: a problem or a difference between the sides may be a flake
+      fs.mkdirSync(path.dirname(recordPath), { recursive: true })
+      fs.writeFileSync(recordPath, JSON.stringify({ about: `What the ${recordFrom === 'node' ? 'Node' : 'Rust'} core did in scenario ${scenario.name} on ${platformKey()}, frozen for the core port's C10 (tools/parity/README.md). Rewrite with node tools/parity/run.mjs --record --record-from rust; a change here is a change to the CLI's behaviour.`, scenario: scenario.name, platform: platformKey(), from: recordFrom, ...recordOf(results[recordFrom], neutral) }, null, 1) + '\n')
+    }
+  } else if (frozen === 'check' && results.rust) {
+    if (fs.existsSync(recordPath)) {
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'))
+      // a self-test's record is the unseeded run: with a Node side its seeded difference is
+      // already found between the sides
+      if (!(expect === 'differ' && results.node)) frozenDiffs = compareSides(sideOfRecord(record), sideOfRecord(recordOf(results.rust, neutral)), ['frozen', 'rust'])
+    } else if (!results.node) {
+      problems.push(`no frozen record for ${platformKey()}: ${path.relative(repo, recordPath)}`)
+    }
+  }
+  // what the Rust side is held to: the Node side when it ran, else the frozen record
+  const sideDiffs = results.node ? diffs : frozenDiffs
   // a self-test names the differences it seeded, so finding some other difference is not a pass
   if (expect === 'differ') {
     for (const want of scenario.expectDifferences ?? []) {
-      if (!diffs.some(d => d.what.includes(want))) problems.push(`self-test: no reported difference matches "${want}" (found: ${diffs.map(d => d.what).join('; ') || 'none'})`)
+      if (!sideDiffs.some(d => d.what.includes(want))) problems.push(`self-test: no reported difference matches "${want}" (found: ${sideDiffs.map(d => d.what).join('; ') || 'none'})`)
     }
   }
-  const allDiffs = [...diffs, ...goldenDiffs]
-  const ok = problems.length === 0 && (expect === 'differ' ? diffs.length > 0 && goldenDiffs.length === 0 : allDiffs.length === 0)
+  const allDiffs = results.node ? [...diffs, ...goldenDiffs, ...frozenDiffs] : [...frozenDiffs, ...goldenDiffs]
+  const ok = problems.length === 0 && (expect === 'differ' ? sideDiffs.length > 0 && goldenDiffs.length === 0 : allDiffs.length === 0)
   return { name: scenario.name, expect, ok, diffs: allDiffs, problems, sides: results }
 }

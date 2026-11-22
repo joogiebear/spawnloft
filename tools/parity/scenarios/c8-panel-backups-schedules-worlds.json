@@ -19,8 +19,8 @@
    "replace": "\"$1\"$2:$3<n>"
   },
   {
-   "pattern": "((?:pre-restore|world-delete)_files_<stamp>)_\\d+",
-   "replace": "$1"
+   "pattern": "<stamp>_\\d+\\b",
+   "replace": "<stamp>"
   },
   {
    "pattern": "x-spawnloft-proof: [A-Za-z0-9_-]{43}$",
