@@ -30,10 +30,24 @@ use std::time::Duration;
 use crate::panel_auth::{self, PanelAuth, Verdict};
 use crate::settings::{self, Layout};
 
+mod backups;
 mod basics;
+mod client;
+mod creates;
+mod databases;
 mod http;
+mod jobs;
 mod pages;
+mod players;
+mod plugins;
 mod routes;
+mod schedules;
+mod server_files;
+mod server_props;
+mod servers;
+mod shared;
+mod sse;
+mod worlds;
 
 /// What the routes answered in this process know about the panel they run in.
 struct Panel {
@@ -42,13 +56,22 @@ struct Panel {
     layout: Option<Layout>,
     /// Behind the desktop window (`behindWindow()`): it sets `SPAWNLOFT_SHELL` for the core.
     shell: bool,
+    /// The long jobs this panel started, for the pages that watch them.
+    jobs: Arc<jobs::Jobs>,
 }
 
 impl Panel {
+    /// Who the history says did what a route does (`asActor({ kind: 'panel' })`).
+    #[allow(dead_code)] // used by the route families as they move
+    fn actor() -> crate::activity::Actor {
+        crate::activity::Actor::new("panel", None)
+    }
+
     fn of_this_process() -> Panel {
         Panel {
             layout: Layout::resolve(&settings::load().0).ok(),
             shell: behind_window(),
+            jobs: Arc::default(),
         }
     }
 }
@@ -853,6 +876,7 @@ mod tests {
         let panel = Panel {
             layout: None,
             shell: false,
+            jobs: Arc::default(),
         };
         front_of(panel, upstream, requests)
     }
@@ -893,6 +917,7 @@ mod tests {
                 data_root: root,
             }),
             shell,
+            jobs: Arc::default(),
         }
     }
 
